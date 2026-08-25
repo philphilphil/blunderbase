@@ -22,6 +22,861 @@
 </style>
 </helmet>
 
+<section style="display:flex;flex-direction:column;gap:26px;padding:44px 44px 20px">
+
+  <div style="display:flex;align-items:baseline;gap:14px">
+    <span style="color:#e7eaef;font-weight:600;font-size:19px">Turn 2 — the other four screens</span>
+    <span style="color:#646c78;font-family:'Geist Mono',monospace;font-size:13px">built on 1a · dashboard · library · opening explorer · stats</span>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <!-- ===== 2a DASHBOARD ===== -->
+    <div id="2a" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:5px;background:#3ecfd6;color:#06272a;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600">2a</span>
+        <span style="color:#e7eaef;font-size:15px;font-weight:600">Dashboard</span>
+        <span style="color:#646c78;font-size:13px">recent games, rating trend, queue, MCP activity, worst moments</span>
+      </div>
+      <div style="width:1440px;height:900px;background:#0e1013;border:1px solid #22272f;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(0,0,0,.8)">
+        <div style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid #1a1e24;background:#0b0d10">
+          <div style="display:flex;gap:7px"><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div></div>
+          <div style="width:1px;height:18px;background:#1f242b;margin-left:6px"></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:13px;height:13px;background:#3ecfd6;transform:rotate(45deg);border-radius:2px"></div><span style="color:#e7eaef;font-size:13px;font-weight:600">Blunderbase</span></div>
+          <span style="font-size:12px;color:#646c78;margin-left:8px">Overview</span>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a"><span style="font-size:11px;color:#949ca8">Queue</span><div style="width:64px;height:3px;border-radius:2px;background:#22272f;overflow:hidden"><div style="width:43%;height:100%;background:#3ecfd6"></div></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e7eaef;font-variant-numeric:tabular-nums">3/7</span></div>
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;color:#646c78;font-size:11px;font-family:'Geist Mono',monospace">⌘K</div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#1d232b;border:1px solid #262d36;display:flex;align-items:center;justify-content:center;color:#949ca8;font-size:10px;font-weight:600">SG</div>
+        </div>
+        <div style="flex:1;display:flex;min-height:0">
+          <div style="width:200px;flex:none;border-right:1px solid #1a1e24;background:#0b0d10;display:flex;flex-direction:column;padding:14px 10px;gap:2px">
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Workspace</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:#14191f;color:#e7eaef;font-size:13px;font-weight:500;box-shadow:inset 2px 0 0 #3ecfd6"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #3ecfd6"></div>Dashboard</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Games<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1,284</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Openings</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Stats</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Blunder log<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">47</span></div>
+            <div style="height:14px"></div>
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Engines</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:6px;height:6px;border-radius:50%;background:#3ecfd6;margin:0 4px"></div>Stockfish 17</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:6px;height:6px;border-radius:50%;background:#4d545e;margin:0 4px"></div>Maia 1100–1900</div>
+            <div style="flex:1"></div>
+            <div style="border-top:1px solid #1a1e24;padding:12px 8px 4px;display:flex;flex-direction:column;gap:5px"><div style="font-size:11px;color:#646c78">Storage · local</div><div style="height:3px;border-radius:2px;background:#1a1e24;overflow:hidden"><div style="width:64%;height:100%;background:#3a424b"></div></div><div style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f;font-variant-numeric:tabular-nums">2.4 GB / 3.8 GB</div></div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;padding:18px 20px;gap:16px">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:flex-end;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:3px"><span style="color:#e7eaef;font-size:19px;font-weight:600;letter-spacing:-.01em">Overview</span><span style="color:#646c78;font-size:12.5px">1,284 games in the database. 47 blunders still unexplained.</span></div>
+                <div style="flex:1"></div>
+                <div style="padding:7px 11px;border-radius:6px;border:1px solid #262d36;color:#949ca8;font-size:12px" style-hover="color:#e7eaef;border-color:#39414c">Import PGN</div>
+                <div style="padding:7px 11px;border-radius:6px;background:#3ecfd6;color:#062a2c;font-size:12px;font-weight:600" style-hover="background:#5fdde3">Sync Lichess</div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">Recent games</span><div style="flex:1"></div><span style="font-size:11px;color:#3ecfd6" style-hover="color:#7de1e7">all 1,284</span></div>
+                <div style="display:flex;gap:10px">
+                  <div style="flex:1;min-width:0;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;border-top:2px solid #f0524a;display:flex;flex-direction:column;gap:7px" style-hover="border-color:#2c333c">
+                    <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-weight:600">L</span><span style="color:#e7eaef;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">kn1ghtmare</span><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">1748</span></div>
+                    <div style="color:#8a929d;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">English, Botvinnik <span style="font-family:'Geist Mono',monospace;color:#5c646f">A26</span></div>
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#c8cfd8;font-variant-numeric:tabular-nums">78.4</span><span style="font-size:10px;color:#5c646f">acc</span><div style="flex:1"></div><span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:15px;border-radius:3px;background:#f0524a;color:#1a0605;font-family:'Geist Mono',monospace;font-size:9.5px;font-weight:700">??</span></div>
+                    <div style="display:flex;align-items:center;gap:5px"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">d32</span></div>
+                  </div>
+                  <div style="flex:1;min-width:0;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;border-top:2px solid #9ec49a;display:flex;flex-direction:column;gap:7px" style-hover="border-color:#2c333c">
+                    <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-weight:600">W</span><span style="color:#e7eaef;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pawnshop_hero</span><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">1690</span></div>
+                    <div style="color:#8a929d;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sicilian, Alapin <span style="font-family:'Geist Mono',monospace;color:#5c646f">B22</span></div>
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#c8cfd8;font-variant-numeric:tabular-nums">84.9</span><span style="font-size:10px;color:#5c646f">acc</span><div style="flex:1"></div><span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:15px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-family:'Geist Mono',monospace;font-size:9.5px;font-weight:700">?!</span></div>
+                    <div style="display:flex;align-items:center;gap:5px"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span><span style="padding:1px 6px;border-radius:4px;border:1px solid #2c333c;background:#14181d;color:#949ca8;font-size:10px">d18</span></div>
+                  </div>
+                  <div style="flex:1;min-width:0;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;border-top:2px solid #949ca8;display:flex;flex-direction:column;gap:7px" style-hover="border-color:#2c333c">
+                    <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#949ca8;font-weight:600">D</span><span style="color:#e7eaef;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Tal_Ent</span><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">1725</span></div>
+                    <div style="color:#8a929d;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Italian, Giuoco Pia <span style="font-family:'Geist Mono',monospace;color:#5c646f">C50</span></div>
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#c8cfd8;font-variant-numeric:tabular-nums">88.1</span><span style="font-size:10px;color:#5c646f">acc</span><div style="flex:1"></div><span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:15px;border-radius:3px;background:rgba(62,207,214,.14);color:#3ecfd6;font-family:'Geist Mono',monospace;font-size:9.5px;font-weight:700">!</span></div>
+                    <div style="display:flex;align-items:center;gap:5px"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#16191a;border:1px solid #2b3330;color:#9ec49a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#9ec49a"></span>Chess.com</span><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">d32</span></div>
+                  </div>
+                  <div style="flex:1;min-width:0;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;border-top:2px solid #f0524a;display:flex;flex-direction:column;gap:7px" style-hover="border-color:#2c333c">
+                    <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-weight:600">L</span><span style="color:#e7eaef;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">fianchetto_dad</span><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">1701</span></div>
+                    <div style="color:#8a929d;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">King's Indian <span style="font-family:'Geist Mono',monospace;color:#5c646f">E60</span></div>
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#5c646f;font-variant-numeric:tabular-nums">—</span><span style="font-size:10px;color:#5c646f">acc</span><div style="flex:1"></div></div>
+                    <div style="display:flex;align-items:center;gap:5px"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#16191a;border:1px solid #2b3330;color:#9ec49a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#9ec49a"></span>Chess.com</span><span style="padding:1px 6px;border-radius:4px;border:1px dashed #2c333c;color:#5c646f;font-size:10px">unanalysed</span></div>
+                  </div>
+                  <div style="flex:1;min-width:0;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;border-top:2px solid #9ec49a;display:flex;flex-direction:column;gap:7px" style-hover="border-color:#2c333c">
+                    <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-weight:600">W</span><span style="color:#e7eaef;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">rook_bottom</span><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">1663</span></div>
+                    <div style="color:#8a929d;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Trompowsky <span style="font-family:'Geist Mono',monospace;color:#5c646f">A45</span></div>
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#c8cfd8;font-variant-numeric:tabular-nums">90.3</span><span style="font-size:10px;color:#5c646f">acc</span><div style="flex:1"></div><span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:15px;border-radius:3px;background:rgba(178,135,255,.14);color:#b287ff;font-family:'Geist Mono',monospace;font-size:9.5px;font-weight:700">!!</span></div>
+                    <div style="display:flex;align-items:center;gap:5px"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#1a1816;border:1px solid #34302a;color:#c9b89a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#c9b89a"></span>OTB</span><span style="padding:1px 6px;border-radius:4px;background:rgba(178,135,255,.10);border:1px solid rgba(178,135,255,.28);color:#c9b0ff;font-size:10px">deep</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="flex:none;padding:14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:11px">
+                <div style="display:flex;align-items:flex-end;gap:12px">
+                  <div style="display:flex;flex-direction:column;gap:2px"><span style="color:#949ca8;font-size:11px">Rapid rating</span><div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:26px;color:#e7eaef;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em">1712</span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#9ec49a;font-variant-numeric:tabular-nums">+64</span><span style="font-size:11px;color:#5c646f">90 days</span></div></div>
+                  <div style="flex:1"></div>
+                  <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;font-family:'Geist Mono',monospace;font-size:11px">
+                    <span style="padding:4px 10px;color:#646c78;border-right:1px solid #22272f" style-hover="color:#e7eaef">30d</span>
+                    <span style="padding:4px 10px;color:#e7eaef;background:#1a1f26;border-right:1px solid #22272f">90d</span>
+                    <span style="padding:4px 10px;color:#646c78" style-hover="color:#e7eaef">1y</span>
+                  </div>
+                </div>
+                <svg width="640" height="170" viewBox="0 0 640 170" style="display:block;width:100%">
+                  <line x1="0" y1="10" x2="640" y2="10" stroke="#171c22" stroke-width="1"></line>
+                  <line x1="0" y1="85" x2="640" y2="85" stroke="#171c22" stroke-width="1"></line>
+                  <line x1="0" y1="160" x2="640" y2="160" stroke="#22272f" stroke-width="1"></line>
+                  <path d="M0,125 L40,116.25 L80,133.75 L120,110 L160,95 L200,103.75 L240,112.5 L280,83.75 L320,67.5 L360,76.25 L400,90 L440,72.5 L480,56.25 L520,62.5 L560,48.75 L600,55 L640,45 L640,160 L0,160 Z" fill="rgba(62,207,214,.09)"></path>
+                  <path d="M0,125 L40,116.25 L80,133.75 L120,110 L160,95 L200,103.75 L240,112.5 L280,83.75 L320,67.5 L360,76.25 L400,90 L440,72.5 L480,56.25 L520,62.5 L560,48.75 L600,55 L640,45" fill="none" stroke="#3ecfd6" stroke-width="1.8" stroke-linejoin="round"></path>
+                  <circle cx="640" cy="45" r="3.5" fill="#3ecfd6" stroke="#0b0d10" stroke-width="2"></circle>
+                </svg>
+                <div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:9.5px;color:#5c646f;font-variant-numeric:tabular-nums"><span>25 May</span><span>14 Jun</span><span>4 Jul</span><span>24 Jul</span><span>13 Aug</span><span>22 Aug</span></div>
+              </div>
+
+              <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">Your worst recent moments</span><span style="color:#5c646f;font-size:11px">by eval swing, last 30 days</span><div style="flex:1"></div><span style="font-size:11px;color:#3ecfd6" style-hover="color:#7de1e7">blunder log</span></div>
+                <div style="flex:1;display:flex;gap:10px">
+                  <div style="flex:1;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;gap:11px" style-hover="border-color:#2c333c">
+                    <div style="position:relative;width:112px;height:112px;flex:none;border-radius:3px;overflow:hidden;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:28px 28px">
+                      <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)"><div style="grid-area:5/5;box-shadow:inset 0 0 0 2px rgba(240,82,74,.9)"></div></div>
+                      <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-size:11px;line-height:1;place-items:center">
+                        <div style="grid-area:1/3;color:#14181c">♜</div><div style="grid-area:1/7;color:#14181c">♚</div><div style="grid-area:2/3;color:#14181c">♛</div><div style="grid-area:2/7;color:#14181c">♟</div><div style="grid-area:3/4;color:#14181c">♟</div><div style="grid-area:4/5;color:#14181c">♟</div><div style="grid-area:5/5;color:#14181c">♞</div>
+                        <div style="grid-area:6/3;color:#fbfcfd">♞</div><div style="grid-area:6/4;color:#fbfcfd">♝</div><div style="grid-area:7/4;color:#fbfcfd">♛</div><div style="grid-area:8/3;color:#fbfcfd">♜</div><div style="grid-area:8/7;color:#fbfcfd">♚</div>
+                      </div>
+                    </div>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                      <div style="display:flex;align-items:center;gap:7px;font-family:'Geist Mono',monospace"><span style="font-size:13px;color:#f0524a;font-weight:500">24…Nxe4</span><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:10px;font-weight:700">??</span></div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#8a929d;font-variant-numeric:tabular-nums">+0.18 → +2.96</div>
+                      <div style="font-size:11px;color:#646c78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs kn1ghtmare · 22 Aug</div>
+                      <div style="flex:1"></div>
+                      <div style="font-size:11px;color:#5c646f;line-height:1.4">Free pawn, two defenders.</div>
+                    </div>
+                  </div>
+                  <div style="flex:1;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;gap:11px" style-hover="border-color:#2c333c">
+                    <div style="position:relative;width:112px;height:112px;flex:none;border-radius:3px;overflow:hidden;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:28px 28px">
+                      <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)"><div style="grid-area:7/4;box-shadow:inset 0 0 0 2px rgba(240,82,74,.9)"></div></div>
+                      <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-size:11px;line-height:1;place-items:center">
+                        <div style="grid-area:2/7;color:#14181c">♚</div><div style="grid-area:2/6;color:#14181c">♟</div><div style="grid-area:2/8;color:#14181c">♟</div><div style="grid-area:3/7;color:#14181c">♟</div><div style="grid-area:7/4;color:#14181c">♜</div>
+                        <div style="grid-area:6/7;color:#fbfcfd">♟</div><div style="grid-area:7/6;color:#fbfcfd">♟</div><div style="grid-area:7/8;color:#fbfcfd">♟</div><div style="grid-area:7/7;color:#fbfcfd">♚</div><div style="grid-area:8/4;color:#fbfcfd">♜</div>
+                      </div>
+                    </div>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                      <div style="display:flex;align-items:center;gap:7px;font-family:'Geist Mono',monospace"><span style="font-size:13px;color:#f0524a;font-weight:500">31…Rd2</span><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:10px;font-weight:700">??</span></div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#8a929d;font-variant-numeric:tabular-nums">−0.42 → +2.99</div>
+                      <div style="font-size:11px;color:#646c78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs fianchetto_dad · 19 Aug</div>
+                      <div style="flex:1"></div>
+                      <div style="font-size:11px;color:#5c646f;line-height:1.4">Rook trade with 14s left.</div>
+                    </div>
+                  </div>
+                  <div style="flex:1;padding:11px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;gap:11px" style-hover="border-color:#2c333c">
+                    <div style="position:relative;width:112px;height:112px;flex:none;border-radius:3px;overflow:hidden;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:28px 28px">
+                      <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)"><div style="grid-area:5/4;box-shadow:inset 0 0 0 2px rgba(240,82,74,.9)"></div></div>
+                      <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-size:11px;line-height:1;place-items:center">
+                        <div style="grid-area:1/6;color:#14181c">♜</div><div style="grid-area:1/7;color:#14181c">♚</div><div style="grid-area:2/6;color:#14181c">♟</div><div style="grid-area:2/8;color:#14181c">♟</div><div style="grid-area:3/2;color:#14181c">♛</div><div style="grid-area:5/4;color:#14181c">♞</div>
+                        <div style="grid-area:6/6;color:#fbfcfd">♞</div><div style="grid-area:6/4;color:#fbfcfd">♝</div><div style="grid-area:7/5;color:#fbfcfd">♛</div><div style="grid-area:8/6;color:#fbfcfd">♜</div><div style="grid-area:8/8;color:#fbfcfd">♚</div>
+                      </div>
+                    </div>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                      <div style="display:flex;align-items:center;gap:7px;font-family:'Geist Mono',monospace"><span style="font-size:13px;color:#f0524a;font-weight:500">19…Nxd4</span><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:10px;font-weight:700">??</span></div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:11px;color:#8a929d;font-variant-numeric:tabular-nums">+0.61 → +4.63</div>
+                      <div style="font-size:11px;color:#646c78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs bishopnoodle · 14 Aug</div>
+                      <div style="flex:1"></div>
+                      <div style="font-size:11px;color:#5c646f;line-height:1.4">Third knight this month.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="width:326px;flex:none;display:flex;flex-direction:column;gap:14px">
+              <div style="padding:13px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:11px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">Analysis queue</span><span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#3ecfd6"><span style="width:5px;height:5px;border-radius:50%;background:#3ecfd6"></span>running</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#949ca8;font-variant-numeric:tabular-nums">3/7</span></div>
+                <div style="height:3px;border-radius:2px;background:#1c2128;overflow:hidden"><div style="width:43%;height:100%;background:#3ecfd6"></div></div>
+                <div style="display:flex;flex-direction:column;gap:1px">
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:5px" style-hover="background:#14181d"><span style="width:5px;height:5px;border-radius:50%;background:#3ecfd6;flex:none"></span><span style="flex:1;color:#c8cfd8;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">kn1ghtmare</span><span style="padding:1px 5px;border-radius:4px;background:rgba(178,135,255,.10);border:1px solid rgba(178,135,255,.28);color:#c9b0ff;font-size:9.5px">deep</span><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#949ca8;font-variant-numeric:tabular-nums">62%</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:5px" style-hover="background:#14181d"><span style="width:5px;height:5px;border-radius:50%;background:#e0872f;flex:none"></span><span style="flex:1;color:#949ca8;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pawnshop_hero</span><span style="padding:1px 5px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:9.5px">d32</span><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#5c646f">queued</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:5px" style-hover="background:#14181d"><span style="width:5px;height:5px;border-radius:50%;background:#e0872f;flex:none"></span><span style="flex:1;color:#949ca8;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Tal_Ent</span><span style="padding:1px 5px;border-radius:4px;background:rgba(178,135,255,.10);border:1px solid rgba(178,135,255,.28);color:#c9b0ff;font-size:9.5px">deep</span><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#5c646f">queued</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:5px;background:rgba(240,82,74,.05)"><span style="width:5px;height:5px;border-radius:50%;background:#f0524a;flex:none"></span><span style="flex:1;color:#c8cfd8;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">fianchetto_dad</span><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#f0524a">failed</span><span style="font-size:10.5px;color:#3ecfd6" style-hover="color:#7de1e7">retry</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;color:#5c646f;font-size:11px">+ 3 more queued</div>
+                </div>
+              </div>
+
+              <div style="padding:13px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">MCP</span><span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#949ca8;border:1px solid #22272f;border-radius:4px;padding:1px 6px"><span style="width:5px;height:5px;border-radius:50%;background:#9ec49a"></span>running</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">1 client</span></div>
+                <div style="display:flex;align-items:center;gap:7px;font-family:'Geist Mono',monospace;font-size:10.5px;color:#646c78"><span style="color:#949ca8">claude-desktop</span><span style="color:#3a4049">→</span><span>blunderbase-mcp</span></div>
+                <div style="display:flex;flex-direction:column;gap:5px;font-family:'Geist Mono',monospace;font-size:10.5px">
+                  <div style="display:flex;align-items:center;gap:8px"><span style="flex:1;color:#8fb6c9">query_games</span><div style="width:56px;height:3px;border-radius:2px;background:#1c2128;overflow:hidden"><div style="width:100%;height:100%;background:#2f3d47"></div></div><span style="width:20px;text-align:right;color:#949ca8;font-variant-numeric:tabular-nums">12</span></div>
+                  <div style="display:flex;align-items:center;gap:8px"><span style="flex:1;color:#8fb6c9">get_position</span><div style="width:56px;height:3px;border-radius:2px;background:#1c2128;overflow:hidden"><div style="width:66%;height:100%;background:#2f3d47"></div></div><span style="width:20px;text-align:right;color:#949ca8;font-variant-numeric:tabular-nums">8</span></div>
+                  <div style="display:flex;align-items:center;gap:8px"><span style="flex:1;color:#8fb6c9">write_note</span><div style="width:56px;height:3px;border-radius:2px;background:#1c2128;overflow:hidden"><div style="width:25%;height:100%;background:#2f3d47"></div></div><span style="width:20px;text-align:right;color:#949ca8;font-variant-numeric:tabular-nums">3</span></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;border-top:1px solid #1a1e24;padding-top:9px"><span style="font-size:11px;color:#5c646f;flex:1">last call 4m ago</span><span style="font-size:11px;color:#3ecfd6" style-hover="color:#7de1e7">copy config</span></div>
+              </div>
+
+              <div style="flex:1;padding:13px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">This week</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f;font-variant-numeric:tabular-nums">12 games</span></div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;color:#949ca8;font-size:11.5px">Blunders per game</span><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#e7eaef;font-variant-numeric:tabular-nums">1.4</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">−0.3</span></div>
+                  <div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;color:#949ca8;font-size:11.5px">Average ACPL</span><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#e7eaef;font-variant-numeric:tabular-nums">41</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">−6</span></div>
+                  <div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;color:#949ca8;font-size:11.5px">Accuracy</span><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#e7eaef;font-variant-numeric:tabular-nums">83.7</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">−1.1</span></div>
+                </div>
+                <div style="flex:1"></div>
+                <div style="color:#5c646f;font-size:11px;line-height:1.5;border-top:1px solid #1a1e24;padding-top:10px">Fewer blunders, slightly worse accuracy. You are losing the game in smaller pieces now.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 2b GAMES LIBRARY ===== -->
+    <div id="2b" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:5px;background:#3ecfd6;color:#06272a;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600">2b</span>
+        <span style="color:#e7eaef;font-size:15px;font-weight:600">Games library</span>
+        <span style="color:#646c78;font-size:13px">filter bar, 13-column table, selection footer</span>
+      </div>
+      <div style="width:1440px;height:900px;background:#0e1013;border:1px solid #22272f;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(0,0,0,.8)">
+        <div style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid #1a1e24;background:#0b0d10">
+          <div style="display:flex;gap:7px"><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div></div>
+          <div style="width:1px;height:18px;background:#1f242b;margin-left:6px"></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:13px;height:13px;background:#3ecfd6;transform:rotate(45deg);border-radius:2px"></div><span style="color:#e7eaef;font-size:13px;font-weight:600">Blunderbase</span></div>
+          <span style="font-size:12px;color:#646c78;margin-left:8px">Library</span>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a"><span style="font-size:11px;color:#949ca8">Queue</span><div style="width:64px;height:3px;border-radius:2px;background:#22272f;overflow:hidden"><div style="width:43%;height:100%;background:#3ecfd6"></div></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e7eaef;font-variant-numeric:tabular-nums">3/7</span></div>
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;color:#646c78;font-size:11px;font-family:'Geist Mono',monospace">⌘K</div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#1d232b;border:1px solid #262d36;display:flex;align-items:center;justify-content:center;color:#949ca8;font-size:10px;font-weight:600">SG</div>
+        </div>
+        <div style="flex:1;display:flex;min-height:0">
+          <div style="width:200px;flex:none;border-right:1px solid #1a1e24;background:#0b0d10;display:flex;flex-direction:column;padding:14px 10px;gap:2px">
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Workspace</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Dashboard</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:#14191f;color:#e7eaef;font-size:13px;font-weight:500;box-shadow:inset 2px 0 0 #3ecfd6"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #3ecfd6"></div>Games<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1,284</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Openings</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Stats</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Blunder log<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">47</span></div>
+            <div style="height:14px"></div>
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Saved filters</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:6px;height:6px;border-radius:50%;background:#f0524a;margin:0 4px"></div>Losses as black<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">208</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:6px;height:6px;border-radius:50%;background:#e0872f;margin:0 4px"></div>Time trouble<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">96</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:6px;height:6px;border-radius:50%;background:#4d545e;margin:0 4px"></div>Unanalysed<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">312</span></div>
+            <div style="flex:1"></div>
+            <div style="border-top:1px solid #1a1e24;padding:12px 8px 4px;display:flex;flex-direction:column;gap:5px"><div style="font-size:11px;color:#646c78">Storage · local</div><div style="height:3px;border-radius:2px;background:#1a1e24;overflow:hidden"><div style="width:64%;height:100%;background:#3a424b"></div></div><div style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f;font-variant-numeric:tabular-nums">2.4 GB / 3.8 GB</div></div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="flex:none;padding:16px 20px 12px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid #1a1e24">
+              <div style="display:flex;align-items:flex-end;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:3px"><span style="color:#e7eaef;font-size:19px;font-weight:600;letter-spacing:-.01em">Games</span><span style="color:#646c78;font-size:12.5px"><span style="font-family:'Geist Mono',monospace;color:#949ca8">312</span> of <span style="font-family:'Geist Mono',monospace;color:#949ca8">1,284</span> match the current filter</span></div>
+                <div style="flex:1"></div>
+                <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid #22272f;border-radius:6px;background:#12151a;width:220px"><span style="color:#4d545e;font-size:12px">⌕</span><span style="color:#5c646f;font-size:12px">Opponent, ECO, PGN text…</span></div>
+                <div style="padding:7px 11px;border-radius:6px;border:1px solid #262d36;color:#949ca8;font-size:12px" style-hover="color:#e7eaef;border-color:#39414c">Import</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:11.5px">Colour: black<span style="color:#2a9aa1">×</span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:11.5px">Result: loss<span style="color:#2a9aa1">×</span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:#12151a;border:1px solid #22272f;color:#949ca8;font-size:11.5px" style-hover="color:#e7eaef;border-color:#39414c">Time control<span style="color:#4d545e">▾</span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:#12151a;border:1px solid #22272f;color:#949ca8;font-size:11.5px" style-hover="color:#e7eaef;border-color:#39414c">Source<span style="color:#4d545e">▾</span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:#12151a;border:1px solid #22272f;color:#949ca8;font-size:11.5px" style-hover="color:#e7eaef;border-color:#39414c">Opening<span style="color:#4d545e">▾</span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:#12151a;border:1px solid #22272f;color:#949ca8;font-size:11.5px" style-hover="color:#e7eaef;border-color:#39414c">Accuracy<span style="color:#4d545e">▾</span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:#12151a;border:1px solid #22272f;color:#949ca8;font-size:11.5px" style-hover="color:#e7eaef;border-color:#39414c">Tier<span style="color:#4d545e">▾</span></span>
+                <span style="font-size:11.5px;color:#3ecfd6;padding:0 4px" style-hover="color:#7de1e7">Save filter</span>
+                <div style="flex:1"></div>
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78">rows 34px</span>
+                <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;font-family:'Geist Mono',monospace;font-size:11px"><span style="padding:4px 9px;color:#e7eaef;background:#1a1f26;border-right:1px solid #22272f">S</span><span style="padding:4px 9px;color:#646c78;border-right:1px solid #22272f" style-hover="color:#e7eaef">M</span><span style="padding:4px 9px;color:#646c78" style-hover="color:#e7eaef">L</span></div>
+              </div>
+            </div>
+
+            <div style="flex:none;display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-bottom:1px solid #1a1e24;background:#0b0d10;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c646f">
+              <span style="width:14px;flex:none"></span>
+              <span style="width:78px;flex:none;color:#949ca8">Date ↓</span>
+              <span style="width:136px;flex:none">Opponent</span>
+              <span style="width:46px;flex:none;text-align:right">Elo</span>
+              <span style="width:30px;flex:none;text-align:center">Col</span>
+              <span style="width:186px;flex:none">Opening</span>
+              <span style="width:40px;flex:none;text-align:center">Res</span>
+              <span style="width:70px;flex:none">Time</span>
+              <span style="width:40px;flex:none;text-align:right">Mv</span>
+              <span style="width:50px;flex:none;text-align:right">Acc</span>
+              <span style="width:44px;flex:none;text-align:right">ACPL</span>
+              <span style="width:82px;flex:none">Source</span>
+              <span style="width:84px;flex:none">Tier</span>
+              <span style="flex:1">Flags</span>
+            </div>
+
+            <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;font-family:'Geist Mono',monospace;font-size:11.5px;font-variant-numeric:tabular-nums">
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;background:rgba(62,207,214,.08);box-shadow:inset 2px 0 0 #3ecfd6">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;background:#3ecfd6"></span></span>
+                <span style="width:78px;flex:none;color:#c8cfd8">22 Aug</span>
+                <span style="width:136px;flex:none;color:#fff;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">kn1ghtmare</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1748</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">English, Botvinnik <span style="font-family:'Geist Mono',monospace;color:#646c78">A26</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#f0524a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">10+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">31</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">78.4</span>
+                <span style="width:44px;flex:none;text-align:right;color:#e0872f">71</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">Standard</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:9.5px;font-weight:700">??1</span><span style="padding:1px 5px;border-radius:3px;background:rgba(224,135,47,.16);color:#e0872f;font-size:9.5px;font-weight:700">?2</span><span style="padding:1px 5px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:9.5px;font-weight:700">?!5</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">21 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pawnshop_hero</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1690</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#dfe3e8"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sicilian, Alapin <span style="font-family:'Geist Mono',monospace;color:#646c78">B22</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#9ec49a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">3+2</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">41</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">84.9</span>
+                <span style="width:44px;flex:none;text-align:right;color:#949ca8">38</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;border:1px solid #2c333c;background:#14181d;color:#949ca8;font-size:10px">Quick</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:9.5px;font-weight:700">?!3</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">21 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Tal_Ent</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1725</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Italian, Giuoco Piano <span style="font-family:'Geist Mono',monospace;color:#646c78">C50</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#949ca8;font-weight:600">½–½</span>
+                <span style="width:70px;flex:none;color:#949ca8">10+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">52</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">88.1</span>
+                <span style="width:44px;flex:none;text-align:right;color:#949ca8">27</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#16191a;border:1px solid #2b3330;color:#9ec49a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#9ec49a"></span>Chess.com</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">Standard</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(62,207,214,.14);color:#3ecfd6;font-size:9.5px;font-weight:700">!2</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">19 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">fianchetto_dad</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1701</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">King's Indian <span style="font-family:'Geist Mono',monospace;color:#646c78">E60</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#f0524a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">5+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">38</span>
+                <span style="width:50px;flex:none;text-align:right;color:#5c646f">—</span>
+                <span style="width:44px;flex:none;text-align:right;color:#5c646f">—</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#16191a;border:1px solid #2b3330;color:#9ec49a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#9ec49a"></span>Chess.com</span></span>
+                <span style="width:84px;flex:none"><span style="display:inline-flex;align-items:center;gap:5px;padding:1px 6px;border-radius:4px;border:1px solid #2c333c;background:#14181d;color:#949ca8;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#f0524a"></span>Failed</span></span>
+                <span style="flex:1;display:flex;gap:4px;color:#5c646f;font-size:10px;align-items:center">retry queued</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">18 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">rook_bottom</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1663</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#dfe3e8"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Trompowsky <span style="font-family:'Geist Mono',monospace;color:#646c78">A45</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#9ec49a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">OTB 90+30</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">44</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">90.3</span>
+                <span style="width:44px;flex:none;text-align:right;color:#9ec49a">19</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#1a1816;border:1px solid #34302a;color:#c9b89a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#c9b89a"></span>OTB</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(178,135,255,.10);border:1px solid rgba(178,135,255,.28);color:#c9b0ff;font-size:10px">Deep</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(178,135,255,.14);color:#b287ff;font-size:9.5px;font-weight:700">!!1</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">17 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">bishopnoodle</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1734</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Nimzo-Indian, Rubinstein <span style="font-family:'Geist Mono',monospace;color:#646c78">E41</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#f0524a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">10+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">29</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">74.6</span>
+                <span style="width:44px;flex:none;text-align:right;color:#f0524a">96</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">Standard</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:9.5px;font-weight:700">??2</span><span style="padding:1px 5px;border-radius:3px;background:rgba(224,135,47,.16);color:#e0872f;font-size:9.5px;font-weight:700">?1</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">16 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">en_passant_ly</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1682</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#dfe3e8"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">French, Tarrasch <span style="font-family:'Geist Mono',monospace;color:#646c78">C07</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#9ec49a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">15+10</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">36</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">86.2</span>
+                <span style="width:44px;flex:none;text-align:right;color:#949ca8">31</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;border:1px solid #2c333c;background:#14181d;color:#949ca8;font-size:10px">Quick</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:9.5px;font-weight:700">?!4</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">15 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">zugzwangela</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1756</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Caro-Kann, Advance <span style="font-family:'Geist Mono',monospace;color:#646c78">B12</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#f0524a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">3+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">27</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">69.8</span>
+                <span style="width:44px;flex:none;text-align:right;color:#f0524a">118</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">Standard</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:9.5px;font-weight:700">??3</span><span style="padding:1px 5px;border-radius:3px;background:rgba(224,135,47,.16);color:#e0872f;font-size:9.5px;font-weight:700">?2</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">14 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">bishopnoodle</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1734</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Queen's Gambit Declined <span style="font-family:'Geist Mono',monospace;color:#646c78">D37</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#f0524a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">10+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">33</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">76.1</span>
+                <span style="width:44px;flex:none;text-align:right;color:#e0872f">88</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(178,135,255,.10);border:1px solid rgba(178,135,255,.28);color:#c9b0ff;font-size:10px">Deep</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:9.5px;font-weight:700">??1</span><span style="padding:1px 5px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:9.5px;font-weight:700">?!2</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">13 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">knightlylife</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1648</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#dfe3e8"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Scotch, Classical <span style="font-family:'Geist Mono',monospace;color:#646c78">C45</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#9ec49a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">10+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">40</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">89.4</span>
+                <span style="width:44px;flex:none;text-align:right;color:#9ec49a">22</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">Standard</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(62,207,214,.14);color:#3ecfd6;font-size:9.5px;font-weight:700">!3</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">12 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Grünfeld_Gary</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1712</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Grünfeld, Exchange <span style="font-family:'Geist Mono',monospace;color:#646c78">D85</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#949ca8;font-weight:600">½–½</span>
+                <span style="width:70px;flex:none;color:#949ca8">15+10</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">61</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">85.0</span>
+                <span style="width:44px;flex:none;text-align:right;color:#949ca8">33</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#16191a;border:1px solid #2b3330;color:#9ec49a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#9ec49a"></span>Chess.com</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;border:1px dashed #2c333c;color:#5c646f;font-size:10px">Unanalysed</span></span>
+                <span style="flex:1;display:flex;gap:4px;align-items:center"><span style="font-size:10.5px;color:#3ecfd6" style-hover="color:#7de1e7">analyse</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">11 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">petrosian_fan</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1699</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#dfe3e8"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">English, Symmetrical <span style="font-family:'Geist Mono',monospace;color:#646c78">A30</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#f0524a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">10+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">47</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">80.7</span>
+                <span style="width:44px;flex:none;text-align:right;color:#e0872f">57</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">Standard</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(224,135,47,.16);color:#e0872f;font-size:9.5px;font-weight:700">?2</span><span style="padding:1px 5px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:9.5px;font-weight:700">?!3</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">10 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">h4_hooligan</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1721</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Dutch, Leningrad <span style="font-family:'Geist Mono',monospace;color:#646c78">A81</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#9ec49a;font-weight:600">0–1</span>
+                <span style="width:70px;flex:none;color:#949ca8">5+3</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">35</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">87.3</span>
+                <span style="width:44px;flex:none;text-align:right;color:#949ca8">29</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;border:1px solid #2c333c;background:#14181d;color:#949ca8;font-size:10px">Quick</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:9.5px;font-weight:700">?!1</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d" style-hover="background:#12161b">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">9 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Aunt_Emma_64</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1590</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#dfe3e8"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">London System <span style="font-family:'Geist Mono',monospace;color:#646c78">D02</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#9ec49a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">OTB 60+15</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">51</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">91.6</span>
+                <span style="width:44px;flex:none;text-align:right;color:#9ec49a">17</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#1a1816;border:1px solid #34302a;color:#c9b89a;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#c9b89a"></span>OTB</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:10px">Standard</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:rgba(62,207,214,.14);color:#3ecfd6;font-size:9.5px;font-weight:700">!1</span></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 20px;border-top:1px solid #14181d;opacity:.75" style-hover="background:#12161b;opacity:1">
+                <span style="width:14px;flex:none;display:flex;align-items:center"><span style="width:11px;height:11px;border-radius:3px;border:1px solid #2c333c"></span></span>
+                <span style="width:78px;flex:none;color:#949ca8">8 Aug</span>
+                <span style="width:136px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">stonewall_stan</span>
+                <span style="width:46px;flex:none;text-align:right;color:#949ca8">1677</span>
+                <span style="width:30px;flex:none;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:#20242a;border:1px solid #3a424b"></span></span>
+                <span style="width:186px;flex:none;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Slav, Exchange <span style="font-family:'Geist Mono',monospace;color:#646c78">D13</span></span>
+                <span style="width:40px;flex:none;text-align:center;color:#f0524a;font-weight:600">1–0</span>
+                <span style="width:70px;flex:none;color:#949ca8">3+0</span>
+                <span style="width:40px;flex:none;text-align:right;color:#949ca8">24</span>
+                <span style="width:50px;flex:none;text-align:right;color:#c8cfd8">72.9</span>
+                <span style="width:44px;flex:none;text-align:right;color:#f0524a">104</span>
+                <span style="width:82px;flex:none"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:10px"><span style="width:4px;height:4px;border-radius:50%;background:#8fb6c9"></span>Lichess</span></span>
+                <span style="width:84px;flex:none"><span style="padding:1px 6px;border-radius:4px;border:1px solid #2c333c;background:#14181d;color:#949ca8;font-size:10px">Quick</span></span>
+                <span style="flex:1;display:flex;gap:4px"><span style="padding:1px 5px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:9.5px;font-weight:700">??2</span></span>
+              </div>
+            </div>
+
+            <div style="flex:none;height:46px;display:flex;align-items:center;gap:12px;padding:0 20px;border-top:1px solid #1a1e24;background:#0b0d10">
+              <span style="font-family:'Geist Mono',monospace;font-size:11.5px;color:#3ecfd6;font-variant-numeric:tabular-nums">1 selected</span>
+              <div style="width:1px;height:16px;background:#1f242b"></div>
+              <span style="font-size:11.5px;color:#949ca8" style-hover="color:#e7eaef">Queue deep analysis</span>
+              <span style="font-size:11.5px;color:#949ca8" style-hover="color:#e7eaef">Add to study</span>
+              <span style="font-size:11.5px;color:#949ca8" style-hover="color:#e7eaef">Export PGN</span>
+              <span style="font-size:11.5px;color:#f0524a" style-hover="color:#f57a74">Delete</span>
+              <div style="flex:1"></div>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#5c646f;font-variant-numeric:tabular-nums">showing 1–16 of 312</span>
+              <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;font-family:'Geist Mono',monospace;font-size:11px"><span style="padding:4px 9px;color:#646c78;border-right:1px solid #22272f" style-hover="color:#e7eaef">←</span><span style="padding:4px 9px;color:#646c78" style-hover="color:#e7eaef">→</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 2c OPENING EXPLORER ===== -->
+    <div id="2c" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:5px;background:#3ecfd6;color:#06272a;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600">2c</span>
+        <span style="color:#e7eaef;font-size:15px;font-weight:600">Opening explorer</span>
+        <span style="color:#646c78;font-size:13px">line breadcrumb, personal move tree, score bars, avg eval drop</span>
+      </div>
+      <div style="width:1440px;height:900px;background:#0e1013;border:1px solid #22272f;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(0,0,0,.8)">
+        <div style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid #1a1e24;background:#0b0d10">
+          <div style="display:flex;gap:7px"><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div></div>
+          <div style="width:1px;height:18px;background:#1f242b;margin-left:6px"></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:13px;height:13px;background:#3ecfd6;transform:rotate(45deg);border-radius:2px"></div><span style="color:#e7eaef;font-size:13px;font-weight:600">Blunderbase</span></div>
+          <span style="font-size:12px;color:#646c78;margin-left:8px">Openings</span>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a"><span style="font-size:11px;color:#949ca8">Repertoire</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e7eaef">as black</span></div>
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;color:#646c78;font-size:11px;font-family:'Geist Mono',monospace">⌘K</div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#1d232b;border:1px solid #262d36;display:flex;align-items:center;justify-content:center;color:#949ca8;font-size:10px;font-weight:600">SG</div>
+        </div>
+        <div style="flex:1;display:flex;min-height:0">
+          <div style="width:200px;flex:none;border-right:1px solid #1a1e24;background:#0b0d10;display:flex;flex-direction:column;padding:14px 10px;gap:2px">
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Workspace</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Dashboard</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Games<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1,284</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:#14191f;color:#e7eaef;font-size:13px;font-weight:500;box-shadow:inset 2px 0 0 #3ecfd6"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #3ecfd6"></div>Openings</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Stats</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Blunder log<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">47</span></div>
+            <div style="height:14px"></div>
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Your lines · black</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:#14181d;color:#e7eaef;font-size:12.5px"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">A26</span>English, Botvinnik<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">38%</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:12.5px" style-hover="background:#14181d;color:#e7eaef"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">B22</span>Sicilian, Alapin<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">61%</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:12.5px" style-hover="background:#14181d;color:#e7eaef"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">E60</span>King's Indian<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#c9b23e;font-variant-numeric:tabular-nums">49%</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:12.5px" style-hover="background:#14181d;color:#e7eaef"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">B12</span>Caro-Kann<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">55%</span></div>
+            <div style="flex:1"></div>
+            <div style="border-top:1px solid #1a1e24;padding:12px 8px 4px;display:flex;flex-direction:column;gap:5px"><div style="font-size:11px;color:#646c78">Book · 1,284 own games</div><div style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">+ Lichess masters overlay</div></div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;padding:18px 20px;gap:18px">
+            <div style="width:520px;flex:none;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:center gap:8px"><span style="color:#e7eaef;font-size:15px;font-weight:600">English Opening, Botvinnik System</span></div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:'Geist Mono',monospace;font-size:11.5px">
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">1.c4</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">e5</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">2.Nc3</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">Nf6</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">3.g3</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">d5</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">4.cxd5</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:#14181d;border:1px solid #22272f;color:#949ca8" style-hover="color:#e7eaef">Nxd5</span>
+                  <span style="color:#3a4049">›</span>
+                  <span style="padding:2px 7px;border-radius:5px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.35);color:#3ecfd6">5.Bg2</span>
+                </div>
+              </div>
+
+              <div style="position:relative;width:460px;height:460px;border-radius:3px;overflow:hidden;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:115px 115px">
+                <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)">
+                  <div style="grid-area:8/6;background:rgba(62,207,214,.22)"></div>
+                  <div style="grid-area:7/7;background:rgba(62,207,214,.22)"></div>
+                  <div style="grid-area:3/2;box-shadow:inset 0 0 0 3px rgba(62,207,214,.45);border-radius:2px"></div>
+                  <div style="grid-area:2/5;box-shadow:inset 0 0 0 3px rgba(62,207,214,.25);border-radius:2px"></div>
+                </div>
+                <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-size:42px;line-height:1;place-items:center">
+                  <div style="grid-area:1/1;color:#14181c">♜</div><div style="grid-area:1/2;color:#14181c">♞</div><div style="grid-area:1/3;color:#14181c">♝</div><div style="grid-area:1/4;color:#14181c">♛</div><div style="grid-area:1/5;color:#14181c">♚</div><div style="grid-area:1/6;color:#14181c">♝</div><div style="grid-area:1/8;color:#14181c">♜</div>
+                  <div style="grid-area:2/1;color:#14181c">♟</div><div style="grid-area:2/2;color:#14181c">♟</div><div style="grid-area:2/3;color:#14181c">♟</div><div style="grid-area:2/6;color:#14181c">♟</div><div style="grid-area:2/7;color:#14181c">♟</div><div style="grid-area:2/8;color:#14181c">♟</div>
+                  <div style="grid-area:4/4;color:#14181c">♞</div><div style="grid-area:4/5;color:#14181c">♟</div>
+                  <div style="grid-area:6/3;color:#fbfcfd">♞</div><div style="grid-area:6/7;color:#fbfcfd">♟</div>
+                  <div style="grid-area:7/1;color:#fbfcfd">♟</div><div style="grid-area:7/2;color:#fbfcfd">♟</div><div style="grid-area:7/4;color:#fbfcfd">♟</div><div style="grid-area:7/5;color:#fbfcfd">♟</div><div style="grid-area:7/6;color:#fbfcfd">♟</div><div style="grid-area:7/7;color:#fbfcfd">♝</div><div style="grid-area:7/8;color:#fbfcfd">♟</div>
+                  <div style="grid-area:8/1;color:#fbfcfd">♜</div><div style="grid-area:8/3;color:#fbfcfd">♝</div><div style="grid-area:8/4;color:#fbfcfd">♛</div><div style="grid-area:8/5;color:#fbfcfd">♚</div><div style="grid-area:8/7;color:#fbfcfd">♞</div><div style="grid-area:8/8;color:#fbfcfd">♜</div>
+                </div>
+                <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-family:'Geist Mono',monospace;font-size:9.5px;pointer-events:none">
+                  <div style="grid-area:8/1;display:flex;align-items:flex-end;justify-content:flex-start;padding:0 0 3px 4px;color:rgba(251,252,253,.45)">a1</div>
+                  <div style="grid-area:8/8;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(20,24,28,.55)">h1</div>
+                  <div style="grid-area:1/1;padding:3px 0 0 4px;color:rgba(20,24,28,.55)">a8</div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:9px">
+                <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;background:#12151a">
+                  <div style="padding:5px 10px;color:#949ca8;font-size:12px;border-right:1px solid #22272f" style-hover="background:#1a1f26;color:#e7eaef">◀</div>
+                  <div style="padding:5px 10px;color:#949ca8;font-size:12px" style-hover="background:#1a1f26;color:#e7eaef">▶</div>
+                </div>
+                <div style="padding:5px 10px;border:1px solid #22272f;border-radius:6px;background:#12151a;color:#949ca8;font-size:12px" style-hover="color:#e7eaef">⇅ Flip</div>
+                <div style="flex:1"></div>
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78">black to move · ply 9</span>
+              </div>
+
+              <div style="flex:1;min-height:0;padding:13px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:11px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">Your results in this line</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">64 games</span></div>
+                <div style="display:flex;height:8px;border-radius:4px;overflow:hidden"><div style="width:31%;background:#9ec49a"></div><div style="width:17%;background:#4d545e"></div><div style="width:52%;background:#f0524a"></div></div>
+                <div style="display:flex;font-family:'Geist Mono',monospace;font-size:11px;color:#8a929d;font-variant-numeric:tabular-nums"><span style="flex:1">20 W</span><span style="flex:1;text-align:center">11 D</span><span style="flex:1;text-align:right">33 L</span></div>
+                <div style="display:flex;gap:22px;border-top:1px solid #1a1e24;padding-top:11px">
+                  <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:10.5px;color:#5c646f">Score</span><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#f0524a;font-variant-numeric:tabular-nums">38.3%</span></div>
+                  <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:10.5px;color:#5c646f">Accuracy</span><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#e7eaef;font-variant-numeric:tabular-nums">79.1</span></div>
+                  <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:10.5px;color:#5c646f">Avg. drop</span><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#e0872f;font-variant-numeric:tabular-nums">−0.34</span></div>
+                  <div style="flex:1"></div>
+                  <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end"><span style="font-size:10.5px;color:#5c646f">Worst move here</span><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#f0524a">7…Be6?</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:14px">
+              <div style="flex:none;display:flex;align-items:center;gap:9px">
+                <span style="color:#e7eaef;font-size:12px;font-weight:600">Your move tree from here</span>
+                <div style="flex:1"></div>
+                <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;font-family:'Geist Mono',monospace;font-size:11px"><span style="padding:4px 9px;color:#e7eaef;background:#1a1f26;border-right:1px solid #22272f">my games</span><span style="padding:4px 9px;color:#646c78;border-right:1px solid #22272f" style-hover="color:#e7eaef">masters</span><span style="padding:4px 9px;color:#646c78" style-hover="color:#e7eaef">both</span></div>
+              </div>
+
+              <div style="flex:none;display:flex;align-items:center;gap:12px;height:30px;padding:0 12px;border-radius:7px;background:#0b0d10;border:1px solid #1f242b;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c646f">
+                <span style="width:74px;flex:none">Move</span>
+                <span style="width:46px;flex:none;text-align:right">Games</span>
+                <span style="width:150px;flex:none">Score</span>
+                <span style="width:52px;flex:none;text-align:right">Score%</span>
+                <span style="width:66px;flex:none;text-align:right">Avg drop</span>
+                <span style="width:44px;flex:none;text-align:right">Acc</span>
+                <span style="flex:1">Note</span>
+              </div>
+
+              <div style="flex:none;display:flex;flex-direction:column;gap:2px;font-family:'Geist Mono',monospace;font-size:12.5px;font-variant-numeric:tabular-nums">
+                <div style="display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:7px;background:rgba(62,207,214,.07);box-shadow:inset 0 0 0 1px rgba(62,207,214,.28)">
+                  <span style="width:74px;flex:none;color:#fff;font-size:13.5px">5…Nb6</span>
+                  <span style="width:46px;flex:none;text-align:right;color:#c8cfd8">26</span>
+                  <span style="width:150px;flex:none;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:42%;background:#9ec49a"></span><span style="width:19%;background:#4d545e"></span><span style="width:39%;background:#f0524a"></span></span>
+                  <span style="width:52px;flex:none;text-align:right;color:#9ec49a">51.9</span>
+                  <span style="width:66px;flex:none;text-align:right;color:#949ca8">−0.19</span>
+                  <span style="width:44px;flex:none;text-align:right;color:#c8cfd8">82.4</span>
+                  <span style="flex:1;font-family:'Geist',sans-serif;font-size:11.5px;color:#8a929d">main line</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:7px" style-hover="background:#12161b">
+                  <span style="width:74px;flex:none;color:#c8cfd8;font-size:13.5px">5…Be6</span>
+                  <span style="width:46px;flex:none;text-align:right;color:#c8cfd8">18</span>
+                  <span style="width:150px;flex:none;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:22%;background:#9ec49a"></span><span style="width:11%;background:#4d545e"></span><span style="width:67%;background:#f0524a"></span></span>
+                  <span style="width:52px;flex:none;text-align:right;color:#f0524a">27.8</span>
+                  <span style="width:66px;flex:none;text-align:right;color:#f0524a">−0.71</span>
+                  <span style="width:44px;flex:none;text-align:right;color:#c8cfd8">74.2</span>
+                  <span style="flex:1;font-family:'Geist',sans-serif;font-size:11.5px;color:#8a929d">where the trouble lives</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:7px" style-hover="background:#12161b">
+                  <span style="width:74px;flex:none;color:#c8cfd8;font-size:13.5px">5…Nxc3</span>
+                  <span style="width:46px;flex:none;text-align:right;color:#c8cfd8">11</span>
+                  <span style="width:150px;flex:none;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:36%;background:#9ec49a"></span><span style="width:28%;background:#4d545e"></span><span style="width:36%;background:#f0524a"></span></span>
+                  <span style="width:52px;flex:none;text-align:right;color:#c8cfd8">50.0</span>
+                  <span style="width:66px;flex:none;text-align:right;color:#949ca8">−0.22</span>
+                  <span style="width:44px;flex:none;text-align:right;color:#c8cfd8">85.9</span>
+                  <span style="flex:1;font-family:'Geist',sans-serif;font-size:11.5px;color:#8a929d">simplifies early</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:7px" style-hover="background:#12161b">
+                  <span style="width:74px;flex:none;color:#c8cfd8;font-size:13.5px">5…Be7</span>
+                  <span style="width:46px;flex:none;text-align:right;color:#c8cfd8">6</span>
+                  <span style="width:150px;flex:none;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:50%;background:#9ec49a"></span><span style="width:17%;background:#4d545e"></span><span style="width:33%;background:#f0524a"></span></span>
+                  <span style="width:52px;flex:none;text-align:right;color:#9ec49a">58.3</span>
+                  <span style="width:66px;flex:none;text-align:right;color:#949ca8">−0.16</span>
+                  <span style="width:44px;flex:none;text-align:right;color:#c8cfd8">88.0</span>
+                  <span style="flex:1;font-family:'Geist',sans-serif;font-size:11.5px;color:#8a929d">small sample</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:7px" style-hover="background:#12161b">
+                  <span style="width:74px;flex:none;color:#c8cfd8;font-size:13.5px">5…c6</span>
+                  <span style="width:46px;flex:none;text-align:right;color:#c8cfd8">3</span>
+                  <span style="width:150px;flex:none;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:33%;background:#9ec49a"></span><span style="width:0%;background:#4d545e"></span><span style="width:67%;background:#f0524a"></span></span>
+                  <span style="width:52px;flex:none;text-align:right;color:#f0524a">33.3</span>
+                  <span style="width:66px;flex:none;text-align:right;color:#e0872f">−0.48</span>
+                  <span style="width:44px;flex:none;text-align:right;color:#c8cfd8">77.5</span>
+                  <span style="flex:1;font-family:'Geist',sans-serif;font-size:11.5px;color:#5c646f">3 games, ignore</span>
+                </div>
+              </div>
+
+              <div style="flex:none;padding:13px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;border-left:2px solid #e0872f;display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">Where this line goes wrong</span><span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#949ca8;border:1px solid #22272f;border-radius:4px;padding:1px 6px"><span style="width:5px;height:5px;border-radius:50%;background:#9ec49a"></span>note via MCP</span></div>
+                <div style="color:#c1c8d1;font-size:12.5px;line-height:1.55">You score 27.8% after <span style="font-family:'Geist Mono',monospace;color:#e7eaef">5…Be6</span> and 51.9% after <span style="font-family:'Geist Mono',monospace;color:#e7eaef">5…Nb6</span>, off 44 games. The bishop move keeps getting hit by <span style="font-family:'Geist Mono',monospace;color:#e7eaef">d4</span> and <span style="font-family:'Geist Mono',monospace;color:#e7eaef">Ng5</span> before you have castled.</div>
+              </div>
+
+              <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12px;font-weight:600">Games in this line</span><div style="flex:1"></div><span style="font-size:11px;color:#3ecfd6" style-hover="color:#7de1e7">open all 64 in library</span></div>
+                <div style="display:flex;flex-direction:column;font-family:'Geist Mono',monospace;font-size:11.5px;font-variant-numeric:tabular-nums">
+                  <div style="display:flex;align-items:center;gap:10px;height:29px;padding:0 10px;border-radius:5px" style-hover="background:#12161b"><span style="width:60px;color:#949ca8">22 Aug</span><span style="flex:1;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px">kn1ghtmare</span><span style="width:44px;text-align:right;color:#949ca8">1748</span><span style="width:56px;text-align:right;color:#c8cfd8">5…Nb6</span><span style="width:34px;text-align:center;color:#f0524a;font-weight:600">1–0</span><span style="width:44px;text-align:right;color:#e0872f">71</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;height:29px;padding:0 10px;border-radius:5px" style-hover="background:#12161b"><span style="width:60px;color:#949ca8">11 Aug</span><span style="flex:1;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px">petrosian_fan</span><span style="width:44px;text-align:right;color:#949ca8">1699</span><span style="width:56px;text-align:right;color:#c8cfd8">5…Be6</span><span style="width:34px;text-align:center;color:#f0524a;font-weight:600">1–0</span><span style="width:44px;text-align:right;color:#e0872f">57</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;height:29px;padding:0 10px;border-radius:5px" style-hover="background:#12161b"><span style="width:60px;color:#949ca8">4 Aug</span><span style="flex:1;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px">tempo_tantrum</span><span style="width:44px;text-align:right;color:#949ca8">1668</span><span style="width:56px;text-align:right;color:#c8cfd8">5…Nb6</span><span style="width:34px;text-align:center;color:#9ec49a;font-weight:600">0–1</span><span style="width:44px;text-align:right;color:#9ec49a">24</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;height:29px;padding:0 10px;border-radius:5px" style-hover="background:#12161b"><span style="width:60px;color:#949ca8">28 Jul</span><span style="flex:1;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px">zugzwangela</span><span style="width:44px;text-align:right;color:#949ca8">1756</span><span style="width:56px;text-align:right;color:#c8cfd8">5…Be6</span><span style="width:34px;text-align:center;color:#f0524a;font-weight:600">1–0</span><span style="width:44px;text-align:right;color:#f0524a">103</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;height:29px;padding:0 10px;border-radius:5px" style-hover="background:#12161b"><span style="width:60px;color:#949ca8">21 Jul</span><span style="flex:1;color:#c8cfd8;font-family:'Geist',sans-serif;font-size:12.5px">rook_bottom</span><span style="width:44px;text-align:right;color:#949ca8">1663</span><span style="width:56px;text-align:right;color:#c8cfd8">5…Nxc3</span><span style="width:34px;text-align:center;color:#949ca8;font-weight:600">½–½</span><span style="width:44px;text-align:right;color:#949ca8">31</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 2d STATS ===== -->
+    <div id="2d" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:5px;background:#3ecfd6;color:#06272a;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600">2d</span>
+        <span style="color:#e7eaef;font-size:15px;font-weight:600">Stats</span>
+        <span style="color:#646c78;font-size:13px">phase, time control, time trouble, progress</span>
+      </div>
+      <div style="width:1440px;height:900px;background:#0e1013;border:1px solid #22272f;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(0,0,0,.8)">
+        <div style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid #1a1e24;background:#0b0d10">
+          <div style="display:flex;gap:7px"><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div><div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div></div>
+          <div style="width:1px;height:18px;background:#1f242b;margin-left:6px"></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:13px;height:13px;background:#3ecfd6;transform:rotate(45deg);border-radius:2px"></div><span style="color:#e7eaef;font-size:13px;font-weight:600">Blunderbase</span></div>
+          <span style="font-size:12px;color:#646c78;margin-left:8px">Stats</span>
+          <div style="flex:1"></div>
+          <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;font-family:'Geist Mono',monospace;font-size:11px"><span style="padding:5px 10px;color:#646c78;border-right:1px solid #22272f" style-hover="color:#e7eaef">30d</span><span style="padding:5px 10px;color:#646c78;border-right:1px solid #22272f" style-hover="color:#e7eaef">90d</span><span style="padding:5px 10px;color:#e7eaef;background:#1a1f26;border-right:1px solid #22272f">1y</span><span style="padding:5px 10px;color:#646c78" style-hover="color:#e7eaef">all</span></div>
+          <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;font-size:11px"><span style="padding:5px 10px;color:#e7eaef;background:#1a1f26;border-right:1px solid #22272f">both</span><span style="padding:5px 10px;color:#646c78;border-right:1px solid #22272f" style-hover="color:#e7eaef">white</span><span style="padding:5px 10px;color:#646c78" style-hover="color:#e7eaef">black</span></div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#1d232b;border:1px solid #262d36;display:flex;align-items:center;justify-content:center;color:#949ca8;font-size:10px;font-weight:600">SG</div>
+        </div>
+        <div style="flex:1;display:flex;min-height:0">
+          <div style="width:200px;flex:none;border-right:1px solid #1a1e24;background:#0b0d10;display:flex;flex-direction:column;padding:14px 10px;gap:2px">
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Workspace</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Dashboard</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Games<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1,284</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Openings</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:#14191f;color:#e7eaef;font-size:13px;font-weight:500;box-shadow:inset 2px 0 0 #3ecfd6"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #3ecfd6"></div>Stats</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Blunder log<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">47</span></div>
+            <div style="height:14px"></div>
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Reports</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:#14181d;color:#e7eaef;font-size:12.5px">Overview</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:12.5px" style-hover="background:#14181d;color:#e7eaef">Blunder taxonomy</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:12.5px" style-hover="background:#14181d;color:#e7eaef">Opponents</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:12.5px" style-hover="background:#14181d;color:#e7eaef">Clock behaviour</div>
+            <div style="flex:1"></div>
+            <div style="border-top:1px solid #1a1e24;padding:12px 8px 4px;display:flex;flex-direction:column;gap:5px"><div style="font-size:11px;color:#646c78">Sample</div><div style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f;font-variant-numeric:tabular-nums">972 analysed games</div></div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:18px 20px;gap:14px">
+            <div style="flex:none;display:flex;align-items:flex-end;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:3px"><span style="color:#e7eaef;font-size:19px;font-weight:600;letter-spacing:-.01em">Stats</span><span style="color:#646c78;font-size:12.5px">972 analysed games · 12 months · both colours</span></div>
+              <div style="flex:1"></div>
+              <div style="padding:7px 11px;border-radius:6px;border:1px solid #262d36;color:#949ca8;font-size:12px" style-hover="color:#e7eaef;border-color:#39414c">Export CSV</div>
+            </div>
+
+            <div style="flex:none;display:flex;gap:12px">
+              <div style="flex:1;padding:12px 14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;color:#5c646f">Games</span><div style="display:flex;align-items:baseline;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:22px;color:#e7eaef;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em">972</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78">analysed</span></div></div>
+              <div style="flex:1;padding:12px 14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;color:#5c646f">Accuracy</span><div style="display:flex;align-items:baseline;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:22px;color:#e7eaef;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em">82.6</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">+3.4</span></div></div>
+              <div style="flex:1;padding:12px 14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;color:#5c646f">Average ACPL</span><div style="display:flex;align-items:baseline;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:22px;color:#e7eaef;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em">41</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">−11</span></div></div>
+              <div style="flex:1;padding:12px 14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;color:#5c646f">Blunders per game</span><div style="display:flex;align-items:baseline;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:22px;color:#f0524a;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em">1.6</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">−0.4</span></div></div>
+              <div style="flex:1;padding:12px 14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;color:#5c646f">Score</span><div style="display:flex;align-items:baseline;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:22px;color:#e7eaef;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em">49.1%</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">−0.8</span></div></div>
+            </div>
+
+            <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px">
+
+              <div style="padding:14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:14px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12.5px;font-weight:600">Blunders by game phase</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#5c646f">1,556 blunders</span></div>
+                <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;color:#c8cfd8;font-size:12px">Opening <span style="color:#5c646f">moves 1–12</span></span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#949ca8;font-variant-numeric:tabular-nums">187</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#5c646f;font-variant-numeric:tabular-nums">12%</span></div>
+                    <div style="height:9px;border-radius:5px;background:#14181d;overflow:hidden"><div style="width:12%;height:100%;background:#3a424b;border-radius:5px"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;color:#c8cfd8;font-size:12px">Middlegame <span style="color:#5c646f">13–32</span></span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#e7eaef;font-variant-numeric:tabular-nums">918</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">59%</span></div>
+                    <div style="height:9px;border-radius:5px;background:#14181d;overflow:hidden"><div style="width:59%;height:100%;background:#f0524a;border-radius:5px"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;color:#c8cfd8;font-size:12px">Endgame <span style="color:#5c646f">33+</span></span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#949ca8;font-variant-numeric:tabular-nums">451</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e0872f;font-variant-numeric:tabular-nums">29%</span></div>
+                    <div style="height:9px;border-radius:5px;background:#14181d;overflow:hidden"><div style="width:29%;height:100%;background:#e0872f;border-radius:5px"></div></div>
+                  </div>
+                </div>
+                <div style="border-top:1px solid #1a1e24;padding-top:10px;color:#5c646f;font-size:11.5px;line-height:1.5">Six in ten happen between moves 13 and 32, where the position stops explaining itself.</div>
+              </div>
+
+              <div style="padding:14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12.5px;font-weight:600">Performance by time control</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#5c646f">score · ACPL</span></div>
+                <div style="flex:none;display:flex;align-items:center;gap:10px;height:26px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c646f;border-bottom:1px solid #1a1e24"><span style="width:76px;flex:none">Control</span><span style="width:44px;flex:none;text-align:right">Games</span><span style="flex:1">Score</span><span style="width:48px;flex:none;text-align:right">Score%</span><span style="width:44px;flex:none;text-align:right">ACPL</span><span style="width:44px;flex:none;text-align:right">Acc</span></div>
+                <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;font-family:'Geist Mono',monospace;font-size:12px;font-variant-numeric:tabular-nums">
+                  <div style="display:flex;align-items:center;gap:10px;height:30px;padding:0 2px;border-radius:5px" style-hover="background:#12161b"><span style="width:76px;flex:none;color:#c8cfd8">Bullet 1+0</span><span style="width:44px;flex:none;text-align:right;color:#949ca8">104</span><span style="flex:1;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:38%;background:#9ec49a"></span><span style="width:8%;background:#4d545e"></span><span style="width:54%;background:#f0524a"></span></span><span style="width:48px;flex:none;text-align:right;color:#f0524a">42.0</span><span style="width:44px;flex:none;text-align:right;color:#f0524a">96</span><span style="width:44px;flex:none;text-align:right;color:#c8cfd8">68.2</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;height:30px;padding:0 2px;border-radius:5px" style-hover="background:#12161b"><span style="width:76px;flex:none;color:#c8cfd8">Blitz 3+2</span><span style="width:44px;flex:none;text-align:right;color:#949ca8">288</span><span style="flex:1;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:44%;background:#9ec49a"></span><span style="width:10%;background:#4d545e"></span><span style="width:46%;background:#f0524a"></span></span><span style="width:48px;flex:none;text-align:right;color:#c8cfd8">48.6</span><span style="width:44px;flex:none;text-align:right;color:#e0872f">62</span><span style="width:44px;flex:none;text-align:right;color:#c8cfd8">76.4</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;height:30px;padding:0 2px;border-radius:5px;background:rgba(62,207,214,.06);box-shadow:inset 0 0 0 1px rgba(62,207,214,.22)"><span style="width:76px;flex:none;color:#fff">Rapid 10+0</span><span style="width:44px;flex:none;text-align:right;color:#c8cfd8">461</span><span style="flex:1;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:47%;background:#9ec49a"></span><span style="width:14%;background:#4d545e"></span><span style="width:39%;background:#f0524a"></span></span><span style="width:48px;flex:none;text-align:right;color:#9ec49a">54.1</span><span style="width:44px;flex:none;text-align:right;color:#949ca8">34</span><span style="width:44px;flex:none;text-align:right;color:#c8cfd8">84.7</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;height:30px;padding:0 2px;border-radius:5px" style-hover="background:#12161b"><span style="width:76px;flex:none;color:#c8cfd8">Classical</span><span style="width:44px;flex:none;text-align:right;color:#949ca8">119</span><span style="flex:1;display:flex;height:7px;border-radius:4px;overflow:hidden"><span style="width:50%;background:#9ec49a"></span><span style="width:20%;background:#4d545e"></span><span style="width:30%;background:#f0524a"></span></span><span style="width:48px;flex:none;text-align:right;color:#9ec49a">60.1</span><span style="width:44px;flex:none;text-align:right;color:#9ec49a">23</span><span style="width:44px;flex:none;text-align:right;color:#c8cfd8">89.8</span></div>
+                </div>
+                <div style="border-top:1px solid #1a1e24;padding-top:10px;color:#5c646f;font-size:11.5px;line-height:1.5">Every minute you add is worth about four accuracy points.</div>
+              </div>
+
+              <div style="padding:14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="color:#e7eaef;font-size:12.5px;font-weight:600">Eval loss by clock remaining</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#5c646f">avg centipawn loss</span></div>
+                <div style="flex:1;display:flex;align-items:flex-end;gap:16px;padding:0 4px">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#949ca8;font-variant-numeric:tabular-nums">26</span><div style="width:100%;height:34px;border-radius:4px 4px 0 0;background:#3a424b"></div><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">&gt;5 min</span></div>
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#949ca8;font-variant-numeric:tabular-nums">33</span><div style="width:100%;height:48px;border-radius:4px 4px 0 0;background:#454e59"></div><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">5–2 min</span></div>
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#c8cfd8;font-variant-numeric:tabular-nums">51</span><div style="width:100%;height:76px;border-radius:4px 4px 0 0;background:#c9b23e"></div><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">2–1 min</span></div>
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#c8cfd8;font-variant-numeric:tabular-nums">78</span><div style="width:100%;height:110px;border-radius:4px 4px 0 0;background:#e0872f"></div><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">60–30 s</span></div>
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#f0524a;font-variant-numeric:tabular-nums">134</span><div style="width:100%;height:150px;border-radius:4px 4px 0 0;background:#f0524a"></div><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">&lt;30 s</span></div>
+                </div>
+                <div style="border-top:1px solid #1a1e24;padding-top:10px;color:#5c646f;font-size:11.5px;line-height:1.5">Under thirty seconds you play five times worse than at leisure. Nothing here is a surprise, but it is now numbered.</div>
+              </div>
+
+              <div style="padding:14px;border-radius:9px;background:#0b0d10;border:1px solid #1f242b;display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:baseline;gap:10px"><span style="color:#e7eaef;font-size:12.5px;font-weight:600">Progress</span><span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:#646c78"><span style="width:7px;height:2px;background:#3ecfd6"></span>ACPL</span><span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:#646c78"><span style="width:7px;height:2px;background:#4d545e"></span>blunders/game</span><div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:#5c646f">Sep 25 → Aug 26</span></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                  <svg width="480" height="140" viewBox="0 0 480 140" style="display:block;width:100%;flex:1">
+                    <line x1="0" y1="10" x2="480" y2="10" stroke="#171c22" stroke-width="1"></line>
+                    <line x1="0" y1="70" x2="480" y2="70" stroke="#171c22" stroke-width="1"></line>
+                    <line x1="0" y1="130" x2="480" y2="130" stroke="#22272f" stroke-width="1"></line>
+                    <path d="M0,34 L43.6,52 L87.3,42 L130.9,66 L174.5,76 L218.2,70 L261.8,90 L305.5,100 L349.1,94 L392.7,114 L436.4,119 L480,124 L480,130 L0,130 Z" fill="rgba(62,207,214,.08)"></path>
+                    <path d="M0,34 L43.6,52 L87.3,42 L130.9,66 L174.5,76 L218.2,70 L261.8,90 L305.5,100 L349.1,94 L392.7,114 L436.4,119 L480,124" fill="none" stroke="#3ecfd6" stroke-width="1.8" stroke-linejoin="round"></path>
+                    <path d="M0,52 L43.6,60 L87.3,56 L130.9,72 L174.5,80 L218.2,86 L261.8,84 L305.5,96 L349.1,102 L392.7,110 L436.4,112 L480,116" fill="none" stroke="#4d545e" stroke-width="1.5" stroke-dasharray="3 3" stroke-linejoin="round"></path>
+                    <circle cx="480" cy="124" r="3.5" fill="#3ecfd6" stroke="#0b0d10" stroke-width="2"></circle>
+                  </svg>
+                  <div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:9.5px;color:#5c646f;font-variant-numeric:tabular-nums"><span>Sep</span><span>Nov</span><span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Aug</span></div>
+                </div>
+                <div style="border-top:1px solid #1a1e24;padding-top:10px;display:flex;gap:20px">
+                  <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:10.5px;color:#5c646f">ACPL then → now</span><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#e7eaef;font-variant-numeric:tabular-nums">52 → 34</span></div>
+                  <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:10.5px;color:#5c646f">Blunders/game</span><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#e7eaef;font-variant-numeric:tabular-nums">2.4 → 1.6</span></div>
+                  <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:10.5px;color:#5c646f">Rating</span><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#9ec49a;font-variant-numeric:tabular-nums">1583 → 1712</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section style="display:flex;flex-direction:column;gap:26px;padding:44px 44px 90px">
 
   <div style="display:flex;align-items:baseline;gap:14px;color:#646c78;font-size:13px;letter-spacing:.08em;text-transform:uppercase">
@@ -56,7 +911,7 @@
           <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:#646c78;margin-left:8px">
             <span>Library</span><span style="color:#3a4049">/</span>
             <span style="font-family:'Geist Mono',monospace">22 Aug 2026</span><span style="color:#3a4049">/</span>
-            <span style="color:#b6bec9">sundialgambit — kn1ghtmare</span>
+            <span style="color:#b6bec9">kn1ghtmare — sundialgambit</span>
           </div>
           <div style="flex:1"></div>
           <div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a">
@@ -101,7 +956,7 @@
                   <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9"><span style="width:5px;height:5px;border-radius:50%;background:#8fb6c9"></span>Lichess</span>
                   <span style="font-family:'Geist Mono',monospace">Rapid 10+0</span>
                   <span style="color:#3a4049">·</span>
-                  <span style="font-family:'Geist Mono',monospace">0–1</span>
+                  <span style="font-family:'Geist Mono',monospace">1–0</span>
                 </div>
               </div>
               <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
@@ -408,12 +1263,12 @@
           </div>
           <div style="flex:1"></div>
           <div style="display:flex;align-items:center;gap:10px;padding:5px 10px;border:1px solid #22272f;border-radius:6px;background:#12151a">
-            <span style="color:#b6bec9;font-size:12px">sundialgambit</span>
-            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1712</span>
-            <span style="color:#3a4049">vs</span>
             <span style="color:#b6bec9;font-size:12px">kn1ghtmare</span>
             <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1748</span>
-            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-weight:600">0–1</span>
+            <span style="color:#3a4049">vs</span>
+            <span style="color:#b6bec9;font-size:12px">sundialgambit</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1712</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-weight:600">1–0</span>
           </div>
           <div style="flex:1"></div>
           <div style="display:flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid rgba(62,207,214,.28);border-radius:6px;background:rgba(62,207,214,.07)">

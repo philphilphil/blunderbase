@@ -18,9 +18,15 @@ directory are local snapshots pulled 2026-08-25.
 
 ## Scope
 
-Only the **Game view** (flagship page) is designed so far. Frontend v1 =
-app shell (routing, nav, theme, brand) + Game view per design. Dashboard,
-Games, Explorer, Stats, Import, Engines pages await further design turns.
+Designed (Turn 1 + Turn 2, all on the 1a direction): **Game view** (flagship),
+**Dashboard** (2a), **Games library** (2b), **Opening explorer** (2c),
+**Stats** (2d). Frontend v1 builds all of these plus **Import** and
+**Settings → Engines**, which have no dedicated design turn — derive them
+from the established system (same shell, cards, tables, badges).
+
+Libraries, not wheel-reinvention: chessground (board), Recharts via shadcn/ui
+chart components (eval graph, rating graphs, stats dashboards); custom SVG
+only for tiny sparklines/board-overlay glyphs where a chart lib doesn't fit.
 
 ## Live behavior (spec addition, backend follow-up pending)
 
