@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#08090b; font-family:'Geist','Helvetica Neue',Helvetica,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#3ecfd6; text-decoration:none; }
+  a:hover { color:#7ee3e8; }
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb { background:#252b33; border-radius:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:26px;padding:44px 44px 90px">
+
+  <div style="display:flex;align-items:baseline;gap:14px;color:#646c78;font-size:13px;letter-spacing:.08em;text-transform:uppercase">
+    <span style="color:#e7eaef;font-weight:600;letter-spacing:.02em;text-transform:none;font-size:19px">Turn 1 — Game view</span>
+    <span style="font-family:'Geist Mono',monospace">two layouts · move list &amp; badge treatment · eval graph style</span>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <!-- ================= OPTION 1a ================= -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:5px;background:#3ecfd6;color:#06272a;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600">1a</span>
+        <span style="color:#e7eaef;font-size:15px;font-weight:600">Studio — four columns</span>
+        <span style="color:#646c78;font-size:13px">paired move table, glyph badges, filled eval area chart, Maia as a board overlay</span>
+      </div>
+
+      <div style="width:1440px;height:900px;background:#0e1013;border:1px solid #22272f;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(0,0,0,.8)">
+
+        <!-- titlebar -->
+        <div style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid #1a1e24;background:#0b0d10">
+          <div style="display:flex;gap:7px;align-items:center">
+            <div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div>
+          </div>
+          <div style="width:1px;height:18px;background:#1f242b;margin-left:6px"></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:13px;height:13px;background:#3ecfd6;transform:rotate(45deg);border-radius:2px"></div>
+            <span style="color:#e7eaef;font-size:13px;font-weight:600;letter-spacing:-.01em">Blunderbase</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:#646c78;margin-left:8px">
+            <span>Library</span><span style="color:#3a4049">/</span>
+            <span style="font-family:'Geist Mono',monospace">22 Aug 2026</span><span style="color:#3a4049">/</span>
+            <span style="color:#b6bec9">sundialgambit — kn1ghtmare</span>
+          </div>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a">
+            <span style="font-size:11px;color:#949ca8">Queue</span>
+            <div style="width:64px;height:3px;border-radius:2px;background:#22272f;overflow:hidden"><div style="width:43%;height:100%;background:#3ecfd6"></div></div>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e7eaef;font-variant-numeric:tabular-nums">3/7</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid #22272f;border-radius:6px;color:#646c78;font-size:11px;font-family:'Geist Mono',monospace">⌘K</div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#1d232b;border:1px solid #262d36;display:flex;align-items:center;justify-content:center;color:#949ca8;font-size:10px;font-weight:600">SG</div>
+        </div>
+
+        <div style="flex:1;display:flex;min-height:0">
+          <!-- nav -->
+          <div style="width:200px;flex:none;border-right:1px solid #1a1e24;background:#0b0d10;display:flex;flex-direction:column;padding:14px 10px;gap:2px">
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Workspace</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Dashboard</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:#14191f;color:#e7eaef;font-size:13px;font-weight:500;box-shadow:inset 2px 0 0 #3ecfd6"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #3ecfd6"></div>Games<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1,284</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Openings</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Stats</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #4d545e"></div>Blunder log<div style="flex:1"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">47</span></div>
+            <div style="height:14px"></div>
+            <div style="padding:6px 8px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4d545e">Engines</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:6px;height:6px;border-radius:50%;background:#3ecfd6;margin:0 4px"></div>Stockfish 17</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;color:#949ca8;font-size:13px" style-hover="background:#14181d;color:#e7eaef"><div style="width:6px;height:6px;border-radius:50%;background:#4d545e;margin:0 4px"></div>Maia 1100–1900</div>
+            <div style="flex:1"></div>
+            <div style="border-top:1px solid #1a1e24;padding:12px 8px 4px;display:flex;flex-direction:column;gap:5px">
+              <div style="font-size:11px;color:#646c78">Storage · local</div>
+              <div style="height:3px;border-radius:2px;background:#1a1e24;overflow:hidden"><div style="width:64%;height:100%;background:#3a424b"></div></div>
+              <div style="font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e;font-variant-numeric:tabular-nums">2.4 GB / 3.8 GB</div>
+            </div>
+          </div>
+
+          <!-- board column -->
+          <div style="width:524px;flex:none;border-right:1px solid #1a1e24;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:flex-start;gap:10px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="color:#e7eaef;font-size:14px;font-weight:600">English Opening, Botvinnik System</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;border:1px solid #22272f;border-radius:4px;padding:1px 5px">A26</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#646c78">
+                  <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9"><span style="width:5px;height:5px;border-radius:50%;background:#8fb6c9"></span>Lichess</span>
+                  <span style="font-family:'Geist Mono',monospace">Rapid 10+0</span>
+                  <span style="color:#3a4049">·</span>
+                  <span style="font-family:'Geist Mono',monospace">0–1</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:5px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:11px;font-weight:500">Standard · d32</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e">analysed 3 days ago</span>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <!-- eval bar -->
+              <div style="width:14px;height:460px;flex:none;border-radius:3px;overflow:hidden;display:flex;flex-direction:column;background:#1a1e24;position:relative">
+                <div style="height:47%;background:#20242a"></div>
+                <div style="flex:1;background:#dfe3e8"></div>
+                <div style="position:absolute;left:0;right:0;top:47%;height:1px;background:#3ecfd6;opacity:.8"></div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;gap:6px">
+                  <div style="width:14px;height:460px;flex:none;display:flex;flex-direction:column-reverse;justify-content:space-around;align-items:center;font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">
+                    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                  </div>
+                  <div style="position:relative;width:460px;height:460px;border-radius:3px;overflow:hidden;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:115px 115px">
+                    <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)">
+                      <div style="grid-area:7/8;background:rgba(62,207,214,.26);box-shadow:inset 0 0 0 2px rgba(62,207,214,.45)"></div>
+                      <div style="grid-area:6/8;background:rgba(62,207,214,.26);box-shadow:inset 0 0 0 2px rgba(62,207,214,.45)"></div>
+                      <div style="grid-area:3/6;box-shadow:inset 0 0 0 3px rgba(240,82,74,.85);border-radius:2px"></div>
+                      <div style="grid-area:5/5;box-shadow:inset 0 0 0 3px rgba(240,82,74,.35);border-radius:2px"></div>
+                    </div>
+                    <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-size:42px;line-height:1;place-items:center">
+                      <div style="grid-area:1/3;color:#14181c">♜</div><div style="grid-area:1/6;color:#14181c">♜</div><div style="grid-area:1/7;color:#14181c">♚</div>
+                      <div style="grid-area:2/1;color:#14181c">♟</div><div style="grid-area:2/2;color:#14181c">♟</div><div style="grid-area:2/3;color:#14181c">♛</div><div style="grid-area:2/5;color:#14181c">♝</div><div style="grid-area:2/6;color:#14181c">♟</div><div style="grid-area:2/7;color:#14181c">♟</div><div style="grid-area:2/8;color:#14181c">♟</div>
+                      <div style="grid-area:3/3;color:#14181c">♞</div><div style="grid-area:3/4;color:#14181c">♟</div><div style="grid-area:3/6;color:#14181c">♞</div>
+                      <div style="grid-area:4/5;color:#14181c">♟</div>
+                      <div style="grid-area:5/3;color:#fbfcfd">♟</div><div style="grid-area:5/5;color:#fbfcfd">♟</div>
+                      <div style="grid-area:6/3;color:#fbfcfd">♞</div><div style="grid-area:6/4;color:#fbfcfd">♝</div><div style="grid-area:6/6;color:#fbfcfd">♞</div><div style="grid-area:6/8;color:#fbfcfd">♟</div>
+                      <div style="grid-area:7/1;color:#fbfcfd">♟</div><div style="grid-area:7/2;color:#fbfcfd">♟</div><div style="grid-area:7/4;color:#fbfcfd">♛</div><div style="grid-area:7/6;color:#fbfcfd">♟</div><div style="grid-area:7/7;color:#fbfcfd">♟</div>
+                      <div style="grid-area:8/3;color:#fbfcfd">♜</div><div style="grid-area:8/5;color:#fbfcfd">♜</div><div style="grid-area:8/7;color:#fbfcfd">♚</div>
+                    </div>
+
+                    <sc-if value="{{ maia }}" hint-placeholder-val="{{ true }}">
+                    <div style="position:absolute;left:10px;top:10px;width:246px;padding:11px 12px;border-radius:8px;background:rgba(11,13,16,.93);border:1px solid #2a323b;backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:8px;box-shadow:0 16px 40px -12px rgba(0,0,0,.9)">
+                      <div style="display:flex;align-items:center;gap:7px">
+                        <span style="width:6px;height:6px;border-radius:50%;background:#b287ff"></span>
+                        <span style="color:#e7eaef;font-size:11px;font-weight:600;letter-spacing:.02em">Maia 1700</span>
+                        <div style="flex:1"></div>
+                        <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e">human model</span>
+                      </div>
+                      <div style="color:#b6bec9;font-size:12px;line-height:1.45">A 1700 plays <span style="font-family:'Geist Mono',monospace;color:#f0524a">24…Nxe4</span> here — <span style="font-family:'Geist Mono',monospace;color:#e7eaef;font-variant-numeric:tabular-nums">41%</span></div>
+                      <div style="display:flex;flex-direction:column;gap:4px">
+                        <div style="display:flex;align-items:center;gap:8px"><span style="width:44px;font-family:'Geist Mono',monospace;font-size:10px;color:#949ca8">Nxe4</span><div style="flex:1;height:4px;border-radius:2px;background:#1c2128;overflow:hidden"><div style="width:41%;height:100%;background:#f0524a"></div></div><span style="width:26px;text-align:right;font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">41</span></div>
+                        <div style="display:flex;align-items:center;gap:8px"><span style="width:44px;font-family:'Geist Mono',monospace;font-size:10px;color:#949ca8">Rfe8</span><div style="flex:1;height:4px;border-radius:2px;background:#1c2128;overflow:hidden"><div style="width:22%;height:100%;background:#3a424b"></div></div><span style="width:26px;text-align:right;font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">22</span></div>
+                        <div style="display:flex;align-items:center;gap:8px"><span style="width:44px;font-family:'Geist Mono',monospace;font-size:10px;color:#949ca8">h6</span><div style="flex:1;height:4px;border-radius:2px;background:#1c2128;overflow:hidden"><div style="width:12%;height:100%;background:#3a424b"></div></div><span style="width:26px;text-align:right;font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">12</span></div>
+                      </div>
+                      <div style="border-top:1px solid #1f242b;padding-top:7px;color:#5c646f;font-size:11px;font-style:italic">It called your move before you made it.</div>
+                    </div>
+                    </sc-if>
+                  </div>
+                </div>
+                <div style="display:flex;padding-left:20px">
+                  <div style="width:460px;display:flex;justify-content:space-around;font-family:'Geist Mono',monospace;font-size:10px;color:#5c646f">
+                    <span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- board toolbar -->
+            <div style="display:flex;align-items:center;gap:8px;padding-left:24px">
+              <div style="display:flex;border:1px solid #22272f;border-radius:6px;overflow:hidden;background:#12151a">
+                <div style="padding:5px 10px;color:#949ca8;font-size:12px;border-right:1px solid #22272f" style-hover="background:#1a1f26;color:#e7eaef">⏮</div>
+                <div style="padding:5px 10px;color:#949ca8;font-size:12px;border-right:1px solid #22272f" style-hover="background:#1a1f26;color:#e7eaef">◀</div>
+                <div style="padding:5px 10px;color:#e7eaef;font-size:12px;border-right:1px solid #22272f;background:#1a1f26" style-hover="background:#22282f">▶</div>
+                <div style="padding:5px 10px;color:#949ca8;font-size:12px" style-hover="background:#1a1f26;color:#e7eaef">⏭</div>
+              </div>
+              <div style="padding:5px 10px;border:1px solid #22272f;border-radius:6px;background:#12151a;color:#949ca8;font-size:12px" style-hover="color:#e7eaef">⇅ Flip</div>
+              <div style="flex:1"></div>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">ply 47 / 62</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e7eaef;background:#141922;border:1px solid #22272f;border-radius:4px;padding:2px 6px;font-variant-numeric:tabular-nums">+0.18</span>
+            </div>
+
+            <!-- eval graph : filled area -->
+            <div style="flex:1;min-height:0;border:1px solid #1f242b;border-radius:8px;background:#0b0d10;padding:11px 12px 9px;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:11px;color:#949ca8;font-weight:500">Evaluation</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e">white advantage above axis</span>
+                <div style="flex:1"></div>
+                <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#646c78"><span style="width:6px;height:6px;border-radius:50%;background:#f0524a"></span>blunder</span>
+                <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#646c78"><span style="width:6px;height:6px;border-radius:50%;background:#e0872f"></span>mistake</span>
+              </div>
+              <svg width="460" height="100" viewBox="0 0 460 100" style="display:block;overflow:visible">
+                <rect x="0" y="0" width="460" height="100" fill="#0e1216"></rect>
+                <line x1="0" y1="50" x2="460" y2="50" stroke="#2a313a" stroke-width="1"></line>
+                <line x1="0" y1="27.5" x2="460" y2="27.5" stroke="#1a1f25" stroke-width="1"></line>
+                <line x1="0" y1="72.5" x2="460" y2="72.5" stroke="#1a1f25" stroke-width="1"></line>
+                <path d="M0,47.75 L19.2,47 L38.3,46.25 L57.5,48.5 L76.7,45.5 L95.8,44.75 L115,47 L134.2,43.25 L153.3,41 L172.5,44 L191.7,41.75 L210.8,33.5 L230,39.5 L249.2,42.5 L268.3,40.25 L287.5,54.5 L306.7,53.75 L325.8,51.5 L345,49.25 L364.2,47.75 L383.3,48.5 L402.5,45.5 L421.7,46.25 L440.8,47 L460,5.6 L460,50 L0,50 Z" fill="rgba(223,227,232,.16)"></path>
+                <path d="M0,47.75 L19.2,47 L38.3,46.25 L57.5,48.5 L76.7,45.5 L95.8,44.75 L115,47 L134.2,43.25 L153.3,41 L172.5,44 L191.7,41.75 L210.8,33.5 L230,39.5 L249.2,42.5 L268.3,40.25 L287.5,54.5 L306.7,53.75 L325.8,51.5 L345,49.25 L364.2,47.75 L383.3,48.5 L402.5,45.5 L421.7,46.25 L440.8,47 L460,5.6" fill="none" stroke="#dfe3e8" stroke-width="1.6" stroke-linejoin="round"></path>
+                <circle cx="210.8" cy="33.5" r="3" fill="#e0872f" stroke="#0e1216" stroke-width="1.5"></circle>
+                <circle cx="287.5" cy="54.5" r="3" fill="#e0872f" stroke="#0e1216" stroke-width="1.5"></circle>
+                <line x1="440.8" y1="0" x2="440.8" y2="100" stroke="#3ecfd6" stroke-width="1" stroke-dasharray="2 3"></line>
+                <circle cx="460" cy="5.6" r="3.5" fill="#f0524a" stroke="#0e1216" stroke-width="1.5"></circle>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:9px;color:#454c56;font-variant-numeric:tabular-nums"><span>1</span><span>5</span><span>10</span><span>15</span><span>20</span><span>24</span></div>
+            </div>
+          </div>
+
+          <!-- moves + engine -->
+          <div style="flex:1;min-width:0;border-right:1px solid #1a1e24;display:flex;flex-direction:column">
+            <div style="height:38px;flex:none;display:flex;align-items:stretch;border-bottom:1px solid #1a1e24;padding:0 12px;gap:2px">
+              <div style="display:flex;align-items:center;padding:0 10px;font-size:12px;color:#e7eaef;font-weight:500;box-shadow:inset 0 -2px 0 #3ecfd6">Moves</div>
+              <div style="display:flex;align-items:center;padding:0 10px;font-size:12px;color:#646c78" style-hover="color:#e7eaef">Variations</div>
+              <div style="display:flex;align-items:center;padding:0 10px;font-size:12px;color:#646c78" style-hover="color:#e7eaef">Book</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;align-items:center;font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e">PGN</div>
+            </div>
+
+            <div style="flex:none;padding:10px 12px 4px;display:flex;align-items:center;gap:8px">
+              <div style="flex:1;height:1px;background:#1a1e24"></div>
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e">moves 1–18 collapsed</span>
+              <div style="flex:1;height:1px;background:#1a1e24"></div>
+            </div>
+
+            <div style="flex:none;display:flex;flex-direction:column;font-family:'Geist Mono',monospace;font-size:12.5px;padding:2px 6px">
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px" style-hover="background:#14181d">
+                <span style="width:30px;color:#4d545e;font-variant-numeric:tabular-nums">19.</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px" style-hover="color:#fff">Nh4</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px" style-hover="color:#fff">Ne8</span>
+              </div>
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px" style-hover="background:#14181d">
+                <span style="width:30px;color:#4d545e;font-variant-numeric:tabular-nums">20.</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px;display:flex;align-items:center;gap:5px">Ng5<span style="color:#3ecfd6">!</span></span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Nd7</span>
+              </div>
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px" style-hover="background:#14181d">
+                <span style="width:30px;color:#4d545e;font-variant-numeric:tabular-nums">21.</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Bd3</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px;display:flex;align-items:center;gap:5px">Qc7<span style="display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:15px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:10px;font-weight:600">?!</span></span>
+              </div>
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px" style-hover="background:#14181d">
+                <span style="width:30px;color:#4d545e;font-variant-numeric:tabular-nums">22.</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Rac1</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Rac8</span>
+              </div>
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px" style-hover="background:#14181d">
+                <span style="width:30px;color:#4d545e;font-variant-numeric:tabular-nums">23.</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Nf3</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Nf6</span>
+              </div>
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px;background:#151b22">
+                <span style="width:30px;color:#646c78;font-variant-numeric:tabular-nums">24.</span>
+                <span style="flex:1;color:#fff;padding:0 4px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(62,207,214,.55);background:rgba(62,207,214,.10);height:20px;display:flex;align-items:center">h3</span>
+                <span style="flex:1;color:#f0524a;padding:0 4px;display:flex;align-items:center;gap:5px;font-weight:500">Nxe4<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:10px;font-weight:700">??</span></span>
+              </div>
+              <div style="display:flex;gap:8px;padding:6px 8px 8px 42px;font-family:'Geist',sans-serif;font-size:11.5px;color:#8a929d;line-height:1.5;font-style:italic">
+                <div style="width:2px;flex:none;border-radius:1px;background:#f0524a;opacity:.5"></div>
+                <div>Loses a piece to the recapture. Eval <span style="font-family:'Geist Mono',monospace;color:#f0524a;font-style:normal">+0.18 → +2.96</span></div>
+              </div>
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px;opacity:.55" style-hover="background:#14181d;opacity:1">
+                <span style="width:30px;color:#4d545e;font-variant-numeric:tabular-nums">25.</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Nxe4</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">d5</span>
+              </div>
+              <div style="display:flex;align-items:center;height:28px;border-radius:5px;padding:0 6px;opacity:.55" style-hover="background:#14181d;opacity:1">
+                <span style="width:30px;color:#4d545e;font-variant-numeric:tabular-nums">26.</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">cxd5</span>
+                <span style="flex:1;color:#c8cfd8;padding:0 4px">Nb4</span>
+              </div>
+            </div>
+
+            <div style="flex:1"></div>
+
+            <!-- engine panel -->
+            <div style="flex:none;border-top:1px solid #1a1e24;background:#0b0d10;display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px 8px">
+                <span style="width:6px;height:6px;border-radius:50%;background:#3ecfd6"></span>
+                <span style="color:#e7eaef;font-size:12px;font-weight:600">Stockfish 17</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e">NNUE</span>
+                <div style="flex:1"></div>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">d32</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">18.4 MN/s</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;border:1px solid #22272f;border-radius:4px;padding:1px 5px">MPV 4</span>
+              </div>
+              <div style="display:flex;flex-direction:column;padding:0 6px 6px;font-family:'Geist Mono',monospace;font-size:11.5px">
+                <div style="display:flex;align-items:center;gap:9px;height:26px;padding:0 6px;border-radius:5px" style-hover="background:#14181d">
+                  <span style="min-width:44px;text-align:right;color:#dfe3e8;background:#1e242b;border-radius:3px;padding:2px 6px;font-variant-numeric:tabular-nums">+0.18</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:#e7eaef">24…Rfe8</span> 25.b3 h6 26.a4 Nh5 27.Bf1</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;height:26px;padding:0 6px;border-radius:5px" style-hover="background:#14181d">
+                  <span style="min-width:44px;text-align:right;color:#b6bec9;background:#181d23;border-radius:3px;padding:2px 6px;font-variant-numeric:tabular-nums">+0.31</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:#e7eaef">24…h6</span> 25.Rcd1 Rfe8 26.a3 a6</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;height:26px;padding:0 6px;border-radius:5px" style-hover="background:#14181d">
+                  <span style="min-width:44px;text-align:right;color:#b6bec9;background:#181d23;border-radius:3px;padding:2px 6px;font-variant-numeric:tabular-nums">+0.44</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:#e7eaef">24…Nh5</span> 25.g3 Nf6 26.Nh4 Ne8</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;height:26px;padding:0 6px;border-radius:5px;background:rgba(240,82,74,.06)">
+                  <span style="min-width:44px;text-align:right;color:#f0524a;background:rgba(240,82,74,.13);border-radius:3px;padding:2px 6px;font-variant-numeric:tabular-nums">+2.96</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:#f0524a">24…Nxe4</span> 25.Nxe4 d5 26.cxd5 Nb4</span>
+                  <span style="font-size:9.5px;color:#f0524a;border:1px solid rgba(240,82,74,.35);border-radius:3px;padding:1px 4px">played</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- coach notes -->
+          <div style="width:316px;flex:none;background:#0b0d10;display:flex;flex-direction:column">
+            <div style="height:38px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid #1a1e24">
+              <span style="color:#e7eaef;font-size:12px;font-weight:600">Notes</span>
+              <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#949ca8;border:1px solid #22272f;border-radius:4px;padding:1px 6px"><span style="width:5px;height:5px;border-radius:50%;background:#9ec49a"></span>via MCP</span>
+              <div style="flex:1"></div>
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">3</span>
+            </div>
+
+            <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:1px;padding:10px 12px">
+              <div style="display:flex;align-items:center;gap:7px;padding:0 2px 10px;font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">
+                <span style="color:#949ca8">claude-desktop</span><span style="color:#3a4049">→</span><span>blunderbase-mcp</span><div style="flex:1"></div><span>2d ago</span>
+              </div>
+              <sc-if value="{{ wry }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <div style="display:flex;flex-direction:column;gap:6px;padding:11px 12px;border-radius:8px;background:#12161b;border:1px solid #1f242b;border-left:2px solid #f0524a">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#f0524a">24…Nxe4</span><span style="font-size:10px;color:#4d545e">the moment</span></div>
+                  <div style="color:#c1c8d1;font-size:12.5px;line-height:1.55">Nine moves of careful improving, one move of generosity. Both the knight on c3 and the bishop on d3 were watching e4 — the pawn was defended twice and free zero times.</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;padding:11px 12px;border-radius:8px;background:#12161b;border:1px solid #1f242b;border-left:2px solid #e0872f">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#e0872f">15.Bf1</span><span style="font-size:10px;color:#4d545e">their mistake</span></div>
+                  <div style="color:#c1c8d1;font-size:12.5px;line-height:1.55">They handed you a full point of eval on move 15 and you were fine for nine more moves. Worth noting that you did have an advantage. Briefly.</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;padding:11px 12px;border-radius:8px;background:#12161b;border:1px solid #1f242b;border-left:2px solid #3ecfd6">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#3ecfd6">pattern</span><span style="font-size:10px;color:#4d545e">4th time this month</span></div>
+                  <div style="color:#c1c8d1;font-size:12.5px;line-height:1.55">Central pawn grabs with a knight while two pieces cover the square. Filed under recurring. Three drill positions are already in the queue.</div>
+                </div>
+              </div>
+              </sc-if>
+              <sc-if value="{{ dry }}">
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <div style="display:flex;flex-direction:column;gap:6px;padding:11px 12px;border-radius:8px;background:#12161b;border:1px solid #1f242b;border-left:2px solid #f0524a">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#f0524a">24…Nxe4</span><span style="font-size:10px;color:#4d545e">the moment</span></div>
+                  <div style="color:#c1c8d1;font-size:12.5px;line-height:1.55">Loses a piece for a pawn. e4 is defended by Nc3 and Bd3; after 25.Nxe4 there is no follow-up compensation.</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;padding:11px 12px;border-radius:8px;background:#12161b;border:1px solid #1f242b;border-left:2px solid #e0872f">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#e0872f">15.Bf1</span><span style="font-size:10px;color:#4d545e">their mistake</span></div>
+                  <div style="color:#c1c8d1;font-size:12.5px;line-height:1.55">−0.95 for White. You held a small edge from move 15 to move 23.</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;padding:11px 12px;border-radius:8px;background:#12161b;border:1px solid #1f242b;border-left:2px solid #3ecfd6">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-family:'Geist Mono',monospace;font-size:10px;color:#3ecfd6">pattern</span><span style="font-size:10px;color:#4d545e">4 occurrences · 30 days</span></div>
+                  <div style="color:#c1c8d1;font-size:12.5px;line-height:1.55">Knight captures on a doubly defended central square. Three drill positions queued.</div>
+                </div>
+              </div>
+              </sc-if>
+            </div>
+
+            <div style="flex:none;padding:12px;border-top:1px solid #1a1e24;display:flex;flex-direction:column;gap:10px">
+              <div style="padding:12px;border-radius:8px;background:linear-gradient(180deg,#12181d,#0e1216);border:1px solid #232a33;display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="color:#e7eaef;font-size:12px;font-weight:600">Deep analysis</span>
+                  <span style="font-size:10px;color:#b287ff;background:rgba(178,135,255,.10);border:1px solid rgba(178,135,255,.28);border-radius:4px;padding:1px 5px">cloud</span>
+                </div>
+                <div style="color:#8a929d;font-size:11.5px;line-height:1.5">40M nodes/move, full variation tree, Maia at five rating bands. About 6 minutes.</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="flex:1;padding:8px 10px;border-radius:6px;background:#3ecfd6;color:#062a2c;font-size:12px;font-weight:600;text-align:center" style-hover="background:#5fdde3">Request deep analysis</div>
+                  <div style="padding:8px 10px;border-radius:6px;border:1px solid #262d36;color:#949ca8;font-size:12px" style-hover="color:#e7eaef;border-color:#39414c">Queue</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;padding:10px 11px;border-radius:8px;border:1px solid #1f242b;background:#0e1114">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <span style="width:5px;height:5px;border-radius:50%;background:#9ec49a"></span>
+                  <span style="color:#b6bec9;font-size:11.5px;font-weight:500">MCP server running</span>
+                  <div style="flex:1"></div>
+                  <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">1 client</span>
+                </div>
+                <div style="color:#7d858f;font-size:11px;line-height:1.5">Notes are written by your own assistant. Blunderbase just keeps them next to the move.</div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;color:#8fb6c9">
+                  <span style="border:1px solid #23303c;border-radius:4px;padding:1px 5px">query_games</span>
+                  <span style="border:1px solid #23303c;border-radius:4px;padding:1px 5px">get_position</span>
+                  <span style="border:1px solid #23303c;border-radius:4px;padding:1px 5px">write_note</span>
+                  <span style="border:1px solid #23303c;border-radius:4px;padding:1px 5px">+4</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= OPTION 1b ================= -->
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:5px;background:#3ecfd6;color:#06272a;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600">1b</span>
+        <span style="color:#e7eaef;font-size:15px;font-weight:600">Focus — board left, one tall rail</span>
+        <span style="color:#646c78;font-size:13px">single-stream move list, numeric swing badges, mirrored eval-loss bars, Maia inline with the engine</span>
+      </div>
+
+      <div style="width:1440px;height:900px;background:#0e1013;border:1px solid #22272f;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(0,0,0,.8)">
+
+        <div style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid #1a1e24;background:#0b0d10">
+          <div style="display:flex;gap:7px;align-items:center">
+            <div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#2c323a"></div>
+          </div>
+          <div style="width:1px;height:18px;background:#1f242b;margin-left:6px"></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:13px;height:13px;background:#3ecfd6;transform:rotate(45deg);border-radius:2px"></div>
+            <span style="color:#e7eaef;font-size:13px;font-weight:600">Blunderbase</span>
+          </div>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:5px 10px;border:1px solid #22272f;border-radius:6px;background:#12151a">
+            <span style="color:#b6bec9;font-size:12px">sundialgambit</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1712</span>
+            <span style="color:#3a4049">vs</span>
+            <span style="color:#b6bec9;font-size:12px">kn1ghtmare</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;font-variant-numeric:tabular-nums">1748</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-weight:600">0–1</span>
+          </div>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid rgba(62,207,214,.28);border-radius:6px;background:rgba(62,207,214,.07)">
+            <span style="width:5px;height:5px;border-radius:50%;background:#3ecfd6"></span>
+            <span style="font-size:11px;color:#3ecfd6">Analysing 3 of 7</span>
+          </div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#1d232b;border:1px solid #262d36;display:flex;align-items:center;justify-content:center;color:#949ca8;font-size:10px;font-weight:600">SG</div>
+        </div>
+
+        <div style="flex:1;display:flex;min-height:0">
+          <!-- icon rail -->
+          <div style="width:64px;flex:none;border-right:1px solid #1a1e24;background:#0b0d10;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px">
+            <div style="width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#646c78" style-hover="background:#14181d;color:#e7eaef"><div style="width:16px;height:16px;border:1.5px solid currentColor;border-radius:3px"></div></div>
+            <div style="width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#3ecfd6;background:rgba(62,207,214,.10);box-shadow:inset 0 0 0 1px rgba(62,207,214,.28)"><div style="width:16px;height:16px;border:1.5px solid currentColor;border-radius:3px;transform:rotate(45deg)"></div></div>
+            <div style="width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#646c78" style-hover="background:#14181d;color:#e7eaef"><div style="width:16px;height:16px;border:1.5px solid currentColor;border-radius:50%"></div></div>
+            <div style="width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#646c78" style-hover="background:#14181d;color:#e7eaef"><div style="width:16px;height:16px;border-bottom:1.5px solid currentColor;border-left:1.5px solid currentColor"></div></div>
+            <div style="flex:1"></div>
+            <div style="width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#646c78;position:relative" style-hover="background:#14181d;color:#e7eaef"><div style="width:16px;height:16px;border:1.5px solid currentColor;border-radius:3px"></div><div style="position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;background:#f0524a;border:1.5px solid #0b0d10"></div></div>
+          </div>
+
+          <!-- board + engine strip -->
+          <div style="width:900px;flex:none;border-right:1px solid #1a1e24;padding:18px 24px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="color:#e7eaef;font-size:14px;font-weight:600">English Opening, Botvinnik System</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78;border:1px solid #22272f;border-radius:4px;padding:1px 5px">A26</span>
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:11px"><span style="width:5px;height:5px;border-radius:50%;background:#8fb6c9"></span>Lichess</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#646c78">Rapid 10+0</span>
+              <div style="flex:1"></div>
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:5px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:11px">Standard · d32</span>
+              <span style="padding:3px 8px;border-radius:5px;border:1px solid #262d36;color:#949ca8;font-size:11px" style-hover="color:#e7eaef">⇅ Flip</span>
+            </div>
+
+            <div style="display:flex;justify-content:center;gap:12px">
+              <div style="width:16px;height:520px;flex:none;border-radius:3px;overflow:hidden;display:flex;flex-direction:column;background:#1a1e24;position:relative">
+                <div style="height:47%;background:#20242a"></div>
+                <div style="flex:1;background:#dfe3e8"></div>
+                <div style="position:absolute;left:0;right:0;top:47%;height:1px;background:#3ecfd6;opacity:.8"></div>
+                <div style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-family:'Geist Mono',monospace;font-size:9px;color:#0b0d10;font-weight:700">.18</div>
+              </div>
+
+              <div style="position:relative;width:520px;height:520px;border-radius:4px;overflow:hidden;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:130px 130px">
+                <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)">
+                  <div style="grid-area:7/8;background:rgba(62,207,214,.26)"></div>
+                  <div style="grid-area:6/8;background:rgba(62,207,214,.26)"></div>
+                  <div style="grid-area:3/6;box-shadow:inset 0 0 0 3px rgba(240,82,74,.85)"></div>
+                  <div style="grid-area:5/5;box-shadow:inset 0 0 0 3px rgba(240,82,74,.35)"></div>
+                </div>
+                <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-size:48px;line-height:1;place-items:center">
+                  <div style="grid-area:1/3;color:#14181c">♜</div><div style="grid-area:1/6;color:#14181c">♜</div><div style="grid-area:1/7;color:#14181c">♚</div>
+                  <div style="grid-area:2/1;color:#14181c">♟</div><div style="grid-area:2/2;color:#14181c">♟</div><div style="grid-area:2/3;color:#14181c">♛</div><div style="grid-area:2/5;color:#14181c">♝</div><div style="grid-area:2/6;color:#14181c">♟</div><div style="grid-area:2/7;color:#14181c">♟</div><div style="grid-area:2/8;color:#14181c">♟</div>
+                  <div style="grid-area:3/3;color:#14181c">♞</div><div style="grid-area:3/4;color:#14181c">♟</div><div style="grid-area:3/6;color:#14181c">♞</div>
+                  <div style="grid-area:4/5;color:#14181c">♟</div>
+                  <div style="grid-area:5/3;color:#fbfcfd">♟</div><div style="grid-area:5/5;color:#fbfcfd">♟</div>
+                  <div style="grid-area:6/3;color:#fbfcfd">♞</div><div style="grid-area:6/4;color:#fbfcfd">♝</div><div style="grid-area:6/6;color:#fbfcfd">♞</div><div style="grid-area:6/8;color:#fbfcfd">♟</div>
+                  <div style="grid-area:7/1;color:#fbfcfd">♟</div><div style="grid-area:7/2;color:#fbfcfd">♟</div><div style="grid-area:7/4;color:#fbfcfd">♛</div><div style="grid-area:7/6;color:#fbfcfd">♟</div><div style="grid-area:7/7;color:#fbfcfd">♟</div>
+                  <div style="grid-area:8/3;color:#fbfcfd">♜</div><div style="grid-area:8/5;color:#fbfcfd">♜</div><div style="grid-area:8/7;color:#fbfcfd">♚</div>
+                </div>
+                <!-- inside coordinates -->
+                <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-family:'Geist Mono',monospace;font-size:9.5px;pointer-events:none">
+                  <div style="grid-area:1/1;padding:3px 0 0 4px;color:rgba(20,24,28,.55)">8</div>
+                  <div style="grid-area:2/1;padding:3px 0 0 4px;color:rgba(251,252,253,.45)">7</div>
+                  <div style="grid-area:3/1;padding:3px 0 0 4px;color:rgba(20,24,28,.55)">6</div>
+                  <div style="grid-area:4/1;padding:3px 0 0 4px;color:rgba(251,252,253,.45)">5</div>
+                  <div style="grid-area:5/1;padding:3px 0 0 4px;color:rgba(20,24,28,.55)">4</div>
+                  <div style="grid-area:6/1;padding:3px 0 0 4px;color:rgba(251,252,253,.45)">3</div>
+                  <div style="grid-area:7/1;padding:3px 0 0 4px;color:rgba(20,24,28,.55)">2</div>
+                  <div style="grid-area:8/1;padding:3px 0 0 4px;color:rgba(251,252,253,.45)">1</div>
+                  <div style="grid-area:8/2;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(20,24,28,.55)">b</div>
+                  <div style="grid-area:8/3;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(251,252,253,.45)">c</div>
+                  <div style="grid-area:8/4;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(20,24,28,.55)">d</div>
+                  <div style="grid-area:8/5;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(251,252,253,.45)">e</div>
+                  <div style="grid-area:8/6;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(20,24,28,.55)">f</div>
+                  <div style="grid-area:8/7;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(251,252,253,.45)">g</div>
+                  <div style="grid-area:8/8;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 4px 3px 0;color:rgba(20,24,28,.55)">h</div>
+                </div>
+              </div>
+
+              <div style="width:16px;flex:none"></div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;justify-content:center">
+              <div style="display:flex;border:1px solid #22272f;border-radius:7px;overflow:hidden;background:#12151a">
+                <div style="padding:6px 12px;color:#949ca8;font-size:12px;border-right:1px solid #22272f" style-hover="background:#1a1f26;color:#e7eaef">⏮</div>
+                <div style="padding:6px 12px;color:#949ca8;font-size:12px;border-right:1px solid #22272f" style-hover="background:#1a1f26;color:#e7eaef">◀</div>
+                <div style="padding:6px 14px;color:#e7eaef;font-size:12px;background:#1a1f26;border-right:1px solid #22272f;font-family:'Geist Mono',monospace;font-variant-numeric:tabular-nums">24. h3</div>
+                <div style="padding:6px 12px;color:#949ca8;font-size:12px;border-right:1px solid #22272f" style-hover="background:#1a1f26;color:#e7eaef">▶</div>
+                <div style="padding:6px 12px;color:#949ca8;font-size:12px" style-hover="background:#1a1f26;color:#e7eaef">⏭</div>
+              </div>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#4d545e">← → to step · J to jump to next flag</span>
+            </div>
+
+            <!-- engine strip -->
+            <div style="flex:1;min-height:0;border:1px solid #1f242b;border-radius:9px;background:#0b0d10;display:flex;flex-direction:column;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid #1a1e24">
+                <span style="width:6px;height:6px;border-radius:50%;background:#3ecfd6"></span>
+                <span style="color:#e7eaef;font-size:12px;font-weight:600">Stockfish 17</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">d32 · 18.4 MN/s · MPV 4</span>
+                <div style="flex:1"></div>
+                <sc-if value="{{ maia }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;align-items:center;gap:8px;padding:3px 9px;border-radius:5px;background:rgba(178,135,255,.07);border:1px solid rgba(178,135,255,.24)">
+                  <span style="width:5px;height:5px;border-radius:50%;background:#b287ff"></span>
+                  <span style="font-size:11px;color:#c9b0ff">Maia 1700 predicts</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a">Nxe4</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e7eaef;font-variant-numeric:tabular-nums">41%</span>
+                  <span style="color:#5c646f;font-size:11px;font-style:italic">— correctly</span>
+                </div>
+                </sc-if>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;padding:4px 6px;font-family:'Geist Mono',monospace;font-size:12px">
+                <div style="flex:1;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:6px" style-hover="background:#14181d">
+                  <span style="min-width:46px;text-align:right;color:#dfe3e8;background:#1e242b;border-radius:3px;padding:3px 7px;font-variant-numeric:tabular-nums">+0.18</span>
+                  <span style="color:#e7eaef;min-width:70px">24…Rfe8</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">25.b3 h6 26.a4 Nh5 27.Bf1 Nf4 28.Bg4</span>
+                  <span style="color:#4d545e;font-size:10px">d32</span>
+                </div>
+                <div style="flex:1;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:6px" style-hover="background:#14181d">
+                  <span style="min-width:46px;text-align:right;color:#b6bec9;background:#181d23;border-radius:3px;padding:3px 7px;font-variant-numeric:tabular-nums">+0.31</span>
+                  <span style="color:#e7eaef;min-width:70px">24…h6</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">25.Rcd1 Rfe8 26.a3 a6 27.b4 cxb4</span>
+                  <span style="color:#4d545e;font-size:10px">d32</span>
+                </div>
+                <div style="flex:1;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:6px" style-hover="background:#14181d">
+                  <span style="min-width:46px;text-align:right;color:#b6bec9;background:#181d23;border-radius:3px;padding:3px 7px;font-variant-numeric:tabular-nums">+0.44</span>
+                  <span style="color:#e7eaef;min-width:70px">24…Nh5</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">25.g3 Nf6 26.Nh4 Ne8 27.Bc2</span>
+                  <span style="color:#4d545e;font-size:10px">d31</span>
+                </div>
+                <div style="flex:1;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:6px;background:rgba(240,82,74,.06)">
+                  <span style="min-width:46px;text-align:right;color:#f0524a;background:rgba(240,82,74,.13);border-radius:3px;padding:3px 7px;font-variant-numeric:tabular-nums">+2.96</span>
+                  <span style="color:#f0524a;min-width:70px">24…Nxe4</span>
+                  <span style="flex:1;color:#949ca8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">25.Nxe4 d5 26.cxd5 Nb4 27.Bb1</span>
+                  <span style="font-size:9.5px;color:#f0524a;border:1px solid rgba(240,82,74,.35);border-radius:3px;padding:1px 4px">played</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- right rail -->
+          <div style="flex:1;min-width:0;background:#0b0d10;display:flex;flex-direction:column">
+
+            <!-- eval loss bars -->
+            <div style="flex:none;padding:14px 16px;border-bottom:1px solid #1a1e24;display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="color:#e7eaef;font-size:12px;font-weight:600">Eval loss per move</span>
+                <div style="flex:1"></div>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78;font-variant-numeric:tabular-nums">ACPL 34 / 71</span>
+              </div>
+              <div style="position:relative;height:92px;display:flex;align-items:center;gap:0">
+                <div style="position:absolute;left:0;right:0;top:46px;height:1px;background:#22272f"></div>
+                <div style="display:flex;gap:6px;align-items:center;height:92px;position:relative">
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;gap:0;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:8px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:9px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:6px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:10px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:12px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:8px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:9px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:11px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:8px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:14px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:10px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:17px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:9px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:12px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:8px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:20px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:13px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:10px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:9px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:15px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:8px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:33px;background:#e0872f;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:18px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:9px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:12px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:8px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:10px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:15px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:40px;background:#e0872f;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:8px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:9px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:13px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:11px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:9px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:8px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:12px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:10px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:9px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:14px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:11px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:8px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:10px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:9px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:8px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:12px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:9px;background:#2f363e;border-radius:1px"></div></div></div>
+                  <div style="display:flex;flex-direction:column;justify-content:center;height:92px;width:8px;box-shadow:0 0 0 1px rgba(62,207,214,.35);border-radius:2px"><div style="display:flex;flex-direction:column;justify-content:flex-end;height:46px"><div style="width:8px;height:8px;background:#48515b;border-radius:1px"></div></div><div style="display:flex;flex-direction:column;height:46px"><div style="width:8px;height:40px;background:#f0524a;border-radius:1px"></div></div></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;font-size:10px;color:#5c646f">
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;background:#48515b;border-radius:1px"></span>kn1ghtmare (white)</span>
+                <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;background:#2f363e;border-radius:1px"></span>you (black)</span>
+                <div style="flex:1"></div>
+                <span style="font-family:'Geist Mono',monospace">moves 1–24</span>
+              </div>
+            </div>
+
+            <!-- move stream -->
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+              <div style="flex:none;display:flex;align-items:center;gap:8px;padding:11px 16px 8px">
+                <span style="color:#e7eaef;font-size:12px;font-weight:600">Move stream</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:4px;background:rgba(240,82,74,.10);border:1px solid rgba(240,82,74,.26);color:#f0524a;font-size:10.5px">3 flagged</span>
+                <div style="flex:1"></div>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#4d545e">swing in pawns</span>
+              </div>
+              <div style="flex:1;min-height:0;overflow:hidden;padding:0 10px;display:flex;flex-direction:column;font-family:'Geist Mono',monospace;font-size:12.5px">
+                <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px;opacity:.5" style-hover="background:#14181d;opacity:1">
+                  <div style="width:2px;height:14px;border-radius:1px;background:#2a313a"></div>
+                  <span style="width:34px;color:#4d545e;font-variant-numeric:tabular-nums">22.</span>
+                  <span style="flex:1;color:#c8cfd8">Rac1</span>
+                  <span style="color:#4d545e;font-variant-numeric:tabular-nums">0.03</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px;opacity:.5" style-hover="background:#14181d;opacity:1">
+                  <div style="width:2px;height:14px;border-radius:1px;background:#2a313a"></div>
+                  <span style="width:34px;color:#4d545e;font-variant-numeric:tabular-nums">22…</span>
+                  <span style="flex:1;color:#c8cfd8">Rac8</span>
+                  <span style="color:#4d545e;font-variant-numeric:tabular-nums">0.02</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px" style-hover="background:#14181d">
+                  <div style="width:2px;height:14px;border-radius:1px;background:#2a313a"></div>
+                  <span style="width:34px;color:#4d545e;font-variant-numeric:tabular-nums">23.</span>
+                  <span style="flex:1;color:#c8cfd8">Nf3</span>
+                  <span style="color:#4d545e;font-variant-numeric:tabular-nums">0.06</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px" style-hover="background:#14181d">
+                  <div style="width:2px;height:14px;border-radius:1px;background:#2a313a"></div>
+                  <span style="width:34px;color:#4d545e;font-variant-numeric:tabular-nums">23…</span>
+                  <span style="flex:1;color:#c8cfd8">Nf6</span>
+                  <span style="color:#4d545e;font-variant-numeric:tabular-nums">0.03</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;height:28px;padding:0 8px;border-radius:5px;background:rgba(62,207,214,.09);box-shadow:inset 0 0 0 1px rgba(62,207,214,.35)">
+                  <div style="width:2px;height:16px;border-radius:1px;background:#3ecfd6"></div>
+                  <span style="width:34px;color:#7de1e7;font-variant-numeric:tabular-nums">24.</span>
+                  <span style="flex:1;color:#fff">h3</span>
+                  <span style="color:#646c78;font-variant-numeric:tabular-nums">0.02</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;height:28px;padding:0 8px;border-radius:5px;background:rgba(240,82,74,.09)">
+                  <div style="width:2px;height:16px;border-radius:1px;background:#f0524a"></div>
+                  <span style="width:34px;color:#f0524a;font-variant-numeric:tabular-nums">24…</span>
+                  <span style="flex:1;color:#f0524a;font-weight:500">Nxe4</span>
+                  <span style="color:#f0524a;font-weight:600;font-variant-numeric:tabular-nums">−2.78</span>
+                </div>
+                <div style="display:flex;gap:10px;padding:5px 8px 8px 22px;font-family:'Geist',sans-serif;font-size:11.5px;color:#8a929d;line-height:1.5">
+                  <div style="width:2px;flex:none;border-radius:1px;background:rgba(240,82,74,.4)"></div>
+                  <div>Piece for a pawn. Best was <span style="font-family:'Geist Mono',monospace;color:#c8cfd8">Rfe8</span>.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px;opacity:.55" style-hover="background:#14181d;opacity:1">
+                  <div style="width:2px;height:14px;border-radius:1px;background:#2a313a"></div>
+                  <span style="width:34px;color:#4d545e;font-variant-numeric:tabular-nums">25.</span>
+                  <span style="flex:1;color:#c8cfd8">Nxe4</span>
+                  <span style="color:#4d545e;font-variant-numeric:tabular-nums">0.00</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px;opacity:.55" style-hover="background:#14181d;opacity:1">
+                  <div style="width:2px;height:14px;border-radius:1px;background:#2a313a"></div>
+                  <span style="width:34px;color:#4d545e;font-variant-numeric:tabular-nums">25…</span>
+                  <span style="flex:1;color:#c8cfd8">d5</span>
+                  <span style="color:#c9b23e;font-variant-numeric:tabular-nums">−0.31</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- coach -->
+            <div style="flex:none;border-top:1px solid #1a1e24;padding:12px 16px 14px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="color:#e7eaef;font-size:12px;font-weight:600">Notes</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#949ca8;border:1px solid #22272f;border-radius:4px;padding:1px 6px"><span style="width:5px;height:5px;border-radius:50%;background:#9ec49a"></span>via MCP</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#646c78">claude-desktop · 2d</span>
+                <div style="flex:1"></div>
+                <span style="font-size:11px;color:#3ecfd6" style-hover="color:#7de1e7">all 3 notes</span>
+              </div>
+              <sc-if value="{{ wry }}" hint-placeholder-val="{{ true }}">
+              <div style="color:#c1c8d1;font-size:12.5px;line-height:1.6">Nine moves of careful improving, one move of generosity. e4 was covered twice — by <span style="font-family:'Geist Mono',monospace;color:#e7eaef">Nc3</span> and <span style="font-family:'Geist Mono',monospace;color:#e7eaef">Bd3</span>. Fourth central pawn grab of the month; three drills are already in the queue.</div>
+              </sc-if>
+              <sc-if value="{{ dry }}">
+              <div style="color:#c1c8d1;font-size:12.5px;line-height:1.6">24…Nxe4 loses a piece for a pawn: e4 is defended by <span style="font-family:'Geist Mono',monospace;color:#e7eaef">Nc3</span> and <span style="font-family:'Geist Mono',monospace;color:#e7eaef">Bd3</span>. Fourth similar capture in 30 days. Three drills queued.</div>
+              </sc-if>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="flex:1;padding:8px 10px;border-radius:6px;background:#3ecfd6;color:#062a2c;font-size:12px;font-weight:600;text-align:center" style-hover="background:#5fdde3">Request deep analysis</div>
+                <div style="padding:8px 10px;border-radius:6px;border:1px solid #262d36;color:#949ca8;font-size:12px" style-hover="color:#e7eaef;border-color:#39414c">MCP · 1 client</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= STATES SHEET ================= -->
+  <sc-if value="{{ states }}" hint-placeholder-val="{{ true }}">
+  <div id="1c" style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:5px;background:#20262e;color:#949ca8;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600">1c</span>
+      <span style="color:#e7eaef;font-size:15px;font-weight:600">Component states</span>
+      <span style="color:#646c78;font-size:13px">shared by both layouts</span>
+    </div>
+
+    <div style="width:2920px;background:#0b0d10;border:1px solid #22272f;border-radius:12px;padding:26px;display:grid;grid-template-columns:repeat(3,1fr);gap:26px 34px">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e">Eval badges — glyph (1a)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-family:'Geist Mono',monospace">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#f0524a"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:#f0524a;color:#1a0605;font-size:10px;font-weight:700">??</span>blunder</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#e0872f"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:rgba(224,135,47,.16);color:#e0872f;font-size:10px;font-weight:700">?</span>mistake</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#c9b23e"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:rgba(201,178,62,.14);color:#c9b23e;font-size:10px;font-weight:700">?!</span>inaccuracy</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#8fb6c9"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:rgba(143,182,201,.14);color:#8fb6c9;font-size:10px;font-weight:700">!?</span>interesting</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#3ecfd6"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:rgba(62,207,214,.14);color:#3ecfd6;font-size:10px;font-weight:700">!</span>best</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#b287ff"><span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:16px;border-radius:3px;background:rgba(178,135,255,.14);color:#b287ff;font-size:10px;font-weight:700">!!</span>brilliant</span>
+        </div>
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e;margin-top:6px">Eval badges — numeric swing (1b)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-family:'Geist Mono',monospace;font-size:12.5px;font-variant-numeric:tabular-nums">
+          <span style="display:inline-flex;align-items:center;gap:7px"><span style="width:2px;height:14px;background:#f0524a;border-radius:1px"></span><span style="color:#f0524a;font-weight:600">−2.78</span></span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><span style="width:2px;height:14px;background:#e0872f;border-radius:1px"></span><span style="color:#e0872f">−0.95</span></span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><span style="width:2px;height:14px;background:#c9b23e;border-radius:1px"></span><span style="color:#c9b23e">−0.31</span></span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><span style="width:2px;height:14px;background:#2a313a;border-radius:1px"></span><span style="color:#4d545e">0.04</span></span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><span style="width:2px;height:14px;background:#3ecfd6;border-radius:1px"></span><span style="color:#3ecfd6">0.00</span></span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e">Source badges</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:4px;background:#141922;border:1px solid #23303c;color:#8fb6c9;font-size:11.5px"><span style="width:5px;height:5px;border-radius:50%;background:#8fb6c9"></span>Lichess</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:4px;background:#16191a;border:1px solid #2b3330;color:#9ec49a;font-size:11.5px"><span style="width:5px;height:5px;border-radius:50%;background:#9ec49a"></span>Chess.com</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:4px;background:#1a1816;border:1px solid #34302a;color:#c9b89a;font-size:11.5px"><span style="width:5px;height:5px;border-radius:50%;background:#c9b89a"></span>OTB</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:4px;background:#141619;border:1px dashed #2c333c;color:#646c78;font-size:11.5px">Import pending</span>
+        </div>
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e;margin-top:6px">Analysis tiers</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="padding:3px 8px;border-radius:5px;border:1px dashed #2c333c;color:#5c646f;font-size:11.5px">Unanalysed</span>
+          <span style="padding:3px 8px;border-radius:5px;border:1px solid #2c333c;background:#14181d;color:#949ca8;font-size:11.5px">Quick · d18</span>
+          <span style="padding:3px 8px;border-radius:5px;background:rgba(62,207,214,.10);border:1px solid rgba(62,207,214,.30);color:#3ecfd6;font-size:11.5px">Standard · d32</span>
+          <span style="padding:3px 8px;border-radius:5px;background:rgba(178,135,255,.10);border:1px solid rgba(178,135,255,.28);color:#c9b0ff;font-size:11.5px">Deep · 40M cloud</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:5px;background:#14181d;border:1px solid #2c333c;color:#949ca8;font-size:11.5px"><span style="width:5px;height:5px;border-radius:50%;background:#e0872f"></span>Queued</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:5px;background:#14181d;border:1px solid #2c333c;color:#949ca8;font-size:11.5px"><span style="width:5px;height:5px;border-radius:50%;background:#f0524a"></span>Failed</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e">Queue progress</div>
+        <div style="display:flex;flex-direction:column;gap:9px;max-width:300px">
+          <div style="display:flex;align-items:center;gap:9px;padding:6px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a"><span style="font-size:11px;color:#5c646f;flex:1">Idle</span><div style="width:70px;height:3px;border-radius:2px;background:#1c2128"></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#4d545e;font-variant-numeric:tabular-nums">0/0</span></div>
+          <div style="display:flex;align-items:center;gap:9px;padding:6px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a"><span style="font-size:11px;color:#949ca8;flex:1">Analysing</span><div style="width:70px;height:3px;border-radius:2px;background:#22272f;overflow:hidden"><div style="width:43%;height:100%;background:#3ecfd6"></div></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#e7eaef;font-variant-numeric:tabular-nums">3/7</span></div>
+          <div style="display:flex;align-items:center;gap:9px;padding:6px 9px;border:1px solid #22272f;border-radius:6px;background:#12151a"><span style="font-size:11px;color:#949ca8;flex:1">Complete</span><div style="width:70px;height:3px;border-radius:2px;background:#22272f;overflow:hidden"><div style="width:100%;height:100%;background:#9ec49a"></div></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#9ec49a;font-variant-numeric:tabular-nums">7/7</span></div>
+          <div style="display:flex;align-items:center;gap:9px;padding:6px 9px;border:1px solid rgba(240,82,74,.28);border-radius:6px;background:rgba(240,82,74,.05)"><span style="font-size:11px;color:#f0524a;flex:1">2 failed — retry</span><div style="width:70px;height:3px;border-radius:2px;background:#22272f;overflow:hidden"><div style="width:71%;height:100%;background:#f0524a"></div></div><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#f0524a;font-variant-numeric:tabular-nums">5/7</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e">Move-list rows</div>
+        <div style="display:flex;flex-direction:column;gap:3px;font-family:'Geist Mono',monospace;font-size:12.5px;max-width:340px">
+          <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px"><span style="width:34px;color:#4d545e">21.</span><span style="flex:1;color:#c8cfd8">Bd3</span><span style="font-size:10px;color:#3a4049">default</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px;background:#14181d"><span style="width:34px;color:#4d545e">21.</span><span style="flex:1;color:#fff">Bd3</span><span style="font-size:10px;color:#3a4049">hover</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px;background:rgba(62,207,214,.09);box-shadow:inset 0 0 0 1px rgba(62,207,214,.35)"><span style="width:34px;color:#7de1e7">21.</span><span style="flex:1;color:#fff">Bd3</span><span style="font-size:10px;color:#3a4049">active</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px;background:rgba(240,82,74,.09)"><span style="width:34px;color:#f0524a">24…</span><span style="flex:1;color:#f0524a">Nxe4</span><span style="font-size:10px;color:#3a4049">flagged</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px"><span style="width:34px;color:#4d545e">12.</span><span style="flex:1;color:#c8cfd8;display:flex;align-items:center;gap:6px">e4<span style="width:4px;height:4px;border-radius:50%;background:#3ecfd6"></span></span><span style="font-size:10px;color:#3a4049">annotated</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:26px;padding:0 8px;border-radius:5px"><span style="width:34px;color:#4d545e">6.</span><span style="flex:1;color:#8fb6c9;display:flex;align-items:center;gap:7px">Nge2<span style="font-size:9.5px;border:1px solid #23303c;border-radius:3px;padding:0 4px">book 812</span></span><span style="font-size:10px;color:#3a4049">book</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e">Board coordinates &amp; square states</div>
+        <div style="display:flex;gap:16px;align-items:flex-start">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:4px">
+              <div style="width:12px;height:104px;display:flex;flex-direction:column-reverse;justify-content:space-around;align-items:center;font-family:'Geist Mono',monospace;font-size:8px;color:#5c646f"><span>1</span><span>2</span><span>3</span><span>4</span></div>
+              <div style="width:104px;height:104px;border-radius:3px;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:52px 52px"></div>
+            </div>
+            <div style="display:flex;padding-left:16px;width:104px;justify-content:space-around;font-family:'Geist Mono',monospace;font-size:8px;color:#5c646f"><span>a</span><span>b</span><span>c</span><span>d</span></div>
+            <div style="font-size:10px;color:#4d545e;padding-left:16px">edge · 1a</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="position:relative;width:104px;height:104px;border-radius:3px;overflow:hidden;background-image:conic-gradient(#5c6a73 25%, #a7b3bb 25% 50%, #5c6a73 50% 75%, #a7b3bb 75%);background-size:52px 52px">
+              <div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);font-family:'Geist Mono',monospace;font-size:8px">
+                <div style="grid-area:1/1;padding:2px 0 0 3px;color:rgba(20,24,28,.55)">4</div>
+                <div style="grid-area:2/1;padding:2px 0 0 3px;color:rgba(251,252,253,.45)">3</div>
+                <div style="grid-area:3/1;padding:2px 0 0 3px;color:rgba(20,24,28,.55)">2</div>
+                <div style="grid-area:4/1;padding:2px 0 0 3px;color:rgba(251,252,253,.45)">1</div>
+                <div style="grid-area:4/2;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 3px 2px 0;color:rgba(20,24,28,.55)">b</div>
+                <div style="grid-area:4/3;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 3px 2px 0;color:rgba(251,252,253,.45)">c</div>
+                <div style="grid-area:4/4;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 3px 2px 0;color:rgba(20,24,28,.55)">d</div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:#4d545e">inside · 1b</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:11px;color:#949ca8">
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:3px;background:#a7b3bb;box-shadow:inset 0 0 0 2px rgba(62,207,214,.5);position:relative"><div style="position:absolute;inset:0;background:rgba(62,207,214,.26)"></div></div>last move</div>
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:3px;background:#a7b3bb;box-shadow:inset 0 0 0 2.5px rgba(240,82,74,.85)"></div>blunder square</div>
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:3px;background:#5c6a73;position:relative"><div style="position:absolute;inset:6px;border-radius:50%;background:rgba(62,207,214,.55)"></div></div>engine target</div>
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:3px;background:#5c6a73;position:relative"><div style="position:absolute;inset:5px;border-radius:50%;border:2px solid rgba(178,135,255,.7)"></div></div>Maia target</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#4d545e">Type &amp; numerals</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="color:#e7eaef;font-size:20px;font-weight:600;letter-spacing:-.01em">Geist — UI, 400/500/600</div>
+          <div style="font-family:'Geist Mono',monospace;font-size:20px;color:#c8cfd8;font-variant-numeric:tabular-nums">Geist Mono — +2.96 −0.31 1712</div>
+          <div style="font-family:'Geist Mono',monospace;font-size:12px;color:#646c78">every eval, rating, ECO and percentage is tabular</div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <div style="width:34px;height:34px;border-radius:5px;background:#08090b;border:1px solid #22272f"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#0e1013;border:1px solid #22272f"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#12151a;border:1px solid #22272f"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#22272f"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#3ecfd6"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#f0524a"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#e0872f"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#c9b23e"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#b287ff"></div>
+            <div style="width:34px;height:34px;border-radius:5px;background:#dfe3e8"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showMaia&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Concepts&quot;},&quot;showStatesSheet&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Concepts&quot;},&quot;coachTone&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;wry&quot;,&quot;dry&quot;],&quot;default&quot;:&quot;wry&quot;,&quot;tsType&quot;:&quot;'wry' | 'dry'&quot;,&quot;section&quot;:&quot;Copy&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const tone = this.props.coachTone ?? 'wry';
+    return {
+      maia: this.props.showMaia ?? true,
+      states: this.props.showStatesSheet ?? true,
+      wry: tone === 'wry',
+      dry: tone === 'dry'
+    };
+  }
+}
+</script>
+</body>
+</html>
+
