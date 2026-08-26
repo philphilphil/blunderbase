@@ -16,9 +16,11 @@ const { version } = JSON.parse(
 ) as { version: string }
 
 /**
- * The backend mounts its routers at the bare paths (`/games`, `/analysis`, …), so the
- * client talks to `/api/*` and the dev proxy strips that prefix on the way through. A
- * deployment that puts the API somewhere else only has to keep the same `/api` mount.
+ * The client talks to `/api/*`, and the proxy forwards that prefix untouched — the
+ * backend answers there itself. Stripping it here would be worse than redundant: page
+ * routes and routers share spellings (`/games` is both), so a bare `/games` reaches a
+ * server holding a web build as the SPA index, and every dev API call comes back as
+ * HTML the moment somebody has run `pnpm build`.
  */
 const BACKEND = 'http://127.0.0.1:8765'
 
@@ -34,7 +36,6 @@ export default defineConfig({
       '/api': {
         target: BACKEND,
         changeOrigin: true,
-        rewrite: (route) => route.replace(/^\/api/, ''),
       },
       '/events': {
         target: BACKEND,
