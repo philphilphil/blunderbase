@@ -116,6 +116,7 @@ class _Slot:
         # Not reentrant: one UCI process serves one caller at a time.
         self._lock = asyncio.Lock()
         self._engine: Adapter | None = None
+        self._stopping = False
         self._last_used = clock()
 
     @property
@@ -168,15 +169,23 @@ class _Slot:
                 self._lock.release()
 
     async def _shutdown(self) -> None:
-        engine, self._engine = self._engine, None
-        if engine is None:
+        engine = self._engine
+        if engine is None or self._stopping:
+            # One `close()` per process: a shutdown already in flight owns this one.
             return
+        self._stopping = True
         try:
             await asyncio.to_thread(engine.close)
         except Exception:
             # Closing an already-dead process is not a reason to fail the caller; the
             # slot is cold either way.
             pass
+        finally:
+            self._stopping = False
+        # Cold only once the process is really gone. Clearing the slot before the close ran
+        # would let `warm()` — and the pool's own close — skip a process whose shutdown is
+        # still in flight, and a cancellation there would orphan it.
+        self._engine = None
 
 
 class _SlotGroup:
@@ -263,6 +272,7 @@ class EnginePool:
         self._active = 0
         self._closing = False
         self._reaper: asyncio.Task[None] | None = None
+        self._reap_stop = asyncio.Event()
 
     @property
     def active(self) -> int:
@@ -305,10 +315,15 @@ class EnginePool:
         self._closing = True
         reaper, self._reaper = self._reaper, None
         if reaper is not None:
-            reaper.cancel()
+            # Cancelling the reaper outright would abandon the `close()` of a process it
+            # had already taken out of circulation, leaving it running with nothing left
+            # holding it. Ask it to stop and let the reap in flight finish — but no longer
+            # than one engine's shutdown budget, since a process that will not quit must
+            # not hold up the server's shutdown either.
+            self._reap_stop.set()
             try:
-                await reaper
-            except asyncio.CancelledError:
+                await asyncio.wait_for(reaper, CLOSE_TIMEOUT)
+            except (TimeoutError, asyncio.CancelledError):
                 pass
         for group in list(self._groups.values()):
             for slot in group.slots:
@@ -334,7 +349,12 @@ class EnginePool:
 
     async def _reap_loop(self) -> None:
         while True:
-            await asyncio.sleep(self._reap_interval)
+            try:
+                await asyncio.wait_for(self._reap_stop.wait(), self._reap_interval)
+            except TimeoutError:
+                pass
+            else:
+                return
             await self.reap_idle()
 
 

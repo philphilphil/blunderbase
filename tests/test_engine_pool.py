@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -424,18 +425,69 @@ async def test_a_busy_process_is_never_reaped_out_from_under_its_caller() -> Non
 
 async def test_the_reaper_runs_on_its_own_and_stops_with_the_pool() -> None:
     log: list[str] = []
-    pool = build(log, clock=Clock(), idle_seconds=0.0, reap_interval=0.01)
+    closed = threading.Event()
+
+    class Watched(FakeAdapter):
+        def close(self) -> None:
+            super().close()
+            closed.set()
+
+    pool = EnginePool(
+        concurrency=2,
+        factory=lambda spec: Watched(spec, log),  # type: ignore[arg-type,return-value]
+        idle_seconds=0.0,
+        reap_interval=0.01,
+        clock=Clock(),
+    )
 
     async with pool.acquire(STOCKFISH):
         pass
-    for _ in range(200):
-        if not pool.warm():
-            break
-        await asyncio.sleep(0.01)
-
-    assert pool.warm() == []
-    await pool.close()
+    # Wait on the shutdown itself rather than polling `warm()`: what this test is about is
+    # that the process was closed without anyone asking, and a runner slow enough to lose
+    # a polling race would not change that.
+    assert await asyncio.to_thread(closed.wait, 5.0)
     assert log == ["start:Stockfish", "close:Stockfish"]
+
+    await pool.close()
+    assert pool.warm() == []
+    assert log == ["start:Stockfish", "close:Stockfish"]
+    assert [task for task in asyncio.all_tasks() if task.get_name() == "engine-pool-reaper"] == []
+
+
+async def test_closing_the_pool_waits_for_a_process_the_reaper_is_still_shutting_down() -> None:
+    """A reaped process is not gone the moment the reaper takes it out of circulation: its
+    `close()` runs off the event loop and takes as long as the engine takes to quit. Stopping
+    the reaper before that finishes would leave a process running with nothing holding it."""
+    log: list[str] = []
+    entered = threading.Event()
+    release = threading.Event()
+
+    class Slow(FakeAdapter):
+        def close(self) -> None:
+            entered.set()
+            release.wait(5.0)
+            super().close()
+
+    pool = EnginePool(
+        concurrency=1,
+        factory=lambda spec: Slow(spec, log),  # type: ignore[arg-type,return-value]
+        idle_seconds=0.0,
+        reap_interval=0.01,
+        clock=Clock(),
+    )
+
+    async with pool.acquire(STOCKFISH):
+        pass
+    assert await asyncio.to_thread(entered.wait, 5.0)
+
+    closing = asyncio.create_task(pool.close())
+    await asyncio.sleep(0.05)
+    assert not closing.done()  # the pool waits for the shutdown it interrupted
+
+    release.set()
+    await asyncio.wait_for(closing, timeout=5)
+    assert log == ["start:Stockfish", "close:Stockfish"]
+    assert pool.warm() == []
 
 
 async def test_close_shuts_every_process_down() -> None:
