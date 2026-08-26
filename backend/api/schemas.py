@@ -468,6 +468,12 @@ class EngineUpdate(Input):
         return self.model_dump(exclude_unset=True)
 
 
+class EngineDeleteResponse(BaseModel):
+    """How many of its queued runs had nowhere left to run and were dropped with it."""
+
+    unqueued: int
+
+
 class ProbeRequest(Input):
     path: str = Field(min_length=1, max_length=512)
     kind: EngineKind = EngineKind.UCI

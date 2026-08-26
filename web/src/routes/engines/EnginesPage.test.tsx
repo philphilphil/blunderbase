@@ -509,6 +509,87 @@ describe('EnginesPage — runners', () => {
   })
 })
 
+describe('EnginesPage — delete engine', () => {
+  it('confirms before deleting, and cancels without sending anything', async () => {
+    const fetchMock = stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/tiers': TIERS,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete stockfish' }))
+    expect(
+      await screen.findByText(/Delete stockfish\? This removes the engine and unqueues its pending analyses\./),
+    ).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(
+      screen.queryByText(/This removes the engine and unqueues its pending analyses\./),
+    ).not.toBeInTheDocument()
+    expect(requestedPaths(fetchMock)).not.toContain('/api/engines/1')
+  })
+
+  it('deletes the engine on confirm and reports how many queued runs it unqueued', async () => {
+    const fetchMock = stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/tiers': TIERS,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+      '/api/engines/1': { status: 200, body: { unqueued: 2 } },
+    })
+    renderPage(<EnginesPage />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete stockfish' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(requestedPaths(fetchMock)).toContain('/api/engines/1'))
+    const call = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/api/engines/1'))!
+    expect(call[1]?.method).toBe('DELETE')
+    expect(await screen.findByText('Engine deleted, 2 queued runs removed')).toBeInTheDocument()
+  })
+
+  it('says a runner-bound, enabled engine will re-register on the runner\'s next advertisement', async () => {
+    stubFetch({
+      '/api/engines': [SF_REMOTE],
+      '/api/engines/tiers': TIERS,
+      '/api/runners/status': runnersStatus([
+        runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
+      ]),
+    })
+    renderPage(<EnginesPage />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete sf-remote' }))
+    expect(
+      await screen.findByText(/will re-register the next time that runner connects/),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing about re-registering for a local engine, or one that is disabled', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH, { ...SF_REMOTE, enabled: false }],
+      '/api/engines/tiers': TIERS,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus([
+        runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
+      ]),
+    })
+    renderPage(<EnginesPage />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete stockfish' }))
+    expect(
+      await screen.findByText(/Delete stockfish\? This removes the engine and unqueues its pending analyses\./),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/will re-register/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete sf-remote' }))
+    expect(await screen.findByText(/Delete sf-remote\?/)).toBeInTheDocument()
+    expect(screen.queryByText(/will re-register/)).not.toBeInTheDocument()
+  })
+})
+
 describe('EngineDetail', () => {
   it('follows a runner-bound row when the runner re-advertises it', () => {
     // The card is keyed on the engine id, so it does not remount when the row's *contents*

@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, status
 
 from backend.api.deps import SessionDep, not_found
 from backend.api.schemas import (
     EngineCreate,
+    EngineDeleteResponse,
     EngineResponse,
     EngineUpdate,
     ProbeRequest,
@@ -71,13 +72,12 @@ def update_engine(session: SessionDep, engine_id: int, body: EngineUpdate) -> An
     return engines_service.update_engine(session, engine_id, **body.changes())
 
 
-@router.delete(
-    "/{engine_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Remove an engine"
-)
-def delete_engine(session: SessionDep, engine_id: int) -> Response:
-    if not engines_service.delete_engine(session, engine_id):
+@router.delete("/{engine_id}", response_model=EngineDeleteResponse, summary="Remove an engine")
+def delete_engine(session: SessionDep, engine_id: int) -> Any:
+    ok, unqueued = engines_service.delete_engine(session, engine_id)
+    if not ok:
         raise not_found("unknown_engine", f"no engine with id {engine_id}")
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return {"unqueued": unqueued}
 
 
 @router.post("/{engine_id}/test-run", response_model=SampleResponse, summary="Test-run an engine")

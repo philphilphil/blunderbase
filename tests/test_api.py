@@ -812,9 +812,36 @@ def test_a_test_run_shows_what_the_engine_says_about_one_position(
 def test_an_engine_can_be_removed(api: TestClient, seeded: dict[str, int]) -> None:
     response = api.delete(f"/engines/{seeded['engine_id']}")
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert response.json() == {"unqueued": 0}
     assert api.get("/engines").json() == []
     assert api.delete(f"/engines/{seeded['engine_id']}").status_code == 404
+
+
+def test_removing_an_engine_unqueues_its_pending_runs_but_keeps_the_rest(
+    settings: Settings, api: TestClient, seeded: dict[str, int]
+) -> None:
+    """`seeded` already has one done run with move evals; add a queued one alongside it."""
+    with get_sessionmaker(settings)() as session:
+        queued = AnalysisRun(
+            tier=Tier.QUICK, engine_id=seeded["engine_id"], status=RunStatus.QUEUED
+        )
+        session.add(queued)
+        session.commit()
+        queued_id = queued.id
+
+    response = api.delete(f"/engines/{seeded['engine_id']}")
+
+    assert response.status_code == 200
+    assert response.json() == {"unqueued": 1}
+
+    with get_sessionmaker(settings)() as session:
+        assert session.get(AnalysisRun, queued_id) is None
+        done_run = session.get(AnalysisRun, seeded["run_id"])
+        assert done_run is not None
+        assert done_run.engine_id is None
+        evals = session.scalars(select(MoveEval).where(MoveEval.run_id == done_run.id)).all()
+        assert len(evals) == seeded["plies"]
 
 
 def test_an_engine_that_is_not_there_is_a_typed_404(api: TestClient) -> None:

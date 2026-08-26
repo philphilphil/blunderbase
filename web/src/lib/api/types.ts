@@ -483,6 +483,11 @@ export interface EngineUpdate {
   enabled?: boolean
 }
 
+/** `DELETE /engines/{id}` — queued runs bound to the engine are removed as a side effect. */
+export interface EngineDeleteResult {
+  unqueued: number
+}
+
 export interface ProbeRequest {
   path: string
   kind?: EngineKind

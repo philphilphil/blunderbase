@@ -7,10 +7,11 @@ from typing import Any
 
 import pytest
 from fake_uci import MAIA_OPTIONS, STOCKFISH_OPTIONS, fake_engine_command
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.db.enums import EngineKind, Tier
-from backend.db.models import AnalysisRun, Engine
+from backend.db.enums import EngineKind, RunStatus, Tier
+from backend.db.models import AnalysisRun, Engine, MoveEval
 from backend.services.engines import (
     DuplicateEngineError,
     EngineOptionError,
@@ -276,19 +277,39 @@ def test_deleting_an_engine_leaves_its_runs_behind_without_it(
     session: Session, stockfish_path: str
 ) -> None:
     engine = register(session, stockfish_path)
-    run = AnalysisRun(tier=Tier.QUICK, engine_id=engine.id)
+    run = AnalysisRun(tier=Tier.QUICK, engine_id=engine.id, status=RunStatus.DONE)
     session.add(run)
     session.commit()
 
-    assert delete_engine(session, engine.id) is True
+    assert delete_engine(session, engine.id) == (True, 0)
 
     session.refresh(run)
     assert run.engine_id is None
     assert list_engines(session) == []
 
 
+def test_deleting_an_engine_drops_its_queued_runs_but_keeps_the_rest(
+    session: Session, stockfish_path: str
+) -> None:
+    engine = register(session, stockfish_path)
+    queued = AnalysisRun(tier=Tier.QUICK, engine_id=engine.id, status=RunStatus.QUEUED)
+    done = AnalysisRun(tier=Tier.QUICK, engine_id=engine.id, status=RunStatus.DONE)
+    session.add_all([queued, done])
+    session.commit()
+    session.add(MoveEval(run_id=done.id, ply=0, move_uci="e2e4", move_san="e4"))
+    session.commit()
+    queued_id, done_id = queued.id, done.id
+
+    assert delete_engine(session, engine.id) == (True, 1)
+
+    assert session.get(AnalysisRun, queued_id) is None
+    session.refresh(done)
+    assert done.engine_id is None
+    assert len(session.scalars(select(MoveEval).where(MoveEval.run_id == done_id)).all()) == 1
+
+
 def test_deleting_an_engine_that_is_not_there_says_so(session: Session) -> None:
-    assert delete_engine(session, 4242) is False
+    assert delete_engine(session, 4242) == (False, 0)
 
 
 # --- tiers ----------------------------------------------------------------

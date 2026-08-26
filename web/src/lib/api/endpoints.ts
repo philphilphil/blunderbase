@@ -10,6 +10,7 @@ import type {
   ComparisonResponse,
   DimensionList,
   EngineCreate,
+  EngineDeleteResult,
   EngineResponse,
   EngineUpdate,
   ExplorerResponse,
@@ -193,7 +194,7 @@ export const addEngine = (body: EngineCreate) =>
 export const updateEngine = (id: number, body: EngineUpdate) =>
   http.patch<EngineResponse>(`/engines/${id}`, { body })
 
-export const deleteEngine = (id: number) => http.delete<void>(`/engines/${id}`)
+export const deleteEngine = (id: number) => http.delete<EngineDeleteResult>(`/engines/${id}`)
 
 export const probeEngine = (body: ProbeRequest) =>
   http.post<ProbeResponse>('/engines/probe', { body })

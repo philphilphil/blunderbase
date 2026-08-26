@@ -20,6 +20,7 @@ import type {
   AnalysisRequest,
   AuthStatus,
   EngineCreate,
+  EngineDeleteResult,
   EngineUpdate,
   GameFilters,
   ImportRequest,
@@ -348,8 +349,9 @@ export function useUpdateEngine(
   })
 }
 
+/** Deleting an engine unqueues any of its queued analysis runs, so both rosters move. */
 export function useDeleteEngine(
-  options?: UseMutationOptions<void, Error, number>,
+  options?: UseMutationOptions<EngineDeleteResult, Error, number>,
 ) {
   const client = useQueryClient()
   return useMutation({
@@ -357,6 +359,8 @@ export function useDeleteEngine(
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.engines() })
+      void client.invalidateQueries({ queryKey: queryKeys.runners() })
+      void client.invalidateQueries({ queryKey: queryKeys.queue() })
       options?.onSuccess?.(...args)
     },
   })

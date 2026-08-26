@@ -29,10 +29,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from backend.db.enums import EngineKind, Tier
+from backend.db.enums import EngineKind, RunStatus, Tier
 from backend.db.models import AnalysisRun, Engine, Runner
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -244,17 +244,33 @@ def update_engine(
     return engine
 
 
-def delete_engine(session: Session, engine_id: int) -> bool:
-    """Remove an engine. Existing runs keep their reference as NULL."""
+def delete_engine(session: Session, engine_id: int, *, unqueue: bool = True) -> tuple[bool, int]:
+    """Remove an engine. A run that already started or finished keeps its row, with its
+    reference set to NULL.
+
+    A queued run bound to it has nothing left to run on. By default (`unqueue=True`, what
+    the owner gets from Settings) it is dropped rather than left behind. `delete_runner`
+    passes `unqueue=False`: its engine rows are the runner's own advertisement, not
+    configuration the owner deleted on purpose, and a run still queued for one is nobody's
+    job yet — the local fallback at `_prepare` will find it an engine, same as it would if
+    the runner had merely gone offline.
+    """
     engine = get_engine(session, engine_id)
     if engine is None:
-        return False
+        return False, 0
+    unqueued = 0
+    if unqueue:
+        unqueued = session.execute(
+            delete(AnalysisRun).where(
+                AnalysisRun.engine_id == engine_id, AnalysisRun.status == RunStatus.QUEUED
+            )
+        ).rowcount
     session.execute(
         update(AnalysisRun).where(AnalysisRun.engine_id == engine_id).values(engine_id=None)
     )
     session.delete(engine)
     session.commit()
-    return True
+    return True, unqueued
 
 
 # --- where an engine lives -------------------------------------------------

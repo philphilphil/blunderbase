@@ -176,15 +176,16 @@ def update_runner(
 def delete_runner(session: Session, runner_id: int) -> bool:
     """Revoke a runner: its token, its engine rows and its place in the queue.
 
-    Its engines go through `delete_engine`, which nulls the `AnalysisRun.engine_id` of
-    every run that named one — a remote engine row is an advertisement owned by the runner,
-    not configuration the owner would want left behind pointing at nothing.
+    Its engines go through `delete_engine` with `unqueue=False`, which nulls the
+    `AnalysisRun.engine_id` of every run that named one — a remote engine row is an
+    advertisement owned by the runner, not configuration the owner deleted on purpose, so a
+    run still queued for it keeps its place rather than being dropped with the row.
     """
     runner = get_runner(session, runner_id)
     if runner is None:
         return False
     for engine in engines_service.engines_of_runner(session, runner_id):
-        engines_service.delete_engine(session, engine.id)
+        engines_service.delete_engine(session, engine.id, unqueue=False)
     session.delete(runner)
     session.commit()
     return True
