@@ -89,18 +89,19 @@ export function TimeControlCard({ filters }: { filters: GameFilters }) {
 
   return (
     <StatCard
+      compact
       title="Performance by time control"
-      aside={<span className="font-mono text-[0.65625rem] tabular text-dim-2">score · blunders</span>}
+      aside={<span className="font-mono text-[0.625rem] tabular text-dim-2">score · blunders</span>}
       footer={query.data ? sentence(rows) : undefined}
     >
       <Async
         query={query}
-        loading={<LoadingRows rows={4} />}
+        loading={<LoadingRows compact rows={4} />}
         empty={rows.length === 0}
         emptyMessage="No games in this window. Import a few, or widen the window."
       >
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex h-[1.625rem] flex-none items-center gap-2.5 border-b border-hairline text-[0.65625rem] tracking-[0.06em] text-dim-2 uppercase">
+          <div className="flex h-[1.125rem] flex-none items-center gap-2.5 border-b border-hairline text-[0.5625rem] tracking-[0.06em] text-dim-2 uppercase">
             <span className="w-[4.75rem] flex-none">Control</span>
             <span className="w-11 flex-none text-right">Games</span>
             <span className="flex-1">Score</span>
@@ -108,7 +109,7 @@ export function TimeControlCard({ filters }: { filters: GameFilters }) {
             <span className="w-12 flex-none text-right">Bl/g</span>
             <span className="w-11 flex-none text-right">Rating</span>
           </div>
-          <div className="flex flex-1 flex-col justify-around font-mono text-xs tabular">
+          <div className="flex flex-1 flex-col justify-start pt-0.5 font-mono text-[0.6875rem] tabular">
             {rows.map((row) => {
               const played = Math.max(1, row.wins + row.draws + row.losses)
               const highlight = busiest?.key === row.key && rows.length > 1
@@ -116,7 +117,7 @@ export function TimeControlCard({ filters }: { filters: GameFilters }) {
                 <div
                   key={row.key}
                   className={cn(
-                    'flex h-[1.875rem] items-center gap-2.5 rounded-[0.3125rem] px-0.5',
+                    'flex h-[1.25rem] items-center gap-2.5 rounded-[0.25rem] px-0.5',
                     highlight
                       ? 'bg-accent-teal/6 shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--bb-accent)_22%,transparent)]'
                       : 'hover:bg-elevated-2',
@@ -139,7 +140,7 @@ export function TimeControlCard({ filters }: { filters: GameFilters }) {
                     {row.games}
                   </span>
                   <span
-                    className="flex h-[0.4375rem] flex-1 overflow-hidden rounded-full"
+                    className="flex h-[0.3125rem] flex-1 overflow-hidden rounded-full"
                     title={`${row.wins}W · ${row.draws}D · ${row.losses}L`}
                   >
                     <span className="bg-good" style={{ width: `${(row.wins / played) * 100}%` }} />

@@ -20,6 +20,7 @@ export function StatCard({
   children,
   className,
   bodyClassName,
+  compact = false,
 }: {
   title: ReactNode
   /** The small grey clause the design sets beside a title. */
@@ -30,16 +31,26 @@ export function StatCard({
   children: ReactNode
   className?: string
   bodyClassName?: string
+  /** Half the vertical bulk: tighter padding, a smaller title, a closer footer. */
+  compact?: boolean
 }) {
   return (
     <section
       className={cn(
-        'flex min-h-0 flex-col gap-3 rounded-xl border border-line bg-panel p-3.5',
+        'flex min-h-0 flex-col rounded-xl border border-line bg-panel',
+        compact ? 'gap-2 p-2.5' : 'gap-3 p-3.5',
         className,
       )}
     >
       <header className="flex items-baseline gap-2">
-        <h2 className="text-[0.78125rem] font-semibold text-ink">{title}</h2>
+        <h2
+          className={cn(
+            'font-semibold text-ink',
+            compact ? 'text-[0.71875rem]' : 'text-[0.78125rem]',
+          )}
+        >
+          {title}
+        </h2>
         {hint ? <span className="text-[0.6875rem] text-dim-2">{hint}</span> : null}
         <div className="flex-1" />
         {aside}
@@ -48,7 +59,14 @@ export function StatCard({
         {children}
       </div>
       {footer ? (
-        <p className="border-t border-hairline pt-2.5 text-[0.71875rem] leading-relaxed text-dim-2">
+        <p
+          className={cn(
+            'border-t border-hairline text-dim-2',
+            compact
+              ? 'pt-1.5 text-[0.65625rem] leading-snug'
+              : 'pt-2.5 text-[0.71875rem] leading-relaxed',
+          )}
+        >
           {footer}
         </p>
       ) : null}
@@ -63,16 +81,27 @@ export function Bar({ className, style }: { className?: string; style?: CSSPrope
   return <div className={cn('animate-pulse rounded-sm bg-raised', className)} style={style} />
 }
 
-export function LoadingRows({ rows = 3, className }: { rows?: number; className?: string }) {
+export function LoadingRows({
+  rows = 3,
+  className,
+  compact = false,
+}: {
+  rows?: number
+  className?: string
+  /** Matches the compact `MeterRow`: thinner bars, half the gap. */
+  compact?: boolean
+}) {
   return (
     <div
-      className={cn('flex flex-1 flex-col justify-center gap-4', className)}
+      className={cn('flex flex-1 flex-col justify-center', compact ? 'gap-2' : 'gap-4', className)}
       data-testid="loading"
     >
       {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="flex flex-col gap-1.5">
-          <Bar className="h-2.5 w-1/3" />
-          <Bar className="h-[0.5625rem] w-full rounded-full" />
+        <div key={index} className={cn('flex flex-col', compact ? 'gap-1' : 'gap-1.5')}>
+          <Bar className={cn('w-1/3', compact ? 'h-2' : 'h-2.5')} />
+          <Bar
+            className={cn('w-full rounded-full', compact ? 'h-[0.3125rem]' : 'h-[0.5625rem]')}
+          />
         </div>
       ))}
     </div>
@@ -196,6 +225,7 @@ export function MeterRow({
   color,
   emphasis = false,
   title,
+  compact = false,
 }: {
   label: ReactNode
   sub?: ReactNode
@@ -208,26 +238,44 @@ export function MeterRow({
   emphasis?: boolean
   /** The detail behind the row, on hover — the rate the share does not show. */
   title?: string
+  /** A 5px track and one size down on the type — the half-height card. */
+  compact?: boolean
 }) {
   const width = Math.max(0, Math.min(100, share))
   return (
-    <div className="flex flex-col gap-1.5" title={title}>
+    <div className={cn('flex flex-col', compact ? 'gap-0.5' : 'gap-1.5')} title={title}>
       <div className="flex items-baseline gap-2">
-        <span className="flex-1 truncate text-xs text-body">
+        <span
+          className={cn('flex-1 truncate text-body', compact ? 'text-[0.6875rem]' : 'text-xs')}
+        >
           {label}
           {sub ? <span className="ml-1.5 text-dim-2">{sub}</span> : null}
         </span>
-        <span className={cn('font-mono text-xs tabular', emphasis ? 'text-ink' : 'text-soft')}>
+        <span
+          className={cn(
+            'font-mono tabular',
+            compact ? 'text-[0.6875rem]' : 'text-xs',
+            emphasis ? 'text-ink' : 'text-soft',
+          )}
+        >
           {value}
         </span>
         <span
-          className="w-9 text-right font-mono text-[0.6875rem] tabular"
+          className={cn(
+            'text-right font-mono tabular',
+            compact ? 'w-8 text-[0.625rem]' : 'w-9 text-[0.6875rem]',
+          )}
           style={{ color: emphasis ? color : undefined }}
         >
           {width.toFixed(0)}%
         </span>
       </div>
-      <div className="h-[0.5625rem] overflow-hidden rounded-full bg-raised">
+      <div
+        className={cn(
+          'overflow-hidden rounded-full bg-raised',
+          compact ? 'h-[0.3125rem]' : 'h-[0.5625rem]',
+        )}
+      >
         <div
           className="h-full rounded-full transition-[width] duration-500"
           style={{ width: `${width}%`, background: color }}

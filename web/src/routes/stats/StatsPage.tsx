@@ -244,15 +244,22 @@ export function StatsPage() {
 
       {/* Design 2d's grid: one report at a time, two by two, filling the frame rather than
           scrolling. The rows keep a floor so a short window scrolls instead of squeezing
-          a chart to nothing. */}
+          a chart to nothing — except the overview's first row, which holds the two compact
+          cards (phase meters, time-control table) and is sized to their content so they
+          read at about half height and hand the spare room to the charts underneath.
+          The blunders report treats the phase card the same way: its stacked row is
+          content-sized, and side by side on xl it self-starts against the piece chart,
+          whose Recharts container needs the row to keep its 1fr height. */}
       <div
         className={cn(
           'grid min-h-0 flex-1 gap-3 grid-cols-1 xl:grid-cols-2',
           report === 'progress'
             ? 'grid-rows-[minmax(15rem,1fr)] xl:grid-cols-1'
             : report === 'overview'
-              ? 'grid-rows-[repeat(4,minmax(15rem,1fr))] xl:grid-rows-[repeat(2,minmax(15rem,1fr))]'
-              : 'grid-rows-[repeat(2,minmax(15rem,1fr))] xl:grid-rows-[minmax(15rem,1fr)]',
+              ? 'grid-rows-[repeat(2,minmax(7rem,auto))_repeat(2,minmax(15rem,1fr))] xl:grid-rows-[minmax(7rem,auto)_minmax(15rem,1fr)]'
+              : report === 'blunders'
+                ? 'grid-rows-[minmax(7rem,auto)_minmax(15rem,1fr)] xl:grid-rows-[minmax(15rem,1fr)]'
+                : 'grid-rows-[repeat(2,minmax(15rem,1fr))] xl:grid-rows-[minmax(15rem,1fr)]',
         )}
       >
         {report === 'overview' ? (
@@ -265,7 +272,7 @@ export function StatsPage() {
         ) : null}
         {report === 'blunders' ? (
           <>
-            <BlundersByPhaseCard filters={filters} />
+            <BlundersByPhaseCard filters={filters} className="xl:self-start" />
             <BlundersByPieceCard filters={filters} />
           </>
         ) : null}

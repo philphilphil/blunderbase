@@ -30,7 +30,13 @@ function sentence(rows: { label: string; blunders: number; share: number }[], al
   return `${worst.share.toFixed(0)}% of them happen in the ${worst.label.toLowerCase()}, where the position stops explaining itself.`
 }
 
-export function BlundersByPhaseCard({ filters }: { filters: GameFilters }) {
+export function BlundersByPhaseCard({
+  filters,
+  className,
+}: {
+  filters: GameFilters
+  className?: string
+}) {
   const query = useStats('blunders_by_phase', filters)
   const found = buckets(query.data)
   const overall = total(query.data)
@@ -60,9 +66,11 @@ export function BlundersByPhaseCard({ filters }: { filters: GameFilters }) {
 
   return (
     <StatCard
+      compact
+      className={className}
       title="Blunders by game phase"
       aside={
-        <span className="font-mono text-[0.65625rem] tabular text-dim-2">
+        <span className="font-mono text-[0.625rem] tabular text-dim-2">
           {all.toLocaleString()} blunder{all === 1 ? '' : 's'}
         </span>
       }
@@ -70,13 +78,14 @@ export function BlundersByPhaseCard({ filters }: { filters: GameFilters }) {
     >
       <Async
         query={query}
-        loading={<LoadingRows rows={3} />}
+        loading={<LoadingRows compact rows={3} className="justify-start" />}
         empty={numOr(overall, 'moves') === 0}
         emptyMessage="No analysed moves in this window. Run an analysis pass and the phases fill in."
       >
-        <div className="flex flex-1 flex-col justify-center gap-4">
+        <div className="flex flex-1 flex-col justify-start gap-2">
           {rows.map((row) => (
             <MeterRow
+              compact
               key={row.key}
               label={row.label}
               sub={row.sub}
