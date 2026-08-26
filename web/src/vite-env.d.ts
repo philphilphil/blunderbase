@@ -10,3 +10,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** `web/package.json`'s version, substituted at build time by `define` in vite.config.ts. */
+declare const __APP_VERSION__: string

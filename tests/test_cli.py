@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import getpass
+import tomllib
 from pathlib import Path
 
 import pytest
 from fake_uci import STOCKFISH_OPTIONS, fake_engine_command
 from sqlalchemy import select
 
+import backend
 from backend.cli import _import_options, build_parser, main
 from backend.config import Settings
 from backend.db.enums import EngineKind, JobStatus, RunStatus
-from backend.db.models import AnalysisRun, Engine, Game, GamePosition, ImportJob
+from backend.db.models import AnalysisRun, Credential, Engine, Game, GamePosition, ImportJob
 from backend.db.session import session_scope
+from backend.services import auth as auth_service
 from backend.services import import_service
 
 
@@ -29,6 +33,24 @@ def test_an_unregistered_source_is_refused(settings: Settings) -> None:
 def test_serve_defaults_come_from_settings(settings: Settings) -> None:
     args = build_parser(settings).parse_args(["serve"])
     assert (args.host, args.port, args.reload) == (settings.host, settings.port, False)
+
+
+def test_version_prints_the_package_version(
+    settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--version` answers on its own, without the otherwise-required subcommand."""
+    with pytest.raises(SystemExit) as exit_code:
+        build_parser(settings).parse_args(["--version"])
+    assert exit_code.value.code == 0
+    assert capsys.readouterr().out.strip() == f"blunderbase {backend.__version__}"
+
+
+def test_the_version_is_not_a_second_literal() -> None:
+    """One number, in pyproject.toml; `backend.__version__` reads it back."""
+    pyproject = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
+    )
+    assert backend.__version__ == pyproject["project"]["version"]
 
 
 def test_db_upgrade_is_a_subcommand(settings: Settings) -> None:
@@ -167,3 +189,62 @@ def test_analyze_says_so_when_no_engine_is_registered(
 
     assert main(["analyze", "--queue-only"]) == 1
     assert "no engine is registered yet" in capsys.readouterr().out
+
+
+def test_set_password_asks_twice_and_stores_a_hash(
+    settings: Settings, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The headless bootstrap: no UI, no echo, and the plaintext goes nowhere."""
+    entries = iter(["a-headless-password", "a-headless-password"])
+    monkeypatch.setattr(getpass, "getpass", lambda prompt="": next(entries))
+
+    assert main(["set-password"]) == 0
+
+    assert "password set" in capsys.readouterr().out
+    with session_scope(settings) as session:
+        credential = session.scalars(select(Credential)).one()
+        assert "a-headless-password" not in credential.password_hash
+        assert auth_service.verify_password(session, "a-headless-password") is True
+
+
+def test_set_password_refuses_two_entries_that_differ(
+    settings: Settings, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entries = iter(["a-headless-password", "a-different-password"])
+    monkeypatch.setattr(getpass, "getpass", lambda prompt="": next(entries))
+
+    assert main(["set-password"]) == 1
+
+    assert "did not match" in capsys.readouterr().out
+    with session_scope(settings) as session:
+        assert auth_service.setup_required(session) is True
+
+
+def test_set_password_replaces_the_one_that_is_there(
+    settings: Settings, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An owner who has locked themselves out cannot be asked for the old password."""
+    assert main(["db", "upgrade"]) == 0
+    with session_scope(settings) as session:
+        auth_service.set_password(session, "the-forgotten-one")
+        auth_service.create_session(session)
+    entries = iter(["the-replacement", "the-replacement"])
+    monkeypatch.setattr(getpass, "getpass", lambda prompt="": next(entries))
+    capsys.readouterr()
+
+    assert main(["set-password"]) == 0
+
+    assert "password replaced" in capsys.readouterr().out
+    with session_scope(settings) as session:
+        assert auth_service.verify_password(session, "the-replacement") is True
+        assert auth_service.open_session_count(session) == 0
+
+
+def test_set_password_refuses_one_below_the_minimum(
+    settings: Settings, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(getpass, "getpass", lambda prompt="": "short")
+
+    assert main(["set-password"]) == 1
+
+    assert "at least" in capsys.readouterr().out

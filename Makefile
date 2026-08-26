@@ -1,4 +1,4 @@
-.PHONY: run backend web install test migrate mcp mcp-http mcp-key
+.PHONY: run backend web install test migrate mcp mcp-http mcp-key release
 
 KEY_FILE := data/mcp.key
 key = $$(cat $(KEY_FILE))
@@ -44,3 +44,63 @@ mcp-http: $(KEY_FILE)
 mcp-key: $(KEY_FILE)
 	@echo "URL:    http://127.0.0.1:8765/mcp"
 	@echo "Header: Authorization: Bearer $(key)"
+
+# `make release v=0.2.0` — move the version, commit it, tag it.
+#
+# The number lives in pyproject.toml and web/package.json; uv.lock restates the first and
+# is relocked rather than hand-edited. Everything else reads one of those: the backend via
+# importlib.metadata, the sidebar footer via Vite's `define`.
+#
+# The push is deliberately not done here — the tag is the release, and you should look at
+# it before it leaves the machine. `DRY=1` says what would happen and stops.
+release:
+	@set -eu; \
+	version="$(v)"; \
+	if [ -z "$$version" ]; then \
+	  echo "release: needs a version, e.g. make release v=0.2.0" >&2; exit 1; \
+	fi; \
+	case "$$version" in \
+	  v*) echo "release: drop the leading v — make release v=$${version#v}" >&2; exit 1;; \
+	esac; \
+	if ! echo "$$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$$'; then \
+	  echo "release: '$$version' is not X.Y.Z (optionally X.Y.Z-suffix)" >&2; exit 1; \
+	fi; \
+	tag="v$$version"; \
+	branch=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$branch" != "main" ]; then \
+	  echo "release: HEAD is on '$$branch'; releases are cut from main" >&2; exit 1; \
+	fi; \
+	if [ -n "$$(git status --porcelain)" ]; then \
+	  echo "release: the working tree is dirty; commit or stash first" >&2; exit 1; \
+	fi; \
+	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
+	  echo "release: $$tag already exists" >&2; exit 1; \
+	fi; \
+	was_py=$$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1); \
+	was_web=$$(sed -n 's/^  "version": "\(.*\)",/\1/p' web/package.json | head -1); \
+	if [ -n "$(DRY)" ]; then \
+	  echo "release: dry run for $$tag — nothing written"; \
+	  echo "  pyproject.toml    $$was_py -> $$version"; \
+	  echo "  web/package.json  $$was_web -> $$version"; \
+	  echo "  uv.lock           relocked"; \
+	  echo "  git commit -m \"chore: release $$tag\" && git tag -a $$tag"; \
+	  exit 0; \
+	fi; \
+	BB_VERSION="$$version" perl -0pi \
+	  -e 's/(\[project\][^\[]*\nversion = ")[^"]*(")/$$1$$ENV{BB_VERSION}$$2/' pyproject.toml; \
+	BB_VERSION="$$version" perl -pi \
+	  -e 's/^(  "version": ")[^"]*(")/$$1$$ENV{BB_VERSION}$$2/' web/package.json; \
+	grep -q "^version = \"$$version\"$$" pyproject.toml \
+	  || { echo "release: pyproject.toml's version key did not move" >&2; exit 1; }; \
+	grep -q "^  \"version\": \"$$version\",$$" web/package.json \
+	  || { echo "release: web/package.json's version key did not move" >&2; exit 1; }; \
+	uv lock --quiet; \
+	git add pyproject.toml web/package.json uv.lock; \
+	if git diff --cached --quiet; then \
+	  echo "release: already at $$version; tagging the commit that set it"; \
+	else \
+	  git commit -q -m "chore: release $$tag"; \
+	fi; \
+	git tag -a "$$tag" -m "Blunderbase $$tag"; \
+	echo "release: $$tag committed and tagged locally. Publish it with"; \
+	echo "  git push origin main --follow-tags"

@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import getpass
 from collections.abc import Sequence
 from typing import Any
 
+from backend import __version__
 from backend.config import Settings, get_settings
 from backend.db.enums import JobStatus, Tier
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import session_scope
 from backend.services import analysis as analysis_service
+from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import import_service
 
@@ -40,6 +43,8 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="blunderbase", description="A personal chess database with an AI coach"
     )
+    # Handled while parsing, so it answers before the required subcommand is missed.
+    parser.add_argument("--version", action="version", version=f"blunderbase {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     serve = commands.add_parser(
@@ -87,6 +92,11 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     )
     mcp.add_argument("--host", default=settings.host)
     mcp.add_argument("--port", type=int, default=settings.port + 1)
+
+    commands.add_parser(
+        "set-password",
+        help="set or replace the owner's password (which is also the MCP bearer key)",
+    )
 
     db = commands.add_parser("db", help="database maintenance")
     db_commands = db.add_subparsers(dest="db_command", required=True)
@@ -218,6 +228,31 @@ def command_mcp(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def command_set_password(args: argparse.Namespace, settings: Settings) -> int:
+    """Bootstrap or reset the password without the UI, for a headless deployment.
+
+    Asked for twice and never echoed. It replaces whatever was there, which is the point:
+    the owner who has locked themselves out cannot be asked for the old one.
+    """
+    upgrade_to_head(settings)
+    password = getpass.getpass("New password: ")
+    if password != getpass.getpass("Repeat password: "):
+        print("set-password: the two entries did not match")
+        return 1
+    try:
+        with session_scope(settings) as session:
+            replaced = not auth_service.setup_required(session)
+            auth_service.reset_password(session, password)
+    except auth_service.AuthError as exc:
+        print(f"set-password: {exc}")
+        return 1
+    if replaced:
+        print("password replaced; every open session was signed out")
+    else:
+        print("password set")
+    return 0
+
+
 def command_db(args: argparse.Namespace, settings: Settings) -> int:
     if args.db_command == "upgrade":
         upgrade_to_head(settings)
@@ -230,6 +265,7 @@ COMMANDS = {
     "import": command_import,
     "analyze": command_analyze,
     "mcp": command_mcp,
+    "set-password": command_set_password,
     "db": command_db,
 }
 

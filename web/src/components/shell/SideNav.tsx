@@ -33,6 +33,7 @@ import {
 } from '@/routes/games/savedFilters'
 import { REPORTS, reportFrom } from '@/routes/stats/reports'
 import { cn } from '@/lib/utils'
+import { VERSION_LABEL } from '@/lib/version'
 
 import { LINE_SAMPLE, scoreTone, topLines } from './openingLines'
 
@@ -298,6 +299,9 @@ function Reports({ search }: { search: string }) {
  * The pinned footer. Its label follows the screen the way the design's does — "Book" in the
  * explorer, "Sample" on stats — and the bar is the share of the library a deep pass has
  * been over, which is the closest thing to "how full is this database" the API can answer.
+ *
+ * Below it, in the same small print, sits the build's version — the bottom-left corner of
+ * the window, where a desktop app puts it.
  */
 function NavFooter({ pathname }: { pathname: string }) {
   const all = useGames({ limit: 1 })
@@ -330,6 +334,9 @@ function NavFooter({ pathname }: { pathname: string }) {
         <div className="h-full bg-meter-2" style={{ width: `${share}%` }} />
       </div>
       <div className="font-mono text-[0.625rem] tabular text-dim-2">{figure}</div>
+      <div className="font-mono text-[0.625rem] text-dim-2" title={`Blunderbase ${VERSION_LABEL}`}>
+        {VERSION_LABEL}
+      </div>
     </div>
   )
 }
