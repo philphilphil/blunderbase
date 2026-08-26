@@ -8,6 +8,7 @@ import { useGames, useImportJobs, useProfile } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 
 import { ConnectAccount } from './ConnectAccount'
+import { ConnectAssistant } from './ConnectAssistant'
 import { PgnUpload } from './PgnUpload'
 import { SyncHistory } from './SyncHistory'
 import { useImportProgress } from './useImportProgress'
@@ -27,9 +28,9 @@ function latestOf(jobs: ImportJob[] | undefined, source: Source): ImportJob | un
 }
 
 /**
- * Import: connect an account, sync it, drop a PGN in, and read what every previous sync
- * did. No dedicated design turn — the cards, table and badges are the ones the rest of
- * the app uses.
+ * Import: connect an account, sync it, drop a PGN in, hand the coach the address of what
+ * arrived, and read what every previous sync did. No dedicated design turn — the cards,
+ * table and badges are the ones the rest of the app uses.
  */
 export function ImportPage() {
   const jobs = useImportJobs({ limit: HISTORY_LIMIT })
@@ -75,6 +76,8 @@ export function ImportPage() {
         />
         <PgnUpload progress={progress.pgn} />
       </div>
+
+      <ConnectAssistant />
 
       <div className="flex items-start gap-3 rounded-xl border border-dashed border-edge-strong bg-panel/60 px-3.5 py-3">
         <Hand className="mt-px size-3.5 flex-none text-faint" aria-hidden />

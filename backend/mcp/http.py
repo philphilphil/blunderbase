@@ -102,6 +102,7 @@ def create_http_app(
     sessions: sessionmaker[Session] | None = None,
     path: str = MCP_PATH,
     json_response: bool = False,
+    before_setup: bool = False,
 ) -> ASGIApp:
     """The streamable-HTTP transport behind the bearer key.
 
@@ -110,7 +111,9 @@ def create_http_app(
 
     Raises `TransportDisabledError` when there is neither an environment key nor a
     password to check one against: a transport that would refuse every caller is a
-    configuration mistake, not a service.
+    configuration mistake, not a service. `before_setup=True` turns that off — see
+    `password_verifier` — for the copy mounted inside the API app, which has to exist
+    before the owner has chosen anything so it can start serving the moment they do.
     """
     resolved = settings or get_settings()
     # The bind host decides the SDK's DNS-rebinding policy, and this app is the one
@@ -122,11 +125,15 @@ def create_http_app(
         stateless_http=True,
         host=resolved.host,
     )
-    return BearerGuard(app, resolved.mcp_bearer_key, verify=password_verifier(resolved, sessions))
+    verify = password_verifier(resolved, sessions, before_setup=before_setup)
+    return BearerGuard(app, resolved.mcp_bearer_key, verify=verify)
 
 
 def password_verifier(
-    settings: Settings, sessions: sessionmaker[Session] | None = None
+    settings: Settings,
+    sessions: sessionmaker[Session] | None = None,
+    *,
+    before_setup: bool = False,
 ) -> Verifier | None:
     """Check a presented bearer token against the owner's password, or None if there is none.
 
@@ -134,19 +141,30 @@ def password_verifier(
     migrated — `blunderbase mcp --transport http` pointed at nothing — is a refusal to
     start rather than a 500 per request. The check itself reads the row every time, so a
     password change takes effect without a restart.
+
+    `before_setup=True` skips that resolution and always hands back a verifier: it answers
+    "no" to everything until a password exists, and yes the moment one does. That is what
+    lets the API app mount `/mcp` at startup on a deployment that has never been set up —
+    the transport's sessions live in a task group only the lifespan can open, so a route
+    added later would have nowhere to run.
     """
     factory = sessions or get_sessionmaker(settings)
-    try:
-        with factory() as session:
-            if auth_service.setup_required(session):
-                return None
-    except SQLAlchemyError:
-        # No credentials table at all is the same answer as an empty one.
-        return None
+    if not before_setup:
+        try:
+            with factory() as session:
+                if auth_service.setup_required(session):
+                    return None
+        except SQLAlchemyError:
+            # No credentials table at all is the same answer as an empty one.
+            return None
 
     def verify(token: str) -> bool:
-        with factory() as session:
-            return auth_service.verify_bearer(session, token)
+        try:
+            with factory() as session:
+                return auth_service.verify_bearer(session, token)
+        except SQLAlchemyError:
+            # A database with no credentials table yet: no token can be the owner's.
+            return False
 
     return verify
 
@@ -168,15 +186,28 @@ def mount_http_app(
     no sub-paths of its own: mounted, `/mcp` would answer with a redirect to `/mcp/` that
     a client posting JSON-RPC has no reason to follow.
 
+    The route exists whether or not the deployment has been set up yet: with no bearer key
+    and no password the guard answers 401 to everyone, and starts accepting the password
+    the moment one is chosen in the browser — no restart, because the route and its task
+    group are already there.
+
     The caller keeps `server.session_manager.run()` open for as long as it serves. The
     transport runs its sessions in a task group that context opens, and the host app
     never drives a route's lifespan — the standalone app's `lifespan=` is exactly this
     same call, which is why `run_http` needs nothing extra.
+
+    A session manager runs once and never again, so a second call replaces the route
+    rather than adding one: the transport belongs to the lifespan that is serving, and an
+    app started twice gets a working transport both times.
     """
     resolved = settings or get_settings()
     server = build_server(resolved, sessions)
-    transport = create_http_app(resolved, server=server, sessions=sessions, path=path)
-    app.router.routes.append(Route(path, endpoint=transport))
+    transport = create_http_app(
+        resolved, server=server, sessions=sessions, path=path, before_setup=True
+    )
+    routes = app.router.routes
+    routes[:] = [route for route in routes if not (isinstance(route, Route) and route.path == path)]
+    routes.append(Route(path, endpoint=transport))
     return server
 
 

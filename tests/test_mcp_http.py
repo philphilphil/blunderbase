@@ -240,11 +240,12 @@ async def test_the_mcp_transport_turns_an_unauthorized_client_away(
 def test_the_transport_is_mounted_when_a_key_is_configured(settings: Settings) -> None:
     """One process for the coach and the browser, which is what live mode needs."""
     settings.mcp_bearer_key = KEY
+    settings.analysis_workers = False
     app = create_app(settings)
-    assert app.state.mcp is not None
     # The bind host is the loopback default here, so the SDK's DNS-rebinding protection
     # is on and the client has to say the same thing uvicorn would be told.
     with TestClient(app, base_url=BASE_URL) as client:
+        assert app.state.mcp is not None
         assert client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS).status_code == 401
         response = client.post(
             "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {KEY}"}
@@ -263,8 +264,8 @@ def test_the_transport_is_mounted_for_a_password_with_no_key_configured(
     settings.analysis_workers = False
     app = create_app(settings)
 
-    # Nothing at build time: whether there is a password is a row, and the database has
-    # not been migrated yet on a first run. The lifespan is where it is decided.
+    # Nothing at build time: with no key there is nothing to mount around until the
+    # lifespan has migrated the database and opened the session manager's task group.
     assert app.state.mcp is None
     with TestClient(app, base_url=BASE_URL) as client:
         assert app.state.mcp is not None
@@ -278,8 +279,36 @@ def test_the_transport_is_mounted_for_a_password_with_no_key_configured(
     assert '"blunderbase"' in response.text
 
 
-def test_nothing_is_mounted_without_a_key_or_a_password(settings: Settings) -> None:
+def test_the_transport_refuses_everyone_before_first_run_setup(settings: Settings) -> None:
+    """No key and no password yet: the route is there, and it lets nobody past."""
+    settings.analysis_workers = False
     app = create_app(settings)
     with TestClient(app, base_url=BASE_URL) as client:
-        assert app.state.mcp is None
-        assert client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS).status_code == 404
+        assert app.state.mcp is not None
+        assert client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS).status_code == 401
+        guessed = client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": "Bearer anything"}
+        )
+    assert guessed.status_code == 401
+    assert "serverInfo" not in guessed.text
+
+
+def test_a_password_set_through_the_ui_reaches_mcp_without_a_restart(
+    settings: Settings,
+) -> None:
+    """The whole point: first-run setup in the browser, then `/mcp` works in the same process."""
+    settings.analysis_workers = False
+    app = create_app(settings)
+    with TestClient(app, base_url=BASE_URL) as client:
+        before = client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {PASSWORD}"}
+        )
+        assert before.status_code == 401
+
+        assert client.post("/auth/setup", json={"password": PASSWORD}).status_code == 200
+
+        after = client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {PASSWORD}"}
+        )
+    assert after.status_code == 200
+    assert '"blunderbase"' in after.text

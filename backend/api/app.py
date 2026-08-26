@@ -17,7 +17,6 @@ from backend.api.web import install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_sessionmaker
-from backend.services import auth as auth_service
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers
@@ -43,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
     upgrade_to_head(settings)
     _clear_stale_connections(settings)
-    _mount_mcp_for_the_owners_password(app, settings)
+    _mount_mcp(app, settings)
     app.state.loop = asyncio.get_running_loop()
     events: EventBroker = app.state.events
     events.start()
@@ -59,11 +58,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await streams.start()
     try:
         async with AsyncExitStack() as stack:
-            if app.state.mcp is not None:
-                # The mounted transport keeps its sessions in a task group this context
-                # opens. It is a route rather than a sub-application, so nothing else
-                # would ever start it.
-                await stack.enter_async_context(app.state.mcp.session_manager.run())
+            # The mounted transport keeps its sessions in a task group this context opens.
+            # It is a route rather than a sub-application, so nothing else would ever
+            # start it.
+            await stack.enter_async_context(app.state.mcp.session_manager.run())
             yield
     finally:
         await wait_for_imports(app.state.imports)
@@ -106,23 +104,20 @@ def _clear_stale_connections(settings: Settings) -> None:
         logger.info("cleared %s runner connection(s) a previous process left set", cleared)
 
 
-def _mount_mcp_for_the_owners_password(app: FastAPI, settings: Settings) -> None:
-    """Serve `/mcp` when the owner has a password, even with no bearer key configured.
+def _mount_mcp(app: FastAPI, settings: Settings) -> None:
+    """Serve `/mcp` for as long as we serve anything, key or no key, password or none yet.
 
-    The key and the password are one credential now, so a deployment that was set up
-    through the web UI has a remote transport without anyone exporting an environment
-    variable. It is decided here rather than in `create_app` because the answer is a row,
-    and the database has only just been migrated — on a first run it did not exist at all.
+    The key and the password are one credential, so a deployment set up through the web UI
+    has a remote transport without anyone exporting an environment variable — and it has
+    it *immediately*, because the route and the task group its sessions live in are opened
+    here, before anyone has chosen a password. Until one exists the bearer guard answers
+    401 to every caller; the first request after first-run setup is the first one it lets
+    through. Mounting on demand is not an option: the lifespan is the only place that can
+    open the session manager's task group, and it runs exactly once.
 
-    Consequence worth knowing: a password chosen through the UI reaches `/mcp` at the next
-    restart, not immediately. The transport's sessions live in a task group the lifespan
-    below opens, and there is no second chance to open one while the server is serving.
+    Which is why this is the only place that mounts, key or no key. A transport built in
+    `create_app` would be one whose sessions nothing ever runs.
     """
-    if app.state.mcp is not None:
-        return
-    with get_sessionmaker(settings)() as session:
-        if auth_service.setup_required(session):
-            return
     from backend.mcp.http import mount_http_app
 
     app.state.mcp = mount_http_app(app, settings)
@@ -151,13 +146,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    if settings.mcp_http_enabled:
-        # Imported here so a process that serves no remote transport never builds the
-        # coach's tool surface, and `blunderbase mcp --transport http` keeps working as
-        # its own app either way.
-        from backend.mcp.http import mount_http_app
-
-        app.state.mcp = mount_http_app(app, settings)
+    # `/mcp` is mounted by the lifespan rather than here — see `_mount_mcp`.
 
     # Added before the web app so the page and its assets are answered in front of the
     # guard — the UI has to load in order to show the login screen — and so the `/api`

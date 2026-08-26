@@ -9,8 +9,8 @@
 #   BLUNDERBASE_RUNNER_TOKEN=bb_rnr_… docker compose -f docker-compose.runner.yml up -d
 #
 # The link carries the token on every frame, so put HTTPS/WSS in front of the server —
-# docker-compose.traefik.yml is the setup that does. `server:` in the yaml is the https
-# URL; the socket URL is derived from it.
+# docs/deploy.md is a Caddyfile and an nginx site that do. `server:` in the yaml is the
+# https URL; the socket URL is derived from it.
 services:
   blunderbase-runner:
     image: ghcr.io/philphilphil/blunderbase:latest

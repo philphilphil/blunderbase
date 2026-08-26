@@ -128,10 +128,6 @@ class Settings(BaseSettings):
         value = value.expanduser()
         return value if value.is_absolute() else (self.root / value).resolve()
 
-    @property
-    def mcp_http_enabled(self) -> bool:
-        return bool(self.mcp_bearer_key.strip())
-
     def ensure_directories(self) -> None:
         assert self.data_dir is not None and self.database_path is not None
         for path in (self.data_dir, self.database_path.parent):

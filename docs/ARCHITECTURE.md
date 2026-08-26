@@ -522,9 +522,9 @@ is how the coach knows whether anyone is actually looking at the board.
 The state is process-wide, which is the whole of its storage: one owner, one board, nothing
 to migrate and nothing to clean up. That makes the process boundary the feature's one rule:
 the browser sees what the coach does only when the MCP tools and the `/events` sockets run
-in one process. `blunderbase serve` arranges exactly that — when `BLUNDERBASE_MCP_BEARER_KEY`
-is set it mounts the streamable-HTTP transport at `/mcp` (behind the bearer guard) inside
-the API app, so a coach connected there drives the board the browser is watching. The
+in one process. `blunderbase serve` arranges exactly that — it always mounts the
+streamable-HTTP transport at `/mcp` (behind the bearer guard) inside the API app, so a
+coach connected there drives the board the browser is watching. The
 standalone transports still exist (`blunderbase mcp` for stdio, `--transport http` for its
 own uvicorn app), but each is its own process with its own board and no viewers — fine for
 querying the database, wrong for live mode. Point the coach at the served `/mcp` when the
@@ -580,6 +580,10 @@ worker thread rather than blocking the loop, the same place a `def` handler's qu
 up through the browser has a remote transport without anyone exporting anything.
 `BLUNDERBASE_MCP_BEARER_KEY` is the override — set, it is the only token accepted, which
 is what keeps existing automation working while the password changes underneath. `/mcp` is
-mounted when either exists, and because "is there a password" is a row rather than a
-setting, the answer is taken in the lifespan (after the migration) rather than in
-`create_app`: a password chosen through the UI reaches `/mcp` at the next restart.
+mounted unconditionally — key or no key, password or none yet — because "is there a
+password" is a row rather than a setting, and a row can change while the server is serving.
+The route is added in the lifespan (after the migration) rather than in `create_app`, since
+the lifespan is the only place that can open the task group the transport's sessions live
+in and it runs exactly once. Until a password exists the bearer guard answers 401 to
+everyone; the first request after first-run setup is the first one it lets through, with no
+restart.

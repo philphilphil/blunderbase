@@ -74,7 +74,7 @@ on first use. In development the page comes from Vite, which proxies `/api` and 
 to the backend.
 
 Deployed, it is one container on one port: the API, the built web app, the `/events`
-socket and — when a key is set — `/mcp` are all served by the same uvicorn.
+socket and `/mcp` are all served by the same uvicorn.
 
 ```bash
 docker run -d --name blunderbase -p 8765:8765 -v blunderbase-data:/data \
@@ -83,9 +83,11 @@ docker run -d --name blunderbase -p 8765:8765 -v blunderbase-data:/data \
 ```
 
 Or `docker compose up -d` with the bearer key in a `.env` beside `docker-compose.yml`.
-Put a TLS terminator in front of anything reachable from elsewhere
-(`docker-compose.traefik.yml` is one such setup): the session cookie is `Secure` on any
-host that is not loopback, so plain HTTP on a LAN address will not keep you signed in.
+Put a TLS terminator in front of anything reachable from elsewhere: the session cookie is
+`Secure` on any host that is not loopback, so plain HTTP on a LAN address will not keep
+you signed in. `docs/deploy.md` has a Caddyfile and an nginx site that front all four
+surfaces correctly — the page, `/api`, the `/events` socket and `/mcp`, which needs its
+`Authorization` header passed through, its stream unbuffered and its path not redirected.
 The database, uploaded PGNs and any engine you download from the UI live in `/data`; back
 that volume up and you have backed up everything.
 
@@ -103,8 +105,9 @@ Five wrong passwords in a row close the door for a few seconds, doubling to five
 deployment in the browser and the coach connects with what you already typed. Changing the
 password changes the key. `BLUNDERBASE_MCP_BEARER_KEY` stays an override — set it and it
 is the only token `/mcp` accepts, which is how automation and the compose files keep
-working while the password changes underneath. `/mcp` is served when either exists; a
-password set through the UI reaches it at the next restart.
+working while the password changes underneath. `/mcp` is always mounted and answers 401
+to everyone until one of the two exists — so a password chosen in the browser reaches the
+coach immediately, with no restart.
 
 ```bash
 uv run blunderbase set-password    # bootstrap or reset headless; asked twice, never echoed
@@ -162,7 +165,7 @@ engines:
 ```
 
 `docker-compose.runner.yml` is the same thing as a container. The link carries a bearer
-token, so put HTTPS/WSS in front of the server (`docker-compose.traefik.yml`).
+token, so put HTTPS/WSS in front of the server (`docs/deploy.md`).
 `docs/runners.md` is the full reference: every yaml key, the compose walk-through, what
 `blunderbase runners list/create/revoke` do, and what each refusal means.
 
@@ -184,7 +187,7 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_DATA_DIR` | `<root>/data` | everything written that is not the database |
 | `BLUNDERBASE_WEB_DIST` | `<root>/web/dist` | the built web app; a directory that is not there is simply not served |
 | `BLUNDERBASE_HOST` `BLUNDERBASE_PORT` | `127.0.0.1` `8765` | what `serve` binds |
-| `BLUNDERBASE_MCP_BEARER_KEY` | — | overrides the password as `/mcp`'s bearer key; unset, `/mcp` is served behind the password once one is set |
+| `BLUNDERBASE_MCP_BEARER_KEY` | — | overrides the password as `/mcp`'s bearer key; unset, `/mcp` accepts the owner's password as soon as there is one |
 | `BLUNDERBASE_ANALYSIS_CONCURRENCY` | cores − 2 | engine processes at once, across every tier |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
 | `BLUNDERBASE_QUICK_NODES` `BLUNDERBASE_DEEP_NODES` `BLUNDERBASE_DEEP_MULTIPV` | `250000` `2000000` `4` | the per-position budget of each tier |

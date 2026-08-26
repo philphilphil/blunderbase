@@ -104,8 +104,8 @@ The image ships Stockfish at `/usr/games/stockfish`. A Maia build and its weight
 to mount — uncomment the `./engines` volume and register the path as `kind: maia`.
 
 **Put TLS in front of the server.** The token is a bearer credential on every frame;
-`docker-compose.traefik.yml` is the setup that does it, and `server:` is then the `https`
-URL with the socket derived from it.
+`docs/deploy.md` is a Caddyfile and an nginx site that do it, and `server:` is then the
+`https` URL with the socket derived from it.
 
 ## Watching it work
 
