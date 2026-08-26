@@ -1,0 +1,25 @@
+services:
+  blunderbase:
+    image: ghcr.io/philphilphil/blunderbase:latest
+    # Build the image here instead of pulling it: docker compose build
+    build: .
+    container_name: blunderbase
+    restart: unless-stopped
+    ports:
+      # The API carries no auth of its own — the bearer key guards the MCP transport
+      # only. On a machine other people can reach, publish it on loopback
+      # ("127.0.0.1:8765:8765") and put a terminator in front, the way
+      # docker-compose.traefik.yml does.
+      - "8765:8765"
+    volumes:
+      # The database, uploaded PGNs and any engine binary downloaded from the UI.
+      - blunderbase-data:/data
+    environment:
+      # Set this and the same port also serves the coach at /mcp, behind the key. Supply
+      # it from the shell or from a `.env` file beside this one (`.env` is gitignored):
+      #   BLUNDERBASE_MCP_BEARER_KEY=$(openssl rand -hex 32)
+      # Left empty, the remote transport is not served at all.
+      BLUNDERBASE_MCP_BEARER_KEY: ${BLUNDERBASE_MCP_BEARER_KEY:-}
+
+volumes:
+  blunderbase-data:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
@@ -11,6 +11,7 @@ from backend.api.errors import install_error_handlers
 from backend.api.events import EventBroker
 from backend.api.routes import ROUTERS
 from backend.api.routes.imports import wait_for_imports
+from backend.api.web import install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.workers import AnalysisWorkers
@@ -36,7 +37,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.analysis_workers:
         await workers.start()
     try:
-        yield
+        async with AsyncExitStack() as stack:
+            if app.state.mcp is not None:
+                # The mounted transport keeps its sessions in a task group this context
+                # opens. It is a route rather than a sub-application, so nothing else
+                # would ever start it.
+                await stack.enter_async_context(app.state.mcp.session_manager.run())
+            yield
     finally:
         await wait_for_imports(app.state.imports)
         await workers.stop()
@@ -55,6 +62,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.imports = imports
     app.state.workers = None
     app.state.loop = None
+    app.state.mcp = None
 
     install_error_handlers(app)
     for router in ROUTERS:
@@ -64,6 +72,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    if settings.mcp_http_enabled:
+        # Imported here so a process that serves no remote transport never builds the
+        # coach's tool surface, and `blunderbase mcp --transport http` keeps working as
+        # its own app either way.
+        from backend.mcp.http import mount_http_app
+
+        app.state.mcp = mount_http_app(app, settings)
+
+    app.state.web = install_web(app, settings.web_dist)
     return app
 
 

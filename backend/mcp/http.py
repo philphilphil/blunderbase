@@ -5,7 +5,9 @@ import secrets
 
 from mcp.server import MCPServer
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.applications import Starlette
 from starlette.datastructures import Headers
+from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from backend.config import Settings, get_settings
@@ -96,6 +98,35 @@ def create_http_app(
         host=resolved.host,
     )
     return BearerGuard(app, resolved.mcp_bearer_key)
+
+
+def mount_http_app(
+    app: Starlette,
+    settings: Settings | None = None,
+    *,
+    sessions: sessionmaker[Session] | None = None,
+    path: str = MCP_PATH,
+) -> MCPServer:
+    """Add the guarded transport to another app's routes, and hand back its server.
+
+    This is what puts the coach and the browser in one process: the MCP tools that drive
+    the live board and the `/events` sockets watching it are then the same
+    `services.live` state, and the owner's page follows what the coach does.
+
+    A `Route` rather than a `Mount`, because the transport owns exactly one path and has
+    no sub-paths of its own: mounted, `/mcp` would answer with a redirect to `/mcp/` that
+    a client posting JSON-RPC has no reason to follow.
+
+    The caller keeps `server.session_manager.run()` open for as long as it serves. The
+    transport runs its sessions in a task group that context opens, and the host app
+    never drives a route's lifespan — the standalone app's `lifespan=` is exactly this
+    same call, which is why `run_http` needs nothing extra.
+    """
+    resolved = settings or get_settings()
+    server = build_server(resolved, sessions)
+    transport = create_http_app(resolved, server=server, sessions=sessions, path=path)
+    app.router.routes.append(Route(path, endpoint=transport))
+    return server
 
 
 def run_http(settings: Settings | None = None, host: str | None = None, port: int = 0) -> None:

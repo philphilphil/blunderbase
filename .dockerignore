@@ -1,0 +1,19 @@
+# An allowlist: `data/` is the owner's real database and their whole game archive, and
+# nothing outside these paths is needed to build the image.
+*
+!backend/
+!web/
+!docker/
+!alembic.ini
+!pyproject.toml
+!uv.lock
+!README.md
+
+# `web/dist` is produced by the node stage inside the build. A host build copied in would
+# be whatever was last run locally — possibly stale, possibly pointed at a dev backend.
+web/dist/
+web/node_modules/
+web/.vite/
+**/__pycache__/
+**/*.py[cod]
+**/.DS_Store

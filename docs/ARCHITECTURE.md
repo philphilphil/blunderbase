@@ -395,14 +395,15 @@ is what increments and decrements the `viewer_count` that `get_live_state` repor
 is how the coach knows whether anyone is actually looking at the board.
 
 The state is process-wide, which is the whole of its storage: one owner, one board, nothing
-to migrate and nothing to clean up. It is also the limit of the feature as it stands. The
-browser sees what the coach does only when the MCP tools and the `/events` sockets run in
-one process, and no entry point arranges that yet — `blunderbase serve` runs the API app
-and `blunderbase mcp --transport http` runs the transport as its own uvicorn app, while a
-stdio server is a subprocess of the chat client. Whichever process the coach reaches drives
-its own board and reports no viewers. Mounting the MCP transport into the API app (behind
-the bearer key it already carries) is what closes that, and is the one thing live mode
-still needs.
+to migrate and nothing to clean up. That makes the process boundary the feature's one rule:
+the browser sees what the coach does only when the MCP tools and the `/events` sockets run
+in one process. `blunderbase serve` arranges exactly that — when `BLUNDERBASE_MCP_BEARER_KEY`
+is set it mounts the streamable-HTTP transport at `/mcp` (behind the bearer guard) inside
+the API app, so a coach connected there drives the board the browser is watching. The
+standalone transports still exist (`blunderbase mcp` for stdio, `--transport http` for its
+own uvicorn app), but each is its own process with its own board and no viewers — fine for
+querying the database, wrong for live mode. Point the coach at the served `/mcp` when the
+board should follow.
 
 **Binding.** `settings.host` defaults to `127.0.0.1`, and `blunderbase serve` binds what
 it says. The API carries no auth of its own; the bearer key guards the MCP HTTP transport

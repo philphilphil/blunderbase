@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # uploaded PGNs. Defaults to `<root>/data`.
     data_dir: Path | None = None
     database_path: Path | None = Field(default=None, validation_alias="BLUNDERBASE_DB_PATH")
+    # The built web app, served by the API process so a deployment is one port. Defaults
+    # to `<root>/web/dist`; a directory that was never built simply is not served, which
+    # is the normal case in development (the Vite dev server has the page instead).
+    web_dist: Path | None = None
     # The PostgreSQL escape hatch: a full SQLAlchemy URL that replaces the SQLite file.
     # Unset — the normal case — means the database at `database_path`. Nothing else in the
     # codebase asks which back end it is talking to; this is the only seam.
@@ -82,6 +86,7 @@ class Settings(BaseSettings):
         self.root = self.root.expanduser().resolve()
         self.data_dir = self._resolve(self.data_dir, self.root / "data")
         self.database_path = self._resolve(self.database_path, self.data_dir / "blunderbase.db")
+        self.web_dist = self._resolve(self.web_dist, self.root / "web" / "dist")
         if not self.database_url.strip():
             self.database_url = f"sqlite+pysqlite:///{self.database_path}"
         return self

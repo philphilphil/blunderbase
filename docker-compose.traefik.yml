@@ -1,0 +1,30 @@
+# The owner's own deployment: no published port, reached only through Traefik on the
+# shared `gateway` network. Generic hosting starts from docker-compose.yml instead.
+services:
+  blunderbase:
+    image: ghcr.io/philphilphil/blunderbase:latest
+    build: .
+    container_name: blunderbase
+    restart: unless-stopped
+    networks:
+      - gateway
+    volumes:
+      - blunderbase-data:/data
+    environment:
+      BLUNDERBASE_MCP_BEARER_KEY: ${BLUNDERBASE_MCP_BEARER_KEY:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.blunderbase.rule=Host(`blunderbase.phib.io`)"
+      # Assumes this Traefik's TLS entrypoint is called `websecure` and its ACME resolver
+      # `myresolver` — both are Traefik's own example names, so rename them here if the
+      # static configuration spells them differently.
+      - "traefik.http.routers.blunderbase.entrypoints=websecure"
+      - "traefik.http.routers.blunderbase.tls.certresolver=myresolver"
+      - "traefik.http.services.blunderbase.loadbalancer.server.port=8765"
+
+networks:
+  gateway:
+    external: true
+
+volumes:
+  blunderbase-data:

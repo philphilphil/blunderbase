@@ -8,10 +8,12 @@ from typing import Any
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 from mcp.types import LATEST_PROTOCOL_VERSION
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.types import Receive, Scope, Send
 
+from backend.api.app import create_app
 from backend.config import Settings
 from backend.mcp.http import BearerGuard, TransportDisabledError, create_http_app
 
@@ -161,3 +163,29 @@ async def test_the_mcp_transport_turns_an_unauthorized_client_away(
         response = await client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS)
     assert response.status_code == 401
     assert "serverInfo" not in response.text
+
+
+# --- the transport inside the API app --------------------------------------
+
+
+def test_the_transport_is_mounted_when_a_key_is_configured(settings: Settings) -> None:
+    """One process for the coach and the browser, which is what live mode needs."""
+    settings.mcp_bearer_key = KEY
+    app = create_app(settings)
+    assert app.state.mcp is not None
+    # The bind host is the loopback default here, so the SDK's DNS-rebinding protection
+    # is on and the client has to say the same thing uvicorn would be told.
+    with TestClient(app, base_url=BASE_URL) as client:
+        assert client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS).status_code == 401
+        response = client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {KEY}"}
+        )
+    assert response.status_code == 200
+    assert '"blunderbase"' in response.text
+
+
+def test_nothing_is_mounted_without_a_key(settings: Settings) -> None:
+    app = create_app(settings)
+    assert app.state.mcp is None
+    with TestClient(app, base_url=BASE_URL) as client:
+        assert client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS).status_code == 404
