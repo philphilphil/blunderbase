@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.adapters import lichess, pgn_import
-from backend.db.enums import JobStatus, Result, Source, Speed
+from backend.db.enums import JobStatus, Platform, Result, Source, Speed
 from backend.db.models import Account, Game, ImportJob
 from backend.services.import_service import ImportFailure, ParsedGame, run_import
 
@@ -109,6 +109,25 @@ def test_the_owners_side_is_resolved_from_the_accounts_table(
     assert stored["zzDanish"].owner_color == "white"
     assert stored["zzScandi"].owner_color == "black"
     assert job.account_id == session.scalars(select(Account.id)).one()
+
+
+@respx.mock
+def test_a_sync_registers_the_account_it_was_asked_for(session: Session, archive: str) -> None:
+    """The username a sync was asked for is the owner's, whether or not a row said so."""
+    respx.get(EXPORT).mock(return_value=httpx.Response(200, text=archive))
+
+    job = sync(session)
+
+    account = session.scalars(select(Account)).one()
+    assert (account.platform, account.username, account.is_owner) == (
+        Platform.LICHESS,
+        PLAYER,
+        True,
+    )
+    assert job.account_id == account.id
+    stored = {game.source_id: game for game in games(session)}
+    assert stored["zzDanish"].owner_color == "white"
+    assert stored["zzScandi"].owner_color == "black"
 
 
 @respx.mock

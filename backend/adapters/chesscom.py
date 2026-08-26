@@ -26,7 +26,8 @@ import chess.pgn
 import httpx
 
 from backend.adapters import pgn_import
-from backend.db.enums import JobStatus, Result, Source, Speed
+from backend.db.enums import JobStatus, Platform, Result, Source, Speed
+from backend.services import accounts
 from backend.services.import_service import (
     AccountIndex,
     ImportFailure,
@@ -119,9 +120,11 @@ def run(
     if not USERNAME.fullmatch(name):
         raise ValueError("a chess.com import needs the username whose archives to read")
     job.message = name
-    accounts = AccountIndex.load(session)
-    account_id, _is_owner = accounts.match(Source.CHESSCOM, name)
-    job.account_id = account_id
+    # The account a sync was asked for is the owner's, and it has to exist before the
+    # first game is stored: `owner_color` is read off the accounts as they are on the way
+    # in, and a game stored without one is a game with no side of its own.
+    job.account_id = accounts.register_account(session, Platform.CHESSCOM, name).id
+    index = AccountIndex.load(session)
 
     if cursor is not None:
         resume, month = cursor, None
@@ -152,7 +155,7 @@ def run(
                 headers=headers,
             ),
             progress=progress,
-            accounts=accounts,
+            accounts=index,
         )
     finally:
         if owned:

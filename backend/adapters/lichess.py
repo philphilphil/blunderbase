@@ -22,7 +22,8 @@ import chess
 import chess.pgn
 import httpx
 
-from backend.db.enums import JobStatus, Result, Source, Speed
+from backend.db.enums import JobStatus, Platform, Result, Source, Speed
+from backend.services import accounts
 from backend.services.import_service import (
     CHESS960_VARIANTS,
     AccountIndex,
@@ -128,9 +129,11 @@ def run(
         raise ValueError("a lichess import needs the username whose games to sync")
 
     job.message = player
-    accounts = AccountIndex.load(session)
-    account_id, _is_owner = accounts.match(Source.LICHESS, player)
-    job.account_id = account_id
+    # The account a sync was asked for is the owner's, and it has to exist before the
+    # first game is stored: `owner_color` is read off the accounts as they are on the way
+    # in, and a game stored without one is a game with no side of its own.
+    job.account_id = accounts.register_account(session, Platform.LICHESS, player).id
+    index = AccountIndex.load(session)
 
     since_ms = resolve_since(session, player, since)
     cursor = Cursor(since_ms or 0)
@@ -148,7 +151,7 @@ def run(
             sleep=sleep,
         )
         games = parse_stream(lines, cursor=cursor, speeds=speeds)
-        result = ingest_games(session, job, games, progress=progress, accounts=accounts)
+        result = ingest_games(session, job, games, progress=progress, accounts=index)
     finally:
         if owned:
             http.close()

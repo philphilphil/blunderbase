@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from backend.db.enums import (
     Color,
     JobStatus,
-    Platform,
     Result,
     Source,
     Speed,
@@ -29,7 +28,9 @@ from backend.db.models import (
     Position,
 )
 from backend.db.types import utcnow
+from backend.services import accounts as accounts_service
 from backend.services import analysis, engines
+from backend.services.accounts import AccountIndex, fold
 from backend.services.analysis import QUICK_PRIORITY  # noqa: F401  (the pipeline's own priority)
 
 
@@ -125,13 +126,6 @@ GAME_IMPORTED = "imported"
 GAME_SKIPPED = "skipped"
 GAME_FAILED = "failed"
 
-# Which platform's accounts name the owner in a game from this source. A PGN or a manual
-# game belongs to no platform, so it matches an account by username alone.
-PLATFORM_FOR_SOURCE: dict[Source, Platform] = {
-    Source.LICHESS: Platform.LICHESS,
-    Source.CHESSCOM: Platform.CHESSCOM,
-}
-
 CHESS960_VARIANTS = frozenset({"chess960", "fischerandom", "fischerrandom"})
 
 # SQLite's default parameter limit is the tighter of the two back ends; a game never has
@@ -204,6 +198,7 @@ def run_import(
 
     try:
         result = adapter(session, job, progress=progress, **options)
+        _reconcile(session, job)
     except Exception as exc:
         session.rollback()
         job.status = JobStatus.FAILED
@@ -228,6 +223,21 @@ def run_import(
         },
     )
     return job
+
+
+def _reconcile(session: Session, job: ImportJob) -> None:
+    """Re-derive the owner's side over this account's games, now that the sync has run.
+
+    An adapter that names an account registers it before it stores anything, so a healthy
+    sync finds nothing left to fill in. What this catches is everything that was stored
+    before the account existed: games from an earlier sync of the same username, and games
+    of it that arrived through a PGN.
+    """
+    if job.account_id is None:
+        return
+    account = session.get(Account, job.account_id)
+    if account is not None:
+        accounts_service.reconcile_games(session, account)
 
 
 def ingest_games(
@@ -356,8 +366,8 @@ def dedup_hash(parsed: ParsedGame) -> str:
     day = parsed.played_at.date().isoformat() if parsed.played_at else ""
     material = "|".join(
         (
-            _fold(parsed.white_name),
-            _fold(parsed.black_name),
+            fold(parsed.white_name),
+            fold(parsed.black_name),
             day,
             " ".join(parsed.moves_uci),
         )
@@ -491,51 +501,6 @@ def quick_tier_engine(session: Session) -> Engine | None:
     return engines.engine_for_tier(session, Tier.QUICK)
 
 
-@dataclass(slots=True)
-class AccountIndex:
-    """The owner's usernames, which is what decides which side of a game is "you"."""
-
-    entries: list[tuple[int, Platform, str, bool]] = field(default_factory=list)
-
-    @classmethod
-    def load(cls, session: Session) -> AccountIndex:
-        accounts = session.scalars(select(Account).order_by(Account.id)).all()
-        return cls(
-            entries=[
-                (account.id, account.platform, _fold(account.username), account.is_owner)
-                for account in accounts
-            ]
-        )
-
-    def match(self, source: Source, name: str) -> tuple[int | None, bool]:
-        """The account this player name is, and whether that account is the owner's.
-
-        A source that names a platform matches on that platform only — a stranger on
-        chess.com may well be called what the owner is called on Lichess. A PGN or a
-        manual game belongs to no platform, so it matches on the username alone, and where
-        several accounts share one the owner's wins: the same handle on two sites is still
-        the same person.
-        """
-        folded = _fold(name)
-        if not folded:
-            return None, False
-
-        platform = PLATFORM_FOR_SOURCE.get(source)
-        if platform is not None:
-            for identifier, account_platform, username, is_owner in self.entries:
-                if account_platform == platform and username == folded:
-                    return identifier, is_owner
-            return None, False
-
-        candidates = [entry for entry in self.entries if entry[2] == folded]
-        owners = [entry for entry in candidates if entry[3]]
-        if owners:
-            return owners[0][0], True
-        if len(candidates) == 1:
-            return candidates[0][0], candidates[0][3]
-        return None, False
-
-
 def get_job(session: Session, job_id: int) -> ImportJob | None:
     """One import job with its counts and per-game errors."""
     return session.get(ImportJob, job_id)
@@ -563,10 +528,6 @@ def latest_cursor(session: Session, source: str, account_id: int | None = None) 
     if account_id is not None:
         statement = statement.where(ImportJob.account_id == account_id)
     return session.scalars(statement.limit(1)).first()
-
-
-def _fold(name: str | None) -> str:
-    return (name or "").strip().casefold()
 
 
 def _stamp() -> str:

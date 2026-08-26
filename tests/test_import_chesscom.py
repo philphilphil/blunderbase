@@ -132,6 +132,44 @@ def test_a_sync_is_attributed_to_the_owners_account(
     assert job.account_id == account.id
 
 
+def test_a_sync_registers_the_account_it_was_asked_for(
+    session: Session, sync: Callable[..., Any]
+) -> None:
+    """The username a sync was asked for is the owner's, whether or not a row said so."""
+    job = sync(session)
+
+    account = session.scalars(select(Account)).one()
+    assert (account.platform, account.username, account.is_owner) == (
+        Platform.CHESSCOM,
+        "blunderbase",
+        True,
+    )
+    assert job.account_id == account.id
+    assert _game(session, "111111111").owner_color is Color.WHITE
+
+
+def test_a_sync_heals_the_games_a_previous_one_stored_without_an_account(
+    session: Session, sync: Callable[..., Any]
+) -> None:
+    """The production case: games synced before any account row named their owner."""
+    stale = Game(
+        source=Source.CHESSCOM,
+        source_id="900000001",
+        dedup_hash="stale",
+        white_name="Blunderbase",
+        black_name="rival",
+        result=Result.WHITE_WIN,
+        pgn="",
+    )
+    session.add(stale)
+    session.commit()
+
+    sync(session)
+
+    assert stale.owner_color is Color.WHITE
+    assert stale.white_account_id == session.scalars(select(Account.id)).one()
+
+
 def test_metadata_comes_off_the_json_over_the_pgn(
     session: Session, sync: Callable[..., Any]
 ) -> None:
