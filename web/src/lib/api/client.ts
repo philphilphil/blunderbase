@@ -1,3 +1,5 @@
+import { isSessionLoss, reportSessionLost } from '@/lib/auth/session'
+
 import type { ErrorBody } from './types'
 
 /**
@@ -103,7 +105,17 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     signal,
   })
 
-  if (!response.ok) throw await readError(response)
+  if (!response.ok) {
+    const failure = await readError(response)
+    // A guarded route saying `unauthorized` or `setup_required` is the whole app's
+    // problem, not this caller's: the session ended, so the page has to go back to the
+    // login (or setup) screen. The error is still thrown — nothing is retried here, and
+    // the caller renders whatever it renders for a failure until the gate swaps it out.
+    if (failure.status === 401 && isSessionLoss(failure.error)) {
+      reportSessionLost(failure.error)
+    }
+    throw failure
+  }
   if (response.status === 204) return undefined as T
   const raw = await response.text()
   return (raw ? JSON.parse(raw) : undefined) as T

@@ -6,6 +6,7 @@
 import { http, type QueryValue } from './client'
 import type {
   AnalysisRequest,
+  AuthStatus,
   ComparisonResponse,
   DimensionList,
   EngineCreate,
@@ -49,6 +50,25 @@ function filterParams(filters: GameFilters = {}): Record<string, QueryValue> {
 // --- meta -----------------------------------------------------------------
 
 export const health = () => http.get<Health>('/health')
+
+// --- auth -----------------------------------------------------------------
+
+/** Never guarded — this is the call the page makes before it renders anything. */
+export const authStatus = () => http.get<AuthStatus>('/auth/status')
+
+/** First run only: a second caller gets a 409 `already_configured`. */
+export const setupPassword = (password: string) =>
+  http.post<AuthStatus>('/auth/setup', { body: { password } })
+
+export const login = (password: string) =>
+  http.post<AuthStatus>('/auth/login', { body: { password } })
+
+/** Always 204, cookie cleared — a browser asking to be signed out is never refused. */
+export const logout = () => http.post<void>('/auth/logout')
+
+/** Signs every other browser out and hands this one a fresh cookie. */
+export const changePassword = (current: string, next: string) =>
+  http.post<AuthStatus>('/auth/password', { body: { current, new: next } })
 
 // --- games ----------------------------------------------------------------
 

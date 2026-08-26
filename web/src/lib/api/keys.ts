@@ -13,6 +13,12 @@ import type { CompareQuery, ExplorerQuery, GameDetailQuery, GameQuery, NoteQuery
 export const queryKeys = {
   health: (): QueryKey => ['health'],
 
+  /**
+   * The one query that survives signing out — everything else is cleared with the session,
+   * and `AuthProvider` tells the two apart by this prefix.
+   */
+  auth: (): QueryKey => ['auth'],
+
   games: (): QueryKey => ['games'],
   gameList: (query: GameQuery = {}): QueryKey => ['games', 'list', query],
   gameCards: (query: GameQuery = {}): QueryKey => ['games', 'cards', query],

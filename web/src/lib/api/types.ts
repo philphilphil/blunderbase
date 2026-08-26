@@ -47,6 +47,14 @@ export interface ErrorBody {
   fields?: { field: string; message: string }[]
 }
 
+// --- auth -----------------------------------------------------------------
+
+/** What every `/auth` route answers with: is there a password, and do I have it. */
+export interface AuthStatus {
+  setup_required: boolean
+  authenticated: boolean
+}
+
 // --- games ----------------------------------------------------------------
 
 export interface GameSummary extends Extra {

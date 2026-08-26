@@ -13,6 +13,7 @@ import {
 import { eventsUrl } from '@/lib/api/client'
 import { queryKeys } from '@/lib/api/keys'
 import type { LiveState } from '@/lib/api/types'
+import { onSessionRestored, reportSessionLost } from '@/lib/auth/session'
 
 import { dedupeKeys, invalidationsFor } from './invalidation'
 import { parseEvent, type AnyEvent, type EventName } from './types'
@@ -38,6 +39,10 @@ const EventsContext = createContext<EventsContextValue | null>(null)
 // backend that is simply not running does not spin.
 const RETRY_MIN_MS = 500
 const RETRY_MAX_MS = 8_000
+// `backend/api/auth.py: WS_CLOSE_UNAUTHORIZED`. The socket is accepted and then closed with
+// this code when there is no session, so it means "signed out", not "the server went away"
+// — and the one thing not to do about it is reconnect.
+const WS_UNAUTHORIZED = 4401
 // Import and analysis events arrive in bursts (one per game, one per ply). Invalidations
 // are collected over this window and applied once, so a burst is one refetch.
 const FLUSH_MS = 200
@@ -78,6 +83,7 @@ export function EventsProvider({
     let retryTimer: ReturnType<typeof setTimeout> | null = null
     let attempt = 0
     let closed = false
+    let denied = false
     let everConnected = false
 
     const flush = () => {
@@ -100,7 +106,7 @@ export function EventsProvider({
     }
 
     const connect = () => {
-      if (closed) return
+      if (closed || denied) return
       setStatus('connecting')
       let next: WebSocket
       try {
@@ -149,15 +155,24 @@ export function EventsProvider({
       }
 
       next.onerror = () => next.close()
-      next.onclose = () => {
+      next.onclose = (event: CloseEvent | undefined) => {
         if (socket === next) socket = null
         setStatus('closed')
+        // Signed out. Retrying would be a request per backoff step for an answer that will
+        // not change until someone types a password, so the loop stops here and the page is
+        // told — `AuthProvider` puts the login screen up, and `onSessionRestored` below is
+        // what starts the socket again.
+        if (event?.code === WS_UNAUTHORIZED) {
+          denied = true
+          reportSessionLost(event.reason === 'setup_required' ? 'setup_required' : 'unauthorized')
+          return
+        }
         retry()
       }
     }
 
     const retry = () => {
-      if (closed || retryTimer !== null) return
+      if (closed || denied || retryTimer !== null) return
       const backoff = Math.min(RETRY_MAX_MS, RETRY_MIN_MS * 2 ** attempt)
       attempt += 1
       // Jitter so a backend restart does not get every tab back at the same millisecond.
@@ -168,10 +183,18 @@ export function EventsProvider({
       }, delay)
     }
 
+    // Signing in is the only thing that makes the socket worth trying again after a 4401.
+    const stopWaitingForSession = onSessionRestored(() => {
+      if (closed || !denied) return
+      denied = false
+      connect()
+    })
+
     connect()
 
     return () => {
       closed = true
+      stopWaitingForSession()
       if (retryTimer !== null) clearTimeout(retryTimer)
       if (flushTimer.current !== null) {
         clearTimeout(flushTimer.current)

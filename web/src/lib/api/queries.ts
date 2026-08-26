@@ -13,10 +13,12 @@ import {
   type UseQueryOptions,
 } from '@tanstack/react-query'
 
+import { ApiError } from './client'
 import * as api from './endpoints'
 import { queryKeys } from './keys'
 import type {
   AnalysisRequest,
+  AuthStatus,
   EngineCreate,
   EngineUpdate,
   GameFilters,
@@ -29,6 +31,83 @@ import type {
 } from './types'
 
 type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>
+
+// --- auth -----------------------------------------------------------------
+
+/**
+ * The gate's single source of truth (`lib/auth/AuthProvider.tsx` derives the screen from
+ * it). Every mutation below writes its answer straight into this key rather than
+ * invalidating it: the routes all answer with the same `AuthStatus`, so a round trip to
+ * ask what we were just told would only add a frame of the wrong screen.
+ */
+export function useAuthStatus(options?: Options<Awaited<ReturnType<typeof api.authStatus>>>) {
+  return useQuery({ queryKey: queryKeys.auth(), queryFn: api.authStatus, ...options })
+}
+
+function useAuthMutation<Variables>(
+  mutationFn: (variables: Variables) => Promise<AuthStatus>,
+  options?: UseMutationOptions<AuthStatus, Error, Variables>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    ...options,
+    onSuccess: (...args) => {
+      client.setQueryData(queryKeys.auth(), args[0])
+      options?.onSuccess?.(...args)
+    },
+    onError: (...args) => {
+      // The two 409s — logging in to a deployment with no password yet, setting one on a
+      // deployment that already has one — both mean the screen we are on is out of date
+      // about the *deployment*, not about the password. Asking again is the whole fix.
+      if (args[0] instanceof ApiError && args[0].status === 409) {
+        void client.invalidateQueries({ queryKey: queryKeys.auth() })
+      }
+      options?.onError?.(...args)
+    },
+  })
+}
+
+export function useLogin(options?: UseMutationOptions<AuthStatus, Error, string>) {
+  return useAuthMutation((password: string) => api.login(password), options)
+}
+
+export function useSetupPassword(options?: UseMutationOptions<AuthStatus, Error, string>) {
+  return useAuthMutation((password: string) => api.setupPassword(password), options)
+}
+
+/** The cookie is re-issued, so this browser stays signed in while every other one does not. */
+export function useChangePassword(
+  options?: UseMutationOptions<AuthStatus, Error, { current: string; next: string }>,
+) {
+  return useAuthMutation(
+    ({ current, next }: { current: string; next: string }) => api.changePassword(current, next),
+    options,
+  )
+}
+
+/**
+ * Signing out cannot fail: a 204 and a lost cookie are the same outcome as a network error
+ * on the way to one, so both land on the login screen. Clearing what the session cached is
+ * `AuthProvider`'s job, once the app has come off the screen.
+ */
+export function useLogout(options?: UseMutationOptions<void, Error, void>) {
+  const client = useQueryClient()
+  const signedOut = () =>
+    client.setQueryData<AuthStatus>(queryKeys.auth(), { setup_required: false, authenticated: false })
+  return useMutation({
+    mutationFn: api.logout,
+    ...options,
+    onSuccess: (...args) => {
+      signedOut()
+      options?.onSuccess?.(...args)
+    },
+    onError: (...args) => {
+      signedOut()
+      options?.onError?.(...args)
+    },
+  })
+}
 
 // --- games ----------------------------------------------------------------
 

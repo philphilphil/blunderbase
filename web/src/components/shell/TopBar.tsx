@@ -1,12 +1,10 @@
-import { User } from 'lucide-react'
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useProfile } from '@/lib/api/queries'
-import type { AccountSummary } from '@/lib/api/types'
 import { useEvents } from '@/lib/events/EventsProvider'
 import { cn } from '@/lib/utils'
 
+import { AccountMenu } from './AccountMenu'
 import { McpIndicator } from './McpStatus'
 import { ThemeToggle } from './ThemeToggle'
 import { QueueIndicator } from './QueueIndicator'
@@ -33,49 +31,6 @@ function ConnectionDot() {
             : 'bg-blunder',
       )}
     />
-  )
-}
-
-/** `kn1ghtmare` -> `KN`, `Sofia Grover` -> `SG` — the design's 24px avatar square. */
-export function initialsOf(account: AccountSummary | undefined): string {
-  const name = account?.display_name?.trim() || account?.username?.trim()
-  if (!name) return ''
-  const words = name.split(/[\s_.-]+/).filter(Boolean)
-  const initials =
-    words.length > 1 ? `${words[0][0]}${words[1][0]}` : name.replace(/\s/g, '').slice(0, 2)
-  return initials.toUpperCase()
-}
-
-/** The connected account the app is about: the owner's, or the busiest one on record. */
-function ownerAccount(accounts: AccountSummary[]): AccountSummary | undefined {
-  return (
-    accounts.find((account) => account.is_owner) ??
-    [...accounts].sort((left, right) => (right.games ?? 0) - (left.games ?? 0))[0]
-  )
-}
-
-/**
- * The 24px avatar square every design frame ends the titlebar with. There is no user
- * account in Blunderbase — the identity it can honestly show is the connected chess
- * account, so the chip carries its initials and links to where accounts are connected.
- */
-function AccountChip() {
-  const profile = useProfile()
-  const account = ownerAccount(profile.data?.accounts ?? [])
-  const initials = initialsOf(account)
-  const label = account
-    ? `${account.display_name ?? account.username} · ${account.platform}`
-    : 'No account connected — connect one on the import page'
-
-  return (
-    <Link
-      to="/import"
-      title={label}
-      aria-label={label}
-      className="flex size-6 flex-none items-center justify-center rounded-md border border-edge-strong bg-avatar text-[0.625rem] font-semibold text-soft transition-colors hover:border-edge-hover hover:text-ink"
-    >
-      {initials || <User className="size-3" aria-hidden />}
-    </Link>
   )
 }
 
@@ -138,7 +93,7 @@ export function TopBar() {
       <div className="flex items-center gap-1.5 rounded-md border border-edge px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim">
         ⌘K
       </div>
-      <AccountChip />
+      <AccountMenu />
     </header>
   )
 }

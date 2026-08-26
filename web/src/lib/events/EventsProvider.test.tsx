@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { onSessionLost, reportSessionRestored } from '@/lib/auth/session'
+
 import { EventsProvider } from './EventsProvider'
 
 /** A socket that never connects on its own, so the test decides when `open` happens. */
@@ -10,7 +12,7 @@ class FakeSocket {
   onopen: (() => void) | null = null
   onmessage: ((event: MessageEvent<string>) => void) | null = null
   onerror: (() => void) | null = null
-  onclose: (() => void) | null = null
+  onclose: ((event?: CloseEvent) => void) | null = null
   url: string
   constructor(url: string) {
     this.url = url
@@ -19,6 +21,10 @@ class FakeSocket {
   close() {}
   open() {
     act(() => this.onopen?.())
+  }
+  /** The server hanging up, with the code and reason a real `CloseEvent` carries. */
+  closedBy(code: number, reason = '') {
+    act(() => this.onclose?.({ code, reason } as CloseEvent))
   }
 }
 
@@ -45,6 +51,7 @@ function renderProbe(queryFn: () => Promise<string>) {
 afterEach(() => {
   FakeSocket.instances = []
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('EventsProvider', () => {
@@ -73,5 +80,46 @@ describe('EventsProvider', () => {
     socket().open()
     await act(async () => {})
     expect(queryFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a 4401 close as being signed out, and stops instead of reconnecting', async () => {
+    vi.useFakeTimers()
+    const lost = vi.fn()
+    const stop = onSessionLost(lost)
+    const socket = renderProbe(async () => 'the library')
+    socket().open()
+
+    socket().closedBy(4401, 'unauthorized')
+
+    expect(lost).toHaveBeenCalledWith('unauthorized')
+    // The backoff would have opened another socket by now for any other close code.
+    await act(() => vi.advanceTimersByTimeAsync(30_000))
+    expect(FakeSocket.instances).toHaveLength(1)
+
+    // Signing in again is what makes it worth trying, and then it comes straight back.
+    act(() => reportSessionRestored())
+    expect(FakeSocket.instances).toHaveLength(2)
+    stop()
+  })
+
+  it('tells a fresh deployment apart from an expired session on the same close code', async () => {
+    const lost = vi.fn()
+    const stop = onSessionLost(lost)
+    const socket = renderProbe(async () => 'the library')
+    socket().closedBy(4401, 'setup_required')
+
+    expect(lost).toHaveBeenCalledWith('setup_required')
+    stop()
+  })
+
+  it('reconnects on any other close, which is the backend going away', async () => {
+    vi.useFakeTimers()
+    const socket = renderProbe(async () => 'the library')
+    socket().open()
+
+    socket().closedBy(1006)
+    await act(() => vi.advanceTimersByTimeAsync(1_000))
+
+    expect(FakeSocket.instances.length).toBeGreaterThan(1)
   })
 })
