@@ -15,4 +15,3 @@ __pycache__/
 *.db-shm
 *.db-wal
 .env
-tmp_local/
