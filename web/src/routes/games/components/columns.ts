@@ -21,6 +21,12 @@ export interface Column {
   mono?: boolean
 }
 
+/**
+ * The height of one body row, in `rem` so a row grows with the app's scale like everything
+ * else. Shared by the rows and the skeleton that stands in for them.
+ */
+export const ROW_HEIGHT = '2.5rem'
+
 export const COLUMNS: Column[] = [
   { id: 'select', label: '', width: 14 },
   { id: 'date', label: 'Date', width: 78, sort: 'played_at', mono: true },

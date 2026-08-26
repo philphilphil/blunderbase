@@ -1,7 +1,6 @@
 /**
- * Design 2b's filter bar: the free-text box, one chip per filter group and the row-density
- * control. Every chip writes straight into the page's `LibraryFilters`, which the page
- * mirrors into the URL.
+ * Design 2b's filter bar: the free-text box and one chip per filter group. Every chip writes
+ * straight into the page's `LibraryFilters`, which the page mirrors into the URL.
  */
 import { useEffect, useRef, useState } from 'react'
 
@@ -21,15 +20,11 @@ import {
 } from '../filters'
 import { OUTCOME_LABELS, SOURCE_LABELS } from '../format'
 import { MAX_LABEL_LENGTH, saveFilter, suggestLabel } from '../savedFilters'
-import type { Density } from './density'
-import { DENSITIES } from './density'
 import { FilterPopover, OptionRow, PopoverLabel, TriState } from './FilterPopover'
 
 export interface FilterBarProps {
   filters: LibraryFilters
   onChange: (next: LibraryFilters) => void
-  density: Density
-  onDensityChange: (next: Density) => void
 }
 
 /** Presets for the date popover, in days back from today. */
@@ -46,7 +41,7 @@ function isoDay(offsetDays: number): string {
   return date.toISOString().slice(0, 10)
 }
 
-export function FilterBar({ filters, onChange, density, onDensityChange }: FilterBarProps) {
+export function FilterBar({ filters, onChange }: FilterBarProps) {
   const patch = (next: Partial<LibraryFilters>) => onChange(prune({ ...filters, ...next }))
 
   return (
@@ -64,27 +59,6 @@ export function FilterBar({ filters, onChange, density, onDensityChange }: Filte
       ))}
 
       <SaveFilter filters={filters} />
-
-      <div className="flex-1" />
-
-      <span className="font-mono text-[0.6875rem] text-dim">rows {DENSITIES[density].px}px</span>
-      <div className="flex overflow-hidden rounded-md border border-edge font-mono text-[0.6875rem]">
-        {(Object.keys(DENSITIES) as Density[]).map((option, index) => (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={density === option}
-            onClick={() => onDensityChange(option)}
-            className={cn(
-              'px-2.5 py-1 transition-colors',
-              index > 0 && 'border-l border-edge',
-              density === option ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
-            )}
-          >
-            {DENSITIES[option].label}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }

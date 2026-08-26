@@ -1,5 +1,5 @@
 /**
- * One 34px row of design 2b: mono and tabular throughout, with the two name columns set in
+ * One 40px row of design 2b: mono and tabular throughout, with the two name columns set in
  * Geist so they read as prose next to the numbers.
  */
 import type * as React from 'react'
@@ -23,7 +23,7 @@ import {
   tierOf,
   worstDrop,
 } from '../format'
-import { cellStyle, COLUMNS } from './columns'
+import { cellStyle, COLUMNS, ROW_HEIGHT } from './columns'
 
 function column(id: string) {
   const found = COLUMNS.find((entry) => entry.id === id)
@@ -33,7 +33,6 @@ function column(id: string) {
 
 export interface GameRowProps {
   game: GameCard
-  height: string
   selected: boolean
   onToggle: (id: number, event: React.MouseEvent) => void
   onOpen: (id: number) => void
@@ -43,7 +42,6 @@ export interface GameRowProps {
 
 export const GameRow = memo(function GameRow({
   game,
-  height,
   selected,
   onToggle,
   onOpen,
@@ -66,7 +64,7 @@ export const GameRow = memo(function GameRow({
           onOpen(game.id)
         }
       }}
-      style={{ height }}
+      style={{ height: ROW_HEIGHT }}
       className={cn(
         'flex cursor-pointer items-center gap-2.5 border-t border-raised px-5 font-mono text-[0.71875rem] tabular outline-none',
         selected

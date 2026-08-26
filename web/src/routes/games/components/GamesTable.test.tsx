@@ -30,7 +30,6 @@ const GAME = {
 function setup(over: Partial<GamesTableProps> = {}) {
   const props: GamesTableProps = {
     games: [GAME],
-    height: '2.125rem',
     sort: DEFAULT_SORT,
     onSortChange: vi.fn(),
     selected: new Set(),

@@ -13,12 +13,11 @@ import type { GameCard } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
 import { nextSort, type Sort } from '../sorting'
-import { cellStyle, COLUMNS, remWidth } from './columns'
+import { cellStyle, COLUMNS, remWidth, ROW_HEIGHT } from './columns'
 import { GameRow } from './GameRow'
 
 export interface GamesTableProps {
   games: GameCard[]
-  height: string
   sort: Sort
   onSortChange: (next: Sort) => void
   selected: Set<number>
@@ -39,7 +38,6 @@ export interface GamesTableProps {
 
 export function GamesTable({
   games,
-  height,
   sort,
   onSortChange,
   selected,
@@ -147,7 +145,7 @@ export function GamesTable({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {status === 'pending' ? (
-          <LoadingRows height={height} />
+          <LoadingRows />
         ) : status === 'error' ? (
           <ErrorState error={error} onRetry={onRetry} />
         ) : games.length === 0 ? (
@@ -158,7 +156,6 @@ export function GamesTable({
               <GameRow
                 key={game.id}
                 game={game}
-                height={height}
                 selected={selected.has(game.id)}
                 onToggle={onToggle}
                 onOpen={onOpen}
@@ -167,7 +164,7 @@ export function GamesTable({
               />
             ))}
             <div ref={sentinel} className="h-px flex-none" aria-hidden />
-            {isFetchingNextPage ? <LoadingRows height={height} rows={4} /> : null}
+            {isFetchingNextPage ? <LoadingRows rows={4} /> : null}
             {hasNextPage && !isFetchingNextPage ? (
               <button
                 type="button"
@@ -185,13 +182,13 @@ export function GamesTable({
 }
 
 /** The skeleton body: the same 13 columns, so the layout does not jump when rows land. */
-function LoadingRows({ height, rows = 14 }: { height: string; rows?: number }) {
+function LoadingRows({ rows = 14 }: { rows?: number }) {
   return (
     <div aria-busy data-testid="games-loading">
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
-          style={{ height, opacity: 1 - index * (0.6 / rows) }}
+          style={{ height: ROW_HEIGHT, opacity: 1 - index * (0.6 / rows) }}
           className="flex items-center gap-2.5 border-t border-raised px-5"
         >
           {COLUMNS.map((col) => (

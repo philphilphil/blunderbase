@@ -17,7 +17,6 @@ import { useRequestAnalysis } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
 
 import { DebouncedInput, FilterBar } from './components/FilterBar'
-import { DEFAULT_DENSITY, DENSITIES, type Density } from './components/density'
 import { GamesTable } from './components/GamesTable'
 import { SelectionFooter } from './components/SelectionFooter'
 import {
@@ -37,7 +36,6 @@ export function GamesPage() {
 
   const filters = useMemo(() => filtersFromParams(params), [params])
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
-  const [density, setDensity] = useState<Density>(DEFAULT_DENSITY)
   const [selected, setSelected] = useState<Set<number>>(() => new Set())
   const [queueMessage, setQueueMessage] = useState<string | null>(null)
   const [analysing, setAnalysing] = useState<Set<number>>(() => new Set())
@@ -187,17 +185,11 @@ export function GamesPage() {
           </Link>
         </div>
 
-        <FilterBar
-          filters={filters}
-          onChange={setFilters}
-          density={density}
-          onDensityChange={setDensity}
-        />
+        <FilterBar filters={filters} onChange={setFilters} />
       </div>
 
       <GamesTable
         games={rows}
-        height={DENSITIES[density].height}
         sort={sort}
         onSortChange={setSort}
         selected={selectedVisible}
