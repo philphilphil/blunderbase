@@ -51,12 +51,14 @@ loss, trends. **Import** — accounts, sync history, PGN upload, manual entry bo
 | `show_game` `show_position` `make_move` `annotate` `get_live_state` | live mode — the coach drives the board in your browser, and knows whether anyone is watching |
 
 Payloads are compact and token-conscious: summaries first, drill-down on request. Local
-clients get stdio; remote clients get streamable HTTP at `/mcp` behind one bearer key.
+clients get stdio; remote clients get streamable HTTP at `/mcp` behind one bearer key —
+which is your password, unless `BLUNDERBASE_MCP_BEARER_KEY` overrides it (see
+[Signing in](#signing-in)).
 
 ```bash
 claude mcp add blunderbase -- uv run --directory /path/to/blunderbase blunderbase mcp
 claude mcp add --transport http blunderbase https://blunderbase.example/mcp \
-  --header "Authorization: Bearer $BLUNDERBASE_MCP_BEARER_KEY"
+  --header "Authorization: Bearer <your password, or BLUNDERBASE_MCP_BEARER_KEY>"
 ```
 
 ## Run it
@@ -81,11 +83,37 @@ docker run -d --name blunderbase -p 8765:8765 -v blunderbase-data:/data \
 ```
 
 Or `docker compose up -d` with the bearer key in a `.env` beside `docker-compose.yml`.
-**The API carries no auth of its own** — the key guards the MCP transport only, so publish
-the port on loopback and put a TLS terminator in front of anything reachable from
-elsewhere (`docker-compose.traefik.yml` is one such setup). The database, uploaded PGNs
-and any engine you download from the UI live in `/data`; back that volume up and you have
-backed up everything.
+Put a TLS terminator in front of anything reachable from elsewhere
+(`docker-compose.traefik.yml` is one such setup): the session cookie is `Secure` on any
+host that is not loopback, so plain HTTP on a LAN address will not keep you signed in.
+The database, uploaded PGNs and any engine you download from the UI live in `/data`; back
+that volume up and you have backed up everything.
+
+## Signing in
+
+One user, one password, no registration. **The first person to open a fresh deployment
+chooses the password** — until then every API call answers `401 {"error":
+"setup_required"}` and the UI shows the setup screen instead of the login one. After
+that, signing in sets an HTTP-only `blunderbase_session` cookie that slides over 30 days,
+and every route is behind it except `/health`, `/auth/*`, `/mcp` (which has its own bearer
+guard) and the web app's own files — the page has to load in order to show a login form.
+Five wrong passwords in a row close the door for a few seconds, doubling to five minutes.
+
+**The MCP bearer key is that same password.** Nothing extra to configure: set up the
+deployment in the browser and the coach connects with what you already typed. Changing the
+password changes the key. `BLUNDERBASE_MCP_BEARER_KEY` stays an override — set it and it
+is the only token `/mcp` accepts, which is how automation and the compose files keep
+working while the password changes underneath. `/mcp` is served when either exists; a
+password set through the UI reaches it at the next restart.
+
+```bash
+uv run blunderbase set-password    # bootstrap or reset headless; asked twice, never echoed
+```
+
+Only the hash is ever stored — `hashlib.scrypt` over a per-credential random salt, with
+the cost parameters kept beside it so they can be raised later. Session tokens are stored
+hashed too, so a copy of the database is not a way in. A password change signs every other
+browser out.
 
 ## Engines
 
@@ -112,7 +140,7 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_DATA_DIR` | `<root>/data` | everything written that is not the database |
 | `BLUNDERBASE_WEB_DIST` | `<root>/web/dist` | the built web app; a directory that is not there is simply not served |
 | `BLUNDERBASE_HOST` `BLUNDERBASE_PORT` | `127.0.0.1` `8765` | what `serve` binds |
-| `BLUNDERBASE_MCP_BEARER_KEY` | — | set it and `/mcp` is served, behind it; empty means no remote transport at all |
+| `BLUNDERBASE_MCP_BEARER_KEY` | — | overrides the password as `/mcp`'s bearer key; unset, `/mcp` is served behind the password once one is set |
 | `BLUNDERBASE_ANALYSIS_CONCURRENCY` | cores − 2 | engine processes at once, across every tier |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
 | `BLUNDERBASE_QUICK_NODES` `BLUNDERBASE_DEEP_NODES` `BLUNDERBASE_DEEP_MULTIPV` | `250000` `2000000` `4` | the per-position budget of each tier |
@@ -122,9 +150,34 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 ## Commands
 
 `uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`, `analyze` (queue a
-tier and drain it in this process), `mcp [--transport stdio|http]`, `db upgrade`. The
+tier and drain it in this process), `mcp [--transport stdio|http]`, `set-password`,
+`db upgrade`. The
 queue is `analysis_runs` rows rather than a broker, so `blunderbase analyze` is safe to
 run while the server is up, and nothing is lost across a restart.
+
+## Cutting a release
+
+```bash
+make release v=0.2.0        # bump, commit, tag
+make release v=0.2.0 DRY=1  # print what that would do, change nothing
+```
+
+The version lives in two places, `pyproject.toml` and `web/package.json`, and the target
+moves both plus `uv.lock` in one `chore: release vX.Y.Z` commit, then adds an annotated
+`vX.Y.Z` tag. Everything else reads one of those two: `blunderbase --version` via
+`importlib.metadata`, the sidebar footer via Vite's `define`.
+
+It refuses to run on a dirty tree, off `main`, on a version that is not `X.Y.Z`
+(optionally `X.Y.Z-rc.1`), or when the tag already exists. Nothing is pushed — publish it
+yourself:
+
+```bash
+git push origin main --follow-tags
+```
+
+That tag push builds the image again and publishes
+`ghcr.io/philphilphil/blunderbase:0.2.0` and `:0.2`, on top of the `latest` and
+`sha-<short>` the main push publishes.
 
 ## Testing
 

@@ -37,6 +37,8 @@ PLAYED_AT = datetime(2026, 8, 1, 18, 30, tzinfo=UTC)
 EXPECTED_TABLES = {
     "accounts",
     "analysis_runs",
+    "auth_sessions",
+    "credentials",
     "engines",
     "game_positions",
     "games",

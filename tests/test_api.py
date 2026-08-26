@@ -34,6 +34,7 @@ from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
 from backend.services import import_service
 from backend.services import live as live_service
+from tests.conftest import running_app, socket_headers
 from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
 
 OWNER = "blunderbase"
@@ -85,9 +86,12 @@ def seeded(settings: Settings, fixtures_dir: Path, engine_command: str) -> dict[
 
 @pytest.fixture()
 def api(settings: Settings, seeded: dict[str, int]) -> Iterator[TestClient]:
-    """The app with the workers off: nothing here is waiting on an engine to answer."""
+    """The app with the workers off: nothing here is waiting on an engine to answer.
+
+    Signed in, because every route below `/auth` is behind the owner's password now.
+    """
     settings.analysis_workers = False
-    with TestClient(create_app(settings)) as client:
+    with running_app(create_app(settings)) as client:
         yield client
 
 
@@ -208,7 +212,7 @@ def test_a_failure_nobody_anticipated_is_still_not_a_stack_trace(settings: Setti
     def boom() -> None:
         raise ZeroDivisionError("the queue was empty")
 
-    with TestClient(app, raise_server_exceptions=False) as client:
+    with running_app(app, raise_server_exceptions=False) as client:
         response = client.get("/boom")
 
     assert response.status_code == 500
@@ -462,7 +466,7 @@ def test_the_workers_pick_up_what_the_api_enqueues(
         go_default={"info": ["depth 8 score cp 20 nodes 100"], "bestmove": "(none)"},
     )
     settings.analysis_workers = True
-    with TestClient(create_app(settings)) as client:
+    with running_app(create_app(settings)) as client:
         engine = client.post("/engines", json={"name": "Neutral Fish", "path": neutral}).json()
         queued = client.post(
             "/analysis",
@@ -790,7 +794,7 @@ def test_a_note_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
 
 
 def test_the_events_socket_sees_an_import_from_start_to_finish(api: TestClient) -> None:
-    with api.websocket_connect("/events") as socket:
+    with api.websocket_connect("/events", headers=socket_headers(api)) as socket:
         started = api.post("/import/pgn", json={"text": ONE_GAME})
         assert started.status_code == 202
         job_id = started.json()["job_id"]
@@ -813,7 +817,7 @@ def test_the_events_socket_sees_an_import_from_start_to_finish(api: TestClient) 
 def test_the_events_socket_sees_a_run_being_queued(
     api: TestClient, seeded: dict[str, int]
 ) -> None:
-    with api.websocket_connect("/events") as socket:
+    with api.websocket_connect("/events", headers=socket_headers(api)) as socket:
         run = api.post("/analysis", json={"game_id": seeded["game_id"], "tier": "deep"}).json()
         event = _drain(socket, "analysis.queued")[-1]
 
@@ -824,7 +828,7 @@ def test_the_events_socket_sees_a_run_being_queued(
 
 def test_the_events_socket_sees_a_note_being_written(api: TestClient) -> None:
     """A note the coach saves over MCP has to reach the open UI without a refresh."""
-    with api.websocket_connect("/events") as socket:
+    with api.websocket_connect("/events", headers=socket_headers(api)) as socket:
         written = api.post("/notes", json={"text": "watch the c-file", "tags": ["plan"]}).json()
         event = _drain(socket, "note.created")[-1]
 
@@ -834,7 +838,7 @@ def test_the_events_socket_sees_a_note_being_written(api: TestClient) -> None:
 
 
 def test_the_events_socket_sees_the_live_board_move(api: TestClient) -> None:
-    with api.websocket_connect("/events") as socket:
+    with api.websocket_connect("/events", headers=socket_headers(api)) as socket:
         live_service.show_position(FRENCH)
         event = _drain(socket, "live.updated")[-1]
 
@@ -871,7 +875,7 @@ def test_the_live_route_reflects_what_the_coach_showed(api: TestClient) -> None:
 def test_the_live_route_counts_the_sockets_that_are_watching(api: TestClient) -> None:
     live_service.show_position(FRENCH)
     assert api.get("/live").json()["viewer_count"] == 0
-    with api.websocket_connect("/events"):
+    with api.websocket_connect("/events", headers=socket_headers(api)):
         assert api.get("/live").json()["viewer_count"] == 1
     assert api.get("/live").json()["viewer_count"] == 0
 

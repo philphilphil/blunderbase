@@ -46,6 +46,32 @@ class Row(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- auth -----------------------------------------------------------------
+
+
+class AuthStatus(BaseModel):
+    """What the page asks before it renders anything: is there a password, and do I have it."""
+
+    setup_required: bool
+    authenticated: bool
+
+
+class PasswordSetup(Input):
+    """First run. The length rule is the service's, so a short password is a named
+    refusal (`weak_password`) rather than an anonymous validation error."""
+
+    password: str = Field(min_length=1)
+
+
+class PasswordLogin(Input):
+    password: str = Field(min_length=1)
+
+
+class PasswordChange(Input):
+    current: str = Field(min_length=1)
+    new: str = Field(min_length=1)
+
+
 # --- games ----------------------------------------------------------------
 
 

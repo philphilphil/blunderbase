@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from backend.api.routes import (
     analysis,
+    auth,
     engines,
     events,
     explorer,
@@ -15,6 +16,7 @@ from backend.api.routes import (
 )
 
 ROUTERS: tuple[APIRouter, ...] = (
+    auth.router,
     games.router,
     imports.router,
     analysis.router,

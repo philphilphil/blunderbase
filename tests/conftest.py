@@ -2,19 +2,31 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
+from backend.api.auth import COOKIE_NAME
 from backend.config import Settings, get_settings
 from backend.db import models  # noqa: F401  (importing registers every table on Base.metadata)
 from backend.db.base import Base
 from backend.db.session import create_db_engine, reset_engines
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+# The app has one user and every route is behind it, so a test that drives the API signs
+# in first. `running_app` is the whole of that ceremony.
+OWNER_PASSWORD = "correct-horse-battery"
+# Loopback rather than `testserver`: the session cookie carries `Secure` anywhere else,
+# and a `Secure` cookie is never sent back over the plain HTTP the test transport speaks.
+API_BASE_URL = "http://127.0.0.1:8765"
 
 # The PostgreSQL escape hatch is only honest if the suite runs against it. Set this to a
 # SQLAlchemy URL and every test that takes a database — the `engine` fixture's in-memory
@@ -94,6 +106,33 @@ def settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Settin
         _empty_url(TEST_DATABASE_URL)
     get_settings.cache_clear()
     reset_engines()
+
+
+@contextmanager
+def running_app(
+    app: FastAPI, *, password: str | None = OWNER_PASSWORD, **kwargs: Any
+) -> Iterator[TestClient]:
+    """The app under a `TestClient`, through first-run setup and signed in.
+
+    `password=None` leaves the deployment unconfigured, which is what the auth tests want
+    and nothing else does.
+    """
+    with TestClient(app, base_url=API_BASE_URL, **kwargs) as client:
+        if password is not None:
+            response = client.post("/auth/setup", json={"password": password})
+            assert response.status_code == 200, response.text
+        yield client
+
+
+def socket_headers(client: TestClient) -> dict[str, str]:
+    """The session cookie, spelled out for `websocket_connect`.
+
+    A browser offers its cookies on a WebSocket handshake to the same origin; the test
+    transport hardcodes `ws://testserver` and therefore offers nothing the jar collected
+    under the loopback host the HTTP calls used. Handing it over explicitly is the
+    difference, and it is the test's, not the app's.
+    """
+    return {"cookie": f"{COOKIE_NAME}={client.cookies[COOKIE_NAME]}"}
 
 
 @pytest.fixture()

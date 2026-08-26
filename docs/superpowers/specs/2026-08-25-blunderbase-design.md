@@ -185,15 +185,23 @@ MCP tools: `show_game(game_id, ply)`, `show_position(fen)`,
 `make_move(uci)` (advances the live board), `annotate(arrows, squares,
 text)`, `get_live_state()` (includes whether any browser is currently
 subscribed). Invariant: live moves are ephemeral analysis-board state —
-MCP driving the board never mutates stored games. No extra auth: single
-owner, localhost UI, bearer key already guards remote MCP.
+MCP driving the board never mutates stored games. No auth of its own: the
+session cookie the rest of the API needs covers `/live` and `/events`, and
+the bearer key guards remote MCP.
 
 ## HTTP API & Web UI
 
 API: thin service wrappers — `/games`, `/games/{id}`, `/import/{source}`,
 `/analysis`, `/explorer`, `/stats`, `/engines`, `/notes`; one WebSocket
 `/events` pushing import progress and run completion. Localhost binding by
-default; the bearer key only guards the MCP HTTP transport.
+default.
+
+**Superseded (2026-08-26):** this said the bearer key only guarded the MCP
+transport and the API bound to loopback. The app is deployable on the open
+internet now, so every route and `/events` are behind a single-user session
+cookie — `/health`, `/auth/*`, `/mcp` and the static page excepted — and the
+MCP bearer key is the owner's password unless the environment overrides it.
+See `docs/ARCHITECTURE.md`.
 
 UI must look awesome — it is an acceptance criterion, not a nice-to-have.
 Process: key screens are designed in Claude Design before frontend
@@ -259,7 +267,10 @@ games) is testable in daily use before any UI exists.
 
 ## Non-goals (v1)
 
-- Multi-user / hosting / auth beyond the MCP bearer key.
+- Multi-user. (Single-user auth arrived on 2026-08-26 — one password, chosen
+  on first run, guarding the whole API and reused as the MCP bearer key —
+  because the app became deployable on the open internet. Accounts, roles and
+  sharing remain out of scope.)
 - Playing chess (no play-vs-engine mode; Lichess exists).
 - Puzzles/SRS (dropped from predecessor; may return later as a DB consumer).
 - Reference databases of other people's games (personal games only, v1).

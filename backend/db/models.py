@@ -53,6 +53,53 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
 
+class Credential(Base):
+    """The owner's password. One row, because Blunderbase has one user by design.
+
+    Never the password itself: a scrypt hash over a per-credential random salt, with the
+    cost parameters stored beside it so they can be raised later — an old row is still
+    verifiable with the numbers it was written under, and the next password change writes
+    the new ones. The failure counter and the lockout live here too: one user means
+    "consecutive failures" is a single number rather than a table.
+    """
+
+    __tablename__ = "credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    algorithm: Mapped[str] = mapped_column(String(16), nullable=False, default="scrypt")
+    salt: Mapped[str] = mapped_column(String(64), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    scrypt_n: Mapped[int] = mapped_column(Integer, nullable=False)
+    scrypt_r: Mapped[int] = mapped_column(Integer, nullable=False)
+    scrypt_p: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    # Consecutive failures since the last success, and how long the door stays shut.
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(UtcDateTime)
+
+
+class AuthSession(Base):
+    """One signed-in browser. The cookie's value is never stored, only its SHA-256.
+
+    A stolen database is then not a stolen session: the token exists in the owner's cookie
+    jar and nowhere else, and it is high-entropy enough that hashing it once is the whole
+    of the protection it needs.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    # Moved on use, which is what makes the expiry slide rather than run out mid-session.
+    last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+
 class Engine(Base):
     """A configured analysis engine. Managed from the UI, not from a config file."""
 

@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI
 
+from backend.api.auth import install_auth
 from backend.api.errors import install_error_handlers
 from backend.api.events import EventBroker
 from backend.api.routes import ROUTERS
@@ -14,6 +15,8 @@ from backend.api.routes.imports import wait_for_imports
 from backend.api.web import install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
+from backend.db.session import get_sessionmaker
+from backend.services import auth as auth_service
 from backend.workers import AnalysisWorkers
 
 TITLE = "Blunderbase"
@@ -29,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     settings: Settings = app.state.settings
     upgrade_to_head(settings)
+    _mount_mcp_for_the_owners_password(app, settings)
     app.state.loop = asyncio.get_running_loop()
     events: EventBroker = app.state.events
     events.start()
@@ -49,6 +53,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await workers.stop()
         events.stop()
         app.state.loop = None
+
+
+def _mount_mcp_for_the_owners_password(app: FastAPI, settings: Settings) -> None:
+    """Serve `/mcp` when the owner has a password, even with no bearer key configured.
+
+    The key and the password are one credential now, so a deployment that was set up
+    through the web UI has a remote transport without anyone exporting an environment
+    variable. It is decided here rather than in `create_app` because the answer is a row,
+    and the database has only just been migrated — on a first run it did not exist at all.
+
+    Consequence worth knowing: a password chosen through the UI reaches `/mcp` at the next
+    restart, not immediately. The transport's sessions live in a task group the lifespan
+    below opens, and there is no second chance to open one while the server is serving.
+    """
+    if app.state.mcp is not None:
+        return
+    with get_sessionmaker(settings)() as session:
+        if auth_service.setup_required(session):
+            return
+    from backend.mcp.http import mount_http_app
+
+    app.state.mcp = mount_http_app(app, settings)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -80,6 +106,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         app.state.mcp = mount_http_app(app, settings)
 
+    # Added before the web app so the page and its assets are answered in front of the
+    # guard — the UI has to load in order to show the login screen — and so the `/api`
+    # prefix has already been stripped from the paths the guard matches.
+    install_auth(app, settings)
     app.state.web = install_web(app, settings.web_dist)
     return app
 

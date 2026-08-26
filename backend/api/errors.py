@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.services import analysis as analysis_service
+from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import import_service
 from backend.services import notes as notes_service
@@ -53,6 +54,7 @@ STATUS_NAMES: dict[int, str] = {
     405: "method_not_allowed",
     409: "conflict",
     422: "invalid_request",
+    429: "too_many_requests",
     500: "internal_error",
     501: "not_implemented",
     502: "engine_failed",
@@ -75,6 +77,11 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (engines_service.EngineValidationError, 422, "invalid_engine"),
     (engines_service.EngineRunError, 502, "engine_failed"),
     (engines_service.EngineServiceError, 500, "engine_error"),
+    (auth_service.AlreadyConfiguredError, 409, "already_configured"),
+    (auth_service.LockedOutError, 429, "locked_out"),
+    (auth_service.InvalidPasswordError, 401, "invalid_password"),
+    (auth_service.WeakPasswordError, 422, "weak_password"),
+    (auth_service.AuthError, 401, "unauthorized"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
     (stats_service.UnknownDimensionError, 422, "unknown_dimension"),
     # The two families every service layer raises for "you asked for something that is not

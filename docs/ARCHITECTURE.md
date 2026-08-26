@@ -406,5 +406,55 @@ querying the database, wrong for live mode. Point the coach at the served `/mcp`
 board should follow.
 
 **Binding.** `settings.host` defaults to `127.0.0.1`, and `blunderbase serve` binds what
-it says. The API carries no auth of its own; the bearer key guards the MCP HTTP transport
-only.
+it says. It is no longer what keeps the database private — see below.
+
+## Authentication
+
+The app is deployable on the open internet, so "one owner on loopback" stopped being a
+policy and became an open database. There is still exactly one user: no user table, no
+registration, and the `Credential` row *is* the account. Its absence is the setup-required
+state, which is what the first-run screen routes on.
+
+**Nothing is stored in the clear.** The password is `hashlib.scrypt` (stdlib, no new
+dependency) over a per-credential random salt, with `n`, `r` and `p` written onto the row
+so they can be raised later without invalidating the credential that exists; verification
+is `hmac.compare_digest` against the row's own parameters. A **session token is hashed
+too** — the cookie carries 32 random bytes and the database carries their SHA-256, so a
+stolen database is not a stolen session and there is nothing in `auth_sessions` worth
+reading. Expiry is 30 days, sliding, but the write only happens once a day: a slide per
+request would be a write per request.
+
+**Failures are counted.** Five consecutive wrong passwords lock the credential for five
+seconds, doubling per further failure to a five-minute cap. The cap is the interesting
+part: the counter is shared with the MCP bearer check, so a stranger hammering `/mcp`
+must not be able to lock the owner out of their own browser indefinitely.
+
+**One guard, in front of everything.** `api/auth.py` is ASGI middleware rather than a
+dependency, so a route added later is guarded by having been added and the `/events`
+WebSocket is refused by the same rule as everything else (accepted, then closed with
+`4401`, because closing before the accept would reject the handshake with a bare 403 the
+page learns nothing from). It is installed *before* `install_web`, which puts it inside
+`WebApp` and `ApiPrefix` in the stack: a static file is answered by the web layer and
+never reaches it, and the paths it matches have already had `/api` stripped. So the
+exemption list is short and all in one place:
+
+| Exempt | Why |
+|---|---|
+| `/health` | the container's healthcheck has no cookie jar, and runs before setup |
+| `/auth/*` | a locked door needs a handle |
+| `/mcp` | its own bearer guard, in front of the protocol itself |
+| the built web app and `index.html` | the page has to load in order to show the login screen |
+
+An unauthenticated call is always JSON, never a redirect — the client is a `fetch`, and a
+302 to a page it cannot render is worse than a status it can branch on. Before anyone has
+chosen a password the body says `setup_required` rather than `unauthorized`, which is how
+the UI knows which screen to show. The check is a database read, so it goes out to a
+worker thread rather than blocking the loop, the same place a `def` handler's queries run.
+
+**The MCP bearer key is the password.** One credential, two front doors: a deployment set
+up through the browser has a remote transport without anyone exporting anything.
+`BLUNDERBASE_MCP_BEARER_KEY` is the override — set, it is the only token accepted, which
+is what keeps existing automation working while the password changes underneath. `/mcp` is
+mounted when either exists, and because "is there a password" is a row rather than a
+setting, the answer is taken in the lifespan (after the migration) rather than in
+`create_app`: a password chosen through the UI reaches `/mcp` at the next restart.
