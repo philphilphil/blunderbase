@@ -1,10 +1,10 @@
 /**
  * Design 2a — the overview.
  *
- * Two columns: the main one carries the recent-games strip, the rating graph and the worst
- * recent moments; the 326px rail carries the analysis queue, the MCP panel and the trend
- * card. Every panel fetches its own data and owns its own loading, empty and error state,
- * so one endpoint being down does not take the page with it.
+ * Two columns: the main one carries the recent-games strip, the rating graphs and the
+ * worst recent moments; the 326px rail carries the analysis queue and the trend card.
+ * Every panel fetches its own data and owns its own loading, empty and error state, so one
+ * endpoint being down does not take the page with it.
  */
 import { Link } from 'react-router-dom'
 
@@ -13,10 +13,10 @@ import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { useProfile, useStats } from '@/lib/api/queries'
 import { formatCount, num, numOr, total } from '@/routes/stats/kit/analytics'
 
-import { McpCard } from './McpCard'
 import { QueueCard } from './QueueCard'
 import { RatingCard } from './RatingCard'
 import { RecentGamesStrip } from './RecentGamesStrip'
+import { SyncAllButton } from './SyncAllButton'
 import { TrendsCard } from './TrendsCard'
 import { WorstMomentsRow } from './WorstMomentsRow'
 
@@ -55,12 +55,7 @@ export function DashboardPage() {
                 >
                   Import PGN
                 </Link>
-                <Link
-                  to="/import?source=lichess"
-                  className="rounded-md bg-accent-teal px-2.5 py-[0.4375rem] text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
-                >
-                  Sync Lichess
-                </Link>
+                <SyncAllButton />
               </div>
             }
           />
@@ -71,7 +66,6 @@ export function DashboardPage() {
 
         <aside className="flex w-[20.375rem] flex-none flex-col gap-3.5">
           <QueueCard />
-          <McpCard />
           <TrendsCard />
         </aside>
       </div>
