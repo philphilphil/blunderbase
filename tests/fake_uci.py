@@ -15,6 +15,9 @@ Keys: `name`, `author`, `options` (dicts or raw `option name …` lines), `no_uc
 is how a crash gets last words for `AnalysisRun.stderr`), `log` (a path every command is
 appended to as JSON, with the pid and a timestamp, which is what lets a pool test see two
 processes overlap or not).
+
+A `go` reply may also carry `hold`: print the info lines and then wait for `stop` before
+answering `bestmove`, which is what `go infinite` looks like from the driver's side.
 """
 
 from __future__ import annotations
@@ -151,6 +154,30 @@ def _may_crash(scenario: dict[str, Any]) -> bool:
     return True
 
 
+def _held(log) -> bool:
+    """Keep the search open until the driver says `stop`, as `go infinite` really does.
+
+    A reply marked `hold` has printed its info lines and then simply does not answer: that
+    is what an infinite search looks like from the outside, and it is what lets a test stop
+    one, restart it at another position, or watch it hold a slot. False means `quit` came
+    instead and there is no `bestmove` left to give.
+    """
+    while True:
+        raw = sys.stdin.readline()
+        if not raw:
+            return False
+        command = raw.strip()
+        if not command:
+            continue
+        log(command)
+        if command == "isready":
+            _say("readyok")
+        elif command == "stop":
+            return True
+        elif command == "quit":
+            return False
+
+
 def main(argv: list[str]) -> int:
     scenario: dict[str, Any] = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
     log = _logger(scenario)
@@ -188,6 +215,8 @@ def main(argv: list[str]) -> int:
                 os._exit(1)
             for info in reply.get("info") or []:
                 _say(f"info {info}")
+            if reply.get("hold") and not _held(log):
+                return 0
             _say(f"bestmove {reply.get('bestmove', 'e2e4')}")
             log("go-end")
         elif command == "quit":

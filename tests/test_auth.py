@@ -41,6 +41,10 @@ ROUTE_FAMILIES = (
     "/engines",
     "/notes",
     "/live",
+    "/streams",
+    # The plural is the owner's CRUD and is guarded; `/runner` (singular) is the runners'
+    # own transport and is not. The two must never be read as one prefix.
+    "/runners",
 )
 
 INDEX = "<!doctype html><title>Blunderbase</title><div id=root></div>"

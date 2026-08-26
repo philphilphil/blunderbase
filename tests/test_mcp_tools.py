@@ -26,6 +26,7 @@ from backend.mcp import server as mcp_server
 from backend.mcp.server import build_server
 from backend.services import analysis as analysis_service
 from backend.services import live as live_service
+from backend.services import runners as runners_service
 from backend.services.import_service import run_import
 
 OWNER = "blunderbase"
@@ -54,6 +55,7 @@ TOOLS = {
     "make_move",
     "annotate",
     "get_live_state",
+    "runners_status",
 }
 
 # What "token-conscious" has to mean in bytes: five analysed games, with their eval
@@ -857,6 +859,55 @@ async def test_search_notes_narrows_by_date(coach: MCPServer, analysed: dict[str
     await call(coach, "save_note", text="today's note")
     assert (await call(coach, "search_notes", since="1d"))["count"] == 1
     assert (await call(coach, "search_notes", until="2020-01-01"))["count"] == 0
+
+
+# --- runners ---------------------------------------------------------------
+
+
+async def test_runners_status_describes_a_deployment_with_no_runners(
+    coach: MCPServer, engine_row: Engine
+) -> None:
+    payload = await call(coach, "runners_status")
+    assert payload["runners"] == []
+    assert payload["local"]["name"] == "local"
+    assert [engine["name"] for engine in payload["local"]["engines"]] == ["stockfish-test"]
+    assert payload["queue"] == {"queued": 0, "running": 0}
+
+
+async def test_runners_status_says_which_runner_the_backlog_is_waiting_on(
+    coach: MCPServer, session: Session, library: dict[str, Game]
+) -> None:
+    """The coach reads rows, not links: `connected` is a column for exactly this caller."""
+    runner, _token = runners_service.create_runner(session, "gpu-box", slots=4)
+    runner.connected = True
+    remote = Engine(
+        name="sf-remote",
+        kind=EngineKind.UCI,
+        path="/usr/games/stockfish",
+        default_tier=Tier.DEEP,
+        runner_id=runner.id,
+    )
+    session.add(remote)
+    session.flush()
+    session.add(AnalysisRun(engine_id=remote.id, tier=Tier.DEEP, game_id=library["qg000001"].id))
+    session.commit()
+
+    payload = await call(coach, "runners_status")
+
+    assert payload["runners"][0]["name"] == "gpu-box"
+    assert payload["runners"][0]["connected"] is True
+    assert payload["runners"][0]["slots"] == 4
+    assert payload["runners"][0]["queued_eligible"] == 1
+    assert [engine["name"] for engine in payload["runners"][0]["engines"]] == ["sf-remote"]
+    assert payload["local"]["queued"] == 0
+    assert payload["queue"]["queued"] == 1
+
+
+async def test_runners_status_takes_no_arguments_and_mints_nothing(coach: MCPServer) -> None:
+    listing = await tools_of(coach)
+    tools = {tool.name: tool for tool in listing}
+    assert set(tools["runners_status"].input_schema.get("required", ())) == set()
+    assert not {name for name in tools if "runner" in name} - {"runners_status"}
 
 
 # --- live session ----------------------------------------------------------

@@ -46,6 +46,7 @@ EXPECTED_TABLES = {
     "move_evals",
     "notes",
     "positions",
+    "runners",
 }
 
 

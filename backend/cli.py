@@ -16,6 +16,7 @@ from backend.services import analysis as analysis_service
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import import_service
+from backend.services import runners as runners_service
 
 
 def _positive_int(value: str) -> int:
@@ -78,6 +79,24 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     account_commands.add_parser(
         "reconcile", help="re-run owner attribution over the games already stored"
     )
+
+    runners = commands.add_parser("runners", help="the machines allowed to run engine work")
+    runner_commands = runners.add_subparsers(dest="runners_command", required=True)
+    runner_commands.add_parser("list", help="every runner, what it advertises and its backlog")
+    create_runner = runner_commands.add_parser(
+        "create", help="register a runner and print its token and runner.yaml, once"
+    )
+    create_runner.add_argument("name")
+    create_runner.add_argument(
+        "--slots", type=_positive_int, default=1, metavar="N", help="engine jobs at once"
+    )
+    create_runner.add_argument(
+        "--server", help="how the runner reaches this server; defaults to BLUNDERBASE_PUBLIC_URL"
+    )
+    revoke_runner = runner_commands.add_parser(
+        "revoke", help="delete a runner, its token and the engines it advertised"
+    )
+    revoke_runner.add_argument("name")
 
     analyze = commands.add_parser("analyze", help="enqueue engine analysis and run the queue")
     analyze.add_argument(
@@ -183,6 +202,69 @@ def command_accounts(args: argparse.Namespace, settings: Settings) -> int:
             filled = accounts_service.reconcile_games(session)
         print(f"{filled.linked} game side(s) linked, {filled.colored} game(s) coloured")
         print(f"{accounts_service.unclaimed_games(session)} game(s) still belong to nobody")
+    return 0
+
+
+def _print_runners(rows: list[dict[str, Any]]) -> None:
+    """One line per runner: what it is called, whether it is there, and what waits on it."""
+    if not rows:
+        print("no runners yet; `blunderbase runners create gpu-box --slots 4` registers one")
+        return
+    width = max(len(row["name"]) for row in rows)
+    for row in rows:
+        state = "connected" if row["connected"] else "offline"
+        engines = ", ".join(engine["name"] for engine in row["engines"]) or "nothing advertised"
+        print(
+            f"{row['name']:{width}}  {state:9}  {row['slots']} slot(s)  "
+            f"{row['queued_eligible']} queued  {engines}"
+        )
+
+
+def _runner_server_url(args: argparse.Namespace, settings: Settings) -> str:
+    """What to write as `server:` in the yaml this command prints.
+
+    Whatever was asked for, then how the deployment says it is reached, then the address
+    this process would bind — which is right for a runner on the same machine and is at
+    least an honest starting point for one that is not.
+    """
+    given = (args.server or settings.public_url).strip().rstrip("/")
+    return given or f"http://{settings.host}:{settings.port}"
+
+
+def command_runners(args: argparse.Namespace, settings: Settings) -> int:
+    """Register, list and revoke the machines that may be handed engine work.
+
+    `list` reads rows, so it says whether a runner was connected to the *server* — this
+    process holds no links of its own. Creating one prints its token and the `runner.yaml`
+    around it exactly once: only a hash is stored, so there is nothing to print a second
+    time.
+    """
+    upgrade_to_head(settings)
+    with session_scope(settings) as session:
+        if args.runners_command == "list":
+            _print_runners(runners_service.runner_rows(session))
+            return 0
+        if args.runners_command == "create":
+            try:
+                runner, token = runners_service.create_runner(session, args.name, args.slots)
+            except runners_service.RunnerValidationError as exc:
+                print(f"runners: {exc}")
+                return 1
+            print(f"runner {runner.name!r} registered with {runner.slots} slot(s)")
+            print("This token is shown once. Save the yaml below as runner.yaml on that machine:")
+            print()
+            print(runners_service.config_yaml(
+                runner, token, server_url=_runner_server_url(args, settings)
+            ))
+            return 0
+        runner = runners_service.runner_by_name(session, args.name)
+        if runner is None:
+            print(f"runners: no runner named {args.name!r}")
+            return 1
+        name, runner_id = runner.name, runner.id
+        runners_service.delete_runner(session, runner_id)
+    print(f"runner {name!r} revoked; its token and its advertised engines are gone")
+    print("A runner still connected to a running server is given no further work.")
     return 0
 
 
@@ -307,6 +389,7 @@ COMMANDS = {
     "serve": command_serve,
     "import": command_import,
     "accounts": command_accounts,
+    "runners": command_runners,
     "analyze": command_analyze,
     "mcp": command_mcp,
     "set-password": command_set_password,

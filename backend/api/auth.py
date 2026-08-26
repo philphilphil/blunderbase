@@ -7,6 +7,10 @@ short list of things that are not is here rather than spread across the routers:
 - `/health`, because the container's healthcheck has no cookie jar;
 - `/auth/*`, because a locked door needs a handle;
 - `/mcp`, which has its own bearer guard in front of the protocol itself;
+- `/runner`, the transport a remote runner speaks, which carries its own per-runner bearer
+  token instead of a cookie. `/runners` — the owner's CRUD over the same rows — is
+  deliberately *not* exempt: the rule below is `path == prefix or path.startswith(prefix +
+  "/")`, so the plural never falls under the singular's exemption;
 - the built web app and its `index.html`, because the page has to load in order to show
   the login screen. That one is not a rule here at all — `install_auth` is added to the
   middleware stack *before* `install_web`, so a static file is answered by `WebApp` and
@@ -41,7 +45,7 @@ COOKIE_SAMESITE = "lax"
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
 
 EXEMPT_EXACT = frozenset({"/health"})
-EXEMPT_PREFIXES = ("/auth", "/mcp")
+EXEMPT_PREFIXES = ("/auth", "/mcp", "/runner")
 
 # 4401 rather than 1008: the 4000 range is the application's, and mirroring HTTP's 401
 # lets the page tell "you are not signed in" from "the server went away".

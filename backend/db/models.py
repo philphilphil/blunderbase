@@ -104,6 +104,7 @@ class Engine(Base):
     """A configured analysis engine. Managed from the UI, not from a config file."""
 
     __tablename__ = "engines"
+    __table_args__ = (Index("ix_engines_runner_id", "runner_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
@@ -113,6 +114,36 @@ class Engine(Base):
     options: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     default_tier: Mapped[Tier | None] = mapped_column(EnumString(Tier))
+    # NULL means the binary is on this host. A row that names a runner is that runner's
+    # advertisement of what it can run, and `path` is a path on *its* filesystem.
+    runner_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("runners.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+
+
+class Runner(Base):
+    """A machine that hosts engines for this deployment and dials in for work.
+
+    The token is never stored, only its SHA-256 — the same reasoning as `AuthSession`, and
+    the same one-time-display rule: 32 random bytes need no scrypt, and a copy of the
+    database is then not a way to impersonate a runner.
+
+    `connected` is a persisted column rather than a fact the gateway keeps in memory,
+    because the questions that need it — can this tier run, where will the backlog be
+    worked — are answered by pure database reads that have no gateway to ask. A process
+    that dies leaves the flag set, so a starting one clears every row the way it collects
+    the runs a dead process left `running`.
+    """
+
+    __tablename__ = "runners"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    # Concurrent engine jobs plus stream sessions. The owner's cap, not the runner's claim.
+    slots: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    version: Mapped[str | None] = mapped_column(String(32))
+    connected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
 
@@ -274,6 +305,10 @@ class AnalysisRun(Base):
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # A crashed engine buys one retry; after that the run stays failed.
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Written by every claim. A result is only accepted while the run is `running` under
+    # the token it was dispatched with, which is what lets a late answer from a runner that
+    # was already given up on be dropped instead of overwriting the retry's work.
+    attempt_token: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     # Touched while a worker is executing this run. A `running` row whose heartbeat has

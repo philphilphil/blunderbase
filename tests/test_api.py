@@ -478,12 +478,11 @@ def test_a_run_can_be_enqueued_for_a_game(api: TestClient, seeded: dict[str, int
     assert body["tier"] == "deep"
     assert body["multipv"] == 3
     assert body["engine_id"] == seeded["engine_id"]
-    assert api.get("/analysis/queue").json() == {
-        "queued": 1,
-        "running": 0,
-        "workers": False,
-        "busy": 0,
-    }
+    queue = api.get("/analysis/queue").json()
+    assert (queue["queued"], queue["running"], queue["workers"], queue["busy"]) == (1, 0, False, 0)
+    # With no runners registered there is one destination, and it is this machine.
+    assert [row["name"] for row in queue["destinations"]] == ["local"]
+    assert queue["destinations"][0]["queued"] == 1
 
 
 def test_a_run_over_a_position_takes_no_ply_range(api: TestClient) -> None:

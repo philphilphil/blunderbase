@@ -13,7 +13,10 @@ from backend.api.routes import (
     imports,
     live,
     notes,
+    runner_gateway,
+    runners,
     stats,
+    streams,
 )
 
 ROUTERS: tuple[APIRouter, ...] = (
@@ -27,6 +30,9 @@ ROUTERS: tuple[APIRouter, ...] = (
     engines.router,
     notes.router,
     live.router,
+    runner_gateway.router,
+    runners.router,
+    streams.router,
     events.router,
 )
 

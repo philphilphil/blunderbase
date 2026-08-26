@@ -2,21 +2,27 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request, status
 
 from backend.api.deps import SessionDep, SettingsDep, not_found, ply_range, wake_workers
+from backend.api.routes.runners import live_picture, local_picture
 from backend.api.schemas import (
     AnalysisRequest,
     MoveEvalResponse,
     PositionAnalysis,
     PositionAnalysisRequest,
+    QueueDestination,
     QueueStatus,
     RunResponse,
 )
+from backend.config import Settings
 from backend.db.enums import Tier
+from backend.db.session import session_scope
 from backend.services import analysis as analysis_service
+from backend.services import runners as runners_service
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -46,14 +52,28 @@ def enqueue(
 
 
 @router.get("/queue", response_model=QueueStatus, summary="How much work is outstanding")
-def queue_status(request: Request, session: SessionDep) -> QueueStatus:
+async def queue_status(request: Request, settings: SettingsDep) -> QueueStatus:
+    """The backlog, and where it will actually be worked.
+
+    `destinations` splits the same rows by the host that can run them: this one, and each
+    registered runner. It answers the question the totals cannot — a queue that is not
+    moving because the only machine with that engine is not connected looks exactly like a
+    queue that is simply long. The top-level fields are unchanged, and `busy` is still
+    *this* process's, so a client that predates the breakdown reads the same numbers.
+
+    Async, like `/runners`: the live half of a destination is the gateway's own state, and
+    that belongs to the loop.
+    """
     workers = getattr(request.app.state, "workers", None)
-    depth = analysis_service.queue_depth(session)
+    live = live_picture(request)
+    local = local_picture(request, settings)
+    depth, destinations = await asyncio.to_thread(_queue, settings, live, local)
     return QueueStatus(
         queued=depth["queued"],
         running=depth["running"],
         workers=bool(workers is not None and workers.running),
         busy=int(workers.busy) if workers is not None else 0,
+        destinations=[QueueDestination.model_validate(row) for row in destinations],
     )
 
 
@@ -94,3 +114,14 @@ def get_run_evals(
 def analyze_position(session: SessionDep, body: PositionAnalysisRequest) -> Any:
     """A bounded synchronous eval for a "what if" line, on its own short-lived process."""
     return analysis_service.analyze_position(session, body.fen, body.nodes)
+
+
+def _queue(
+    settings: Settings, live: dict[int, dict[str, Any]], local: dict[str, Any]
+) -> tuple[dict[str, int], list[dict[str, Any]]]:
+    """The database half of a queue answer. Runs in a thread; the live half is the loop's."""
+    with session_scope(settings) as session:
+        return (
+            analysis_service.queue_depth(session),
+            runners_service.queue_destinations(session, live=live, local=local),
+        )

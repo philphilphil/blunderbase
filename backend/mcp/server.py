@@ -26,6 +26,7 @@ from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services import live as live_service
 from backend.services import notes as notes_service
+from backend.services import runners as runners_service
 from backend.services import stats as stats_service
 from backend.services.games import GameFilters
 
@@ -140,6 +141,7 @@ def build_server(
     _register_insight(server, coach)
     _register_analysis(server, coach)
     _register_memory(server, coach)
+    _register_runners(server, coach)
     _register_live(server, coach)
     return server
 
@@ -602,6 +604,24 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
             payload = {"notes": rows, "count": len(rows)}
             if not any((query, tags, since, until, game_id, fen)):
                 payload["tags"] = notes_service.list_tags(session)
+        return payloads.result(payload)
+
+
+# --- runners ---------------------------------------------------------------
+
+
+def _register_runners(server: MCPServer, coach: Coach) -> None:
+    @server.tool()
+    @guarded
+    def runners_status() -> TextContent:
+        """Where engine work can actually run right now: this host and each remote runner,
+        whether it is connected, which engines it advertises, and how much of the backlog
+        is waiting on it. Read this when analysis is queued but nothing is finishing — a
+        runner that is offline is a queue that cannot move, and that is not something
+        get_analysis_status can tell you. Read-only: registering a runner or revoking one
+        means handling its token, which stays out of this conversation."""
+        with coach.session() as session:
+            payload = runners_service.status_payload(session)
         return payloads.result(payload)
 
 

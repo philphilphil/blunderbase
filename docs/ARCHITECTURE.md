@@ -333,6 +333,125 @@ exist.
 headless, drains the queue and exits. Each set owns its own engine pool, so stopping one
 really does stop the processes it started.
 
+## Remote runners
+
+A runner is a remote **worker**, not a remote engine. Whole jobs go out — a serialized
+`RunPlan` — and whole results come back as `MoveEval` payloads. The alternative, tunnelling
+UCI per position, would have put a network round trip inside every search and made the
+protocol a second engine API to keep honest; this way `analyse_plan` runs unchanged on the
+far machine and there is still exactly one definition of what a blunder is.
+
+**The database stays the one queue.** A runner claims nothing itself: the gateway on the
+server claims through the same `claim_next_run`, narrowed to `engine_ids` — the engines
+that runner advertises — and the local worker set claims with `exclude_engine_ids` so it
+never picks up work only another machine can start. One queue, one claim, two kinds of
+worker reading it. Scheduling therefore survives a runner dying exactly the way it survives
+a restart: the rows are still there.
+
+**The attempt token** is what makes a remote result safe. Every claim writes
+`analysis_runs.attempt_token`, every dispatch carries it, and `complete_run` accepts a
+payload only while the run is `running` under that token. A runner that reconnected twice
+and finally answers for a run the stale sweep took away is told `run_ack{accepted: false}`
+and its payload is dropped — idempotent by construction rather than by luck.
+
+**Layering.** `backend/runners/` is a peer of `workers/`, and it is the one package both
+halves import: `protocol.py` is the wire contract, so a frame the server sends is a frame
+the runner can decode by construction. The rule that keeps it importable from both sides is
+that **nothing in it opens a `Session`** — `backend.db.models` is imported because a
+`MoveEval` row is what crosses the wire, and `services/analysis.py` because the runner
+computes what the server would have, but the database is the server's business alone.
+
+**The runner process** (`runners/client.py`, `blunderbase-runner`) reads a `runner.yaml`,
+probes every binary once at startup — which is what replaces the server-side probe for a
+remote engine, so a bad UCI option is a rejected advertisement with a reason rather than a
+run that fails on another machine an hour later — and owns an `EnginePool` sized to its
+slot count. Progress doubles as the run's heartbeat: `analyse_plan` reports every few
+positions, and a reporter task sends one at least every heartbeat interval anyway, because
+a single very deep position is otherwise a silence the stale sweep collects.
+
+**One run, one machine.** A run's evaluation and its human-move passes share a process, so
+both engines have to be on one host. There is no field in an analysis request that could
+say "this Stockfish and that Maia", so a search engine on a host with no Maia is refused at
+enqueue when the deployment's only Maia is somewhere else, naming both machines. A
+deployment with no Maia at all is unaffected — the pass simply does not happen, exactly as
+before runners existed.
+
+**The socket is the transport, polling is the fallback.** After
+`reconnect.websocket_failures` consecutive failures the runner starts polling `/runner/poll`
+instead and keeps retrying the socket every `reconnect.retry_websocket_seconds`. Both modes
+execute a job identically; only where the frames go differs. Stream sessions are
+unavailable while polling, and an engine advertised over a poll link reports
+`streams: false` for exactly that reason — `POST /streams` on one is refused with
+`stream_unavailable` at the request, rather than opening a board that never draws and holds
+a slot until the idle reaper takes it.
+
+**A runner's engine row is an advertisement, not a binary here.** Its `path` is a path on
+that machine, so the two things that start a binary in this process refuse it by name: the
+synchronous `POST /analysis/position` resolves the tier `local_only` and falls back to an
+engine this host can really run, and the Engines page's test-run button says whose machine
+the engine is on. Tunnelling a single position to a runner is deliberately outside the
+protocol — a runner carries whole runs.
+
+**Two prefixes, deliberately.** `/runner` (singular) is the transport: it carries a
+per-runner bearer token and is exempt from the session cookie. `/runners` (plural) is the
+owner's CRUD over the same rows and is guarded like everything else — `AuthGuard`'s rule is
+`path == prefix or path.startswith(prefix + "/")`, so the plural never falls under the
+singular's exemption. Minting a token is the most privileged operation in the application;
+it lives behind the same door as the rest of the database.
+
+**The management surface.** `GET /runners` is the row and the live picture in one object:
+`connected` and `last_seen_at` are columns, while `transport`, `busy`, `streams` and
+`free_slots` are what the gateway knows about the link it is holding. That split is why the
+`/runners` handlers are the rare `async def` ones — the gateway's dictionaries belong to the
+event loop, so the live half is read there and only the database half goes to a thread.
+`POST /runners` answers with the token and a paste-ready `runner.yaml` **once**; only a
+SHA-256 is stored, so there is no second reading to offer, and a lost token is a revoke and
+a new runner. `DELETE` closes the link with 4403, hands back what it was running with the
+attempts refunded — the owner took the machine away, which is not a failed try — and deletes
+the engine rows it advertised, because a runner-bound engine is an advertisement rather than
+configuration. `GET /runners/status` is the one read the Engines page, the CLI and the
+coach's `runners_status` share, so the three cannot drift into three accounts of the same
+deployment; `GET /analysis/queue` splits the same backlog by destination, which is what
+tells "the queue is long" from "the only machine with that engine is offline". A run with no
+engine, or one on a *local* engine that has been switched off, counts as local work — that
+is where the worker's fallback will send it. A run on a runner's engine stays that runner's
+even while the runner is away: the local set claims with every remote engine excluded,
+disabled ones included, so nothing here would ever drain it, and counting it as local would
+show a backlog against a host that cannot touch it.
+
+**What the coach can and cannot do.** `runners_status` is read-only and reads rows: the MCP
+server may be a different process with no gateway to ask, which is the reason `connected` is
+a column at all rather than a fact about a socket. Registering a runner means handling a
+token, and that stays out of a chat transcript.
+
+## Infinite analysis
+
+An analysis board is a *stream session*: "search this FEN at multipv N until I stop you".
+It is ephemeral in the same way the live session is — `services/streams.py` holds the
+sessions in memory and **nothing is written to the database**, because a board is a slot on
+an engine and a place to send pictures to, and losing one costs a click rather than a row.
+
+**One driver, two backends.** `adapters/infinite.py` is the `go infinite` loop, written
+once: a blocking driver a thread owns, merging the engine's per-multipv `info` lines into
+one picture and handing it over no more often than `stream_snapshot_interval`. The local
+backend (`workers/local_streams.py`) runs it on a slot out of the analysis workers' own
+`EnginePool`; the remote one (`workers/runner_streams.py`) sends three frames down a
+runner's socket and relays the snapshots back. The broker cannot tell them apart, and
+neither can the browser: `runner_id` on the response is context, not a different kind of
+session.
+
+**Throttling belongs to the producer**, which is what keeps a runner from putting a flood
+on the wire for this process to thin out. **Numbering belongs to the broker**: `seq` is
+assigned here so a local board and a remote one are read the same way on `/events`, which
+drops its oldest frames rather than growing without bound.
+
+**A board outranks queue work.** On a runner, opening one reserves a slot through the
+gateway, preempting the most recently started run if it has to — that run goes back to the
+queue with its attempt refunded, because it was taken away rather than failed. A position
+change is a stop-and-go on the same slot, never a teardown, so the engine cannot be lost to
+the queue in the gap. And a slot nobody is using is a slot the queue should have back: the
+reaper ends every session `stream_idle_seconds` after the last `/events` listener leaves.
+
 ## The HTTP API
 
 `backend/api/` is a wrapper and nothing else. A handler reads its arguments, calls one
@@ -341,9 +460,10 @@ Session factory the dependency yields (`api/deps.py`), and no handler writes a q
 
 **Handlers are sync (`def`), not `async def`.** The Session is synchronous, so a handler
 that awaited would block the loop for the length of its query. FastAPI runs a `def`
-handler in its threadpool, which is where a blocking database call belongs. The two
-exceptions are the ones that do no database work of their own: the import trigger and the
-`/events` socket.
+handler in its threadpool, which is where a blocking database call belongs. The exceptions
+are the handlers that do no database work of their own and have an asyncio thing to await
+instead: the import trigger, the `/events` socket, the runner transport, and `/streams`,
+whose broker owns tasks rather than queries.
 
 **Errors.** `api/errors.py` maps each typed service exception to a status code and a
 stable name, and every response body is the same `ErrorResponse` shape — `error` (a name

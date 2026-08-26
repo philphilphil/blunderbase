@@ -16,11 +16,22 @@ Three things live here and nothing else does:
 
 `backend/workers/` drives all of this; it owns the asyncio and the engine pool, and this
 module owns every rule about what a run means.
+
+**The attempt token.** Every claim writes a fresh `attempt_token` onto the row, and a
+caller that did not claim the run itself — a remote runner handing a result back over a
+socket it may have reconnected twice since — presents that token with its result. A
+payload for a run that has moved on, because the stale sweep took it away or because the
+answer is a duplicate, therefore fails `guard_attempt` and is dropped with a log line
+rather than overwriting the retry that is already running. Local callers pass no token and
+behave exactly as they did before this existed.
 """
 
 from __future__ import annotations
 
+import hmac
+import logging
 import math
+import secrets
 import threading
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
@@ -63,6 +74,10 @@ SELF_ELO = "SelfElo"
 
 STALE_RUN_MESSAGE = "the process running this pass stopped before it finished"
 
+# 16 random bytes as 32 hex characters, written by every claim. Long enough that two
+# attempts at the same run never collide, short enough to sit in a String(32).
+ATTEMPT_TOKEN_BYTES = 16
+
 # How long a `running` row may go without a heartbeat before a starting worker set treats
 # it as abandoned. Generous next to `HEARTBEAT_SECONDS` in `backend/workers`: a live worker
 # beats several times inside it, and taking a run off one that is still working would mean
@@ -79,6 +94,8 @@ EVENT_RUN_FAILED = "analysis.failed"
 # hundred positions should tell a UI it is moving without flooding a socket.
 PROGRESS_EVERY = 8
 
+logger = logging.getLogger(__name__)
+
 
 class AnalysisError(RuntimeError):
     """Anything the analysis surface has to report instead of a stack trace."""
@@ -90,6 +107,18 @@ class AnalysisRequestError(AnalysisError, ValueError):
 
 class UnknownRunError(AnalysisError, LookupError):
     """No run with that id."""
+
+
+class StaleResultError(AnalysisError):
+    """A result for a run that has moved on: the wrong attempt, or no longer running."""
+
+    def __init__(self, run_id: int, expected: str | None, presented: str | None) -> None:
+        super().__init__(
+            f"the result for run {run_id} is for an attempt that is over; it was dropped"
+        )
+        self.run_id = run_id
+        self.expected = expected
+        self.presented = presented
 
 
 # A lifecycle subscriber. Called from whichever thread reached the transition, so a
@@ -329,6 +358,11 @@ def request_analysis(
     The engine is resolved now so the row records which engine was meant, but its binary
     is not checked here: enqueueing must stay a cheap write, and a binary that has gone
     missing is the worker's problem to report on the run it fails.
+
+    The one thing that *is* checked is where the engines live. A run's evaluation and its
+    human-move passes happen in one process on one machine, so a search engine on a host
+    with no Maia is refused here when the deployment's only Maia is somewhere else — see
+    `_require_one_host`.
     """
     resolved = settings or get_settings()
     tier = Tier(tier)
@@ -347,6 +381,7 @@ def request_analysis(
             raise AnalysisRequestError("a run over a FEN has no ply range")
 
     engine = _resolve_engine(session, tier, engine_id)
+    _require_one_host(session, engine)
     run = AnalysisRun(
         game_id=game_id,
         fen=fen,
@@ -451,6 +486,27 @@ def _default_multipv(tier: Tier, settings: Settings) -> int:
     return settings.deep_multipv if tier is Tier.DEEP else 1
 
 
+def _require_one_host(session: Session, engine: Engine) -> None:
+    """Refuse a run whose two engine passes would have to happen on different machines.
+
+    A run is one process's worth of work: `analyse_plan` searches, then `apply_maia` asks
+    the human-move model about the same boards, and both hold the same slot on the same
+    host. Nothing in an analysis request can say "this Stockfish and that Maia", so a
+    mismatch is a deployment that has been configured into a corner, and the honest place
+    to say so is here — at enqueue, naming both machines — rather than on a run that
+    finishes hours later with the human-move half silently missing.
+    """
+    stranded = engines_service.stranded_maia(session, engine)
+    if stranded is None:
+        return
+    raise AnalysisRequestError(
+        f"a run's engine and its Maia model must be on one machine: {engine.name!r} is on "
+        f"{engines_service.engine_host(session, engine)} and the only human-move model, "
+        f"{stranded.name!r}, is on {engines_service.engine_host(session, stranded)}. "
+        f"Install a Maia there, or disable {stranded.name!r}."
+    )
+
+
 def _resolve_engine(session: Session, tier: Tier, engine_id: int | None) -> Engine:
     if engine_id is not None:
         return engines_service.require_engine(session, engine_id)
@@ -502,22 +558,44 @@ def queue_depth(session: Session) -> dict[str, int]:
     }
 
 
-def claim_next_run(session: Session) -> AnalysisRun | None:
+def claim_next_run(
+    session: Session,
+    *,
+    engine_ids: Sequence[int] | None = None,
+    exclude_engine_ids: Sequence[int] | None = None,
+) -> AnalysisRun | None:
     """Take the highest-priority queued run and mark it running, or return None if idle.
 
     The claim is a conditional UPDATE rather than a `SELECT … FOR UPDATE`, because SQLite
     has no row locks at all and the same statement has to be correct on both back ends: a
     second worker's UPDATE simply matches no row and it looks at the next candidate.
+
+    The two filters are how one queue serves several kinds of worker. `engine_ids` narrows
+    the claim to the engines one runner advertises; `exclude_engine_ids` is what a local
+    worker set uses to leave the remote half of the queue alone. A run with no engine at
+    all is nobody's in particular, so it stays claimable under an exclusion and is not
+    claimable under an inclusion — the local fallback at `_prepare` time is what will end
+    up serving it.
     """
+    if engine_ids is not None and not list(engine_ids):
+        return None
     while True:
-        candidate = session.scalars(
+        statement = (
             select(AnalysisRun.id)
             .where(AnalysisRun.status == RunStatus.QUEUED)
             .order_by(
                 AnalysisRun.priority.desc(), AnalysisRun.created_at.asc(), AnalysisRun.id.asc()
             )
             .limit(1)
-        ).first()
+        )
+        if engine_ids is not None:
+            statement = statement.where(AnalysisRun.engine_id.in_(list(engine_ids)))
+        if exclude_engine_ids:
+            statement = statement.where(
+                (AnalysisRun.engine_id.is_(None))
+                | (AnalysisRun.engine_id.not_in(list(exclude_engine_ids)))
+            )
+        candidate = session.scalars(statement).first()
         if candidate is None:
             return None
         claimed = session.execute(
@@ -529,6 +607,7 @@ def claim_next_run(session: Session) -> AnalysisRun | None:
                 heartbeat_at=utcnow(),
                 finished_at=None,
                 attempts=AnalysisRun.attempts + 1,
+                attempt_token=secrets.token_hex(ATTEMPT_TOKEN_BYTES),
             )
         )
         session.commit()
@@ -552,6 +631,65 @@ def heartbeat_runs(session: Session, run_ids: Sequence[int]) -> None:
         .values(heartbeat_at=utcnow())
     )
     session.commit()
+
+
+def guard_attempt(session: Session, run_id: int, attempt_token: str) -> AnalysisRun:
+    """The run this token still owns, or `StaleResultError` because it does not.
+
+    A row claimed before the token column existed has none, and cannot be vouched for
+    either way; the conservative answer is the safe one, because the only caller that
+    presents a token is one the server dispatched to and therefore did claim.
+    """
+    run = require_run(session, run_id)
+    _require_attempt(run, attempt_token)
+    return run
+
+
+def heartbeat_run(session: Session, run_id: int, attempt_token: str) -> bool:
+    """Say one remote run is still being worked on. False means it is not yours any more.
+
+    One conditional UPDATE, so the answer and the write are the same statement: a runner
+    whose run was collected by the stale sweep learns it on its next beat rather than at
+    the end of a search nobody is waiting for.
+    """
+    touched = session.execute(
+        update(AnalysisRun)
+        .where(
+            AnalysisRun.id == run_id,
+            AnalysisRun.status == RunStatus.RUNNING,
+            AnalysisRun.attempt_token == attempt_token,
+        )
+        .values(heartbeat_at=utcnow())
+    )
+    session.commit()
+    return touched.rowcount == 1
+
+
+def _require_attempt(run: AnalysisRun, attempt_token: str | None) -> None:
+    """Refuse a result for an attempt that is over. Nothing is written on the way out.
+
+    The line names the token that was presented and never the one on the row: the row's is
+    the live capability guarding the attempt that is running *now*, and anyone who can make
+    this line be written is by definition someone who does not have it.
+    """
+    if attempt_token is None:
+        return
+    if run.status is RunStatus.RUNNING and _same_token(run.attempt_token, attempt_token):
+        return
+    logger.info(
+        "dropped a result for run %s: it is %s, and attempt %r is not the one that owns it",
+        run.id,
+        run.status.value,
+        attempt_token,
+    )
+    raise StaleResultError(run.id, run.attempt_token, attempt_token)
+
+
+def _same_token(expected: str | None, presented: str) -> bool:
+    """Constant-time, and a row with no token matches nothing."""
+    if not expected:
+        return False
+    return hmac.compare_digest(expected, presented)
 
 
 def requeue_stale_runs(
@@ -593,12 +731,24 @@ def requeue_stale_runs(
     return stale
 
 
-def complete_run(session: Session, run: AnalysisRun, evals: Sequence[MoveEval]) -> None:
+def complete_run(
+    session: Session,
+    run: AnalysisRun,
+    evals: Sequence[MoveEval],
+    *,
+    attempt_token: str | None = None,
+) -> None:
     """Store a whole run's MoveEvals and mark it done in one commit.
 
     Buffering to the end of the run is what keeps SQLite's single-writer model a
     non-issue: the write lock is held for milliseconds, not for the length of the search.
+
+    `attempt_token` is what a caller that did not claim the run itself presents. Given one,
+    the run has to still be running under it or nothing at all is written; without one —
+    the local worker, which holds the run for the length of its own search — this behaves
+    exactly as it always has.
     """
+    _require_attempt(run, attempt_token)
     session.execute(delete(MoveEval).where(MoveEval.run_id == run.id))
     for row in evals:
         row.run_id = run.id
@@ -618,13 +768,18 @@ def fail_run(
     stderr: str | None = None,
     *,
     retry: bool = True,
+    attempt_token: str | None = None,
 ) -> RunStatus:
     """Mark a run failed with the engine's stderr, releasing its slot. One retry follows.
 
     The first failure puts the run back in the queue with its error still on it, so the
     UI can show what went wrong while the retry is pending; the second gives up. Either
     way the game stays browsable with whatever tiers it already has.
+
+    `attempt_token` guards exactly as it does in `complete_run`: a failure reported by a
+    runner whose run was already taken away must not fail the attempt that replaced it.
     """
+    _require_attempt(run, attempt_token)
     run.error = error
     run.stderr = stderr
     will_retry = retry and run.attempts < MAX_ATTEMPTS
@@ -639,6 +794,33 @@ def fail_run(
         run_event(EVENT_RUN_FAILED, run, error=error, stderr=stderr, will_retry=will_retry)
     )
     return run.status
+
+
+def abandon_run(
+    session: Session,
+    run: AnalysisRun,
+    *,
+    reason: str = STALE_RUN_MESSAGE,
+    refund_attempt: bool = True,
+) -> bool:
+    """Give a running run back to the queue rather than stranding it. Was there one to give?
+
+    With its attempt refunded by default: a worker that was cancelled, or a runner whose
+    socket dropped, did not fail the pass — it had it taken away mid-search. Counting that
+    against the retry budget would let two restarts during one long deep run mark it
+    permanently failed with no engine ever having crashed.
+    """
+    if run.status is not RunStatus.RUNNING:
+        return False
+    run.status = RunStatus.QUEUED
+    run.started_at = None
+    run.heartbeat_at = None
+    if refund_attempt:
+        run.attempts = max(0, run.attempts - 1)
+    run.error = reason
+    session.commit()
+    emit_run_event(run_event(EVENT_RUN_QUEUED, run))
+    return True
 
 
 def note_run(session: Session, run: AnalysisRun, message: str) -> None:
@@ -1002,6 +1184,10 @@ def analyze_position(session: Session, fen: str, budget_nodes: int) -> dict[str,
 
     Starts its own short-lived process rather than borrowing a warm one: this is called
     from a request thread, and the warm pool is asyncio-facing and reserved for runs.
+
+    That process starts here, which is why the engine is resolved `local_only`: a runner
+    carries whole runs, not single positions, and its engine's path means nothing on this
+    machine.
     """
     import chess
     import chess.engine
@@ -1009,7 +1195,7 @@ def analyze_position(session: Session, fen: str, budget_nodes: int) -> dict[str,
     from backend.adapters.stockfish import EngineError, StockfishAdapter
     from backend.services.explorer import read_fen
 
-    engine = engines_service.require_engine_for_tier(session, Tier.QUICK)
+    engine = engines_service.require_engine_for_tier(session, Tier.QUICK, local_only=True)
     text = (fen or "").strip()
     try:
         board = read_fen(text)

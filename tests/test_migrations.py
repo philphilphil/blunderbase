@@ -51,6 +51,9 @@ def test_indexes_the_hot_queries_need_exist(settings: Settings) -> None:
     assert ("game_id", "ply") in unique("game_positions")
     assert ("run_id", "ply") in unique("move_evals")
     assert ("position_id",) in indexed("game_positions")
+    assert ("runner_id",) in indexed("engines")
+    assert ("name",) in unique("runners")
+    assert ("token_hash",) in unique("runners")
 
 
 @pytest.mark.sqlite

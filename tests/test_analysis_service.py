@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import Any
 
@@ -274,6 +275,87 @@ def test_no_engine_at_all_is_a_tier_that_degrades(session: Session) -> None:
     game = _game(session)
     with pytest.raises(TierUnavailableError):
         analysis.request_analysis(session, game_id=game.id)
+
+
+# --- one run, one machine ---------------------------------------------------
+#
+# A run's evaluation and its human-move passes share a process, so the two engines have to
+# share a host. The refusal is at enqueue, where an owner can still do something about it.
+
+
+def _remote_engine(session: Session, name: str, **changes: Any) -> Engine:
+    """An engine bound to a runner, as an advertisement would have written it."""
+    from backend.services import runners as runners_service
+
+    runner = runners_service.runner_by_name(session, "gpu-box")
+    if runner is None:
+        runner, _token = runners_service.create_runner(session, "gpu-box", slots=2)
+    engine = _engine(session, name=name, **changes)
+    engine.runner_id = runner.id
+    session.commit()
+    return engine
+
+
+def test_a_search_here_and_the_only_maia_on_a_runner_is_refused(session: Session) -> None:
+    _engine(session, name="stockfish")
+    _remote_engine(session, "maia-remote", kind=EngineKind.MAIA, default_tier=None)
+    game = _game(session)
+
+    with pytest.raises(analysis.AnalysisRequestError) as refused:
+        analysis.request_analysis(session, game_id=game.id)
+
+    message = str(refused.value)
+    assert "must be on one machine" in message
+    assert "'stockfish' is on this host" in message
+    assert "'maia-remote', is on runner 'gpu-box'" in message
+
+
+def test_a_search_on_a_runner_and_the_only_maia_here_is_refused(session: Session) -> None:
+    remote = _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
+    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None)
+    game = _game(session)
+
+    with pytest.raises(analysis.AnalysisRequestError, match="must be on one machine"):
+        analysis.request_analysis(session, game_id=game.id, engine_id=remote.id, tier=Tier.DEEP)
+
+
+def test_a_host_with_its_own_maia_is_not_mixed(session: Session) -> None:
+    remote = _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
+    _remote_engine(session, "maia-remote", kind=EngineKind.MAIA, default_tier=None)
+    _engine(session, name="stockfish")
+    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None)
+    game = _game(session)
+
+    remote_run = analysis.request_analysis(session, game_id=game.id, engine_id=remote.id)
+    local_run = analysis.request_analysis(session, game_id=game.id)
+
+    assert remote_run.engine_id == remote.id
+    assert local_run.status is RunStatus.QUEUED
+
+
+def test_a_deployment_with_no_maia_at_all_has_nothing_to_mix(session: Session) -> None:
+    """The pass simply does not happen, which is exactly today's behaviour."""
+    _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
+    game = _game(session)
+
+    assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
+
+
+def test_a_maia_that_is_switched_off_strands_nobody(session: Session) -> None:
+    _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
+    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None, enabled=False)
+    game = _game(session)
+
+    assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
+
+
+def test_a_run_on_the_maia_itself_is_not_a_mixed_host_run(session: Session) -> None:
+    """Nothing is stranded when the engine named *is* the model."""
+    maia = _remote_engine(session, "maia-remote", kind=EngineKind.MAIA, default_tier=None)
+    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None)
+    game = _game(session)
+
+    assert analysis.request_analysis(session, game_id=game.id, engine_id=maia.id).id
 
 
 def test_re_analysis_is_a_new_run_and_keeps_the_old_one(session: Session) -> None:
@@ -655,3 +737,294 @@ def test_every_run_of_a_game_is_listed_newest_first(session: Session) -> None:
         run.id for run in reversed(runs)
     ]
     assert session.scalar(select(AnalysisRun.id).limit(1)) == runs[0].id
+
+
+# --- the attempt token ----------------------------------------------------
+
+
+def _queued(session: Session, engine_id: int | None) -> AnalysisRun:
+    """A queued run bound to whatever engine — including none at all."""
+    run = AnalysisRun(engine_id=engine_id, tier=Tier.QUICK, status=RunStatus.QUEUED)
+    session.add(run)
+    session.commit()
+    return run
+
+
+def test_every_claim_writes_a_fresh_attempt_token(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+
+    first = analysis.claim_next_run(session)
+    assert first is not None
+    one = first.attempt_token
+    analysis.fail_run(session, first, "engine died")
+    second = analysis.claim_next_run(session)
+    assert second is not None
+
+    assert one is not None and len(one) == analysis.ATTEMPT_TOKEN_BYTES * 2
+    assert second.attempt_token != one
+
+
+def test_a_result_under_the_dispatching_token_is_stored(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+
+    analysis.complete_run(session, run, [MoveEval(ply=0)], attempt_token=run.attempt_token)
+
+    assert run.status is RunStatus.DONE
+    assert len(analysis.get_move_evals(session, run.id)) == 1
+
+
+def test_a_result_for_an_attempt_that_is_over_is_dropped(session: Session) -> None:
+    """The run was taken away and re-claimed; the first runner's answer must not land on
+    the attempt that replaced it."""
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    first = analysis.claim_next_run(session)
+    assert first is not None
+    stale_token = first.attempt_token
+    _went_quiet(session, first)
+    analysis.requeue_stale_runs(session)
+    second = analysis.claim_next_run(session)
+    assert second is not None
+
+    with pytest.raises(analysis.StaleResultError) as dropped:
+        analysis.complete_run(session, second, [MoveEval(ply=0)], attempt_token=stale_token)
+
+    assert dropped.value.run_id == second.id
+    assert dropped.value.presented == stale_token
+    assert second.status is RunStatus.RUNNING
+    assert analysis.get_move_evals(session, second.id) == []
+
+
+def test_a_dropped_result_never_writes_the_live_token_to_the_log(
+    session: Session, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The token on the row is the capability guarding the attempt that is running now, and
+    anyone who can make this line be written is by definition somebody without it."""
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    live_token = run.attempt_token
+
+    with caplog.at_level(logging.INFO, logger="backend.services.analysis"):
+        with pytest.raises(analysis.StaleResultError):
+            analysis.complete_run(session, run, [MoveEval(ply=0)], attempt_token="f" * 32)
+
+    written = caplog.text
+    assert "f" * 32 in written, "the presented token is the one worth naming"
+    assert live_token not in written
+
+
+def test_a_duplicate_result_is_dropped_rather_than_rewriting_the_run(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    token = run.attempt_token
+    analysis.complete_run(session, run, [MoveEval(ply=0, win_loss=1.0)], attempt_token=token)
+
+    with pytest.raises(analysis.StaleResultError):
+        analysis.complete_run(session, run, [MoveEval(ply=0, win_loss=2.0)], attempt_token=token)
+
+    assert [row.win_loss for row in analysis.get_move_evals(session, run.id)] == [1.0]
+
+
+def test_a_run_that_is_not_running_accepts_nothing(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+    run.attempt_token = "f" * 32
+    session.commit()
+
+    with pytest.raises(analysis.StaleResultError):
+        analysis.complete_run(session, run, [], attempt_token="f" * 32)
+
+
+def test_a_row_claimed_before_the_token_existed_cannot_be_vouched_for(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    run.attempt_token = None
+    session.commit()
+
+    with pytest.raises(analysis.StaleResultError):
+        analysis.complete_run(session, run, [], attempt_token="f" * 32)
+
+
+def test_a_local_caller_completes_exactly_as_it_always_did(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+
+    analysis.complete_run(session, run, [MoveEval(ply=0)])
+
+    assert run.status is RunStatus.DONE
+
+
+def test_a_failure_from_an_attempt_that_is_over_is_dropped(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+
+    with pytest.raises(analysis.StaleResultError):
+        analysis.fail_run(session, run, "engine died", attempt_token="f" * 32)
+
+    assert run.status is RunStatus.RUNNING
+    assert run.error is None
+
+
+def test_the_guard_names_the_run_it_could_not_find(session: Session) -> None:
+    with pytest.raises(analysis.UnknownRunError):
+        analysis.guard_attempt(session, 4242, "f" * 32)
+
+
+def test_the_guard_hands_back_the_run_the_token_still_owns(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+
+    assert analysis.guard_attempt(session, run.id, run.attempt_token).id == run.id
+
+
+def test_a_beat_from_the_runner_holding_the_run_lands(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    run.heartbeat_at = None
+    session.commit()
+
+    assert analysis.heartbeat_run(session, run.id, run.attempt_token) is True
+
+    session.refresh(run)
+    assert run.heartbeat_at is not None
+
+
+def test_a_beat_for_a_run_that_was_taken_away_says_so(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+
+    assert analysis.heartbeat_run(session, run.id, "f" * 32) is False
+    assert analysis.heartbeat_run(session, 4242, run.attempt_token) is False
+
+
+# --- claiming for one host ------------------------------------------------
+
+
+def test_a_claim_can_be_narrowed_to_one_hosts_engines(session: Session) -> None:
+    mine = _engine(session, name="mine")
+    theirs = _engine(session, name="theirs", default_tier=None)
+    ours = _queued(session, mine.id)
+    _queued(session, theirs.id)
+
+    claimed = analysis.claim_next_run(session, engine_ids=[mine.id])
+
+    assert claimed is not None and claimed.id == ours.id
+    assert analysis.claim_next_run(session, engine_ids=[mine.id]) is None
+
+
+def test_a_claim_for_no_engines_at_all_takes_nothing(session: Session) -> None:
+    engine = _engine(session)
+    _queued(session, engine.id)
+
+    assert analysis.claim_next_run(session, engine_ids=[]) is None
+
+
+def test_a_run_with_no_engine_belongs_to_nobody_in_particular(session: Session) -> None:
+    """It stays claimable under an exclusion — the local fallback will find it one — and is
+    not claimable under an inclusion."""
+    engine = _engine(session)
+    orphan = _queued(session, None)
+
+    assert analysis.claim_next_run(session, engine_ids=[engine.id]) is None
+    claimed = analysis.claim_next_run(session, exclude_engine_ids=[engine.id])
+    assert claimed is not None and claimed.id == orphan.id
+
+
+def test_an_excluded_engines_run_is_left_where_it_is(session: Session) -> None:
+    local = _engine(session, name="local")
+    remote = _engine(session, name="remote", default_tier=None)
+    _queued(session, remote.id)
+    mine = _queued(session, local.id)
+
+    claimed = analysis.claim_next_run(session, exclude_engine_ids=[remote.id])
+
+    assert claimed is not None and claimed.id == mine.id
+    assert analysis.claim_next_run(session, exclude_engine_ids=[remote.id]) is None
+
+
+# --- handing a run back ---------------------------------------------------
+
+
+def test_an_abandoned_run_goes_back_with_its_attempt_refunded(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+
+    assert analysis.abandon_run(session, run) is True
+
+    assert run.status is RunStatus.QUEUED
+    assert run.attempts == 0
+    assert run.started_at is None
+    assert run.heartbeat_at is None
+    assert run.error == analysis.STALE_RUN_MESSAGE
+
+
+def test_an_abandoned_run_can_be_made_to_pay_for_its_attempt(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+
+    analysis.abandon_run(session, run, reason="the runner was revoked", refund_attempt=False)
+
+    assert run.attempts == 1
+    assert run.error == "the runner was revoked"
+
+
+def test_there_is_nothing_to_abandon_about_a_finished_run(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+    analysis.complete_run(session, run, [])
+
+    assert analysis.abandon_run(session, run) is False
+    assert run.status is RunStatus.DONE
+
+
+def test_abandoning_a_run_announces_that_it_is_queued_again(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    events: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(events.append)
+    try:
+        analysis.abandon_run(session, run)
+    finally:
+        cancel()
+
+    assert [event["event"] for event in events] == [analysis.EVENT_RUN_QUEUED]

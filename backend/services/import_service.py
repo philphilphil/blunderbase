@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -32,6 +33,8 @@ from backend.services import accounts as accounts_service
 from backend.services import analysis, engines
 from backend.services.accounts import AccountIndex, fold
 from backend.services.analysis import QUICK_PRIORITY  # noqa: F401  (the pipeline's own priority)
+
+logger = logging.getLogger(__name__)
 
 
 class UnknownSourceError(LookupError):
@@ -483,17 +486,25 @@ def enqueue_quick_analysis(session: Session, game: Game) -> AnalysisRun | None:
     No enabled engine to run it with means no run: an import must not fail because the
     engine list is empty, and a run pointing at nothing would only fail later. The commit
     is left to `ingest_games`, which owns the transaction this game is being written in.
+
+    A configuration `request_analysis` refuses — a search engine and a Maia model on two
+    different machines — is the same story: the games still import, and the refusal is
+    logged rather than raised. An owner who asks for a pass by hand is told exactly why.
     """
     engine = quick_tier_engine(session)
     if engine is None:
         return None
-    return analysis.request_analysis(
-        session,
-        game_id=game.id,
-        tier=Tier.QUICK,
-        engine_id=engine.id,
-        commit=False,
-    )
+    try:
+        return analysis.request_analysis(
+            session,
+            game_id=game.id,
+            tier=Tier.QUICK,
+            engine_id=engine.id,
+            commit=False,
+        )
+    except analysis.AnalysisRequestError as exc:
+        logger.warning("game %s was imported without a quick pass: %s", game.id, exc)
+        return None
 
 
 def quick_tier_engine(session: Session) -> Engine | None:

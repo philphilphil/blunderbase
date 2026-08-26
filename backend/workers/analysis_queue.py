@@ -20,6 +20,12 @@ one deadlocks the moment that cap is a single process.
 A set also says that the runs it holds are alive, every `HEARTBEAT_SECONDS`. That is what
 tells another starting process which `running` rows are a dead one's to collect and which
 belong to a worker that is still searching.
+
+This set drains the **local** half of the queue: it claims past every run bound to an
+engine that lives on a runner, because that machine is the only one that can start the
+binary. The remote half is `workers/runner_gateway.py`, and both halves take their work
+through the same `claim_next_run` — there is one queue and one claim, only two kinds of
+worker reading it.
 """
 
 from __future__ import annotations
@@ -30,11 +36,10 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import EngineKind, RunStatus
+from backend.db.enums import RunStatus
 from backend.db.models import Engine
 from backend.db.session import get_sessionmaker
 from backend.services import analysis
@@ -340,7 +345,9 @@ class AnalysisWorkers:
 
     def _claim(self, claimed: list[int]) -> int | None:
         with self.sessions() as session:
-            run = analysis.claim_next_run(session)
+            run = analysis.claim_next_run(
+                session, exclude_engine_ids=engines_service.remote_engine_ids(session)
+            )
             if run is None:
                 return None
             claimed.append(run.id)
@@ -357,10 +364,12 @@ class AnalysisWorkers:
             if run.status is not RunStatus.RUNNING:
                 return None
             engine = session.get(Engine, run.engine_id) if run.engine_id else None
-            if engine is None or not engine.enabled:
-                # The engine named at enqueue time has since been deleted or switched
-                # off; the tier's current choice stands in rather than the run failing.
-                engine = engines_service.engine_for_tier(session, run.tier)
+            if engine is None or not engine.enabled or engine.runner_id is not None:
+                # The engine named at enqueue time has since been deleted, switched off or
+                # moved to a runner; the tier's current local choice stands in rather than
+                # the run failing. Remote work is claimed by the gateway, not by this set,
+                # so a remote engine reaching here is a race, not a job to attempt.
+                engine = engines_service.engine_for_tier(session, run.tier, local_only=True)
             if engine is None:
                 raise analysis.AnalysisError("no engine is available for this tier")
             if not engines_service.binary_present(engine.path):
@@ -368,7 +377,7 @@ class AnalysisWorkers:
                     f"the binary for {engine.name!r} is no longer at {engine.path}"
                 )
             plan = analysis.build_plan(session, run, self.settings)
-            maia = _maia_engine(session)
+            maia = engines_service.maia_engine_for_host(session, None)
             return RunContext(
                 plan=plan,
                 spec=engines_service.spec_for(engine),
@@ -390,32 +399,11 @@ class AnalysisWorkers:
             analysis.fail_run(session, run, error, stderr, retry=retry)
 
     def _abandon(self, run_id: int) -> None:
-        """A cancelled worker gives its run back to the queue rather than stranding it.
-
-        With the attempt it spent: the pass was taken away from it mid-search, it did not
-        fail. Counting a shutdown against the retry budget would let two restarts during
-        one long deep run mark it permanently failed with no engine ever having crashed.
-        """
+        """A cancelled worker gives its run back to the queue rather than stranding it."""
         with self.sessions() as session:
             run = analysis.get_run(session, run_id)
-            if run is None or run.status is not RunStatus.RUNNING:
-                return
-            run.status = RunStatus.QUEUED
-            run.started_at = None
-            run.heartbeat_at = None
-            run.attempts = max(0, run.attempts - 1)
-            run.error = analysis.STALE_RUN_MESSAGE
-            session.commit()
-            analysis.emit_run_event(analysis.run_event(analysis.EVENT_RUN_QUEUED, run))
-
-
-def _maia_engine(session: Session) -> Engine | None:
-    """The human-move model, if one is enabled. Its absence is not an error."""
-    return session.scalars(
-        select(Engine)
-        .where(Engine.enabled.is_(True), Engine.kind == EngineKind.MAIA)
-        .order_by(Engine.id)
-    ).first()
+            if run is not None:
+                analysis.abandon_run(session, run)
 
 
 def _stderr_of(adapter: Any) -> str | None:

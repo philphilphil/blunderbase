@@ -78,6 +78,28 @@ class Settings(BaseSettings):
     # Empty means the remote transport is not configured and must not be served.
     mcp_bearer_key: str = ""
 
+    # Remote runners. Every one of these has a default, so a deployment with no runners
+    # registered behaves exactly as it did before they existed.
+    #
+    # How often the gateway pings a connected runner, and how often a polling one comes
+    # back for work. Several beats fit inside `analysis.STALE_AFTER_SECONDS`.
+    runner_heartbeat_seconds: float = Field(default=10.0, gt=0)
+    runner_poll_seconds: float = Field(default=5.0, gt=0)
+    # The gateway sweeps for stale runs on its own clock, because it is what creates
+    # orphans no local worker would ever notice.
+    runner_stale_sweep_seconds: float = Field(default=20.0, gt=0)
+
+    # Infinite analysis. Snapshots are throttled at whichever host is producing them.
+    stream_snapshot_interval: float = Field(default=0.5, gt=0)
+    # How long a session survives with nobody listening on `/events` before it frees its slot.
+    stream_idle_seconds: float = Field(default=30.0, gt=0)
+    # One session per browser surface: the game board and the live board.
+    stream_max_sessions: int = Field(default=2, ge=1)
+
+    # How this deployment is reached from outside, used to write the `runner.yaml` snippet
+    # the create-runner flow hands over. Empty falls back to the requesting origin.
+    public_url: str = ""
+
     host: str = "127.0.0.1"
     port: int = 8765
 

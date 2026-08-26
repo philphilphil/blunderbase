@@ -298,11 +298,31 @@ class MoveEvalResponse(Row):
     maia_policy: dict[str, Any] | None = None
 
 
+class QueueDestination(Payload):
+    """`services.runners.queue_destinations`: one place the backlog can be worked.
+
+    A run with no engine, or one whose engine is switched off, counts as `local` — that is
+    where the worker's fallback sends it, whatever it was queued against.
+    """
+
+    destination: str = Field(description="local | runner")
+    runner_id: int | None = None
+    name: str
+    connected: bool = True
+    slots: int | None = None
+    queued: int = 0
+    running: int = 0
+    streams: int = 0
+
+
 class QueueStatus(BaseModel):
     queued: int
     running: int
     workers: bool = Field(description="whether this process is draining the queue")
     busy: int = Field(default=0, description="runs executing in this process right now")
+    destinations: list[QueueDestination] = Field(
+        default_factory=list, description="the same backlog, split by where it will be run"
+    )
 
 
 class PositionAnalysisRequest(Input):
@@ -521,6 +541,224 @@ class NoteUpdate(Input):
 class TagCount(BaseModel):
     tag: str
     notes: int
+
+
+# --- runner gateway -------------------------------------------------------
+
+
+class Frame(BaseModel):
+    """A body a runner sends over the poll fallback.
+
+    Deliberately **not** an `Input`: the wire protocol's own rule is that a field the
+    receiver does not know is ignored, so that a newer runner talking to an older server
+    is a missing feature rather than a 422 on every poll. A browser typing a field name
+    wrongly wants the opposite, which is why `Input` stays strict for everything else.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class RunnerActiveRun(Frame):
+    """One run the runner says it is still executing, and the attempt it holds it under."""
+
+    run_id: int
+    attempt_token: str
+
+
+class RunnerPoll(Frame):
+    """`POST /runner/poll`: announce, say how much room there is, and take work away."""
+
+    proto: int = 1
+    runner: str = ""
+    version: str | None = None
+    slots: int = Field(default=1, ge=0)
+    # Omitted after the first poll means "what I advertised last still stands"; an empty
+    # list means "I advertise nothing", which switches the previous ones off.
+    engines: list[dict[str, Any]] | None = None
+    free_slots: int | None = Field(default=None, ge=0)
+    active_runs: list[RunnerActiveRun] = Field(default_factory=list)
+
+
+class RunnerPollResponse(BaseModel):
+    runner_id: int
+    proto: int
+    runner: str
+    poll_seconds: float
+    engines: list[dict[str, Any]] = Field(default_factory=list)
+    dispatch: list[dict[str, Any]] = Field(default_factory=list)
+    cancel: list[int] = Field(default_factory=list)
+
+
+class RunnerHeartbeat(Frame):
+    attempt_token: str
+    done: int = 0
+    total: int = 0
+
+
+class RunnerHeartbeatResponse(BaseModel):
+    ok: bool
+    cancel: bool = Field(
+        default=False, description="the run is no longer this runner's; abandon it"
+    )
+
+
+class RunnerResult(Frame):
+    """A finished run: exactly one of `evals` and `error`."""
+
+    attempt_token: str
+    evals: list[dict[str, Any]] | None = None
+    note: str | None = None
+    error: str | None = None
+    stderr: str | None = None
+    retry: bool = True
+
+    @model_validator(mode="after")
+    def _one_answer(self) -> RunnerResult:
+        if (self.evals is None) == (self.error is None):
+            raise ValueError("a result carries exactly one of evals and error")
+        return self
+
+
+class RunnerResultResponse(BaseModel):
+    """A dropped payload is a 200: the runner did nothing wrong, and a 4xx would retry."""
+
+    accepted: bool
+    reason: str | None = None
+
+
+# --- runners ---------------------------------------------------------------
+
+
+class RunnerEngine(Payload):
+    """`services.runners.engine_payload`: an engine as its host advertises it.
+
+    A runner-bound engine is read-mostly here — its truth is the yaml on that machine, and
+    `path` is a path over there — so the UI shows it rather than offering to edit it.
+    """
+
+    id: int
+    name: str
+    kind: EngineKind
+    version: str | None = None
+    path: str | None = None
+    enabled: bool = True
+    default_tier: Tier | None = None
+    streams: bool = Field(default=False, description="whether it can drive an analysis board")
+
+
+class RunnerResponse(Payload):
+    """`services.runners.runner_payload`: one registered machine.
+
+    The row and the live picture in one object: `connected` and `last_seen_at` are columns,
+    while `transport` and the three slot counts are what the gateway knows about the link
+    it is holding. A process with no gateway reports the row alone.
+    """
+
+    id: int
+    name: str
+    slots: int = 1
+    version: str | None = None
+    connected: bool = False
+    transport: str | None = Field(default=None, description="websocket | poll | null")
+    last_seen_at: datetime | None = None
+    created_at: datetime | None = None
+    busy: int = Field(default=0, description="slots holding a queue run")
+    streams: int = Field(default=0, description="slots holding an analysis board")
+    free_slots: int = 0
+    queued_eligible: int = Field(default=0, description="queued runs only this runner can take")
+    engines: list[RunnerEngine] = Field(default_factory=list)
+
+
+class RunnerCreate(Input):
+    name: str = Field(min_length=1, max_length=64)
+    slots: int = Field(default=1, ge=1, description="engine jobs and boards at once")
+
+
+class RunnerUpdate(Input):
+    """Only the fields that are present are changed."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    slots: int | None = Field(default=None, ge=1)
+
+
+class RunnerCreated(BaseModel):
+    """The one answer that carries a token. It is not readable again from anywhere."""
+
+    runner: RunnerResponse
+    token: str = Field(description="shown once; the runner's whole identity")
+    config_yaml: str = Field(description="a paste-ready runner.yaml with the token in it")
+
+
+class LocalHost(Payload):
+    """`services.runners.local_row`: this machine, described as one more destination."""
+
+    name: str = "local"
+    slots: int | None = Field(default=None, description="analysis_concurrency, when known")
+    busy: int = 0
+    streams: int = 0
+    workers: bool = Field(default=False, description="whether this process drains the queue")
+    queued: int = 0
+    running: int = 0
+    engines: list[RunnerEngine] = Field(default_factory=list)
+
+
+class QueueTotals(BaseModel):
+    queued: int = 0
+    running: int = 0
+
+
+class RunnersStatus(BaseModel):
+    """Where engine work can run right now — the read the Engines page and the coach share."""
+
+    runners: list[RunnerResponse] = Field(default_factory=list)
+    local: LocalHost
+    queue: QueueTotals
+
+
+# --- streams ---------------------------------------------------------------
+
+
+class StreamCreate(Input):
+    """Open an analysis board. `engine_id` omitted takes the deep tier's engine."""
+
+    fen: str = Field(min_length=1)
+    engine_id: int | None = None
+    multipv: int = Field(default=1, ge=1, le=5)
+    surface: str = Field(default="game", description="game | live — one session each")
+    # Echoed back untouched, so the page can tell which board a session belongs to.
+    game_id: int | None = None
+    ply: int | None = None
+
+
+class StreamUpdate(Input):
+    """A position change or a new multipv. Only what is sent changes."""
+
+    fen: str | None = Field(default=None, min_length=1)
+    multipv: int | None = Field(default=None, ge=1, le=5)
+
+
+class StreamResponse(Payload):
+    """`services.streams.StreamSession.payload`: one analysis board.
+
+    `runner_id: null` is a local engine, and that is the only thing that distinguishes
+    the two — the snapshots on `/events` are identical either way.
+    """
+
+    id: str
+    surface: str
+    fen: str
+    multipv: int = 1
+    engine_id: int
+    engine: str
+    runner_id: int | None = None
+    runner: str | None = None
+    state: str = "starting"
+    reason: str | None = None
+    seq: int = 0
+    created_at: datetime
+    last_snapshot_at: datetime | None = None
+    game_id: int | None = None
+    ply: int | None = None
 
 
 # --- live -----------------------------------------------------------------

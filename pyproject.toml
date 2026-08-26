@@ -11,12 +11,19 @@ dependencies = [
     "httpx>=0.27",
     "mcp>=2.0.0",
     "pydantic-settings>=2.4",
+    # The runner reads its yaml with one and dials its socket with the other. Both arrive
+    # today through `uvicorn[standard]`, and depending on that accident is not a plan.
+    "pyyaml>=6",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.30",
+    "websockets>=13",
 ]
 
 [project.scripts]
 blunderbase = "backend.cli:main"
+# Same package, same image, a different command: the runner is a headless worker that
+# dials the server rather than a second deployment.
+blunderbase-runner = "backend.runners.entrypoint:main"
 
 [dependency-groups]
 dev = [

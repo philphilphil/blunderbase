@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
@@ -17,10 +18,17 @@ from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_sessionmaker
 from backend.services import auth as auth_service
+from backend.services import runners as runners_service
+from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers
+from backend.workers.local_streams import LocalStreamBackend
+from backend.workers.runner_gateway import RunnerGateway
+from backend.workers.runner_streams import RemoteStreamBackend
 
 TITLE = "Blunderbase"
 DESCRIPTION = "A personal chess database. Every route is a thin wrapper over `backend.services`."
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -28,10 +36,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Bring the database to head, then run the analysis workers for as long as we do.
 
     The queue is `AnalysisRun` rows, so nothing is lost across a restart: starting the
-    workers is also what collects the runs the previous process left `running`.
+    workers is also what collects the runs the previous process left `running`. The runner
+    gateway is the same story a connection at a time — `disconnect_all` clears the
+    `connected` flags a dead process left set, before anything reads them.
     """
     settings: Settings = app.state.settings
     upgrade_to_head(settings)
+    _clear_stale_connections(settings)
     _mount_mcp_for_the_owners_password(app, settings)
     app.state.loop = asyncio.get_running_loop()
     events: EventBroker = app.state.events
@@ -40,6 +51,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.workers = workers
     if settings.analysis_workers:
         await workers.start()
+    gateway = RunnerGateway(settings=settings)
+    app.state.gateway = gateway
+    await gateway.start()
+    streams = _analysis_boards(settings, workers, gateway)
+    app.state.streams = streams
+    await streams.start()
     try:
         async with AsyncExitStack() as stack:
             if app.state.mcp is not None:
@@ -50,9 +67,43 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             yield
     finally:
         await wait_for_imports(app.state.imports)
+        # Before the gateway and the workers, in that order: an analysis board holds a slot
+        # on one of them, and both have to still be there for it to give the slot back to.
+        await streams.stop()
+        app.state.streams = None
+        await gateway.stop()
+        app.state.gateway = None
         await workers.stop()
         events.stop()
         app.state.loop = None
+
+
+def _analysis_boards(
+    settings: Settings, workers: AnalysisWorkers, gateway: RunnerGateway
+) -> StreamBroker:
+    """The infinite-analysis broker, wired to both hosts it can serve a board on.
+
+    The local backend shares the workers' engine pool on purpose: an infinite search and a
+    queue pass are the same machine's cores, and `analysis_concurrency` is where that is
+    counted. The remote one plugs into the gateway's handler seam and is what makes a
+    board on a runner indistinguishable from one here.
+    """
+    broker = StreamBroker(settings=settings)
+    broker.register_backend(
+        LocalStreamBackend.name, LocalStreamBackend(broker, pool=workers.pool, settings=settings)
+    )
+    remote = RemoteStreamBackend(gateway, broker, settings=settings)
+    remote.install()
+    broker.register_backend(RemoteStreamBackend.name, remote)
+    return broker
+
+
+def _clear_stale_connections(settings: Settings) -> None:
+    """Nobody is dialled in yet, whatever the last process left the rows saying."""
+    with get_sessionmaker(settings)() as session:
+        cleared = runners_service.disconnect_all(session)
+    if cleared:
+        logger.info("cleared %s runner connection(s) a previous process left set", cleared)
 
 
 def _mount_mcp_for_the_owners_password(app: FastAPI, settings: Settings) -> None:
@@ -87,6 +138,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     imports: set[asyncio.Task[Any]] = set()
     app.state.imports = imports
     app.state.workers = None
+    app.state.gateway = None
+    app.state.streams = None
     app.state.loop = None
     app.state.mcp = None
 

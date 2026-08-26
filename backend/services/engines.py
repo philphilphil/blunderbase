@@ -10,6 +10,12 @@ and the MCP coach both talk to. Two rules shape it:
   explains why in words a UI can show; only `require_engine_for_tier` raises, and it raises
   `TierUnavailableError` rather than whatever the process layer threw.
 
+An engine row with a `runner_id` bends the first rule and keeps the second. Its binary is
+on another machine, so there is nothing here to probe and nothing to `stat`: the row is
+written from the runner's own advertisement, its options are validated against the probe
+the runner did, and "is it available" becomes "is that runner connected". Everything else
+— tiers, Maia, the pool key — treats it exactly like a local engine, which is the point.
+
 Adapter modules are imported inside the functions that need them: importing this module
 must not pull python-chess and an engine process into a server that only wanted to list
 engines.
@@ -27,13 +33,14 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from backend.db.enums import EngineKind, Tier
-from backend.db.models import AnalysisRun, Engine
+from backend.db.models import AnalysisRun, Engine, Runner
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Mapping, Sequence
 
     from backend.adapters.pool import EngineSpec
     from backend.adapters.stockfish import EngineProbe, UciOption
+    from backend.runners.protocol import EngineAd
 
     ProbeFn = Callable[..., EngineProbe]
 
@@ -83,6 +90,24 @@ class TierUnavailableError(EngineServiceError):
         super().__init__(f"the {tier.value} tier is unavailable: {reason}")
         self.tier = tier
         self.reason = reason
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptedEngine:
+    """What became of one advertised engine, in the words the runner is told them in."""
+
+    name: str
+    engine_id: int | None = None
+    accepted: bool = False
+    reason: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "engine_id": self.engine_id,
+            "accepted": self.accepted,
+            "reason": self.reason,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,11 +194,23 @@ def update_engine(
     A change that could invalidate the stored options — a new path, a new kind, new options
     — re-probes the binary and validates against what it declares now. Renaming, disabling
     or re-tiering does not: an engine whose binary has gone missing must still be editable.
+
+    A runner's engine is not editable at all. The row is an advertisement from another
+    machine — its `path` is a path over there, written by that machine — and the re-probe
+    this function does would start whatever *this* host happens to find at it. The same
+    reasoning as `sample_eval`'s refusal, and the same answer: the yaml on the runner is
+    where a remote engine is changed.
     """
     unknown = sorted(set(changes) - EDITABLE)
     if unknown:
         raise EngineValidationError(f"cannot change {', '.join(unknown)}")
     engine = require_engine(session, engine_id)
+    if engine.runner_id is not None:
+        raise EngineValidationError(
+            f"{engine.name!r} is on {engine_host(session, engine)} and is edited there; "
+            f"this row is that machine's advertisement, and it is rewritten every time it "
+            f"connects"
+        )
 
     name = changes.get("name", engine.name)
     if isinstance(name, str):
@@ -220,6 +257,164 @@ def delete_engine(session: Session, engine_id: int) -> bool:
     return True
 
 
+# --- where an engine lives -------------------------------------------------
+
+
+def local_engine_ids(session: Session, *, enabled_only: bool = True) -> list[int]:
+    """The engines whose binary is on this host."""
+    return _engine_ids(session, Engine.runner_id.is_(None), enabled_only=enabled_only)
+
+
+def remote_engine_ids(session: Session, *, enabled_only: bool = False) -> list[int]:
+    """Every engine that belongs to a runner.
+
+    Disabled ones count by default, because this is what the local worker set excludes
+    itself from claiming: a run bound to a remote engine that has been switched off is
+    still not work this host should pick up behind the runner's back.
+    """
+    return _engine_ids(session, Engine.runner_id.is_not(None), enabled_only=enabled_only)
+
+
+def runner_engine_ids(session: Session, runner_id: int, *, enabled_only: bool = True) -> list[int]:
+    """The engines one runner advertises — what its dispatcher may claim runs for."""
+    return _engine_ids(session, Engine.runner_id == runner_id, enabled_only=enabled_only)
+
+
+def engines_of_runner(session: Session, runner_id: int) -> list[Engine]:
+    """One runner's engine rows, advertisement order."""
+    return list(
+        session.scalars(select(Engine).where(Engine.runner_id == runner_id).order_by(Engine.id))
+    )
+
+
+def maia_engine_for_host(session: Session, runner_id: int | None) -> Engine | None:
+    """The human-move model on one host, if it has one. Its absence is not an error.
+
+    A run's Stockfish and Maia passes execute in the same process, so the model has to be
+    where the search is. A host without one runs the evaluation and notes the skipped pass
+    rather than refusing the run — the alternative would refuse every remote run on a
+    deployment whose only Maia is local.
+    """
+    return session.scalars(
+        select(Engine)
+        .where(
+            Engine.enabled.is_(True),
+            Engine.kind == EngineKind.MAIA,
+            Engine.runner_id.is_(None) if runner_id is None else Engine.runner_id == runner_id,
+        )
+        .order_by(Engine.id)
+    ).first()
+
+
+def stranded_maia(session: Session, engine: Engine) -> Engine | None:
+    """The Maia a run on this engine could never reach, when one exists on another host.
+
+    V1's rule is that a run's evaluation and its human-move passes live on the same
+    machine: the two engines run in one process, and there is no way to ship a board to
+    Stockfish here and to Maia there. So a search engine on a host with no Maia, in a
+    deployment whose only Maia is somewhere else, describes a run that cannot be computed
+    as configured — and `request_analysis` refuses it by name rather than quietly producing
+    a game with no human-move data in it.
+
+    None means there is nothing mixed about it: this host has its own Maia, or the
+    deployment has none at all and the pass simply does not happen.
+    """
+    if engine.kind is EngineKind.MAIA:
+        return None
+    if maia_engine_for_host(session, engine.runner_id) is not None:
+        return None
+    return session.scalars(
+        select(Engine)
+        .where(Engine.enabled.is_(True), Engine.kind == EngineKind.MAIA)
+        .order_by(Engine.id)
+    ).first()
+
+
+def engine_host(session: Session, engine: Engine) -> str:
+    """Where an engine's binary is, phrased for a message an owner has to act on."""
+    if engine.runner_id is None:
+        return "this host"
+    runner = session.get(Runner, engine.runner_id)
+    return f"runner {runner.name!r}" if runner is not None else "a runner that is gone"
+
+
+def sync_runner_engines(
+    session: Session, runner: Runner, ads: Sequence[EngineAd]
+) -> list[AcceptedEngine]:
+    """Write one runner's advertisement into the engine table, and say what was taken.
+
+    An advertised engine is the runner's, not the owner's: the yaml on that machine is the
+    truth, so a row that already belongs to this runner is overwritten from the ad rather
+    than merged with what the UI last saw. A name that belongs to another host is refused
+    by name — the alternative is two engines called `stockfish` and a dispatcher that
+    cannot tell which machine a run meant.
+
+    Engines this runner advertised before and no longer does are disabled rather than
+    deleted: an `AnalysisRun` may still point at one, and its history is worth keeping.
+    """
+    from backend.runners.protocol import decode_probe
+
+    existing = {engine.name: engine for engine in engines_of_runner(session, runner.id)}
+    results: list[AcceptedEngine] = []
+    kept: set[str] = set()
+
+    for ad in ads:
+        taken = session.scalars(select(Engine).where(Engine.name == ad.name)).first()
+        if taken is not None and taken.runner_id != runner.id:
+            where = "this host" if taken.runner_id is None else "another runner"
+            results.append(
+                AcceptedEngine(
+                    name=ad.name,
+                    reason=f"an engine named {ad.name!r} is already registered on {where}",
+                )
+            )
+            continue
+        probed = decode_probe(ad.version, None, ad.declared_options)
+        try:
+            options = validate_options(probed, ad.options)
+        except EngineValidationError as exc:
+            results.append(AcceptedEngine(name=ad.name, reason=str(exc)))
+            continue
+
+        engine = taken or Engine(name=ad.name)
+        engine.kind = EngineKind(ad.kind)
+        engine.path = ad.path
+        engine.version = (ad.version or "")[:64] or None
+        engine.options = options
+        engine.default_tier = None if ad.tier is None else Tier(ad.tier)
+        engine.enabled = True
+        engine.runner_id = runner.id
+        if taken is None:
+            session.add(engine)
+        session.flush()
+        kept.add(ad.name)
+        results.append(AcceptedEngine(name=ad.name, engine_id=engine.id, accepted=True))
+
+    for name, engine in existing.items():
+        if name not in kept:
+            engine.enabled = False
+    session.commit()
+    return results
+
+
+def disable_runner_engines(session: Session, runner_id: int) -> int:
+    """Mark a gone runner's engines unavailable. How many were still enabled."""
+    disabled = session.execute(
+        update(Engine)
+        .where(Engine.runner_id == runner_id, Engine.enabled.is_(True))
+        .values(enabled=False)
+    ).rowcount
+    session.commit()
+    return int(disabled)
+
+
+def _engine_ids(session: Session, *where: Any, enabled_only: bool) -> list[int]:
+    statement = select(Engine.id).where(*where).order_by(Engine.id)
+    if enabled_only:
+        statement = statement.where(Engine.enabled.is_(True))
+    return [int(engine_id) for engine_id in session.scalars(statement)]
+
+
 def probe_engine(
     path: str, kind: EngineKind = EngineKind.UCI, *, probe: ProbeFn | None = None
 ) -> EngineProbe:
@@ -258,9 +453,16 @@ def validate_options(probed: EngineProbe, options: Mapping[str, Any] | None) -> 
     return validated
 
 
-def engine_for_tier(session: Session, tier: Tier) -> Engine | None:
-    """The engine a tier should use, or None if its engine is missing or disabled."""
+def engine_for_tier(session: Session, tier: Tier, *, local_only: bool = False) -> Engine | None:
+    """The engine a tier should use, or None if its engine is missing or disabled.
+
+    `local_only` is what the local worker set asks with: a run whose engine has gone away
+    falls back to something this host can actually start, not to a binary on a machine that
+    may not even be connected.
+    """
     enabled = list_engines(session, enabled_only=True)
+    if local_only:
+        enabled = [engine for engine in enabled if engine.runner_id is None]
     for engine in enabled:
         if engine.default_tier is tier:
             return engine
@@ -269,12 +471,31 @@ def engine_for_tier(session: Session, tier: Tier) -> Engine | None:
     return next((engine for engine in enabled if engine.kind is EngineKind.UCI), None)
 
 
-def require_engine_for_tier(session: Session, tier: Tier) -> Engine:
-    """The tier's engine, or a typed reason it has none."""
+def require_engine_for_tier(session: Session, tier: Tier, *, local_only: bool = False) -> Engine:
+    """The tier's engine, or a typed reason it has none.
+
+    `local_only` is what a caller that starts the binary itself asks with. A one-shot
+    evaluation is computed in this process — tunnelling a single position to a runner is
+    deliberately not part of the runner protocol — so a remote engine's `path` is a path on
+    a machine this one cannot see, and starting it here would at best be a different
+    binary. Such a caller falls back to something this host can really run, and says so
+    plainly when there is nothing.
+    """
     status = tier_status(session, tier)
     if not status.available or status.engine_id is None:
         raise TierUnavailableError(tier, status.reason or "no engine is available")
-    return require_engine(session, status.engine_id)
+    engine = require_engine(session, status.engine_id)
+    if not local_only or engine.runner_id is None:
+        return engine
+    here = engine_for_tier(session, tier, local_only=True)
+    if here is None:
+        raise TierUnavailableError(
+            tier,
+            f"the {tier.value} tier's engine, {engine.name!r}, is on "
+            f"{engine_host(session, engine)}, and this is worked out here; no engine on "
+            f"this host is available for it",
+        )
+    return here
 
 
 def tier_status(session: Session, tier: Tier) -> TierStatus:
@@ -288,6 +509,20 @@ def tier_status(session: Session, tier: Tier) -> TierStatus:
             else "no engine is registered yet"
         )
         return TierStatus(tier=tier, available=False, reason=reason)
+    if engine.runner_id is not None:
+        # `binary_present` is meaningless for a path on another machine, so availability
+        # is the one thing this host can actually know: whether that runner is dialled in.
+        runner = session.get(Runner, engine.runner_id)
+        if runner is None or not runner.connected:
+            where = "its runner" if runner is None else repr(runner.name)
+            return TierStatus(
+                tier=tier,
+                engine_id=engine.id,
+                engine_name=engine.name,
+                available=False,
+                reason=f"{engine.name!r} runs on {where}, which is not connected",
+            )
+        return TierStatus(tier=tier, engine_id=engine.id, engine_name=engine.name, available=True)
     if not binary_present(engine.path):
         return TierStatus(
             tier=tier,
@@ -339,12 +574,21 @@ def sample_eval(
 
     Works on a disabled engine too: the point of the button is to decide whether to enable
     it. A UCI engine answers with an evaluation, a Maia engine with its move policy.
+
+    It does not work on a runner's engine, and says so rather than starting whatever this
+    host happens to have at that path: the row is an advertisement from another machine,
+    and the only thing that can start it is the runner itself.
     """
     import chess
 
     from backend.adapters.stockfish import EngineError
 
     engine_row = require_engine(session, engine_id)
+    if engine_row.runner_id is not None:
+        raise EngineRunError(
+            f"{engine_row.name!r} is on {engine_host(session, engine_row)}, and a test run "
+            f"starts the binary here; {engine_row.path!r} is a path on that machine"
+        )
     position = (fen or STARTING_FEN).strip()
     try:
         board = chess.Board(position)

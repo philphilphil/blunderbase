@@ -21,7 +21,9 @@ from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import import_service
 from backend.services import notes as notes_service
+from backend.services import runners as runners_service
 from backend.services import stats as stats_service
+from backend.services import streams as streams_service
 
 Handler = Callable[[Request, Any], Awaitable[JSONResponse]]
 
@@ -38,10 +40,20 @@ class ErrorResponse(BaseModel):
 
 
 class ApiError(HTTPException):
-    """An HTTPException that also carries the error name the body should report."""
+    """An HTTPException that also carries the error name the body should report.
 
-    def __init__(self, status_code: int, error: str, detail: str) -> None:
-        super().__init__(status_code=status_code, detail=detail)
+    `headers` is for the few refusals a client is meant to act on rather than read: the
+    `WWW-Authenticate` a bearer door owes and the `Retry-After` a limiter offers.
+    """
+
+    def __init__(
+        self,
+        status_code: int,
+        error: str,
+        detail: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(status_code=status_code, detail=detail, headers=headers)
         self.error = error
 
 
@@ -67,6 +79,7 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (import_service.SourceNotImplementedError, 501, "source_not_implemented"),
     (import_service.UnknownSourceError, 404, "unknown_source"),
     (analysis_service.UnknownRunError, 404, "unknown_run"),
+    (analysis_service.StaleResultError, 409, "stale_result"),
     (analysis_service.AnalysisRequestError, 422, "invalid_request"),
     (analysis_service.AnalysisError, 500, "analysis_failed"),
     (engines_service.UnknownEngineError, 404, "unknown_engine"),
@@ -82,6 +95,15 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (auth_service.InvalidPasswordError, 401, "invalid_password"),
     (auth_service.WeakPasswordError, 422, "weak_password"),
     (auth_service.AuthError, 401, "unauthorized"),
+    (runners_service.UnknownRunnerError, 404, "unknown_runner"),
+    (runners_service.DuplicateRunnerError, 409, "duplicate_runner"),
+    (runners_service.RunnerLockedOutError, 429, "locked_out"),
+    (runners_service.RunnerAuthError, 401, "unauthorized"),
+    (runners_service.RunnerValidationError, 422, "invalid_runner"),
+    (streams_service.UnknownStreamError, 404, "unknown_stream"),
+    (streams_service.StreamLimitError, 409, "stream_limit"),
+    (streams_service.StreamUnavailableError, 409, "stream_unavailable"),
+    (streams_service.StreamRequestError, 422, "invalid_request"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
     (stats_service.UnknownDimensionError, 422, "unknown_dimension"),
     # The two families every service layer raises for "you asked for something that is not
@@ -117,7 +139,11 @@ def _typed_handler(status_code: int, name: str) -> Handler:
 async def _http_handler(_request: Request, exc: HTTPException) -> JSONResponse:
     name = getattr(exc, "error", None) or STATUS_NAMES.get(exc.status_code, "error")
     detail = exc.detail if isinstance(exc.detail, str) else name
-    return error_response(exc.status_code, name, detail)
+    response = error_response(exc.status_code, name, detail)
+    # Headers on an HTTPException are part of the answer, not decoration: Starlette's own
+    # handler forwards them and a 401 without its `WWW-Authenticate` is not one.
+    response.headers.update(exc.headers or {})
+    return response
 
 
 async def _validation_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:

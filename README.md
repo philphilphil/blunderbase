@@ -128,6 +128,50 @@ weights and is deliberately not bundled: mount it into the container and registe
 path. No Maia degrades rather than fails — you lose the human-move predictions, not the
 evaluation.
 
+## Running an engine on another machine
+
+A **runner** is a second process on a machine with cores to spare. It has no database and
+no web app: it dials out to Blunderbase, says which engines it has, and is handed whole
+analysis jobs. The engines it advertises appear on the Engines page bound to its name, and
+a run is a run whether it happened here or there.
+
+```bash
+blunderbase runners create gpu-box --slots 8   # on the server — the token is shown once
+```
+
+That prints a paste-ready `runner.yaml` with the token already in it. On the other machine,
+edit the engine paths and start it:
+
+```bash
+blunderbase-runner --config runner.yaml --check   # probe the engines, test the link, exit
+blunderbase-runner --config runner.yaml
+```
+
+```yaml
+server: https://blunderbase.example.com   # ws(s) is derived from this
+token: bb_rnr_…                           # or $BLUNDERBASE_RUNNER_TOKEN, which wins
+name: gpu-box
+slots: 8                                  # engine jobs at once
+
+engines:
+  - name: sf-remote
+    path: /usr/games/stockfish
+    tier: deep
+    options:
+      Threads: 8
+```
+
+`docker-compose.runner.yml` is the same thing as a container. The link carries a bearer
+token, so put HTTPS/WSS in front of the server (`docker-compose.traefik.yml`).
+`docs/runners.md` is the full reference: every yaml key, the compose walk-through, what
+`blunderbase runners list/create/revoke` do, and what each refusal means.
+
+Two things worth knowing. The socket is the transport and HTTP polling is the fallback,
+picked up automatically after a few failures and dropped again when the socket comes back.
+And a run's engine and its Maia model must be on **one** machine — the two passes share a
+process — so a runner that should do human-move predictions needs its own Maia; asking for
+a pass across two hosts is refused when you queue it, with both machines named.
+
 ## Configuration
 
 Every setting is an environment variable with a `BLUNDERBASE_` prefix
