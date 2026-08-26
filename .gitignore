@@ -6,8 +6,11 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
-data/
-engines/
+/data/
+# Downloaded engine binaries at the repo root. Anchored: unanchored it also swallowed
+# `web/src/routes/engines/`, which took that route out of git and out of Tailwind's
+# source scanning (it skips ignored paths), so its classes were never generated.
+/engines/
 *.db
 *.db-shm
 *.db-wal

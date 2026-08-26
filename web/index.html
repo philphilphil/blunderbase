@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" class="dark" data-theme="dark" style="color-scheme: dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08090b" />
+    <title>Blunderbase</title>
+    <!--
+      Theme bootstrap. Runs before the first paint so the stored preference — or the OS
+      one, when the preference is `system` — is on <html> by the time any pixel is drawn;
+      the markup above is only the fallback for a browser that never gets here. Kept in
+      step with `src/lib/ui/theme.tsx`'s `THEME_BOOTSTRAP`, which `theme.test.ts` checks.
+    -->
+    <script>
+      (function () {
+        var root = document.documentElement
+        try {
+          var stored = localStorage.getItem('blunderbase.theme')
+          var pref = stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'dark'
+          var resolved = pref === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pref
+          root.classList.remove('dark', 'light')
+          root.classList.add(resolved)
+          root.setAttribute('data-theme', pref)
+          root.style.colorScheme = resolved
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', resolved === 'light' ? '#f4f6f8' : '#08090b')
+        } catch (error) {
+          root.classList.add('dark')
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

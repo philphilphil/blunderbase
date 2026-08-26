@@ -1,0 +1,538 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+@import '@lichess-org/chessground/assets/chessground.base.css';
+@import '@lichess-org/chessground/assets/chessground.cburnett.css';
+
+/*
+ * Theming (docs/design/README.md, "Themes"). The root carries a resolved theme class —
+ * `dark` or `light` — written by the pre-hydration script in index.html and kept in sync
+ * by `lib/ui/theme.tsx`. `:root` alone holds the dark palette so that any context without
+ * the class (jsdom in tests, a stylesheet loaded standalone) still gets the flagship look;
+ * `:root.light` overrides the same names. The `dark` variant stays declared so shadcn
+ * components pulled in with `pnpm dlx shadcn add` keep working.
+ */
+@custom-variant dark (&:is(.dark *));
+
+/* --------------------------------------------------------------------------
+ * Design tokens, lifted from docs/design/Blunderbase Game View.dc.html.
+ * Raw palette first, semantic aliases second; only the semantic names are meant
+ * to be used from components. Every colour in the app resolves through a
+ * `--bb-*` name — nothing outside this file names a hex.
+ * ----------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  /* surfaces — darkest to lightest */
+  --bb-void: #08090b; /* app background */
+  --bb-panel: #0b0d10; /* nav, titlebar, cards */
+  --bb-surface: #0e1013; /* content canvas */
+  --bb-surface-2: #0e1114;
+  --bb-elevated: #12151a; /* chips, inputs */
+  --bb-elevated-2: #12161b; /* note cards */
+  --bb-raised: #14181d; /* hover */
+  --bb-raised-2: #14191f; /* nav active */
+  --bb-selected: #1a1f26; /* segmented-control active */
+  --bb-avatar: #1d232b;
+
+  /* lines */
+  --bb-hairline: #1a1e24; /* chrome dividers */
+  --bb-line: #1f242b; /* card borders */
+  --bb-edge: #22272f; /* default border */
+  --bb-edge-strong: #2c333c;
+  --bb-edge-hover: #39414c;
+  --bb-edge-input: #262d36;
+
+  /* text — most contrast to least */
+  --bb-text-bright: #fbfcfd;
+  --bb-text: #e7eaef;
+  --bb-text-2: #dfe3e8;
+  --bb-body: #c8cfd8;
+  --bb-body-2: #c1c8d1;
+  --bb-body-3: #b6bec9;
+  --bb-muted: #949ca8;
+  --bb-muted-2: #8a929d;
+  --bb-dim-3: #7d858f;
+  --bb-dim: #646c78;
+  --bb-dim-2: #5c646f;
+  --bb-faint: #4d545e;
+  --bb-faint-2: #3a4049;
+
+  /* accent + semantics */
+  --bb-accent: #3ecfd6;
+  --bb-accent-hover: #5fdde3;
+  --bb-accent-link: #7de1e7;
+  --bb-accent-ink: #062a2c; /* text on a filled accent surface */
+  --bb-blunder: #f0524a;
+  --bb-blunder-ink: #1a0605;
+  --bb-mistake: #e0872f;
+  --bb-inaccuracy: #c9b23e;
+  --bb-good: #9ec49a;
+  --bb-info: #8fb6c9;
+  --bb-brilliant: #b287ff;
+  --bb-deep: #c9b0ff;
+  --bb-otb: #c9b89a;
+
+  /* board */
+  --bb-board-light: #a7b3bb;
+  --bb-board-dark: #5c6a73;
+  --bb-coord-on-light: rgb(20 24 28 / 0.55);
+  --bb-coord-on-dark: rgb(251 252 253 / 0.45);
+
+  /* component fills the design names once and reuses everywhere */
+  --bb-track: #1c2128; /* progress / meter troughs */
+  --bb-meter: #2f3d47; /* filled meter, quiet */
+  --bb-meter-2: #3a424b; /* filled meter, quieter still */
+  --bb-row-active: #151b22; /* the move-list pair under the cursor */
+  --bb-cell: #181d23; /* engine-panel cell */
+  --bb-cell-strong: #1e242b; /* engine-panel cell, top line */
+  --bb-eval-track: #1a1e24;
+  --bb-eval-white: #dfe3e8;
+  --bb-eval-black: #20242a;
+  --bb-graph-bg: #0e1216;
+  --bb-graph-grid: #1a1f25;
+  --bb-graph-axis: #2a313a;
+  --bb-graph-tick: #454c56;
+  --bb-card-grad-a: #12181d;
+  --bb-card-grad-b: #0e1216;
+  --bb-chip-neutral: #141619;
+  --bb-chip-info: #141922;
+  --bb-chip-info-edge: #23303c;
+  --bb-chip-good: #16191a;
+  --bb-chip-good-edge: #2b3330;
+  --bb-chip-otb: #1a1816;
+  --bb-chip-otb-edge: #34302a;
+  --bb-scroll-thumb: #252b33;
+  --bb-shadow: rgb(0 0 0 / 0.9);
+
+  /* radii — the design uses 4 / 5 / 6 / 8 / 9 / 12 */
+  --radius: 0.5rem;
+
+  /* shadcn semantic layer, mapped onto the palette above */
+  --background: var(--bb-void);
+  --foreground: var(--bb-text);
+  --card: var(--bb-panel);
+  --card-foreground: var(--bb-text);
+  --popover: var(--bb-elevated);
+  --popover-foreground: var(--bb-text);
+  --primary: var(--bb-accent);
+  --primary-foreground: var(--bb-accent-ink);
+  --secondary: var(--bb-elevated);
+  --secondary-foreground: var(--bb-text);
+  --muted: var(--bb-raised);
+  --muted-foreground: var(--bb-muted);
+  --accent: var(--bb-raised);
+  --accent-foreground: var(--bb-text);
+  --destructive: var(--bb-blunder);
+  --destructive-foreground: var(--bb-blunder-ink);
+  --border: var(--bb-edge);
+  --input: var(--bb-edge-input);
+  --ring: var(--bb-accent);
+
+  /* chart series — teal-led, matching the eval/rating graphs in the design */
+  --chart-1: var(--bb-accent);
+  --chart-2: var(--bb-brilliant);
+  --chart-3: var(--bb-info);
+  --chart-4: var(--bb-mistake);
+  --chart-5: var(--bb-good);
+
+  --sidebar: var(--bb-panel);
+  --sidebar-foreground: var(--bb-muted);
+  --sidebar-primary: var(--bb-accent);
+  --sidebar-primary-foreground: var(--bb-accent-ink);
+  --sidebar-accent: var(--bb-raised-2);
+  --sidebar-accent-foreground: var(--bb-text);
+  --sidebar-border: var(--bb-hairline);
+  --sidebar-ring: var(--bb-accent);
+}
+
+/* --------------------------------------------------------------------------
+ * Light theme — the same design language on a light ground, not a new one.
+ * The neutral ramp is inverted by contrast rank rather than by hue, so a token
+ * that was the quietest label in the dark is still the quietest label here; the
+ * teal and purple keep their identity and are darkened only as far as WCAG AA
+ * on `--bb-void` demands (accent 4.65:1, deep 5.01:1, blunder 5.05:1). Only the
+ * raw palette is redefined — every alias below picks the new values up.
+ * ----------------------------------------------------------------------- */
+:root.light {
+  color-scheme: light;
+
+  --bb-void: #f4f6f8;
+  --bb-panel: #ffffff;
+  --bb-surface: #eef1f5;
+  --bb-surface-2: #edf0f4;
+  --bb-elevated: #e9edf2;
+  --bb-elevated-2: #f2f5f8;
+  --bb-raised: #e4e9ef;
+  --bb-raised-2: #e2e7ee;
+  --bb-selected: #d9e0e8;
+  --bb-avatar: #d3dbe4;
+
+  --bb-hairline: #e3e7ec;
+  --bb-line: #dce1e8;
+  --bb-edge: #d1d8e0;
+  --bb-edge-strong: #bcc5cf;
+  --bb-edge-hover: #98a2ae;
+  --bb-edge-input: #c8d0da;
+
+  --bb-text-bright: #05070a;
+  --bb-text: #12161c;
+  --bb-text-2: #1a1f26;
+  --bb-body: #2b323b;
+  --bb-body-2: #333a44;
+  --bb-body-3: #3f4751;
+  --bb-muted: #4f5761;
+  --bb-muted-2: #565e69;
+  --bb-dim-3: #5e6671;
+  --bb-dim: #626a75;
+  --bb-dim-2: #68707b;
+  --bb-faint: #7e8792;
+  --bb-faint-2: #949da8;
+
+  --bb-accent: #0a7b82;
+  --bb-accent-hover: #086a70;
+  --bb-accent-link: #096f75;
+  --bb-accent-ink: #ffffff;
+  --bb-blunder: #c62f26;
+  --bb-blunder-ink: #ffffff;
+  --bb-mistake: #96590a;
+  --bb-inaccuracy: #77650c;
+  --bb-good: #2f7343;
+  --bb-info: #33697f;
+  --bb-brilliant: #6d34d6;
+  --bb-deep: #7b4cd8;
+  --bb-otb: #7a6440;
+
+  --bb-board-light: #e9edf0;
+  --bb-board-dark: #8fa0ac;
+  --bb-coord-on-light: rgb(20 24 28 / 0.5);
+  --bb-coord-on-dark: rgb(255 255 255 / 0.8);
+
+  --bb-track: #dbe1e8;
+  --bb-meter: #a8b8c4;
+  --bb-meter-2: #99a3ae;
+  --bb-row-active: #e6ebf1;
+  --bb-cell: #eaeef3;
+  --bb-cell-strong: #dfe5ec;
+  --bb-eval-track: #d5dbe2;
+  --bb-eval-white: #ffffff;
+  --bb-eval-black: #4b545e;
+  --bb-graph-bg: #eef1f5;
+  --bb-graph-grid: #dfe4ea;
+  --bb-graph-axis: #c6ced7;
+  --bb-graph-tick: #666e79;
+  --bb-card-grad-a: #f8fafc;
+  --bb-card-grad-b: #eef2f6;
+  --bb-chip-neutral: #edeff2;
+  --bb-chip-info: #e6eef4;
+  --bb-chip-info-edge: #b9cdda;
+  --bb-chip-good: #e6f1e9;
+  --bb-chip-good-edge: #b7d2bf;
+  --bb-chip-otb: #f2ece2;
+  --bb-chip-otb-edge: #d6c9b2;
+  --bb-scroll-thumb: #c5ccd5;
+  --bb-shadow: rgb(15 23 32 / 0.22);
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', 'Geist', ui-sans-serif, 'Helvetica Neue', Helvetica, sans-serif;
+  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Radii in rem so they grow with the root scale like everything else. */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.375rem; /* 6px */
+  --radius-lg: 0.5rem; /* 8px */
+  --radius-xl: 0.5625rem; /* 9px */
+  --radius-2xl: 0.75rem; /* 12px */
+
+  /* surfaces */
+  --color-void: var(--bb-void);
+  --color-panel: var(--bb-panel);
+  --color-surface: var(--bb-surface);
+  --color-surface-2: var(--bb-surface-2);
+  --color-elevated: var(--bb-elevated);
+  --color-elevated-2: var(--bb-elevated-2);
+  --color-raised: var(--bb-raised);
+  --color-raised-2: var(--bb-raised-2);
+  --color-selected: var(--bb-selected);
+  --color-avatar: var(--bb-avatar);
+
+  /* lines */
+  --color-hairline: var(--bb-hairline);
+  --color-line: var(--bb-line);
+  --color-edge: var(--bb-edge);
+  --color-edge-strong: var(--bb-edge-strong);
+  --color-edge-hover: var(--bb-edge-hover);
+
+  /* text */
+  --color-bright: var(--bb-text-bright);
+  --color-ink: var(--bb-text);
+  --color-ink-2: var(--bb-text-2);
+  --color-body: var(--bb-body);
+  --color-body-2: var(--bb-body-2);
+  --color-body-3: var(--bb-body-3);
+  --color-soft: var(--bb-muted);
+  --color-soft-2: var(--bb-muted-2);
+  --color-dim: var(--bb-dim);
+  --color-dim-2: var(--bb-dim-2);
+  --color-dim-3: var(--bb-dim-3);
+  --color-faint: var(--bb-faint);
+  --color-faint-2: var(--bb-faint-2);
+
+  /* semantics */
+  --color-accent-teal: var(--bb-accent);
+  --color-accent-hover: var(--bb-accent-hover);
+  --color-accent-link: var(--bb-accent-link);
+  --color-accent-ink: var(--bb-accent-ink);
+  --color-blunder: var(--bb-blunder);
+  --color-blunder-ink: var(--bb-blunder-ink);
+  --color-mistake: var(--bb-mistake);
+  --color-inaccuracy: var(--bb-inaccuracy);
+  --color-good: var(--bb-good);
+  --color-info: var(--bb-info);
+  --color-brilliant: var(--bb-brilliant);
+  --color-deep: var(--bb-deep);
+  --color-otb: var(--bb-otb);
+  --color-board-light: var(--bb-board-light);
+  --color-board-dark: var(--bb-board-dark);
+
+  /* component fills */
+  --color-track: var(--bb-track);
+  --color-meter: var(--bb-meter);
+  --color-meter-2: var(--bb-meter-2);
+  --color-row-active: var(--bb-row-active);
+  --color-cell: var(--bb-cell);
+  --color-cell-strong: var(--bb-cell-strong);
+  --color-eval-track: var(--bb-eval-track);
+  --color-eval-white: var(--bb-eval-white);
+  --color-eval-black: var(--bb-eval-black);
+  --color-graph-bg: var(--bb-graph-bg);
+  --color-chip-neutral: var(--bb-chip-neutral);
+  --color-chip-info: var(--bb-chip-info);
+  --color-chip-info-edge: var(--bb-chip-info-edge);
+  --color-chip-good: var(--bb-chip-good);
+  --color-chip-good-edge: var(--bb-chip-good-edge);
+  --color-chip-otb: var(--bb-chip-otb);
+  --color-chip-otb-edge: var(--bb-chip-otb-edge);
+
+  /* shadcn aliases */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  /*
+   * Global scale (docs/design/README.md, "120 % as the base scale"): the owner reads the
+   * app at 120 % browser zoom, so 120 % is what the app ships at. Every size in the code
+   * base is expressed in `rem`/`em` or a Tailwind scale utility, which makes this one
+   * declaration the single knob — no `zoom`, no `transform`. Media-query breakpoints are
+   * deliberately *not* scaled: `rem` in a media query resolves against the browser's
+   * initial font size, so `xl:` still means 1280 physical pixels.
+   */
+  html {
+    font-size: 120%;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--bb-void);
+    color: var(--bb-text);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem; /* the design's 13px, at the app's scale */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* every eval, rating, ECO and percentage is tabular (design 1c, "Type & numerals") */
+  .font-mono,
+  code,
+  kbd,
+  samp {
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    color: var(--bb-accent);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--bb-accent-link);
+  }
+
+  ::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.5rem;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--bb-scroll-thumb);
+    border-radius: 0.25rem;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--bb-edge-strong);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--bb-scroll-thumb) transparent;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--bb-accent) 24%, transparent);
+    color: var(--bb-text-bright);
+  }
+
+  :focus-visible {
+    outline: 0.125rem solid color-mix(in srgb, var(--bb-accent) 55%, transparent);
+    outline-offset: 0.0625rem;
+  }
+}
+
+@layer utilities {
+  /* the panel idiom the design repeats: --bb-panel on a 1px --bb-line, 9px radius */
+  .bb-card {
+    background: var(--bb-panel);
+    border: 1px solid var(--bb-line);
+    border-radius: 0.5625rem;
+  }
+  .bb-chip {
+    background: var(--bb-elevated);
+    border: 1px solid var(--bb-edge);
+    border-radius: 0.375rem;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * chessground board theme — the design's two square colours (1c, "Board
+ * coordinates & square states") instead of the shipped brown set. Every overlay
+ * is mixed off `--bb-accent` / `--bb-blunder` &c, so the board follows the theme
+ * without a second stylesheet.
+ * ----------------------------------------------------------------------- */
+cg-board {
+  background-color: var(--bb-board-light);
+  background-image: conic-gradient(
+    var(--bb-board-dark) 25%,
+    var(--bb-board-light) 25% 50%,
+    var(--bb-board-dark) 50% 75%,
+    var(--bb-board-light) 75%
+  );
+  background-size: 25% 25%;
+}
+
+cg-board square.last-move {
+  background-color: color-mix(in srgb, var(--bb-accent) 26%, transparent);
+  box-shadow: inset 0 0 0 0.125rem color-mix(in srgb, var(--bb-accent) 50%, transparent);
+}
+cg-board square.selected {
+  background-color: color-mix(in srgb, var(--bb-accent) 34%, transparent);
+}
+cg-board square.move-dest {
+  background: radial-gradient(
+    color-mix(in srgb, var(--bb-accent) 55%, transparent) 22%,
+    transparent 22%
+  );
+}
+cg-board square.oc.move-dest {
+  background: radial-gradient(
+    transparent 0 78%,
+    color-mix(in srgb, var(--bb-accent) 40%, transparent) 78%
+  );
+}
+cg-board square.check {
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--bb-blunder) 95%, transparent) 0%,
+    transparent 72%
+  );
+}
+
+/* custom highlight classes the Board component hands to chessground */
+cg-board square.bb-blunder {
+  box-shadow: inset 0 0 0 0.15625rem color-mix(in srgb, var(--bb-blunder) 85%, transparent);
+}
+cg-board square.bb-mistake {
+  box-shadow: inset 0 0 0 0.15625rem color-mix(in srgb, var(--bb-mistake) 85%, transparent);
+}
+cg-board square.bb-inaccuracy {
+  box-shadow: inset 0 0 0 0.15625rem color-mix(in srgb, var(--bb-inaccuracy) 85%, transparent);
+}
+cg-board square.bb-engine::after {
+  content: '';
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bb-accent) 55%, transparent);
+}
+cg-board square.bb-maia::after {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  border: 0.125rem solid color-mix(in srgb, var(--bb-brilliant) 70%, transparent);
+}
+
+.cg-wrap coords {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+}
+.orientation-white .ranks :nth-child(odd),
+.orientation-white .files :nth-child(even),
+.orientation-black .ranks :nth-child(even),
+.orientation-black .files :nth-child(odd) {
+  color: var(--bb-coord-on-light);
+}
+.orientation-white .ranks :nth-child(even),
+.orientation-white .files :nth-child(odd),
+.orientation-black .ranks :nth-child(odd),
+.orientation-black .files :nth-child(even) {
+  color: var(--bb-coord-on-dark);
+}

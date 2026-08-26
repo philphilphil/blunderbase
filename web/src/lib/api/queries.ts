@@ -1,0 +1,366 @@
+/**
+ * TanStack Query bindings over `endpoints.ts`.
+ *
+ * Nothing here polls: freshness comes from the `/events` socket, which invalidates these
+ * keys (see `src/lib/events/invalidation.ts`). The one exception is the queue widget,
+ * which keeps a slow poll as a floor for when the socket is down.
+ */
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationOptions,
+  type UseQueryOptions,
+} from '@tanstack/react-query'
+
+import * as api from './endpoints'
+import { queryKeys } from './keys'
+import type {
+  AnalysisRequest,
+  EngineCreate,
+  EngineUpdate,
+  GameFilters,
+  ImportRequest,
+  NoteCreate,
+  NoteUpdate,
+  SampleRequest,
+  Source,
+  Tier,
+} from './types'
+
+type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>
+
+// --- games ----------------------------------------------------------------
+
+export function useGames(query: api.GameQuery = {}, options?: Options<Awaited<ReturnType<typeof api.listGames>>>) {
+  return useQuery({
+    queryKey: queryKeys.gameList(query),
+    queryFn: () => api.listGames(query),
+    ...options,
+  })
+}
+
+export function useGameCards(
+  query: api.GameQuery = {},
+  options?: Options<Awaited<ReturnType<typeof api.listGameCards>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.gameCards(query),
+    queryFn: () => api.listGameCards(query),
+    ...options,
+  })
+}
+
+export function useGame(
+  id: number,
+  query: api.GameDetailQuery = {},
+  options?: Options<Awaited<ReturnType<typeof api.getGame>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.gameDetail(id, query),
+    queryFn: () => api.getGame(id, query),
+    ...options,
+  })
+}
+
+// --- analysis -------------------------------------------------------------
+
+export function useQueueStatus(options?: Options<Awaited<ReturnType<typeof api.getQueue>>>) {
+  return useQuery({
+    queryKey: queryKeys.queue(),
+    queryFn: api.getQueue,
+    refetchInterval: 15_000,
+    ...options,
+  })
+}
+
+export function useRuns(gameId: number, tier?: Tier, options?: Options<Awaited<ReturnType<typeof api.listRuns>>>) {
+  return useQuery({
+    queryKey: queryKeys.runs(gameId, tier),
+    queryFn: () => api.listRuns(gameId, tier),
+    ...options,
+  })
+}
+
+export function useRunEvals(
+  runId: number,
+  window: { ply_start?: number; ply_end?: number } = {},
+  options?: Options<Awaited<ReturnType<typeof api.getRunEvals>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.runEvals(runId, window),
+    queryFn: () => api.getRunEvals(runId, window),
+    ...options,
+  })
+}
+
+export function useRequestAnalysis(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.requestAnalysis>>, Error, AnalysisRequest>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: AnalysisRequest) => api.requestAnalysis(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+// --- import ---------------------------------------------------------------
+
+export function useImportJobs(
+  query: { source?: Source; limit?: number } = {},
+  options?: Options<Awaited<ReturnType<typeof api.listImportJobs>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.importJobs(query),
+    queryFn: () => api.listImportJobs(query),
+    ...options,
+  })
+}
+
+export function useStartImport(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.startImport>>,
+    Error,
+    { source: Source; body?: ImportRequest }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ source, body }: { source: Source; body?: ImportRequest }) =>
+      api.startImport(source, body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.imports() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useUploadPgn(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.uploadPgn>>,
+    Error,
+    { pgn: string; wait?: boolean; max_games?: number }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ pgn, ...query }: { pgn: string; wait?: boolean; max_games?: number }) =>
+      api.uploadPgn(pgn, query),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.imports() })
+      void client.invalidateQueries({ queryKey: queryKeys.games() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+// --- explorer -------------------------------------------------------------
+
+export function useExplorer(
+  query: api.ExplorerQuery = {},
+  options?: Options<Awaited<ReturnType<typeof api.explore>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.explorerTree(query),
+    queryFn: () => api.explore(query),
+    ...options,
+  })
+}
+
+export function usePositionOccurrences(
+  fen: string,
+  query: { color?: 'white' | 'black'; limit?: number } = {},
+  options?: Options<Awaited<ReturnType<typeof api.findPositions>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.explorerPositions(fen, query),
+    queryFn: () => api.findPositions(fen, query),
+    ...options,
+  })
+}
+
+// --- stats ----------------------------------------------------------------
+
+export function useDimensions(options?: Options<Awaited<ReturnType<typeof api.listDimensions>>>) {
+  return useQuery({ queryKey: queryKeys.statsDimensions(), queryFn: api.listDimensions, ...options })
+}
+
+export function useProfile(options?: Options<Awaited<ReturnType<typeof api.getProfile>>>) {
+  return useQuery({ queryKey: queryKeys.statsProfile(), queryFn: api.getProfile, ...options })
+}
+
+export function useStats(
+  dimension: string,
+  filters: GameFilters = {},
+  options?: Options<Awaited<ReturnType<typeof api.getStats>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.statsDimension(dimension, filters),
+    queryFn: () => api.getStats(dimension, filters),
+    ...options,
+  })
+}
+
+export function useWorstMoments(
+  query: GameFilters & { days?: number; amount?: number } = {},
+  options?: Options<Awaited<ReturnType<typeof api.getWorstMoments>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.worstMoments(query),
+    queryFn: () => api.getWorstMoments(query),
+    ...options,
+  })
+}
+
+// --- engines --------------------------------------------------------------
+
+export function useEngines(
+  enabledOnly = false,
+  options?: Options<Awaited<ReturnType<typeof api.listEngines>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.engineList(enabledOnly),
+    queryFn: () => api.listEngines(enabledOnly),
+    ...options,
+  })
+}
+
+export function useTierStatus(options?: Options<Awaited<ReturnType<typeof api.listTierStatus>>>) {
+  return useQuery({ queryKey: queryKeys.engineTiers(), queryFn: api.listTierStatus, ...options })
+}
+
+export function useAddEngine(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.addEngine>>, Error, EngineCreate>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: EngineCreate) => api.addEngine(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.engines() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useUpdateEngine(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.updateEngine>>,
+    Error,
+    { id: number; body: EngineUpdate }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: EngineUpdate }) => api.updateEngine(id, body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.engines() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useDeleteEngine(
+  options?: UseMutationOptions<void, Error, number>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteEngine(id),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.engines() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useTestRunEngine(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.testRunEngine>>,
+    Error,
+    { id: number; body?: SampleRequest }
+  >,
+) {
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body?: SampleRequest }) => api.testRunEngine(id, body),
+    ...options,
+  })
+}
+
+// --- notes ----------------------------------------------------------------
+
+export function useNotes(
+  query: api.NoteQuery = {},
+  options?: Options<Awaited<ReturnType<typeof api.searchNotes>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.noteList(query),
+    queryFn: () => api.searchNotes(query),
+    ...options,
+  })
+}
+
+export function useNoteTags(options?: Options<Awaited<ReturnType<typeof api.listTags>>>) {
+  return useQuery({ queryKey: queryKeys.noteTags(), queryFn: api.listTags, ...options })
+}
+
+export function useSaveNote(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.saveNote>>, Error, NoteCreate>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: NoteCreate) => api.saveNote(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.notes() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useUpdateNote(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.updateNote>>,
+    Error,
+    { id: number; body: NoteUpdate }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: NoteUpdate }) => api.updateNote(id, body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.notes() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+// --- live -----------------------------------------------------------------
+
+/**
+ * The live session as the server holds it. The socket writes `live.updated` payloads
+ * straight into this key, so the fetch happens once on load and once per reconnect.
+ */
+export function useLiveState(options?: Options<Awaited<ReturnType<typeof api.getLiveState>>>) {
+  return useQuery({ queryKey: queryKeys.live(), queryFn: api.getLiveState, ...options })
+}
+
+// --- meta -----------------------------------------------------------------
+
+export function useHealth(options?: Options<Awaited<ReturnType<typeof api.health>>>) {
+  return useQuery({
+    queryKey: queryKeys.health(),
+    queryFn: api.health,
+    refetchInterval: 30_000,
+    retry: false,
+    ...options,
+  })
+}
