@@ -287,6 +287,29 @@ describe('GamePage', () => {
     )
   })
 
+  it('cannot be pressed into two deep passes while the run list catches up', async () => {
+    // `POST /analysis` never dedupes, and `/analysis/runs` only learns about the run a
+    // debounced invalidation and a refetch later. Between the two the trigger must
+    // already be gone, or an impatient second click queues a whole second pass.
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const trigger = screen.getByRole('button', { name: 'Request deep analysis' })
+    await user.click(trigger)
+    await waitFor(() => expect(posted).toHaveLength(1))
+
+    // The run list still answers with [] — only the mutation's own run stands in.
+    expect(screen.queryByRole('button', { name: 'Request deep analysis' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Quick' })).toBeNull()
+    expect(screen.getByText('run #21')).toBeInTheDocument()
+
+    // The button element the user was pointing at is detached; clicking it again is not
+    // a second request.
+    await user.click(trigger).catch(() => {})
+    expect(posted).toHaveLength(1)
+  })
+
   it('follows only the run the card is tracking through the progress frames', async () => {
     const user = userEvent.setup()
     renderPage()

@@ -135,6 +135,35 @@ describe('ImportPage', () => {
     expect(screen.getByRole('button', { name: /Sync/ })).toBeInTheDocument()
   })
 
+  it('never seeds the username from a failed sync, whose message is the exception', async () => {
+    // `services/import_service.py` overwrites the job's message with the exception text
+    // when a sync throws, so a failed job's message is an error string, not a username —
+    // seeding the field with it would post `AdapterError: …` as the username on Connect.
+    stubFetch({
+      '/api/import/jobs': [
+        {
+          ...JOB,
+          status: 'failed',
+          account_id: null,
+          games_imported: 0,
+          games_seen: 0,
+          message: 'AdapterError: lichess answered 404 for user fooo',
+        },
+      ],
+      '/api/stats/profile': { accounts: [], ratings: [], volume: {} },
+      '/api/games': { games: [], total: 0, limit: 1, offset: 0 },
+    })
+    renderPage(<ImportPage />)
+
+    // The history has the job, so the query has resolved and any seeding has happened.
+    expect(await screen.findByText(/lichess answered 404/)).toBeInTheDocument()
+    const username = screen.getByLabelText<HTMLInputElement>('Username', {
+      selector: '#lichess-username',
+    })
+    expect(username.value).toBe('')
+    expect(username).toHaveAttribute('placeholder', 'lichess username')
+  })
+
   it('says so when nothing has ever been synced', async () => {
     stubFetch({
       '/api/import/jobs': [],

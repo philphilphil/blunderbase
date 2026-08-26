@@ -81,6 +81,32 @@ Libraries, not wheel-reinvention: chessground (board), Recharts via shadcn/ui
 chart components (eval graph, rating graphs, stats dashboards); custom SVG
 only for tiny sparklines/board-overlay glyphs where a chart lib doesn't fit.
 
+## Deferred
+
+Places the frontend knowingly departs from the design file because the data
+model behind it does not exist. Each ships the closest thing that is true;
+none of them is a layout problem, so none is fixable in `web/`.
+
+- **`Acc` and `ACPL`** (design 2b's table, 2c's results card and move tree, 2d's
+  KPI row, 2a's game cards) — nothing in the pipeline computes an accuracy score
+  or centipawn loss; `services/stats.py` aggregates win percentage given away.
+  The slots carry that instead (`Worst`, `Win % given away`, `Blunder rate`), so
+  the columns read in real units rather than invented ones. Needs a backend
+  accuracy/ACPL model.
+- **The `Standard · d32` tier** (design 1a's header, 1c's tier row) —
+  `db/enums.py: Tier` is `quick | deep`, so the teal middle badge has nothing to
+  render for. Adding it is a backend scope change (a third budget, its own engine
+  binding and queue priority), not a badge.
+- **The `Variations` and `Book` move-list tabs** (design 1a) — `/games/{id}`
+  sends a flat move list with no variation tree and takes none, and `Book` is the
+  per-position question `/explorer` already answers on a screen with a board to
+  walk it. The slot carries `Flagged`; the design's `PGN` affordance is
+  implemented. Rationale in `MoveList.tsx`'s docblock.
+- **The sidebar footer's `2.4 GB / 3.8 GB`** (every design frame) — no endpoint
+  reports disk usage. The same three-line treatment carries deep-analysis
+  coverage of the library, which is the "how full is this database" question the
+  API can answer. Rationale in `SideNav.tsx`'s docblock.
+
 ## Live behavior (spec addition, backend follow-up pending)
 
 - Frontend subscribes to WebSocket `/events` and refetches on events
