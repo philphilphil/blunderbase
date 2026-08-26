@@ -2,7 +2,17 @@
 
 from fastapi import APIRouter
 
-from backend.api.routes import analysis, engines, events, explorer, games, imports, notes, stats
+from backend.api.routes import (
+    analysis,
+    engines,
+    events,
+    explorer,
+    games,
+    imports,
+    live,
+    notes,
+    stats,
+)
 
 ROUTERS: tuple[APIRouter, ...] = (
     games.router,
@@ -12,6 +22,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     stats.router,
     engines.router,
     notes.router,
+    live.router,
     events.router,
 )
 

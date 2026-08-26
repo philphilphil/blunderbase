@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,10 +25,12 @@ from backend.db.models import Account, AnalysisRun, Engine, Game, GamePosition, 
 from backend.mcp import server as mcp_server
 from backend.mcp.server import build_server
 from backend.services import analysis as analysis_service
+from backend.services import live as live_service
 from backend.services.import_service import run_import
 
 OWNER = "blunderbase"
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+FRENCH = "rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
 
 # Every tool the design spec asks the coach surface for.
 TOOLS = {
@@ -46,6 +48,11 @@ TOOLS = {
     "analyze_position",
     "save_note",
     "search_notes",
+    "show_game",
+    "show_position",
+    "make_move",
+    "annotate",
+    "get_live_state",
 }
 
 # What "token-conscious" has to mean in bytes: five analysed games, with their eval
@@ -825,3 +832,137 @@ async def test_search_notes_narrows_by_date(coach: MCPServer, analysed: dict[str
     await call(coach, "save_note", text="today's note")
     assert (await call(coach, "search_notes", since="1d"))["count"] == 1
     assert (await call(coach, "search_notes", until="2020-01-01"))["count"] == 0
+
+
+# --- live session ----------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def empty_live_board() -> Iterator[None]:
+    """The live board is process-wide, so no test inherits the one before it."""
+    live_service.clear()
+    yield
+    live_service.clear()
+
+
+async def test_show_position_puts_a_fen_on_the_live_board(coach: MCPServer) -> None:
+    payload = await call(coach, "show_position", fen=FRENCH)
+    assert payload["active"] is True
+    assert payload["fen"] == FRENCH
+    assert payload["turn"] == "white"
+    assert live_service.get_state()["fen"] == FRENCH
+
+
+async def test_show_game_puts_a_stored_game_on_the_live_board(
+    coach: MCPServer, library: dict[str, Game]
+) -> None:
+    game = library["qg000001"]
+    payload = await call(coach, "show_game", game_id=game.id, ply=4)
+    assert payload["game_id"] == game.id
+    assert payload["ply"] == 4
+    assert payload["last_move"] == game.moves_uci[3]
+
+
+async def test_make_move_advances_the_live_board(coach: MCPServer) -> None:
+    await call(coach, "show_position", fen=START_FEN)
+    payload = await call(coach, "make_move", uci="e2e4")
+    assert payload["last_move"] == "e2e4"
+    assert payload["moves"] == ["e2e4"]
+    assert payload["turn"] == "black"
+
+
+async def test_annotate_draws_on_the_live_board(coach: MCPServer) -> None:
+    await call(coach, "show_position", fen=START_FEN)
+    payload = await call(
+        coach, "annotate", arrows=["e2e4", "g1f3:blue"], squares=["d5:red"], text="centre first"
+    )
+    assert payload["arrows"] == [
+        {"from": "e2", "to": "e4", "color": "green"},
+        {"from": "g1", "to": "f3", "color": "blue"},
+    ]
+    assert payload["squares"] == [{"square": "d5", "color": "red"}]
+    assert payload["text"] == "centre first"
+
+
+async def test_get_live_state_reads_the_board_back_with_the_viewer_count(
+    coach: MCPServer,
+) -> None:
+    await call(coach, "show_position", fen=FRENCH)
+    live_service.viewer_joined()
+    try:
+        payload = await call(coach, "get_live_state")
+    finally:
+        live_service.viewer_left()
+    assert payload["fen"] == FRENCH
+    assert payload["viewer_count"] == 1
+
+
+async def test_the_live_board_needs_no_arguments_to_be_read(coach: MCPServer) -> None:
+    listing = await tools_of(coach)
+    required = {tool.name: set(tool.input_schema.get("required", ())) for tool in listing}
+    assert required["get_live_state"] == set()
+    assert required["show_game"] == {"game_id"}
+    assert required["show_position"] == {"fen"}
+    assert required["make_move"] == {"uci"}
+    assert required["annotate"] == set()
+
+
+async def test_a_live_payload_is_one_compact_json_block(coach: MCPServer) -> None:
+    result = await invoke(coach, "show_position", {"fen": FRENCH})
+    text = text_of(result)
+    assert text.startswith("{") and "\n" not in text
+    assert ", " not in text and '": ' not in text
+    json.loads(text)
+
+
+async def test_an_illegal_live_move_is_a_structured_error(coach: MCPServer) -> None:
+    await call(coach, "show_position", fen=START_FEN)
+    payload = await failure(coach, "make_move", uci="e2e5")
+    assert payload["error"] == "illegal_move"
+    assert live_service.get_state()["fen"] == START_FEN
+
+
+async def test_moving_before_showing_anything_says_which_tool_to_call(
+    coach: MCPServer,
+) -> None:
+    payload = await failure(coach, "make_move", uci="e2e4")
+    assert payload["error"] == "no_live_position"
+    assert "show_position" in payload["message"]
+
+
+async def test_a_live_position_that_is_not_one_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "show_position", fen="not a position")
+    assert payload["error"] == "bad_fen"
+    assert live_service.get_state()["active"] is False
+
+
+async def test_showing_a_game_that_is_not_there_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "show_game", game_id=9999)
+    assert payload["error"] == "unknown_game"
+
+
+async def test_a_ply_past_the_end_of_the_game_is_a_structured_error(
+    coach: MCPServer, library: dict[str, Game]
+) -> None:
+    game = library["qg000001"]
+    payload = await failure(coach, "show_game", game_id=game.id, ply=game.ply_count + 1)
+    assert payload["error"] == "bad_argument"
+
+
+async def test_a_mark_that_is_not_a_square_is_a_structured_error(coach: MCPServer) -> None:
+    await call(coach, "show_position", fen=START_FEN)
+    payload = await failure(coach, "annotate", squares=["j9"])
+    assert payload["error"] == "bad_argument"
+
+
+async def test_driving_the_live_board_never_touches_a_stored_game(
+    coach: MCPServer, library: dict[str, Game], session: Session
+) -> None:
+    game = library["qg000001"]
+    moves = list(game.moves_uci)
+    await call(coach, "show_game", game_id=game.id, ply=0)
+    await call(coach, "make_move", uci="a2a3" if moves[0] != "a2a3" else "h2h3")
+    session.expire_all()
+    stored = session.get(Game, game.id)
+    assert stored is not None
+    assert stored.moves_uci == moves

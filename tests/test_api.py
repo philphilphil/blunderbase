@@ -33,6 +33,7 @@ from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval, Note
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
 from backend.services import import_service
+from backend.services import live as live_service
 from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
 
 OWNER = "blunderbase"
@@ -66,6 +67,14 @@ def engine_command(tmp_path: Path) -> str:
             "bestmove": "e2e4",
         },
     )
+
+
+@pytest.fixture(autouse=True)
+def empty_live_board() -> Iterator[None]:
+    """The live board is process-wide state, so no test inherits the one before it."""
+    live_service.clear()
+    yield
+    live_service.clear()
 
 
 @pytest.fixture()
@@ -811,6 +820,60 @@ def test_the_events_socket_sees_a_run_being_queued(
     assert event["run_id"] == run["id"]
     assert event["game_id"] == seeded["game_id"]
     assert event["tier"] == "deep"
+
+
+def test_the_events_socket_sees_a_note_being_written(api: TestClient) -> None:
+    """A note the coach saves over MCP has to reach the open UI without a refresh."""
+    with api.websocket_connect("/events") as socket:
+        written = api.post("/notes", json={"text": "watch the c-file", "tags": ["plan"]}).json()
+        event = _drain(socket, "note.created")[-1]
+
+    assert event["note_id"] == written["id"]
+    assert event["text"] == "watch the c-file"
+    assert event["tags"] == ["plan"]
+
+
+def test_the_events_socket_sees_the_live_board_move(api: TestClient) -> None:
+    with api.websocket_connect("/events") as socket:
+        live_service.show_position(FRENCH)
+        event = _drain(socket, "live.updated")[-1]
+
+    assert event["fen"] == FRENCH
+    assert event["active"] is True
+    # The whole state, so a page that has the socket never needs to fetch /live again.
+    assert event["viewer_count"] == 1
+
+
+# --- /live -----------------------------------------------------------------
+
+
+def test_the_live_route_answers_an_empty_board(api: TestClient) -> None:
+    state = api.get("/live").json()
+    assert state["active"] is False
+    assert state["fen"] is None
+    assert state["viewer_count"] == 0
+
+
+def test_the_live_route_reflects_what_the_coach_showed(api: TestClient) -> None:
+    live_service.show_position(FRENCH)
+    live_service.annotate(arrows=["e2e4:blue"], squares=["d5"], text="strike the centre")
+
+    state = api.get("/live").json()
+    assert state["active"] is True
+    assert state["fen"] == FRENCH
+    assert state["turn"] == "white"
+    assert state["arrows"] == [{"from": "e2", "to": "e4", "color": "blue"}]
+    assert state["squares"] == [{"square": "d5", "color": "yellow"}]
+    assert state["text"] == "strike the centre"
+    assert state["updated_at"]
+
+
+def test_the_live_route_counts_the_sockets_that_are_watching(api: TestClient) -> None:
+    live_service.show_position(FRENCH)
+    assert api.get("/live").json()["viewer_count"] == 0
+    with api.websocket_connect("/events"):
+        assert api.get("/live").json()["viewer_count"] == 1
+    assert api.get("/live").json()["viewer_count"] == 0
 
 
 def _drain(socket: Any, until: str, limit: int = 20) -> list[dict[str, Any]]:

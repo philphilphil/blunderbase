@@ -22,6 +22,7 @@ from backend.mcp.errors import (
 from backend.services import analysis as analysis_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
+from backend.services import live as live_service
 from backend.services import notes as notes_service
 from backend.services import stats as stats_service
 from backend.services.games import GameFilters
@@ -74,7 +75,10 @@ of it a move gave away, and a classification only appears on an inaccuracy, mist
 blunder. Start wide (get_last_games, get_worst_recent_moments, get_stats) and drill down
 (get_game, opening_explorer, find_positions) rather than pulling whole games first.
 Deep analysis is queued, not immediate: request_analysis returns a run id to poll.
-Write what you learn down with save_note, and open a session with search_notes."""
+Write what you learn down with save_note, and open a session with search_notes.
+The owner may have Blunderbase open beside this chat: show_game, show_position, make_move
+and annotate drive the board they are looking at, so show a position rather than spelling
+one out. Those moves are an analysis board — they never change a stored game."""
 
 STATS_DESCRIPTION = (
     "One aggregation over the owner's games. `dimension` is one of: "
@@ -133,6 +137,7 @@ def build_server(
     _register_insight(server, coach)
     _register_analysis(server, coach)
     _register_memory(server, coach)
+    _register_live(server, coach)
     return server
 
 
@@ -564,6 +569,64 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
             if not any((query, tags, since, until, game_id, fen)):
                 payload["tags"] = notes_service.list_tags(session)
         return payloads.result(payload)
+
+
+# --- live session ----------------------------------------------------------
+
+
+def _register_live(server: MCPServer, coach: Coach) -> None:
+    @server.tool()
+    @guarded
+    def show_game(game_id: int, ply: int = 0) -> TextContent:
+        """Put one of the owner's games on the board they are watching, `ply` half-moves
+        in (0 is the starting position). Use this instead of describing a position in
+        words. The answer is the live state, which also says whether a browser is
+        actually following along."""
+        with coach.session() as session:
+            state = live_service.show_game(session, int(game_id), int(ply))
+        return payloads.result(state)
+
+    @server.tool()
+    @guarded
+    def show_position(fen: str) -> TextContent:
+        """Put an ad-hoc position on the board they are watching. Takes a FEN or an EPD.
+        This leaves whatever game was showing: it is an analysis board from here, and
+        nothing done on it changes a stored game."""
+        position = args.fen(fen)
+        state = live_service.show_position(str(position))
+        return payloads.result(state)
+
+    @server.tool()
+    @guarded
+    def make_move(uci: str) -> TextContent:
+        """Play one move on the live board, in UCI (e2e4, e7e8q for a promotion), and let
+        the browser animate it. Walk a line one call at a time. An illegal move is
+        refused with code illegal_move rather than being shown; playing the followed
+        game's own next move keeps the board on that game."""
+        state = live_service.make_move(str(uci))
+        return payloads.result(state)
+
+    @server.tool()
+    @guarded
+    def annotate(
+        arrows: list[str] | None = None,
+        squares: list[str] | None = None,
+        text: str | None = None,
+    ) -> TextContent:
+        """Draw on the live board. An arrow is "e2e4" or "e2e4:blue"; a highlighted square
+        is "e4" or "e4:red"; colours are green, red, blue and yellow. `text` is the comment
+        shown under the board. Each argument replaces what was there and an empty list
+        clears it; the marks are wiped whenever the position changes."""
+        state = live_service.annotate(arrows=arrows, squares=squares, text=text)
+        return payloads.result(state)
+
+    @server.tool()
+    @guarded
+    def get_live_state() -> TextContent:
+        """What the owner's board is showing right now, and whether anyone is looking:
+        `viewer_count` is how many browsers are subscribed. Read this before driving the
+        board in a new session, or after being told the page was reloaded."""
+        return payloads.result(live_service.get_state())
 
 
 def _tail(text: str | None) -> str | None:

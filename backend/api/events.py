@@ -1,6 +1,7 @@
 """The bridge between the service layer's synchronous hooks and the `/events` sockets.
 
-Both hooks — `analysis.subscribe` for run lifecycle and the `progress=` callable an import
+All three hooks — `analysis.subscribe` for run lifecycle, `services.events.subscribe` for
+what belongs to no run (notes, the live session), and the `progress=` callable an import
 takes — are plain callables invoked from whichever thread reached the transition: a worker
 thread, the import thread, a request thread. `publish` is that boundary. It bounces the
 event onto the loop that owns the sockets and returns immediately, so a slow or absent
@@ -19,32 +20,37 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 from backend.services import analysis as analysis_service
+from backend.services import events as events_service
+from backend.services import live as live_service
 
 # How many events one socket may fall behind before it starts losing the oldest of them.
 CLIENT_BACKLOG = 256
 
 
 class EventBroker:
-    """Fan import and analysis events out to every connected `/events` socket."""
+    """Fan import, analysis, note and live-session events out to every `/events` socket."""
 
     def __init__(self, *, backlog: int = CLIENT_BACKLOG) -> None:
         self._backlog = backlog
         self._loop: asyncio.AbstractEventLoop | None = None
         self._clients: set[asyncio.Queue[dict[str, Any]]] = set()
-        self._cancel: Callable[[], None] | None = None
+        self._cancels: list[Callable[[], None]] = []
 
     # --- lifecycle --------------------------------------------------------
 
     def start(self) -> None:
-        """Bind to the running loop and start receiving run events. Called from lifespan."""
+        """Bind to the running loop and start receiving events. Called from lifespan."""
         self._loop = asyncio.get_running_loop()
-        if self._cancel is None:
-            self._cancel = analysis_service.subscribe(self.publish)
+        if not self._cancels:
+            self._cancels = [
+                analysis_service.subscribe(self.publish),
+                events_service.subscribe(self.publish),
+            ]
 
     def stop(self) -> None:
-        if self._cancel is not None:
-            self._cancel()
-            self._cancel = None
+        for cancel in self._cancels:
+            cancel()
+        self._cancels = []
         self._clients.clear()
         self._loop = None
 
@@ -74,10 +80,17 @@ class EventBroker:
 
     @contextlib.contextmanager
     def listen(self) -> Iterator[asyncio.Queue[dict[str, Any]]]:
-        """One socket's backlog, unregistered however the socket ends."""
+        """One socket's backlog, unregistered however the socket ends.
+
+        A socket here is also a browser watching the live session, which is the only place
+        that can be observed: `get_live_state` reports the count so the coach knows whether
+        anyone is actually looking at the board it is driving.
+        """
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=self._backlog)
         self._clients.add(queue)
+        live_service.viewer_joined()
         try:
             yield queue
         finally:
             self._clients.discard(queue)
+            live_service.viewer_left()

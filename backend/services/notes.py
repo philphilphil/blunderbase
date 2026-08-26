@@ -8,12 +8,19 @@ from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session
 
 from backend.db.models import Note
+from backend.services import events as events_service
 from backend.services.explorer import find_position, get_or_create_position
 
 # A tag is matched after the row is read rather than in SQL: `notes.tags` is a portable
 # JSON column, and the operators that would search inside one are spelled differently on
 # SQLite and on PostgreSQL. Coach memory is small; this is the cheap half of the trade.
 SCAN_LIMIT = 5000
+
+# A note the coach writes has to show up in the open UI without a refresh, so both of the
+# writes announce themselves on the `/events` stream. Emitted after the commit, never
+# before: a note that was rolled back was never written.
+EVENT_NOTE_CREATED = "note.created"
+EVENT_NOTE_UPDATED = "note.updated"
 
 
 class NoteNotFoundError(LookupError):
@@ -50,6 +57,7 @@ def save_note(
     )
     session.add(note)
     session.commit()
+    _announce(EVENT_NOTE_CREATED, note)
     return note
 
 
@@ -137,6 +145,7 @@ def update_note(
     if tags is not None:
         note.tags = normalize_tags(tags)
     session.commit()
+    _announce(EVENT_NOTE_UPDATED, note)
     return note
 
 
@@ -177,6 +186,12 @@ def note_payload(note: Note) -> dict[str, Any]:
         "created_at": note.created_at.isoformat(),
         "updated_at": note.updated_at.isoformat(),
     }
+
+
+def _announce(event: str, note: Note) -> None:
+    """One note write on the `/events` stream, flat, the way every other event is shaped."""
+    payload = note_payload(note)
+    events_service.emit({"event": event, "note_id": payload.pop("id"), **payload})
 
 
 def _contains(column: ColumnElement[str | None], value: str) -> ColumnElement[bool]:

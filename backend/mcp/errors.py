@@ -9,6 +9,7 @@ from mcp.types import CallToolResult, TextContent
 
 from backend.services import analysis as analysis_service
 from backend.services import engines as engines_service
+from backend.services import live as live_service
 from backend.services import notes as notes_service
 from backend.services import stats as stats_service
 
@@ -26,6 +27,8 @@ ENGINE_UNAVAILABLE = "engine_unavailable"
 ENGINE_FAILED = "engine_failed"
 QUEUE_FULL = "queue_full"
 NOT_IMPLEMENTED = "not_implemented"
+ILLEGAL_MOVE = "illegal_move"
+NO_LIVE_POSITION = "no_live_position"
 
 
 class CoachError(Exception):
@@ -63,6 +66,11 @@ TRANSLATIONS: tuple[tuple[type[Exception], str], ...] = (
     (engines_service.EngineServiceError, ENGINE_FAILED),
     (stats_service.UnknownDimensionError, UNKNOWN_DIMENSION),
     (notes_service.NoteNotFoundError, UNKNOWN_NOTE),
+    (live_service.UnknownLiveGameError, UNKNOWN_GAME),
+    (live_service.IllegalMoveError, ILLEGAL_MOVE),
+    (live_service.NoLivePositionError, NO_LIVE_POSITION),
+    (live_service.LiveFenError, BAD_FEN),
+    (live_service.LiveRequestError, BAD_ARGUMENT),
     (ValueError, BAD_ARGUMENT),
     (LookupError, NOT_FOUND),
 )

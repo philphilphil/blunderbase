@@ -364,12 +364,45 @@ with the finished job instead, which is what the PGN paths and the tests use.
 `POST /import/pgn/upload` takes the PGN as the raw request body rather than a multipart
 form, so the API needs no form-parsing dependency.
 
-**`/events`.** One WebSocket carrying both hooks: `analysis.subscribe` for run lifecycle,
-and the `progress=` callable each import is given. `api/events.py` is the boundary between
-them — both are called from whichever thread reached the transition, so `publish` bounces
-the event onto the loop the sockets live on and returns immediately. Delivery is
-deliberately lossy: a socket that falls more than `CLIENT_BACKLOG` events behind drops its
-oldest, and a dropped connection is not repaired. The UI refetches on reconnect.
+**`/events`.** One WebSocket carrying three hooks: `analysis.subscribe` for run lifecycle,
+the `progress=` callable each import is given, and `services.events.subscribe` for what
+belongs to neither a run nor a job — `note.created` / `note.updated`, and `live.updated`.
+`api/events.py` is the boundary between them — all are called from whichever thread
+reached the transition, so `publish` bounces the event onto the loop the sockets live on
+and returns immediately. Delivery is deliberately lossy: a socket that falls more than
+`CLIENT_BACKLOG` events behind drops its oldest, and a dropped connection is not repaired.
+The UI refetches on reconnect.
+
+## The live session
+
+`services/live.py` is one board held in memory, because there is one owner: the game and
+ply the coach is showing, or an ad-hoc FEN with the moves played on top of it, plus arrows,
+highlights and a comment. The MCP tools `show_game`, `show_position`, `make_move` and
+`annotate` drive it and `GET /live` reads it; every mutation publishes `live.updated`
+carrying the *whole* new state, so a socket that has the event never needs the route again.
+The state lives on the server rather than in the socket, which is what makes a refresh or a
+reconnect restore it: the page fetches `/live` once and follows the events.
+
+Three rules hold it together. **It is ephemeral** — nothing here writes a `Game`, a
+`Position` or a `MoveEval`, and the one query in the module reads a stored game only in
+order to start from it, so the coach can play anything legal on the board without touching
+what was actually played. **Legality is the board's** — `make_move` parses the move against
+the position as it stands, so an MCP client can never put the browser in a position that
+does not exist; playing the followed game's own next move advances `ply` and keeps the
+board on that game, and anything else lands in `moves` as a departure from it. **Watching
+is countable** — `EventBroker.listen` is every `/events` socket's one entry and exit, so it
+is what increments and decrements the `viewer_count` that `get_live_state` reports, which
+is how the coach knows whether anyone is actually looking at the board.
+
+The state is process-wide, which is the whole of its storage: one owner, one board, nothing
+to migrate and nothing to clean up. It is also the limit of the feature as it stands. The
+browser sees what the coach does only when the MCP tools and the `/events` sockets run in
+one process, and no entry point arranges that yet — `blunderbase serve` runs the API app
+and `blunderbase mcp --transport http` runs the transport as its own uvicorn app, while a
+stdio server is a subprocess of the chat client. Whichever process the coach reaches drives
+its own board and reports no viewers. Mounting the MCP transport into the API app (behind
+the bearer key it already carries) is what closes that, and is the one thing live mode
+still needs.
 
 **Binding.** `settings.host` defaults to `127.0.0.1`, and `blunderbase serve` binds what
 it says. The API carries no auth of its own; the bearer key guards the MCP HTTP transport

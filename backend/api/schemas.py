@@ -458,3 +458,40 @@ class NoteUpdate(Input):
 class TagCount(BaseModel):
     tag: str
     notes: int
+
+
+# --- live -----------------------------------------------------------------
+
+
+class LiveArrow(BaseModel):
+    """An arrow drawn on the live board, as chessground takes one."""
+
+    from_: str = Field(alias="from")
+    to: str
+    color: str
+
+
+class LiveSquare(BaseModel):
+    square: str
+    color: str
+
+
+class LiveState(Payload):
+    """`services.live.get_state`: the board the coach is driving, whole.
+
+    The page fetches this once on load or reconnect and follows `live.updated` from there,
+    which is why every field the socket carries is documented here too.
+    """
+
+    active: bool = False
+    game_id: int | None = None
+    ply: int | None = None
+    fen: str | None = None
+    turn: str | None = None
+    moves: list[str] = Field(default_factory=list)
+    last_move: str | None = None
+    arrows: list[LiveArrow] = Field(default_factory=list)
+    squares: list[LiveSquare] = Field(default_factory=list)
+    text: str | None = None
+    viewer_count: int = 0
+    updated_at: datetime | None = None

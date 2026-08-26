@@ -165,6 +165,29 @@ Memory:
 - `search_notes(query | tags | date)` — a new session starts with "what were
   we working on?".
 
+## Live session (coach-driven UI)
+
+The owner works split-screen: Blunderbase in the browser, the AI coach in a
+chat next to it. Two behaviors make that seamless:
+
+- **Auto-refresh** — the frontend subscribes to `/events` and refetches on
+  events. The event set includes import progress, analysis run lifecycle,
+  and `note.created / note.updated`, so a note the coach saves via MCP
+  appears in the open UI within a second.
+- **Live mode** — a single server-side live-session state: current game/ply
+  or ad-hoc FEN, arrows/highlights, a coach comment, updated via MCP tools
+  and broadcast over the same WebSocket. A `/live` page (or "follow coach"
+  toggle on the game view) renders it and animates incoming moves; refresh
+  or reconnect restores the last state (it lives on the server, not in the
+  socket).
+
+MCP tools: `show_game(game_id, ply)`, `show_position(fen)`,
+`make_move(uci)` (advances the live board), `annotate(arrows, squares,
+text)`, `get_live_state()` (includes whether any browser is currently
+subscribed). Invariant: live moves are ephemeral analysis-board state —
+MCP driving the board never mutates stored games. No extra auth: single
+owner, localhost UI, bearer key already guards remote MCP.
+
 ## HTTP API & Web UI
 
 API: thin service wrappers — `/games`, `/games/{id}`, `/import/{source}`,
