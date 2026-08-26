@@ -1,14 +1,20 @@
 import { TierBadge } from '@/components/badges/TierBadge'
 import type { EngineResponse } from '@/lib/api/types'
+import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
+
+import { HostBadge } from './HostBadge'
 
 /** The engine roster: one row each, the selected one carrying the teal inset bar. */
 export function EngineList({
   engines,
+  hosts,
   selectedId,
   onSelect,
 }: {
   engines: EngineResponse[]
+  /** Where each engine lives, joined from `/runners/status` on engine id. */
+  hosts?: Map<number, EngineHost>
   selectedId: number | null
   onSelect: (id: number) => void
 }) {
@@ -36,13 +42,16 @@ export function EngineList({
                 )}
               />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span
-                  className={cn(
-                    'truncate text-[0.8125rem]',
-                    selected ? 'font-medium text-ink' : 'text-soft',
-                  )}
-                >
-                  {engine.name}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    className={cn(
+                      'min-w-0 truncate text-[0.8125rem]',
+                      selected ? 'font-medium text-ink' : 'text-soft',
+                    )}
+                  >
+                    {engine.name}
+                  </span>
+                  <HostBadge host={hosts?.get(engine.id)} />
                 </span>
                 <span className="truncate font-mono text-[0.65625rem] text-faint">{engine.path}</span>
               </span>

@@ -1,12 +1,12 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import type { LiveState } from '@/lib/api/types'
+import type { LiveState, RunnersStatus } from '@/lib/api/types'
 
 import { LivePage } from './LivePage'
 
@@ -25,24 +25,58 @@ class FakeSocket {
   close() {}
 }
 
+/** Every `/streams` request, method included — an open and a close are not the same call. */
+let streamCalls: { method: string; path: string; body: unknown }[] = []
+
+/**
+ * Method-aware, because the page now opens and closes analysis sessions on the same path.
+ * `/runners/status` answers for every case: the panel reads it to fill its engine picker.
+ */
 function stubFetch(routes: Record<string, unknown>) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (input: RequestInfo | URL) => {
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input).split('?')[0]!
-      const body = routes[path]
-      if (body === undefined) {
-        return new Response(JSON.stringify({ error: 'not_found', detail: path }), {
-          status: 404,
-          headers: { 'content-type': 'application/json' },
-        })
+      const method = init?.method ?? 'GET'
+
+      if (path.startsWith('/api/streams')) {
+        const body = init?.body ? JSON.parse(String(init.body)) : null
+        streamCalls.push({ method, path, body })
+        if (method === 'DELETE') return new Response(null, { status: 204 })
+        if (method === 'POST') {
+          return json(
+            {
+              id: 'str_1',
+              surface: 'live',
+              fen: String((body as { fen?: string })?.fen ?? ''),
+              multipv: 3,
+              engine_id: 1,
+              engine: 'stockfish',
+              runner_id: null,
+              runner: null,
+              state: 'starting',
+              seq: 0,
+              created_at: new Date().toISOString(),
+            },
+            201,
+          )
+        }
+        return json([])
       }
-      return new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
+      if (path === '/api/runners/status') return json(RUNNERS_STATUS)
+
+      const body = routes[path]
+      if (body === undefined) return json({ error: 'not_found', detail: path }, 404)
+      return json(body)
     }),
   )
+}
+
+function json(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
 }
 
 function renderPage(ui: ReactNode) {
@@ -85,6 +119,32 @@ const IDLE: LiveState = {
   updated_at: null,
 }
 
+/** Where engine work can run. One local engine, no runners — today's single-host install. */
+const RUNNERS_STATUS: RunnersStatus = {
+  local: {
+    name: 'local',
+    slots: 2,
+    busy: 0,
+    streams: 0,
+    workers: true,
+    queued: 0,
+    running: 0,
+    engines: [
+      {
+        id: 1,
+        name: 'stockfish',
+        kind: 'uci',
+        path: '/usr/games/stockfish',
+        enabled: true,
+        default_tier: 'deep',
+        streams: true,
+      },
+    ],
+  },
+  runners: [],
+  queue: { queued: 0, running: 0 },
+}
+
 const AFTER_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'
 
 const SHOWING: LiveState = {
@@ -116,6 +176,7 @@ const GAME = {
 }
 
 beforeEach(() => {
+  streamCalls = []
   vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket)
 })
 
@@ -188,6 +249,44 @@ describe('LivePage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Flip the board' }))
     expect(screen.getByTestId('board')).toHaveClass('orientation-white')
+  })
+
+  it('keeps the analysis panel inert while nothing is on the board', async () => {
+    stubFetch({ '/api/live': IDLE })
+    renderPage(<LivePage />)
+    await screen.findByText('Nothing is on the board.')
+
+    const toggle = screen.getByRole('switch', {
+      name: 'Analyse this position continuously',
+    })
+    expect(toggle).toBeDisabled()
+    expect(toggle).toHaveAttribute('title', 'nothing is on the board')
+    expect(streamCalls).toHaveLength(0)
+  })
+
+  it('analyses the coach’s position when asked', async () => {
+    stubFetch({ '/api/live': SHOWING, '/api/games/7': GAME })
+    renderPage(<LivePage />)
+    await screen.findByText('kn1ghtmare — phib · ply 1')
+
+    expect(screen.getByText('Analyse this position continuously.')).toBeInTheDocument()
+    expect(streamCalls).toHaveLength(0)
+
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
+    )
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    expect(streamCalls[0]!.body).toMatchObject({
+      surface: 'live',
+      fen: AFTER_E4,
+      game_id: 7,
+      ply: 1,
+      engine_id: null,
+    })
+    // The engine picker knows what this deployment can offer.
+    expect(
+      screen.getByRole('option', { name: 'stockfish · local' }),
+    ).toBeInTheDocument()
   })
 
   it('says so when the live session cannot be read', async () => {

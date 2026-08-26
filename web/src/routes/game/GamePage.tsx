@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
+import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { useStreamSession } from '@/lib/analysis'
 import { useGame, useRequestAnalysis, useRuns, useWorstMoments } from '@/lib/api/queries'
 import type { MoveRow, RunResponse, Tier } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
@@ -224,6 +226,16 @@ function GameStudio({ gameId }: { gameId: number }) {
     return flipped ? (owner === 'white' ? 'black' : 'white') : owner
   }, [detail, flipped])
 
+  // The live search on the position the board is showing. Nothing is opened until the
+  // reader asks for it, and scrubbing the move list PATCHes the one session rather than
+  // opening one per ply.
+  const stream = useStreamSession({
+    surface: 'game',
+    fen: position?.fen ?? null,
+    gameId,
+    ply: boardIndex,
+  })
+
   useBoardKeys(
     {
       step: (delta) => seek(cursor + delta),
@@ -313,7 +325,14 @@ function GameStudio({ gameId }: { gameId: number }) {
             onSelectPly={selectPly}
             className="flex-1"
           />
+          {/*
+            Two panels, two different claims: the stored run says what an analysis pass
+            concluded about the move that was played, the one under it says what an engine
+            is finding in this position right now. Merging them would put a number nobody
+            asked for next to a verdict somebody did.
+          */}
           <EnginePanel run={engineRun} lines={lines} ply={boardIndex} />
+          <InfiniteAnalysisPanel stream={stream} fen={position.fen} ply={boardIndex} />
         </div>
 
         <NotesColumn

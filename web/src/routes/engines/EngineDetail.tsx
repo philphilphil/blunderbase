@@ -20,6 +20,7 @@ import type {
   Tier,
   TierStatusResponse,
 } from '@/lib/api/types'
+import { isRemote, type EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
 import { OptionsEditor } from './OptionsEditor'
@@ -93,16 +94,40 @@ function Section({
   )
 }
 
-/** One engine, whole: what it is, what it is set to, and what it says when it is run. */
+/**
+ * One engine, whole: what it is, what it is set to, and what it says when it is run.
+ *
+ * A runner-bound row is read-mostly. Its truth is the yaml on that machine — the server
+ * rewrites the row every time the runner connects, and `PATCH /engines/{id}`,
+ * `POST /engines/{id}/test-run` and the probe all refuse it, because `path` is a path over
+ * there. So the editable half is shown rather than offered, and the probe is *not* started:
+ * spawning whatever this host happens to have at a remote path is the one thing worse than
+ * a disabled button.
+ *
+ * Which of the two a row is comes from `/runners/status`, a different read from the one that
+ * fetched the row — so there is a third state, `hostKnown === false`, while that read is in
+ * flight or after it failed. Nothing that touches the binary happens in it: "not known to be
+ * remote" is not the same claim as "local", and the probe is the difference between the two.
+ */
 export function EngineDetail({
   engine,
+  host,
+  hostKnown,
   tiers,
   onDeleted,
 }: {
   engine: EngineResponse
+  /** Where the binary is, from `/runners/status`; absent means this host. */
+  host?: EngineHost
+  /** Whether `/runners/status` has answered — until it has, `host` says nothing. */
+  hostKnown: boolean
   tiers: TierStatusResponse[]
   onDeleted: () => void
 }) {
+  const remote = isRemote(host)
+  /** Known to be somebody else's, or not yet known to be ours. */
+  const locked = remote || !hostKnown
+  const runnerName = host?.runnerName ?? 'that machine'
   const [name, setName] = useState(engine.name)
   const [path, setPath] = useState(engine.path)
   const [tier, setTier] = useState<Tier | ''>(engine.default_tier ?? '')
@@ -120,7 +145,10 @@ export function EngineDetail({
     // engines must not start a subprocess.
     queryKey: ['engine-probe', engine.path, engine.kind],
     queryFn: () => probeEngine({ path: engine.path, kind: engine.kind }),
-    enabled: autoProbe(engine) || probeAsked,
+    // Never for a runner-bound engine — nor for one that has not been shown to be local:
+    // `path` may be a path on the other machine, and probing it here would start whatever
+    // this host happens to have at that path.
+    enabled: (autoProbe(engine) || probeAsked) && !locked,
     staleTime: 5 * 60_000,
     retry: false,
   })
@@ -201,7 +229,7 @@ export function EngineDetail({
         <Toggle
           label={`${engine.enabled ? 'Disable' : 'Enable'} ${engine.name}`}
           checked={engine.enabled}
-          disabled={update.isPending}
+          disabled={locked || update.isPending}
           onChange={(next) => update.mutate({ id: engine.id, body: { enabled: next } })}
         />
       </div>
@@ -218,42 +246,74 @@ export function EngineDetail({
           ) : null
         }
       >
+        {remote ? (
+          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
+            Advertised by <span className="font-medium text-soft">{runnerName}</span>. This row is
+            that machine&rsquo;s advertisement and is rewritten every time it connects — change it
+            in <span className="font-mono text-soft">runner.yaml</span> over there. Its path is a
+            path on that machine.
+          </p>
+        ) : hostKnown ? null : (
+          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
+            Which machine advertises this engine is not known yet, so nothing here is editable
+            and the binary is not probed — a runner&rsquo;s path is a path on that machine, not
+            on this one.
+          </p>
+        )}
         <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`engine-${engine.id}-name`}>Name</Label>
+            {/*
+              A row nobody can edit has no draft to preserve, and the runner rewrites it on
+              every connection — so it is read from the row rather than from the state this
+              card started with, which the header next to it would otherwise contradict.
+            */}
             <Input
               id={`engine-${engine.id}-name`}
-              value={name}
+              value={remote ? engine.name : name}
               spellCheck={false}
+              readOnly={locked}
               onChange={(event) => setName(event.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`engine-${engine.id}-tier`}>Default tier</Label>
-            <select
-              id={`engine-${engine.id}-tier`}
-              value={tier}
-              onChange={(event) => setTier(event.target.value as Tier | '')}
-              className="h-8 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50"
-            >
-              <option value="">none</option>
-              <option value="quick">quick</option>
-              <option value="deep">deep</option>
-            </select>
+            {remote ? (
+              <Input
+                id={`engine-${engine.id}-tier`}
+                value={engine.default_tier ?? 'none'}
+                readOnly
+                onChange={() => {}}
+              />
+            ) : (
+              <select
+                id={`engine-${engine.id}-tier`}
+                value={tier}
+                disabled={locked}
+                onChange={(event) => setTier(event.target.value as Tier | '')}
+                className="h-8 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50 disabled:opacity-50"
+              >
+                <option value="">none</option>
+                <option value="quick">quick</option>
+                <option value="deep">deep</option>
+              </select>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`engine-${engine.id}-path`}>Path</Label>
           <Input
             id={`engine-${engine.id}-path`}
-            value={path}
+            value={remote ? engine.path : path}
             spellCheck={false}
+            readOnly={locked}
             className="font-mono"
             onChange={(event) => setPath(event.target.value)}
           />
           <p className="text-[0.65625rem] text-dim">
-            A file, a command line with arguments, or a name on PATH. Saving a new path
-            re-probes the binary.
+            {remote
+              ? `A path on ${runnerName}, not here.`
+              : 'A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary.'}
           </p>
         </div>
       </Section>
@@ -261,32 +321,38 @@ export function EngineDetail({
       <Section
         title="UCI options"
         aside={
-          <div className="flex items-center gap-2">
-            {probe.isFetching ? (
-              <span className="text-[0.65625rem] text-dim">probing…</span>
-            ) : probe.isSuccess ? (
-              <span className="font-mono text-[0.65625rem] text-dim">
-                {probe.data.name ?? 'unnamed'}
-                {probe.data.author ? ` · ${probe.data.author.split('(')[0]!.trim()}` : ''}
-              </span>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={probe.isFetching}
-              onClick={() => {
-                setProbeAsked(true)
-                void probe.refetch()
-              }}
-            >
-              <RefreshCw aria-hidden />
-              Probe
-            </Button>
-          </div>
+          remote ? null : (
+            <div className="flex items-center gap-2">
+              {probe.isFetching ? (
+                <span className="text-[0.65625rem] text-dim">probing…</span>
+              ) : probe.isSuccess ? (
+                <span className="font-mono text-[0.65625rem] text-dim">
+                  {probe.data.name ?? 'unnamed'}
+                  {probe.data.author ? ` · ${probe.data.author.split('(')[0]!.trim()}` : ''}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={probe.isFetching || locked}
+                onClick={() => {
+                  setProbeAsked(true)
+                  void probe.refetch()
+                }}
+              >
+                <RefreshCw aria-hidden />
+                Probe
+              </Button>
+            </div>
+          )
         }
       >
-        {probe.isFetching && !probe.data ? (
+        {remote ? (
+          <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
+            Options come from the runner&rsquo;s own probe.
+          </p>
+        ) : probe.isFetching && !probe.data ? (
           <div className="flex flex-col gap-2" data-testid="probe-loading">
             {[0, 1, 2].map((row) => (
               <Skeleton key={row} className="h-8 w-full" />
@@ -315,79 +381,97 @@ export function EngineDetail({
         )}
       </Section>
 
-      <Section title="Test run">
-        <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_5.625rem_4.375rem]">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`engine-${engine.id}-fen`}>Position</Label>
-            <Input
-              id={`engine-${engine.id}-fen`}
-              value={fen}
-              spellCheck={false}
-              className="font-mono"
-              placeholder="starting position"
-              onChange={(event) => setFen(event.target.value)}
-            />
-          </div>
-          {engine.kind === 'maia' ? (
-            <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor={`engine-${engine.id}-ratings`}>Ratings</Label>
+      {remote ? (
+        <Section title="Test run">
+          <p className="text-[0.6875rem] leading-[1.6] text-dim">
+            A test run starts the binary here;{' '}
+            <span className="font-mono text-soft">{engine.path}</span> is a path on{' '}
+            <span className="font-medium text-soft">{runnerName}</span>.
+          </p>
+        </Section>
+      ) : (
+        <Section title="Test run">
+          <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_5.625rem_4.375rem]">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`engine-${engine.id}-fen`}>Position</Label>
               <Input
-                id={`engine-${engine.id}-ratings`}
-                value={ratings}
+                id={`engine-${engine.id}-fen`}
+                value={fen}
+                spellCheck={false}
                 className="font-mono"
-                placeholder="1500 1900"
-                onChange={(event) => setRatings(event.target.value)}
+                placeholder="starting position"
+                onChange={(event) => setFen(event.target.value)}
               />
             </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`engine-${engine.id}-nodes`}>Nodes</Label>
+            {engine.kind === 'maia' ? (
+              <div className="col-span-2 flex flex-col gap-1.5">
+                <Label htmlFor={`engine-${engine.id}-ratings`}>Ratings</Label>
                 <Input
-                  id={`engine-${engine.id}-nodes`}
-                  value={nodes}
-                  inputMode="numeric"
+                  id={`engine-${engine.id}-ratings`}
+                  value={ratings}
                   className="font-mono"
-                  onChange={(event) => setNodes(event.target.value)}
+                  placeholder="1500 1900"
+                  onChange={(event) => setRatings(event.target.value)}
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`engine-${engine.id}-multipv`}>Lines</Label>
-                <Input
-                  id={`engine-${engine.id}-multipv`}
-                  value={multipv}
-                  inputMode="numeric"
-                  className="font-mono"
-                  onChange={(event) => setMultipv(event.target.value)}
-                />
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="flex-1 text-[0.6875rem] text-dim">
-            Runs whether the engine is enabled or not — the point of the button is to decide.
-          </span>
-          <Button type="button" size="sm" disabled={testRun.isPending} onClick={run}>
-            {testRun.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
-            Test run
-          </Button>
-        </div>
-
-        {testRun.isError ? (
-          <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-            <p className="text-[0.75rem] text-blunder">The engine did not answer.</p>
-            <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
-              {testRun.error.message}
-            </p>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={`engine-${engine.id}-nodes`}>Nodes</Label>
+                  <Input
+                    id={`engine-${engine.id}-nodes`}
+                    value={nodes}
+                    inputMode="numeric"
+                    className="font-mono"
+                    onChange={(event) => setNodes(event.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={`engine-${engine.id}-multipv`}>Lines</Label>
+                  <Input
+                    id={`engine-${engine.id}-multipv`}
+                    value={multipv}
+                    inputMode="numeric"
+                    className="font-mono"
+                    onChange={(event) => setMultipv(event.target.value)}
+                  />
+                </div>
+              </>
+            )}
           </div>
-        ) : null}
-        {testRun.data ? <SampleResult sample={testRun.data} /> : null}
-      </Section>
+
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-[0.6875rem] text-dim">
+              Runs whether the engine is enabled or not — the point of the button is to decide.
+            </span>
+            <Button type="button" size="sm" disabled={locked || testRun.isPending} onClick={run}>
+              {testRun.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
+              Test run
+            </Button>
+          </div>
+
+          {testRun.isError ? (
+            <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
+              <p className="text-[0.75rem] text-blunder">The engine did not answer.</p>
+              <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
+                {testRun.error.message}
+              </p>
+            </div>
+          ) : null}
+          {testRun.data ? <SampleResult sample={testRun.data} /> : null}
+        </Section>
+      )}
 
       <div className="mt-auto flex items-center gap-2 border-t border-hairline px-3.5 py-2.5">
-        {confirmDelete ? (
+        {remote ? (
+          // Removing the row would delete an advertisement the runner recreates on its next
+          // connection. Revoking the runner in the section below is the honest way out.
+          <p className="text-[0.6875rem] leading-[1.6] text-dim">
+            Nothing here is editable. Change this engine in{' '}
+            <span className="font-mono text-soft">runner.yaml</span> on {runnerName}, or revoke
+            the runner under Runners below.
+          </p>
+        ) : confirmDelete ? (
           <>
             <span className="flex-1 text-[0.6875rem] text-blunder">
               Remove {engine.name}? Analysis already stored keeps its runs.
@@ -434,7 +518,7 @@ export function EngineDetail({
             <Button
               type="button"
               size="sm"
-              disabled={!dirty || blocked || update.isPending}
+              disabled={locked || !dirty || blocked || update.isPending}
               onClick={save}
             >
               {update.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}

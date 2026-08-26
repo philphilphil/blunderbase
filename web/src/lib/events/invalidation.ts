@@ -54,7 +54,23 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
       return keys
     }
 
-    // Carried whole on the socket, and a keepalive is not news.
+    // A link coming or going changes where work can run: the runner rows, the backlog's
+    // split between destinations, and the engines themselves — a disconnect flips
+    // `enabled` on that runner's rows and with it which tiers are available (`['engines']`
+    // is a prefix of `['engines', 'tiers']`).
+    case 'runner.connected':
+    case 'runner.disconnected':
+      return [queryKeys.runners(), queryKeys.queue(), queryKeys.engines()]
+
+    // Fires per slot taken and freed, so it must not drag the engine list along.
+    case 'runner.updated':
+      return [queryKeys.runners(), queryKeys.queue()]
+
+    // Carried whole on the socket, and a keepalive is not news. `stream.snapshot` arrives
+    // twice a second per open board — refetching on it would be a refetch loop.
+    case 'stream.started':
+    case 'stream.snapshot':
+    case 'stream.ended':
     case 'live.updated':
     case 'ping':
       return []

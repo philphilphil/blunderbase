@@ -33,11 +33,19 @@ import type {
   ProbeResponse,
   ProfileResponse,
   QueueStatus,
+  RunnerCreate,
+  RunnerCreated,
+  RunnerResponse,
+  RunnersStatus,
+  RunnerUpdate,
   RunResponse,
   SampleRequest,
   SampleResponse,
   Source,
   StatsResponse,
+  StreamCreate,
+  StreamResponse,
+  StreamUpdate,
   TagCount,
   Tier,
   TierStatusResponse,
@@ -220,6 +228,34 @@ export const updateNote = (id: number, body: NoteUpdate) =>
 export const deleteNote = (id: number) => http.delete<void>(`/notes/${id}`)
 
 export const listTags = () => http.get<TagCount[]>('/notes/tags')
+
+// --- runners --------------------------------------------------------------
+
+export const listRunners = () => http.get<RunnerResponse[]>('/runners')
+
+/** Where engine work can run right now: this host, every runner, the backlog between them. */
+export const getRunnersStatus = () => http.get<RunnersStatus>('/runners/status')
+
+/** The one answer that carries a token — nothing stores it, so nothing can show it again. */
+export const createRunner = (body: RunnerCreate) =>
+  http.post<RunnerCreated>('/runners', { body })
+
+export const updateRunner = (id: number, body: RunnerUpdate) =>
+  http.patch<RunnerResponse>(`/runners/${id}`, { body })
+
+export const deleteRunner = (id: number) => http.delete<void>(`/runners/${id}`)
+
+// --- streams --------------------------------------------------------------
+
+export const listStreams = () => http.get<StreamResponse[]>('/streams')
+
+export const openStream = (body: StreamCreate) => http.post<StreamResponse>('/streams', { body })
+
+/** A position change is a restart on the same slot, never a teardown. */
+export const restartStream = (id: string, body: StreamUpdate) =>
+  http.patch<StreamResponse>(`/streams/${id}`, { body })
+
+export const closeStream = (id: string) => http.delete<void>(`/streams/${id}`)
 
 // --- live -----------------------------------------------------------------
 

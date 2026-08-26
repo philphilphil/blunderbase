@@ -1,9 +1,11 @@
 import { FlipVertical2, Radio } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useStreamSession } from '@/lib/analysis'
 import { useGame, useLiveState } from '@/lib/api/queries'
 import type { BoardOrientation } from '@/components/board/Board'
 import { useEvents, useLiveUpdates } from '@/lib/events/EventsProvider'
@@ -86,6 +88,16 @@ export function LivePage() {
   const active = state?.active === true
   const orientation: BoardOrientation = orientationFor(game, flipped)
 
+  // `fen: null` while nothing is on the board keeps the session shut and the toggle
+  // disabled — there is no position to search, and the coach may put one up at any moment.
+  const boardFen = active && state?.fen ? state.fen : null
+  const stream = useStreamSession({
+    surface: 'live',
+    fen: boardFen,
+    gameId: state?.game_id ?? null,
+    ply: state?.ply ?? null,
+  })
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome breadcrumb={[{ label: 'Live' }]} actions={<ConnectionPill />} />
@@ -163,6 +175,14 @@ export function LivePage() {
         </div>
 
         <aside className="flex w-[21.25rem] flex-none flex-col gap-4 overflow-y-auto">
+          <InfiniteAnalysisPanel
+            stream={stream}
+            fen={boardFen}
+            ply={state?.ply ?? null}
+            // In the rail it is a card like the ones under it, rather than the hairline
+            // strip it is when it hangs off the bottom of the game page's move list.
+            className="rounded-xl border border-line"
+          />
           <CoachComment text={state?.text} updatedAt={state?.updated_at} />
           {state && active ? <SessionMeta state={state} game={game} /> : null}
           {followed.isError ? (

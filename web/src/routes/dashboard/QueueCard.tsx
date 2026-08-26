@@ -4,6 +4,7 @@
  */
 import { Link } from 'react-router-dom'
 
+import { QueueDestinations } from '@/components/shell/QueueDestinations'
 import { useGames, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
 import type { RunStatus } from '@/lib/api/types'
 import { TIER_STYLES } from '@/lib/chess/classification'
@@ -103,6 +104,7 @@ export function QueueCard() {
   const running = queue.data?.running ?? 0
   const outstanding = queued + running
   const workersOff = queue.data?.workers === false
+  const destinations = queue.data?.destinations ?? []
 
   const names = new Map<number, string>(
     (games.data?.games ?? []).map((game) => [game.id, game.opponent ?? `Game #${game.id}`]),
@@ -151,6 +153,12 @@ export function QueueCard() {
               }}
             />
           </div>
+
+          {destinations.length > 1 ? (
+            <div className="border-t border-hairline pt-2">
+              <QueueDestinations destinations={destinations} />
+            </div>
+          ) : null}
 
           {shown.length > 0 ? (
             <div className="flex flex-col gap-px">

@@ -287,11 +287,28 @@ export interface MoveEvalResponse {
   maia_policy?: MaiaPolicy | null
 }
 
+/**
+ * One place the backlog can be worked. A run with no engine, or one whose engine is
+ * switched off, counts as `local` — that is where the worker's fallback sends it.
+ */
+export interface QueueDestination extends Extra {
+  destination: 'local' | 'runner'
+  runner_id?: number | null
+  name: string
+  connected: boolean
+  slots?: number | null
+  queued: number
+  running: number
+  streams: number
+}
+
 export interface QueueStatus {
   queued: number
   running: number
   workers: boolean
   busy: number
+  /** Always sent by the backend (`default_factory`); consumers still read `?? []`. */
+  destinations: QueueDestination[]
 }
 
 export interface PositionAnalysis extends Extra {
@@ -574,6 +591,147 @@ export interface LiveState extends Extra {
   text?: string | null
   viewer_count: number
   updated_at?: string | null
+}
+
+// --- runners --------------------------------------------------------------
+
+export type RunnerTransport = 'websocket' | 'poll'
+
+/**
+ * An engine as its host advertises it. A runner-bound row is read-mostly here — its truth
+ * is the yaml on that machine, and `path` is a path over there.
+ */
+export interface RunnerEngine extends Extra {
+  id: number
+  name: string
+  kind: EngineKind
+  version?: string | null
+  /** The path on THAT machine; read-only here. */
+  path?: string | null
+  enabled: boolean
+  default_tier?: Tier | null
+  /**
+   * Whether the engine *kind* can drive a board at all — false for Maia. It does not know
+   * the transport: see `lib/engines/hosts.ts`, where "queue only" is decided.
+   */
+  streams: boolean
+}
+
+export interface RunnerResponse extends Extra {
+  id: number
+  name: string
+  slots: number
+  version?: string | null
+  connected: boolean
+  transport?: RunnerTransport | null
+  last_seen_at?: string | null
+  created_at?: string | null
+  /** Slots holding a queue run. */
+  busy: number
+  /** Slots holding an analysis board. */
+  streams: number
+  free_slots: number
+  /** Queued runs only this runner can take. */
+  queued_eligible: number
+  engines: RunnerEngine[]
+}
+
+export interface RunnerCreate {
+  name: string
+  /** >= 1, default 1. */
+  slots?: number
+}
+
+export interface RunnerUpdate {
+  name?: string
+  slots?: number
+}
+
+/** The one answer that carries a token. It is not readable again from anywhere. */
+export interface RunnerCreated {
+  runner: RunnerResponse
+  token: string
+  /** A paste-ready `runner.yaml` with the token already in it. */
+  config_yaml: string
+}
+
+/** This host, described as one more destination. */
+export interface LocalHost extends Extra {
+  name: string
+  /** `analysis_concurrency`, when this process knows it. */
+  slots?: number | null
+  busy: number
+  streams: number
+  /** Whether this process drains the queue. */
+  workers: boolean
+  queued: number
+  running: number
+  engines: RunnerEngine[]
+}
+
+export interface QueueTotals {
+  queued: number
+  running: number
+}
+
+export interface RunnersStatus {
+  runners: RunnerResponse[]
+  local: LocalHost
+  queue: QueueTotals
+}
+
+// --- streams --------------------------------------------------------------
+
+export type StreamSurface = 'game' | 'live'
+export type StreamState = 'starting' | 'running' | 'ended'
+export type StreamEndReason = 'closed' | 'replaced' | 'idle' | 'engine_failed' | 'runner_gone'
+
+/**
+ * One multi-PV line of a snapshot. `cp` is from the SIDE TO MOVE's point of view — the same
+ * vocabulary as `MoveEval.best_lines`, and structurally compatible with `EngineLine`.
+ */
+export interface StreamLine extends Extra {
+  multipv: number
+  cp?: number | null
+  mate?: number | null
+  pv: string[]
+}
+
+export interface StreamCreate {
+  fen: string
+  /** Omitted or null ⇒ the deep tier's engine. */
+  engine_id?: number | null
+  /** 1..5, default 1. */
+  multipv?: number
+  /** One session per surface; a second POST replaces the first. */
+  surface?: StreamSurface
+  /** Echoed back untouched, for the page's own bookkeeping. */
+  game_id?: number | null
+  ply?: number | null
+}
+
+export interface StreamUpdate {
+  fen?: string
+  multipv?: number
+}
+
+export interface StreamResponse extends Extra {
+  id: string
+  surface: StreamSurface
+  fen: string
+  multipv: number
+  engine_id: number
+  engine: string
+  /** null ⇒ a local engine; that is the only thing that distinguishes the two. */
+  runner_id?: number | null
+  runner?: string | null
+  state: StreamState
+  reason?: StreamEndReason | null
+  seq: number
+  created_at: string
+  last_snapshot_at?: string | null
+  game_id?: number | null
+  ply?: number | null
 }
 
 // --- meta -----------------------------------------------------------------

@@ -25,6 +25,8 @@ import type {
   ImportRequest,
   NoteCreate,
   NoteUpdate,
+  RunnerCreate,
+  RunnerUpdate,
   SampleRequest,
   Source,
   Tier,
@@ -370,6 +372,81 @@ export function useTestRunEngine(
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body?: SampleRequest }) => api.testRunEngine(id, body),
     ...options,
+  })
+}
+
+// --- runners --------------------------------------------------------------
+
+export function useRunners(options?: Options<Awaited<ReturnType<typeof api.listRunners>>>) {
+  return useQuery({ queryKey: queryKeys.runnerList(), queryFn: api.listRunners, ...options })
+}
+
+/**
+ * The join every runner-aware surface reads: `GET /engines` carries no `runner_id`, so
+ * where an engine lives is only knowable from here (see `lib/engines/hosts.ts`).
+ */
+export function useRunnersStatus(
+  options?: Options<Awaited<ReturnType<typeof api.getRunnersStatus>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.runnersStatus(),
+    queryFn: api.getRunnersStatus,
+    ...options,
+  })
+}
+
+/**
+ * Registering a runner mints its token. The answer is deliberately *not* written into the
+ * cache: the token exists in that one response and nowhere else, so it lives in the
+ * component's own state and dies with the panel that shows it.
+ */
+export function useCreateRunner(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.createRunner>>, Error, RunnerCreate>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: RunnerCreate) => api.createRunner(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.runners() })
+      void client.invalidateQueries({ queryKey: queryKeys.engines() })
+      void client.invalidateQueries({ queryKey: queryKeys.queue() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** A rename or a resize touches nothing but the runner rows. */
+export function useUpdateRunner(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.updateRunner>>,
+    Error,
+    { id: number; body: RunnerUpdate }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: RunnerUpdate }) => api.updateRunner(id, body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.runners() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** A revoke takes the runner's engine rows with it, and hands its work back to the queue. */
+export function useDeleteRunner(options?: UseMutationOptions<void, Error, number>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteRunner(id),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.runners() })
+      void client.invalidateQueries({ queryKey: queryKeys.engines() })
+      void client.invalidateQueries({ queryKey: queryKeys.queue() })
+      options?.onSuccess?.(...args)
+    },
   })
 }
 

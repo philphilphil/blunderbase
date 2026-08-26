@@ -1,11 +1,11 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import type { GameDetail, MoveRow, RunResponse } from '@/lib/api/types'
+import type { GameDetail, MoveRow, RunResponse, RunnersStatus } from '@/lib/api/types'
 
 import { GamePage } from './GamePage'
 
@@ -109,15 +109,69 @@ const QUEUED_RUN: RunResponse = {
   created_at: new Date().toISOString(),
 }
 
+/** Where engine work can run. One local engine, no runners — today's single-host install. */
+const RUNNERS_STATUS: RunnersStatus = {
+  local: {
+    name: 'local',
+    slots: 2,
+    busy: 0,
+    streams: 0,
+    workers: true,
+    queued: 0,
+    running: 0,
+    engines: [
+      {
+        id: 1,
+        name: 'stockfish',
+        kind: 'uci',
+        path: '/usr/games/stockfish',
+        enabled: true,
+        default_tier: 'deep',
+        streams: true,
+      },
+    ],
+  },
+  runners: [],
+  queue: { queued: 0, running: 0 },
+}
+
 let posted: { url: string; body: unknown }[] = []
+/** Every `/streams` request, method included — an open and a close are not the same call. */
+let streamCalls: { method: string; url: string; body: unknown }[] = []
 
 function stubFetch(overrides: Record<string, unknown> = {}) {
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (init?.method === 'POST') {
-      posted.push({ url, body: init.body ? JSON.parse(String(init.body)) : null })
+    const method = init?.method ?? 'GET'
+    if (url.includes('/streams')) {
+      const body = init?.body ? JSON.parse(String(init.body)) : null
+      streamCalls.push({ method, url, body })
+      if (method === 'DELETE') return new Response(null, { status: 204 })
+      if (method === 'POST') {
+        return json(
+          {
+            id: 'str_1',
+            surface: 'game',
+            fen: String((body as { fen?: string })?.fen ?? ''),
+            multipv: 3,
+            engine_id: 1,
+            engine: 'stockfish',
+            runner_id: null,
+            runner: null,
+            state: 'starting',
+            seq: 0,
+            created_at: new Date().toISOString(),
+          },
+          201,
+        )
+      }
+      return json([])
+    }
+    if (method === 'POST') {
+      posted.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null })
       return json(QUEUED_RUN, 202)
     }
+    if (url.includes('/runners/status')) return json(RUNNERS_STATUS)
     for (const [fragment, payload] of Object.entries(overrides)) {
       if (url.includes(fragment)) return json(payload)
     }
@@ -154,6 +208,7 @@ function renderPage() {
 
 beforeEach(() => {
   posted = []
+  streamCalls = []
   SilentSocket.instances = []
   vi.stubGlobal('WebSocket', SilentSocket)
   vi.stubGlobal('fetch', stubFetch())
@@ -392,5 +447,74 @@ describe('GamePage', () => {
     // The deep pass is the obvious next thing to do, so the card offers it rather than
     // describing a run that has already happened.
     expect(screen.getByRole('button', { name: 'Request deep analysis' })).toBeInTheDocument()
+  })
+
+  it('offers a live search under the stored run, and opens one when asked', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Two panels, two claims: what the run concluded, and what an engine could find now.
+    expect(screen.getByText('stockfish')).toBeInTheDocument()
+    expect(screen.getByText('Analyse this position continuously.')).toBeInTheDocument()
+    // Nothing is opened until the reader asks.
+    expect(streamCalls).toHaveLength(0)
+
+    await user.click(
+      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
+    )
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    expect(streamCalls[0]!.body).toMatchObject({
+      surface: 'game',
+      game_id: 14,
+      ply: 0,
+      engine_id: null,
+      // The starting position, because that is where the board is.
+      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    })
+  })
+
+  it('reads the live lines in the same frame as the run stacked above them', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Ply 1: Black to move, and the stored run says +0.40 — White's frame, the way
+    // `MoveEval.best_lines` is written and every other evaluation on this page is drawn.
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
+    )
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    const { fen } = streamCalls[0]!.body as { fen: string }
+
+    SilentSocket.instances.at(-1)!.emit({
+      event: 'stream.snapshot',
+      session_id: 'str_1',
+      seq: 1,
+      engine_id: 1,
+      engine: 'stockfish',
+      runner_id: null,
+      fen,
+      multipv: 3,
+      depth: 22,
+      nodes: 1_000,
+      nps: 500,
+      time_ms: 1_000,
+      // The wire is side-to-move relative: Black, to move, is 0.40 worse off.
+      lines: [{ multipv: 1, cp: -40, mate: null, pv: ['c7c6'] }],
+      at: new Date().toISOString(),
+    })
+
+    const live = within(screen.getByTestId('infinite-analysis'))
+    expect(live.getAllByTestId('infinite-analysis-line')).toHaveLength(1)
+    // Not −0.40: the same engine may not disagree with itself between two panels an inch
+    // apart, so the panel says what the run above it would have said.
+    expect(live.getByText('+0.40')).toBeInTheDocument()
+    expect(live.queryByText('−0.40')).not.toBeInTheDocument()
+    // The stored run's own row for this position, unchanged, says the same number.
+    expect(screen.getAllByText('+0.40').length).toBeGreaterThan(1)
   })
 })

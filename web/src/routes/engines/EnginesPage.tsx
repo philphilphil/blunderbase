@@ -1,15 +1,17 @@
 import { Cpu, Plus } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useEngines, useTierStatus } from '@/lib/api/queries'
+import { useEngines, useRunnersStatus, useTierStatus } from '@/lib/api/queries'
+import { hostByEngineId } from '@/lib/engines/hosts'
 
 import { AddEngineForm } from './AddEngineForm'
 import { EngineDetail } from './EngineDetail'
 import { EngineList } from './EngineList'
+import { RunnersSection } from './RunnersSection'
 import { TierStatus } from './TierStatus'
 
 /**
@@ -18,15 +20,23 @@ import { TierStatus } from './TierStatus'
  * The roster on the left, one engine whole on the right — every write path on the backend
  * probes the binary, so this page is where a bad engine is found rather than at analysis
  * time three minutes into a run.
+ *
+ * `/engines` carries no `runner_id`, so where each binary actually lives is joined in from
+ * `/runners/status` on engine id (`lib/engines/hosts.ts`). That join is what turns a row
+ * into a read-only advertisement and what puts "queue only" on a poll-mode machine — and it
+ * is a second read, which can land after the roster or not at all, so the detail card is
+ * told whether it has arrived rather than left to read "no binding" as "local".
  */
 export function EnginesPage() {
   const engines = useEngines()
   const tiers = useTierStatus()
+  const status = useRunnersStatus()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
 
   const list = engines.data ?? []
   const selected = list.find((engine) => engine.id === selectedId) ?? null
+  const hosts = useMemo(() => hostByEngineId(status.data), [status.data])
 
   // Whatever the roster holds, something is selected: the first engine on load, and the
   // next one along after one is removed.
@@ -107,18 +117,34 @@ export function EnginesPage() {
       ) : (
         <div className="flex items-start gap-4">
           <div className="w-[18.75rem] flex-none">
-            <EngineList engines={list} selectedId={selectedId} onSelect={setSelectedId} />
+            <EngineList
+              engines={list}
+              hosts={hosts}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
           </div>
           {selected ? (
             <EngineDetail
               key={selected.id}
               engine={selected}
+              host={hosts.get(selected.id)}
+              // `/engines` and `/runners/status` are two reads: an engine with no binding
+              // *yet* is not a local engine, and the card must not treat it as one.
+              hostKnown={status.isSuccess}
               tiers={tiers.data ?? []}
               onDeleted={() => setSelectedId(null)}
             />
           ) : null}
         </div>
       )}
+
+      <RunnersSection
+        status={status.data}
+        isLoading={status.isPending}
+        error={status.error}
+        onRetry={() => void status.refetch()}
+      />
     </PageBody>
   )
 }

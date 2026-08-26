@@ -2,7 +2,17 @@
  * The `/events` frames, as `backend/api/routes/events.py` sends them: one service event
  * per frame, flat, with the `event` key naming it.
  */
-import type { JobStatus, LiveState, RunStatus, Source, Tier } from '@/lib/api/types'
+import type {
+  JobStatus,
+  LiveState,
+  RunStatus,
+  RunnerTransport,
+  Source,
+  StreamEndReason,
+  StreamLine,
+  StreamSurface,
+  Tier,
+} from '@/lib/api/types'
 
 export const EVENT_NAMES = [
   'ping',
@@ -17,6 +27,12 @@ export const EVENT_NAMES = [
   'note.created',
   'note.updated',
   'live.updated',
+  'stream.started',
+  'stream.snapshot',
+  'stream.ended',
+  'runner.connected',
+  'runner.disconnected',
+  'runner.updated',
 ] as const
 
 export type EventName = (typeof EVENT_NAMES)[number]
@@ -101,12 +117,98 @@ export interface NoteEvent {
 
 export type LiveUpdatedEvent = { event: 'live.updated' } & LiveState
 
+/**
+ * ~2 per second per open board. Delivery is lossy and may reorder (`CLIENT_BACKLOG = 256`,
+ * oldest dropped): `seq` is monotonic per session and is what lets a consumer drop a stale
+ * frame. `fen`/`multipv` are the session's, so a frame for a position the board has
+ * already left can be recognised and dropped.
+ */
+export interface StreamSnapshotEvent {
+  event: 'stream.snapshot'
+  session_id: string
+  seq: number
+  engine_id: number
+  engine: string
+  runner_id: number | null
+  fen: string
+  multipv: number
+  depth: number | null
+  nodes: number | null
+  nps: number | null
+  time_ms: number | null
+  lines: StreamLine[]
+  at: string
+}
+
+export interface StreamStartedEvent {
+  event: 'stream.started'
+  session_id: string
+  surface: StreamSurface
+  engine_id: number
+  engine: string
+  runner_id: number | null
+  runner: string | null
+  fen: string
+  multipv: number
+  at: string
+}
+
+/** NOTE: carries no `surface` — match on `session_id` alone. */
+export interface StreamEndedEvent {
+  event: 'stream.ended'
+  session_id: string
+  reason: StreamEndReason
+  error: string | null
+  engine_id: number
+  runner_id: number | null
+  at: string
+}
+
+export type StreamEvent = StreamStartedEvent | StreamSnapshotEvent | StreamEndedEvent
+
+export interface RunnerConnectedEvent {
+  event: 'runner.connected'
+  runner_id: number
+  name: string
+  slots: number
+  version: string | null
+  transport: RunnerTransport
+  /** Advertised engine names. */
+  engines: string[]
+  at: string
+}
+
+export interface RunnerDisconnectedEvent {
+  event: 'runner.disconnected'
+  runner_id: number
+  name: string
+  reason: 'socket_closed' | 'timeout' | 'revoked' | 'replaced' | 'shutdown'
+  at: string
+}
+
+/** A state change only — never a heartbeat, never a snapshot. */
+export interface RunnerUpdatedEvent {
+  event: 'runner.updated'
+  runner_id: number
+  name: string
+  slots: number
+  connected: boolean
+  busy: number
+  streams: number
+  free_slots: number
+  at: string
+}
+
+export type RunnerEvent = RunnerConnectedEvent | RunnerDisconnectedEvent | RunnerUpdatedEvent
+
 export type BlunderbaseEvent =
   | PingEvent
   | ImportEvent
   | AnalysisEvent
   | NoteEvent
   | LiveUpdatedEvent
+  | StreamEvent
+  | RunnerEvent
 
 /** A frame carrying an event name we do not model yet. */
 export interface UnknownEvent {

@@ -103,6 +103,45 @@ describe('invalidationsFor — notes', () => {
   })
 })
 
+describe('invalidationsFor — runners', () => {
+  const connected: AnyEvent = {
+    event: 'runner.connected',
+    runner_id: 3,
+    name: 'gpu-box',
+    slots: 4,
+    version: '0.1.0',
+    transport: 'websocket',
+    engines: ['sf-remote'],
+    at: '2026-08-26T10:00:00Z',
+  }
+
+  it('refetches the runners, the queue split and the engines when a link comes or goes', () => {
+    for (const event of ['runner.connected', 'runner.disconnected'] as const) {
+      const keys = invalidationsFor({ ...connected, event })
+      expect(has(keys, queryKeys.runners())).toBe(true)
+      expect(has(keys, queryKeys.queue())).toBe(true)
+      // A disconnect flips `enabled` on that runner's rows, and with it which tiers can run.
+      expect(has(keys, queryKeys.engines())).toBe(true)
+    }
+  })
+
+  it('keeps a slot change cheap: the runners and the queue, never the engine list', () => {
+    const keys = invalidationsFor({
+      event: 'runner.updated',
+      runner_id: 3,
+      name: 'gpu-box',
+      slots: 4,
+      connected: true,
+      busy: 2,
+      streams: 1,
+      free_slots: 1,
+      at: '2026-08-26T10:00:00Z',
+    })
+    expect(names(keys)).toEqual(names([queryKeys.runners(), queryKeys.queue()]))
+    expect(has(keys, queryKeys.engines())).toBe(false)
+  })
+})
+
 describe('invalidationsFor — quiet events', () => {
   it('invalidates nothing for a keepalive', () => {
     expect(invalidationsFor({ event: 'ping' })).toEqual([])
@@ -117,6 +156,42 @@ describe('invalidationsFor — quiet events', () => {
         arrows: [],
         squares: [],
         viewer_count: 1,
+      }),
+    ).toEqual([])
+  })
+
+  // Two a second per open board: anything but `[]` here is a refetch loop.
+  it('invalidates nothing for a stream snapshot, which arrives whole and often', () => {
+    expect(
+      invalidationsFor({
+        event: 'stream.snapshot',
+        session_id: 'str_7f3c9a12',
+        seq: 7,
+        engine_id: 7,
+        engine: 'sf-remote',
+        runner_id: 3,
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        multipv: 3,
+        depth: 24,
+        nodes: 18_402_113,
+        nps: 1_840_211,
+        time_ms: 10_000,
+        lines: [{ multipv: 1, cp: 34, mate: null, pv: ['e2e4'] }],
+        at: '2026-08-26T10:00:10Z',
+      }),
+    ).toEqual([])
+  })
+
+  it('invalidates nothing when a stream starts or ends — the frame says it all', () => {
+    expect(
+      invalidationsFor({
+        event: 'stream.ended',
+        session_id: 'str_7f3c9a12',
+        reason: 'runner_gone',
+        error: null,
+        engine_id: 7,
+        runner_id: 3,
+        at: '2026-08-26T10:00:10Z',
       }),
     ).toEqual([])
   })

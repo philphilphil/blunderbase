@@ -78,6 +78,13 @@ export const queryKeys = {
   engine: (id: number): QueryKey => ['engines', 'detail', id],
   engineTiers: (): QueryKey => ['engines', 'tiers'],
 
+  runners: (): QueryKey => ['runners'],
+  runnerList: (): QueryKey => ['runners', 'list'],
+  runnersStatus: (): QueryKey => ['runners', 'status'],
+
+  streams: (): QueryKey => ['streams'],
+  streamList: (): QueryKey => ['streams', 'list'],
+
   notes: (): QueryKey => ['notes'],
   noteList: (query: NoteQuery = {}): QueryKey => ['notes', 'list', query],
   note: (id: number): QueryKey => ['notes', 'detail', id],
