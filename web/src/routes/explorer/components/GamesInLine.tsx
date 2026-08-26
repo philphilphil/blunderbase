@@ -57,9 +57,10 @@ export function GamesInLine({
               key={`${occurrence.game.id}-${occurrence.ply}`}
               type="button"
               onClick={() => navigate(`/games/${occurrence.game.id}`)}
-              className="flex h-[1.8125rem] flex-none items-center gap-2.5 rounded-[0.3125rem] px-2.5 text-left transition-colors hover:bg-elevated-2"
+              className="flex h-[1.8125rem] flex-none items-center gap-2.5 whitespace-nowrap rounded-[0.3125rem] px-2.5 text-left transition-colors hover:bg-elevated-2"
             >
-              <span className="w-[3.75rem] flex-none text-soft">
+              {/* `27 Dec 16` is nine mono glyphs — the cell has to hold them on one line. */}
+              <span className="w-[4.25rem] flex-none text-soft">
                 {formatGameDate(occurrence.game.played_at)}
               </span>
               <span className="min-w-0 flex-1 truncate font-sans text-[0.78125rem] text-body">
