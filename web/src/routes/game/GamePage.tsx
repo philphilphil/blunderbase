@@ -16,6 +16,7 @@ import { EnginePanel } from './components/EnginePanel'
 import { EvalGraph } from './components/EvalGraph'
 import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
+import { MaiaPanel } from './components/MaiaPanel'
 import { MoveList, type MoveAnnotation } from './components/MoveList'
 import { NotesColumn } from './components/NotesColumn'
 import {
@@ -48,9 +49,10 @@ const RECURRING_DAYS = 30
 const RECURRING_SAMPLE = 100
 
 /**
- * Design 1a "Studio": board with its eval bar, Maia overlay and the filled eval area chart
- * on the left; the paired move table over the engine's multi-PV lines in the middle; the
- * coach's notes, the recurring-mistake card and the deep-analysis trigger on the right.
+ * Design 1a "Studio": board with its eval bar and a short eval curve on the left; the
+ * paired move table with everything said about the position on the board stacked under it
+ * — the run's multi-PV lines, the deep-analysis trigger, the live search, Maia — in the
+ * middle; the coach's notes and the recurring-mistake card on the right.
  *
  * The cursor is the ply *last played* (`-1` is the starting position). Everything about the
  * position on the board — the engine lines, Maia's prediction, the flagged-move marks —
@@ -77,6 +79,8 @@ function GameStudio({ gameId }: { gameId: number }) {
   const [cursor, setCursor] = useState(-1)
   const [flipped, setFlipped] = useState(false)
   const [hints, setHints] = useState(true)
+  /** The first move of the engine line being pointed at, previewed on the board. */
+  const [hoverMove, setHoverMove] = useState<string | null>(null)
   /** The last `analysis.progress` frame, tagged with the run it belongs to. */
   const [progress, setProgress] = useState<(RunProgress & { runId: number }) | null>(null)
   /** The run `POST /analysis` just returned, until `useRuns` reports it. See `activeRun`. */
@@ -94,7 +98,12 @@ function GameStudio({ gameId }: { gameId: number }) {
   )
 
   const seek = useCallback(
-    (next: number) => setCursor(Math.max(-1, Math.min(plyCount - 1, next))),
+    (next: number) => {
+      setCursor(Math.max(-1, Math.min(plyCount - 1, next)))
+      // A hovered line belongs to the position it was read in: leaving that position drops
+      // the preview, even where the pointer never left the row it was drawn from.
+      setHoverMove(null)
+    },
     [plyCount],
   )
   /** Selecting a move puts the board *after* it, which is what a move list click means. */
@@ -133,6 +142,9 @@ function GameStudio({ gameId }: { gameId: number }) {
     () => engineLines(line, boardIndex, upcoming),
     [line, boardIndex, upcoming],
   )
+  // The board's arrow is the engine's move *here*, which is the top stored line for this
+  // position — not the move that happens next, and nothing at all where no run has looked.
+  const engineBest = lines[0]?.firstUci ?? null
   const maia = useMemo(
     () => preferredLevel(maiaLevels(upcoming?.maia), detail?.game.rating),
     [upcoming, detail],
@@ -268,6 +280,19 @@ function GameStudio({ gameId }: { gameId: number }) {
 
   const players = `${detail.game.white ?? '?'} — ${detail.game.black ?? '?'}`
 
+  // Once a deep pass has finished, the multi-PV box is the thing worth reading first about
+  // the position on the board, so it goes above the move table. Before that it has little
+  // to say, and the table keeps the top of the column.
+  const enginePanel = (
+    <EnginePanel
+      run={engineRun}
+      lines={lines}
+      ply={boardIndex}
+      onHoverMove={setHoverMove}
+      className={deepRun ? 'border-b border-t-0 border-hairline' : undefined}
+    />
+  )
+
   return (
     <>
       <SetPageChrome
@@ -294,6 +319,8 @@ function GameStudio({ gameId }: { gameId: number }) {
             orientation={orientation}
             lastMove={played}
             upcoming={upcoming}
+            engineBest={engineBest}
+            hoverMove={hoverMove}
             maia={maia}
             win={win}
             score={score}
@@ -314,6 +341,7 @@ function GameStudio({ gameId }: { gameId: number }) {
         </div>
 
         <div className="flex min-w-[16rem] flex-1 flex-col border-r border-hairline">
+          {deepRun ? enginePanel : null}
           <MoveList
             pairs={pairs}
             cursor={cursor}
@@ -323,26 +351,17 @@ function GameStudio({ gameId }: { gameId: number }) {
             plyCount={plyCount}
             pgn={pgn}
             onSelectPly={selectPly}
-            className="flex-1"
+            className="min-h-0 flex-1"
           />
           {/*
-            Two panels, two different claims: the stored run says what an analysis pass
-            concluded about the move that was played, the one under it says what an engine
-            is finding in this position right now. Merging them would put a number nobody
-            asked for next to a verdict somebody did.
+            Three panels, three different claims about the same position: the stored run
+            says what an analysis pass concluded about the move that was played, the live
+            search says what an engine is finding right now, and Maia says what a human of
+            this rating would play. Stacked, never merged — and the deep-analysis trigger
+            sits with them, next to the lines it would deepen, rather than in the notes.
           */}
-          <EnginePanel run={engineRun} lines={lines} ply={boardIndex} />
-          <InfiniteAnalysisPanel stream={stream} fen={position.fen} ply={boardIndex} />
-        </div>
-
-        <NotesColumn
-          notes={notes}
-          moves={moves}
-          recurring={recurring}
-          recurringPending={moments.isPending}
-          onSelectPly={selectPly}
-          className="w-[19.75rem] flex-none"
-          footer={
+          {deepRun ? null : enginePanel}
+          <div className="flex-none border-t border-hairline bg-panel p-3">
             <DeepAnalysisCard
               deepRun={deepRun}
               activeRun={activeRun}
@@ -352,7 +371,23 @@ function GameStudio({ gameId }: { gameId: number }) {
               onRequestDeep={() => requestAnalysis('deep')}
               onRequestQuick={() => requestAnalysis('quick')}
             />
-          }
+          </div>
+          <InfiniteAnalysisPanel
+            stream={stream}
+            fen={position.fen}
+            ply={boardIndex}
+            onHoverMove={setHoverMove}
+          />
+          {hints && maia ? <MaiaPanel level={maia} played={upcoming} /> : null}
+        </div>
+
+        <NotesColumn
+          notes={notes}
+          moves={moves}
+          recurring={recurring}
+          recurringPending={moments.isPending}
+          onSelectPly={selectPly}
+          className="w-[19.75rem] flex-none"
         />
       </div>
     </>

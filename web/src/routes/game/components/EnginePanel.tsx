@@ -15,14 +15,16 @@ function tint(color: string, percent: number): string {
 }
 
 /**
- * The engine panel pinned under the move list: which run is speaking, what it spent, and
- * its multi-PV lines for the position on the board. The move actually played is always the
- * last row, marked `played`, so a blunder reads as "these were the options, this happened".
+ * The engine panel in the move-list column — under the table, or over it once a deep pass
+ * has given it something to say: which run is speaking, what it spent, and its multi-PV
+ * lines for the position on the board. The move actually played is always the last row,
+ * marked `played`, so a blunder reads as "these were the options, this happened".
  */
 export function EnginePanel({
   run,
   lines,
   ply,
+  onHoverMove,
   className,
 }: {
   /** The run whose evals the current ply is showing, if any. */
@@ -30,12 +32,17 @@ export function EnginePanel({
   lines: EngineLineView[]
   /** The ply the lines start from — the move about to be played. */
   ply: number
+  /** Pointing at a line previews its first move on the board; leaving clears it. */
+  onHoverMove?: (uci: string | null) => void
   className?: string
 }) {
   const nodes = formatNodes(run?.nodes)
 
   return (
-    <div className={cn('flex flex-none flex-col border-t border-hairline bg-panel', className)}>
+    <div
+      className={cn('flex flex-none flex-col border-t border-hairline bg-panel', className)}
+      data-testid="engine-panel"
+    >
       <div className="flex items-center gap-2 px-3 pb-2 pt-2.5">
         <span
           className={cn('size-1.5 rounded-full', run ? 'bg-accent-teal' : 'bg-edge-strong')}
@@ -76,6 +83,8 @@ export function EnginePanel({
             <div
               key={`${line.multipv}-${line.firstUci ?? 'x'}`}
               data-testid={line.played ? 'engine-played-line' : undefined}
+              onMouseEnter={() => onHoverMove?.(line.firstUci)}
+              onMouseLeave={() => onHoverMove?.(null)}
               className={cn(
                 'flex h-[1.625rem] items-center gap-[0.5625rem] rounded-[0.3125rem] px-1.5',
                 verdict ? null : 'hover:bg-raised',

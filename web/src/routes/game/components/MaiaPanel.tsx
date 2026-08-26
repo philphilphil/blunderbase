@@ -4,17 +4,20 @@ import { cn } from '@/lib/utils'
 
 import { sameMove, type MaiaLevel } from '../gameModel'
 
-const OVERLAY_MOVES = 3
+const PANEL_MOVES = 3
 
 /**
- * The human-model card that floats over the board in design 1a: what a player of this
- * rating plays here, and how often. Purple is the Maia/deep hue throughout the app.
+ * The human model, as a panel under the engine's own lines: what a player of this rating
+ * plays here, and how often. Purple is the Maia/deep hue throughout the app.
  *
- * `played` is the move actually made from this position, so the card can colour its own
+ * It used to float over the board. It reads better stacked with the two engine panels —
+ * the same position, three claims about it — and the board keeps its squares to itself.
+ *
+ * `played` is the move actually made from this position, so the panel can colour its own
  * prediction with the verdict the engine later gave it — the "it called your move before
  * you made it" line only earns its place when the prediction was the blunder.
  */
-export function MaiaOverlay({
+export function MaiaPanel({
   level,
   played,
   className,
@@ -23,7 +26,7 @@ export function MaiaOverlay({
   played: MoveRow | undefined
   className?: string
 }) {
-  const shown = level.moves.slice(0, OVERLAY_MOVES)
+  const shown = level.moves.slice(0, PANEL_MOVES)
   const top = shown[0]
   if (!top) return null
 
@@ -34,10 +37,10 @@ export function MaiaOverlay({
   return (
     <div
       className={cn(
-        'pointer-events-none absolute left-2.5 top-2.5 flex w-[15.375rem] flex-col gap-2 rounded-lg border border-edge-strong bg-panel/93 p-[0.6875rem_0.75rem] shadow-[0_1rem_2.5rem_-0.75rem_var(--bb-shadow)] backdrop-blur-[0.375rem]',
+        'flex flex-none flex-col gap-2 border-t border-hairline bg-panel px-3 py-2.5',
         className,
       )}
-      data-testid="maia-overlay"
+      data-testid="maia-panel"
     >
       <div className="flex items-center gap-[0.4375rem]">
         <span className="size-1.5 rounded-full bg-brilliant" />

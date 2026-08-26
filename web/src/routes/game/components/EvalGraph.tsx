@@ -29,7 +29,9 @@ interface DotProps {
  * the midline so advantage reads as area above the axis, blunders and mistakes marked
  * where they happened, and a dashed teal cursor on the ply the board is showing.
  *
- * Clicking anywhere on the plot jumps the board to that ply.
+ * Kept deliberately short — it is a shape to glance at, not a chart to read numbers off,
+ * and the height it used to take belongs to the board above it. Clicking anywhere on the
+ * plot still jumps the board to that ply.
  */
 export function EvalGraph({
   points,
@@ -54,7 +56,7 @@ export function EvalGraph({
   return (
     <div
       className={cn(
-        'flex min-h-0 flex-col gap-[0.4375rem] rounded-lg border border-line bg-panel px-3 pb-[0.5625rem] pt-[0.6875rem]',
+        'flex max-h-[6.5rem] min-h-0 flex-col gap-[0.21875rem] rounded-lg border border-line bg-panel px-2 pb-[0.28125rem] pt-[0.34375rem]',
         className,
       )}
     >
@@ -67,13 +69,13 @@ export function EvalGraph({
       </div>
 
       {points.length === 0 ? (
-        <div className="flex min-h-[5.75rem] flex-1 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-[0.6875rem] text-dim">
+        <div className="flex min-h-[2.875rem] flex-1 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-center text-[0.6875rem] text-dim">
           No evaluations yet — run an analysis pass to draw the curve.
         </div>
       ) : (
         <ChartContainer
           config={CONFIG}
-          className="min-h-[5.75rem] w-full flex-1 aspect-auto rounded-md bg-graph-bg [&_.recharts-surface]:cursor-crosshair"
+          className="min-h-[2.875rem] w-full flex-1 aspect-auto rounded-md bg-graph-bg [&_.recharts-surface]:cursor-crosshair"
         >
           <AreaChart
             data={points}
@@ -92,8 +94,8 @@ export function EvalGraph({
               tickFormatter={(ply: number) => String(Math.floor(ply / 2) + 1)}
               tickLine={false}
               axisLine={false}
-              height={scalePx(16)}
-              tickMargin={scalePx(2)}
+              height={scalePx(11)}
+              tickMargin={scalePx(1)}
               interval={0}
             />
             <YAxis type="number" domain={[0, 100]} hide />

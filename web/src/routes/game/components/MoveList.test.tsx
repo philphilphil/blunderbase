@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { MoveRow } from '@/lib/api/types'
 
@@ -21,7 +21,7 @@ function longGame(): MoveRow[] {
 
 function renderList(moves: MoveRow[], props: Partial<Parameters<typeof MoveList>[0]> = {}) {
   const onSelectPly = vi.fn()
-  render(
+  const view = render(
     <MoveList
       pairs={pairMoves(moves)}
       cursor={-1}
@@ -33,8 +33,60 @@ function renderList(moves: MoveRow[], props: Partial<Parameters<typeof MoveList>
       {...props}
     />,
   )
-  return { onSelectPly }
+  return { onSelectPly, ...view }
 }
+
+const ROW_HEIGHT = 28
+const VIEWPORT = 100
+
+/**
+ * jsdom has no layout, so the box metrics the scroll effect reads are stood up by hand:
+ * every element is `ROW_HEIGHT` tall, stacked in order inside its parent, in a `VIEWPORT`
+ * of visible height. `scrollTop` is given a backing store so a write can be read back.
+ */
+function stubLayout(): () => void {
+  const scrolled = new WeakMap<Element, number>()
+  const original = {
+    offsetTop: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetTop'),
+    offsetHeight: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight'),
+    clientHeight: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight'),
+    scrollTop: Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop'),
+  }
+  Object.defineProperties(HTMLElement.prototype, {
+    offsetTop: {
+      configurable: true,
+      get(this: HTMLElement) {
+        const parent = this.parentElement
+        return parent ? [...parent.children].indexOf(this) * ROW_HEIGHT : 0
+      },
+    },
+    offsetHeight: { configurable: true, get: () => ROW_HEIGHT },
+    clientHeight: { configurable: true, get: () => VIEWPORT },
+  })
+  Object.defineProperty(Element.prototype, 'scrollTop', {
+    configurable: true,
+    get(this: Element) {
+      return scrolled.get(this) ?? 0
+    },
+    set(this: Element, value: number) {
+      scrolled.set(this, value)
+    },
+  })
+  return () => {
+    for (const [name, descriptor] of Object.entries(original)) {
+      const proto = name === 'scrollTop' ? Element.prototype : HTMLElement.prototype
+      if (descriptor) Object.defineProperty(proto, name, descriptor)
+      else delete (proto as unknown as Record<string, unknown>)[name]
+    }
+  }
+}
+
+let restoreLayout: (() => void) | null = null
+
+afterEach(() => {
+  restoreLayout?.()
+  restoreLayout = null
+})
 
 describe('MoveList', () => {
   it('shows the collapsed-opening affordance and opens it on click', async () => {
@@ -114,6 +166,32 @@ describe('MoveList', () => {
     expect(writeText).toHaveBeenCalledWith('[Event "?"]\n\n1. e4 *\n')
     expect(await screen.findByText('copied')).toBeInTheDocument()
     vi.unstubAllGlobals()
+  })
+
+  it('scrolls its own box to the cursor and never the page around it', () => {
+    // `scrollIntoView` scrolls every scrollable ancestor, the studio's columns and the
+    // window included, so the row is brought into view by hand instead.
+    const scrollIntoView = vi.fn()
+    const previous = Element.prototype.scrollIntoView
+    const undoLayout = stubLayout()
+    restoreLayout = () => {
+      undoLayout()
+      Element.prototype.scrollIntoView = previous
+    }
+    Element.prototype.scrollIntoView = scrollIntoView
+
+    // Move 21 of 21: the 21st row, below a 100px viewport of 28px rows.
+    const { container } = renderList(longGame(), { cursor: 41 })
+    const scroller = container.querySelector('.overflow-y-auto')!
+    expect(scroller.scrollTop).toBe(20 * ROW_HEIGHT + ROW_HEIGHT - VIEWPORT)
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
+  it('leaves the cursor’s row alone while it is already in view', () => {
+    restoreLayout = stubLayout()
+    // Move 2 of 21 sits inside the first viewport, so nothing moves.
+    const { container } = renderList(longGame(), { cursor: 2 })
+    expect(container.querySelector('.overflow-y-auto')!.scrollTop).toBe(0)
   })
 
   it('leaves the PGN affordance out when there is nothing to copy', () => {

@@ -77,9 +77,18 @@ export function MoveList({
     return !folded || pair.moveNumber > collapsedThrough!
   })
 
+  // Keep the cursor's row in view *inside this box*. `scrollIntoView` would do it by
+  // scrolling every scrollable ancestor as well — on this page that means the studio's own
+  // columns and the window, so stepping through a game dragged the whole screen about.
+  // The scroller is the row's offset parent (it is `relative`), so the arithmetic is local.
   useEffect(() => {
-    // Optional-called: jsdom does not implement it, and it is a nicety either way.
-    activeRow.current?.scrollIntoView?.({ block: 'nearest' })
+    const box = scroller.current
+    const row = activeRow.current
+    if (!box || !row) return
+    const top = row.offsetTop
+    const bottom = top + row.offsetHeight
+    if (top < box.scrollTop) box.scrollTop = top
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight
   }, [cursor, tab])
 
   return (
@@ -101,7 +110,7 @@ export function MoveList({
         </div>
       </div>
 
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto py-0.5">
+      <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto py-0.5">
         {folded ? (
           <button
             type="button"

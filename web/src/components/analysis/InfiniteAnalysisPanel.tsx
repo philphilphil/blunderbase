@@ -16,6 +16,12 @@ export interface InfiniteAnalysisPanelProps {
   fen: string | null
   /** For numbering the variation; omitted numbers from move 1. */
   ply?: number | null
+  /**
+   * Pointing at a line offers its first move in UCI, so a surface with a board of its own
+   * can preview it as an arrow; leaving a line offers `null`. Surfaces that draw nothing
+   * pass nothing.
+   */
+  onHoverMove?: (uci: string | null) => void
   className?: string
 }
 
@@ -53,6 +59,25 @@ function HostChip({ runner }: { runner: string | null }) {
 }
 
 /**
+ * The controls sit under the lines, not over them: the lines are what the panel is for, and
+ * a row that changes height as engines and hosts arrive would otherwise keep shoving them
+ * down the page. Shared by the live rail and the game page, so both read the same way.
+ */
+function ControlsFooter({
+  stream,
+  fen,
+}: {
+  stream: StreamSessionApi
+  fen: string | null
+}) {
+  return (
+    <div className="flex flex-none items-center border-t border-hairline px-3 py-2">
+      <AnalysisControls stream={stream} fen={fen} className="w-full" />
+    </div>
+  )
+}
+
+/**
  * What the engine is finding *now* in the position on the board.
  *
  * It sits under the stored-run panel on the game page rather than replacing it: a run says
@@ -69,6 +94,7 @@ export function InfiniteAnalysisPanel({
   stream,
   fen,
   ply,
+  onHoverMove,
   className,
 }: InfiniteAnalysisPanelProps) {
   const { phase, snapshot, session, offer, error, note } = stream
@@ -85,12 +111,11 @@ export function InfiniteAnalysisPanel({
           <span className="text-[0.71875rem] text-dim">
             Analyse this position continuously.
           </span>
-          <div className="flex-1" />
-          <AnalysisControls stream={stream} fen={fen} />
         </div>
         {note ? (
           <p className="px-3 pb-2.5 text-[0.6875rem] text-dim">{note}</p>
         ) : null}
+        <ControlsFooter stream={stream} fen={fen} />
       </section>
     )
   }
@@ -136,7 +161,6 @@ export function InfiniteAnalysisPanel({
             {formatNps(snapshot.nps)}
           </span>
         ) : null}
-        <AnalysisControls stream={stream} fen={fen} />
       </div>
 
       {offer ? (
@@ -196,6 +220,8 @@ export function InfiniteAnalysisPanel({
               <div
                 key={line.multipv}
                 data-testid="infinite-analysis-line"
+                onMouseEnter={() => onHoverMove?.(line.pv[0] ?? null)}
+                onMouseLeave={() => onHoverMove?.(null)}
                 className="flex h-[1.625rem] items-center gap-[0.5625rem] rounded-[0.3125rem] px-1.5 hover:bg-raised"
               >
                 <span
@@ -214,6 +240,8 @@ export function InfiniteAnalysisPanel({
           })}
         </div>
       ) : null}
+
+      <ControlsFooter stream={stream} fen={fen} />
     </section>
   )
 }

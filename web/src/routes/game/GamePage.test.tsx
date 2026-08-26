@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -242,6 +242,34 @@ describe('GamePage', () => {
     expect(screen.getByText('MPV 3')).toBeInTheDocument()
   })
 
+  it('puts the multi-PV box over the move table once a deep pass has run', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const engine = screen.getByTestId('engine-panel')
+    const moveButton = screen.getByRole('button', { name: 'Qxd5' })
+    // A finished deep run is in the payload, so the lines lead the column.
+    expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // The deep-analysis trigger moved out of the notes column and in with the lines.
+    const trigger = screen.getByRole('button', { name: 'Request deep analysis' })
+    expect(screen.getByText('via MCP').closest('button')?.contains(trigger)).toBeFalsy()
+    expect(engine.parentElement?.contains(trigger)).toBe(true)
+  })
+
+  it('leaves the move table on top while nothing has been analysed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({ '/games/14': { ...DETAIL, runs: [] } }),
+    )
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const engine = screen.getByTestId('engine-panel')
+    const moveButton = screen.getByRole('button', { name: 'Qxd5' })
+    expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+  })
+
   it('steps through plies with the arrow keys and follows with the board', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -258,6 +286,20 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 4 / 4')).toBeInTheDocument()
   })
 
+  it('steps the game with the wheel over the board', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const board = screen.getByTestId('board')
+    // Down is forwards, and the page underneath must not scroll with it.
+    expect(fireEvent.wheel(board, { deltaY: 120 })).toBe(false)
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+    fireEvent.wheel(board, { deltaY: 120 })
+    expect(screen.getByText('ply 2 / 4')).toBeInTheDocument()
+    fireEvent.wheel(board, { deltaY: -120 })
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+  })
+
   it('jumps to the position the next flagged move was made from with J', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -266,7 +308,9 @@ describe('GamePage', () => {
     await user.keyboard('j')
     // The blunder is ply 1, so the board sits after ply 0 — where the decision was made.
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
-    expect(screen.getByTestId('maia-overlay')).toHaveTextContent('Maia 1500')
+    // Maia is a panel under the engine lines now, not a card floating over the board.
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1500')
+    expect(screen.getByTestId('board').contains(screen.getByTestId('maia-panel'))).toBe(false)
     expect(screen.getByText('played')).toBeInTheDocument()
   })
 

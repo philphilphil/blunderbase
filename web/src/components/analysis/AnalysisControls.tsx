@@ -2,7 +2,11 @@ import type { StreamSessionApi } from '@/lib/analysis'
 import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
-/** The same switch the Engines page uses, at the size the panel header can carry. */
+/**
+ * The switch the Engines page uses, grown to the size a footer row can carry: the track is
+ * what reads as on or off, and the button around it is a full row-height hit target so the
+ * switch is no harder to hit than the pickers beside it.
+ */
 function Toggle({
   checked,
   onChange,
@@ -26,16 +30,24 @@ function Toggle({
       title={title}
       onClick={() => onChange(!checked)}
       className={cn(
-        'inline-flex h-[1.125rem] w-8 flex-none items-center rounded-full border p-px transition-colors disabled:opacity-50',
-        checked ? 'border-accent-teal/40 bg-accent-teal/25' : 'border-edge bg-elevated',
+        'inline-flex h-8 flex-none items-center rounded-md px-1.5 transition-colors',
+        'hover:bg-raised disabled:opacity-50 disabled:hover:bg-transparent',
+        'outline-none focus-visible:bg-raised',
       )}
     >
       <span
         className={cn(
-          'size-3.5 rounded-full transition-transform',
-          checked ? 'translate-x-3.5 bg-accent-teal' : 'translate-x-0 bg-faint',
+          'inline-flex h-5 w-9 flex-none items-center rounded-full border p-px transition-colors',
+          checked ? 'border-accent-teal/50 bg-accent-teal/25' : 'border-edge-strong bg-elevated',
         )}
-      />
+      >
+        <span
+          className={cn(
+            'size-4 rounded-full transition-transform',
+            checked ? 'translate-x-4 bg-accent-teal' : 'translate-x-0 bg-faint',
+          )}
+        />
+      </span>
     </button>
   )
 }
@@ -54,8 +66,10 @@ export function engineOptionLabel(host: EngineHost): string {
   return `${host.name}${where}${why}`
 }
 
+// Pickers you can actually hit: a 2rem row, text at the size the rest of the panel reads
+// at, and room around it. Anything smaller was a target you had to aim for.
 const SELECT_CLASS =
-  'h-[1.375rem] rounded-md border border-input bg-elevated px-1 text-[0.6875rem] text-soft outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50'
+  'h-8 rounded-md border border-input bg-elevated px-2 text-xs text-soft outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50'
 
 /**
  * The three things a live search is steered by: whether it runs at all, which engine runs
@@ -77,7 +91,17 @@ export function AnalysisControls({
   const deepName = stream.engineId === null ? stream.session?.engine ?? null : null
 
   return (
-    <div className={cn('flex flex-none items-center gap-1.5', className)}>
+    // The switch leads: it is the one control that decides whether the other two matter, and
+    // on a narrow rail it is the one that must never be the thing that wraps away.
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
+      <Toggle
+        checked={stream.enabled}
+        onChange={stream.setEnabled}
+        label="Analyse this position continuously"
+        disabled={idle}
+        title={idle ? 'nothing is on the board' : 'Analyse this position continuously'}
+      />
+
       <select
         aria-label="Engine"
         value={stream.engineId === null ? '' : String(stream.engineId)}
@@ -85,7 +109,9 @@ export function AnalysisControls({
         onChange={(event) =>
           stream.setEngineId(event.target.value === '' ? null : Number(event.target.value))
         }
-        className={cn(SELECT_CLASS, 'max-w-40 truncate')}
+        // Engine names carry a host and sometimes a reason, so this one takes whatever the
+        // row has left, and never less than enough for a name to be read.
+        className={cn(SELECT_CLASS, 'min-w-40 flex-1 truncate')}
       >
         <option value="">{deepName ? `deep tier — ${deepName}` : 'deep tier'}</option>
         {stream.engines.map((host) => (
@@ -100,7 +126,7 @@ export function AnalysisControls({
         value={String(stream.multipv)}
         disabled={idle}
         onChange={(event) => stream.setMultipv(Number(event.target.value))}
-        className={cn(SELECT_CLASS, 'tabular')}
+        className={cn(SELECT_CLASS, 'w-[5.5rem] flex-none tabular')}
       >
         {[1, 2, 3, 4, 5].map((lines) => (
           <option key={lines} value={String(lines)}>
@@ -108,14 +134,6 @@ export function AnalysisControls({
           </option>
         ))}
       </select>
-
-      <Toggle
-        checked={stream.enabled}
-        onChange={stream.setEnabled}
-        label="Analyse this position continuously"
-        disabled={idle}
-        title={idle ? 'nothing is on the board' : undefined}
-      />
     </div>
   )
 }

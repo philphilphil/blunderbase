@@ -123,6 +123,32 @@ describe('InfiniteAnalysisPanel', () => {
     expect(toggle).toBeDisabled()
     expect(toggle).toHaveAttribute('title', 'nothing is on the board')
     expect(screen.getByRole('combobox', { name: 'Engine' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Lines' })).toBeDisabled()
+  })
+
+  it('keeps the controls under the lines rather than over them', () => {
+    render(
+      <InfiniteAnalysisPanel
+        stream={streamApi({
+          enabled: true,
+          phase: 'running',
+          session: SESSION,
+          snapshot: SNAPSHOT,
+        })}
+        fen={SICILIAN}
+        ply={3}
+      />,
+    )
+
+    const rows = screen.getAllByTestId('infinite-analysis-line')
+    const last = rows[rows.length - 1]!
+    for (const control of [
+      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
+      screen.getByRole('combobox', { name: 'Engine' }),
+      screen.getByRole('combobox', { name: 'Lines' }),
+    ]) {
+      expect(last.compareDocumentPosition(control)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    }
   })
 
   it('renders the multi-PV lines as SAN, sorted, with the engine’s own evals', () => {
@@ -159,6 +185,30 @@ describe('InfiniteAnalysisPanel', () => {
     expect(screen.getByText('18.4M nodes')).toBeInTheDocument()
     expect(screen.getByText('1.8M/s')).toBeInTheDocument()
     expect(screen.queryByTestId('infinite-analysis-pending')).not.toBeInTheDocument()
+  })
+
+  it('offers the hovered line’s first move, and takes it back on leaving', async () => {
+    const onHoverMove = vi.fn()
+    render(
+      <InfiniteAnalysisPanel
+        stream={streamApi({
+          enabled: true,
+          phase: 'running',
+          session: SESSION,
+          snapshot: SNAPSHOT,
+        })}
+        fen={SICILIAN}
+        ply={3}
+        onHoverMove={onHoverMove}
+      />,
+    )
+
+    const rows = screen.getAllByTestId('infinite-analysis-line')
+    await userEvent.hover(rows[1]!)
+    // The second-best line, not the first: the arrow follows the pointer.
+    expect(onHoverMove).toHaveBeenLastCalledWith('b8c6')
+    await userEvent.unhover(rows[1]!)
+    expect(onHoverMove).toHaveBeenLastCalledWith(null)
   })
 
   it('falls back to the raw UCI when the position will not replay', () => {

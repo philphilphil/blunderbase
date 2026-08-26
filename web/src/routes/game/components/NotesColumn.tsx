@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
 
-import { McpPanel } from '@/components/shell/McpStatus'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MoveRow } from '@/lib/api/types'
 import { GLYPHS, glyphFor } from '@/lib/chess/classification'
@@ -12,11 +12,37 @@ import { noteAccent, plyLabel, type GameNote, type RecurringMistake } from '../g
 const PATTERN_COLOR = 'var(--bb-accent)'
 
 /**
+ * Whether the column is folded down to its header. Nothing in the API stores UI state, so
+ * it lives in `localStorage` beside the theme preference and the saved filters.
+ */
+export const NOTES_COLLAPSED_KEY = 'blunderbase.notes.collapsed'
+
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(NOTES_COLLAPSED_KEY) === '1'
+  } catch {
+    // Storage disabled or unreadable: the column simply starts open.
+    return false
+  }
+}
+
+function writeCollapsed(collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(NOTES_COLLAPSED_KEY, collapsed ? '1' : '0')
+  } catch {
+    // Quota or a private window: the fold still holds for this session.
+  }
+}
+
+/**
  * The right-hand column from design 1a: what the coach wrote, attributed to the MCP server
- * that carried it, plus the recurring-mistake card and the deep-analysis trigger.
+ * that carried it, plus the recurring-mistake card.
  *
  * Notes are never written here — they arrive from the coach over MCP and land in the open
  * page through the `note.created` / `note.updated` socket events.
+ *
+ * The header folds the list away: a game whose notes have been read is mostly a column of
+ * whitespace, and the board deserves the width more than an empty list does.
  */
 export function NotesColumn({
   notes,
@@ -24,7 +50,6 @@ export function NotesColumn({
   recurring,
   recurringPending,
   onSelectPly,
-  footer,
   className,
 }: {
   notes: GameNote[]
@@ -33,15 +58,33 @@ export function NotesColumn({
   /** `/stats/worst-moments` is a second request, so the pattern card arrives later. */
   recurringPending: boolean
   onSelectPly: (ply: number) => void
-  /** The deep-analysis card and the MCP panel, pinned to the bottom. */
-  footer: ReactNode
   className?: string
 }) {
   const newest = notes[0]
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+
+  const toggle = () => {
+    setCollapsed((value) => {
+      writeCollapsed(!value)
+      return !value
+    })
+  }
+
+  const Chevron = collapsed ? ChevronRight : ChevronDown
 
   return (
     <div className={cn('flex min-h-0 flex-col bg-panel', className)}>
-      <div className="flex h-[2.375rem] flex-none items-center gap-2 border-b border-hairline px-3.5">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        title={collapsed ? 'Show the notes' : 'Hide the notes'}
+        className={cn(
+          'flex h-[2.375rem] flex-none items-center gap-2 px-3.5 text-left hover:bg-raised',
+          !collapsed && 'border-b border-hairline',
+        )}
+      >
+        <Chevron className="size-3.5 flex-none text-dim" aria-hidden />
         <span className="text-xs font-semibold text-ink">Notes</span>
         <span className="inline-flex items-center gap-1.5 rounded-sm border border-edge px-1.5 py-px text-[0.625rem] text-soft">
           <span className="size-[0.3125rem] rounded-full bg-good" />
@@ -49,37 +92,34 @@ export function NotesColumn({
         </span>
         <div className="flex-1" />
         <span className="font-mono text-[0.625rem] tabular text-dim">{notes.length}</span>
-      </div>
+      </button>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-3 py-2.5">
-        <div className="flex items-center gap-[0.4375rem] px-0.5 font-mono text-[0.625rem] text-dim">
-          <span className="text-soft">your assistant</span>
-          <span className="text-faint-2">→</span>
-          <span>{MCP_SERVER_NAME}</span>
-          <div className="flex-1" />
-          <span>{newest ? relative(newest.created_at) : '—'}</span>
-        </div>
-
-        {notes.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-edge-strong bg-elevated-2/50 p-3.5 text-[0.71875rem] leading-[1.55] text-dim">
-            No notes on this game yet. Ask your assistant to look at it — anything it writes
-            with <span className="font-mono text-soft">write_note</span> appears here without a
-            reload.
+      {collapsed ? null : (
+        <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-3 py-2.5">
+          <div className="flex items-center gap-[0.4375rem] px-0.5 font-mono text-[0.625rem] text-dim">
+            <span className="text-soft">your assistant</span>
+            <span className="text-faint-2">→</span>
+            <span>{MCP_SERVER_NAME}</span>
+            <div className="flex-1" />
+            <span>{newest ? relative(newest.created_at) : '—'}</span>
           </div>
-        ) : null}
 
-        {notes.map((note) => (
-          <NoteCard key={note.id} note={note} moves={moves} onSelectPly={onSelectPly} />
-        ))}
+          {notes.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-edge-strong bg-elevated-2/50 p-3.5 text-[0.71875rem] leading-[1.55] text-dim">
+              No notes on this game yet. Ask your assistant to look at it — anything it writes
+              with <span className="font-mono text-soft">write_note</span> appears here without a
+              reload.
+            </div>
+          ) : null}
 
-        {recurring ? <RecurringCard recurring={recurring} /> : null}
-        {!recurring && recurringPending ? <Skeleton className="h-16 rounded-lg" /> : null}
-      </div>
+          {notes.map((note) => (
+            <NoteCard key={note.id} note={note} moves={moves} onSelectPly={onSelectPly} />
+          ))}
 
-      <div className="flex flex-none flex-col gap-2.5 border-t border-hairline p-3">
-        {footer}
-        <McpPanel />
-      </div>
+          {recurring ? <RecurringCard recurring={recurring} /> : null}
+          {!recurring && recurringPending ? <Skeleton className="h-16 rounded-lg" /> : null}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import type { MoveRow } from '@/lib/api/types'
@@ -6,17 +6,24 @@ import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
-import type { MaiaLevel, PlyPosition, Side } from '../gameModel'
+import { sameMove, type MaiaLevel, type PlyPosition, type Side } from '../gameModel'
 import { EvalBar } from './EvalBar'
-import { MaiaOverlay } from './MaiaOverlay'
 
 export interface BoardPanelProps {
   position: PlyPosition
   orientation: Side
   /** The move that produced this position, for the last-move highlight. */
   lastMove: MoveRow | undefined
-  /** The move about to be played — what the engine, Maia and the flags all describe. */
+  /** The move about to be played — what Maia and the flags describe. */
   upcoming: MoveRow | undefined
+  /**
+   * The engine's own move in the position on the board, in UCI: the first move of the top
+   * stored line. Null where nothing has analysed this position — the board then says
+   * nothing rather than pointing at a move no engine ever recommended.
+   */
+  engineBest: string | null
+  /** A line being hovered in one of the engine panels, previewed as its own arrow. */
+  hoverMove?: string | null
   maia: MaiaLevel | null
   win: number | null
   score: Score | null
@@ -31,15 +38,28 @@ export interface BoardPanelProps {
 }
 
 /**
+ * Wheel travel — in CSS pixels, whatever the device reports in — that counts as one move.
+ * A mouse notch is 100 or so and steps once; a trackpad's stream of small deltas is added
+ * up to the same threshold and then reset, so one flick is one move rather than ten.
+ */
+const WHEEL_STEP = 60
+
+/**
  * The board column's middle band: eval bar, board with its overlays, and the transport
  * toolbar. Square marks follow design 1c — the flagged move's two squares outlined in its
  * own colour, the engine's target and Maia's target as a teal and a purple mark.
+ *
+ * The arrows are about the position on the board, never about the move that happens next:
+ * an arrow means "this is what the engine would play here". Maia's arrow is the same claim
+ * for a human of the owner's rating, and is left out when the two agree.
  */
 export function BoardPanel({
   position,
   orientation,
   lastMove,
   upcoming,
+  engineBest,
+  hoverMove,
   maia,
   win,
   score,
@@ -56,8 +76,7 @@ export function BoardPanel({
     if (hints) {
       const maiaTop = maia?.moves[0]?.uci
       if (maiaTop) marks.set(maiaTop.slice(2, 4), 'bb-maia')
-      const best = upcoming?.best_move_uci
-      if (best) marks.set(best.slice(2, 4), 'bb-engine')
+      if (engineBest) marks.set(engineBest.slice(2, 4), 'bb-engine')
     }
     const glyph = glyphFor(upcoming?.classification)
     if (glyph && upcoming?.uci && glyph !== 'best' && glyph !== 'brilliant') {
@@ -65,26 +84,67 @@ export function BoardPanel({
       marks.set(upcoming.uci.slice(2, 4), `bb-${glyph}`)
     }
     return [...marks].map(([square, className]) => ({ square, className }))
-  }, [hints, maia, upcoming])
+  }, [engineBest, hints, maia, upcoming])
 
   const arrows = useMemo<BoardArrow[]>(() => {
-    if (!hints) return []
     const drawn: BoardArrow[] = []
-    const best = upcoming?.best_move_uci
-    if (best) drawn.push({ from: best.slice(0, 2), to: best.slice(2, 4), color: 'paleAccent' })
-    const maiaTop = maia?.moves[0]?.uci
-    if (maiaTop && (!best || maiaTop.slice(0, 4) !== best.slice(0, 4))) {
-      drawn.push({ from: maiaTop.slice(0, 2), to: maiaTop.slice(2, 4), color: 'paleMaia' })
+    if (hints) {
+      if (engineBest) {
+        drawn.push({ from: engineBest.slice(0, 2), to: engineBest.slice(2, 4), color: 'accent' })
+      }
+      const maiaTop = maia?.moves[0]?.uci
+      if (maiaTop && !(engineBest && sameMove(maiaTop, engineBest))) {
+        drawn.push({ from: maiaTop.slice(0, 2), to: maiaTop.slice(2, 4), color: 'paleMaia' })
+      }
+    }
+    // The hover preview is an answer to something the reader is doing right now, so it is
+    // drawn whether or not the standing hints are on — but never twice over its own arrow.
+    if (hoverMove && !(hints && engineBest && sameMove(hoverMove, engineBest))) {
+      drawn.push({ from: hoverMove.slice(0, 2), to: hoverMove.slice(2, 4), color: 'paleAccent' })
     }
     return drawn
-  }, [hints, maia, upcoming])
+  }, [engineBest, hints, hoverMove, maia])
+
+  // Wheeling over the board steps the game: down is forwards, the way a move list reads.
+  // The listener is attached by hand because React's `onWheel` is passive, and a passive
+  // listener cannot stop the page from scrolling underneath the gesture.
+  const column = useRef<HTMLDivElement>(null)
+  // The listener is bound once, so the current cursor lives behind a ref (as in `Board`).
+  const seeking = useRef({ cursor, onSeek })
+  useEffect(() => {
+    seeking.current = { cursor, onSeek }
+  })
+  const travel = useRef(0)
+
+  useEffect(() => {
+    const node = column.current
+    if (!node) return
+    function onWheel(event: WheelEvent) {
+      // A pinch-zoom is a wheel event too, and is not a request for the next move.
+      if (event.ctrlKey) return
+      event.preventDefault()
+      // `deltaMode` is lines or pages on some browsers; both become rough pixels.
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1
+      const delta = event.deltaY * scale
+      if (delta === 0) return
+      // Turning round mid-gesture starts its own count rather than paying off the old one.
+      if (delta > 0 !== travel.current > 0) travel.current = 0
+      travel.current += delta
+      if (Math.abs(travel.current) < WHEEL_STEP) return
+      const step = travel.current > 0 ? 1 : -1
+      travel.current = 0
+      seeking.current.onSeek(seeking.current.cursor + step)
+    }
+    node.addEventListener('wheel', onWheel, { passive: false })
+    return () => node.removeEventListener('wheel', onWheel)
+  }, [])
 
   return (
-    <div className={cn('flex flex-col gap-3.5', className)}>
+    <div ref={column} className={cn('flex flex-col gap-3.5', className)}>
       <div className="flex items-start gap-2.5">
         <EvalBar win={win} score={score} className="self-stretch" />
-        {/* The overlay is a child of the board so it is positioned against the squares
-            rather than against the rank rail beside them. */}
+        {/* Nothing floats over the squares: Maia's prediction is a panel of its own, under
+            the engine lines, and only its target square is marked here. */}
         <Board
           fen={position.fen}
           orientation={orientation}
@@ -95,9 +155,7 @@ export function BoardPanel({
           check={position.check ? position.turn : false}
           coordinates="edge"
           className="min-w-0 flex-1"
-        >
-          {hints && maia ? <MaiaOverlay level={maia} played={upcoming} /> : null}
-        </Board>
+        />
       </div>
 
       <div className="flex items-center gap-2">
