@@ -8,17 +8,19 @@ from mcp.types import TextContent
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import Result, Tier
+from backend.db.enums import Platform, Result, Tier
 from backend.db.session import get_sessionmaker
 from backend.mcp import arguments as args
 from backend.mcp import payloads
 from backend.mcp.errors import (
+    BAD_ARGUMENT,
     NOT_IMPLEMENTED,
     QUEUE_FULL,
     UNKNOWN_GAME,
     CoachError,
     guarded,
 )
+from backend.services import accounts as accounts_service
 from backend.services import analysis as analysis_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
@@ -134,6 +136,7 @@ def build_server(
     server: MCPServer = MCPServer(name=name, instructions=INSTRUCTIONS)
     _register_convenience(server, coach)
     _register_query(server, coach)
+    _register_accounts(server, coach)
     _register_insight(server, coach)
     _register_analysis(server, coach)
     _register_memory(server, coach)
@@ -345,6 +348,37 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
         with coach.session() as session:
             profile = games_service.get_player_profile(session, max_points=points)
         return payloads.result(profile)
+
+
+# --- accounts --------------------------------------------------------------
+
+
+def _register_accounts(server: MCPServer, coach: Coach) -> None:
+    @server.tool()
+    @guarded
+    def register_account(platform: str, username: str) -> TextContent:
+        """Tell the database that a username on `lichess` or `chesscom` is one the owner
+        plays under, and claim the games already stored under it. This is the fix when
+        games come back with no colour, opponent or rating: they were imported before any
+        account named their owner. Safe to repeat — a game whose side is already known
+        keeps it."""
+        kind = args.member(Platform, platform, "platform")
+        if kind is None:
+            raise CoachError(BAD_ARGUMENT, "a platform is required")
+        with coach.session() as session:
+            account, filled = accounts_service.register_and_reconcile(session, kind, username)
+            payload = accounts_service.account_payload(
+                account, accounts_service.attributed_counts(session).get(account.id, 0)
+            )
+            unclaimed = accounts_service.unclaimed_games(session)
+        return payloads.result(
+            {
+                "account": payload,
+                "linked": filled.linked,
+                "colored": filled.colored,
+                "unclaimed": unclaimed,
+            }
+        )
 
 
 # --- stats and explorer ----------------------------------------------------

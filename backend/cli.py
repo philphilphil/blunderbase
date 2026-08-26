@@ -8,9 +8,10 @@ from typing import Any
 
 from backend import __version__
 from backend.config import Settings, get_settings
-from backend.db.enums import JobStatus, Tier
+from backend.db.enums import JobStatus, Platform, Tier
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import session_scope
+from backend.services import accounts as accounts_service
 from backend.services import analysis as analysis_service
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
@@ -65,6 +66,18 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     imports.add_argument("--path", help="the PGN file to read (pgn)")
     imports.add_argument("--since", help="resume from this cursor instead of the stored one")
     imports.add_argument("--max-games", type=_positive_int, metavar="N", help="stop after N games")
+
+    accounts = commands.add_parser("accounts", help="the usernames that make a game yours")
+    account_commands = accounts.add_subparsers(dest="accounts_command", required=True)
+    account_commands.add_parser("list", help="every account and the games attributed to it")
+    add_account = account_commands.add_parser(
+        "add", help="register an account and claim the games it has already played"
+    )
+    add_account.add_argument("platform", choices=[str(platform) for platform in Platform])
+    add_account.add_argument("username")
+    account_commands.add_parser(
+        "reconcile", help="re-run owner attribution over the games already stored"
+    )
 
     analyze = commands.add_parser("analyze", help="enqueue engine analysis and run the queue")
     analyze.add_argument(
@@ -140,6 +153,36 @@ def command_import(args: argparse.Namespace, settings: Settings) -> int:
     if status == JobStatus.FAILED:
         print(f"{args.source}: import failed: {message}")
         return 1
+    return 0
+
+
+def _print_accounts(rows: list[dict[str, Any]]) -> None:
+    """One line per account: where it plays, who it is, and how much of the library it is."""
+    if not rows:
+        print("no accounts yet; `blunderbase accounts add lichess <username>` writes one")
+        return
+    width = max(len(row["username"]) for row in rows)
+    for row in rows:
+        owner = "owner" if row["is_owner"] else "other"
+        print(f"{row['platform']:8} {row['username']:{width}}  {owner}  {row['games']} game(s)")
+
+
+def command_accounts(args: argparse.Namespace, settings: Settings) -> int:
+    """The account rows, which are the only thing that makes a stored game the owner's."""
+    upgrade_to_head(settings)
+    with session_scope(settings) as session:
+        if args.accounts_command == "list":
+            _print_accounts(accounts_service.list_accounts(session))
+            return 0
+        if args.accounts_command == "add":
+            account, filled = accounts_service.register_and_reconcile(
+                session, args.platform, args.username
+            )
+            print(f"{account.platform}: {account.username} is the owner's account")
+        else:
+            filled = accounts_service.reconcile_games(session)
+        print(f"{filled.linked} game side(s) linked, {filled.colored} game(s) coloured")
+        print(f"{accounts_service.unclaimed_games(session)} game(s) still belong to nobody")
     return 0
 
 
@@ -263,6 +306,7 @@ def command_db(args: argparse.Namespace, settings: Settings) -> int:
 COMMANDS = {
     "serve": command_serve,
     "import": command_import,
+    "accounts": command_accounts,
     "analyze": command_analyze,
     "mcp": command_mcp,
     "set-password": command_set_password,

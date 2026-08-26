@@ -22,6 +22,7 @@ from backend.db.enums import (
     Color,
     EngineKind,
     JobStatus,
+    Platform,
     RunStatus,
     Source,
     Tier,
@@ -146,6 +147,42 @@ class GameDetail(Payload):
     moves: list[MoveRow] = Field(default_factory=list)
     runs: list[dict[str, Any]] = Field(default_factory=list)
     notes: list[dict[str, Any]] | None = None
+
+
+# --- accounts -------------------------------------------------------------
+
+
+class AccountResponse(Payload):
+    """`services.accounts.account_payload`: one username the owner plays under."""
+
+    id: int
+    platform: Platform
+    username: str
+    display_name: str | None = None
+    is_owner: bool = True
+    games: int = Field(default=0, description="stored games this account is a player in")
+    created_at: datetime | None = None
+
+
+class AccountCreate(Input):
+    """Register an account. Registering also repairs the games it already played in."""
+
+    platform: Platform
+    username: str = Field(min_length=1, max_length=64)
+    display_name: str | None = Field(default=None, max_length=128)
+
+
+class Reconciliation(BaseModel):
+    """What a repair filled in, and what it could not: games nobody is a player in."""
+
+    linked: int = Field(default=0, description="game sides that gained their account link")
+    colored: int = Field(default=0, description="games that gained an owner colour")
+    unclaimed: int = Field(default=0, description="games left with no owner colour at all")
+
+
+class AccountRegistered(BaseModel):
+    account: AccountResponse
+    reconciled: Reconciliation
 
 
 # --- import ---------------------------------------------------------------

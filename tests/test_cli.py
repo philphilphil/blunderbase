@@ -11,8 +11,16 @@ from sqlalchemy import select
 import backend
 from backend.cli import _import_options, build_parser, main
 from backend.config import Settings
-from backend.db.enums import EngineKind, JobStatus, RunStatus
-from backend.db.models import AnalysisRun, Credential, Engine, Game, GamePosition, ImportJob
+from backend.db.enums import EngineKind, JobStatus, Platform, RunStatus
+from backend.db.models import (
+    Account,
+    AnalysisRun,
+    Credential,
+    Engine,
+    Game,
+    GamePosition,
+    ImportJob,
+)
 from backend.db.session import session_scope
 from backend.services import auth as auth_service
 from backend.services import import_service
@@ -112,6 +120,67 @@ def test_a_missing_pgn_file_reports_a_failed_job(
 ) -> None:
     assert main(["import", "pgn", "/nowhere/at/all.pgn"]) == 1
     assert "import failed" in capsys.readouterr().out
+
+
+def test_accounts_list_names_the_owner_and_counts_their_games(
+    settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
+    assert main(["accounts", "add", "lichess", "blunderbase"]) == 0
+    capsys.readouterr()
+
+    assert main(["accounts", "list"]) == 0
+
+    line = capsys.readouterr().out.strip()
+    assert line.startswith("lichess  blunderbase")
+    assert "owner" in line and "3 game(s)" in line
+
+
+def test_accounts_list_says_so_when_there_are_none(
+    settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["accounts", "list"]) == 0
+    assert "no accounts yet" in capsys.readouterr().out
+
+
+def test_accounts_add_claims_the_games_that_were_already_there(
+    settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The production case: an archive imported before any account named its owner."""
+    assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
+    with session_scope(settings) as session:
+        assert [game.owner_color for game in session.scalars(select(Game))] == [None, None, None]
+    capsys.readouterr()
+
+    assert main(["accounts", "add", "lichess", "blunderbase"]) == 0
+
+    output = capsys.readouterr().out
+    assert "lichess: blunderbase is the owner's account" in output
+    assert "3 game side(s) linked, 3 game(s) coloured" in output
+    assert "0 game(s) still belong to nobody" in output
+    with session_scope(settings) as session:
+        assert all(game.owner_color is not None for game in session.scalars(select(Game)))
+
+
+def test_accounts_reconcile_repairs_every_account_and_repeats_harmlessly(
+    settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["db", "upgrade"]) == 0
+    with session_scope(settings) as session:
+        session.add(Account(platform=Platform.LICHESS, username="blunderbase", is_owner=True))
+    assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
+    capsys.readouterr()
+
+    assert main(["accounts", "reconcile"]) == 0
+
+    output = capsys.readouterr().out
+    assert "0 game side(s) linked, 0 game(s) coloured" in output, "the import already claimed them"
+    assert "0 game(s) still belong to nobody" in output
+
+
+def test_accounts_add_refuses_a_platform_that_is_not_one(settings: Settings) -> None:
+    with pytest.raises(SystemExit):
+        build_parser(settings).parse_args(["accounts", "add", "telepathy", "owner"])
 
 
 def test_analyze_parses_the_flags_a_deep_pass_needs(settings: Settings) -> None:

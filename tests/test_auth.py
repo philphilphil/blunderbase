@@ -33,6 +33,7 @@ OTHER = "a-different-password"
 # Every router, by a path that answers on an empty database.
 ROUTE_FAMILIES = (
     "/games",
+    "/accounts",
     "/import/jobs",
     "/analysis/queue",
     "/explorer",

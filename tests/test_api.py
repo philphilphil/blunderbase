@@ -294,6 +294,105 @@ def test_a_game_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
     assert response.json() == {"error": "unknown_game", "detail": "no game with id 9999"}
 
 
+# --- /accounts ------------------------------------------------------------
+
+
+@pytest.fixture()
+def unattributed(settings: Settings, fixtures_dir: Path) -> Iterator[TestClient]:
+    """A library imported before any account named its owner — the production bug.
+
+    Every game names `blunderbase` as a player and not one of them knows it: no account
+    row existed while they were being stored, so `owner_color` was never decided.
+    """
+    settings.analysis_workers = False
+    upgrade_to_head(settings)
+    with get_sessionmaker(settings)() as session:
+        import_service.run_import(session, "pgn", path=str(fixtures_dir / "query_games.pgn"))
+    with running_app(create_app(settings)) as client:
+        yield client
+
+
+def test_the_accounts_list_carries_the_games_each_one_is_a_player_in(
+    api: TestClient,
+) -> None:
+    response = api.get("/accounts")
+
+    assert response.status_code == 200
+    account = response.json()[0]
+    assert account["platform"] == "lichess"
+    assert account["username"] == OWNER
+    assert account["is_owner"] is True
+    assert account["games"] == 6
+
+
+def test_registering_an_account_claims_the_games_that_were_already_stored(
+    unattributed: TestClient,
+) -> None:
+    """The repair, over HTTP: six games that showed no opponent and no rating."""
+    before = unattributed.get("/games", params={"limit": 50}).json()["games"]
+    assert all(game["color"] is None and game["opponent"] is None for game in before)
+
+    response = unattributed.post("/accounts", json={"platform": "lichess", "username": OWNER})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["account"]["username"] == OWNER
+    assert body["account"]["games"] == 6
+    assert body["reconciled"] == {"linked": 6, "colored": 6, "unclaimed": 0}
+    after = unattributed.get("/games", params={"limit": 50}).json()["games"]
+    assert all(game["opponent"] and game["rating"] for game in after)
+
+
+def test_registering_the_same_account_again_repairs_nothing_and_adds_no_row(
+    unattributed: TestClient,
+) -> None:
+    unattributed.post("/accounts", json={"platform": "lichess", "username": OWNER})
+
+    again = unattributed.post("/accounts", json={"platform": "lichess", "username": "BLUNDERBASE"})
+
+    assert again.json()["reconciled"] == {"linked": 0, "colored": 0, "unclaimed": 0}
+    assert len(unattributed.get("/accounts").json()) == 1
+
+
+def test_reconcile_repairs_a_library_whose_account_was_never_applied(
+    settings: Settings, unattributed: TestClient
+) -> None:
+    with get_sessionmaker(settings)() as session:
+        session.add(Account(platform=Platform.LICHESS, username=OWNER, is_owner=True))
+        session.commit()
+
+    response = unattributed.post("/accounts/reconcile")
+
+    assert response.status_code == 200
+    assert response.json() == {"linked": 6, "colored": 6, "unclaimed": 0}
+    assert unattributed.post("/accounts/reconcile").json() == {
+        "linked": 0,
+        "colored": 0,
+        "unclaimed": 0,
+    }
+
+
+def test_a_platform_nobody_plays_on_is_a_422(api: TestClient) -> None:
+    response = api.post("/accounts", json={"platform": "telepathy", "username": OWNER})
+
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+    assert response.json()["fields"][0]["field"].endswith("platform")
+
+
+def test_the_accounts_routes_are_behind_the_owners_password(
+    settings: Settings, seeded: dict[str, int]
+) -> None:
+    settings.analysis_workers = False
+    with running_app(create_app(settings), password=None) as stranger:
+        assert stranger.get("/accounts").status_code == 401
+        assert (
+            stranger.post("/accounts", json={"platform": "lichess", "username": OWNER}).status_code
+            == 401
+        )
+        assert stranger.post("/accounts/reconcile").status_code == 401
+
+
 # --- /import --------------------------------------------------------------
 
 

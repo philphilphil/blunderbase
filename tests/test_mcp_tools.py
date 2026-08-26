@@ -41,6 +41,7 @@ TOOLS = {
     "get_game",
     "find_positions",
     "get_player_profile",
+    "register_account",
     "opening_explorer",
     "get_stats",
     "request_analysis",
@@ -574,6 +575,30 @@ async def test_get_player_profile_thins_a_rating_series(
 ) -> None:
     payload = await call(coach, "get_player_profile", rating_points=2)
     assert all(len(series["points"]) <= 2 for series in payload["ratings"])
+
+
+# --- accounts --------------------------------------------------------------
+
+
+async def test_register_account_claims_the_games_that_were_stored_without_one(
+    coach: MCPServer, session: Session, fixtures_dir: Path
+) -> None:
+    """The coach's own repair for an archive imported before an account named its owner."""
+    run_import(session, Source.PGN, path=str(fixtures_dir / "query_games.pgn"))
+    assert all(game.owner_color is None for game in session.scalars(select(Game)))
+
+    payload = await call(coach, "register_account", platform="lichess", username=OWNER)
+
+    assert payload["account"]["username"] == OWNER
+    assert payload["account"]["is_owner"] is True
+    assert payload["account"]["games"] == 6
+    assert (payload["linked"], payload["colored"], payload["unclaimed"]) == (6, 6, 0)
+
+
+async def test_register_account_refuses_a_platform_nobody_plays_on(coach: MCPServer) -> None:
+    payload = await failure(coach, "register_account", platform="telepathy", username=OWNER)
+    assert payload["error"] == "bad_argument"
+    assert "chesscom" in payload["allowed"]
 
 
 # --- stats and explorer ----------------------------------------------------

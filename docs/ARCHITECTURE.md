@@ -138,6 +138,11 @@ stream's place, so one broken game costs exactly that game. `ingest_games` then,
 - **Resolves the owner.** `AccountIndex` matches player names against `accounts`. A source
   that names a platform matches on that platform only; a PGN or a manual game has no
   platform and matches on the username alone. No match means `owner_color` stays NULL.
+  An account is a first-class row rather than a side effect of a sync — `blunderbase
+  accounts add` and `POST /accounts` write one — and both of those, like the sync itself,
+  then run `reconcile_games`: the same match re-applied to the games already stored, which
+  is what repairs a library imported before any account named its owner. The repair only
+  ever fills in an empty column, so it is idempotent and never revises a decided game.
 - **Enqueues the quick tier.** A `queued` `AnalysisRun` per imported game, against the
   enabled engine whose `default_tier` is `quick`, else any enabled UCI engine. No engine
   means no run — an import must never fail because the engine list is empty.

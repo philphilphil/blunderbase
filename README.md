@@ -149,11 +149,18 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 
 ## Commands
 
-`uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`, `analyze` (queue a
+`uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`,
+`accounts <list|add|reconcile>`, `analyze` (queue a
 tier and drain it in this process), `mcp [--transport stdio|http]`, `set-password`,
 `db upgrade`. The
 queue is `analysis_runs` rows rather than a broker, so `blunderbase analyze` is safe to
 run while the server is up, and nothing is lost across a restart.
+
+`accounts add lichess <username>` names a username as one of yours and claims the games
+already stored under it — that is what fills in the colour, opponent and ratings of an
+archive imported before any account said which player was you. `accounts reconcile` runs
+the same repair for every account; it is idempotent, and never revises a game whose side
+is already known.
 
 ## Cutting a release
 

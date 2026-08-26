@@ -149,6 +149,25 @@ def register_account(
     return account
 
 
+def register_and_reconcile(
+    session: Session,
+    platform: Platform | str,
+    username: str,
+    *,
+    display_name: str | None = None,
+) -> tuple[Account, Reconciled]:
+    """`register_account`, saying what registering it repaired.
+
+    Registering reconciles either way; a surface with someone waiting on the answer — the
+    CLI, `POST /accounts` — has to be able to tell them how many games that claimed, and
+    the account row is not a record of it.
+    """
+    account = register_account(
+        session, platform, username, display_name=display_name, reconcile=False
+    )
+    return account, reconcile_games(session, account)
+
+
 def reconcile_games(session: Session, account: Account | None = None) -> Reconciled:
     """Re-derive the account links and the owner colour of games that were stored without.
 
@@ -187,6 +206,52 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
     # still remembers the values from before; the next read of one comes off the database.
     session.expire_all()
     return filled
+
+
+def list_accounts(session: Session) -> list[dict[str, Any]]:
+    """Every account, oldest first, with the number of games each one is a player in."""
+    counts = attributed_counts(session)
+    return [
+        account_payload(account, counts.get(account.id, 0))
+        for account in session.scalars(select(Account).order_by(Account.id))
+    ]
+
+
+def account_payload(account: Account, games: int = 0) -> dict[str, Any]:
+    """One account as an API response, a CLI row or a tool result."""
+    return {
+        "id": account.id,
+        "platform": str(account.platform),
+        "username": account.username,
+        "display_name": account.display_name,
+        "is_owner": account.is_owner,
+        "games": games,
+        "created_at": account.created_at.isoformat(),
+    }
+
+
+def attributed_counts(session: Session) -> dict[int, int]:
+    """How many stored games name each account as one of their two players.
+
+    Two grouped counts rather than a walk over the rows: the answer is a column in a list
+    a person reads, and the table it is counted over is the whole library.
+    """
+    counts: dict[int, int] = {}
+    for column in (Game.white_account_id, Game.black_account_id):
+        rows = session.execute(
+            select(column, func.count()).where(column.is_not(None)).group_by(column)
+        )
+        for account_id, played in rows:
+            counts[account_id] = counts.get(account_id, 0) + played
+    return counts
+
+
+def unclaimed_games(session: Session) -> int:
+    """Stored games with no owner colour: the ones no account has claimed a side of."""
+    total = session.scalar(
+        select(func.count()).select_from(Game).where(Game.owner_color.is_(None))
+    )
+    return int(total or 0)
 
 
 def claimable_sources(account: Account, accounts: Sequence[Account]) -> list[Source]:
