@@ -1,0 +1,632 @@
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from importlib import import_module
+from typing import Any, Protocol
+
+from sqlalchemy import insert, select
+from sqlalchemy.orm import Session
+
+from backend.db.enums import (
+    Color,
+    JobStatus,
+    Platform,
+    Result,
+    Source,
+    Speed,
+    Tier,
+)
+from backend.db.models import (
+    Account,
+    AnalysisRun,
+    Engine,
+    Game,
+    GamePosition,
+    ImportJob,
+    Position,
+)
+from backend.db.types import utcnow
+from backend.services import analysis, engines
+from backend.services.analysis import QUICK_PRIORITY  # noqa: F401  (the pipeline's own priority)
+
+
+class UnknownSourceError(LookupError):
+    """The requested source has no registered adapter."""
+
+
+class SourceNotImplementedError(NotImplementedError):
+    """The adapter is registered but has not been written yet."""
+
+
+@dataclass(slots=True)
+class ImportResult:
+    """What one adapter run did, folded back into the job row by `run_import`."""
+
+    seen: int = 0
+    imported: int = 0
+    skipped: int = 0
+    failed: int = 0
+    cursor: str | None = None
+    # One entry per game that could not be parsed or stored: {"ref": ..., "error": ...}.
+    errors: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ParsedGame:
+    """One game as an adapter hands it over: source-neutral, still database-free.
+
+    The pipeline replays `moves_uci` itself to extract positions, so an adapter is only
+    responsible for producing a legal move list and whatever metadata its source carries.
+    """
+
+    source: Source
+    white_name: str
+    black_name: str
+    result: Result
+    pgn: str
+    moves_uci: list[str] = field(default_factory=list)
+    moves_san: list[str] = field(default_factory=list)
+    source_id: str | None = None
+    white_rating: int | None = None
+    black_rating: int | None = None
+    termination: str | None = None
+    variant: str = "standard"
+    rated: bool | None = None
+    speed: Speed | None = None
+    time_control: str | None = None
+    initial_clock: int | None = None
+    increment: int | None = None
+    eco: str | None = None
+    opening_name: str | None = None
+    played_at: datetime | None = None
+    clocks: list[float | None] | None = None
+    # Set when the game does not start from the initial array (chess960, OTB fragments).
+    initial_fen: str | None = None
+    # How this game is named in an error record or a progress event.
+    ref: str | None = None
+
+    @property
+    def reference(self) -> str:
+        if self.ref:
+            return self.ref
+        if self.source_id:
+            return f"{self.source}:{self.source_id}"
+        return f"{self.white_name} vs {self.black_name}"
+
+
+@dataclass(slots=True)
+class ImportFailure:
+    """A game an adapter could not parse. Yielded in place of a `ParsedGame`."""
+
+    ref: str
+    error: str
+
+
+@dataclass(slots=True)
+class IngestOutcome:
+    """The stored game and whether this call is what created it."""
+
+    game: Game
+    created: bool
+
+
+# A progress subscriber: the WebSocket layer, a CLI printer, a test recorder. It is called
+# once per game and once each at the start and the end of a job; see the EVENT_* shapes.
+ProgressHook = Callable[[dict[str, Any]], None]
+
+EVENT_IMPORT_STARTED = "import.started"
+EVENT_IMPORT_GAME = "import.game"
+EVENT_IMPORT_FINISHED = "import.finished"
+
+GAME_IMPORTED = "imported"
+GAME_SKIPPED = "skipped"
+GAME_FAILED = "failed"
+
+# Which platform's accounts name the owner in a game from this source. A PGN or a manual
+# game belongs to no platform, so it matches an account by username alone.
+PLATFORM_FOR_SOURCE: dict[Source, Platform] = {
+    Source.LICHESS: Platform.LICHESS,
+    Source.CHESSCOM: Platform.CHESSCOM,
+}
+
+CHESS960_VARIANTS = frozenset({"chess960", "fischerandom", "fischerrandom"})
+
+# SQLite's default parameter limit is the tighter of the two back ends; a game never has
+# this many distinct positions, but a lookup is chunked rather than assumed to be small.
+LOOKUP_CHUNK = 400
+
+
+class ImportAdapter(Protocol):
+    """What every source module exposes as `run`.
+
+    The adapter owns fetching and parsing; it turns what it fetched into `ParsedGame`s
+    (and `ImportFailure`s for what it could not parse) and hands them to `ingest_games`,
+    which does the storing. It never aborts the whole sync for one bad game — that goes
+    into `ImportResult.errors`.
+
+    `**options` are the CLI flags and API fields the caller passed, plus `progress`, which
+    the adapter forwards to `ingest_games`. Every adapter accepts `**options` so a flag it
+    does not know about is ignored rather than raising.
+    """
+
+    def __call__(self, session: Session, job: ImportJob, **options: Any) -> ImportResult: ...
+
+
+# Source name -> the dotted path of its adapter's `run`. Registration is by path rather
+# than by import so that adding a source never means editing an import list, and so that
+# an adapter that is still a stub fails when it is called rather than at start-up.
+SOURCES: dict[str, str] = {
+    Source.LICHESS: "backend.adapters.lichess:run",
+    Source.CHESSCOM: "backend.adapters.chesscom:run",
+    Source.PGN: "backend.adapters.pgn_import:run",
+}
+
+
+def register_source(source: str, target: str) -> None:
+    """Point a source name at `module:attribute`. Overwrites an existing registration."""
+    SOURCES[source] = target
+
+
+def get_adapter(source: str) -> ImportAdapter:
+    """Resolve a registered source to its callable, importing the module on first use."""
+    try:
+        target = SOURCES[source]
+    except KeyError:
+        known = ", ".join(sorted(SOURCES))
+        raise UnknownSourceError(
+            f"unknown import source {source!r}; known sources: {known}"
+        ) from None
+    module_name, _, attribute = target.partition(":")
+    module = import_module(module_name)
+    adapter = getattr(module, attribute, None)
+    if adapter is None:
+        raise SourceNotImplementedError(f"{target} is not implemented yet")
+    return adapter
+
+
+def run_import(
+    session: Session, source: str, *, progress: ProgressHook | None = None, **options: Any
+) -> ImportJob:
+    """Create an ImportJob, run the source's adapter under it and record the outcome.
+
+    Failures of individual games land in `ImportJob.errors`; only an adapter-level error
+    marks the job failed. That error is not re-raised, because the job row is the record
+    of what happened and rolling it back would lose it.
+    """
+    adapter = get_adapter(source)
+    job = ImportJob(source=Source(source), status=JobStatus.RUNNING, started_at=utcnow())
+    session.add(job)
+    session.commit()
+    _emit(progress, {"event": EVENT_IMPORT_STARTED, **_job_fields(job), "at": _stamp()})
+
+    try:
+        result = adapter(session, job, progress=progress, **options)
+    except Exception as exc:
+        session.rollback()
+        job.status = JobStatus.FAILED
+        job.message = f"{type(exc).__name__}: {exc}"
+    else:
+        _apply(job, result)
+        job.status = JobStatus.DONE
+        if result.cursor is not None:
+            job.cursor = result.cursor
+    job.finished_at = utcnow()
+    session.commit()
+
+    _emit(
+        progress,
+        {
+            "event": EVENT_IMPORT_FINISHED,
+            **_job_fields(job),
+            "status": str(job.status),
+            **_counts(job),
+            "message": job.message,
+            "at": _stamp(),
+        },
+    )
+    return job
+
+
+def ingest_games(
+    session: Session,
+    job: ImportJob,
+    games: Iterable[ParsedGame | ImportFailure],
+    *,
+    progress: ProgressHook | None = None,
+    accounts: AccountIndex | None = None,
+) -> ImportResult:
+    """Store a stream of parsed games under one job: dedup, positions, quick-tier run.
+
+    Every game is its own transaction, so a sync that dies half-way keeps what it got and
+    one unstorable game costs exactly that game. The counters and the error list are
+    written back to the job after each one, which is what makes a long sync's progress
+    visible to anything reading the row.
+    """
+    if job.id is None:
+        session.add(job)
+        session.commit()
+    if accounts is None:
+        accounts = AccountIndex.load(session)
+
+    result = ImportResult()
+    for item in games:
+        result.seen += 1
+        if isinstance(item, ImportFailure):
+            _record_failure(result, item.ref, item.error)
+            event = _game_event(job, item.ref, GAME_FAILED, result, error=item.error)
+        else:
+            try:
+                outcome = ingest_game(session, job, item, accounts)
+            except Exception as exc:
+                session.rollback()
+                error = f"{type(exc).__name__}: {exc}"
+                _record_failure(result, item.reference, error)
+                event = _game_event(job, item.reference, GAME_FAILED, result, error=error)
+            else:
+                if outcome.created:
+                    result.imported += 1
+                    status = GAME_IMPORTED
+                else:
+                    result.skipped += 1
+                    status = GAME_SKIPPED
+                event = _game_event(
+                    job, item.reference, status, result, game_id=outcome.game.id
+                )
+        _apply(job, result)
+        session.commit()
+        _emit(progress, event)
+    return result
+
+
+def ingest_game(
+    session: Session,
+    job: ImportJob,
+    parsed: ParsedGame,
+    accounts: AccountIndex | None = None,
+) -> IngestOutcome:
+    """Store one parsed game, or report the one that is already there.
+
+    Raises whatever the move list is wrong about — `ingest_games` turns that into a
+    per-game error record.
+    """
+    if accounts is None:
+        accounts = AccountIndex.load(session)
+
+    digest = dedup_hash(parsed)
+    existing = find_duplicate(session, parsed.source, parsed.source_id, digest)
+    if existing is not None:
+        return IngestOutcome(game=existing, created=False)
+
+    rows = position_rows(parsed)
+    white_account, white_is_owner = accounts.match(parsed.source, parsed.white_name)
+    black_account, black_is_owner = accounts.match(parsed.source, parsed.black_name)
+    owner_color: Color | None = None
+    if white_is_owner:
+        owner_color = Color.WHITE
+    elif black_is_owner:
+        owner_color = Color.BLACK
+
+    game = Game(
+        source=parsed.source,
+        source_id=parsed.source_id,
+        dedup_hash=digest,
+        white_name=parsed.white_name,
+        black_name=parsed.black_name,
+        white_rating=parsed.white_rating,
+        black_rating=parsed.black_rating,
+        white_account_id=white_account,
+        black_account_id=black_account,
+        owner_color=owner_color,
+        result=parsed.result,
+        termination=parsed.termination,
+        variant=parsed.variant,
+        rated=parsed.rated,
+        speed=parsed.speed,
+        time_control=parsed.time_control,
+        initial_clock=parsed.initial_clock,
+        increment=parsed.increment,
+        eco=parsed.eco,
+        opening_name=parsed.opening_name,
+        played_at=parsed.played_at,
+        pgn=parsed.pgn,
+        moves_uci=list(parsed.moves_uci),
+        moves_san=list(parsed.moves_san),
+        clocks=list(parsed.clocks) if parsed.clocks else None,
+        ply_count=len(parsed.moves_uci),
+        import_job_id=job.id,
+    )
+    session.add(game)
+    session.flush()
+
+    store_positions(session, game, rows)
+    enqueue_quick_analysis(session, game)
+    return IngestOutcome(game=game, created=True)
+
+
+def dedup_hash(parsed: ParsedGame) -> str:
+    """A stable identity for a game that carries no source ID.
+
+    Moves plus the calendar day plus both player names, which is what stays the same when
+    the same game arrives twice by two routes — a PGN export of an already-synced Lichess
+    game keeps all three even though its source and its source ID change.
+    """
+    day = parsed.played_at.date().isoformat() if parsed.played_at else ""
+    material = "|".join(
+        (
+            _fold(parsed.white_name),
+            _fold(parsed.black_name),
+            day,
+            " ".join(parsed.moves_uci),
+        )
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def find_duplicate(
+    session: Session, source: Source, source_id: str | None, digest: str
+) -> Game | None:
+    """The game this one already is: same source ID, or the same moves by another route.
+
+    The hash is a fallback for games one of the two routes could not name — a PGN export
+    of an already-synced Lichess game keeps the moves, the day and the players but arrives
+    with no source ID. A game this source *has* named differently is a different game
+    however identical it looks: two bullet rematches of the same short trap line share
+    every scrap of the hash's material, and swallowing the second would lose it for good.
+    """
+    statement = select(Game).where(Game.dedup_hash == digest)
+    if source_id:
+        stored = session.scalars(
+            select(Game).where(Game.source == source, Game.source_id == source_id)
+        ).first()
+        if stored is not None:
+            return stored
+        statement = statement.where((Game.source != source) | Game.source_id.is_(None))
+    return session.scalars(statement).first()
+
+
+def position_rows(parsed: ParsedGame) -> list[tuple[str, str, Color, str | None, str | None]]:
+    """Replay the game into one row per position reached, the last one after the last move.
+
+    The key is the normalised FEN — piece placement, side to move, castling rights and a
+    legal en-passant square. The move and halfmove counters are deliberately dropped, so
+    the same position reached by two move orders is one row.
+    """
+    # Imported here rather than at module scope: registration by path keeps `chess` out of
+    # a process that only serves `/health`, and this is the one function that needs it.
+    import chess
+    import chess.polyglot
+
+    chess960 = parsed.variant.lower() in CHESS960_VARIANTS
+    if parsed.initial_fen:
+        board = chess.Board(parsed.initial_fen, chess960=chess960)
+    else:
+        board = chess.Board(chess960=chess960)
+    board.chess960 = board.chess960 or board.has_chess960_castling_rights()
+
+    def key() -> tuple[str, str, Color]:
+        side = Color.WHITE if board.turn else Color.BLACK
+        return board.epd(), f"{chess.polyglot.zobrist_hash(board):016x}", side
+
+    rows: list[tuple[str, str, Color, str | None, str | None]] = []
+    for index, uci in enumerate(parsed.moves_uci):
+        san = parsed.moves_san[index] if index < len(parsed.moves_san) else None
+        rows.append((*key(), uci, san))
+        board.push(board.parse_uci(uci))
+    rows.append((*key(), None, None))
+    return rows
+
+
+def store_positions(
+    session: Session,
+    game: Game,
+    rows: Sequence[tuple[str, str, Color, str | None, str | None]],
+) -> None:
+    """Insert the positions this game reached that are new, then the join rows in one go."""
+    keys: dict[str, tuple[str, Color]] = {}
+    for fen, zobrist, side, _uci, _san in rows:
+        keys.setdefault(fen, (zobrist, side))
+
+    stored: dict[str, int] = {}
+    fens = list(keys)
+    for start in range(0, len(fens), LOOKUP_CHUNK):
+        chunk = fens[start : start + LOOKUP_CHUNK]
+        found = session.execute(
+            select(Position.fen, Position.id).where(Position.fen.in_(chunk))
+        ).all()
+        stored.update({fen: identifier for fen, identifier in found})
+
+    missing = [
+        Position(fen=fen, zobrist_key=zobrist, side_to_move=side)
+        for fen, (zobrist, side) in keys.items()
+        if fen not in stored
+    ]
+    if missing:
+        session.add_all(missing)
+        session.flush()
+        stored.update({position.fen: position.id for position in missing})
+
+    session.execute(
+        insert(GamePosition),
+        [
+            {
+                "game_id": game.id,
+                "ply": ply,
+                "position_id": stored[fen],
+                "move_uci": uci,
+                "move_san": san,
+            }
+            for ply, (fen, _zobrist, _side, uci, san) in enumerate(rows)
+        ],
+    )
+
+
+def enqueue_quick_analysis(session: Session, game: Game) -> AnalysisRun | None:
+    """Queue the automatic quick pass over a freshly imported game.
+
+    The run is built by `analysis.request_analysis`, so it lands in the queue with the
+    node budget and priority the workers actually need — one enqueue path, one set of
+    defaults, whether the pass was asked for by an import, the UI or the coach.
+
+    No enabled engine to run it with means no run: an import must not fail because the
+    engine list is empty, and a run pointing at nothing would only fail later. The commit
+    is left to `ingest_games`, which owns the transaction this game is being written in.
+    """
+    engine = quick_tier_engine(session)
+    if engine is None:
+        return None
+    return analysis.request_analysis(
+        session,
+        game_id=game.id,
+        tier=Tier.QUICK,
+        engine_id=engine.id,
+        commit=False,
+    )
+
+
+def quick_tier_engine(session: Session) -> Engine | None:
+    """The engine the quick tier should use: its own default, else any enabled UCI engine."""
+    return engines.engine_for_tier(session, Tier.QUICK)
+
+
+@dataclass(slots=True)
+class AccountIndex:
+    """The owner's usernames, which is what decides which side of a game is "you"."""
+
+    entries: list[tuple[int, Platform, str, bool]] = field(default_factory=list)
+
+    @classmethod
+    def load(cls, session: Session) -> AccountIndex:
+        accounts = session.scalars(select(Account).order_by(Account.id)).all()
+        return cls(
+            entries=[
+                (account.id, account.platform, _fold(account.username), account.is_owner)
+                for account in accounts
+            ]
+        )
+
+    def match(self, source: Source, name: str) -> tuple[int | None, bool]:
+        """The account this player name is, and whether that account is the owner's.
+
+        A source that names a platform matches on that platform only — a stranger on
+        chess.com may well be called what the owner is called on Lichess. A PGN or a
+        manual game belongs to no platform, so it matches on the username alone, and where
+        several accounts share one the owner's wins: the same handle on two sites is still
+        the same person.
+        """
+        folded = _fold(name)
+        if not folded:
+            return None, False
+
+        platform = PLATFORM_FOR_SOURCE.get(source)
+        if platform is not None:
+            for identifier, account_platform, username, is_owner in self.entries:
+                if account_platform == platform and username == folded:
+                    return identifier, is_owner
+            return None, False
+
+        candidates = [entry for entry in self.entries if entry[2] == folded]
+        owners = [entry for entry in candidates if entry[3]]
+        if owners:
+            return owners[0][0], True
+        if len(candidates) == 1:
+            return candidates[0][0], candidates[0][3]
+        return None, False
+
+
+def get_job(session: Session, job_id: int) -> ImportJob | None:
+    """One import job with its counts and per-game errors."""
+    return session.get(ImportJob, job_id)
+
+
+def list_jobs(session: Session, source: str | None = None, limit: int = 50) -> list[ImportJob]:
+    """Sync history, newest first, optionally for one source."""
+    statement = select(ImportJob).order_by(ImportJob.created_at.desc(), ImportJob.id.desc())
+    if source is not None:
+        statement = statement.where(ImportJob.source == Source(source))
+    return list(session.scalars(statement.limit(limit)))
+
+
+def latest_cursor(session: Session, source: str, account_id: int | None = None) -> str | None:
+    """The cursor of the last successful sync of this source, for an incremental run."""
+    statement = (
+        select(ImportJob.cursor)
+        .where(
+            ImportJob.source == Source(source),
+            ImportJob.status == JobStatus.DONE,
+            ImportJob.cursor.is_not(None),
+        )
+        .order_by(ImportJob.created_at.desc(), ImportJob.id.desc())
+    )
+    if account_id is not None:
+        statement = statement.where(ImportJob.account_id == account_id)
+    return session.scalars(statement.limit(1)).first()
+
+
+def _fold(name: str | None) -> str:
+    return (name or "").strip().casefold()
+
+
+def _stamp() -> str:
+    return utcnow().isoformat()
+
+
+def _job_fields(job: ImportJob) -> dict[str, Any]:
+    return {"job_id": job.id, "source": str(job.source)}
+
+
+def _counts(job: ImportJob) -> dict[str, int]:
+    return {
+        "seen": job.games_seen,
+        "imported": job.games_imported,
+        "skipped": job.games_skipped,
+        "failed": job.games_failed,
+    }
+
+
+def _record_failure(result: ImportResult, ref: str, error: str) -> None:
+    result.failed += 1
+    result.errors.append({"ref": ref, "error": error})
+
+
+def _game_event(
+    job: ImportJob,
+    ref: str,
+    status: str,
+    result: ImportResult,
+    *,
+    game_id: int | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "event": EVENT_IMPORT_GAME,
+        **_job_fields(job),
+        "ref": ref,
+        "status": status,
+        "game_id": game_id,
+        "error": error,
+        "seen": result.seen,
+        "imported": result.imported,
+        "skipped": result.skipped,
+        "failed": result.failed,
+    }
+
+
+def _apply(job: ImportJob, result: ImportResult) -> None:
+    job.games_seen = result.seen
+    job.games_imported = result.imported
+    job.games_skipped = result.skipped
+    job.games_failed = result.failed
+    job.errors = list(result.errors)
+
+
+def _emit(progress: ProgressHook | None, event: dict[str, Any]) -> None:
+    """Hand one event to the subscriber. A subscriber must never be able to abort a sync."""
+    if progress is None:
+        return
+    try:
+        progress(event)
+    except Exception:
+        return

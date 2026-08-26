@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+from enum import StrEnum
+
+# Every one of these is stored as a plain string column and validated in Python (see
+# `backend.db.types.EnumString`). No native database enum type is used: PostgreSQL's would
+# need its own migration to gain a member, and SQLite has none at all.
+
+
+class Source(StrEnum):
+    """Where a game came from."""
+
+    LICHESS = "lichess"
+    CHESSCOM = "chesscom"
+    PGN = "pgn"
+    MANUAL = "manual"
+
+
+class Platform(StrEnum):
+    """Where an account lives."""
+
+    LICHESS = "lichess"
+    CHESSCOM = "chesscom"
+    OTB = "otb"
+
+
+class Color(StrEnum):
+    WHITE = "white"
+    BLACK = "black"
+
+
+class Result(StrEnum):
+    WHITE_WIN = "1-0"
+    BLACK_WIN = "0-1"
+    DRAW = "1/2-1/2"
+    UNKNOWN = "*"
+
+
+class Speed(StrEnum):
+    BULLET = "bullet"
+    BLITZ = "blitz"
+    RAPID = "rapid"
+    CLASSICAL = "classical"
+    CORRESPONDENCE = "correspondence"
+
+
+class Tier(StrEnum):
+    """How much engine budget one analysis pass gets."""
+
+    QUICK = "quick"
+    DEEP = "deep"
+
+
+class RunStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class JobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class Classification(StrEnum):
+    """Win-percentage-based move quality, à la Lichess; thresholds are configurable."""
+
+    BEST = "best"
+    GOOD = "good"
+    INACCURACY = "inaccuracy"
+    MISTAKE = "mistake"
+    BLUNDER = "blunder"
+
+
+class EngineKind(StrEnum):
+    UCI = "uci"
+    MAIA = "maia"

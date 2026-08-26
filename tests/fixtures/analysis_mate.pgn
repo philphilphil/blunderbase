@@ -1,0 +1,17 @@
+[Event "Rated Bullet game"]
+[Site "https://lichess.org/m4t3d000"]
+[Date "2026.04.02"]
+[Round "-"]
+[White "blunderbase"]
+[Black "opponent"]
+[Result "0-1"]
+[UTCDate "2026.04.02"]
+[UTCTime "20:41:09"]
+[WhiteElo "1712"]
+[BlackElo "1701"]
+[TimeControl "60+0"]
+[ECO "A00"]
+[Opening "Barnes Opening"]
+[Termination "Normal"]
+
+1. f3 e5 2. g4 Qh4# 0-1

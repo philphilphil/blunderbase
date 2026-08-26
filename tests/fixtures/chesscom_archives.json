@@ -1,0 +1,177 @@
+{
+  "https://api.chess.com/pub/player/blunderbase/games/archives": {
+    "archives": [
+      "https://api.chess.com/pub/player/blunderbase/games/2025/12",
+      "https://api.chess.com/pub/player/blunderbase/games/2026/01",
+      "https://api.chess.com/pub/player/blunderbase/games/2026/02"
+    ]
+  },
+  "https://api.chess.com/pub/player/blunderbase/games/2025/12": {
+    "games": [
+      {
+        "url": "https://www.chess.com/game/live/999000001",
+        "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2025.12.28\"]\n[Round \"-\"]\n[White \"opponent0\"]\n[Black \"Blunderbase\"]\n[Result \"1-0\"]\n[ECO \"B90\"]\n[ECOUrl \"https://www.chess.com/openings/Sicilian-Defense-Najdorf-Variation\"]\n[UTCDate \"2025.12.28\"]\n[UTCTime \"20:15:00\"]\n[WhiteElo \"1544\"]\n[BlackElo \"1521\"]\n[TimeControl \"180+2\"]\n[Termination \"opponent0 won by resignation\"]\n[StartTime \"20:15:00\"]\n[EndDate \"2025.12.28\"]\n[EndTime \"20:19:40\"]\n[Link \"https://www.chess.com/game/live/999000001\"]\n\n1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 1-0\n",
+        "time_control": "180+2",
+        "end_time": 1766953180,
+        "rated": true,
+        "tcn": "mC0Kbs!Tgv",
+        "uuid": "aaaaaaaa-0001-4000-8000-000000000001",
+        "initial_setup": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+        "fen": "rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq -",
+        "time_class": "blitz",
+        "rules": "chess",
+        "white": {
+          "rating": 1544,
+          "result": "win",
+          "@id": "https://api.chess.com/pub/player/opponent0",
+          "username": "opponent0",
+          "uuid": "bbbbbbbb-0001-4000-8000-000000000001"
+        },
+        "black": {
+          "rating": 1521,
+          "result": "resigned",
+          "@id": "https://api.chess.com/pub/player/blunderbase",
+          "username": "Blunderbase",
+          "uuid": "cccccccc-0001-4000-8000-000000000001"
+        },
+        "eco": "https://www.chess.com/openings/Sicilian-Defense-Najdorf-Variation"
+      }
+    ]
+  },
+  "https://api.chess.com/pub/player/blunderbase/games/2026/01": {
+    "games": [
+      {
+        "url": "https://www.chess.com/game/live/111111111",
+        "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.01.12\"]\n[Round \"-\"]\n[White \"Blunderbase\"]\n[Black \"opponent1\"]\n[Result \"1-0\"]\n[ECO \"C54\"]\n[ECOUrl \"https://www.chess.com/openings/Italian-Game-Classical-Variation\"]\n[UTCDate \"2026.01.12\"]\n[UTCTime \"19:22:04\"]\n[WhiteElo \"1503\"]\n[BlackElo \"1488\"]\n[TimeControl \"300+5\"]\n[Termination \"Blunderbase won by resignation\"]\n[StartTime \"19:22:04\"]\n[EndDate \"2026.01.12\"]\n[EndTime \"19:27:31\"]\n[Link \"https://www.chess.com/game/live/111111111\"]\n\n1. e4 {[%clk 0:05:00]} e5 {[%clk 0:05:00]} 2. Nf3 {[%clk 0:04:58]} Nc6 {[%clk 0:04:57]} 3. Bc4 {[%clk 0:04:55]} Bc5 {[%clk 0:04:56]} 4. c3 {[%clk 0:04:52]} Nf6 {[%clk 0:04:50]} 5. d4 {[%clk 0:04:48]} exd4 {[%clk 0:04:44]} 6. cxd4 {[%clk 0:04:47]} Bb4+ {[%clk 0:04:40]} 7. Bd2 {[%clk 0:04:45]} Bxd2+ {[%clk 0:04:38]} 8. Nbxd2 {[%clk 0:04:44]} d5 {[%clk 0:04:30]} 9. exd5 {[%clk 0:04:41]} Nxd5 {[%clk 0:04:26]} 10. O-O {[%clk 0:04:39]} O-O {[%clk 0:04:22]} 1-0\n",
+        "time_control": "300+5",
+        "end_time": 1768245451,
+        "rated": true,
+        "tcn": "mC0Kbs!Tgvks",
+        "uuid": "aaaaaaaa-0002-4000-8000-000000000002",
+        "initial_setup": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+        "fen": "r1bqk2r/pppp1ppp/2n2n2/8/1bPP4/5N2/PP3PPP/RNBQKB1R w KQkq -",
+        "time_class": "blitz",
+        "rules": "chess",
+        "white": {
+          "rating": 1503,
+          "result": "win",
+          "@id": "https://api.chess.com/pub/player/blunderbase",
+          "username": "Blunderbase",
+          "uuid": "cccccccc-0001-4000-8000-000000000001"
+        },
+        "black": {
+          "rating": 1488,
+          "result": "resigned",
+          "@id": "https://api.chess.com/pub/player/opponent1",
+          "username": "opponent1",
+          "uuid": "bbbbbbbb-0002-4000-8000-000000000002"
+        },
+        "eco": "https://www.chess.com/openings/Italian-Game-Classical-Variation",
+        "accuracies": {
+          "white": 82.5,
+          "black": 71.2
+        }
+      },
+      {
+        "url": "https://www.chess.com/game/daily/222222222",
+        "pgn": "[Event \"Let's Play!\"]\n[Site \"Chess.com\"]\n[Date \"2026.01.20\"]\n[Round \"-\"]\n[White \"opponent2\"]\n[Black \"Blunderbase\"]\n[Result \"1/2-1/2\"]\n[ECO \"D35\"]\n[ECOUrl \"https://www.chess.com/openings/Queens-Gambit-Declined\"]\n[UTCDate \"2026.01.20\"]\n[UTCTime \"08:00:00\"]\n[WhiteElo \"1610\"]\n[BlackElo \"1590\"]\n[TimeControl \"1/259200\"]\n[Termination \"Game drawn by agreement\"]\n[Link \"https://www.chess.com/game/daily/222222222\"]\n\n1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 1/2-1/2\n",
+        "time_control": "1/259200",
+        "end_time": 1768982400,
+        "rated": true,
+        "tcn": "lB!Tbs",
+        "uuid": "aaaaaaaa-0003-4000-8000-000000000003",
+        "initial_setup": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+        "fen": "rnbqk2r/ppp1bppp/4pn2/3p2B1/2PP4/2N5/PP2PPPP/R2QKBNR w KQkq -",
+        "time_class": "daily",
+        "rules": "chess",
+        "white": {
+          "rating": 1610,
+          "result": "agreed",
+          "@id": "https://api.chess.com/pub/player/opponent2",
+          "username": "opponent2",
+          "uuid": "bbbbbbbb-0003-4000-8000-000000000003"
+        },
+        "black": {
+          "rating": 1590,
+          "result": "agreed",
+          "@id": "https://api.chess.com/pub/player/blunderbase",
+          "username": "Blunderbase",
+          "uuid": "cccccccc-0001-4000-8000-000000000001"
+        },
+        "eco": "https://www.chess.com/openings/Queens-Gambit-Declined"
+      }
+    ]
+  },
+  "https://api.chess.com/pub/player/blunderbase/games/2026/02": {
+    "games": [
+      {
+        "url": "https://www.chess.com/game/live/333333333",
+        "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.02.03\"]\n[Round \"-\"]\n[White \"opponent3\"]\n[Black \"Blunderbase\"]\n[Result \"0-1\"]\n[ECO \"A02\"]\n[ECOUrl \"https://www.chess.com/openings/Birds-Opening\"]\n[UTCDate \"2026.02.03\"]\n[UTCTime \"07:41:12\"]\n[WhiteElo \"1470\"]\n[BlackElo \"1512\"]\n[TimeControl \"600\"]\n[Termination \"Blunderbase won by checkmate\"]\n[StartTime \"07:41:12\"]\n[EndDate \"2026.02.03\"]\n[EndTime \"07:41:55\"]\n[Link \"https://www.chess.com/game/live/333333333\"]\n\n1. f3 e5 2. g4 Qh4# 0-1\n",
+        "time_control": "600",
+        "end_time": 1770104515,
+        "rated": false,
+        "tcn": "fm0Kdm",
+        "uuid": "aaaaaaaa-0004-4000-8000-000000000004",
+        "initial_setup": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+        "fen": "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq -",
+        "time_class": "rapid",
+        "rules": "chess",
+        "white": {
+          "rating": 1470,
+          "result": "checkmated",
+          "@id": "https://api.chess.com/pub/player/opponent3",
+          "username": "opponent3",
+          "uuid": "bbbbbbbb-0004-4000-8000-000000000004"
+        },
+        "black": {
+          "rating": 1512,
+          "result": "win",
+          "@id": "https://api.chess.com/pub/player/blunderbase",
+          "username": "Blunderbase",
+          "uuid": "cccccccc-0001-4000-8000-000000000001"
+        },
+        "eco": "https://www.chess.com/openings/Birds-Opening"
+      },
+      {
+        "url": "https://www.chess.com/game/live/444444444",
+        "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.02.09\"]\n[Round \"-\"]\n[White \"Blunderbase\"]\n[Black \"opponent4\"]\n[Result \"1-0\"]\n[UTCDate \"2026.02.09\"]\n[UTCTime \"21:05:00\"]\n[TimeControl \"180\"]\n[Termination \"Blunderbase won on time\"]\n[Link \"https://www.chess.com/game/live/444444444\"]\n\n1. e4 e5 2. Qxf7 1-0\n",
+        "time_control": "180",
+        "end_time": 1770671160,
+        "rated": true,
+        "uuid": "aaaaaaaa-0005-4000-8000-000000000005",
+        "time_class": "blitz",
+        "rules": "chess",
+        "white": {
+          "rating": 1499,
+          "result": "win",
+          "username": "Blunderbase"
+        },
+        "black": {
+          "rating": 1502,
+          "result": "timeout",
+          "username": "opponent4"
+        }
+      },
+      {
+        "url": "https://www.chess.com/game/live/555555555",
+        "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2026.02.14\"]\n[Round \"-\"]\n[White \"Blunderbase\"]\n[Black \"opponent5\"]\n[Result \"1-0\"]\n[Variant \"Bughouse\"]\n[UTCDate \"2026.02.14\"]\n[UTCTime \"18:30:00\"]\n[TimeControl \"180\"]\n[Termination \"Blunderbase won by checkmate\"]\n[Link \"https://www.chess.com/game/live/555555555\"]\n\n1. e4 e5 2. Nf3 Nc6 1-0\n",
+        "time_control": "180",
+        "end_time": 1771093800,
+        "rated": true,
+        "uuid": "aaaaaaaa-0006-4000-8000-000000000006",
+        "time_class": "blitz",
+        "rules": "bughouse",
+        "white": {
+          "rating": 1499,
+          "result": "win",
+          "username": "Blunderbase"
+        },
+        "black": {
+          "rating": 1502,
+          "result": "checkmated",
+          "username": "opponent5"
+        }
+      }
+    ]
+  }
+}

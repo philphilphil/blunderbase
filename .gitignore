@@ -1,2 +1,14 @@
 docs/superpowers/
 docs/notes.md
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+data/
+engines/
+*.db
+*.db-shm
+*.db-wal
+.env

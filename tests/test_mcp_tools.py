@@ -1,0 +1,827 @@
+from __future__ import annotations
+
+import json
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import pytest
+from mcp import Client
+from mcp.server import MCPServer
+from mcp.types import CallToolResult, TextContent, Tool
+from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
+
+from backend.db.enums import (
+    Classification,
+    EngineKind,
+    Platform,
+    RunStatus,
+    Source,
+    Tier,
+)
+from backend.db.models import Account, AnalysisRun, Engine, Game, GamePosition, MoveEval
+from backend.mcp import server as mcp_server
+from backend.mcp.server import build_server
+from backend.services import analysis as analysis_service
+from backend.services.import_service import run_import
+
+OWNER = "blunderbase"
+START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
+# Every tool the design spec asks the coach surface for.
+TOOLS = {
+    "get_last_games",
+    "get_worst_recent_moments",
+    "compare_periods",
+    "search_games",
+    "get_game",
+    "find_positions",
+    "get_player_profile",
+    "opening_explorer",
+    "get_stats",
+    "request_analysis",
+    "get_analysis_status",
+    "analyze_position",
+    "save_note",
+    "search_notes",
+}
+
+# What "token-conscious" has to mean in bytes: five analysed games, with their eval
+# curves and worst moments, inside a couple of thousand characters.
+LAST_GAMES_BUDGET = 4000
+
+
+@pytest.fixture()
+def library(session: Session, fixtures_dir: Path) -> dict[str, Game]:
+    """The fixture PGN imported through the real pipeline, owned by one account."""
+    session.add(Account(platform=Platform.LICHESS, username=OWNER, is_owner=True))
+    session.commit()
+    job = run_import(session, Source.PGN, path=str(fixtures_dir / "query_games.pgn"))
+    assert job.games_imported == 6, job.errors
+    stored = session.scalars(select(Game).order_by(Game.id)).all()
+    return {game.source_id: game for game in stored}
+
+
+@pytest.fixture()
+def engine_row(session: Session) -> Engine:
+    engine = Engine(
+        name="stockfish-test",
+        kind=EngineKind.UCI,
+        path="/nonexistent/stockfish",
+        default_tier=Tier.QUICK,
+    )
+    session.add(engine)
+    session.commit()
+    return engine
+
+
+def analyse(
+    session: Session,
+    game: Game,
+    evals: Sequence[dict[str, Any]],
+    *,
+    engine: Engine | None = None,
+    tier: Tier = Tier.QUICK,
+    status: RunStatus = RunStatus.DONE,
+) -> AnalysisRun:
+    """One finished full-game run, the way a worker eventually writes it."""
+    positions = {
+        row.ply: row.position_id
+        for row in session.scalars(select(GamePosition).where(GamePosition.game_id == game.id))
+    }
+    run = AnalysisRun(
+        game_id=game.id,
+        engine_id=engine.id if engine is not None else None,
+        tier=tier,
+        status=status,
+        finished_at=datetime.now(UTC),
+    )
+    session.add(run)
+    session.flush()
+    for entry in evals:
+        ply = entry["ply"]
+        session.add(
+            MoveEval(
+                run_id=run.id,
+                ply=ply,
+                position_id=positions.get(ply),
+                move_san=game.moves_san[ply],
+                move_uci=game.moves_uci[ply],
+                classification=entry.get("classification"),
+                win_before=entry.get("win_before"),
+                win_after=entry.get("win_after"),
+                win_loss=entry.get("win_loss"),
+                eval_after_cp=entry.get("cp"),
+                best_move_uci=entry.get("best_move_uci"),
+                best_lines=entry.get("best_lines"),
+                maia_policy=entry.get("maia_policy"),
+            )
+        )
+    session.commit()
+    return run
+
+
+@pytest.fixture()
+def analysed(library: dict[str, Game], session: Session, engine_row: Engine) -> dict[str, Game]:
+    """Quick passes over two of the owner's games, one of them with Maia and lines."""
+    berlin = library["qg000001"]
+    analyse(
+        session,
+        berlin,
+        [
+            {"ply": 0, "classification": Classification.BEST, "win_after": 52.0, "cp": 20},
+            {"ply": 1, "classification": Classification.GOOD, "win_after": 51.0, "cp": 15},
+            {
+                "ply": 2,
+                "classification": Classification.INACCURACY,
+                "win_after": 39.0,
+                "win_loss": 12.0,
+                "cp": -60,
+                "best_move_uci": "d2d4",
+                "best_lines": [{"rank": 1, "cp": 30, "pv": ["d2d4", "d7d5", "g1f3"]}],
+                "maia_policy": {"1700": [{"uci": "b1c3", "p": 0.41}]},
+            },
+            {"ply": 3, "classification": Classification.GOOD, "win_after": 60.0, "cp": 55},
+            {
+                "ply": 4,
+                "classification": Classification.BLUNDER,
+                "win_after": 8.0,
+                "win_loss": 45.0,
+                "cp": -420,
+                "best_move_uci": "f1c4",
+            },
+            {"ply": 5, "classification": Classification.BEST, "win_after": 92.0, "cp": 430},
+            {
+                "ply": 6,
+                "classification": Classification.MISTAKE,
+                "win_after": 70.0,
+                "win_loss": 22.0,
+                "cp": 180,
+                "best_move_uci": "e1g1",
+            },
+        ],
+        engine=engine_row,
+    )
+    analyse(
+        session,
+        library["qg000006"],
+        [
+            {"ply": ply, "classification": Classification.GOOD, "win_after": 50.0 + ply}
+            for ply in range(0, 20)
+        ],
+        engine=engine_row,
+    )
+    return library
+
+
+@pytest.fixture()
+def coach(sessions: sessionmaker[Session]) -> MCPServer:
+    """The coach surface over the test database.
+
+    Every call below connects a client of its own: the SDK's client owns a task group,
+    and a fixture that yielded one would tear it down in a different task than the one it
+    was entered in. Connecting is in-process and costs nothing.
+    """
+    return build_server(sessions=sessions)
+
+
+def text_of(result: CallToolResult) -> str:
+    assert result.content, "a tool answered with no content"
+    block = result.content[0]
+    assert isinstance(block, TextContent)
+    assert len(result.content) == 1, "a payload should be one block, not several"
+    return block.text
+
+
+async def invoke(coach: MCPServer, name: str, arguments: dict[str, Any]) -> CallToolResult:
+    async with Client(coach) as client:
+        return await client.call_tool(name, arguments)
+
+
+async def tools_of(coach: MCPServer) -> list[Tool]:
+    async with Client(coach) as client:
+        return (await client.list_tools()).tools
+
+
+async def call(coach: MCPServer, name: str, **arguments: Any) -> Any:
+    result = await invoke(coach, name, arguments)
+    assert not result.is_error, text_of(result)
+    return json.loads(text_of(result))
+
+
+async def failure(coach: MCPServer, name: str, **arguments: Any) -> dict[str, Any]:
+    result = await invoke(coach, name, arguments)
+    assert result.is_error, text_of(result)
+    payload = json.loads(text_of(result))
+    assert set(payload) >= {"error", "message"}
+    assert "Traceback" not in payload["message"]
+    return payload
+
+
+# --- the surface itself ----------------------------------------------------
+
+
+async def test_every_tool_the_spec_asks_for_is_registered(coach: MCPServer) -> None:
+    listing = await tools_of(coach)
+    assert {tool.name for tool in listing} == TOOLS
+
+
+async def test_every_tool_describes_itself(coach: MCPServer) -> None:
+    listing = await tools_of(coach)
+    for tool in listing:
+        assert tool.description and len(tool.description) > 40, tool.name
+        assert tool.input_schema["type"] == "object"
+
+
+async def test_only_the_id_arguments_are_required(coach: MCPServer) -> None:
+    """A coach tool with no required argument is one the model can always reach for."""
+    listing = await tools_of(coach)
+    required = {tool.name: set(tool.input_schema.get("required", ())) for tool in listing}
+    assert required["get_last_games"] == set()
+    assert required["search_games"] == set()
+    assert required["get_game"] == {"game_id"}
+    assert required["get_analysis_status"] == {"run_id"}
+    assert required["find_positions"] == {"fen"}
+    assert required["save_note"] == {"text"}
+
+
+async def test_a_payload_is_one_compact_json_block(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    result = await invoke(coach, "get_last_games", {"amount": 2})
+    text = text_of(result)
+    assert text.startswith("{") and "\n" not in text
+    assert ", " not in text and '": ' not in text
+    json.loads(text)
+
+
+# --- convenience -----------------------------------------------------------
+
+
+async def test_get_last_games_returns_newest_first_with_cards(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_last_games", amount=3)
+    assert payload["count"] == 3
+    games = payload["games"]
+    assert [game["id"] for game in games] == [
+        analysed["qg000006"].id,
+        analysed["qg000005"].id,
+        analysed["qg000004"].id,
+    ]
+    newest = games[0]
+    assert newest["opponent"] == "slowburner"
+    assert newest["opponent_rating"] == 1800
+    assert newest["color"] == "white"
+    assert newest["outcome"] == "win"
+    assert newest["opening"].startswith("Italian Game")
+    assert newest["analyzed"] is True
+    assert newest["played_at"].endswith("Z")
+
+
+async def test_get_last_games_carries_the_curve_and_the_worst_moments(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_last_games", amount=6)
+    berlin = next(game for game in payload["games"] if game["id"] == analysed["qg000001"].id)
+    assert berlin["eval_curve"] == [
+        [0, 52.0], [1, 51.0], [2, 39.0], [3, 60.0], [4, 8.0], [5, 92.0], [6, 70.0]
+    ]
+    moments = berlin["worst_moments"]
+    assert [moment["ply"] for moment in moments] == [4, 6, 2]
+    assert moments[0]["classification"] == "blunder"
+    assert moments[0]["best_move_uci"] == "f1c4"
+    assert moments[0]["san"] == analysed["qg000001"].moves_san[4]
+
+
+async def test_worst_moments_are_only_the_owners_own_moves(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    """The Berlin game is the owner's as White, so an odd ply is the opponent's."""
+    payload = await call(coach, "get_last_games", amount=6, worst_moments=8)
+    berlin = next(game for game in payload["games"] if game["id"] == analysed["qg000001"].id)
+    assert all(moment["ply"] % 2 == 0 for moment in berlin["worst_moments"])
+
+
+async def test_get_last_games_stays_inside_its_byte_budget(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    result = await invoke(coach, "get_last_games", {"amount": 5})
+    assert len(text_of(result).encode()) < LAST_GAMES_BUDGET
+
+
+async def test_a_long_eval_curve_is_thinned(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    payload = await call(coach, "get_last_games", amount=6)
+    giuoco = next(game for game in payload["games"] if game["id"] == analysed["qg000006"].id)
+    assert len(giuoco["eval_curve"]) == mcp_server.CURVE_POINTS
+    assert giuoco["eval_curve"][0][0] == 0
+    assert giuoco["eval_curve"][-1][0] == 19
+
+
+async def test_get_last_games_filters_by_platform_and_time_control(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    assert (await call(coach, "get_last_games", platform="lichess"))["count"] == 0
+    assert (await call(coach, "get_last_games", platform="pgn"))["count"] == 5
+    blitz = await call(coach, "get_last_games", time_control="blitz")
+    assert {game["speed"] for game in blitz["games"]} == {"blitz"}
+    literal = await call(coach, "get_last_games", time_control="600+5")
+    assert [game["id"] for game in literal["games"]] == [analysed["qg000006"].id]
+
+
+async def test_get_last_games_caps_a_greedy_amount(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_last_games", amount=5000)
+    assert payload["count"] == 6
+
+
+async def test_an_unknown_platform_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "get_last_games", platform="chess24")
+    assert payload["error"] == "bad_argument"
+    assert "lichess" in payload["allowed"]
+
+
+async def test_get_worst_recent_moments_ranks_by_what_it_cost(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_worst_recent_moments")
+    moments = payload["moments"]
+    # Blunders only: this is the "what should I train?" question, not a move list.
+    assert [moment["win_loss"] for moment in moments] == [45.0]
+    worst = moments[0]
+    assert worst["classification"] == "blunder"
+    assert worst["phase"] == "opening"
+    assert worst["piece"]
+    assert worst["fen"]
+    assert worst["best_move_san"]
+    assert worst["game"]["id"] == analysed["qg000001"].id
+
+
+async def test_get_worst_recent_moments_narrows_by_days(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    """The fixture games are months old, so a week's window is honestly empty."""
+    assert (await call(coach, "get_worst_recent_moments", days=7))["count"] == 0
+    assert (await call(coach, "get_worst_recent_moments", days=3650))["count"] == 1
+
+
+async def test_compare_periods_answers_with_both_windows_and_the_delta(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(
+        coach,
+        "compare_periods",
+        dimension="performance_by_speed",
+        then_start="2026-01-01",
+        then_end="2026-02-01",
+        now_start="2026-02-01",
+        now_end="2026-04-01",
+    )
+    assert set(payload) >= {"dimension", "then", "now", "delta"}
+    assert payload["then"]["total"]["games"] == 2
+    assert payload["now"]["total"]["games"] == 4
+
+
+async def test_compare_periods_accepts_relative_windows(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(
+        coach,
+        "compare_periods",
+        dimension="rating_trend",
+        then_start="2y",
+        then_end="1y",
+        now_start="1y",
+    )
+    assert payload["now"]["total"]["games"] == 6
+
+
+async def test_a_backwards_window_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(
+        coach,
+        "compare_periods",
+        dimension="rating_trend",
+        then_start="2026-03-01",
+        then_end="2026-01-01",
+        now_start="2026-04-01",
+    )
+    assert payload["error"] == "bad_argument"
+    assert "then_start" in payload["message"]
+
+
+async def test_an_unparseable_date_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "search_games", since="last tuesday")
+    assert payload["error"] == "bad_argument"
+    assert "since" in payload["message"]
+
+
+# --- query -----------------------------------------------------------------
+
+
+async def test_search_games_filters_and_counts(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    payload = await call(coach, "search_games", eco="C6")
+    assert payload["total"] == 2
+    assert {game["eco"] for game in payload["games"]} == {"C65", "C60"}
+    assert payload["offset"] == 0
+
+
+async def test_search_games_understands_the_owners_side(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    wins = await call(coach, "search_games", outcome="win")
+    assert {game["id"] for game in wins["games"]} == {
+        analysed["qg000001"].id,
+        analysed["qg000004"].id,
+        analysed["qg000005"].id,
+        analysed["qg000006"].id,
+    }
+    black = await call(coach, "search_games", color="black")
+    assert [game["id"] for game in black["games"]] == [analysed["qg000005"].id]
+
+
+async def test_search_games_finds_the_game_with_blunders(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "search_games", has_blunders=True)
+    assert [game["id"] for game in payload["games"]] == [analysed["qg000001"].id]
+
+
+async def test_search_games_pages(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    first = await call(coach, "search_games", limit=2)
+    second = await call(coach, "search_games", limit=2, offset=2)
+    assert first["total"] == second["total"] == 6
+    assert not {game["id"] for game in first["games"]} & {game["id"] for game in second["games"]}
+
+
+async def test_an_unknown_outcome_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "search_games", outcome="victory")
+    assert payload["error"] == "bad_argument"
+
+
+async def test_get_game_reads_a_game_move_by_move(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game = analysed["qg000001"]
+    payload = await call(coach, "get_game", game_id=game.id)
+    assert payload["game"]["id"] == game.id
+    assert len(payload["moves"]) == game.ply_count
+    assert [move["ply"] for move in payload["moves"][:3]] == [0, 1, 2]
+    assert payload["moves"][0]["san"] == game.moves_san[0]
+    assert payload["runs"][0]["tier"] == "quick"
+    assert payload["runs"][0]["status"] == "done"
+
+
+async def test_get_game_only_classifies_the_moves_that_went_wrong(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_game", game_id=analysed["qg000001"].id)
+    by_ply = {move["ply"]: move for move in payload["moves"]}
+    assert "classification" not in by_ply[0]
+    assert by_ply[4]["classification"] == "blunder"
+    assert by_ply[4]["win_loss"] == 45.0
+    assert by_ply[4]["best_move_uci"] == "f1c4"
+    assert by_ply[2]["maia"] == {"1700": [{"uci": "b1c3", "p": 0.41}]}
+
+
+async def test_get_game_leaves_the_engine_lines_out_until_they_are_asked_for(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    without = await call(coach, "get_game", game_id=analysed["qg000001"].id)
+    assert all("best_lines" not in move for move in without["moves"])
+    with_lines = await call(
+        coach, "get_game", game_id=analysed["qg000001"].id, include_lines=True
+    )
+    lines = [move for move in with_lines["moves"] if "best_lines" in move]
+    assert lines and lines[0]["best_lines"][0]["pv"] == ["d2d4", "d7d5", "g1f3"]
+
+
+async def test_get_game_narrows_to_a_ply_range(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    payload = await call(coach, "get_game", game_id=analysed["qg000001"].id, ply_start=2, ply_end=5)
+    assert [move["ply"] for move in payload["moves"]] == [2, 3, 4]
+    assert payload["ply_range"] == [2, 5]
+
+
+async def test_half_a_ply_range_is_a_structured_error(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await failure(coach, "get_game", game_id=analysed["qg000001"].id, ply_start=4)
+    assert payload["error"] == "bad_argument"
+
+
+async def test_an_unknown_game_is_a_structured_error(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await failure(coach, "get_game", game_id=9999)
+    assert payload["error"] == "unknown_game"
+    assert payload["game_id"] == 9999
+
+
+async def test_get_game_carries_its_notes(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    game = analysed["qg000001"]
+    await call(coach, "save_note", text="watch the Berlin", tags=["opening"], game_id=game.id)
+    payload = await call(coach, "get_game", game_id=game.id)
+    assert [note["text"] for note in payload["notes"]] == ["watch the Berlin"]
+    without = await call(coach, "get_game", game_id=game.id, include_notes=False)
+    assert "notes" not in without
+
+
+async def test_find_positions_answers_have_i_been_here_before(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "find_positions", fen=START_FEN)
+    assert payload["count"] == 6
+    first = payload["games"][0]
+    assert first["ply"] == 0
+    assert first["game"]["id"] == analysed["qg000006"].id
+    assert first["move_san"]
+
+
+async def test_find_positions_rejects_a_typo_as_a_bad_fen(coach: MCPServer) -> None:
+    payload = await failure(coach, "find_positions", fen="8/8/not a position")
+    assert payload["error"] == "bad_fen"
+
+
+async def test_find_positions_says_so_about_motifs(coach: MCPServer) -> None:
+    payload = await failure(coach, "find_positions", fen=START_FEN, motif="fork")
+    assert payload["error"] == "not_implemented"
+    assert payload["motif"] == "fork"
+
+
+async def test_get_player_profile_reports_accounts_ratings_and_volume(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_player_profile")
+    assert [account["username"] for account in payload["accounts"]] == [OWNER]
+    assert payload["volume"]["games"] == 6
+    assert payload["volume"]["wins"] == 4
+    series = payload["ratings"][0]
+    assert series["current"] and series["points"]
+    assert series["points"][0]["at"].endswith("Z")
+
+
+async def test_get_player_profile_thins_a_rating_series(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_player_profile", rating_points=2)
+    assert all(len(series["points"]) <= 2 for series in payload["ratings"])
+
+
+# --- stats and explorer ----------------------------------------------------
+
+
+async def test_opening_explorer_walks_the_owners_own_tree(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "opening_explorer")
+    assert payload["totals"]["games"] == 6
+    assert payload["side_to_move"] == "white"
+    played = {move["san"]: move for move in payload["moves"]}
+    assert played["e4"]["games"] == 5
+    assert payload["main_line"][0]["san"] == "e4"
+
+
+async def test_opening_explorer_enters_by_eco(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    payload = await call(coach, "opening_explorer", eco="C5")
+    assert payload["totals"]["games"] == 2
+    assert payload["path"]
+
+
+async def test_opening_explorer_caps_its_continuations(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "opening_explorer", limit=1)
+    assert len(payload["moves"]) == 1
+
+
+async def test_get_stats_answers_every_dimension_it_advertises(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    listing = await tools_of(coach)
+    description = next(tool for tool in listing if tool.name == "get_stats").description
+    for dimension in ("blunders_by_phase", "performance_by_speed", "rating_trend"):
+        assert dimension in description
+        payload = await call(coach, "get_stats", dimension=dimension)
+        assert payload["dimension"] == dimension
+        assert "buckets" in payload
+
+
+async def test_get_stats_counts_the_owners_blunders_by_phase(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "get_stats", dimension="blunders_by_phase")
+    opening = next(bucket for bucket in payload["buckets"] if bucket["key"] == "opening")
+    assert opening["blunder"] == 1
+    assert opening["mistake"] == 1
+    assert opening["inaccuracy"] == 1
+
+
+async def test_get_stats_narrows_by_window_and_filter(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(
+        coach, "get_stats", dimension="performance_by_speed", since="2026-03-01"
+    )
+    assert payload["total"]["games"] == 2
+    filtered = await call(
+        coach, "get_stats", dimension="performance_by_speed", time_control="blitz"
+    )
+    assert {bucket["key"] for bucket in filtered["buckets"]} == {"blitz"}
+
+
+async def test_an_unknown_dimension_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "get_stats", dimension="blunders_by_vibe")
+    assert payload["error"] == "unknown_dimension"
+    assert "blunders_by_phase" in payload["message"]
+
+
+async def test_a_planned_dimension_says_it_is_not_built_yet(coach: MCPServer) -> None:
+    payload = await failure(coach, "get_stats", dimension="blunders_by_motif")
+    assert payload["error"] == "unknown_dimension"
+    assert "not implemented" in payload["message"]
+
+
+# --- analysis --------------------------------------------------------------
+
+
+async def test_request_analysis_queues_a_run_and_hands_back_its_id(
+    coach: MCPServer, analysed: dict[str, Game], session: Session
+) -> None:
+    game = analysed["qg000001"]
+    payload = await call(coach, "request_analysis", game_id=game.id, tier="deep")
+    assert payload["status"] == "queued"
+    assert payload["tier"] == "deep"
+    assert payload["game_id"] == game.id
+    assert payload["queue"]["queued"] == 1
+    run = analysis_service.get_run(session, payload["run_id"])
+    assert run is not None and run.game_id == game.id
+
+
+async def test_request_analysis_takes_a_ply_range(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(
+        coach, "request_analysis", game_id=analysed["qg000001"].id, ply_start=2, ply_end=6
+    )
+    assert (payload["ply_start"], payload["ply_end"]) == (2, 6)
+
+
+async def test_request_analysis_takes_a_position(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "request_analysis", fen=START_FEN)
+    assert payload["fen"].startswith("rnbqkbnr")
+    assert "game_id" not in payload
+
+
+async def test_request_analysis_refuses_an_unknown_game(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await failure(coach, "request_analysis", game_id=4242)
+    assert payload["error"] == "unknown_game"
+
+
+async def test_request_analysis_refuses_both_a_game_and_a_position(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await failure(
+        coach, "request_analysis", game_id=analysed["qg000001"].id, fen=START_FEN
+    )
+    assert payload["error"] == "bad_argument"
+
+
+async def test_request_analysis_needs_an_engine(coach: MCPServer, library: dict[str, Game]) -> None:
+    payload = await failure(coach, "request_analysis", game_id=library["qg000001"].id)
+    assert payload["error"] == "engine_unavailable"
+
+
+async def test_a_full_queue_is_a_structured_error(
+    coach: MCPServer, analysed: dict[str, Game], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mcp_server, "MAX_QUEUED_RUNS", 1)
+    first = await call(coach, "request_analysis", game_id=analysed["qg000001"].id)
+    assert first["run_id"]
+    payload = await failure(coach, "request_analysis", game_id=analysed["qg000006"].id)
+    assert payload["error"] == "queue_full"
+    assert payload["queued"] == 1
+
+
+async def test_get_analysis_status_reports_a_run(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    queued = await call(coach, "request_analysis", game_id=analysed["qg000001"].id)
+    payload = await call(coach, "get_analysis_status", run_id=queued["run_id"])
+    assert payload["status"] == "queued"
+    assert payload["engine"] == "stockfish-test"
+    assert payload["evals"] == 0
+    assert payload["queue"]["queued"] == 1
+    assert payload["created_at"].endswith("Z")
+
+
+async def test_get_analysis_status_counts_what_a_finished_run_wrote(
+    coach: MCPServer, analysed: dict[str, Game], session: Session
+) -> None:
+    run = session.scalars(select(AnalysisRun).order_by(AnalysisRun.id)).first()
+    assert run is not None
+    payload = await call(coach, "get_analysis_status", run_id=run.id)
+    assert payload["status"] == "done"
+    assert payload["evals"] == 7
+
+
+async def test_an_unknown_run_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "get_analysis_status", run_id=7777)
+    assert payload["error"] == "unknown_run"
+
+
+async def test_analyze_position_degrades_when_no_engine_is_enabled(
+    coach: MCPServer, library: dict[str, Game]
+) -> None:
+    payload = await failure(coach, "analyze_position", fen=START_FEN)
+    assert payload["error"] == "engine_unavailable"
+
+
+async def test_analyze_position_answers_inside_its_budget(
+    coach: MCPServer, analysed: dict[str, Game], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The engine itself is covered by the adapter suite; what matters here is the cap."""
+    seen: dict[str, Any] = {}
+
+    def fake(session: Session, fen: str, budget_nodes: int) -> dict[str, Any]:
+        seen["fen"], seen["nodes"] = fen, budget_nodes
+        return {"fen": fen, "cp": 21, "win_percent": 52.0, "best_move": {"uci": "e2e4"}}
+
+    monkeypatch.setattr(analysis_service, "analyze_position", fake)
+    payload = await call(coach, "analyze_position", fen=START_FEN, budget=10**9)
+    assert seen["nodes"] == mcp_server.MAX_BUDGET_NODES
+    assert payload["best_move"]["uci"] == "e2e4"
+
+
+async def test_analyze_position_rejects_a_bad_fen(coach: MCPServer) -> None:
+    payload = await failure(coach, "analyze_position", fen="rubbish")
+    assert payload["error"] == "bad_fen"
+
+
+# --- memory ----------------------------------------------------------------
+
+
+async def test_save_note_writes_a_note(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    payload = await call(
+        coach, "save_note", text="  work on the Berlin  ", tags=["opening", "berlin"]
+    )
+    assert payload["text"] == "work on the Berlin"
+    assert payload["tags"] == ["opening", "berlin"]
+    assert payload["created_at"].endswith("Z")
+
+
+async def test_save_note_anchors_to_a_game_or_a_position(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game = analysed["qg000001"]
+    on_game = await call(coach, "save_note", text="lost the thread here", game_id=game.id)
+    assert on_game["game_id"] == game.id
+    on_position = await call(coach, "save_note", text="know this one", fen=START_FEN)
+    assert on_position["position_id"]
+
+
+async def test_save_note_refuses_an_unknown_game(coach: MCPServer) -> None:
+    payload = await failure(coach, "save_note", text="about nothing", game_id=1234)
+    assert payload["error"] == "unknown_game"
+
+
+async def test_an_empty_note_is_a_structured_error(coach: MCPServer) -> None:
+    payload = await failure(coach, "save_note", text="   ")
+    assert payload["error"] == "bad_argument"
+
+
+async def test_search_notes_finds_by_text_tags_and_anchor(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game = analysed["qg000001"]
+    await call(coach, "save_note", text="Berlin endgames", tags=["opening", "berlin"])
+    await call(coach, "save_note", text="time trouble again", tags=["clock"], game_id=game.id)
+
+    by_text = await call(coach, "search_notes", query="berlin")
+    assert [note["text"] for note in by_text["notes"]] == ["Berlin endgames"]
+    by_tags = await call(coach, "search_notes", tags=["opening", "berlin"])
+    assert by_tags["count"] == 1
+    by_game = await call(coach, "search_notes", game_id=game.id)
+    assert [note["text"] for note in by_game["notes"]] == ["time trouble again"]
+    both_tags = await call(coach, "search_notes", tags=["opening", "clock"])
+    assert both_tags["count"] == 0
+
+
+async def test_search_notes_opens_a_session_with_the_tags_in_use(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    await call(coach, "save_note", text="focus: endgames", tags=["plan"])
+    payload = await call(coach, "search_notes")
+    assert payload["count"] == 1
+    assert payload["tags"] == [{"tag": "plan", "notes": 1}]
+
+
+async def test_search_notes_narrows_by_date(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    await call(coach, "save_note", text="today's note")
+    assert (await call(coach, "search_notes", since="1d"))["count"] == 1
+    assert (await call(coach, "search_notes", until="2020-01-01"))["count"] == 0

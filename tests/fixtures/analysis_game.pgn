@@ -1,0 +1,17 @@
+[Event "Rated Blitz game"]
+[Site "https://lichess.org/an4lys1s"]
+[Date "2026.04.01"]
+[Round "-"]
+[White "blunderbase"]
+[Black "opponent"]
+[Result "0-1"]
+[UTCDate "2026.04.01"]
+[UTCTime "09:12:44"]
+[WhiteElo "1712"]
+[BlackElo "1698"]
+[TimeControl "300+3"]
+[ECO "C60"]
+[Opening "Ruy Lopez"]
+[Termination "Normal"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 0-1
