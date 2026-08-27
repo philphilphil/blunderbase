@@ -15,6 +15,7 @@ from backend.services import accounts as accounts_service
 from backend.services import analysis as analysis_service
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
+from backend.services import games as games_service
 from backend.services import import_service
 from backend.services import runners as runners_service
 
@@ -133,6 +134,9 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     db = commands.add_parser("db", help="database maintenance")
     db_commands = db.add_subparsers(dest="db_command", required=True)
     db_commands.add_parser("upgrade", help="apply pending migrations")
+    db_commands.add_parser(
+        "rebuild-cards", help="recompute the stored card of every analysed game"
+    )
 
     return parser
 
@@ -378,6 +382,14 @@ def command_db(args: argparse.Namespace, settings: Settings) -> int:
     if args.db_command == "upgrade":
         upgrade_to_head(settings)
         print(f"database at {settings.database_path} is at head")
+    if args.db_command == "rebuild-cards":
+        # For a library analysed before the cards existed. Everything works without it —
+        # a game with no card is computed on the way out — so this only makes the games
+        # table fast everywhere at once rather than one re-analysis at a time.
+        upgrade_to_head(settings)
+        with session_scope(settings) as session:
+            rebuilt = games_service.rebuild_game_cards(session)
+        print(f"rebuilt the card of {rebuilt} game(s)")
     return 0
 
 

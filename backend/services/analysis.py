@@ -48,6 +48,7 @@ from backend.db.models import AnalysisRun, Engine, Game, GamePosition, MoveEval,
 from backend.db.types import utcnow
 from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
+from backend.services import games as games_service
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import chess
@@ -823,6 +824,9 @@ def complete_run(
     the run has to still be running under it or nothing at all is written; without one —
     the local worker, which holds the run for the length of its own search — this behaves
     exactly as it always has.
+
+    This is also the only moment a game's card can change, so the card is rewritten here,
+    inside the same commit.
     """
     _require_attempt(run, attempt_token)
     session.execute(delete(MoveEval).where(MoveEval.run_id == run.id))
@@ -833,8 +837,27 @@ def complete_run(
     run.finished_at = utcnow()
     run.error = None
     run.stderr = None
+    _refresh_game_card(session, run)
     session.commit()
     emit_run_event(run_event(EVENT_RUN_DONE, run, evals=len(evals)))
+
+
+def _refresh_game_card(session: Session, run: AnalysisRun) -> None:
+    """Rebuild the game's stored card from the run that has just finished, plus its elders.
+
+    Uncommitted on purpose: `complete_run`'s commit carries both, so a listing can never
+    read a card that describes a run nobody can see yet, or miss one it already can. The
+    flush is what makes the rebuild see the rows this call has only just added — sessions
+    here run with autoflush off, and the rebuild reads back through a query.
+
+    A run over a bare position belongs to no game and so has no card to keep.
+    """
+    if run.game_id is None:
+        return
+    session.flush()
+    game = session.get(Game, run.game_id)
+    if game is not None:
+        games_service.refresh_card(session, game)
 
 
 def fail_run(

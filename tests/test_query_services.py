@@ -392,6 +392,119 @@ def test_get_last_games_and_cards(analysed: Library) -> None:
     assert card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 8, "win": 12.0}]
 
 
+def _no_fallback(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    raise AssertionError("the card was recomputed when the stored one should have answered")
+
+
+def test_a_stored_card_answers_without_touching_the_evals(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole point of the column: a page of cards must not read move_evals at all."""
+    session = analysed.session
+    game = analysed["qg000001"]
+    games_service.refresh_card(session, game)
+    session.commit()
+
+    monkeypatch.setattr(games_service, "build_card", _no_fallback)
+    card = games_service.game_cards(session, [game], worst=2)[0]
+
+    assert card["analyzed"] is True
+    assert card["deep"] is False
+    assert card["opponent"] == "ruyfan"
+    assert [moment["win_loss"] for moment in card["worst_moments"]] == [42.0, 30.0]
+    assert card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 8, "win": 12.0}]
+
+
+def test_a_stored_card_and_a_computed_one_are_the_same_payload(analysed: Library) -> None:
+    session = analysed.session
+    game = analysed["qg000001"]
+    computed = games_service.game_card(session, game, worst=3)
+
+    games_service.refresh_card(session, game)
+    session.commit()
+
+    assert games_service.game_card(session, game, worst=3) == computed
+
+
+def test_asking_for_more_moments_than_a_card_keeps_reads_the_evals(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = analysed.session
+    game = analysed["qg000001"]
+    games_service.refresh_card(session, game)
+    session.commit()
+    assert game.card is not None
+    assert len(game.card["worst_moments"]) == games_service.CARD_WORST_MOMENTS
+
+    asked: list[int] = []
+    build_card = games_service.build_card
+
+    def _counted(session: Session, game: Game, *, worst: int) -> dict[str, Any]:
+        asked.append(worst)
+        return build_card(session, game, worst=worst)
+
+    monkeypatch.setattr(games_service, "build_card", _counted)
+    card = games_service.game_card(session, game, worst=8)
+
+    assert asked == [8]
+    assert [moment["win_loss"] for moment in card["worst_moments"]] == [
+        42.0,
+        30.0,
+        12.0,
+        6.0,
+        1.0,
+    ]
+
+
+def test_a_card_that_kept_every_moment_answers_any_amount(
+    library: Library, engine_row: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fewer moments than the cap means the game had no more, not that the card was cut."""
+    session = library.session
+    game = library["qg000001"]
+    analyse(
+        session,
+        game,
+        [
+            {"ply": 0, "classification": Classification.MISTAKE, "win_loss": 12.0},
+            {"ply": 2, "classification": Classification.BLUNDER, "win_loss": 40.0},
+        ],
+        engine=engine_row,
+    )
+    games_service.refresh_card(session, game)
+    session.commit()
+
+    monkeypatch.setattr(games_service, "build_card", _no_fallback)
+    card = games_service.game_card(session, game, worst=8)
+
+    assert [moment["win_loss"] for moment in card["worst_moments"]] == [40.0, 12.0]
+
+
+def test_rebuilding_the_cards_covers_every_analysed_game(analysed: Library) -> None:
+    session = analysed.session
+    assert all(game.card is None for game in analysed.all)
+
+    rebuilt = games_service.rebuild_game_cards(session, chunk=2)
+
+    assert rebuilt == 3
+    # Re-read rather than trusting the fixture's instances: the sweep lets go of them, and
+    # what matters is what it committed.
+    stored = {
+        game.source_id: game.card
+        for game in session.scalars(select(Game))
+        if game.card is not None
+    }
+    assert set(stored) == {"qg000001", "qg000003", "qg000006"}
+    assert stored["qg000001"]["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 8, "win": 12.0}]
+    assert [moment["win_loss"] for moment in stored["qg000001"]["worst_moments"]] == [
+        42.0,
+        30.0,
+        12.0,
+        6.0,
+        1.0,
+    ]
+
+
 def test_player_profile_series_are_per_platform_and_speed(library: Library) -> None:
     profile = games_service.get_player_profile(library.session)
     assert profile["volume"]["games"] == 6

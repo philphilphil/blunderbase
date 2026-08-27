@@ -11,7 +11,7 @@ from sqlalchemy import select
 import backend
 from backend.cli import _import_options, build_parser, main
 from backend.config import Settings
-from backend.db.enums import EngineKind, JobStatus, Platform, RunStatus
+from backend.db.enums import EngineKind, JobStatus, Platform, RunStatus, Tier
 from backend.db.models import (
     Account,
     AnalysisRun,
@@ -20,6 +20,7 @@ from backend.db.models import (
     Game,
     GamePosition,
     ImportJob,
+    MoveEval,
 )
 from backend.db.session import session_scope
 from backend.services import auth as auth_service
@@ -64,6 +65,31 @@ def test_the_version_is_not_a_second_literal() -> None:
 def test_db_upgrade_is_a_subcommand(settings: Settings) -> None:
     args = build_parser(settings).parse_args(["db", "upgrade"])
     assert (args.command, args.db_command) == ("db", "upgrade")
+
+
+def test_db_rebuild_cards_fills_the_column_for_a_library_analysed_before_it(
+    settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["db", "upgrade"]) == 0
+    with session_scope(settings) as session:
+        session.add(Account(platform=Platform.LICHESS, username="blunderbase", is_owner=True))
+    assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
+    with session_scope(settings) as session:
+        game = session.scalars(select(Game).order_by(Game.id)).first()
+        assert game is not None
+        run = AnalysisRun(game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE)
+        session.add(run)
+        session.flush()
+        session.add(MoveEval(run_id=run.id, ply=0, win_after=52.0, win_loss=40.0))
+    capsys.readouterr()
+
+    assert main(["db", "rebuild-cards"]) == 0
+
+    assert "rebuilt the card of 1 game(s)" in capsys.readouterr().out
+    with session_scope(settings) as session:
+        cards = [game.card for game in session.scalars(select(Game)) if game.card is not None]
+        assert len(cards) == 1
+        assert cards[0]["eval_curve"] == [{"ply": 0, "win": 52.0}]
 
 
 def test_unknown_source_lookup_names_the_known_ones() -> None:

@@ -43,6 +43,7 @@ from backend.db.models import (
 )
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
+from backend.services import games as games_service
 from backend.services import import_service
 from backend.services import live as live_service
 from tests.conftest import OWNER_PASSWORD, running_app, socket_headers
@@ -290,6 +291,22 @@ def test_a_game_card_carries_the_eval_curve_and_the_worst_moments(
     assert card["deep"] is False
     assert len(card["eval_curve"]) == seeded["plies"]
     assert card["worst_moments"][0]["classification"] == "blunder"
+
+
+def test_a_stored_card_serves_the_payload_a_computed_one_would(
+    api: TestClient, settings: Settings
+) -> None:
+    """Moving the work to write time must not have moved the wire format by a byte.
+
+    The seed writes its run by hand, so the first response is the fallback computing every
+    card; the second is the same page served out of the column the backfill just filled.
+    """
+    computed = api.get("/games", params={"cards": True, "limit": 50}).json()
+
+    with get_sessionmaker(settings)() as session:
+        assert games_service.rebuild_game_cards(session) == 1
+
+    assert api.get("/games", params={"cards": True, "limit": 50}).json() == computed
 
 
 def test_a_game_detail_merges_the_runs_over_it(api: TestClient, seeded: dict[str, int]) -> None:

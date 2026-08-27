@@ -623,6 +623,85 @@ def test_move_evals_can_be_read_back_over_a_window(session: Session) -> None:
     assert [row.ply for row in analysis.get_move_evals(session, run.id, (2, 5))] == [2, 3, 4]
 
 
+# --- the game card a finished run leaves behind ----------------------------
+
+
+def test_finishing_a_run_stores_the_game_card_in_the_same_commit(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+    rows = [
+        MoveEval(ply=0, win_after=52.0, win_loss=4.0),
+        MoveEval(ply=2, win_after=12.0, win_loss=40.0, classification=Classification.BLUNDER),
+    ]
+
+    commits = _CountingCommits(session)
+    with commits:
+        analysis.complete_run(session, run, rows)
+
+    assert commits.count == 1
+    assert game.card is not None
+    assert game.card["analyzed"] is True
+    assert game.card["deep"] is False
+    assert game.card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 2, "win": 12.0}]
+    assert [moment["ply"] for moment in game.card["worst_moments"]] == [2, 0]
+
+
+def test_the_card_a_run_stores_covers_every_run_over_the_game(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    quick = analysis.request_analysis(session, game_id=game.id)
+    analysis.complete_run(session, quick, [MoveEval(ply=0, win_after=52.0, win_loss=4.0)])
+    deep = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+    analysis.complete_run(session, deep, [MoveEval(ply=2, win_after=12.0, win_loss=40.0)])
+
+    assert game.card is not None
+    assert game.card["deep"] is True
+    assert game.card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 2, "win": 12.0}]
+
+
+def test_replacing_a_finished_run_rewrites_the_card_it_left(session: Session) -> None:
+    """`complete_run` is also the only path that drops a done run's evals — its own retry."""
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+    analysis.complete_run(session, run, [MoveEval(ply=0, win_after=52.0, win_loss=40.0)])
+
+    analysis.complete_run(session, run, [MoveEval(ply=2, win_after=12.0, win_loss=4.0)])
+
+    assert game.card is not None
+    assert game.card["eval_curve"] == [{"ply": 2, "win": 12.0}]
+    assert [moment["ply"] for moment in game.card["worst_moments"]] == [2]
+
+
+def test_a_failed_run_leaves_the_card_of_the_passes_that_did_finish(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    first = analysis.request_analysis(session, game_id=game.id)
+    analysis.complete_run(session, first, [MoveEval(ply=0, win_after=52.0, win_loss=4.0)])
+    stored = game.card
+    second = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+    analysis.fail_run(session, second, "engine died", retry=False)
+
+    assert game.card == stored
+
+
+def test_a_run_over_a_bare_position_has_no_card_to_store(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(
+        session, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    )
+
+    analysis.complete_run(session, run, [MoveEval(ply=0, win_after=50.0)])
+
+    assert run.game_id is None
+    assert game.card is None
+    assert session.scalars(select(Game.card)).all() == [None]
+
+
 # --- failure and retry ----------------------------------------------------
 
 

@@ -263,6 +263,14 @@ class Game(Base):
     clocks: Mapped[list[float | None] | None] = mapped_column(JSON)
     ply_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # The analysis half of the game's card — the eval curve, the worst moments, whether a
+    # deep pass reached it — as `services.games` builds it. Written in the same commit that
+    # changes the game's finished runs, because a listing of fifty games cannot afford to
+    # read every MoveEval of every run behind each of them. NULL for a game nothing has
+    # analysed yet, and for one analysed before this column existed: a reader that finds
+    # NULL computes the card the slow way.
+    card: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
     import_job_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("import_jobs.id"))
 
     import_job: Mapped[ImportJob | None] = relationship()

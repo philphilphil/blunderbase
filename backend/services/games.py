@@ -55,6 +55,14 @@ PROFILE_RECENT_WINDOW_DAYS = 365
 # keep at least this many points, so ancient history never fully vanishes from the chart.
 PROFILE_MIN_OLD_POINTS = 20
 
+# How many worst moments a stored card keeps. The games table shows three and the coach
+# asks for three by default; the few callers that want more than this are served by
+# reading the evals, which is what the card exists to avoid for everyone else.
+CARD_WORST_MOMENTS = 5
+
+# How many games a card backfill rebuilds before it commits and lets go of the write lock.
+CARD_BACKFILL_CHUNK = 200
+
 
 @dataclass(slots=True)
 class GameFilters:
@@ -348,7 +356,42 @@ def get_last_games(
 
 
 def game_card(session: Session, game: Game, *, worst: int = 3) -> dict[str, Any]:
-    """A game as a compact card: the summary, the eval curve and its worst moments."""
+    """A game as a compact card: the summary, the eval curve and its worst moments.
+
+    The expensive half is read off `Game.card`, written whenever the game's finished runs
+    changed, so a page of fifty of these is fifty rows rather than a hundred queries over
+    every MoveEval behind them. Two things still compute it here: a game analysed before
+    the column existed, whose card is NULL, and a caller asking for more worst moments than
+    a card keeps. Neither writes what it computed — this is what GET handlers call, and
+    they do not commit.
+    """
+    stored = _stored_card(game, worst)
+    card = stored if stored is not None else build_card(session, game, worst=max(worst, 0))
+    return {
+        **game_summary(game),
+        "analyzed": card["analyzed"],
+        "deep": card["deep"],
+        "eval_curve": card["eval_curve"],
+        "worst_moments": card["worst_moments"][: max(worst, 0)],
+    }
+
+
+def game_cards(session: Session, games: Iterable[Game], *, worst: int = 3) -> list[dict[str, Any]]:
+    """`game_card` over a list, which is what `get_last_games` is usually followed by."""
+    return [game_card(session, game, worst=worst) for game in games]
+
+
+def build_card(session: Session, game: Game, *, worst: int = CARD_WORST_MOMENTS) -> dict[str, Any]:
+    """The analysis half of a game's card, folded out of every finished run over it.
+
+    Only the analysis: the game's own metadata is read live from the row by `game_card`, so
+    a stored card can never go stale against a re-imported or re-attributed game — the
+    only thing that ages it is analysis, and analysis is what rewrites it.
+
+    The eval curve is one point per evaluated ply and stays that way. Whoever draws it
+    decides how many points they want; a card that had already thinned it could not be
+    un-thinned, and the API shape is the full curve.
+    """
     runs = analysis_runs(session, game.id)
     evals, _maia = merge_run_evals(session, runs)
     curve = [
@@ -363,17 +406,64 @@ def game_card(session: Session, game: Game, *, worst: int = 3) -> dict[str, Any]
     )
     ranked = sorted(owned, key=lambda row: row.win_loss or 0.0, reverse=True)
     return {
-        **game_summary(game),
         "analyzed": bool(runs),
         "deep": any(run.tier == Tier.DEEP for run in runs),
         "eval_curve": curve,
-        "worst_moments": [_moment_row(game, row) for row in ranked[: max(worst, 0)]],
+        "worst_moments": [_moment_row(game, row) for row in ranked[:worst]],
     }
 
 
-def game_cards(session: Session, games: Iterable[Game], *, worst: int = 3) -> list[dict[str, Any]]:
-    """`game_card` over a list, which is what `get_last_games` is usually followed by."""
-    return [game_card(session, game, worst=worst) for game in games]
+def refresh_card(session: Session, game: Game) -> dict[str, Any]:
+    """Recompute a game's stored card, leaving the commit to the caller.
+
+    Deliberately without one: this belongs inside the transaction that changed the game's
+    finished runs, so the card and the evals it describes become visible together and a
+    reader can never catch one without the other.
+    """
+    card = build_card(session, game)
+    game.card = card
+    return card
+
+
+def rebuild_game_cards(session: Session, *, chunk: int = CARD_BACKFILL_CHUNK) -> int:
+    """Rewrite the stored card of every game with a finished run; how many were rebuilt.
+
+    Only a library analysed before the cards existed needs this — from then on the runs
+    keep their own game's card current. It is a convenience rather than a requirement:
+    `game_card` computes what it does not find, so an un-backfilled library is slow, not
+    wrong.
+
+    Committing per chunk is what lets it run beside a live server: SQLite has one writer,
+    and a single transaction over thousands of games would hold it for the whole sweep.
+    """
+    game_ids = list(session.scalars(select(Game.id).where(_has_done_run()).order_by(Game.id)))
+    rebuilt = 0
+    for start in range(0, len(game_ids), max(chunk, 1)):
+        for game_id in game_ids[start : start + max(chunk, 1)]:
+            game = session.get(Game, game_id)
+            if game is not None:
+                refresh_card(session, game)
+                rebuilt += 1
+        session.commit()
+        # Nothing here needs the games again, and a sweep over a large library would
+        # otherwise keep every one of them — PGN and all — in the identity map.
+        session.expunge_all()
+    return rebuilt
+
+
+def _stored_card(game: Game, worst: int) -> dict[str, Any] | None:
+    """The stored card, when it holds enough worst moments to answer `worst`.
+
+    A card is cut at `CARD_WORST_MOMENTS`; one holding fewer than that held everything the
+    game had to give, so slicing it stays complete however many were asked for.
+    """
+    card = game.card
+    if card is None:
+        return None
+    kept = card["worst_moments"]
+    if worst > len(kept) and len(kept) >= CARD_WORST_MOMENTS:
+        return None
+    return card
 
 
 def game_summary(game: Game) -> dict[str, Any]:
@@ -584,6 +674,14 @@ def _has_classification(classification: Classification) -> ColumnElement[bool]:
             MoveEval.classification == classification,
             owner_move_condition(),
         )
+        .correlate(Game)
+    )
+
+
+def _has_done_run() -> ColumnElement[bool]:
+    return exists(
+        select(AnalysisRun.id)
+        .where(AnalysisRun.game_id == Game.id, AnalysisRun.status == RunStatus.DONE)
         .correlate(Game)
     )
 
