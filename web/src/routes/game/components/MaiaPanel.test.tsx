@@ -128,7 +128,10 @@ describe('MaiaPanel', () => {
     render(<MaiaPanel rating="1700" human={HUMAN} engine={ENGINE} run={RUN} ply={1} />)
 
     const panel = screen.getByTestId('maia-panel')
-    expect(within(panel).getByText('uci')).toBeInTheDocument()
+    // The column label pairs with the human column's — the run's protocol kind stays on
+    // the engines page.
+    expect(within(panel).getByText('engine')).toBeInTheDocument()
+    expect(within(panel).queryByText('uci')).not.toBeInTheDocument()
     expect(within(panel).getByText('d20')).toBeInTheDocument()
     expect(within(panel).getByText('400k nodes')).toBeInTheDocument()
     expect(within(panel).getByText('MPV 3')).toBeInTheDocument()
@@ -139,7 +142,7 @@ describe('MaiaPanel', () => {
 
     const panel = screen.getByTestId('maia-panel')
     expect(panel).toHaveTextContent('No engine run')
-    expect(panel).toHaveTextContent('No engine lines for this position.')
+    expect(panel).toHaveTextContent('–')
   })
 
   it('shows the whole stored line, and hands it over whole with the move that was clicked', async () => {

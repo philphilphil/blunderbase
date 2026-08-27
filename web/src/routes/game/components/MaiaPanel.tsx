@@ -52,6 +52,17 @@ export interface MaiaPanelProps {
    * the rest of the line to step through, so a click is an entry point rather than a cut.
    */
   onPlayLine?: (ucis: string[], index: number) => void
+  /**
+   * The engine rows' own entry point, where their lines are measured from a different
+   * position than the board's (walking a line, the column keeps describing the position
+   * the line hangs off). Falls back to `onPlayLine`.
+   */
+  onPlayEngineLine?: (ucis: string[], index: number) => void
+  /**
+   * The ply the engine lines start from, where it differs from `ply` — the branch head
+   * while a line is being walked. Defaults to `ply`.
+   */
+  enginePly?: number
   className?: string
 }
 
@@ -82,6 +93,8 @@ export function MaiaPanel({
   live,
   onHoverMove,
   onPlayLine,
+  onPlayEngineLine,
+  enginePly,
   className,
 }: MaiaPanelProps) {
   const rollout = live?.rollout ?? []
@@ -110,7 +123,7 @@ export function MaiaPanel({
           {/* Switched off, the column holds its place and says nothing at all. */}
           {!showHuman ? null : human.length === 0 ? (
             <p className="py-2 text-[0.6875rem] text-dim">
-              {live?.pending ? 'Reading this position…' : 'No human model for this position.'}
+              {live?.pending ? 'Reading this position…' : '–'}
             </p>
           ) : (
             <div className="flex flex-col gap-1">
@@ -141,10 +154,11 @@ export function MaiaPanel({
             <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
               {run?.engine ?? 'No engine run'}
             </span>
-            {/* The run's kind takes the label slot where there is a run to name. */}
-            <span className="truncate font-mono text-[0.625rem] uppercase text-faint">
-              {run?.engine_kind ?? 'engine'}
-            </span>
+            {/*
+              The label is the column's category, paired with the human column's own —
+              never the run's protocol kind, which lives on the engines page.
+            */}
+            <span className="truncate font-mono text-[0.625rem] text-faint">engine</span>
             <div className="flex-1" />
             {run?.depth ? (
               <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
@@ -160,16 +174,16 @@ export function MaiaPanel({
           </div>
 
           {engine.length === 0 ? (
-            <p className="py-2 text-[0.6875rem] text-dim">No engine lines for this position.</p>
+            <p className="py-2 text-[0.6875rem] text-dim">–</p>
           ) : (
             <div className="flex flex-col gap-1">
               {engine.map((line) => (
                 <EngineRow
                   key={`${line.multipv}-${line.firstUci ?? 'x'}`}
                   line={line}
-                  ply={ply}
+                  ply={enginePly ?? ply}
                   onHoverMove={onHoverMove}
-                  onPlayLine={onPlayLine}
+                  onPlayLine={onPlayEngineLine ?? onPlayLine}
                 />
               ))}
             </div>

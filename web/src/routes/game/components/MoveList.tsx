@@ -23,7 +23,7 @@ export type MoveTab = 'moves' | 'flagged'
 /**
  * The analysis line the reader is walking, drawn inline under the move it hangs off. Only
  * the active branch is ever here: the game carries one line, and this is the one detour off
- * it, not a tree.
+ * it that the board is standing in.
  */
 export interface MoveVariation {
   /** The number of game plies the line branches from — its first move is ply `base`. */
@@ -32,6 +32,17 @@ export interface MoveVariation {
   sans: string[]
   /** How many of its moves are on the board; `0` is the position it branched from. */
   cursor: number
+}
+
+/**
+ * A line walked earlier this session and kept (`../sessionVariations`). The board is not in
+ * it, so it has no cursor — it is a line to look at, and to click back into.
+ */
+export interface KeptMoveVariation {
+  id: number
+  /** The number of game plies the line branches from — its first move is ply `base`. */
+  base: number
+  sans: string[]
 }
 
 export interface MoveListProps {
@@ -49,6 +60,10 @@ export interface MoveListProps {
   variation?: MoveVariation | null
   /** Put the board after the `index`-th move of the variation (0-based). */
   onSelectVariationMove?: (index: number) => void
+  /** Lines walked earlier this session, drawn quietly under their own anchors. */
+  kept?: readonly KeptMoveVariation[]
+  /** Walk back into kept line `id`, standing after its `index`-th move (0-based). */
+  onSelectKeptMove?: (id: number, index: number) => void
   onSelectPly: (ply: number) => void
   className?: string
 }
@@ -59,7 +74,9 @@ export interface MoveListProps {
  * and the moves after the cursor dimmed so the eye stops where the board is.
  *
  * A clicked engine line or Maia rollout is drawn inline as an indented variation under the
- * move it branches from, walkable move by move (`variation`).
+ * move it branches from, walkable move by move (`variation`). Every line walked earlier in
+ * the session stays listed the same way, a shade quieter and with nothing lit (`kept`), so
+ * the table remembers the reading rather than only the last detour.
  *
  * The design's tab row is `Moves / Variations / Book`, with `PGN` pinned right. `PGN` is
  * here; the other two are not, and are not a matter of layout. A game carries one line —
@@ -80,6 +97,8 @@ export function MoveList({
   pgn,
   variation,
   onSelectVariationMove,
+  kept,
+  onSelectKeptMove,
   onSelectPly,
   className,
 }: MoveListProps) {
@@ -100,15 +119,47 @@ export function MoveList({
     return !folded || pair.moveNumber > collapsedThrough!
   })
 
-  // The variation hangs off the move that produced the position it left from — ply
-  // `base - 1`. A line off the starting position has no such move, and a line whose move is
-  // filtered away by the fold or the `Flagged` tab has none on screen; either way it goes to
-  // the top of the list rather than disappearing with its anchor.
-  const anchor = variation && variation.base > 0 ? Math.floor((variation.base - 1) / 2) + 1 : null
-  const orphaned = !!variation && !rows.some((pair) => pair.moveNumber === anchor)
-  const variationRow = variation ? (
-    <Variation variation={variation} onSelectMove={onSelectVariationMove} />
-  ) : null
+  // Every line on screen: the one the board is standing in leads, so it keeps the place
+  // directly under its move that it has always had, and the kept ones follow it in the
+  // order they were walked.
+  const variations: { anchor: number | null; node: React.ReactNode }[] = []
+  if (variation) {
+    variations.push({
+      anchor: anchorOf(variation.base),
+      node: <Variation key="active" variation={variation} onSelectMove={onSelectVariationMove} />,
+    })
+  }
+  for (const entry of kept ?? []) {
+    variations.push({
+      anchor: anchorOf(entry.base),
+      node: (
+        <Variation
+          key={`kept-${entry.id}`}
+          variation={{ base: entry.base, sans: entry.sans, cursor: 0 }}
+          quiet
+          onSelectMove={
+            onSelectKeptMove ? (index) => onSelectKeptMove(entry.id, index) : undefined
+          }
+        />
+      ),
+    })
+  }
+
+  // A line whose anchor is filtered away by the fold or the `Flagged` tab has no move on
+  // screen to hang under, and one off the starting position never had one; either way it
+  // goes to the top of the list rather than disappearing with its anchor.
+  const shown = new Set(rows.map((pair) => pair.moveNumber))
+  const orphans: React.ReactNode[] = []
+  const anchored = new Map<number, React.ReactNode[]>()
+  for (const entry of variations) {
+    if (entry.anchor === null || !shown.has(entry.anchor)) {
+      orphans.push(entry.node)
+      continue
+    }
+    const group = anchored.get(entry.anchor)
+    if (group) group.push(entry.node)
+    else anchored.set(entry.anchor, [entry.node])
+  }
 
   // Keep the cursor's row in view *inside this box*. `scrollIntoView` would do it by
   // scrolling every scrollable ancestor as well — on this page that means the studio's own
@@ -169,7 +220,7 @@ export function MoveList({
         ) : null}
 
         <div className="flex flex-col px-1.5 font-mono text-[0.78125rem]">
-          {orphaned ? variationRow : null}
+          {orphans}
           {rows.map((pair) => {
             const isActivePair =
               pair.white?.ply === cursor || pair.black?.ply === cursor
@@ -198,7 +249,7 @@ export function MoveList({
                   <MoveCell move={pair.black} cursor={cursor} onSelectPly={onSelectPly} />
                 </div>
                 {annotated && annotation ? <Annotation annotation={annotation} /> : null}
-                {!orphaned && pair.moveNumber === anchor ? variationRow : null}
+                {anchored.get(pair.moveNumber)}
               </div>
             )
           })}
@@ -288,34 +339,48 @@ function MoveCell({
   )
 }
 
+/** The move a line hangs off — the one that produced the position it left from. */
+function anchorOf(base: number): number | null {
+  return base > 0 ? Math.floor((base - 1) / 2) + 1 : null
+}
+
 /**
- * The analysis line, indented under the move it branches from and parenthesised the way a
+ * An analysis line, indented under the move it branches from and parenthesised the way a
  * variation is written on paper. Every move is a click that puts the board after it, and the
  * one the board is on is lit — walking the line with the wheel or the arrow keys moves this
  * mark along, which is the whole point of keeping the line rather than the position.
+ *
+ * A line the board has left (`quiet`) is the same row a shade further back: nothing lit,
+ * because the board is not in it, and dimmer text, because it is the reading behind the
+ * reader rather than the thing they are looking at. It is still every bit as clickable —
+ * that click is how they walk back into it.
  */
 function Variation({
   variation,
+  quiet,
   onSelectMove,
 }: {
   variation: MoveVariation
+  quiet?: boolean
   onSelectMove?: (index: number) => void
 }) {
   return (
     <div
-      data-testid="move-variation"
+      data-testid={quiet ? 'kept-variation' : 'move-variation'}
       className="flex gap-2 py-1 pl-[2.625rem] pr-2 font-mono text-[0.6875rem] leading-[1.5]"
     >
-      <div className="w-0.5 flex-none rounded-sm bg-brilliant opacity-40" />
+      <div
+        className={cn('w-0.5 flex-none rounded-sm bg-brilliant', quiet ? 'opacity-20' : 'opacity-40')}
+      />
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-0.5">
-        <span className="text-faint">(</span>
+        <span className={quiet ? 'text-faint-2' : 'text-faint'}>(</span>
         {variation.sans.map((san, index) => {
           const ply = variation.base + index
-          const active = variation.cursor === index + 1
+          const active = !quiet && variation.cursor === index + 1
           return (
             <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
               {ply % 2 === 0 || index === 0 ? (
-                <span className="tabular text-faint">
+                <span className={cn('tabular', quiet ? 'text-faint-2' : 'text-faint')}>
                   {Math.floor(ply / 2) + 1}
                   {ply % 2 === 0 ? '.' : '…'}
                 </span>
@@ -324,14 +389,16 @@ function Variation({
                 type="button"
                 disabled={!onSelectMove}
                 onClick={() => onSelectMove?.(index)}
-                title={`${plyLabel(ply)}${san} — analysis`}
+                title={`${plyLabel(ply)}${san} — ${quiet ? 'kept line' : 'analysis'}`}
                 className={cn(
                   'rounded-[0.1875rem] px-0.5',
                   active
                     ? 'bg-brilliant/15 text-bright'
-                    : onSelectMove
-                      ? 'text-soft-2 hover:text-ink'
-                      : 'text-soft-2',
+                    : quiet
+                      ? cn('text-dim-3', onSelectMove && 'hover:text-ink')
+                      : onSelectMove
+                        ? 'text-soft-2 hover:text-ink'
+                        : 'text-soft-2',
                 )}
               >
                 {san}
@@ -339,7 +406,7 @@ function Variation({
             </span>
           )
         })}
-        <span className="text-faint">)</span>
+        <span className={quiet ? 'text-faint-2' : 'text-faint'}>)</span>
       </div>
     </div>
   )

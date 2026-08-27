@@ -8,6 +8,7 @@ import { Providers } from '@/app/Providers'
 import type { GameDetail, MoveRow, RunResponse, RunnersStatus } from '@/lib/api/types'
 
 import { GamePage } from './GamePage'
+import { resetSessionVariations } from './sessionVariations'
 
 // The events socket is not what most of these tests are about; a stub that never opens
 // keeps the provider quiet. `emit` is there for the one test that does drive it.
@@ -236,6 +237,9 @@ beforeEach(() => {
   posted = []
   streamCalls = []
   SilentSocket.instances = []
+  // Kept lines are session-scoped, and a test file is one session: each test starts on a
+  // game nobody has read yet.
+  resetSessionVariations()
   vi.stubGlobal('WebSocket', SilentSocket)
   vi.stubGlobal('fetch', stubFetch())
 })
@@ -496,7 +500,8 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
     expect(screen.getByText('Unanalysed')).toBeInTheDocument()
     expect(screen.getByText(/No evaluations yet/)).toBeInTheDocument()
-    expect(screen.getByText('No engine lines for this position.')).toBeInTheDocument()
+    // An empty column is a bare dash, not a sentence.
+    expect(within(screen.getByTestId('maia-panel')).getAllByText('–').length).toBeGreaterThan(0)
     expect(screen.getByText('No engine run')).toBeInTheDocument()
     // The deep pass is the obvious next thing to do, so the button is idle and enabled
     // rather than describing a run that has already happened.
@@ -656,6 +661,25 @@ describe('GamePage', () => {
     expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument()
   })
 
+  it('keeps the stored engine lines up while a line is walked, and enters them from the head', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    const panel = () => within(screen.getByTestId('maia-panel'))
+    await user.click(panel().getByRole('button', { name: 'c6' }))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+
+    // The column keeps describing the position the line hangs off — the map stays up.
+    expect(panel().getByRole('button', { name: 'd4' })).toBeInTheDocument()
+
+    // Entering an engine line mid-walk replaces from the head rather than splicing onto
+    // wherever the board stands: the PV's second move lands two plies in, not three.
+    await user.click(panel().getByRole('button', { name: 'd4' }))
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+  })
+
   it('keeps the analysis board walkable after a click the position cannot take', async () => {
     // The stub answers every position with the same policy, so deep in a line some of the
     // moves it offers are no longer legal. A click on one of those must be a no-op and
@@ -768,6 +792,74 @@ describe('GamePage', () => {
     ).not.toBeInTheDocument()
     expect(within(panel).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
+  })
+
+  it('keeps a walked line in the move list once the board has left it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    // The run's line here is 1…c6 2.d4; clicking its first move walks into it.
+    await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+
+    // Leaving it no longer throws it away: it drops to the quiet list, whole — the tail the
+    // reader never walked included.
+    await user.click(screen.getByRole('button', { name: /Back to game/ }))
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+    expect(screen.queryByTestId('move-variation')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('kept-variation')).toHaveLength(1)
+    expect(screen.getByTestId('kept-variation')).toHaveTextContent('(1…c62.d4)')
+  })
+
+  it('walks back into a kept line, from wherever the game cursor happens to be', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+    await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
+    await user.click(screen.getByRole('button', { name: /Back to game/ }))
+
+    // The board is taken to the far end of the game before going back in, so the line has
+    // to bring the game cursor back to the position it hangs off rather than assume it.
+    await user.keyboard('{End}')
+    expect(screen.getByText('ply 4 / 4')).toBeInTheDocument()
+
+    const kept = () => within(screen.getByTestId('kept-variation'))
+    await user.click(kept().getByRole('button', { name: 'd4' }))
+    // The board lands on the second move of the line, which is what was clicked.
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+
+    // It is the active line now, drawn once: lit, walkable, and no longer listed twice.
+    expect(screen.queryByTestId('kept-variation')).not.toBeInTheDocument()
+    const variation = () => within(screen.getByTestId('move-variation'))
+    expect(variation().getByRole('button', { name: 'd4' }).className).toContain('bg-brilliant')
+
+    // …and it walks like a fresh one, back through its head and out onto the game position
+    // it hangs off — ply 1, not the ply 4 the cursor was left on.
+    fireEvent.wheel(screen.getByTestId('board'), { deltaY: -120 })
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+    expect(screen.getByTestId('kept-variation')).toHaveTextContent('(1…c62.d4)')
+  })
+
+  it('holds the kept lines across a visit to another page and back', async () => {
+    const user = userEvent.setup()
+    const view = renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+    await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
+    await user.click(screen.getByRole('button', { name: /Back to game/ }))
+    expect(screen.getByTestId('kept-variation')).toBeInTheDocument()
+
+    // Navigating away unmounts the whole studio; the lines live outside it, so coming back
+    // to the game finds the session's reading still in the table.
+    view.unmount()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    expect(await screen.findByTestId('kept-variation')).toHaveTextContent('(1…c62.d4)')
   })
 
   it('keeps the run’s own findings when the hints are switched off', async () => {

@@ -38,6 +38,7 @@ import {
   type Side,
 } from './gameModel'
 import { buildPgn } from './pgn'
+import { isPrefix, useSessionVariations } from './sessionVariations'
 import { useBoardKeys } from './useBoardKeys'
 import { useDeepAnalysis } from './useDeepAnalysis'
 import { useLiveMaia } from './useLiveMaia'
@@ -86,25 +87,16 @@ function GameStudio({ gameId }: { gameId: number }) {
     moves: string[]
     cursor: number
   } | null>(null)
+  /**
+   * The lines already walked this session, which stay in the move list once the board has
+   * left them. Held outside the component, so they survive navigating to another game and
+   * back within the open app (`./sessionVariations`).
+   */
+  const { kept, keep } = useSessionVariations(gameId)
 
   const detail = game.data
   const moves = useMemo<MoveRow[]>(() => detail?.moves ?? [], [detail])
   const plyCount = moves.length
-
-  const seek = useCallback(
-    (next: number) => {
-      setCursor(Math.max(-1, Math.min(plyCount - 1, next)))
-      // A hovered line belongs to the position it was read in: leaving that position drops
-      // the preview, even where the pointer never left the row it was drawn from.
-      setHoverMove(null)
-      // Any move of the game cursor — a key, the transport, a click in the move list — is a
-      // request to be back on the game, so the analysis line goes with it.
-      setBranch(null)
-    },
-    [plyCount],
-  )
-  /** Selecting a move puts the board *after* it, which is what a move list click means. */
-  const selectPly = useCallback((ply: number) => seek(ply), [seek])
 
   const line = useMemo(() => buildGameLine(moves), [moves])
   const pairs = useMemo(() => pairMoves(moves), [moves])
@@ -159,6 +151,39 @@ function GameStudio({ gameId }: { gameId: number }) {
   const analysisPly = analysis?.ply ?? boardIndex
 
   /**
+   * Hand the line the reader is walking to the session store, on the way out of it.
+   *
+   * Called from everything that abandons or replaces the branch — a step back past its
+   * head, "Back to game", any seek, a click into another line, a drag that truncates it —
+   * so that leaving a line is what keeps it, and nothing has to be pressed to say so.
+   *
+   * What is kept is the whole *replayed* line, `analysis.moves`, not the raw list it was
+   * replayed from and not the part walked so far: the tail the reader never got to is still
+   * theirs to come back to, and an illegal tail was never on the board to begin with.
+   */
+  const keepBranch = useCallback(() => {
+    if (!branch || !analysis) return
+    keep(analysis.base, analysis.moves)
+  }, [analysis, branch, keep])
+
+  const seek = useCallback(
+    (next: number) => {
+      setCursor(Math.max(-1, Math.min(plyCount - 1, next)))
+      // A hovered line belongs to the position it was read in: leaving that position drops
+      // the preview, even where the pointer never left the row it was drawn from.
+      setHoverMove(null)
+      // Any move of the game cursor — a key, the transport, a click in the move list — is a
+      // request to be back on the game, so the analysis line goes with it. It goes to the
+      // kept list rather than nowhere.
+      keepBranch()
+      setBranch(null)
+    },
+    [keepBranch, plyCount],
+  )
+  /** Selecting a move puts the board *after* it, which is what a move list click means. */
+  const selectPly = useCallback((ply: number) => seek(ply), [seek])
+
+  /**
    * Walk into a line from the position on the board — an engine PV, a Maia rollout, a row.
    *
    * The caller hands over the whole line, measured from the position the board is showing,
@@ -176,6 +201,8 @@ function GameStudio({ gameId }: { gameId: number }) {
   const playLine = useCallback(
     (ucis: string[], index: number) => {
       if (ucis.length === 0 || !analysis) return
+      // The line standing here is being replaced by another; it stays in the move list.
+      keepBranch()
       setHoverMove(null)
       setBranch({
         base: analysis.base,
@@ -185,7 +212,24 @@ function GameStudio({ gameId }: { gameId: number }) {
         cursor: analysis.cursor + index + 1,
       })
     },
-    [analysis],
+    [analysis, keepBranch],
+  )
+
+  /**
+   * Walk into one of the stored engine lines. Those lines describe the position the branch
+   * hangs off — not wherever the board stands mid-walk — so entering one replaces the line
+   * being walked from the head, rather than splicing a head-measured line onto a position
+   * it was never about. On the game line the two readings coincide.
+   */
+  const playEngineLine = useCallback(
+    (ucis: string[], index: number) => {
+      if (ucis.length === 0 || !analysis) return
+      // The line standing here is being replaced by another; it stays in the move list.
+      keepBranch()
+      setHoverMove(null)
+      setBranch({ base: analysis.base, moves: [...ucis], cursor: index + 1 })
+    },
+    [analysis, keepBranch],
   )
 
   /** A drag in the middle of a line truncates it there and continues from the board move. */
@@ -194,10 +238,12 @@ function GameStudio({ gameId }: { gameId: number }) {
       if (!analysis) return
       const next = withBoardMove(analysis, orig, dest)
       if (!next) return
+      // The truncated tail is not lost with the drag: the line as it stood is kept.
+      keepBranch()
       setHoverMove(null)
       setBranch({ base: analysis.base, moves: next, cursor: next.length })
     },
-    [analysis],
+    [analysis, keepBranch],
   )
 
   /** Put the board after the `index`-th move of the line the reader is walking. */
@@ -208,6 +254,28 @@ function GameStudio({ gameId }: { gameId: number }) {
       setBranch({ base: analysis.base, moves: analysis.moves, cursor: index + 1 })
     },
     [analysis],
+  )
+
+  /**
+   * Walk back into a line kept from earlier in the session: it becomes the active branch,
+   * standing after its `index`-th move, and is walkable from there like a fresh one.
+   *
+   * A branch hangs off the game position after `base` plies, and that position is the one
+   * the page derives from the game cursor — `boardIndex` is `cursor + 1`. So the game
+   * cursor is put one ply short of the base: it is what makes `branch.base` and
+   * `boardIndex` agree, and it is where stepping back out of the line will land.
+   */
+  const enterKeptVariation = useCallback(
+    (id: number, index: number) => {
+      const target = kept.find((entry) => entry.id === id)
+      if (!target) return
+      // Clicking into another line is leaving this one, which is what keeps it.
+      keepBranch()
+      setHoverMove(null)
+      setCursor(Math.max(-1, Math.min(plyCount - 1, target.base - 1)))
+      setBranch({ base: target.base, moves: target.moves, cursor: index + 1 })
+    },
+    [keepBranch, kept, plyCount],
   )
 
   /**
@@ -225,15 +293,48 @@ function GameStudio({ gameId }: { gameId: number }) {
       }
       const next = analysis.cursor + delta
       setHoverMove(null)
-      if (next < 0) setBranch(null)
-      else
+      if (next < 0) {
+        // Off the head of the line and back onto the game: the line stays in the table.
+        keepBranch()
+        setBranch(null)
+      } else
         setBranch({
           base: analysis.base,
           moves: analysis.moves,
           cursor: Math.min(analysis.moves.length, next),
         })
     },
-    [analysis, branch, cursor, seek],
+    [analysis, branch, cursor, keepBranch, seek],
+  )
+
+  /**
+   * The kept lines as the move list draws them: SAN, replayed against *this* game, so a
+   * stored line can never disagree with the position it hangs off (one that no longer
+   * replays at all simply drops out).
+   *
+   * The line the board is standing in is drawn by `variation` already, so the kept copy of
+   * it is held back while it is active — the two are the same walk whichever of them is the
+   * longer, and the reader should see one row, not the same row twice.
+   */
+  const keptLines = useMemo(
+    () =>
+      kept
+        .filter(
+          (entry) =>
+            !(
+              branch &&
+              analysis &&
+              entry.base === analysis.base &&
+              (isPrefix(entry.moves, analysis.moves) || isPrefix(analysis.moves, entry.moves))
+            ),
+        )
+        .map((entry) => ({
+          id: entry.id,
+          base: entry.base,
+          sans: sanVariation(line, entry.base, entry.moves, entry.moves.length),
+        }))
+        .filter((entry) => entry.sans.length > 0),
+    [analysis, branch, kept, line],
   )
 
   // --- Maia -----------------------------------------------------------------
@@ -351,13 +452,16 @@ function GameStudio({ gameId }: { gameId: number }) {
       human={human}
       showHuman={hints && !(exploring && live.unavailable)}
       run={engineRun}
-      // A stored run says nothing about a position it never saw: off the game line the
-      // column empties rather than describing the position the reader has left.
-      engine={exploring ? [] : lines}
+      // The stored lines describe the position the branch hangs off, and the game cursor
+      // stays there while a line is walked — so they stay up, the map the reader is
+      // navigating by, rather than emptying the moment a line is entered.
+      engine={lines}
       ply={analysisPly}
+      enginePly={analysis?.base ?? analysisPly}
       live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
       onHoverMove={setHoverMove}
       onPlayLine={playLine}
+      onPlayEngineLine={playEngineLine}
       className={deepRun ? 'border-b border-t-0 border-hairline' : undefined}
     />
   )
@@ -388,7 +492,10 @@ function GameStudio({ gameId }: { gameId: number }) {
             position={position}
             analysis={analysis}
             onPlayMove={playMove}
-            onExitAnalysis={() => setBranch(null)}
+            onExitAnalysis={() => {
+              keepBranch()
+              setBranch(null)
+            }}
             orientation={orientation}
             lastMove={played}
             // The marks and the engine arrow are claims about a position a run has looked
@@ -433,14 +540,16 @@ function GameStudio({ gameId }: { gameId: number }) {
             flaggedCount={flaggedCount}
             plyCount={plyCount}
             pgn={pgn}
-            // The line the reader is walking, drawn under the move it hangs off. Only the
-            // active branch — the game has one line and this is the one detour off it.
+            // The line the reader is walking, drawn under the move it hangs off, and every
+            // line they walked earlier this session under theirs.
             variation={
               branch && analysis && analysis.sans.length > 0
                 ? { base: analysis.base, sans: analysis.sans, cursor: analysis.cursor }
                 : null
             }
             onSelectVariationMove={seekVariation}
+            kept={keptLines}
+            onSelectKeptMove={enterKeptVariation}
             onSelectPly={selectPly}
             className="min-h-0 flex-1"
           />

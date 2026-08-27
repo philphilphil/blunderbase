@@ -22,6 +22,7 @@ function longGame(): MoveRow[] {
 function renderList(moves: MoveRow[], props: Partial<Parameters<typeof MoveList>[0]> = {}) {
   const onSelectPly = vi.fn()
   const onSelectVariationMove = vi.fn()
+  const onSelectKeptMove = vi.fn()
   const view = render(
     <MoveList
       pairs={pairMoves(moves)}
@@ -32,10 +33,11 @@ function renderList(moves: MoveRow[], props: Partial<Parameters<typeof MoveList>
       plyCount={moves.length}
       onSelectPly={onSelectPly}
       onSelectVariationMove={onSelectVariationMove}
+      onSelectKeptMove={onSelectKeptMove}
       {...props}
     />,
   )
-  return { onSelectPly, onSelectVariationMove, ...view }
+  return { onSelectPly, onSelectVariationMove, onSelectKeptMove, ...view }
 }
 
 const ROW_HEIGHT = 28
@@ -274,6 +276,82 @@ describe('MoveList', () => {
     // There is no move it can hang under, so it leads the list rather than vanishing.
     expect(
       line.compareDocumentPosition(screen.getByText('e4')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('stacks the kept lines under their anchors, in the order they were walked', () => {
+    // Two lines off the position after 1.e4 and one off the position after 1.e4 d5: the
+    // first two hang under move 1, the third under move 1 as well (ply 2 - 1 = 1).
+    renderList([move(0, 'e4'), move(1, 'd5'), move(2, 'exd5'), move(3, 'Qxd5')], {
+      cursor: 3,
+      kept: [
+        { id: 1, base: 1, sans: ['c6', 'd4'] },
+        { id: 2, base: 1, sans: ['e5'] },
+        { id: 3, base: 3, sans: ['Nc3', 'Qa5'] },
+      ],
+    })
+
+    const lines = screen.getAllByTestId('kept-variation')
+    expect(lines.map((line) => line.textContent)).toEqual([
+      '(1…c62.d4)',
+      '(1…e5)',
+      '(2…Nc33.Qa5)',
+    ])
+    // Under move 1 for the first two, under move 2 for the third — each inside the row of
+    // the move that produced the position it left from.
+    const rowOf = (san: string) =>
+      screen.getByRole('button', { name: san }).closest('div')!.parentElement!
+    expect(rowOf('e4').contains(lines[0]!)).toBe(true)
+    expect(rowOf('e4').contains(lines[1]!)).toBe(true)
+    expect(rowOf('exd5').contains(lines[2]!)).toBe(true)
+  })
+
+  it('draws the walked line and the kept ones together, each once', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')], {
+      cursor: 0,
+      variation: { base: 1, sans: ['c6', 'd4'], cursor: 1 },
+      kept: [{ id: 2, base: 1, sans: ['e5'] }],
+    })
+
+    // The line being walked keeps its own row and its lit move; the kept one is beside it,
+    // quiet and with nothing lit.
+    expect(screen.getByTestId('move-variation')).toHaveTextContent('(1…c62.d4)')
+    const quiet = screen.getByTestId('kept-variation')
+    expect(quiet).toHaveTextContent('(1…e5)')
+    expect(
+      within(quiet)
+        .getAllByRole('button')
+        .some((button) => button.className.includes('bg-brilliant')),
+    ).toBe(false)
+    // The walked line leads, the kept ones follow it under the same move.
+    expect(
+      screen.getByTestId('move-variation').compareDocumentPosition(quiet) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('names the kept line a click landed in, and which of its moves', async () => {
+    const user = userEvent.setup()
+    const { onSelectKeptMove } = renderList([move(0, 'e4'), move(1, 'd5')], {
+      cursor: 0,
+      kept: [{ id: 9, base: 1, sans: ['c6', 'd4'] }],
+    })
+
+    await user.click(
+      within(screen.getByTestId('kept-variation')).getByRole('button', { name: 'd4' }),
+    )
+    expect(onSelectKeptMove).toHaveBeenCalledWith(9, 1)
+  })
+
+  it('keeps a kept line whose anchor is folded away at the top of the table', () => {
+    renderList(longGame(), {
+      collapsedThrough: 18,
+      kept: [{ id: 1, base: 3, sans: ['Nc3'] }],
+    })
+    // Move 2 is behind the fold, so the line leads the list rather than vanishing with it.
+    const line = screen.getByTestId('kept-variation')
+    expect(
+      line.compareDocumentPosition(screen.getByText('m38')) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
   })
 
