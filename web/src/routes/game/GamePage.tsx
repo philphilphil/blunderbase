@@ -460,9 +460,10 @@ function GameStudio({ gameId }: { gameId: number }) {
 
   // --- Maia -----------------------------------------------------------------
   //
-  // One configured target elo drives everything: the batch pass pins the stored blob to it,
-  // and the live endpoint is asked at the same level, so the two columns never speak for
-  // two different humans. A deployment with none falls back to the game's own rating.
+  // One target elo drives everything: the batch pass pins the stored blob to it, and the
+  // live endpoint is asked at the same level, so the two columns never speak for two
+  // different humans. Runs stored before it was pinned are keyed by whatever level they
+  // were computed at, which is what `preferredLevel` falls back to.
   const targetElo = useMaiaTargetElo()
   const stored = useMemo(
     () => preferredLevel(maiaLevels(upcoming?.maia), detail?.game.rating, targetElo),

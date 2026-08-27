@@ -13,9 +13,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { ApiError } from '@/lib/api/client'
 import { useRequestAnalysisBatch } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
 
+import { AnalyseAllButton } from './components/AnalyseAllButton'
 import { DebouncedInput, FilterBar } from './components/FilterBar'
 import { GamesTable } from './components/GamesTable'
 import { SelectionFooter } from './components/SelectionFooter'
@@ -105,13 +107,17 @@ export function GamesPage() {
       // tally kept across as many round-trips as there were rows.
       let queued = 0
       let refused = ids.length
+      let reason: string | null = null
       try {
         const receipt = await analysis.mutateAsync({ game_ids: ids, tier })
         queued = receipt.queued.length
         refused = receipt.refused.length
-      } catch {
-        // A call that never landed refused the selection whole — a tier with no engine
-        // behind it is the usual reason.
+      } catch (error) {
+        // A call that never landed refused the selection whole, and the backend always
+        // says why — a selection over the batch cap, a tier with no engine behind it.
+        // Without the reason on the receipt the refusal reads as the server losing the
+        // selection for no stated cause, which is the one thing that never happened.
+        reason = refusalReason(error)
       }
       setAnalysing((current) => {
         const next = new Set(current)
@@ -121,7 +127,7 @@ export function GamesPage() {
       setQueueMessage(
         refused === 0
           ? `${queued} ${tier} ${queued === 1 ? 'run' : 'runs'} queued`
-          : `${queued} queued, ${refused} refused`,
+          : `${queued} queued, ${refused} refused${reason ? ` — ${reason}` : ''}`,
       )
     },
     [analysis],
@@ -182,6 +188,8 @@ export function GamesPage() {
             </button>
           ) : null}
 
+          <AnalyseAllButton />
+
           <Link
             to="/import"
             className="rounded-md border border-edge-input px-2.5 py-1.5 text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
@@ -224,6 +232,13 @@ export function GamesPage() {
       />
     </div>
   )
+}
+
+/** What the backend called it, or the nearest true sentence when it never answered. */
+function refusalReason(error: unknown): string {
+  if (error instanceof ApiError) return error.message || error.error
+  if (error instanceof Error && error.message) return error.message
+  return 'the request never landed'
 }
 
 function EmptyState({ active, onClear }: { active: number; onClear: () => void }) {

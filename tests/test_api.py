@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.api.app import create_app
+from backend.api.schemas import MAX_BATCH_GAMES
 from backend.config import Settings
 from backend.db.enums import (
     Classification,
@@ -708,6 +709,95 @@ def test_a_batch_with_no_usable_engine_is_the_same_typed_conflict(
     assert error_of(response) == "tier_unavailable"
 
 
+def test_a_batch_still_stops_at_five_hundred_games(api: TestClient) -> None:
+    """The cap on a hand-made selection stays where it is; `/backfill` is the uncapped one."""
+    response = api.post(
+        "/analysis/batch", json={"game_ids": list(range(1, MAX_BATCH_GAMES + 2))}
+    )
+
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+    assert api.get("/analysis/queue").json()["queued"] == 0
+
+
+def test_the_backfill_preview_counts_the_games_with_no_pass(api: TestClient) -> None:
+    """`seeded` finished a quick run over exactly one of its games; the rest are the work."""
+    total = api.get("/games", params={"limit": 1}).json()["total"]
+
+    assert api.get("/analysis/backfill").json() == {"tier": "quick", "pending": total - 1}
+
+
+def test_a_backfill_queues_every_game_that_has_none(api: TestClient) -> None:
+    pending = api.get("/analysis/backfill").json()["pending"]
+
+    response = api.post("/analysis/backfill")
+
+    assert response.status_code == 202
+    assert response.json() == {"tier": "quick", "queued": pending, "outstanding": pending}
+    assert api.get("/analysis/queue").json()["queued"] == pending
+    # Every game now has a live quick run, so the button has nothing left to offer.
+    assert api.get("/analysis/backfill").json()["pending"] == 0
+
+
+def test_a_backfill_takes_the_tier_it_was_asked_for(api: TestClient) -> None:
+    """The done run `seeded` carries is a quick one, so a deep backfill takes every game."""
+    total = api.get("/games", params={"limit": 1}).json()["total"]
+
+    assert api.get("/analysis/backfill", params={"tier": "deep"}).json()["pending"] == total
+
+    body = api.post("/analysis/backfill", json={"tier": "deep"}).json()
+
+    assert body == {"tier": "deep", "queued": total, "outstanding": total}
+    assert api.get("/analysis/backfill", params={"tier": "quick"}).json()["pending"] == total - 1
+
+
+def test_a_backfill_with_nothing_left_to_do_queues_nothing(api: TestClient) -> None:
+    api.post("/analysis/backfill")
+
+    response = api.post("/analysis/backfill")
+
+    assert response.status_code == 202
+    assert response.json()["queued"] == 0
+
+
+def test_cancelling_a_backfill_empties_the_queue_it_filled(api: TestClient) -> None:
+    queued = api.post("/analysis/backfill").json()["queued"]
+
+    body = api.post("/analysis/backfill/cancel").json()
+
+    assert body == {"tier": "quick", "dropped": queued, "outstanding": 0}
+    assert api.get("/analysis/queue").json()["queued"] == 0
+    # The games are uncovered again, which is what makes the button offer them once more.
+    assert api.get("/analysis/backfill").json()["pending"] == queued
+
+
+def test_cancelling_a_backfill_leaves_a_running_and_a_windowed_run(
+    settings: Settings, api: TestClient, seeded: dict[str, int]
+) -> None:
+    """Nothing is taken off a worker mid-search, and a deep look at one phase is not a pass."""
+    api.post("/analysis/backfill")
+    windowed = api.post(
+        "/analysis", json={"game_id": seeded["game_id"], "ply_start": 0, "ply_end": 4}
+    ).json()
+    with get_sessionmaker(settings)() as session:
+        claimed = session.scalars(
+            select(AnalysisRun)
+            .where(AnalysisRun.status == RunStatus.QUEUED, AnalysisRun.ply_start.is_(None))
+            .order_by(AnalysisRun.id)
+        ).first()
+        assert claimed is not None
+        claimed.status = RunStatus.RUNNING
+        session.commit()
+        claimed_id = claimed.id
+
+    body = api.post("/analysis/backfill/cancel").json()
+
+    assert body["outstanding"] == 1
+    with get_sessionmaker(settings)() as session:
+        survived = set(session.scalars(select(AnalysisRun.id).where(AnalysisRun.status != "done")))
+        assert survived == {claimed_id, windowed["id"]}
+
+
 def test_a_run_over_a_position_takes_no_ply_range(api: TestClient) -> None:
     response = api.post("/analysis", json={"fen": FRENCH, "ply_start": 0, "ply_end": 4})
 
@@ -1218,6 +1308,21 @@ def test_the_events_socket_sees_a_run_being_queued(
     assert event["run_id"] == run["id"]
     assert event["game_id"] == seeded["game_id"]
     assert event["tier"] == "deep"
+
+
+def test_the_events_socket_sees_one_frame_for_a_whole_backfill(api: TestClient) -> None:
+    """A library-sized enqueue is one summary, not one frame per run."""
+    with api.websocket_connect("/events", headers=socket_headers(api)) as socket:
+        receipt = api.post("/analysis/backfill").json()
+        events = _drain(socket, "analysis.backfill")
+
+    assert [event["event"] for event in events] == ["analysis.backfill"]
+    assert events[-1] == {
+        "event": "analysis.backfill",
+        "tier": "quick",
+        "queued": receipt["queued"],
+        "outstanding": receipt["outstanding"],
+    }
 
 
 def test_the_events_socket_sees_a_note_being_written(api: TestClient) -> None:

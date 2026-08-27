@@ -23,8 +23,12 @@ from backend.db.session import get_sessionmaker
 from backend.services import analysis, app_settings
 from tests.conftest import running_app
 
-# Every key cleared, which is what an install that never opened the page answers with.
+# Every key cleared, which is what an install that never opened the page has stored.
 NOTHING_SET: dict[str, None] = {key: None for key in app_settings.KEYS}
+
+# The same install as the endpoint answers it. The target elo is the one setting answered
+# with the level in force rather than with the row, because Maia is always asked at one.
+UNCONFIGURED: dict[str, Any] = {**NOTHING_SET, app_settings.MAIA_TARGET_ELO: MAIA_MAX_RATING}
 
 # --- the service ----------------------------------------------------------
 
@@ -32,7 +36,7 @@ NOTHING_SET: dict[str, None] = {key: None for key in app_settings.KEYS}
 def test_nothing_is_configured_until_somebody_configures_it(session: Session) -> None:
     """An install that never opened the Settings page runs on the defaults."""
     assert app_settings.read(session) == NOTHING_SET
-    assert app_settings.get_maia_target_elo(session) is None
+    assert app_settings.get_maia_target_elo(session) == MAIA_MAX_RATING
     assert app_settings.get_quick_nodes(session) == app_settings.QUICK_NODES_DEFAULT
     assert app_settings.get_deep_nodes(session) == app_settings.DEEP_NODES_DEFAULT
     assert app_settings.get_deep_multipv(session) == app_settings.DEEP_MULTIPV_DEFAULT
@@ -102,8 +106,13 @@ def test_clearing_one_removes_the_row_rather_than_writing_a_null(session: Sessio
     assert session.scalars(select(AppSetting)).all() == []
 
 
-def test_clearing_something_nobody_set_is_not_an_error(session: Session) -> None:
-    assert app_settings.set_maia_target_elo(session, None) is None
+def test_clearing_the_target_elo_puts_it_back_to_the_default_level(session: Session) -> None:
+    """None is not a third state: there is one level, and clearing chooses the default."""
+    app_settings.set_maia_target_elo(session, 1700)
+
+    assert app_settings.set_maia_target_elo(session, None) == MAIA_MAX_RATING
+    assert app_settings.stored(session, app_settings.MAIA_TARGET_ELO) is None
+    assert app_settings.get_maia_target_elo(session) == MAIA_MAX_RATING
 
 
 def test_a_row_edited_by_hand_cannot_break_a_caller(session: Session) -> None:
@@ -112,7 +121,7 @@ def test_a_row_edited_by_hand_cannot_break_a_caller(session: Session) -> None:
     session.add(AppSetting(key=app_settings.QUICK_NODES, value=True))
     session.commit()
 
-    assert app_settings.get_maia_target_elo(session) is None
+    assert app_settings.get_maia_target_elo(session) == MAIA_MAX_RATING
     assert app_settings.get_quick_nodes(session) == app_settings.QUICK_NODES_DEFAULT
 
     session.get(AppSetting, app_settings.MAIA_TARGET_ELO).value = 9000
@@ -175,8 +184,11 @@ def api(settings: Settings) -> Iterator[TestClient]:
         yield client
 
 
-def test_an_unconfigured_deployment_answers_null_for_everything(api: TestClient) -> None:
-    assert api.get("/api/settings").json() == NOTHING_SET
+def test_an_unconfigured_deployment_answers_null_for_everything_but_the_level(
+    api: TestClient,
+) -> None:
+    """Null is "nobody set this one" — except for the level Maia is always asked at."""
+    assert api.get("/api/settings").json() == UNCONFIGURED
 
 
 def test_a_put_stores_the_values_and_answers_with_them(api: TestClient) -> None:
@@ -201,7 +213,7 @@ def test_a_put_is_the_whole_of_the_settings_rather_than_a_patch(api: TestClient)
     api.put("/api/settings", json={"quick_nodes": 50_000, "deep_nodes": 5_000_000})
 
     assert api.put("/api/settings", json={"quick_nodes": 60_000}).json() == {
-        **NOTHING_SET,
+        **UNCONFIGURED,
         "quick_nodes": 60_000,
     }
 
@@ -217,11 +229,11 @@ def test_an_out_of_range_value_is_clamped_rather_than_refused(api: TestClient) -
     assert answered["quick_nodes"] == app_settings.MIN_NODES
 
 
-def test_null_clears_it_back_to_the_default_behaviour(api: TestClient) -> None:
+def test_null_puts_the_level_back_to_the_default(api: TestClient) -> None:
     api.put("/api/settings", json={"maia_target_elo": 1700})
 
-    assert api.put("/api/settings", json={"maia_target_elo": None}).json() == NOTHING_SET
-    assert api.get("/api/settings").json() == NOTHING_SET
+    assert api.put("/api/settings", json={"maia_target_elo": None}).json() == UNCONFIGURED
+    assert api.get("/api/settings").json()["maia_target_elo"] == MAIA_MAX_RATING
 
 
 def test_thresholds_that_do_not_rise_are_a_422(api: TestClient) -> None:
@@ -235,7 +247,7 @@ def test_thresholds_that_do_not_rise_are_a_422(api: TestClient) -> None:
     assert body["error"] == "invalid_settings"
     assert "inaccuracy < mistake < blunder" in body["detail"]
     # Refused whole: the deployment is exactly as it was.
-    assert api.get("/api/settings").json() == NOTHING_SET
+    assert api.get("/api/settings").json() == UNCONFIGURED
 
 
 def test_a_value_that_is_not_a_number_is_a_422(api: TestClient) -> None:
@@ -305,8 +317,9 @@ def test_a_plan_built_after_a_put_carries_the_new_level(
     with get_sessionmaker(settings)() as session:
         cleared = analysis.build_plan(session, session.get(AnalysisRun, run_id))
 
-        assert cleared.maia_target_elo is None
-        assert cleared.maia_plies() == [0]
+        # Cleared is the default level, not a different kind of run.
+        assert cleared.maia_target_elo == MAIA_MAX_RATING
+        assert cleared.maia_plies() == [0, 1]
 
 
 def test_a_run_queued_after_a_put_carries_the_new_budget(
@@ -339,9 +352,10 @@ def test_a_plan_built_after_a_put_carries_the_new_thresholds(
         assert plan.thresholds == analysis.Thresholds(inaccuracy=4.0, mistake=12.0, blunder=25.0)
 
 
-def test_a_game_with_no_rating_is_centred_on_the_configured_default(
+def test_a_game_with_no_rating_falls_back_to_the_configured_default(
     api: TestClient, settings: Settings
 ) -> None:
+    """What the plan says the owner was rated where the game itself does not say."""
     api.put("/api/settings", json={"default_owner_rating": 1234})
 
     with get_sessionmaker(settings)() as session:
@@ -351,4 +365,5 @@ def test_a_game_with_no_rating_is_centred_on_the_configured_default(
         plan = analysis.build_plan(session, analysis.request_analysis(session, game_id=game.id))
 
         assert plan.owner_rating == 1234
-        assert analysis.maia_levels(plan.owner_rating, target=plan.maia_target_elo) == [1234]
+        # Which is not the level Maia is asked at: that is the deployment's, not the game's.
+        assert plan.maia_target_elo == MAIA_MAX_RATING

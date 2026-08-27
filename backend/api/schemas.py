@@ -61,9 +61,8 @@ class AuthStatus(BaseModel):
 
     setup_required: bool
     authenticated: bool
-    maia_target_elo: int | None = Field(
-        default=None,
-        description="the configured Maia level, or null for the rating-centred behaviour",
+    maia_target_elo: int = Field(
+        description="the one rating every Maia question on this deployment is asked at",
     )
 
 
@@ -87,19 +86,20 @@ class PasswordChange(Input):
 
 
 class AppSettings(BaseModel):
-    """Everything the Settings page shows: eight numbers, each of them nullable.
+    """Everything the Settings page shows: eight numbers.
 
-    Null is never "not loaded yet". It is the deployment saying nobody has set this one,
-    and what is in force is the default `services.app_settings` names — which is why the
-    page can show that default under an empty box rather than pretending to a value.
+    Seven of them are nullable, and null is never "not loaded yet" — it is the deployment
+    saying nobody has set this one, and what is in force is the default
+    `services.app_settings` names, which is why the page can show that default under an
+    empty box rather than pretending to a value.
+
+    The target elo is the exception: every Maia question is asked at a rating, so the
+    answer is the rating in force rather than the row behind it. Clearing it on a PUT is
+    still how it goes back to the default, and what comes back is that default.
     """
 
-    maia_target_elo: int | None = Field(
-        default=None,
-        description=(
-            "the one rating every Maia question is asked at, or null for a level centred "
-            "on the owner's rating in the game, over their own moves"
-        ),
+    maia_target_elo: int = Field(
+        description="the one rating every Maia question is asked at, both sides of the board",
     )
     quick_nodes: int | None = Field(
         default=None, description="nodes per position in the automatic pass on import"
@@ -416,6 +416,54 @@ class BatchAnalysisResponse(BaseModel):
 
     queued: list[QueuedRun] = Field(default_factory=list)
     refused: list[RefusedGame] = Field(default_factory=list)
+
+
+class BackfillRequest(Input):
+    """Which tier a backfill is over. Its own body so the two verbs read the same.
+
+    A backfill takes no game ids and no budget: the selection *is* "everything with no
+    pass yet", and a run's nodes and multipv are the ones the Settings page is showing at
+    the moment the button is pressed. Nothing else belongs in this body, and an empty one
+    means the quick tier.
+    """
+
+    tier: Tier = Tier.QUICK
+
+
+class BackfillPreview(BaseModel):
+    """How many games a backfill would queue if it were started now.
+
+    What the button reads to label itself and to switch itself off: `pending` at zero means
+    every game already has a live run of that tier and there is nothing to ask for.
+    """
+
+    tier: Tier
+    pending: int
+
+
+class BackfillReceipt(BaseModel):
+    """What a backfill put in the queue, and how deep that tier's queue is now.
+
+    `queued` counts only this call's rows; `outstanding` is every queued and running
+    full-game run of the tier, so a second press while the first pass is still draining
+    reports a small `queued` and a large `outstanding`.
+    """
+
+    tier: Tier
+    queued: int
+    outstanding: int
+
+
+class BackfillCancelled(BaseModel):
+    """How many queued runs the stop button took back, and what is left working.
+
+    `outstanding` is rarely zero: the runs a worker had already claimed are left to finish
+    — see `analysis.cancel_queued`.
+    """
+
+    tier: Tier
+    dropped: int
+    outstanding: int
 
 
 class RunResponse(Row):

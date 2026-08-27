@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import { useMaiaTargetElo } from '@/lib/api/queries'
-import type { AppSettings, GamesDeleted } from '@/lib/api/types'
+import type { AppSettings, AppSettingsUpdate, GamesDeleted } from '@/lib/api/types'
 
 import { SettingsPage } from './SettingsPage'
 
@@ -29,8 +29,12 @@ function json(status: number, body: unknown) {
   })
 }
 
+/**
+ * What an install that never opened the page answers with: null everywhere but the target
+ * elo, which is always a level — the default one until somebody chooses another.
+ */
 const NOTHING_SET: AppSettings = {
-  maia_target_elo: null,
+  maia_target_elo: 2000,
   quick_nodes: null,
   deep_nodes: null,
   deep_multipv: null,
@@ -61,7 +65,7 @@ function stubFetch() {
     const method = init?.method ?? 'GET'
     if (path.endsWith('/api/settings')) {
       if (method === 'PUT') {
-        const sent = JSON.parse(String(init?.body)) as AppSettings
+        const sent = JSON.parse(String(init?.body)) as AppSettingsUpdate
         const inaccuracy = clamp(sent.inaccuracy_threshold, 0, 100) ?? 10
         const mistake = clamp(sent.mistake_threshold, 0, 100) ?? 20
         const blunder = clamp(sent.blunder_threshold, 0, 100) ?? 30
@@ -72,7 +76,8 @@ function stubFetch() {
           })
         }
         stored = {
-          maia_target_elo: clamp(sent.maia_target_elo, 1100, 2000),
+          // Cleared is not a state the target elo has: null is the default level.
+          maia_target_elo: clamp(sent.maia_target_elo, 1100, 2000) ?? 2000,
           quick_nodes: clamp(sent.quick_nodes, 1, Number.MAX_SAFE_INTEGER),
           deep_nodes: clamp(sent.deep_nodes, 1, Number.MAX_SAFE_INTEGER),
           deep_multipv: clamp(sent.deep_multipv, 1, 10),
@@ -193,10 +198,31 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Default 1500')).toBeInTheDocument()
   })
 
+  it('shows the pinned level in the box on a deployment nobody configured', async () => {
+    draw()
+
+    // Not an empty box: there is no such thing as asking Maia at no rating.
+    await waitFor(() => expect(field('Target elo')).toHaveValue(2000))
+    expect(screen.getByText('Default 2000')).toBeInTheDocument()
+  })
+
+  it('puts the level back to the default when its box is emptied', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 1700 }
+    draw()
+    await waitFor(() => expect(field('Target elo')).toHaveValue(1700))
+
+    await userEvent.clear(field('Target elo'))
+    await userEvent.click(save())
+
+    await waitFor(() => expect(stored.maia_target_elo).toBe(2000))
+    expect(field('Target elo')).toHaveValue(2000)
+  })
+
   it('saves every box in one request', async () => {
     draw()
 
-    await userEvent.type(await loadedField('Target elo'), '1700')
+    await userEvent.clear(await loadedField('Target elo'))
+    await userEvent.type(field('Target elo'), '1700')
     await userEvent.type(field('Quick nodes'), '50000')
     await userEvent.type(field('Inaccuracy'), '5')
     await userEvent.click(save())

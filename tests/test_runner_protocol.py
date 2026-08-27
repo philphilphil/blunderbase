@@ -204,11 +204,13 @@ def test_a_target_elo_crosses_the_wire_so_a_runner_computes_the_same_levels() ->
     assert protocol.decode_plan(encoded).maia_plies() == [0, 1]
 
 
-def test_a_plan_from_a_runner_that_predates_the_target_elo_has_none() -> None:
-    older = protocol.encode_plan(_game_plan())
-    del older["maia_target_elo"]
+def test_a_plan_without_a_target_elo_does_not_decode() -> None:
+    """Every plan is asked at a level; one that names none is a payload we cannot honour."""
+    missing = protocol.encode_plan(_game_plan())
+    del missing["maia_target_elo"]
 
-    assert protocol.decode_plan(older).maia_target_elo is None
+    with pytest.raises(ProtocolError, match="maia_target_elo"):
+        protocol.decode_plan(missing)
 
 
 def test_a_plan_crosses_the_wire_as_json_the_runner_can_read() -> None:

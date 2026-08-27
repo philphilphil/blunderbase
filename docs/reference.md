@@ -67,10 +67,10 @@ Unset means the default in that table, not a null.
 
 | Setting | Default | |
 |---|---|---|
-| `maia_target_elo` | — | the single rating every Maia question is asked at, clamped to 1100–2000; set, analysis bakes it into every ply of both sides and the analysis board queries it live. Cleared, Maia is asked about your own moves only, at one level centred on your rating in that game |
+| `maia_target_elo` | `2000` | the single rating every Maia question is asked at — the rating you are playing towards, clamped to 1100–2000. Analysis bakes it into every ply of both sides and the analysis board queries it live, so nothing ever asks about two different humans |
 | `quick_nodes` `deep_nodes` `deep_multipv` | `250000` `2000000` `4` | the per-position budget of each tier, and the lines a deep pass keeps. Read when a run is queued, so they size the next run rather than the queue |
 | `inaccuracy_threshold` `mistake_threshold` `blunder_threshold` | `5` `10` `15` | win-percentage points lost by the mover — Lichess's own cuts on the same curve. The three have to rise; a set of them that does not is the one change refused rather than clamped |
-| `default_owner_rating` | `1500` | the rating to centre Maia on where the game carries none — an OTB PGN, an unrated game |
+| `default_owner_rating` | `1500` | the rating to stand in for yours where the game carries none — an OTB PGN, an unrated game |
 
 Everything else out of range is clamped rather than refused, so what a save answers with is
 what is in force. Budgets and thresholds apply to runs from then on; a game already

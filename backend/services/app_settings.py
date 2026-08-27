@@ -8,11 +8,10 @@ the database and are read where they are used rather than cached in the process.
 There are eight of them, in four groups.
 
 **The Maia target elo.** The single rating every Maia question is asked at — the rating
-the owner is playing towards, not the one they have. Set, batch analysis bakes that level
-into every ply of both sides and the analysis board's live queries use it too. Cleared,
-Maia goes back to a single level centred on the owner's rating in the game being analysed,
-over their own moves only, which is what an install that never opened the Settings page
-gets.
+the owner is playing towards, not the one they have. Batch analysis bakes that level into
+every ply of both sides, and the analysis board's live queries use it too, so no two
+surfaces ever speak for two different humans. An install that never opened the Settings
+page is pinned to the top of what Maia can answer, 2000.
 
 **The analysis budgets** — `quick_nodes`, `deep_nodes`, `deep_multipv`. What one position
 costs in each tier, and how many lines a deep run keeps. Read when a run is enqueued, so
@@ -22,8 +21,8 @@ they are the budget of the *next* run rather than of every run ever queued.
 points lost by the mover. Read per plan, which means a game re-analysed after they moved
 is judged by the new ones and one analysed before it keeps what it was judged by.
 
-**The default owner rating.** The rating to centre Maia on when the game itself carries
-none — an OTB PGN, an unrated game — and the level the live board falls back to.
+**The default owner rating.** The rating to stand in for the owner's when the game itself
+carries none — an OTB PGN, an unrated game.
 
 A value outside what a setting can mean is clamped, never refused: an owner aiming at 2200
 gets Maia's top level rather than a form that will not save. The one exception is the
@@ -91,8 +90,7 @@ class Setting:
     """One stored number: what it falls back to, and the range it is pulled into."""
 
     key: str
-    # None where the absence of a row is itself the behaviour, as it is for the target elo.
-    default: int | float | None
+    default: int | float
     low: int | float
     high: int | float | None
     whole: bool
@@ -106,7 +104,9 @@ class Setting:
 SETTINGS: tuple[Setting, ...] = (
     Setting(
         key=MAIA_TARGET_ELO,
-        default=None,
+        # The top of what Maia can answer: an owner who has said nothing about the rating
+        # they are playing towards is asked about the strongest human the model knows.
+        default=MAIA_MAX_RATING,
         low=MAIA_MIN_RATING,
         high=MAIA_MAX_RATING,
         whole=True,
@@ -177,10 +177,10 @@ def read(session: Session) -> dict[str, int | float | None]:
     return {key: _clean(BY_KEY[key], rows.get(key)) for key in KEYS}
 
 
-def get_maia_target_elo(session: Session) -> int | None:
-    """The configured level, or None for the rating-centred behaviour."""
+def get_maia_target_elo(session: Session) -> int:
+    """The one rating every Maia question is asked at, chosen or defaulted."""
     value = stored(session, MAIA_TARGET_ELO)
-    return None if value is None else int(value)
+    return MAIA_MAX_RATING if value is None else int(value)
 
 
 def get_quick_nodes(session: Session) -> int:
@@ -207,19 +207,15 @@ def get_thresholds(session: Session) -> tuple[float, float, float]:
 
 
 def get_default_owner_rating(session: Session) -> int:
-    """The rating to centre Maia on when the game itself carries none."""
+    """The rating to stand in for the owner's when the game itself carries none."""
     value = stored(session, DEFAULT_OWNER_RATING)
     return OWNER_RATING_DEFAULT if value is None else int(value)
 
 
 def _or_default(values: Mapping[str, int | float | None], key: str) -> float:
-    """One threshold as it would be in force: the value given, else the key's default.
-
-    Only ever asked about the three thresholds, and every one of those has a default; the
-    trailing `or 0.0` is there for the type, not for a case that happens.
-    """
+    """One threshold as it would be in force: the value given, else the key's default."""
     value = values.get(key)
-    return float((BY_KEY[key].default if value is None else value) or 0.0)
+    return float(BY_KEY[key].default if value is None else value)
 
 
 # --- writing --------------------------------------------------------------
@@ -251,10 +247,14 @@ def set_value(session: Session, key: str, value: int | float | None) -> int | fl
     return pulled
 
 
-def set_maia_target_elo(session: Session, value: int | None) -> int | None:
-    """The target elo, stored or cleared. Returns what is in force afterwards."""
+def set_maia_target_elo(session: Session, value: int | None) -> int:
+    """The target elo, chosen or put back to the default. Returns what is in force after.
+
+    None is not a third state here: it clears the row, and the level in force is the
+    default the key names.
+    """
     stored_value = set_value(session, MAIA_TARGET_ELO, value)
-    return None if stored_value is None else int(stored_value)
+    return MAIA_MAX_RATING if stored_value is None else int(stored_value)
 
 
 def replace(

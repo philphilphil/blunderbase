@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, Settings, User, Users } from 'lucide-react'
+import { Bot, CircleHelp, KeyRound, LogOut, Settings, User, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -29,9 +29,10 @@ const ITEM =
  *
  * The chip is a plain person icon — initials read as an identity the app does not have,
  * and the accessible name already says whose installation this is. The menu it opens
- * heads with every connected account, then the deployment's own settings, signing out and
- * changing the password: everything an owner does to their installation rather than to
- * their games.
+ * heads with every connected account, then the deployment's own settings, the MCP config an
+ * assistant is handed, the page explaining what the engines are doing, signing out and
+ * changing the password: everything an owner does to or asks about their installation
+ * rather than about their games.
  */
 export function AccountMenu() {
   const profile = useProfile()
@@ -123,6 +124,19 @@ export function AccountMenu() {
           <Link to="/import" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <Users className="size-3.5" aria-hidden />
             Connected accounts
+          </Link>
+          <Link
+            to="/settings/mcp"
+            role="menuitem"
+            className={ITEM}
+            onClick={() => setOpen(false)}
+          >
+            <Bot className="size-3.5" aria-hidden />
+            Connect your assistant
+          </Link>
+          <Link to="/help" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
+            <CircleHelp className="size-3.5" aria-hidden />
+            How analysis works
           </Link>
           <button
             type="button"

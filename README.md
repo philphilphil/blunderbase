@@ -31,7 +31,7 @@ becomes a coach with your whole chess history in reach.
 
 - Automatic Stockfish analysis of every imported game, with blunder/mistake/inaccuracy classification
 - MCP server that turns Claude (or any MCP agent) into a coach over your games
-- Maia human-move predictions: what a player of your rating would have played
+- Maia human-move predictions: what a player at the rating you are aiming for would have played
 - Personal opening explorer — your tree, your scores, where you leave your own book
 - Stats: blunders by phase, piece and time control, time-trouble losses, trends
 - Live mode: the coach drives a board in your browser, move by move

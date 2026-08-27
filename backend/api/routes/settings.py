@@ -17,6 +17,7 @@ that does not rise, which is refused whole with a 422 the page shows against the
 from __future__ import annotations
 
 from fastapi import APIRouter
+from sqlalchemy.orm import Session
 
 from backend.api.deps import SessionDep
 from backend.api.schemas import AppSettings, AppSettingsUpdate
@@ -27,10 +28,28 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 @router.get("", response_model=AppSettings, summary="Everything the Settings page shows")
 def get_settings(session: SessionDep) -> AppSettings:
-    return AppSettings(**app_settings_service.read(session))
+    return _answer(session, app_settings_service.read(session))
 
 
 @router.put("", response_model=AppSettings, summary="Change the settings")
 def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
     """Answers with what is in force afterwards — the clamped values, or null once cleared."""
-    return AppSettings(**app_settings_service.replace(session, body.model_dump()))
+    return _answer(session, app_settings_service.replace(session, body.model_dump()))
+
+
+def _answer(session: Session, values: dict[str, int | float | None]) -> AppSettings:
+    """The stored settings as the page reads them.
+
+    Seven of them answer with the row: null is the page's cue to show the default under an
+    empty box. The target elo answers with the level in force instead, because there is no
+    such thing as a deployment that asks Maia at no rating — cleared, it is pinned to the
+    default rather than to a behaviour of its own.
+    """
+    return AppSettings(
+        **{
+            **values,
+            app_settings_service.MAIA_TARGET_ELO: app_settings_service.get_maia_target_elo(
+                session
+            ),
+        }
+    )

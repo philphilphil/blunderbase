@@ -18,7 +18,7 @@ from sqlalchemy import Engine as SaEngine
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.config import Settings
+from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.base import Base
 from backend.db.enums import Classification, EngineKind, Platform, RunStatus, Tier
 from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval
@@ -657,9 +657,10 @@ async def test_a_stranded_run_that_has_spent_its_retries_is_failed_on_restart(
 # --- Maia -----------------------------------------------------------------
 
 
-async def test_maia_predicts_a_human_move_at_the_owners_rating(
+async def test_maia_predicts_a_human_move_at_the_default_level(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
+    """Nobody configured a target here, and the pass is the same pass anyway."""
     _register(db, tmp_path, go=QUICK_REPLIES)
     _register(
         db,
@@ -668,8 +669,11 @@ async def test_maia_predicts_a_human_move_at_the_owners_rating(
         name="Maia",
         go=[
             _maia_reply([("e2e4", 31.4), ("d2d4", 22.0), ("g1f3", 11.5)]),
+            _maia_reply([("e7e5", 30.0), ("c7c5", 20.0)]),
             _maia_reply([("g1f3", 40.0), ("b1c3", 18.0), ("f1c4", 12.0)]),
+            _maia_reply([("b8c6", 35.0), ("g8f6", 20.0)]),
             _maia_reply([("f1c4", 28.0), ("f1b5", 26.0), ("d2d4", 14.0)]),
+            _maia_reply([("a7a6", 30.0), ("g8f6", 24.0)]),
         ],
     )
     _import_game(db, fixtures_dir)
@@ -681,14 +685,14 @@ async def test_maia_predicts_a_human_move_at_the_owners_rating(
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE
-    # The owner is White at 1712, so that is the one level asked about, and only their own
-    # moves are worth a second engine pass.
-    assert [row.ply for row in rows if row.maia_policy] == [0, 2, 4]
+    # The owner is White at 1712, and neither that nor the side to move picks the level or
+    # the plies: every move of both sides, at the top of what Maia can answer.
+    assert [row.ply for row in rows if row.maia_policy] == [0, 1, 2, 3, 4, 5]
     first = rows[0].maia_policy
-    assert sorted(first) == ["1712"]
-    assert first["1712"][0]["uci"] == "e2e4"
-    assert first["1712"][0]["p"] == 0.314
-    assert [entry["rank"] for entry in first["1712"]] == [1, 2, 3]
+    assert sorted(first) == [str(MAIA_MAX_RATING)]
+    assert first[str(MAIA_MAX_RATING)][0]["uci"] == "e2e4"
+    assert first[str(MAIA_MAX_RATING)][0]["p"] == 0.314
+    assert [entry["rank"] for entry in first[str(MAIA_MAX_RATING)]] == [1, 2, 3]
 
 
 async def test_a_target_elo_bakes_one_level_into_every_ply_of_both_sides(

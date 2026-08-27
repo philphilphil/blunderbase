@@ -38,6 +38,13 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'analysis.progress':
       return [queryKeys.queue()]
 
+    // A bulk enqueue, announced once for the whole operation rather than once per game.
+    // Queued work has produced no evals, so this is the same news as `analysis.queued` and
+    // stops at `['analysis']` for the same reason — the difference is only that one frame
+    // stands for ten thousand games, and the queue is how they are watched from here.
+    case 'analysis.backfill':
+      return [queryKeys.analysis()]
+
     // New evals: classifications, eval curves, worst moments, explorer eval drops.
     case 'analysis.done':
     case 'analysis.failed':

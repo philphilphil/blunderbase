@@ -11,6 +11,7 @@ from sqlalchemy import event as sa_event
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.config import MAIA_MAX_RATING
 from backend.db.enums import (
     Classification,
     Color,
@@ -167,8 +168,9 @@ def test_an_unconfigured_deployment_classifies_by_the_defaults(session: Session)
 # --- Maia rating levels ---------------------------------------------------
 
 
-def test_the_level_is_the_owners_rating_in_that_game() -> None:
-    assert analysis.maia_levels(1600) == [1600]
+def test_the_level_is_the_target_and_nothing_else() -> None:
+    """One level per deployment is what makes two games comparable at all."""
+    assert analysis.maia_levels(1700) == [1700]
 
 
 def test_the_level_is_clamped_to_what_the_model_can_answer() -> None:
@@ -176,18 +178,8 @@ def test_the_level_is_clamped_to_what_the_model_can_answer() -> None:
     assert analysis.maia_levels(2400) == [2000]
 
 
-def test_an_unrated_owner_falls_back_to_the_configured_default() -> None:
-    assert analysis.maia_levels(None, default=1400) == [1400]
-
-
-def test_a_target_elo_is_the_level_instead(session: Session) -> None:
-    """The rating the game was played at is exactly what a target elo replaces."""
-    assert analysis.maia_levels(1200, target=1700) == [1700]
-
-
-def test_a_target_elo_is_still_clamped_to_what_the_build_declares() -> None:
-    assert analysis.maia_levels(None, target=1900, low=1100, high=1500) == [1500]
-    assert analysis.maia_levels(None, target=900) == [1100]
+def test_the_level_is_clamped_to_what_the_build_declares_too() -> None:
+    assert analysis.maia_levels(1900, low=1100, high=1500) == [1500]
 
 
 def _plan(session: Session, **changes: Any) -> analysis.RunPlan:
@@ -197,26 +189,28 @@ def _plan(session: Session, **changes: Any) -> analysis.RunPlan:
     return analysis.build_plan(session, run)
 
 
-def test_without_a_target_maia_is_only_asked_about_the_owners_own_moves(
+def test_a_deployment_nobody_configured_is_pinned_to_maias_top_level(
     session: Session,
 ) -> None:
+    """No target elo was ever set here, and the plan still carries one."""
     plan = _plan(session)
 
-    assert plan.maia_target_elo is None
-    # The owner has White in `_game`, so the even plies are theirs.
-    assert plan.maia_plies() == [0, 2, 4]
+    assert plan.maia_target_elo == MAIA_MAX_RATING
+    # Both sides, at that one level, without anyone having asked for it.
+    assert plan.maia_plies() == [0, 1, 2, 3, 4, 5]
 
 
-def test_a_target_elo_asks_about_every_ply_of_both_sides(session: Session) -> None:
+def test_maia_is_asked_about_every_ply_of_both_sides(session: Session) -> None:
     """The "what will a human opposite me fall into" half is a question about their moves."""
     app_settings.set_maia_target_elo(session, 1700)
     plan = _plan(session)
 
     assert plan.maia_target_elo == 1700
+    # The owner has White in `_game`, and the odd plies are asked about just the same.
     assert plan.maia_plies() == [0, 1, 2, 3, 4, 5]
 
 
-def test_a_game_with_no_owner_covers_every_ply_either_way(tmp_path: Any) -> None:
+def test_a_game_with_no_owner_is_asked_about_the_same_way(tmp_path: Any) -> None:
     plan = analysis.RunPlan(
         run_id=1,
         tier=Tier.QUICK,
@@ -544,6 +538,157 @@ def test_enqueue_missing_retries_nothing_that_failed_twice(session: Session) -> 
     analysis.fail_run(session, run, "engine died")
 
     assert [again.game_id for again in analysis.enqueue_missing(session)] == [game.id]
+
+
+# --- backfilling a whole library ------------------------------------------
+
+
+def test_the_backfill_preview_counts_exactly_what_the_backfill_takes(session: Session) -> None:
+    """The number on the button and the rows the button writes are one statement.
+
+    A finished pass covers a game; a pass that gave up and a deep look at one phase do not.
+    """
+    _engine(session)
+    done, spent, windowed, fresh = (_game(session, plies=plies) for plies in (4, 6, 6, 4))
+    analysis.complete_run(session, analysis.request_analysis(session, game_id=done.id), [])
+    failed = analysis.request_analysis(session, game_id=spent.id)
+    failed.attempts = analysis.MAX_ATTEMPTS
+    analysis.fail_run(session, failed, "engine died")
+    analysis.request_analysis(session, game_id=windowed.id, ply_range=(0, 4))
+
+    assert analysis.count_missing(session) == 3
+
+    queued = analysis.enqueue_missing(session)
+
+    assert {run.game_id for run in queued} == {spent.id, windowed.id, fresh.id}
+    assert analysis.count_missing(session) == 0
+
+
+def test_a_backfill_of_one_tier_says_nothing_about_the_other(session: Session) -> None:
+    _engine(session)
+    _game(session)
+
+    analysis.enqueue_missing(session)
+
+    assert analysis.count_missing(session, Tier.QUICK) == 0
+    assert analysis.count_missing(session, Tier.DEEP) == 1
+
+
+def test_a_backfill_can_take_a_bite_of_the_backlog(session: Session) -> None:
+    """What `blunderbase analyze --limit` is: the oldest few, and the rest still pending."""
+    _engine(session)
+    games = [_game(session, plies=plies) for plies in (4, 6, 4)]
+
+    queued = analysis.enqueue_missing(session, limit=2)
+
+    assert [run.game_id for run in queued] == [games[0].id, games[1].id]
+    assert analysis.count_missing(session) == 1
+
+
+def test_a_backfill_writes_the_whole_library_in_one_commit(session: Session) -> None:
+    _engine(session)
+    games = [_game(session, plies=plies) for plies in (4, 6, 4)]
+    commits = 0
+
+    @sa_event.listens_for(session, "after_commit")
+    def _count(_session: Session) -> None:
+        nonlocal commits
+        commits += 1
+
+    queued = analysis.enqueue_missing(session)
+
+    assert len(queued) == len(games)
+    assert commits == 1
+
+
+def test_a_backfill_announces_the_write_once_and_never_a_run(session: Session) -> None:
+    """The whole point of the summary event: ten thousand frames in a burst is the storm."""
+    _engine(session)
+    [_game(session, plies=plies) for plies in (4, 6, 4)]
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        analysis.enqueue_missing(session)
+    finally:
+        cancel()
+
+    assert seen == [
+        {"event": analysis.EVENT_BACKFILL, "tier": "quick", "queued": 3, "outstanding": 3}
+    ]
+
+
+def test_a_run_asked_for_on_its_own_still_announces_itself(session: Session) -> None:
+    """The opt-out is the bulk path's; one game queued by hand is one `analysis.queued`."""
+    _engine(session)
+    game = _game(session)
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        run = analysis.request_analysis(session, game_id=game.id)
+    finally:
+        cancel()
+
+    assert [event["event"] for event in seen] == [analysis.EVENT_RUN_QUEUED]
+    assert seen[0]["run_id"] == run.id
+
+
+def test_a_backfill_with_nothing_to_queue_commits_nothing(session: Session) -> None:
+    _engine(session)
+    _game(session)
+    analysis.enqueue_missing(session)
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        assert analysis.enqueue_missing(session) == []
+    finally:
+        cancel()
+
+    assert seen == []
+
+
+def test_cancelling_a_backfill_leaves_running_and_windowed_runs_alone(session: Session) -> None:
+    """The stop button shortens the queue; it does not reach into what is already working."""
+    _engine(session)
+    games = [_game(session, plies=plies) for plies in (4, 6, 4)]
+    analysis.enqueue_missing(session)
+    windowed = analysis.request_analysis(session, game_id=games[1].id, ply_range=(0, 4))
+    position = analysis.request_analysis(
+        session, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    )
+    running = analysis.claim_next_run(session)
+    assert running is not None and running.ply_start is None
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        dropped = analysis.cancel_queued(session)
+    finally:
+        cancel()
+
+    assert dropped == 2
+    left = set(session.scalars(select(AnalysisRun.id)))
+    assert left == {running.id, windowed.id, position.id}
+    assert analysis.outstanding_runs(session) == 1
+    assert seen == [
+        {"event": analysis.EVENT_BACKFILL, "tier": "quick", "queued": 0, "outstanding": 1}
+    ]
+
+
+def test_cancelling_with_nothing_queued_says_nothing(session: Session) -> None:
+    _engine(session)
+    _game(session)
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        assert analysis.cancel_queued(session) == 0
+    finally:
+        cancel()
+
+    assert seen == []
 
 
 # --- the queue ------------------------------------------------------------

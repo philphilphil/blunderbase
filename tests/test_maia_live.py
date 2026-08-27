@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from backend.api.app import create_app
-from backend.config import Settings
+from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.enums import EngineKind
 from backend.db.migrate import upgrade_to_head
 from backend.db.models import Engine, Runner
@@ -252,14 +252,14 @@ def test_the_configured_target_is_the_level_when_nobody_asks_for_one(
     assert "setoption name SelfElo value 1700" in commands(log, "setoption")
 
 
-def test_with_no_target_configured_the_level_is_the_default_rating(
+def test_a_deployment_that_configured_nothing_asks_at_maias_top_level(
     session: Session, tmp_path: Path
 ) -> None:
+    """The board and the stored runs cannot disagree: both are pinned to the same default."""
     register_maia(session, maia_command(tmp_path))
-    app_settings.set_value(session, app_settings.DEFAULT_OWNER_RATING, 1400)
     live = LiveMaia()
     try:
-        assert live.policy(session, fen=STARTING, moves=2)["elo"] == 1400
+        assert live.policy(session, fen=STARTING, moves=2)["elo"] == MAIA_MAX_RATING
     finally:
         live.shutdown()
 

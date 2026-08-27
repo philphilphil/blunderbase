@@ -11,6 +11,10 @@ from backend.api.deps import SessionDep, SettingsDep, not_found, ply_range, wake
 from backend.api.routes.runners import live_picture, local_picture
 from backend.api.schemas import (
     AnalysisRequest,
+    BackfillCancelled,
+    BackfillPreview,
+    BackfillReceipt,
+    BackfillRequest,
     BatchAnalysisRequest,
     BatchAnalysisResponse,
     MoveEvalResponse,
@@ -83,6 +87,73 @@ def enqueue_batch(
         # Every run a batch queued was queued for a game, so `game_id` is one.
         queued=[QueuedRun(game_id=run.game_id, run_id=run.id) for run in queued],
         refused=[RefusedGame(game_id=item.game_id, reason=item.reason) for item in refused],
+    )
+
+
+@router.get(
+    "/backfill", response_model=BackfillPreview, summary="How many games have no pass yet"
+)
+def backfill_preview(
+    session: SessionDep,
+    tier: Annotated[Tier, Query(description="the tier the backfill would be over")] = Tier.QUICK,
+) -> BackfillPreview:
+    """What a backfill of this tier has left to do.
+
+    Read off the same statement the enqueue selects with, so the number the button shows
+    and the number of rows the button writes are answers to one question.
+    """
+    return BackfillPreview(tier=tier, pending=analysis_service.count_missing(session, tier))
+
+
+@router.post(
+    "/backfill",
+    response_model=BackfillReceipt,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Queue a pass over every game that has none",
+)
+def backfill(
+    request: Request, session: SessionDep, body: BackfillRequest | None = None
+) -> BackfillReceipt:
+    """Queue a full-game pass over every game with no live run of this tier.
+
+    Uncapped, which is the whole difference between this and `/batch`. That route serves a
+    selection made by hand on the games page and keeps its five-hundred ceiling for exactly
+    that reason; this one is "analyse the library while I sleep", and a library is ten
+    thousand games. One transaction and one commit carry all of them.
+
+    A backfill announces itself once — see `analysis.backfill_event` — rather than once per
+    run, so a client hears that the queue moved without being handed every row that moved
+    it. The 202 is what the write was accepted as; the runs are worked afterwards, by
+    whichever machine the tier's engine lives on.
+    """
+    tier = (body or BackfillRequest()).tier
+    queued = analysis_service.enqueue_missing(session, tier)
+    wake_workers(request)
+    return BackfillReceipt(
+        tier=tier,
+        queued=len(queued),
+        outstanding=analysis_service.outstanding_runs(session, tier),
+    )
+
+
+@router.post(
+    "/backfill/cancel",
+    response_model=BackfillCancelled,
+    summary="Take a backfill back out of the queue",
+)
+def cancel_backfill(session: SessionDep, body: BackfillRequest | None = None) -> BackfillCancelled:
+    """Drop this tier's queued full-game runs, leaving the ones already being worked.
+
+    Not a 202: the queue is shorter by the time this answers, and `dropped` is the count of
+    rows that actually went. `outstanding` is what is still in flight — a pass the workers
+    had already claimed finishes, because there is nothing to move it to.
+    """
+    tier = (body or BackfillRequest()).tier
+    dropped = analysis_service.cancel_queued(session, tier)
+    return BackfillCancelled(
+        tier=tier,
+        dropped=dropped,
+        outstanding=analysis_service.outstanding_runs(session, tier),
     )
 
 

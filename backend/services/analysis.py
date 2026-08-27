@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy import event as sa_event
 from sqlalchemy.orm import Session
 
@@ -92,6 +92,8 @@ EVENT_RUN_STARTED = "analysis.running"
 EVENT_RUN_PROGRESS = "analysis.progress"
 EVENT_RUN_DONE = "analysis.done"
 EVENT_RUN_FAILED = "analysis.failed"
+# One frame for a whole library-sized write, in place of one per run; see `backfill_event`.
+EVENT_BACKFILL = "analysis.backfill"
 
 # One progress event every this many analysed positions, plus one at the end. A run of a
 # hundred positions should tell a UI it is moving without flooding a socket.
@@ -243,12 +245,14 @@ class RunPlan:
     depth: int | None
     multipv: int
     thresholds: Thresholds
+    # Who the owner was in this game and what they were rated — the game's own rating, or
+    # `default_owner_rating` where it carries none. Neither pass reads them now that Maia
+    # is asked at one level about both sides; they are what a plan says about the player,
+    # and they cross the wire to a runner with the rest of it.
     owner_color: Color | None = None
     owner_rating: int | None = None
-    # The one level every Maia question in this run is asked at, when the deployment
-    # configures one. It replaces `owner_rating` for the human-move pass; None centres that
-    # level on the owner's rating in this game instead.
-    maia_target_elo: int | None = None
+    # The one level every Maia question in this run is asked at, both sides of the board.
+    maia_target_elo: int = MAIA_MAX_RATING
 
     @property
     def plies(self) -> range:
@@ -268,22 +272,16 @@ class RunPlan:
         return range(self.ply_start, self.ply_end + 1)
 
     def maia_plies(self) -> list[int]:
-        """The plies Maia is asked about: the owner's own moves where one is known.
+        """The plies Maia is asked about: every one of them, both sides of the board.
 
-        Maia answers "what would a human of this rating have played" — a question about
-        the owner, so their opponent's moves are not worth the second engine pass. With no
-        owner on the game (an OTB PGN, a stranger's game) every move is fair game.
-
-        A configured target elo widens that to every ply of both sides. The second half of
-        what Maia is for is "what will a human opposite me actually fall into", which is a
-        question about the positions the *opponent* moves in.
+        Maia answers "what would a human at the target rating have played here". That is
+        two questions at once — what the owner would have found, and what a human opposite
+        them will actually fall into — and the second one is about the positions the
+        *opponent* moves in, so neither side of the game is worth skipping.
         """
         if self.is_position_run:
             return [self.ply_start]
-        if self.owner_color is None or self.maia_target_elo is not None:
-            return list(self.plies)
-        white = self.owner_color is Color.WHITE
-        return [ply for ply in self.plies if (ply % 2 == 0) == white]
+        return list(self.plies)
 
 
 # --- win percentage and classification ------------------------------------
@@ -325,22 +323,20 @@ def classify_move(win_loss: float, *, played_best: bool, thresholds: Thresholds)
 
 
 def maia_levels(
-    rating: int | None,
+    target: int,
     *,
     low: int = MAIA_MIN_RATING,
     high: int = MAIA_MAX_RATING,
-    default: int = app_settings_service.OWNER_RATING_DEFAULT,
-    target: int | None = None,
 ) -> list[int]:
     """The rating level to ask Maia about, clamped to what the model can answer.
 
-    One level, always — a list because that is what `policy_at` keys its answer by. The
-    configured target is it where there is one, which is what makes two games comparable at
-    all; without one it is the rating the game was played at, and the owner's default
-    rating where the game carries none.
+    One level, always — a list because that is what `policy_at` keys its answer by. It is
+    the deployment's target and nothing else, which is what makes two games comparable at
+    all: a move that Maia's answer changed between them is the play changing, not the
+    question. The clamp is the build's, since a level outside what it declares it can
+    answer is a number it would ignore.
     """
-    base = target if target is not None else (rating if rating is not None else default)
-    return [min(high, max(low, int(base)))]
+    return [min(high, max(low, int(target)))]
 
 
 def _raw_chances(cp: float) -> float:
@@ -348,6 +344,68 @@ def _raw_chances(cp: float) -> float:
 
 
 # --- enqueueing -----------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class _RunDefaults:
+    """What a queued row takes from configuration rather than from the game it is over.
+
+    Resolved once and reused for every row of a bulk enqueue. Each of the four is a per
+    tier answer, not a per game one, and asking for them ten thousand times over — an
+    engine lookup, a host check and two app-settings reads apiece — is the difference
+    between a backfill that returns and one that times out.
+    """
+
+    tier: Tier
+    engine_id: int
+    nodes: int
+    multipv: int
+    priority: int
+
+
+def _run_defaults(
+    session: Session,
+    tier: Tier,
+    *,
+    engine_id: int | None = None,
+    nodes: int | None = None,
+    multipv: int | None = None,
+    priority: int | None = None,
+) -> _RunDefaults:
+    """Settle what every run of this call will be queued with. Anything given wins."""
+    engine = _resolve_engine(session, tier, engine_id)
+    _require_one_host(session, engine)
+    return _RunDefaults(
+        tier=tier,
+        engine_id=engine.id,
+        nodes=nodes if nodes is not None else _default_nodes(session, tier),
+        multipv=max(1, multipv if multipv is not None else _default_multipv(session, tier)),
+        priority=priority if priority is not None else default_priority(tier),
+    )
+
+
+def _queued_row(
+    defaults: _RunDefaults,
+    *,
+    game_id: int | None = None,
+    fen: str | None = None,
+    window: tuple[int, int] | None = None,
+    depth: int | None = None,
+) -> AnalysisRun:
+    """The one place a queued run row is built, so the single and bulk paths cannot drift."""
+    return AnalysisRun(
+        game_id=game_id,
+        fen=fen,
+        engine_id=defaults.engine_id,
+        tier=defaults.tier,
+        status=RunStatus.QUEUED,
+        nodes=defaults.nodes,
+        depth=depth,
+        multipv=defaults.multipv,
+        ply_start=None if window is None else window[0],
+        ply_end=None if window is None else window[1],
+        priority=defaults.priority,
+    )
 
 
 def request_analysis(
@@ -363,6 +421,7 @@ def request_analysis(
     depth: int | None = None,
     priority: int | None = None,
     commit: bool = True,
+    announce: bool = True,
 ) -> AnalysisRun:
     """Enqueue one pass. Exactly one of `game_id` and `fen` must be given.
 
@@ -380,6 +439,9 @@ def request_analysis(
     human-move passes happen in one process on one machine, so a search engine on a host
     with no Maia is refused here when the deployment's only Maia is somewhere else — see
     `_require_one_host`.
+
+    `announce=False` queues the run silently. Only a bulk path passes it, and only because
+    it announces the whole write once instead; a run enqueued on its own always says so.
     """
     tier = Tier(tier)
     if (game_id is None) == (fen is None):
@@ -396,24 +458,14 @@ def request_analysis(
         if ply_range is not None:
             raise AnalysisRequestError("a run over a FEN has no ply range")
 
-    engine = _resolve_engine(session, tier, engine_id)
-    _require_one_host(session, engine)
-    run = AnalysisRun(
-        game_id=game_id,
-        fen=fen,
-        engine_id=engine.id,
-        tier=tier,
-        status=RunStatus.QUEUED,
-        nodes=nodes if nodes is not None else _default_nodes(session, tier),
-        depth=depth,
-        multipv=max(1, multipv if multipv is not None else _default_multipv(session, tier)),
-        ply_start=None if window is None else window[0],
-        ply_end=None if window is None else window[1],
-        priority=priority if priority is not None else default_priority(tier),
+    defaults = _run_defaults(
+        session, tier, engine_id=engine_id, nodes=nodes, multipv=multipv, priority=priority
     )
+    run = _queued_row(defaults, game_id=game_id, fen=fen, window=window, depth=depth)
     session.add(run)
     session.flush()
-    emit_on_commit(session, run_event(EVENT_RUN_QUEUED, run))
+    if announce:
+        emit_on_commit(session, run_event(EVENT_RUN_QUEUED, run))
     if commit:
         session.commit()
     return run
@@ -477,16 +529,16 @@ def request_analysis_batch(
     return queued, refused
 
 
-def enqueue_missing(
-    session: Session,
-    tier: Tier = Tier.QUICK,
-    *,
-    limit: int | None = None,
-) -> list[AnalysisRun]:
-    """Queue a full-game pass for every game that has no live run of this tier.
+def _missing_games(tier: Tier, *, limit: int | None = None) -> Select[tuple[int]]:
+    """The games with no live full-game run of this tier, oldest id first.
 
-    "Live" means queued, running or done: a run that failed twice is not retried by a
-    batch command, because whatever is wrong with it will still be wrong.
+    One statement behind both the count a preview shows and the set an enqueue takes, so
+    the number on the owner's button and the number of rows it writes cannot drift apart.
+
+    "Live" means queued, running or done: a run that failed twice is not retried by a bulk
+    command, because whatever is wrong with it will still be wrong. Coverage is a *whole*
+    pass, so only a run with both ply bounds NULL counts — a deep look at one phase leaves
+    the game as unanalysed as it was.
     """
     covered = (
         select(AnalysisRun.game_id)
@@ -502,15 +554,102 @@ def enqueue_missing(
     statement = select(Game.id).where(Game.id.not_in(covered)).order_by(Game.id)
     if limit:
         statement = statement.limit(limit)
-    pending = list(session.scalars(statement))
+    return statement
 
-    queued = [
-        request_analysis(session, game_id=game_id, tier=tier, commit=False)
-        for game_id in pending
-    ]
-    if queued:
-        session.commit()
+
+def count_missing(session: Session, tier: Tier = Tier.QUICK) -> int:
+    """How many games a backfill of this tier would queue if it ran now."""
+    total = session.scalar(select(func.count()).select_from(_missing_games(tier).subquery()))
+    return int(total or 0)
+
+
+def outstanding_runs(session: Session, tier: Tier = Tier.QUICK) -> int:
+    """How deep this tier's full-game queue is: the queued and running rows together.
+
+    What a backfill receipt reports and what its event carries. Running rows are in it
+    because they are work still to come off the queue, and a client watching a library-wide
+    pass wants the number of games it is still waiting for, not the number not yet started.
+    """
+    total = session.scalar(
+        select(func.count())
+        .select_from(AnalysisRun)
+        .where(
+            AnalysisRun.game_id.is_not(None),
+            AnalysisRun.tier == Tier(tier),
+            AnalysisRun.status.in_([RunStatus.QUEUED, RunStatus.RUNNING]),
+            AnalysisRun.ply_start.is_(None),
+            AnalysisRun.ply_end.is_(None),
+        )
+    )
+    return int(total or 0)
+
+
+def enqueue_missing(
+    session: Session,
+    tier: Tier = Tier.QUICK,
+    *,
+    limit: int | None = None,
+) -> list[AnalysisRun]:
+    """Queue a full-game pass for every game that has no live run of this tier.
+
+    Sized for the whole library: what the games have in common — the engine, the budget,
+    the priority — is resolved once for the call, the rows go in with one `add_all`, and
+    one flush and one commit carry the lot. A failure therefore leaves no half-queued
+    library behind, the way a batch leaves no half-queued selection.
+
+    The per-run `analysis.queued` events are suppressed and one `analysis.backfill` is
+    emitted in their place. Ten thousand runs are ten thousand frames down the events
+    socket in a single burst, and that is the shape of storm this deployment has fallen
+    over on before; a client that wants the detail refetches the queue.
+
+    `limit` is what `blunderbase analyze --limit` takes a bite of the backlog with.
+    """
+    tier = Tier(tier)
+    pending = list(session.scalars(_missing_games(tier, limit=limit)))
+    if not pending:
+        return []
+
+    defaults = _run_defaults(session, tier)
+    queued = [_queued_row(defaults, game_id=game_id) for game_id in pending]
+    session.add_all(queued)
+    session.flush()
+    emit_on_commit(
+        session,
+        backfill_event(tier, queued=len(queued), outstanding=outstanding_runs(session, tier)),
+    )
+    session.commit()
     return queued
+
+
+def cancel_queued(session: Session, tier: Tier = Tier.QUICK) -> int:
+    """Drop this tier's queued full-game runs and say how many went.
+
+    The stop button on an overnight pass, and the only kind of cancelling there is: a run
+    already being worked is left to finish, because there is no cancelled status for it to
+    move to and one is not worth a migration for the handful of rows in flight. A windowed
+    run is a deep look at one phase that somebody asked for by hand and no backfill ever
+    queued, so it stays as well.
+
+    Announced with the same `analysis.backfill` event the enqueue side emits, for the same
+    reason: one frame for the whole write.
+    """
+    tier = Tier(tier)
+    dropped = session.execute(
+        delete(AnalysisRun).where(
+            AnalysisRun.game_id.is_not(None),
+            AnalysisRun.tier == tier,
+            AnalysisRun.status == RunStatus.QUEUED,
+            AnalysisRun.ply_start.is_(None),
+            AnalysisRun.ply_end.is_(None),
+        )
+    ).rowcount
+    if not dropped:
+        return 0
+    emit_on_commit(
+        session, backfill_event(tier, queued=0, outstanding=outstanding_runs(session, tier))
+    )
+    session.commit()
+    return int(dropped)
 
 
 def ply_window(ply_count: int, ply_range: tuple[int, int] | None) -> tuple[int, int] | None:
@@ -945,6 +1084,27 @@ def run_event(event: str, run: AnalysisRun, **extra: Any) -> dict[str, Any]:
     }
 
 
+def backfill_event(tier: Tier, *, queued: int, outstanding: int) -> dict[str, Any]:
+    """The one event a library-wide enqueue or a cancel announces, in place of thousands.
+
+    The shape is the contract, because the web client mirrors it by hand and nothing
+    generates it from here:
+
+        {"event": "analysis.backfill", "tier": "quick", "queued": 0, "outstanding": 0}
+
+    `queued` is how many runs this call added — zero on the cancel path, which took some
+    away instead — and `outstanding` is that tier's queued-and-running full-game depth once
+    the write landed. It names no run, deliberately: a client that sees one refetches the
+    queue rather than trying to fold ten thousand rows in one at a time.
+    """
+    return {
+        "event": EVENT_BACKFILL,
+        "tier": str(Tier(tier)),
+        "queued": queued,
+        "outstanding": outstanding,
+    }
+
+
 def progress_event(plan: RunPlan, done: int, total: int) -> dict[str, Any]:
     """Emitted while a run is working; the run row itself is unchanged."""
     return {
@@ -967,7 +1127,7 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
 
     The thresholds, the target elo and the fallback rating are app settings rather than
     variables, so they are read here, per plan: a run queued before the owner changed one
-    and analysed after is analysed the way they chose.
+    and analysed after is analysed the way they chose now.
     """
     thresholds = Thresholds.from_session(session)
     target_elo = app_settings_service.get_maia_target_elo(session)
@@ -1046,7 +1206,7 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
 
 
 def owner_rating(session: Session, game: Game) -> int:
-    """The rating Maia's level is centred on: the owner's, else the configured default."""
+    """The owner's rating in this game, else the configured default."""
     if game.owner_color is Color.WHITE and game.white_rating:
         return int(game.white_rating)
     if game.owner_color is Color.BLACK and game.black_rating:
@@ -1106,11 +1266,7 @@ def apply_maia(plan: RunPlan, rows: Sequence[MoveEval], adapter: MaiaAdapter) ->
     concurrency cap, and a worker that held a slot for Stockfish while waiting for one for
     Maia would deadlock the moment the cap is a single process.
     """
-    levels = maia_levels(
-        plan.owner_rating,
-        target=plan.maia_target_elo,
-        **maia_bounds(adapter),
-    )
+    levels = maia_levels(plan.maia_target_elo, **maia_bounds(adapter))
 
     boards = dict(replay(plan))
     by_ply = {row.ply: row for row in rows}

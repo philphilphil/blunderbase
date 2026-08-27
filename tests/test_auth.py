@@ -19,7 +19,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from backend.api.app import create_app
 from backend.api.auth import COOKIE_NAME, WS_CLOSE_UNAUTHORIZED
-from backend.config import Settings
+from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.migrate import alembic_config, upgrade_to_head
 from backend.db.models import AuthSession, Credential
 from backend.db.session import get_engine, get_sessionmaker
@@ -263,7 +263,7 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
     assert unconfigured.get("/auth/status").json() == {
         "setup_required": True,
         "authenticated": False,
-        "maia_target_elo": None,
+        "maia_target_elo": MAIA_MAX_RATING,
     }
 
     response = unconfigured.post("/auth/setup", json={"password": PASSWORD})
@@ -272,12 +272,12 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
     assert response.json() == {
         "setup_required": False,
         "authenticated": True,
-        "maia_target_elo": None,
+        "maia_target_elo": MAIA_MAX_RATING,
     }
     assert unconfigured.get("/auth/status").json() == {
         "setup_required": False,
         "authenticated": True,
-        "maia_target_elo": None,
+        "maia_target_elo": MAIA_MAX_RATING,
     }
 
 

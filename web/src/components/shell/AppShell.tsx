@@ -1,5 +1,8 @@
 import { Outlet } from 'react-router-dom'
 
+import { useBackfillRun } from '@/lib/analysis'
+
+import { BackfillTakeover } from './BackfillTakeover'
 import { CommandPaletteProvider } from './CommandPalette'
 import { SideNav } from './SideNav'
 import { TopBar } from './TopBar'
@@ -11,8 +14,14 @@ import { TopBar } from './TopBar'
  *
  * The ⌘K palette wraps the lot rather than sitting in the titlebar: the shortcut is
  * global, and the dialog has to outlive whichever route is under it.
+ *
+ * A whole-library analysis pass replaces all of it — see `BackfillTakeover`. The route
+ * stays in the URL underneath, so releasing puts the owner back on the page they left.
  */
 export function AppShell() {
+  const backfill = useBackfillRun()
+  if (backfill) return <BackfillTakeover run={backfill} />
+
   return (
     <CommandPaletteProvider>
       <div className="flex h-full min-h-0 flex-col bg-surface">

@@ -55,29 +55,38 @@ export interface ErrorBody {
  * It doubles as the app's bootstrap payload — it is the one call made before anything
  * renders — so the deployment-wide Maia target elo rides along on it. The Settings page
  * owns that value (`AppSettings` below), but every other screen needs it to render and
- * none of them should wait on a second call for it. Optional: a backend that publishes no
- * target (or an older one that does not know the field) leaves it out, and everything
- * Maia falls back to the rating the game was played at.
+ * none of them should wait on a second call for it.
  */
 export interface AuthStatus {
   setup_required: boolean
   authenticated: boolean
   /** The one level batch and live Maia are pinned to — see `AppSettings`. */
-  maia_target_elo?: number | null
+  maia_target_elo: number
 }
 
 // --- settings --------------------------------------------------------------
 
 /**
- * `GET`/`PUT /settings` — everything the Settings page shows: eight numbers, each of them
+ * The level a deployment that has chosen none is pinned to — the backend's own default
+ * (`services/app_settings.py`), repeated here because the client has to name it in the one
+ * place it makes an `AuthStatus` up rather than reading one: a session it just lost.
+ */
+export const DEFAULT_MAIA_TARGET_ELO = 2000
+
+/**
+ * `GET`/`PUT /settings` — everything the Settings page shows: eight numbers, seven of them
  * nullable.
  *
  * Null is not "unset yet" pending a load: it is the deployment's answer that nobody has
  * set this one, and what is in force is the default the backend names. The page shows
  * that default under an empty box rather than pretending to a value.
+ *
+ * The target elo is the exception. Every Maia question is asked at a rating, so what comes
+ * back is the rating in force rather than the row behind it — sending null still puts it
+ * back to the default, and the default is what answers.
  */
 export interface AppSettings {
-  maia_target_elo: number | null
+  maia_target_elo: number
   quick_nodes: number | null
   deep_nodes: number | null
   deep_multipv: number | null
@@ -89,11 +98,13 @@ export interface AppSettings {
 
 /**
  * A PUT carries the whole of the settings, not a patch of them: a field sent as null is
- * cleared back to its default. Out of range is clamped by the backend rather than refused,
- * so the response is what is in force — not always what was sent. The one refusal is a set
- * of classification thresholds that does not rise, which comes back as a 422.
+ * cleared back to its default — the target elo included, which is why every field is
+ * nullable on the way in and only seven of them are on the way back. Out of range is
+ * clamped by the backend rather than refused, so the response is what is in force — not
+ * always what was sent. The one refusal is a set of classification thresholds that does
+ * not rise, which comes back as a 422.
  */
-export type AppSettingsUpdate = AppSettings
+export type AppSettingsUpdate = { [K in keyof AppSettings]: AppSettings[K] | null }
 
 // --- games ----------------------------------------------------------------
 
@@ -199,7 +210,7 @@ export interface MaiaPolicyMove {
 
 export interface MaiaPolicyRequest {
   fen: string
-  /** Defaults to `config.maia_target_elo`, then to the owner's rating. */
+  /** Defaults to the deployment's `maia_target_elo` — the level everything else is asked at. */
   elo?: number | null
   /** Maximum policy entries; defaults to the batch pass's `MAIA_POLICY_MOVES`. */
   moves?: number | null
@@ -368,6 +379,31 @@ export interface RefusedGame {
 export interface BatchAnalysisResponse {
   queued: QueuedRun[]
   refused: RefusedGame[]
+}
+
+/**
+ * The whole library in one pass, for the nights the owner wants every game covered.
+ *
+ * `pending` is how many games have no live run of that tier — what a backfill would take
+ * on. `outstanding` is queued-plus-running full-game runs of the tier, which is what tells
+ * a caller whether a pass it started is still going.
+ */
+export interface BackfillPreview {
+  tier: Tier
+  pending: number
+}
+
+export interface BackfillStarted {
+  tier: Tier
+  queued: number
+  outstanding: number
+}
+
+/** Cancelling drops what is still queued; what is already running is left to finish. */
+export interface BackfillCancelled {
+  tier: Tier
+  dropped: number
+  outstanding: number
 }
 
 export interface RunResponse {

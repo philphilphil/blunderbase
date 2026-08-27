@@ -422,10 +422,10 @@ def encode_plan(plan: RunPlan) -> dict[str, Any]:
         },
         "owner_color": None if plan.owner_color is None else Color(plan.owner_color).value,
         "owner_rating": plan.owner_rating,
-        # The level Maia is asked at is resolved on the runner, not here, so what crosses
-        # the wire is what it is resolved from: the target where the deployment configures
-        # one, and the owner's rating in this game where it does not. Either way the runner
-        # computes the same plies at the same level as this host would have.
+        # The deployment's one Maia level. It crosses the wire because the runner has no
+        # settings of its own to read it out of, and clamping it to what the build declares
+        # happens there — so the runner asks the same plies at the same level this host
+        # would have.
         "maia_target_elo": plan.maia_target_elo,
     }
 
@@ -469,7 +469,7 @@ def decode_plan(data: Mapping[str, Any]) -> RunPlan:
                 else Color(_str(data, "owner_color"))
             ),
             owner_rating=_optional_int(data, "owner_rating"),
-            maia_target_elo=_optional_int(data, "maia_target_elo"),
+            maia_target_elo=_int(data, "maia_target_elo"),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ProtocolError(f"plan does not decode: {exc}") from exc

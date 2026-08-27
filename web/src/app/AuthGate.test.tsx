@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import { http } from '@/lib/api/client'
+import { DEFAULT_MAIA_TARGET_ELO } from '@/lib/api/types'
 import type { AuthStatus } from '@/lib/api/types'
 
 import { AuthGate } from './AuthGate'
@@ -29,9 +30,10 @@ function json(status: number, body: unknown) {
   })
 }
 
-const SIGNED_IN: AuthStatus = { setup_required: false, authenticated: true }
-const SIGNED_OUT: AuthStatus = { setup_required: false, authenticated: false }
-const FRESH: AuthStatus = { setup_required: true, authenticated: false }
+const LEVEL = { maia_target_elo: DEFAULT_MAIA_TARGET_ELO }
+const SIGNED_IN: AuthStatus = { setup_required: false, authenticated: true, ...LEVEL }
+const SIGNED_OUT: AuthStatus = { setup_required: false, authenticated: false, ...LEVEL }
+const FRESH: AuthStatus = { setup_required: true, authenticated: false, ...LEVEL }
 
 /** Every route the test wants to answer, keyed `METHOD /api/path`. */
 type Routes = Record<string, () => Response>

@@ -1,4 +1,12 @@
 export {
+  clearBackfillRun,
+  resetBackfillRun,
+  startBackfillRun,
+  useBackfillRun,
+  BACKFILL_RUN_KEY,
+  type BackfillRun,
+} from './backfill'
+export {
   formatNps,
   formatVariation,
   sanLine,

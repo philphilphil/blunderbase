@@ -161,6 +161,28 @@ describe('GamesPage — queueing analysis over a selection', () => {
     await user.click(screen.getByLabelText('Select every loaded game'))
     await user.click(screen.getByRole('button', { name: /queue deep analysis/i }))
 
-    expect(await screen.findByText('0 queued, 3 refused')).toBeInTheDocument()
+    expect(
+      await screen.findByText('0 queued, 3 refused — no engine serves deep'),
+    ).toBeInTheDocument()
+  })
+
+  it('says what the server refused a whole selection for', async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = String(input).split('?')[0]!
+      if (path.endsWith('/api/analysis/batch')) {
+        return json(422, { error: 'too_many_games', detail: 'a batch takes at most 500 games' })
+      }
+      return json(200, { games: GAMES, total: GAMES.length, limit: 50, offset: 0 })
+    })
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    await user.click(screen.getByLabelText('Select every loaded game'))
+    await user.click(screen.getByRole('button', { name: /queue quick analysis/i }))
+
+    expect(
+      await screen.findByText('0 queued, 3 refused — a batch takes at most 500 games'),
+    ).toBeInTheDocument()
   })
 })

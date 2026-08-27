@@ -90,6 +90,14 @@ describe('AccountMenu', () => {
       'href',
       '/import',
     )
+    expect(screen.getByRole('menuitem', { name: /connect your assistant/i })).toHaveAttribute(
+      'href',
+      '/settings/mcp',
+    )
+    expect(screen.getByRole('menuitem', { name: /how analysis works/i })).toHaveAttribute(
+      'href',
+      '/help',
+    )
     expect(screen.getByRole('menuitem', { name: /change password/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument()
   })

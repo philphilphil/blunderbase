@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react'
 import { ApiError } from './client'
 import * as api from './endpoints'
 import { queryKeys } from './keys'
+import { DEFAULT_MAIA_TARGET_ELO } from './types'
 import type {
   AnalysisRequest,
   AppSettings,
@@ -53,11 +54,12 @@ export function useAuthStatus(options?: Options<Awaited<ReturnType<typeof api.au
 }
 
 /**
- * The deployment's Maia target elo, off the bootstrap payload every screen already has.
+ * The one level this deployment asks Maia at, off the bootstrap payload every screen
+ * already has.
  *
  * `useAuthStatus` here subscribes to the query `AuthProvider` mounted rather than issuing
- * a second one. A backend that publishes no target answers `null`, and every caller falls
- * back to the rating the game was played at.
+ * a second one. `null` is the payload not having landed yet, never a deployment without a
+ * level: there is always a level.
  */
 export function useMaiaTargetElo(): number | null {
   const { data } = useAuthStatus()
@@ -113,8 +115,14 @@ export function useChangePassword(
  */
 export function useLogout(options?: UseMutationOptions<void, Error, void>) {
   const client = useQueryClient()
+  // The level survives the sign-out: it is the deployment's, not the session's, and the
+  // login screen has no way to ask for it again.
   const signedOut = () =>
-    client.setQueryData<AuthStatus>(queryKeys.auth(), { setup_required: false, authenticated: false })
+    client.setQueryData<AuthStatus>(queryKeys.auth(), (previous) => ({
+      setup_required: false,
+      authenticated: false,
+      maia_target_elo: previous?.maia_target_elo ?? DEFAULT_MAIA_TARGET_ELO,
+    }))
   return useMutation({
     mutationFn: api.logout,
     ...options,
@@ -279,6 +287,60 @@ export function useRequestAnalysisBatch(
   const client = useQueryClient()
   return useMutation({
     mutationFn: (body: BatchAnalysisRequest) => api.requestAnalysisBatch(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * How many games a whole-library pass of this tier would take on — the number the
+ * "Analyse all" button labels itself with.
+ *
+ * The key lives under `['analysis']`, so every analysis event marks it stale, which is
+ * what keeps that label honest as games trickle in. Nothing has to guard it against the
+ * pass itself: the takeover unmounts the page the button is on, and an invalidation with
+ * no observer refetches nothing.
+ */
+export function useBackfillPreview(
+  tier: Tier,
+  options?: Options<Awaited<ReturnType<typeof api.getBackfill>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.backfill(tier),
+    queryFn: () => api.getBackfill(tier),
+    ...options,
+  })
+}
+
+/**
+ * The whole library, queued in one call. The answer is counts rather than runs — the
+ * backend deliberately sends one `analysis.backfill` frame instead of one per game — so
+ * the queue is what the caller watches from here.
+ */
+export function useStartBackfill(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.startBackfill>>, Error, Tier>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (tier: Tier) => api.startBackfill(tier),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** Drops what the pass still has queued; what an engine already has stays until it ends. */
+export function useCancelBackfill(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.cancelBackfill>>, Error, Tier>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (tier: Tier) => api.cancelBackfill(tier),
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })

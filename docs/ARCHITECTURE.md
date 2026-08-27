@@ -278,12 +278,11 @@ non-issue: the write lock is held for milliseconds, never for the length of a se
 **Two passes, never nested.** Stockfish evaluates, then Maia predicts, each acquiring the
 pool separately. A worker that held one slot while waiting for a second would deadlock the
 moment `analysis_concurrency` is 1. Maia is asked at exactly one rating level, clamped to
-what the build declares it can answer. Without a configured target that level is the
-owner's rating in the game being analysed (`default_owner_rating` where the game carries
-none), and only their own moves are asked about — the question is "what would a human of
-this rating have played", which is a question about them. A `maia_target_elo` set on the
-Settings page replaces that level everywhere and widens the pass to every ply of both
-sides, because "what will a human opposite me fall into" is a question about the positions
+what the build declares it can answer: the deployment's `maia_target_elo`, the rating the
+owner is playing towards, defaulting to the top of what Maia knows. It never varies by
+game or by player, which is what makes two games comparable — a move Maia's answer changed
+between them is the play changing, not the question. Every ply of both sides is asked
+about, because "what will a human opposite me fall into" is a question about the positions
 the opponent moves in. No Maia engine, or a Maia that will not answer, degrades: the
 evaluation is still worth having, and the reason is recorded on the run.
 
@@ -323,6 +322,16 @@ ignored — it must never be able to fail a run. `analysis.queued` waits for the
 that created the run to commit — the import pipeline enqueues the quick pass inside the
 one that stores the game — so a rolled-back import never announces a run id that does not
 exist.
+
+A library-wide write announces itself differently. `analysis.backfill` carries `tier`,
+`queued` and `outstanding` and names no run at all, because the alternative is ten thousand
+`analysis.queued` frames down every open socket in one burst — the shape of storm this
+deployment has fallen over on before. `POST /analysis/backfill` queues a full-game pass over
+every game with no live run of a tier, uncapped (`/analysis/batch` keeps its five-hundred
+ceiling: that one serves a selection made by hand), `GET /analysis/backfill` is the count the
+button labels itself with, and `POST /analysis/backfill/cancel` drops what is still queued
+while leaving the runs a worker already claimed to finish — there is no cancelled status to
+move them to. A client that sees the event refetches the queue.
 
 **Where the workers run.** The FastAPI lifespan starts and stops a set
 (`analysis_workers = false` turns that off), and `blunderbase analyze` starts the same set

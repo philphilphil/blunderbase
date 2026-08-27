@@ -24,6 +24,7 @@ export const EVENT_NAMES = [
   'analysis.progress',
   'analysis.done',
   'analysis.failed',
+  'analysis.backfill',
   'note.created',
   'note.updated',
   'live.updated',
@@ -102,7 +103,19 @@ export interface AnalysisProgressEvent extends AnalysisBase {
   total: number
 }
 
-export type AnalysisEvent = AnalysisRunEvent | AnalysisProgressEvent
+/**
+ * One frame per bulk operation, not per game: a backfill over ten thousand games says
+ * this once. It carries no run, so it is not an `AnalysisBase` — `outstanding` is the
+ * whole tier's queued-plus-running, which is what a client watching the pass reads.
+ */
+export interface AnalysisBackfillEvent {
+  event: 'analysis.backfill'
+  tier: Tier
+  queued: number
+  outstanding: number
+}
+
+export type AnalysisEvent = AnalysisRunEvent | AnalysisProgressEvent | AnalysisBackfillEvent
 
 export interface NoteEvent {
   event: 'note.created' | 'note.updated'

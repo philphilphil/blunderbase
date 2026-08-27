@@ -35,6 +35,7 @@ export const queryKeys = {
 
   analysis: (): QueryKey => ['analysis'],
   queue: (): QueryKey => ['analysis', 'queue'],
+  backfill: (tier: Tier): QueryKey => ['analysis', 'backfill', tier],
   runs: (gameId: number, tier?: Tier): QueryKey => ['analysis', 'runs', gameId, tier ?? null],
   run: (runId: number): QueryKey => ['analysis', 'run', runId],
   runEvals: (runId: number, window: { ply_start?: number; ply_end?: number } = {}): QueryKey => [

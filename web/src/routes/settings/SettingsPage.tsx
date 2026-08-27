@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAppSettings, useGames, useSaveAppSettings } from '@/lib/api/queries'
+import { DEFAULT_MAIA_TARGET_ELO } from '@/lib/api/types'
 import type { AppSettings, AppSettingsUpdate, GamesDeleted } from '@/lib/api/types'
 
 import { DeleteAllGamesDialog } from './DeleteAllGamesDialog'
@@ -24,6 +25,7 @@ export const MAX_TARGET_ELO = 2000
  * it landed.
  */
 export const DEFAULTS = {
+  maia_target_elo: DEFAULT_MAIA_TARGET_ELO,
   quick_nodes: 250_000,
   deep_nodes: 2_000_000,
   deep_multipv: 4,
@@ -52,7 +54,7 @@ const MAIA_FIELD: Field = {
   min: MIN_TARGET_ELO,
   max: MAX_TARGET_ELO,
   step: 50,
-  unset: `Not set — ${MIN_TARGET_ELO}–${MAX_TARGET_ELO}`,
+  unset: `Default ${DEFAULTS.maia_target_elo}`,
 }
 
 const ANALYSIS_FIELDS: Field[] = [
@@ -124,7 +126,11 @@ const FIELDS: Field[] = [
   ...DEFAULTS_FIELDS,
 ]
 
-/** The stored value as the box shows it: empty is "nobody has set this one". */
+/**
+ * The stored value as the box shows it: empty is "nobody has set this one". The target elo
+ * never comes back empty — the deployment always has a level — so its box always has a
+ * number in it, and emptying it is how the default is asked for.
+ */
 function storedText(settings: AppSettings | undefined, key: Key): string {
   const value = settings?.[key]
   return value === null || value === undefined ? '' : String(value)
@@ -312,8 +318,8 @@ export function SettingsPage() {
                 <CardDescription>
                   The one rating Maia is asked at everywhere — the batch pass over both sides
                   of every game, and the analysis board&rsquo;s live column. Set it to the
-                  rating you are playing towards. Left empty, Maia is asked about your own
-                  moves only, at the rating each game was played at.
+                  rating you are playing towards; one level for every game is what makes two
+                  of them comparable. Emptied, it goes back to {DEFAULTS.maia_target_elo}.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-4">{row(MAIA_FIELD)}</CardContent>

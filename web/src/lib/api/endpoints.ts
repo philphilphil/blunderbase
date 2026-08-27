@@ -9,6 +9,9 @@ import type {
   AppSettings,
   AppSettingsUpdate,
   AuthStatus,
+  BackfillCancelled,
+  BackfillPreview,
+  BackfillStarted,
   BatchAnalysisRequest,
   BatchAnalysisResponse,
   ComparisonResponse,
@@ -159,6 +162,22 @@ export const requestAnalysisBatch = (body: BatchAnalysisRequest) =>
   http.post<BatchAnalysisResponse>('/analysis/batch', { body })
 
 export const getQueue = () => http.get<QueueStatus>('/analysis/queue')
+
+/** How many games a backfill of this tier would take on, without taking any of them on. */
+export const getBackfill = (tier: Tier = 'quick') =>
+  http.get<BackfillPreview>('/analysis/backfill', { query: { tier } })
+
+/**
+ * A pass over the whole library, in one call. Unlike `/analysis/batch` there is no cap and
+ * no per-game receipt: the answer is a count, and the socket says `analysis.backfill` once
+ * rather than once per game.
+ */
+export const startBackfill = (tier: Tier = 'quick') =>
+  http.post<BackfillStarted>('/analysis/backfill', { body: { tier } })
+
+/** Drops what is still queued. Runs already on an engine are left to finish. */
+export const cancelBackfill = (tier: Tier = 'quick') =>
+  http.post<BackfillCancelled>('/analysis/backfill/cancel', { body: { tier } })
 
 export const listRuns = (gameId: number, tier?: Tier) =>
   http.get<RunResponse[]>('/analysis/runs', { query: { game_id: gameId, tier } })

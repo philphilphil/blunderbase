@@ -252,25 +252,26 @@ class LiveMaia:
         )
 
     def _level(self, session: Session, adapter: MaiaAdapter, requested: int | None) -> int:
-        """The level to *ask* for: the request, the target, or the owner's rating, clamped.
+        """The level to *ask* for: what the caller asked for, else the target, clamped.
+
+        The target is the deployment's one Maia level, so a board nobody has given a level
+        speaks for the same human the stored runs do; a caller that names one is exploring
+        another rating deliberately, and gets it.
 
         For a build that declares `SelfElo` this is the level it is conditioned on. For a
         fixed-weights build it conditions nothing — it survives only as the key
         `policy_at` files the answer under, which is why what gets reported back is
         `_reported_level`, not this.
 
-        Both the target and the fallback rating are read out of the database on every
-        query, the same way the engine to start is: changing either on the Settings page
-        takes effect on the next thing the board asks, without restarting anything or
-        dropping the warm process.
+        The target is read out of the database on every query, the same way the engine to
+        start is: changing it on the Settings page takes effect on the next thing the board
+        asks, without restarting anything or dropping the warm process.
         """
         from backend.services.analysis import maia_bounds
 
         base = requested
         if base is None:
             base = app_settings_service.get_maia_target_elo(session)
-        if base is None:
-            base = app_settings_service.get_default_owner_rating(session)
         bounds = maia_bounds(adapter)
         low = int(bounds.get("low", MAIA_MIN_RATING))
         high = int(bounds.get("high", MAIA_MAX_RATING))

@@ -12,6 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, typ
 
 import { queryKeys } from '@/lib/api/keys'
 import { useAuthStatus } from '@/lib/api/queries'
+import { DEFAULT_MAIA_TARGET_ELO } from '@/lib/api/types'
 import type { AuthStatus } from '@/lib/api/types'
 
 import { onSessionLost, reportSessionRestored } from './session'
@@ -50,10 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(
     () =>
       onSessionLost((reason) => {
-        queryClient.setQueryData<AuthStatus>(queryKeys.auth(), {
+        queryClient.setQueryData<AuthStatus>(queryKeys.auth(), (previous) => ({
           setup_required: reason === 'setup_required',
           authenticated: false,
-        })
+          // The deployment's Maia level outlives the session that was told about it.
+          maia_target_elo: previous?.maia_target_elo ?? DEFAULT_MAIA_TARGET_ELO,
+        }))
       }),
     [queryClient],
   )
