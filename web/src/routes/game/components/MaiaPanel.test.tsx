@@ -259,7 +259,7 @@ describe('MaiaPanel', () => {
     expect(screen.getByTestId('maia-panel')).toHaveTextContent('Reading this position…')
   })
 
-  it('stands on the engine column alone where the human one is switched off', () => {
+  it('keeps the split but empties the human column where it is switched off', () => {
     render(
       <MaiaPanel
         rating="1700"
@@ -271,9 +271,12 @@ describe('MaiaPanel', () => {
       />,
     )
 
-    // Hints off takes the human column, never what the run found.
+    // Hints off takes the human column's *content*, never its place in the box and never
+    // what the run found.
     const panel = screen.getByTestId('maia-panel')
-    expect(panel).not.toHaveTextContent('Maia 1700')
+    expect(panel).toHaveTextContent('Maia 1700')
+    expect(within(panel).queryByText('62%')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('No human model for this position.')).not.toBeInTheDocument()
     expect(panel).toHaveTextContent('stockfish')
     expect(within(panel).getByText('+0.40')).toBeInTheDocument()
   })

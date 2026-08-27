@@ -30,9 +30,10 @@ export interface MaiaPanelProps {
   /** The human column, already crossed with the engine's verdicts (`humanMoves`). */
   human: HumanMoveView[]
   /**
-   * Whether the human column is drawn at all. Off — the `hints` toggle, or a deployment
-   * with no Maia to ask — the engine column stands alone across the box, because what the
-   * run found is not a hint and must not vanish with them.
+   * Whether the human column has anything to say. Off — the `hints` toggle, or a
+   * deployment with no Maia to ask — the column keeps its place and its header but shows
+   * nothing, so the box never changes shape; what the run found is not a hint and must not
+   * vanish with them.
    */
   showHuman?: boolean
   /** The engine's ranking of the same position; empty off the game line. */
@@ -94,41 +95,40 @@ export function MaiaPanel({
       )}
       data-testid="maia-panel"
     >
-      <div className={cn('grid divide-x divide-line', showHuman ? 'grid-cols-2' : 'grid-cols-1')}>
-        {showHuman ? (
-          <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
-            <div className="flex items-center gap-[0.4375rem]">
-              <span className="size-1.5 flex-none rounded-full bg-brilliant" />
-              <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-                {rating ? `Maia ${rating}` : 'Maia'}
-              </span>
-              <span className="truncate font-mono text-[0.625rem] text-faint">human</span>
-              <div className="flex-1" />
-              {live ? <LivePill pending={live.pending} /> : null}
+      <div className="grid grid-cols-2 divide-x divide-line">
+        <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
+          <div className="flex items-center gap-[0.4375rem]">
+            <span className="size-1.5 flex-none rounded-full bg-brilliant" />
+            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+              {rating ? `Maia ${rating}` : 'Maia'}
+            </span>
+            <span className="truncate font-mono text-[0.625rem] text-faint">human</span>
+            <div className="flex-1" />
+            {showHuman && live ? <LivePill pending={live.pending} /> : null}
+          </div>
+
+          {/* Switched off, the column holds its place and says nothing at all. */}
+          {!showHuman ? null : human.length === 0 ? (
+            <p className="py-2 text-[0.6875rem] text-dim">
+              {live?.pending ? 'Reading this position…' : 'No human model for this position.'}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {human.map((move) => (
+                <HumanRow
+                  key={move.uci}
+                  move={move}
+                  onHoverMove={onHoverMove}
+                  onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
+                />
+              ))}
             </div>
+          )}
 
-            {human.length === 0 ? (
-              <p className="py-2 text-[0.6875rem] text-dim">
-                {live?.pending ? 'Reading this position…' : 'No human model for this position.'}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {human.map((move) => (
-                  <HumanRow
-                    key={move.uci}
-                    move={move}
-                    onHoverMove={onHoverMove}
-                    onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
-                  />
-                ))}
-              </div>
-            )}
-
-            {live && rollout.length > 0 ? (
-              <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
-            ) : null}
-          </section>
-        ) : null}
+          {showHuman && live && rollout.length > 0 ? (
+            <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
+          ) : null}
+        </section>
 
         <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-[0.4375rem]">

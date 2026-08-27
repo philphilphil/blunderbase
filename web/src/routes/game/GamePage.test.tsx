@@ -745,7 +745,7 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 2 / 4')).toBeInTheDocument()
   })
 
-  it('hides the human column entirely where the deployment has no Maia to ask', async () => {
+  it('empties the human column where the deployment has no Maia to ask', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', stubFetch({}, { maiaStatus: 409 }))
     renderPage()
@@ -758,10 +758,14 @@ describe('GamePage', () => {
     await waitFor(() =>
       expect(posted.filter((call) => call.url.includes('/maia/policy'))).toHaveLength(1),
     )
-    // Degrade, don't error: the human column goes, the box and the analysis board stay.
+    // Degrade, don't error: the human column empties but keeps its place, and the box and
+    // the analysis board stay.
     await waitFor(() => expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument())
     const panel = screen.getByTestId('maia-panel')
-    expect(panel).not.toHaveTextContent('Maia')
+    expect(within(panel).getByText('human')).toBeInTheDocument()
+    expect(
+      within(panel).queryByText('No human model for this position.'),
+    ).not.toBeInTheDocument()
     expect(within(panel).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
   })
@@ -775,9 +779,11 @@ describe('GamePage', () => {
     const panel = () => screen.getByTestId('maia-panel')
     expect(panel()).toHaveTextContent('Maia 1500')
 
-    // Hints are about the human half — what the engine found is not a hint.
+    // Hints are about the human half's content — its column keeps its place, and what the
+    // engine found is not a hint.
     await user.click(screen.getByRole('button', { name: 'Hints' }))
-    expect(panel()).not.toHaveTextContent('Maia')
+    expect(within(panel()).getByText('human')).toBeInTheDocument()
+    expect(within(panel()).queryByText(/%$/)).not.toBeInTheDocument()
     expect(within(panel()).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('played')).toBeInTheDocument()
   })
