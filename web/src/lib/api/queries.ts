@@ -26,6 +26,7 @@ import type {
   EngineDeleteResult,
   EngineUpdate,
   GameFilters,
+  GamesDeleted,
   ImportRequest,
   NoteCreate,
   NoteUpdate,
@@ -188,6 +189,36 @@ export function useGame(
     queryKey: queryKeys.gameDetail(id, query),
     queryFn: () => api.getGame(id, query),
     ...options,
+  })
+}
+
+/**
+ * Empty the library, on the owner's password rather than on their session.
+ *
+ * The invalidation is deliberately whole prefixes rather than the keys this page happens
+ * to hold: every screen the app has ever rendered was rendered against games that no
+ * longer exist. Stats and the profile, the queue and the runs, the explorer tree, the
+ * sync history and the notes list all go back to the server — what comes back is empty,
+ * which is the point.
+ */
+export function useDeleteAllGames(options?: UseMutationOptions<GamesDeleted, Error, string>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (password: string) => api.deleteAllGames(password),
+    ...options,
+    onSuccess: (...args) => {
+      for (const queryKey of [
+        queryKeys.games(),
+        queryKeys.stats(),
+        queryKeys.analysis(),
+        queryKeys.imports(),
+        queryKeys.explorer(),
+        queryKeys.notes(),
+      ]) {
+        void client.invalidateQueries({ queryKey })
+      }
+      options?.onSuccess?.(...args)
+    },
   })
 }
 

@@ -159,6 +159,18 @@ export interface GameCardList extends GameList {
   games: GameCard[]
 }
 
+/**
+ * `POST /games/delete-all` — what the wipe took. `import_jobs` is the surprising one and
+ * is reported for that reason: the sync history goes with the games, which is what makes
+ * the next sync of a source a fresh one.
+ */
+export interface GamesDeleted {
+  games: number
+  runs: number
+  notes: number
+  import_jobs: number
+}
+
 export interface EngineLine extends Extra {
   multipv?: number
   cp?: number | null

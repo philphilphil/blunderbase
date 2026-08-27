@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import { useMaiaTargetElo } from '@/lib/api/queries'
-import type { AppSettings } from '@/lib/api/types'
+import type { AppSettings, GamesDeleted } from '@/lib/api/types'
 
 import { SettingsPage } from './SettingsPage'
 
@@ -40,8 +40,15 @@ const NOTHING_SET: AppSettings = {
   default_owner_rating: null,
 }
 
+const PASSWORD = 'correct-horse-battery'
+
+/** What the wipe would answer for the library the stub starts with. */
+const WIPED: GamesDeleted = { games: 6, runs: 4, notes: 1, import_jobs: 2 }
+
 /** The deployment's stored settings, as the backend would keep them across the calls. */
 let stored: AppSettings
+/** How many games the library holds — the danger zone reads it, and the wipe empties it. */
+let games: number
 
 function clamp(value: number | null, low: number, high: number) {
   return value === null ? null : Math.min(high, Math.max(low, value))
@@ -76,6 +83,17 @@ function stubFetch() {
         }
       }
       return json(200, stored)
+    }
+    if (path.endsWith('/api/games/delete-all')) {
+      const sent = JSON.parse(String(init?.body)) as { password: string }
+      if (sent.password !== PASSWORD) {
+        return json(401, { error: 'invalid_password', detail: 'that is not the password' })
+      }
+      games = 0
+      return json(200, WIPED)
+    }
+    if (path.endsWith('/api/games')) {
+      return json(200, { games: [], total: games, limit: 1, offset: 0 })
     }
     if (path.endsWith('/api/auth/status')) {
       return json(200, {
@@ -124,6 +142,7 @@ function save() {
 
 beforeEach(() => {
   stored = { ...NOTHING_SET }
+  games = 6
   vi.stubGlobal('WebSocket', FakeSocket)
   stubFetch()
 })
@@ -248,6 +267,65 @@ describe('SettingsPage', () => {
 
     expect(save()).toBeDisabled()
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+  })
+
+  it('offers the wipe behind a dialog that names the count and asks for the password', async () => {
+    draw()
+    await screen.findByText('6 games in the database.')
+
+    await userEvent.click(screen.getByRole('button', { name: /delete all games/i }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent(/6 games go/i)
+    expect(screen.getByLabelText('Your password')).toBeInTheDocument()
+    // Nothing has been asked of the backend yet — this is a question, not the deletion.
+    expect(
+      vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('delete-all')),
+    ).toBe(false)
+  })
+
+  it('shows a wrong password against the form rather than losing the dialog', async () => {
+    draw()
+    await screen.findByText('6 games in the database.')
+    await userEvent.click(screen.getByRole('button', { name: /delete all games/i }))
+
+    await userEvent.type(screen.getByLabelText('Your password'), 'not-the-one')
+    await userEvent.click(screen.getByRole('button', { name: /delete them/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('that is not the password')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(games).toBe(6)
+  })
+
+  it('empties the library on the right password and says what it took', async () => {
+    draw()
+    await screen.findByText('6 games in the database.')
+    await userEvent.click(screen.getByRole('button', { name: /delete all games/i }))
+
+    await userEvent.type(screen.getByLabelText('Your password'), PASSWORD)
+    await userEvent.click(screen.getByRole('button', { name: /delete them/i }))
+
+    await waitFor(() => expect(games).toBe(0))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Deleted 6 games, 4 analysis runs and 1 note.',
+    )
+  })
+
+  it('sends every screen back to the server once the games are gone', async () => {
+    const client = draw()
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    await screen.findByText('6 games in the database.')
+    await userEvent.click(screen.getByRole('button', { name: /delete all games/i }))
+
+    await userEvent.type(screen.getByLabelText('Your password'), PASSWORD)
+    await userEvent.click(screen.getByRole('button', { name: /delete them/i }))
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalled())
+    const prefixes = invalidate.mock.calls.map(([filters]) => filters?.queryKey?.[0])
+    for (const prefix of ['games', 'stats', 'analysis', 'import', 'explorer', 'notes']) {
+      expect(prefixes).toContain(prefix)
+    }
   })
 
   it('moves the level every other screen reads, without a reload', async () => {

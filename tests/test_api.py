@@ -24,17 +24,28 @@ from backend.db.enums import (
     Classification,
     Color,
     EngineKind,
+    JobStatus,
     Platform,
     RunStatus,
+    Source,
     Tier,
 )
 from backend.db.migrate import upgrade_to_head
-from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval, Note
+from backend.db.models import (
+    Account,
+    AnalysisRun,
+    Engine,
+    Game,
+    GamePosition,
+    ImportJob,
+    MoveEval,
+    Note,
+)
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
 from backend.services import import_service
 from backend.services import live as live_service
-from tests.conftest import running_app, socket_headers
+from tests.conftest import OWNER_PASSWORD, running_app, socket_headers
 from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
 
 OWNER = "blunderbase"
@@ -316,6 +327,86 @@ def test_a_game_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
 
     assert response.status_code == 404
     assert response.json() == {"error": "unknown_game", "detail": "no game with id 9999"}
+
+
+# --- /games/delete-all ----------------------------------------------------
+
+
+def test_a_wipe_without_the_password_takes_nothing(api: TestClient) -> None:
+    """Being signed in is not consent: the password is asked for again, and refused."""
+    response = api.post("/games/delete-all", json={"password": "not-the-one"})
+
+    assert response.status_code == 401
+    assert error_of(response) == "invalid_password"
+    assert api.get("/games").json()["total"] == 6
+
+
+def test_the_owners_password_empties_the_library_and_says_what_it_took(
+    settings: Settings, api: TestClient
+) -> None:
+    position_note = api.post("/notes", json={"text": "the French again", "fen": FRENCH}).json()
+
+    response = api.post("/games/delete-all", json={"password": OWNER_PASSWORD})
+
+    assert response.status_code == 200
+    assert response.json() == {"games": 6, "runs": 1, "notes": 1, "import_jobs": 1}
+    assert api.get("/games").json()["total"] == 0
+    # A note about a position is memory about chess, not about a game that is gone.
+    assert [note["id"] for note in api.get("/notes").json()] == [position_note["id"]]
+    # Configuration is not library.
+    assert len(api.get("/accounts").json()) == 1
+    assert len(api.get("/engines").json()) == 1
+
+    with get_sessionmaker(settings)() as session:
+        assert session.scalars(select(Game)).all() == []
+        assert session.scalars(select(GamePosition)).all() == []
+        assert session.scalars(select(AnalysisRun)).all() == []
+        assert session.scalars(select(MoveEval)).all() == []
+        assert session.scalars(select(ImportJob)).all() == []
+        assert [note.id for note in session.scalars(select(Note))] == [position_note["id"]]
+
+
+def test_a_wipe_takes_the_queued_runs_with_it_but_leaves_a_position_run(
+    settings: Settings, api: TestClient, seeded: dict[str, int]
+) -> None:
+    """A worker must not be left holding work over a game nobody has any more."""
+    with get_sessionmaker(settings)() as session:
+        over_the_game = AnalysisRun(
+            game_id=seeded["game_id"],
+            engine_id=seeded["engine_id"],
+            tier=Tier.QUICK,
+            status=RunStatus.QUEUED,
+        )
+        over_a_fen = AnalysisRun(
+            fen=FRENCH, engine_id=seeded["engine_id"], tier=Tier.QUICK, status=RunStatus.QUEUED
+        )
+        session.add_all([over_the_game, over_a_fen])
+        session.commit()
+        standalone_id = over_a_fen.id
+
+    response = api.post("/games/delete-all", json={"password": OWNER_PASSWORD})
+
+    assert response.status_code == 200
+    assert response.json()["runs"] == 2
+    with get_sessionmaker(settings)() as session:
+        assert [run.id for run in session.scalars(select(AnalysisRun))] == [standalone_id]
+
+
+def test_a_wipe_drops_the_sync_history_so_the_next_sync_starts_over(
+    settings: Settings, api: TestClient
+) -> None:
+    """The cursor lives on the import jobs, so keeping them would import nothing."""
+    with get_sessionmaker(settings)() as session:
+        session.add(
+            ImportJob(source=Source.LICHESS, status=JobStatus.DONE, cursor="1712000000000")
+        )
+        session.commit()
+        assert import_service.latest_cursor(session, "lichess") == "1712000000000"
+
+    assert api.post("/games/delete-all", json={"password": OWNER_PASSWORD}).status_code == 200
+
+    with get_sessionmaker(settings)() as session:
+        assert import_service.latest_cursor(session, "lichess") is None
 
 
 # --- /accounts ------------------------------------------------------------

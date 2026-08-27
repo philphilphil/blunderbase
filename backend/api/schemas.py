@@ -194,6 +194,25 @@ class GameList(BaseModel):
     offset: int
 
 
+class GamesWipe(Input):
+    """The owner's password again. Holding a session is not consent to empty the library."""
+
+    password: str = Field(min_length=1)
+
+
+class GamesDeleted(BaseModel):
+    """What the wipe removed, so the page can say it rather than only imply it.
+
+    `import_jobs` is in the answer because it is the surprising half: the sync history goes
+    with the games, which is what makes the next sync of a source a fresh one.
+    """
+
+    games: int = 0
+    runs: int = 0
+    notes: int = 0
+    import_jobs: int = 0
+
+
 class MoveRow(Payload):
     ply: int
     move_number: int | None = None

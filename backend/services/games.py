@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, exists, func, or_, select
+from sqlalchemy import ColumnElement, Delete, and_, delete, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
@@ -23,6 +23,7 @@ from backend.db.models import (
     AnalysisRun,
     Game,
     GamePosition,
+    ImportJob,
     MoveEval,
     Note,
 )
@@ -89,6 +90,55 @@ def count_games(session: Session, filters: GameFilters) -> int:
     """How many games match `filters`, for pagination."""
     statement = select(func.count(Game.id)).select_from(Game).where(*game_conditions(filters))
     return int(session.scalar(statement) or 0)
+
+
+@dataclass(slots=True)
+class Wiped:
+    """What `delete_all_games` removed, in rows."""
+
+    games: int = 0
+    runs: int = 0
+    notes: int = 0
+    import_jobs: int = 0
+
+
+def delete_all_games(session: Session) -> Wiped:
+    """Empty the library: every game, and everything that only exists because of one.
+
+    The schema already cascades — `game_positions`, `analysis_runs` and a game's notes name
+    `ondelete="CASCADE"`, and `move_evals` follow their run — but the deletes are spelled
+    out child-first anyway. It is what makes the counts real rather than guessed, it is what
+    a database whose foreign keys are not enforced needs, and it is the order that drops a
+    queued run *before* its game rather than trusting a worker not to claim it in between.
+
+    Three things deliberately survive. `positions` is the shared dictionary every game
+    points into, and a position note points at it too, so it stays whether or not a game
+    ever reached it again. Accounts, engines and runners are configuration, not library.
+    Notes with no `game_id` are the coach's memory about a position rather than about a
+    game, and the owner asked to lose their games, not their notes.
+
+    `import_jobs` does not survive, and that is the point rather than an oversight:
+    `import_service.latest_cursor` reads the cursor of the last finished sync off those
+    rows, so a wipe that kept them would leave the next sync resuming from where the games
+    that are gone left off — importing nothing. Dropping the history is what makes the next
+    sync a fresh one.
+    """
+    wiped = Wiped()
+    of_a_game = select(AnalysisRun.id).where(AnalysisRun.game_id.is_not(None))
+    _deleted(session, delete(MoveEval).where(MoveEval.run_id.in_(of_a_game)))
+    wiped.runs = _deleted(session, delete(AnalysisRun).where(AnalysisRun.game_id.is_not(None)))
+    wiped.notes = _deleted(session, delete(Note).where(Note.game_id.is_not(None)))
+    # Every `game_positions` row names a game, and every game is going.
+    _deleted(session, delete(GamePosition))
+    wiped.games = _deleted(session, delete(Game))
+    wiped.import_jobs = _deleted(session, delete(ImportJob))
+    session.commit()
+    return wiped
+
+
+def _deleted(session: Session, statement: Delete) -> int:
+    """Run one bulk delete and say how many rows it took."""
+    return int(session.execute(statement.execution_options(synchronize_session=False)).rowcount)
 
 
 def game_conditions(filters: GameFilters) -> list[ColumnElement[bool]]:

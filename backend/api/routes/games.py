@@ -1,13 +1,16 @@
-"""`/games` — the games table and the flagship game view."""
+"""`/games` — the games table and the flagship game view, and the one route that empties it."""
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 
 from backend.api.deps import FiltersDep, SessionDep, not_found, ply_range
-from backend.api.schemas import GameDetail, GameList
+from backend.api.errors import ApiError
+from backend.api.schemas import GameDetail, GameList, GamesDeleted, GamesWipe
+from backend.services import auth as auth_service
 from backend.services import games as games_service
 
 router = APIRouter(prefix="/games", tags=["games"])
@@ -36,6 +39,26 @@ def list_games(
         limit=limit,
         offset=offset,
     )
+
+
+@router.post("/delete-all", response_model=GamesDeleted, summary="Delete every game")
+def delete_all_games(session: SessionDep, body: GamesWipe) -> GamesDeleted:
+    """Empty the library, on the owner's password rather than on their cookie.
+
+    A POST rather than a DELETE because the password travels in the body, and a body on a
+    DELETE is something clients and proxies disagree about. The password is checked the way
+    the login route checks it, lockout and all: a browser that is already signed in has
+    proved it is *a* session, not that the person at it meant this.
+
+    Accounts, engines, runners and the settings stay; so do notes about a position rather
+    than about a game. The sync history goes, so the next sync of a source starts over —
+    see `services.games.delete_all_games`.
+    """
+    if not auth_service.verify_password(session, body.password):
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED, "invalid_password", "that is not the password"
+        )
+    return GamesDeleted(**asdict(games_service.delete_all_games(session)))
 
 
 @router.get("/{game_id}", response_model=GameDetail, summary="One game with its analysis")

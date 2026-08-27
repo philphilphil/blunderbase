@@ -20,6 +20,7 @@ import type {
   GameDetail,
   GameFilters,
   GameList,
+  GamesDeleted,
   Health,
   ImportJob,
   ImportRequest,
@@ -117,6 +118,15 @@ export interface GameDetailQuery {
 
 export const getGame = (id: number, query: GameDetailQuery = {}) =>
   http.get<GameDetail>(`/games/${id}`, { query: query as Record<string, QueryValue> })
+
+/**
+ * Every game, and everything that only exists because of one: its analysis, its notes and
+ * the sync history the next import would otherwise resume from. Accounts, engines and
+ * notes about a position stay. A POST because the password rides in the body, and it is
+ * checked again server-side — a session is not consent to this one.
+ */
+export const deleteAllGames = (password: string) =>
+  http.post<GamesDeleted>('/games/delete-all', { body: { password } })
 
 // --- import ---------------------------------------------------------------
 

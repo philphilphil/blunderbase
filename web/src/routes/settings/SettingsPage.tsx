@@ -1,4 +1,4 @@
-import { Loader2, RotateCcw, Save } from 'lucide-react'
+import { Loader2, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -8,8 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAppSettings, useSaveAppSettings } from '@/lib/api/queries'
-import type { AppSettings, AppSettingsUpdate } from '@/lib/api/types'
+import { useAppSettings, useGames, useSaveAppSettings } from '@/lib/api/queries'
+import type { AppSettings, AppSettingsUpdate, GamesDeleted } from '@/lib/api/types'
+
+import { DeleteAllGamesDialog } from './DeleteAllGamesDialog'
 
 /** What Maia was trained on. Anything outside is clamped by the backend, not refused. */
 export const MIN_TARGET_ELO = 1100
@@ -136,9 +138,77 @@ function parse(text: string): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+/** A count with the noun it counts, so no sentence has to say "1 games". */
+function plural(count: number, one: string, many = `${one}s`): string {
+  return `${count.toLocaleString('en-US')} ${count === 1 ? one : many}`
+}
+
+/**
+ * The one control in the app that destroys rather than changes.
+ *
+ * At the bottom, in its own card and behind its own dialog, because a settings page is
+ * somewhere an owner goes to read as often as to act. The count beside the button is the
+ * same one the dialog names — it is what tells them which database this is before the
+ * password is asked for.
+ */
+function DangerZone() {
+  const games = useGames({ limit: 1 })
+  const [asking, setAsking] = useState(false)
+  const [deleted, setDeleted] = useState<GamesDeleted | null>(null)
+  const total = games.data?.total
+
+  return (
+    <Card className="max-w-3xl border-blunder/28">
+      <CardHeader className="flex-col items-stretch gap-1">
+        <CardTitle className="text-blunder">Danger zone</CardTitle>
+        <CardDescription>
+          Deleting the games removes every game, its analysis and its notes, and the sync
+          history with them — the next sync re-imports from the beginning. Accounts, engines
+          and notes about a position stay.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-blunder/40 text-blunder hover:border-blunder hover:text-blunder"
+          onClick={() => {
+            setDeleted(null)
+            setAsking(true)
+          }}
+        >
+          <Trash2 aria-hidden />
+          Delete all games…
+        </Button>
+        {deleted ? (
+          <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
+            {`Deleted ${plural(deleted.games, 'game')}, ${plural(deleted.runs, 'analysis run')} and ${plural(deleted.notes, 'note')}.`}
+          </p>
+        ) : total === undefined ? null : (
+          <p className="text-[0.6875rem] leading-[1.5] text-dim-2">
+            {`${plural(total, 'game')} in the database.`}
+          </p>
+        )}
+      </CardContent>
+
+      {asking ? (
+        <DeleteAllGamesDialog
+          games={total}
+          onClose={() => setAsking(false)}
+          onDone={(result) => {
+            setDeleted(result)
+            setAsking(false)
+          }}
+        />
+      ) : null}
+    </Card>
+  )
+}
+
 /**
  * Settings. Four cards over the eight numbers a deployment keeps in its database rather
- * than in its environment.
+ * than in its environment, and the danger zone under them.
  *
  * Each box is a draft over the stored value rather than a copy of it: a key missing from
  * `draft` means "showing what the server said", which is what makes a save land in the
@@ -322,6 +392,8 @@ export function SettingsPage() {
           </div>
         </form>
       )}
+
+      <DangerZone />
     </PageBody>
   )
 }
