@@ -179,24 +179,22 @@ export function SettingsPage() {
   function row(field: Field) {
     const id = field.key.replace(/_/g, '-')
     return (
-      <div key={field.key} className="flex flex-col gap-1.5">
+      <div key={field.key} className="flex w-32 flex-none flex-col gap-1.5">
         <Label htmlFor={id}>{field.label}</Label>
-        <div className="flex items-center gap-2">
-          <Input
-            id={id}
-            type="number"
-            inputMode="numeric"
-            min={field.min}
-            max={field.max}
-            step={field.step}
-            value={text(field.key)}
-            placeholder="not set"
-            autoComplete="off"
-            className="w-32 font-mono tabular"
-            onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })}
-          />
-          <span className="font-mono text-[0.65625rem] text-dim-2 tabular">{field.unset}</span>
-        </div>
+        <Input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={field.min}
+          max={field.max}
+          step={field.step}
+          value={text(field.key)}
+          placeholder="not set"
+          autoComplete="off"
+          className="w-full font-mono tabular"
+          onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })}
+        />
+        <span className="font-mono text-[0.625rem] text-dim-2 tabular">{field.unset}</span>
       </div>
     )
   }
@@ -234,19 +232,34 @@ export function SettingsPage() {
           of it. Left to validate, the browser would refuse to submit 2400 with a bubble of
           its own wording, where the deployment's answer is simply 2000.
         */
-        <form noValidate onSubmit={submit} className="flex max-w-2xl flex-col gap-3">
-          <Card>
-            <CardHeader className="flex-col items-stretch gap-1">
-              <CardTitle>Maia</CardTitle>
-              <CardDescription>
-                The one rating Maia is asked at everywhere — the batch pass over both sides of
-                every game, and the analysis board&rsquo;s live column. Set it to the rating you
-                are playing towards, not the one you have. Left empty, Maia is asked about your
-                own moves only, at the rating each game was played at.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">{row(MAIA_FIELD)}</CardContent>
-          </Card>
+        <form noValidate onSubmit={submit} className="flex max-w-3xl flex-col gap-3">
+          {/* Two single-number cards share a row; the three-number cards run their boxes
+              across rather than down. Dense on a laptop, still one column on a phone. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Card>
+              <CardHeader className="flex-col items-stretch gap-1">
+                <CardTitle>Maia</CardTitle>
+                <CardDescription>
+                  The one rating Maia is asked at everywhere — the batch pass over both sides
+                  of every game, and the analysis board&rsquo;s live column. Set it to the
+                  rating you are playing towards. Left empty, Maia is asked about your own
+                  moves only, at the rating each game was played at.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-4">{row(MAIA_FIELD)}</CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex-col items-stretch gap-1">
+                <CardTitle>Defaults</CardTitle>
+                <CardDescription>
+                  The rating to stand in for yours where a game carries none — an
+                  over-the-board PGN, an unrated game.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-4">{DEFAULTS_FIELDS.map(row)}</CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader className="flex-col items-stretch gap-1">
@@ -257,7 +270,7 @@ export function SettingsPage() {
                 keeps several lines per position.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">{ANALYSIS_FIELDS.map(row)}</CardContent>
+            <CardContent className="flex flex-wrap gap-4">{ANALYSIS_FIELDS.map(row)}</CardContent>
           </Card>
 
           <Card>
@@ -269,20 +282,9 @@ export function SettingsPage() {
                 positions. The three have to rise.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="flex flex-wrap gap-4">
               {CLASSIFICATION_FIELDS.map(row)}
             </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex-col items-stretch gap-1">
-              <CardTitle>Defaults</CardTitle>
-              <CardDescription>
-                The rating to stand in for yours where a game carries none — an over-the-board
-                PGN, an unrated game.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">{DEFAULTS_FIELDS.map(row)}</CardContent>
           </Card>
 
           {save.isError ? (
