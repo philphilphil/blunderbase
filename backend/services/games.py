@@ -703,7 +703,11 @@ def _downsample(points: list[dict[str, Any]], limit: int) -> list[dict[str, Any]
 
     cutoff = datetime.fromisoformat(points[-1]["at"]) - timedelta(days=PROFILE_RECENT_WINDOW_DAYS)
     split = next(
-        (index for index, point in enumerate(points) if datetime.fromisoformat(point["at"]) >= cutoff),
+        (
+            index
+            for index, point in enumerate(points)
+            if datetime.fromisoformat(point["at"]) >= cutoff
+        ),
         len(points),
     )
     old, recent = points[:split], points[split:]
