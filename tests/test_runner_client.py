@@ -388,6 +388,18 @@ class Sockets:
         raise AssertionError(f"only {len(self.opened)} connection(s) were ever opened")
 
 
+def closed_with(code: int) -> Exception:
+    """What websockets raises when the far end hangs up with a close code of its own.
+
+    A refusal at the handshake never gets an `error` frame down the wire — the server just
+    closes — so this is the shape the client actually has to read the refusal out of.
+    """
+    from websockets.exceptions import ConnectionClosedError
+    from websockets.frames import Close
+
+    return ConnectionClosedError(Close(code, str(protocol.CLOSE_REASONS.get(code, ""))), None)
+
+
 def welcome(**changes: Any) -> dict[str, Any]:
     frame = protocol.welcome(
         runner_id=3,
@@ -602,6 +614,74 @@ async def test_a_token_the_server_refuses_stops_the_process(tmp_path: Path) -> N
         await client.stop()
 
     assert status == EXIT_CONFIG
+
+
+async def test_a_link_closed_as_unauthorized_stops_the_process(tmp_path: Path) -> None:
+    """The same refusal, spelled as a close code: the server hangs up at the handshake."""
+    attempts = 0
+
+    async def hung_up(_config: RunnerConfig) -> Any:
+        nonlocal attempts
+        attempts += 1
+        raise closed_with(protocol.WS_CLOSE_UNAUTHORIZED)
+
+    sockets = Sockets()
+    client = RunnerClient(scripted_client(tmp_path, sockets).config, connect=hung_up)
+
+    status = await asyncio.wait_for(client.run(), SETTLE_SECONDS)
+
+    assert status == EXIT_CONFIG
+    assert attempts == 1, "a token the server does not know is not worth a second dial"
+
+
+async def test_a_rate_limit_before_any_welcome_stops_the_process(tmp_path: Path) -> None:
+    """A lockout on first contact is what a wrong token earns, and retrying only feeds it."""
+    attempts = 0
+
+    async def hung_up(_config: RunnerConfig) -> Any:
+        nonlocal attempts
+        attempts += 1
+        raise closed_with(protocol.WS_CLOSE_RATE_LIMITED)
+
+    sockets = Sockets()
+    client = RunnerClient(scripted_client(tmp_path, sockets).config, connect=hung_up)
+
+    status = await asyncio.wait_for(client.run(), SETTLE_SECONDS)
+
+    assert status == EXIT_CONFIG
+    assert attempts == 1
+
+
+async def test_a_rate_limit_after_a_welcome_is_only_a_reconnect(tmp_path: Path) -> None:
+    """Past the welcome the token is proved good, whatever the server is doing to itself."""
+    sockets = Sockets()
+    client = scripted_client(tmp_path, sockets)
+
+    async with running(client) as task:
+        first = await sockets.latest(0)
+        await first.wait_for(protocol.HELLO)
+        # Welcomed first: the queue is FIFO, so the close lands behind it.
+        first.push(welcome())
+        first.push(closed_with(protocol.WS_CLOSE_RATE_LIMITED))
+        second = await sockets.latest(1)
+        await second.wait_for(protocol.HELLO)
+
+        assert not task.done(), "a session that worked is not given up on"
+
+
+async def test_a_server_restarting_is_still_only_a_reconnect(tmp_path: Path) -> None:
+    """1012 says the server is going away and coming back, which is what dialling again is for."""
+    sockets = Sockets()
+    client = scripted_client(tmp_path, sockets)
+
+    async with running(client) as task:
+        first = await sockets.latest(0)
+        await first.wait_for(protocol.HELLO)
+        first.push(closed_with(1012))
+        second = await sockets.latest(1)
+        await second.wait_for(protocol.HELLO)
+
+        assert not task.done()
 
 
 async def test_enough_socket_failures_and_the_runner_starts_polling(tmp_path: Path) -> None:

@@ -92,6 +92,18 @@ FATAL_CODES = {
 }
 # A socket that closed for one of these was not a failure at all.
 CLEAN_CLOSES = (1000, 1001)
+# What a refusal in the 4000 range is actually about, in the terms whoever runs this process
+# can do something about. A close code on its own reads as "the socket closed" however
+# carefully the server picked it, and a runner that retries forever never says why.
+CLOSE_CAUSES = {
+    protocol.WS_CLOSE_UNAUTHORIZED: "the server does not know this runner's token",
+    protocol.WS_CLOSE_REVOKED: "this runner's token has been revoked",
+    protocol.WS_CLOSE_PROTO_MISMATCH: "the two halves do not speak the same runner protocol",
+    protocol.WS_CLOSE_RATE_LIMITED: (
+        "this token has been refused often enough that the server has shut its door on it, "
+        "and dialling again only holds the door shut"
+    ),
+}
 
 STREAM_FRAMES = (protocol.STREAM_OPEN, protocol.STREAM_RESTART, protocol.STREAM_CLOSE)
 
@@ -518,6 +530,15 @@ class RunnerClient:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
+                    # A refusal can arrive as a close code rather than as an `error` frame —
+                    # the server hangs up on a bad token at the handshake, before there is
+                    # anything to say it in. Reconnecting from that is not patience, it is
+                    # the same wrong token knocking until the rate limiter answers.
+                    refusal = self._refused_by_close(exc)
+                    if refusal is not None:
+                        logger.error("%s", refusal)
+                        status = refusal.status
+                        break
                     # A session that was welcomed and then dropped is not a *connection*
                     # failure, however abnormally it ended: a server restart closes with
                     # 1012 and a proxy with nothing at all, and a runner that worked for
@@ -554,6 +575,28 @@ class RunnerClient:
         finally:
             await self._shutdown()
         return status
+
+    def _refused_by_close(self, exc: BaseException) -> RunnerRefused | None:
+        """The refusal behind a dropped socket, or None because it was only weather.
+
+        A close code in the 4000 range is an answer about *this* token, and dialling again
+        merely asks the same question. The rate limit is the one that needs judgement: a
+        lockout before this process has ever been welcomed is what a wrong token earns, and
+        every retry feeds it — so it is read as the refusal it stands in for. Once a welcome
+        has arrived the reading flips, because the token is proved good and a server in the
+        middle of a redeploy must not cost a runner the session it has had for hours.
+        """
+        code = _close_code(exc)
+        if code is None:
+            return None
+        status = FATAL_CLOSES.get(code)
+        if status is None:
+            if code != protocol.WS_CLOSE_RATE_LIMITED or self._established:
+                return None
+            status = EXIT_CONFIG
+        named = protocol.CLOSE_REASONS.get(code, code)
+        cause = CLOSE_CAUSES.get(code, "the server will not have this runner")
+        return RunnerRefused(f"{self.config.server} closed the link ({named}): {cause}", status)
 
     async def stop(self) -> None:
         """Ask the loop to end. The socket is closed so a blocked receive comes back."""
@@ -601,14 +644,10 @@ class RunnerClient:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            code = _close_code(exc)
-            status = FATAL_CLOSES.get(code) if code is not None else None
-            if status is not None:
-                named = protocol.CLOSE_REASONS.get(code, code)
-                raise RunnerRefused(
-                    f"{self.config.server} closed the link: {named}", status
-                ) from exc
-            if code in CLEAN_CLOSES:
+            refusal = self._refused_by_close(exc)
+            if refusal is not None:
+                raise refusal from exc
+            if _close_code(exc) in CLEAN_CLOSES:
                 return None
             raise
         return text if isinstance(text, str) else bytes(text).decode("utf-8", "replace")
