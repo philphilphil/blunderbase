@@ -45,11 +45,20 @@ describe('invalidationsFor — import', () => {
 describe('invalidationsFor — analysis lifecycle', () => {
   const base = { run_id: 9, game_id: 4, tier: 'quick' as const, status: 'queued' as const }
 
-  it('refetches analysis and games when a run is queued or starts', () => {
+  it('refetches the analysis rows and the queue widget when a run is queued or starts', () => {
     for (const event of ['analysis.queued', 'analysis.running'] as const) {
       const keys = invalidationsFor({ ...base, event })
-      expect(has(keys, queryKeys.analysis())).toBe(true)
-      expect(has(keys, queryKeys.games())).toBe(true)
+      // `['analysis']` is the prefix of `['analysis', 'queue']`, so the widget comes along
+      // with the rows and one key is enough.
+      expect(names(keys)).toEqual([JSON.stringify(queryKeys.analysis())])
+    }
+  })
+
+  // Queueing sixty games is sixty `queued` frames and sixty `running` frames; the games
+  // table is the most expensive read there is, and its badge catches up at `done`.
+  it('keeps the lifecycle cheap: never the games table before a run has finished', () => {
+    for (const event of ['analysis.queued', 'analysis.running'] as const) {
+      expect(has(invalidationsFor({ ...base, event }), queryKeys.games())).toBe(false)
     }
   })
 

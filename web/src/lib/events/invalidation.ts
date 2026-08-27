@@ -24,11 +24,15 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'import.finished':
       return [queryKeys.imports(), queryKeys.games(), queryKeys.stats(), queryKeys.queue()]
 
-    // Lifecycle: the queue always, the game's own analysis rows too. `queued` already
-    // changes a game's badge from "unanalysed" to "queued".
+    // Lifecycle: the queue and the game's own analysis rows, which `['analysis']` covers as
+    // the prefix of `['analysis', 'queue']`. The games table is deliberately *not* here —
+    // queueing sixty games is sixty `queued` frames and sixty `running` frames, and each one
+    // would send every loaded page of `/games?cards=true` plus the badge counts back out. The
+    // queue widget is the live view of a run's lifecycle; the game's own badge catching up at
+    // `analysis.done` is soon enough.
     case 'analysis.queued':
     case 'analysis.running':
-      return [queryKeys.analysis(), queryKeys.games()]
+      return [queryKeys.analysis()]
 
     // Nothing about a run row changes while it works, only how far along it is.
     case 'analysis.progress':

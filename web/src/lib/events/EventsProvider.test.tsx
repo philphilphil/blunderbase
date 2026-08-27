@@ -1,7 +1,8 @@
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery, type QueryKey } from '@tanstack/react-query'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { queryKeys } from '@/lib/api/keys'
 import { onSessionLost, reportSessionRestored } from '@/lib/auth/session'
 
 import { EventsProvider } from './EventsProvider'
@@ -26,14 +27,24 @@ class FakeSocket {
   closedBy(code: number, reason = '') {
     act(() => this.onclose?.({ code, reason } as CloseEvent))
   }
+  /** One frame off the wire, exactly as the backend would send it. */
+  receive(frame: unknown) {
+    act(() => this.onmessage?.({ data: JSON.stringify(frame) } as MessageEvent<string>))
+  }
 }
 
-function Probe({ queryFn }: { queryFn: () => Promise<string> }) {
-  const query = useQuery({ queryKey: ['probe'], queryFn, retry: false })
+function Probe({
+  queryFn,
+  queryKey = ['probe'],
+}: {
+  queryFn: () => Promise<string>
+  queryKey?: QueryKey
+}) {
+  const query = useQuery({ queryKey, queryFn, retry: false })
   return <span>{query.isError ? 'could not load' : (query.data ?? 'loading')}</span>
 }
 
-function renderProbe(queryFn: () => Promise<string>) {
+function renderProbe(queryFn: () => Promise<string>, queryKey?: QueryKey) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 30_000 } },
   })
@@ -41,7 +52,7 @@ function renderProbe(queryFn: () => Promise<string>) {
   render(
     <QueryClientProvider client={client}>
       <EventsProvider url="ws://events">
-        <Probe queryFn={queryFn} />
+        <Probe queryFn={queryFn} queryKey={queryKey} />
       </EventsProvider>
     </QueryClientProvider>,
   )
@@ -110,6 +121,49 @@ describe('EventsProvider', () => {
 
     expect(lost).toHaveBeenCalledWith('setup_required')
     stop()
+  })
+
+  it('holds the games table to one refetch per cooldown, and one more after the burst', async () => {
+    vi.useFakeTimers()
+    const queryFn = vi.fn(async () => 'the library')
+    const socket = renderProbe(queryFn, queryKeys.gameCards())
+    await act(() => vi.advanceTimersByTimeAsync(0))
+    socket().open()
+    expect(queryFn).toHaveBeenCalledTimes(1)
+
+    // A batch of sixty analyses: a `done` frame every 100ms for two seconds. Left alone,
+    // that is a refetch per 200ms window — ten of them, over the most expensive read there is.
+    const done = { event: 'analysis.done', game_id: 4, tier: 'quick', status: 'done' }
+    for (let run = 0; run < 20; run += 1) {
+      socket().receive({ ...done, run_id: run })
+      await act(() => vi.advanceTimersByTimeAsync(100))
+    }
+    // The first window went straight out; everything after it is waiting on the cooldown.
+    expect(queryFn).toHaveBeenCalledTimes(2)
+
+    // Nothing is dropped, though: the state after the last frame is fetched on the trailing
+    // edge — once, not once per frame that arrived while the cooldown was running.
+    await act(() => vi.advanceTimersByTimeAsync(3_000))
+    expect(queryFn).toHaveBeenCalledTimes(3)
+    await act(() => vi.advanceTimersByTimeAsync(30_000))
+    expect(queryFn).toHaveBeenCalledTimes(3)
+  })
+
+  it('leaves a cheap key on the 200ms batch — no cooldown between bursts', async () => {
+    vi.useFakeTimers()
+    const queryFn = vi.fn(async () => 'the queue')
+    const socket = renderProbe(queryFn, queryKeys.queue())
+    await act(() => vi.advanceTimersByTimeAsync(0))
+    socket().open()
+
+    const progress = { event: 'analysis.progress', run_id: 9, game_id: 4, status: 'running' }
+    for (const ply of [1, 2, 3]) {
+      socket().receive({ ...progress, done: ply, total: 40 })
+      await act(() => vi.advanceTimersByTimeAsync(1_000))
+    }
+
+    // One per window rather than one per frame, and no window skipped.
+    expect(queryFn).toHaveBeenCalledTimes(4)
   })
 
   it('reconnects on any other close, which is the backend going away', async () => {

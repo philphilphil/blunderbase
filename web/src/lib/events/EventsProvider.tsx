@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryKey } from '@tanstack/react-query'
 import {
   createContext,
   useCallback,
@@ -47,6 +47,30 @@ const WS_UNAUTHORIZED = 4401
 // are collected over this window and applied once, so a burst is one refetch.
 const FLUSH_MS = 200
 
+/**
+ * How long an expensive read gets to itself after being refetched, by query root.
+ *
+ * 200ms is the right window for a cheap key, and much too short for these four: `['games']`
+ * sends every loaded page of the infinite `/games?cards=true` query *and* every saved-filter
+ * badge count back out at once, and a batch of sixty analyses produces bursts for minutes.
+ * A key inside its cooldown is not dropped — it is held and flushed on the trailing edge, so
+ * the state after the last event of a burst is always the one that ends up on screen.
+ *
+ * Only the whole-prefix key waits. `['games', 'detail', 7]` is one row, a note landing on it
+ * is rare, and it should stay instant. `imports()` is spelled `['import']`, hence the key.
+ */
+const COOLDOWN_MS: Record<string, number> = {
+  games: 3_000,
+  stats: 3_000,
+  explorer: 3_000,
+  import: 3_000,
+}
+
+function cooldownFor(key: QueryKey): number {
+  if (key.length !== 1) return 0
+  return COOLDOWN_MS[String(key[0])] ?? 0
+}
+
 export function EventsProvider({
   children,
   url,
@@ -62,6 +86,11 @@ export function EventsProvider({
   const listeners = useRef(new Map<Topic, Set<EventListener>>())
   const pending = useRef<ReturnType<typeof invalidationsFor>>([])
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Keys a cooldown held back, by serialized key, so a hundred more events for one of them
+  // still only ever amount to a single entry — and a single refetch when the cooldown ends.
+  const deferred = useRef(new Map<string, QueryKey>())
+  const lastFlushed = useRef(new Map<string, number>())
+  const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const subscribe = useCallback((topic: Topic, listener: EventListener) => {
     const map = listeners.current
@@ -86,16 +115,59 @@ export function EventsProvider({
     let denied = false
     let everConnected = false
 
-    const flush = () => {
+    const clearTimers = () => {
+      if (flushTimer.current !== null) clearTimeout(flushTimer.current)
+      if (cooldownTimer.current !== null) clearTimeout(cooldownTimer.current)
       flushTimer.current = null
-      const keys = dedupeKeys(pending.current)
+      cooldownTimer.current = null
+    }
+
+    /** Nothing is worth refetching for a provider that is going away. */
+    const stopFlushing = () => {
+      clearTimers()
       pending.current = []
-      for (const key of keys) void queryClient.invalidateQueries({ queryKey: key })
+      deferred.current.clear()
+    }
+
+    const flush = () => {
+      clearTimers()
+      // What a cooldown held back is flushed with whatever has arrived since, so the two
+      // cannot turn into two refetches of the same key.
+      const keys = dedupeKeys([...pending.current, ...deferred.current.values()])
+      pending.current = []
+      deferred.current.clear()
+      const now = Date.now()
+      for (const key of keys) {
+        const serialized = JSON.stringify(key)
+        const cooldown = cooldownFor(key)
+        if (cooldown > 0) {
+          const last = lastFlushed.current.get(serialized)
+          if (last !== undefined && now - last < cooldown) {
+            deferred.current.set(serialized, key)
+            continue
+          }
+          lastFlushed.current.set(serialized, now)
+        }
+        void queryClient.invalidateQueries({ queryKey: key })
+      }
+      scheduleDeferred()
     }
 
     const scheduleFlush = () => {
       if (flushTimer.current !== null) return
       flushTimer.current = setTimeout(flush, FLUSH_MS)
+    }
+
+    /** The trailing edge: one timer, set for the first held key to come off cooldown. */
+    const scheduleDeferred = () => {
+      if (cooldownTimer.current !== null || deferred.current.size === 0) return
+      const now = Date.now()
+      let wait = Infinity
+      for (const [serialized, key] of deferred.current) {
+        const last = lastFlushed.current.get(serialized) ?? now
+        wait = Math.min(wait, Math.max(0, cooldownFor(key) - (now - last)))
+      }
+      cooldownTimer.current = setTimeout(flush, wait)
     }
 
     const dispatch = (event: AnyEvent) => {
@@ -196,10 +268,7 @@ export function EventsProvider({
       closed = true
       stopWaitingForSession()
       if (retryTimer !== null) clearTimeout(retryTimer)
-      if (flushTimer.current !== null) {
-        clearTimeout(flushTimer.current)
-        flushTimer.current = null
-      }
+      stopFlushing()
       if (socket) {
         socket.onopen = null
         socket.onmessage = null
