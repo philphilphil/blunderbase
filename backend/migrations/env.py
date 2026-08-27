@@ -23,8 +23,6 @@ def _disable_foreign_keys(connection: Connection) -> None:
     dropping a referenced table then fails on the rows pointing at it. PRAGMA is a no-op
     inside a transaction, so it goes on the raw DBAPI connection before Alembic opens one.
     """
-    if connection.dialect.name != "sqlite":
-        return
     dbapi_connection = connection.connection.dbapi_connection
     dbapi_connection.execute("PRAGMA foreign_keys=OFF")
     if dbapi_connection.execute("PRAGMA foreign_keys").fetchone()[0]:
@@ -33,8 +31,6 @@ def _disable_foreign_keys(connection: Connection) -> None:
 
 def _check_foreign_keys(connection: Connection) -> None:
     """With enforcement off a batch recreate can orphan a reference silently, so say so loudly."""
-    if connection.dialect.name != "sqlite":
-        return
     dbapi_connection = connection.connection.dbapi_connection
     violations = dbapi_connection.execute("PRAGMA foreign_key_check").fetchall()
     if violations:

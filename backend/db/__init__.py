@@ -1,7 +1,6 @@
 """The one database: SQLAlchemy 2 models, the engine/session factory and Alembic wiring.
 
-Access is through SQLAlchemy only and no SQLite-only construct is used anywhere, so the
-PostgreSQL escape hatch stays open. See `docs/ARCHITECTURE.md`.
+One SQLite file in WAL mode, reached through SQLAlchemy only. See `docs/ARCHITECTURE.md`.
 """
 
 from backend.db.base import Base

@@ -299,9 +299,9 @@ def _performance_by_hour(
 ) -> dict[str, Any]:
     """Time of day, bucketed in Python.
 
-    The hour is read off the timestamp here rather than in SQL: SQLite and PostgreSQL
-    spell that extraction differently, and the interesting hour is the owner's local one,
-    which the database does not know at all. `tz_offset` is in hours east of UTC.
+    The hour is read off the timestamp here rather than in SQL: the interesting hour is
+    the owner's local one, which the database does not know at all. `tz_offset` is in
+    hours east of UTC.
     """
     offset = timedelta(hours=float(options.get("tz_offset", 0.0)))
     rows = [row for row in _game_rows(session, scope) if row.played_at is not None]
@@ -466,8 +466,8 @@ def _eval_rows(
 
     The aggregation itself happens in Python. The bucket a move belongs to depends on the
     board (phase) or on the game's clock list (time trouble), and neither is something
-    SQLite and PostgreSQL would compute the same way — narrow tuples over a personal
-    archive are the cheaper half of that trade.
+    SQL could work out at all — narrow tuples over a personal archive are the cheaper
+    half of that trade.
     """
     position_id = func.coalesce(MoveEval.position_id, GamePosition.position_id)
     statement = (

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import inspect, text
@@ -56,7 +55,6 @@ def test_indexes_the_hot_queries_need_exist(settings: Settings) -> None:
     assert ("token_hash",) in unique("runners")
 
 
-@pytest.mark.sqlite
 def test_sqlite_runs_in_wal_mode(settings: Settings) -> None:
     upgrade_to_head(settings)
     with get_engine(settings).connect() as connection:

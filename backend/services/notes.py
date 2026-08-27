@@ -11,9 +11,9 @@ from backend.db.models import Note
 from backend.services import events as events_service
 from backend.services.explorer import find_position, get_or_create_position
 
-# A tag is matched after the row is read rather than in SQL: `notes.tags` is a portable
-# JSON column, and the operators that would search inside one are spelled differently on
-# SQLite and on PostgreSQL. Coach memory is small; this is the cheap half of the trade.
+# A tag is matched after the row is read rather than in SQL: `notes.tags` is a plain JSON
+# column, and searching inside one means a full scan through SQLite's JSON functions
+# either way. Coach memory is small; this is the cheap half of the trade.
 SCAN_LIMIT = 5000
 
 # A note the coach writes has to show up in the open UI without a refresh, so both of the

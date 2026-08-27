@@ -44,36 +44,33 @@ Why:
   would be the same threads with more machinery.
 - The predecessor ran this exact pattern in production against the same workload, and
   Alembic, the FastAPI dependency style and the test fixtures are all simpler for it.
-- The PostgreSQL escape hatch is unaffected: `psycopg` is a synchronous driver by default.
 
 Practical consequence: a `Session` belongs to one thread. `backend.db.session` pools with
 the default `QueuePool`, so every Session gets its own connection; never share one across
 threads, and never hold one open across an `await`.
 
-## SQLite now, PostgreSQL if it is ever needed
+## One SQLite file
 
-SQLite in WAL mode is the primary store. `BLUNDERBASE_DATABASE_URL` is the seam: set it to
-a SQLAlchemy URL and everything — the app, the CLI, Alembic — talks to that instead of the
-file at `BLUNDERBASE_DB_PATH`. The rules that keep the escape hatch open:
+SQLite in WAL mode is the store, and the only one: the file at `BLUNDERBASE_DB_PATH` is
+what the app, the CLI and Alembic all open. A personal archive is a single-writer workload
+with one reader who is the same person, which is the shape SQLite is best at, and "back up
+the `/data` volume" is the whole backup story. The rules that follow from it:
 
-- Access through SQLAlchemy only — no raw SQL that is not portable, no SQLite-only column
-  types, no `INSERT OR REPLACE`.
+- Access through SQLAlchemy only — no hand-written SQL, no `INSERT OR REPLACE`.
 - Enums are plain `VARCHAR` columns validated in Python (`backend.db.types.EnumString`
-  over the `StrEnum`s in `backend.db.enums`). No native PostgreSQL enum type, which would
-  need its own migration to gain a member, and no `CHECK` constraint, which SQLite and
-  PostgreSQL would recreate differently.
+  over the `StrEnum`s in `backend.db.enums`). SQLite has no enum type, and a `CHECK`
+  constraint would be one more thing every batch migration has to recreate.
 - Timestamps are stored as naive UTC through `backend.db.types.UtcDateTime` and read back
-  as aware UTC. SQLite carries no zone and PostgreSQL's `timestamptz` would read a naive
-  value in the session's zone, so the conversion is done in Python on both.
+  as aware UTC. SQLite carries no zone, so the conversion is done in Python.
 - Parsed move lists, clock times, multi-PV lines, Maia policies, note tags and per-game
-  import errors are `sqlalchemy.JSON` columns — `JSON` on SQLite, `JSON` on PostgreSQL.
-- Migrations run with `render_as_batch=True`, so SQLite's missing `ALTER` is handled by
-  table copy while PostgreSQL takes the direct path.
+  import errors are `sqlalchemy.JSON` columns.
+- Migrations run with `render_as_batch=True`, because SQLite has no `ALTER` worth the name
+  and a change to a column is a table copy.
 
 WAL, `foreign_keys=ON` and a busy timeout are set by a `connect` event installed in
-`backend.db.session.create_db_engine`, and only when the engine's dialect is SQLite. The
-listener is bound to the engine instance rather than to the `Engine` class, so a
-PostgreSQL engine in the same process never sees it.
+`backend.db.session.create_db_engine`. They are per-connection pragmas, so they have to be
+set on every connection the pool opens; the listener is bound to the engine instance
+rather than to the `Engine` class, so it reaches that engine's connections and no others.
 
 ## Source-adapter registration
 
@@ -198,10 +195,9 @@ run — because a dimension half at quick budget and half at deep budget is not 
 
 **Aggregation in Python, filtering in SQL.** Phase (needs the board), piece moved (needs
 the SAN), time trouble (needs the game's clock list) and time of day (needs the viewer's
-zone) are not things SQLite and PostgreSQL compute the same way. The queries fetch narrow
-tuples under SQL filters; the bucketing happens in Python. Same reason `notes` matches
-tags after the read: `notes.tags` is a portable JSON column, and searching inside one is
-spelled differently on each back end.
+zone) are not things SQL can work out. The queries fetch narrow tuples under SQL filters;
+the bucketing happens in Python. Same reason `notes` matches tags after the read:
+`notes.tags` is a plain JSON column, and searching inside one is a scan either way.
 
 Two conventions worth knowing: a `limit` of 0 means "no limit" throughout, and payload
 builders drop `None` keys, because a chat model pays for every one of them.
@@ -221,11 +217,6 @@ shared across Sessions and threads and the database survives), and `settings`, a
 `tmp_path` file database for anything that needs real Alembic migrations. Engine adapters
 are tested against scripted fake UCI processes; tests that need a real Stockfish or Maia
 binary carry the `engine` marker and are excluded from the default run.
-
-Set `BLUNDERBASE_TEST_DATABASE_URL` and both of those fixtures point at that server
-instead, which is how the whole suite — migrations included — runs against PostgreSQL; CI
-runs it both ways. The handful of assertions that are about SQLite itself (WAL mode, the
-busy timeout) carry the `sqlite` marker and are skipped on the other back end.
 
 `tests/fake_uci.py` is that fake: a real subprocess speaking real UCI over a real pipe,
 scripted by a JSON scenario (declared options, one reply per `go`, a crash, a handshake
@@ -270,9 +261,9 @@ all synchronously; `workers/analysis_queue.py` owns nothing but the asyncio plum
 
 **Claiming.** `claim_next_run` reads the top candidate by `(priority DESC, created_at,
 id)` and then updates it `WHERE id = ? AND status = 'queued'`. A second worker's update
-matches no row and it moves on to the next candidate. `SELECT … FOR UPDATE SKIP LOCKED`
-would have been the PostgreSQL answer, but SQLite has no row locks at all, and the queue
-has to behave identically on both.
+matches no row and it moves on to the next candidate. SQLite has no row locks at all, so
+there is no `SELECT … FOR UPDATE SKIP LOCKED` to reach for: the conditional UPDATE is the
+claim.
 
 **Scheduling.** Quick runs are FIFO at priority 0; deep runs jump the queue at priority 10
 because someone is waiting on one. Concurrency is one semaphore of

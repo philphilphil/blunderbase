@@ -13,9 +13,9 @@ ENUM_LENGTH = 32
 class EnumString[E: StrEnum](TypeDecorator[E]):
     """A `StrEnum` stored as a plain VARCHAR, validated on the way in.
 
-    Both back ends see the same column type, so a member can be added without a
-    migration, and an unknown value is rejected in Python rather than by a database
-    constraint that SQLite and PostgreSQL would spell differently.
+    The column never changes shape, so a member can be added without a migration, and an
+    unknown value is rejected in Python rather than by a `CHECK` constraint every batch
+    migration would have to recreate.
     """
 
     impl = String
@@ -39,9 +39,8 @@ class EnumString[E: StrEnum](TypeDecorator[E]):
 class UtcDateTime(TypeDecorator[datetime]):
     """An aware UTC timestamp stored as a naive UTC one.
 
-    SQLite has no timezone-carrying type and PostgreSQL's `timestamptz` would read a
-    naive value in the session's zone, so the offset is normalised away on the way in and
-    reattached on the way out. Every timestamp in the database is UTC by construction.
+    SQLite has no timezone-carrying type, so the offset is normalised away on the way in
+    and reattached on the way out. Every timestamp in the database is UTC by construction.
     """
 
     impl = DateTime

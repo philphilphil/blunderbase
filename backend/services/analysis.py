@@ -4,9 +4,9 @@ Three things live here and nothing else does:
 
 - **The queue.** `AnalysisRun` rows *are* the queue, so it survives a restart with no
   broker in the picture. `claim_next_run` takes the highest-priority queued row with a
-  conditional UPDATE rather than a lock, which is the one claim that is race-free on both
-  SQLite and PostgreSQL. `requeue_stale_runs` is what a starting process calls to collect
-  the rows a dead one left `running`.
+  conditional UPDATE rather than a lock, which is what makes the claim race-free on
+  SQLite, where there is no row lock to take. `requeue_stale_runs` is what a starting
+  process calls to collect the rows a dead one left `running`.
 - **The computation.** `build_plan` turns a run row into a database-free `RunPlan`, and
   `analyse_plan` turns that plus an engine adapter into a list of unattached `MoveEval`
   objects. Neither touches a Session, which is what lets the worker run them in a thread

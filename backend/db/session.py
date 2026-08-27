@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -22,7 +21,7 @@ BUSY_TIMEOUT_MS = 5000
 
 
 def sqlite_path(url: str) -> Path | None:
-    """The file a SQLite URL points at, or None for PostgreSQL and for `:memory:`."""
+    """The file a SQLite URL points at, or None for the in-memory ones."""
     if not url.startswith(SQLITE_PREFIX):
         return None
     tail = url[len(SQLITE_PREFIX) :]
@@ -34,14 +33,12 @@ def _install_sqlite_pragmas(engine: Engine) -> None:
 
     WAL is what lets the analysis workers read while a run commits, and the pragmas are
     per-connection, so they have to be set on every one the pool opens. The listener is
-    bound to the engine rather than to the `Engine` class so a PostgreSQL engine in the
-    same process never sees it.
+    bound to the engine rather than to the `Engine` class, so it reaches this engine's
+    connections and nobody else's.
     """
 
     @event.listens_for(engine, "connect")
     def _configure(dbapi_connection: Any, _record: Any) -> None:
-        if not isinstance(dbapi_connection, sqlite3.Connection):
-            return
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
@@ -50,7 +47,7 @@ def _install_sqlite_pragmas(engine: Engine) -> None:
 
 
 def create_db_engine(url: str, **kwargs: Any) -> Engine:
-    """Build an engine for `url`, applying the SQLite pragmas when that is what it is."""
+    """Build an engine for `url`, with the pragmas installed and its directory made."""
     path = sqlite_path(url)
     if path is not None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -59,8 +56,7 @@ def create_db_engine(url: str, **kwargs: Any) -> Engine:
         options |= {"pool_size": POOL_SIZE, "max_overflow": MAX_OVERFLOW}
     options |= kwargs
     engine = create_engine(url, **options)
-    if engine.dialect.name == "sqlite":
-        _install_sqlite_pragmas(engine)
+    _install_sqlite_pragmas(engine)
     return engine
 
 

@@ -41,10 +41,6 @@ class Settings(BaseSettings):
     # to `<root>/web/dist`; a directory that was never built simply is not served, which
     # is the normal case in development (the Vite dev server has the page instead).
     web_dist: Path | None = None
-    # The PostgreSQL escape hatch: a full SQLAlchemy URL that replaces the SQLite file.
-    # Unset — the normal case — means the database at `database_path`. Nothing else in the
-    # codebase asks which back end it is talking to; this is the only seam.
-    database_url: str = ""
 
     # Engine processes running at once, shared across tiers. Workers are asyncio tasks in
     # the API process, so this caps CPU rather than connections.
@@ -96,8 +92,6 @@ class Settings(BaseSettings):
         self.data_dir = self._resolve(self.data_dir, self.root / "data")
         self.database_path = self._resolve(self.database_path, self.data_dir / "blunderbase.db")
         self.web_dist = self._resolve(self.web_dist, self.root / "web" / "dist")
-        if not self.database_url.strip():
-            self.database_url = f"sqlite+pysqlite:///{self.database_path}"
         return self
 
     def _resolve(self, value: Path | None, fallback: Path) -> Path:
@@ -105,6 +99,11 @@ class Settings(BaseSettings):
             return fallback
         value = value.expanduser()
         return value if value.is_absolute() else (self.root / value).resolve()
+
+    @property
+    def database_url(self) -> str:
+        """The SQLAlchemy URL for `database_path`. SQLite is the only back end there is."""
+        return f"sqlite+pysqlite:///{self.database_path}"
 
     def ensure_directories(self) -> None:
         assert self.data_dir is not None and self.database_path is not None

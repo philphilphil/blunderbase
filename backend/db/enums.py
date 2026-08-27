@@ -3,8 +3,8 @@ from __future__ import annotations
 from enum import StrEnum
 
 # Every one of these is stored as a plain string column and validated in Python (see
-# `backend.db.types.EnumString`). No native database enum type is used: PostgreSQL's would
-# need its own migration to gain a member, and SQLite has none at all.
+# `backend.db.types.EnumString`). SQLite has no enum type at all, and a plain string column
+# gains a member without a migration.
 
 
 class Source(StrEnum):

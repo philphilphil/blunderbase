@@ -66,7 +66,7 @@ Coach: get_worst_recent_moments → get_stats → a plan grounded in your actual
 |-------|------|
 | Backend | Python 3.12, FastAPI, SQLAlchemy + Alembic |
 | Frontend | React 19 + TypeScript + Vite, shadcn/Radix, Tailwind CSS 4 |
-| Database | SQLite (PostgreSQL escape hatch via `BLUNDERBASE_DATABASE_URL`) |
+| Database | SQLite in WAL mode — one file, `BLUNDERBASE_DB_PATH` |
 | Chess | Stockfish (any UCI engine), Maia via lc0, chessground + chessops |
 | MCP | Built into the backend — stdio for local clients, streamable HTTP at `/mcp` |
 
@@ -99,7 +99,7 @@ backend/
   services/         — the only place a "blunder" or a stat is defined
   adapters/         — Lichess, chess.com, UCI engines, Maia
 web/                — React SPA
-tests/              — pytest (SQLite and PostgreSQL in CI)
+tests/              — pytest
 docs/               — deploy.md, runners.md, reference.md, ARCHITECTURE.md
 ```
 

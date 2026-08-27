@@ -52,7 +52,6 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | Variable | Default | |
 |---|---|---|
 | `BLUNDERBASE_DB_PATH` | `<root>/data/blunderbase.db` | the SQLite file (`/data/blunderbase.db` in the image) |
-| `BLUNDERBASE_DATABASE_URL` | — | a full SQLAlchemy URL, and the only seam the PostgreSQL escape hatch needs |
 | `BLUNDERBASE_DATA_DIR` | `<root>/data` | everything written that is not the database |
 | `BLUNDERBASE_WEB_DIST` | `<root>/web/dist` | the built web app; a directory that is not there is simply not served |
 | `BLUNDERBASE_HOST` `BLUNDERBASE_PORT` | `127.0.0.1` `8765` | what `serve` binds |
@@ -121,9 +120,7 @@ That tag push builds the image again and publishes
 ```bash
 make test                                       # uv run pytest + pnpm test
 uv run pytest -m engine                         # the suite that wants a real binary
-BLUNDERBASE_TEST_DATABASE_URL=postgresql+psycopg://… uv run pytest
 ```
 
 Engine adapters are covered by scripted fake UCI processes, so the default run needs no
-binary. CI runs the whole suite against SQLite and against PostgreSQL — the escape hatch
-is only honest if the tests go through it — then builds and pushes the image from `main`.
+binary. CI lints, runs the whole suite, then builds and pushes the image from `main`.

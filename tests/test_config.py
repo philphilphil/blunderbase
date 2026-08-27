@@ -17,32 +17,17 @@ def test_the_database_is_the_sqlite_file_unless_told_otherwise(tmp_path: Path) -
     assert settings.database_url == f"sqlite+pysqlite:///{settings.database_path}"
 
 
-def test_a_database_url_is_the_postgresql_escape_hatch(
+def test_the_database_url_follows_the_configured_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The one seam the spec's escape hatch needs: everything else reads `database_url`."""
-    url = "postgresql+psycopg://blunderbase@localhost:5432/blunderbase"
+    """`database_url` is derived, so pointing `BLUNDERBASE_DB_PATH` elsewhere moves it too."""
+    elsewhere = tmp_path / "elsewhere" / "games.db"
     monkeypatch.setenv("BLUNDERBASE_ROOT", str(tmp_path))
-    monkeypatch.setenv("BLUNDERBASE_DATABASE_URL", url)
+    monkeypatch.setenv("BLUNDERBASE_DB_PATH", str(elsewhere))
     get_settings.cache_clear()
     reset_engines()
     try:
-        assert get_settings().database_url == url
-    finally:
-        get_settings.cache_clear()
-        reset_engines()
-
-
-def test_an_empty_database_url_falls_back_to_the_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A commented-out entry someone uncommented and left blank must not stop the boot."""
-    monkeypatch.setenv("BLUNDERBASE_ROOT", str(tmp_path))
-    monkeypatch.setenv("BLUNDERBASE_DATABASE_URL", "")
-    get_settings.cache_clear()
-    reset_engines()
-    try:
-        assert get_settings().database_url.startswith("sqlite+pysqlite:///")
+        assert get_settings().database_url == f"sqlite+pysqlite:///{elsewhere}"
     finally:
         get_settings.cache_clear()
         reset_engines()
