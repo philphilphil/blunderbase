@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,6 +21,7 @@ function longGame(): MoveRow[] {
 
 function renderList(moves: MoveRow[], props: Partial<Parameters<typeof MoveList>[0]> = {}) {
   const onSelectPly = vi.fn()
+  const onSelectVariationMove = vi.fn()
   const view = render(
     <MoveList
       pairs={pairMoves(moves)}
@@ -30,10 +31,11 @@ function renderList(moves: MoveRow[], props: Partial<Parameters<typeof MoveList>
       flaggedCount={0}
       plyCount={moves.length}
       onSelectPly={onSelectPly}
+      onSelectVariationMove={onSelectVariationMove}
       {...props}
     />,
   )
-  return { onSelectPly, ...view }
+  return { onSelectPly, onSelectVariationMove, ...view }
 }
 
 const ROW_HEIGHT = 28
@@ -192,6 +194,87 @@ describe('MoveList', () => {
     // Move 2 of 21 sits inside the first viewport, so nothing moves.
     const { container } = renderList(longGame(), { cursor: 2 })
     expect(container.querySelector('.overflow-y-auto')!.scrollTop).toBe(0)
+  })
+
+  it('draws the active variation under the move it hangs off', () => {
+    // 1.e4 d5, and a line played off the position after 1.e4 — so it hangs under move 1.
+    renderList([move(0, 'e4'), move(1, 'd5'), move(2, 'exd5'), move(3, 'Qxd5')], {
+      cursor: 0,
+      variation: { base: 1, sans: ['c6', 'd4', 'Nf6'], cursor: 2 },
+    })
+
+    const line = screen.getByTestId('move-variation')
+    // The gaps are flex, not text: the row reads `(1…c6 2.d4 Nf6)` on screen.
+    expect(line).toHaveTextContent('(1…c62.d4Nf6)')
+    // It is drawn inside the row of the move it left from, not appended to the table.
+    const row = screen.getByText('1.').closest('div')!.parentElement!
+    expect(row.contains(line)).toBe(true)
+  })
+
+  it('lights the move the board is standing on, and only that one', () => {
+    const { rerender } = renderList([move(0, 'e4'), move(1, 'd5')], {
+      cursor: 0,
+      variation: { base: 1, sans: ['c6', 'd4'], cursor: 1 },
+    })
+    const lit = () =>
+      within(screen.getByTestId('move-variation'))
+        .getAllByRole('button')
+        .filter((button) => button.className.includes('bg-brilliant'))
+        .map((button) => button.textContent)
+
+    expect(lit()).toEqual(['c6'])
+
+    rerender(
+      <MoveList
+        pairs={pairMoves([move(0, 'e4'), move(1, 'd5')])}
+        cursor={0}
+        collapsedThrough={null}
+        annotation={null}
+        flaggedCount={0}
+        plyCount={2}
+        variation={{ base: 1, sans: ['c6', 'd4'], cursor: 2 }}
+        onSelectPly={vi.fn()}
+      />,
+    )
+    expect(lit()).toEqual(['d4'])
+
+    // At the head of the line the board is on the game position, so nothing in it is lit.
+    rerender(
+      <MoveList
+        pairs={pairMoves([move(0, 'e4'), move(1, 'd5')])}
+        cursor={0}
+        collapsedThrough={null}
+        annotation={null}
+        flaggedCount={0}
+        plyCount={2}
+        variation={{ base: 1, sans: ['c6', 'd4'], cursor: 0 }}
+        onSelectPly={vi.fn()}
+      />,
+    )
+    expect(lit()).toEqual([])
+  })
+
+  it('moves the cursor to the variation move that was clicked', async () => {
+    const user = userEvent.setup()
+    const { onSelectVariationMove } = renderList([move(0, 'e4'), move(1, 'd5')], {
+      cursor: 0,
+      variation: { base: 1, sans: ['c6', 'd4'], cursor: 1 },
+    })
+
+    await user.click(within(screen.getByTestId('move-variation')).getByRole('button', { name: 'd4' }))
+    expect(onSelectVariationMove).toHaveBeenCalledWith(1)
+  })
+
+  it('keeps a line off the starting position at the top of the table', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')], {
+      variation: { base: 0, sans: ['d4', 'd5'], cursor: 1 },
+    })
+    const line = screen.getByTestId('move-variation')
+    expect(line).toHaveTextContent('(1.d4d5)')
+    // There is no move it can hang under, so it leads the list rather than vanishing.
+    expect(
+      line.compareDocumentPosition(screen.getByText('e4')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('leaves the PGN affordance out when there is nothing to copy', () => {

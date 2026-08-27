@@ -685,6 +685,66 @@ describe('GamePage', () => {
     expect(screen.getByText('analysis +4')).toBeInTheDocument()
   })
 
+  it('walks into a clicked engine line and keeps the rest of it to step through', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    // The position the blunder was played from: the run's line here is 1…c6 2.d4.
+    await user.keyboard('j')
+
+    // Clicking its *first* move puts the board one move in — and keeps the second.
+    const panel = () => within(screen.getByTestId('maia-panel'))
+    await user.click(panel().getByRole('button', { name: 'c6' }))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+
+    // The line is in the move table, under move 1 — the move it branched from — with the
+    // move the board is standing on lit and the rest of it still there.
+    const variation = () => within(screen.getByTestId('move-variation'))
+    expect(screen.getByTestId('move-variation')).toHaveTextContent('(1…c62.d4)')
+    expect(variation().getByRole('button', { name: 'c6' }).className).toContain('bg-brilliant')
+    expect(variation().getByRole('button', { name: 'd4' }).className).not.toContain('bg-brilliant')
+
+    // The wheel over the board now walks the line rather than the game: forwards is the
+    // rest of the line, and nothing about the game cursor moves.
+    fireEvent.wheel(screen.getByTestId('board'), { deltaY: 120 })
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+    expect(variation().getByRole('button', { name: 'd4' }).className).toContain('bg-brilliant')
+    // …and the line ends there: it cannot be wheeled past its own last move.
+    fireEvent.wheel(screen.getByTestId('board'), { deltaY: 120 })
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+
+    // Clicking a move of the line is the same walk by hand.
+    await user.click(variation().getByRole('button', { name: 'c6' }))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+  })
+
+  it('steps back out of the line at its head, onto the game position it left', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'd4' }))
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+
+    // Back through the line, move by move, to the position it branched from — where the
+    // line is still on screen, waiting to be walked again.
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByText('analysis +0')).toBeInTheDocument()
+    expect(screen.getByTestId('move-variation')).toBeInTheDocument()
+
+    // One more step back leaves it: the board is on the game, and the line is gone.
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+    expect(screen.queryByTestId('move-variation')).not.toBeInTheDocument()
+
+    // …and the game's own transport works again from there.
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByText('ply 2 / 4')).toBeInTheDocument()
+  })
+
   it('hides the human column entirely where the deployment has no Maia to ask', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', stubFetch({}, { maiaStatus: 409 }))

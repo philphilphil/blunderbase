@@ -43,6 +43,38 @@ describe('buildAnalysisLine', () => {
     expect(analysis?.moves).toEqual(['c7c6'])
   })
 
+  it('keeps the whole line but stops the board at the cursor', () => {
+    const analysis = buildAnalysisLine(line, 1, ['c7c6', 'd2d4', 'g8f6'], 1)
+    // The line is kept whole — that is what there is left to walk into.
+    expect(analysis?.sans).toEqual(['c6', 'd4', 'Nf6'])
+    expect(analysis?.cursor).toBe(1)
+    // …while everything the board reads is taken one move in.
+    expect(analysis?.ply).toBe(2)
+    expect(analysis?.lastMove).toBe('c7c6')
+    expect(analysis?.position.turn).toBe('white')
+    expect(analysis?.dests.get('d2')).toContain('d4')
+  })
+
+  it('is the position it branched from at cursor 0, with the line still there', () => {
+    const analysis = buildAnalysisLine(line, 1, ['c7c6', 'd2d4'], 0)
+    expect(analysis?.moves).toEqual(['c7c6', 'd2d4'])
+    expect(analysis?.cursor).toBe(0)
+    expect(analysis?.position.fen).toBe(line.positions[1].fen)
+    expect(analysis?.ply).toBe(1)
+    expect(analysis?.lastMove).toBeNull()
+  })
+
+  it('clamps the cursor to the moves that actually replayed', () => {
+    // The tail is illegal here, so a cursor asking for it lands on the last real position
+    // rather than past the end of the line.
+    const past = buildAnalysisLine(line, 1, ['c7c6', 'e2e4'], 2)
+    expect(past?.moves).toEqual(['c7c6'])
+    expect(past?.cursor).toBe(1)
+    expect(past?.ply).toBe(2)
+
+    expect(buildAnalysisLine(line, 1, ['c7c6'], -3)?.cursor).toBe(0)
+  })
+
   it('never mutates the replayed game it branches from', () => {
     const before = line.positions[1].fen
     buildAnalysisLine(line, 1, ['c7c6', 'd2d4'])
@@ -58,6 +90,13 @@ describe('withBoardMove', () => {
   it('appends a legal board move to the line', () => {
     const analysis = buildAnalysisLine(line, 1, [])!
     expect(withBoardMove(analysis, 'c7', 'c6')).toEqual(['c7c6'])
+  })
+
+  it('truncates the line at the cursor before appending', () => {
+    // Standing after 1…c6, with 2.d4 still ahead in the line: dragging a piece is a new
+    // continuation from here, so what the line said next goes.
+    const analysis = buildAnalysisLine(line, 1, ['c7c6', 'd2d4'], 1)!
+    expect(withBoardMove(analysis, 'g1', 'f3')).toEqual(['c7c6', 'g1f3'])
   })
 
   it('refuses a move the position does not allow', () => {

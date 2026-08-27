@@ -50,6 +50,12 @@ export interface BoardPanelProps {
   onHintsChange: (hints: boolean) => void
   onFlip: () => void
   onSeek: (cursor: number) => void
+  /**
+   * One move forwards or back from wherever the board stands. Inside an analysis line that
+   * is a step along the line rather than along the game, which the page decides — the wheel
+   * only says which way. Without it, a step is a plain seek.
+   */
+  onStep?: (delta: number) => void
   /** The newest finished deep run over this game, if there is one. */
   deepRun: GameRunSummary | null
   /** A run over this game that is queued or running right now. */
@@ -98,6 +104,7 @@ export function BoardPanel({
   onHintsChange,
   onFlip,
   onSeek,
+  onStep,
   deepRun,
   deepActiveRun,
   deepProgress,
@@ -145,9 +152,9 @@ export function BoardPanel({
   // listener cannot stop the page from scrolling underneath the gesture.
   const column = useRef<HTMLDivElement>(null)
   // The listener is bound once, so the current cursor lives behind a ref (as in `Board`).
-  const seeking = useRef({ cursor, onSeek })
+  const seeking = useRef({ cursor, onSeek, onStep })
   useEffect(() => {
-    seeking.current = { cursor, onSeek }
+    seeking.current = { cursor, onSeek, onStep }
   })
   const travel = useRef(0)
 
@@ -168,15 +175,21 @@ export function BoardPanel({
       if (Math.abs(travel.current) < WHEEL_STEP) return
       const step = travel.current > 0 ? 1 : -1
       travel.current = 0
-      seeking.current.onSeek(seeking.current.cursor + step)
+      const { onStep: stepBy, onSeek: seek, cursor: at } = seeking.current
+      if (stepBy) stepBy(step)
+      else seek(at + step)
     }
     node.addEventListener('wheel', onWheel, { passive: false })
     return () => node.removeEventListener('wheel', onWheel)
   }, [])
 
   // Off the game line the board shows the analysis line's own position, and its last move
-  // is the one the reader just played rather than the game's.
-  const exploring = (analysis?.moves.length ?? 0) > 0
+  // is the one the reader just played rather than the game's. At the head of a line — walked
+  // all the way back — the two are the same position, and the game's own last-move highlight
+  // is the better one to keep, so only the moves actually on the board count as exploring.
+  // The line itself is still there, which is what the exit affordance is about.
+  const inLine = (analysis?.moves.length ?? 0) > 0
+  const exploring = (analysis?.cursor ?? 0) > 0
   const shown = exploring && analysis ? analysis.position : position
 
   // chessground needs the legal destinations to accept a drag, and `Board` has no prop for
@@ -270,7 +283,7 @@ export function BoardPanel({
           onRequest={onRequestDeep}
         />
 
-        {exploring && onExitAnalysis ? (
+        {inLine && onExitAnalysis ? (
           <button
             type="button"
             onClick={onExitAnalysis}
@@ -284,8 +297,8 @@ export function BoardPanel({
 
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] tabular text-dim">
-          {exploring && analysis
-            ? `analysis +${analysis.moves.length}`
+          {inLine && analysis
+            ? `analysis +${analysis.cursor}`
             : `ply ${cursor + 1} / ${plyCount}`}
         </span>
         <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink">

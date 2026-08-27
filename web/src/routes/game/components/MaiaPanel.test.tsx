@@ -142,7 +142,7 @@ describe('MaiaPanel', () => {
     expect(panel).toHaveTextContent('No engine lines for this position.')
   })
 
-  it('shows the whole stored line, and plays a move off it', async () => {
+  it('shows the whole stored line, and hands it over whole with the move that was clicked', async () => {
     const onPlayLine = vi.fn()
     render(
       <MaiaPanel
@@ -159,9 +159,23 @@ describe('MaiaPanel', () => {
     expect(screen.queryByRole('button', { name: 'Show the line' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'd4' })).toBeInTheDocument()
 
-    // Clicking the second move plays the line up to it onto the analysis board.
+    // Clicking the second move is an entry point, not a cut: the whole line goes over, with
+    // the index the reader asked for, so the page keeps the tail to walk into.
     await userEvent.click(screen.getByRole('button', { name: 'd4' }))
-    expect(onPlayLine).toHaveBeenLastCalledWith(['c7c6', 'd2d4'])
+    expect(onPlayLine).toHaveBeenLastCalledWith(['c7c6', 'd2d4', 'd7d5'], 1)
+
+    await userEvent.click(screen.getByRole('button', { name: 'c6' }))
+    expect(onPlayLine).toHaveBeenLastCalledWith(['c7c6', 'd2d4', 'd7d5'], 0)
+  })
+
+  it('hands a human row over as a one-move line', async () => {
+    const onPlayLine = vi.fn()
+    render(
+      <MaiaPanel rating="1700" human={HUMAN} engine={[]} ply={1} onPlayLine={onPlayLine} />,
+    )
+
+    await userEvent.click(screen.getByTestId('maia-played-row'))
+    expect(onPlayLine).toHaveBeenLastCalledWith(['d7d5'], 0)
   })
 
   it('offers the pointed-at line’s first move for the board, and clears it on leaving', async () => {
@@ -232,8 +246,10 @@ describe('MaiaPanel', () => {
     const rollout = screen.getByTestId('maia-rollout')
     expect(rollout).toHaveTextContent('90%')
 
+    // The whole rollout goes over, with the clicked index: the board lands after exd5 and
+    // the rest of the continuation is still there to step through.
     await userEvent.click(within(rollout).getByRole('button', { name: 'exd5' }))
-    expect(onPlayLine).toHaveBeenLastCalledWith(['d7d5', 'e4d5'])
+    expect(onPlayLine).toHaveBeenLastCalledWith(['d7d5', 'e4d5'], 1)
   })
 
   it('holds the card while a live query is in flight, rather than blinking out', () => {

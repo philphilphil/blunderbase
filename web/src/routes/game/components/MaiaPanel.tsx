@@ -45,8 +45,12 @@ export interface MaiaPanelProps {
   live?: MaiaLiveState | null
   /** Pointing at a row previews its move on the board; leaving clears it. */
   onHoverMove?: (uci: string | null) => void
-  /** Play these moves (from the position on the board) onto the analysis board. */
-  onPlayLine?: (ucis: string[]) => void
+  /**
+   * Walk into a line from the position on the board: the *whole* line in UCI, and which of
+   * its moves was clicked (0-based). The page puts the board just after that move and keeps
+   * the rest of the line to step through, so a click is an entry point rather than a cut.
+   */
+  onPlayLine?: (ucis: string[], index: number) => void
   className?: string
 }
 
@@ -114,7 +118,7 @@ export function MaiaPanel({
                     key={move.uci}
                     move={move}
                     onHoverMove={onHoverMove}
-                    onPlay={onPlayLine ? () => onPlayLine([move.uci]) : undefined}
+                    onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
                   />
                 ))}
               </div>
@@ -257,8 +261,8 @@ function HumanRow({
 }
 
 /**
- * One engine line: its eval, then the whole variation, wrapped. Clicking the Nth move plays
- * the line up to it onto the analysis board.
+ * One engine line: its eval, then the whole variation, wrapped. Clicking the Nth move puts
+ * the analysis board just after it, with the rest of the line kept to walk through.
  *
  * A played move is only drawn in its own colour when the engine had something against it:
  * playing the top line is not a warning, and `best` is a compliment, so only the flagged
@@ -273,7 +277,7 @@ function EngineRow({
   line: EngineLineView
   ply: number
   onHoverMove?: (uci: string | null) => void
-  onPlayLine?: (ucis: string[]) => void
+  onPlayLine?: (ucis: string[], index: number) => void
 }) {
   const verdict = line.played && isFlagged(line.classification) ? glyphStyle(line.classification) : null
 
@@ -309,7 +313,7 @@ function EngineRow({
                 san={san}
                 // The verdict belongs to the move that was played, which is the first one.
                 className={index === 0 ? verdict?.textClass : undefined}
-                onPlay={onPlayLine ? () => onPlayLine(line.pv.slice(0, index + 1)) : undefined}
+                onPlay={onPlayLine ? () => onPlayLine(line.pv, index) : undefined}
               />
             </span>
           ))
@@ -334,8 +338,8 @@ function EngineRow({
 
 /**
  * The rollout: what two humans at this level would most likely play from here. Clicking a
- * move plays the line up to it onto the analysis board, which re-queries from there — the
- * line is a suggestion to walk into, not a verdict.
+ * move puts the analysis board just after it and keeps the rest to walk, re-querying from
+ * wherever the board stands — the line is a suggestion to walk into, not a verdict.
  */
 function Rollout({
   rollout,
@@ -344,7 +348,7 @@ function Rollout({
 }: {
   rollout: MaiaMove[]
   ply: number
-  onPlayLine?: (ucis: string[]) => void
+  onPlayLine?: (ucis: string[], index: number) => void
 }) {
   return (
     <div
@@ -362,7 +366,7 @@ function Rollout({
               san={move.san}
               onPlay={
                 onPlayLine
-                  ? () => onPlayLine(rollout.slice(0, index + 1).map((step) => step.uci))
+                  ? () => onPlayLine(rollout.map((step) => step.uci), index)
                   : undefined
               }
             />

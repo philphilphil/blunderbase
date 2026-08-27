@@ -20,6 +20,20 @@ export interface MoveAnnotation {
 
 export type MoveTab = 'moves' | 'flagged'
 
+/**
+ * The analysis line the reader is walking, drawn inline under the move it hangs off. Only
+ * the active branch is ever here: the game carries one line, and this is the one detour off
+ * it, not a tree.
+ */
+export interface MoveVariation {
+  /** The number of game plies the line branches from — its first move is ply `base`. */
+  base: number
+  /** The line in SAN, whole, however far into it the board currently is. */
+  sans: string[]
+  /** How many of its moves are on the board; `0` is the position it branched from. */
+  cursor: number
+}
+
 export interface MoveListProps {
   pairs: MovePair[]
   /** The ply last played; `-1` for the starting position. */
@@ -31,6 +45,10 @@ export interface MoveListProps {
   plyCount: number
   /** The game as PGN, for the tab row's export affordance. Built by `../pgn`. */
   pgn?: string
+  /** The analysis line to draw inline, or null while the board is on the game. */
+  variation?: MoveVariation | null
+  /** Put the board after the `index`-th move of the variation (0-based). */
+  onSelectVariationMove?: (index: number) => void
   onSelectPly: (ply: number) => void
   className?: string
 }
@@ -39,6 +57,9 @@ export interface MoveListProps {
  * The paired move table from design 1a: a number column and two move cells, glyph badges
  * on anything the engine flagged, the opening folded behind a "moves 1–18 collapsed" rule,
  * and the moves after the cursor dimmed so the eye stops where the board is.
+ *
+ * A clicked engine line or Maia rollout is drawn inline as an indented variation under the
+ * move it branches from, walkable move by move (`variation`).
  *
  * The design's tab row is `Moves / Variations / Book`, with `PGN` pinned right. `PGN` is
  * here; the other two are not, and are not a matter of layout. A game carries one line —
@@ -57,6 +78,8 @@ export function MoveList({
   flaggedCount,
   plyCount,
   pgn,
+  variation,
+  onSelectVariationMove,
   onSelectPly,
   className,
 }: MoveListProps) {
@@ -77,6 +100,16 @@ export function MoveList({
     return !folded || pair.moveNumber > collapsedThrough!
   })
 
+  // The variation hangs off the move that produced the position it left from — ply
+  // `base - 1`. A line off the starting position has no such move, and a line whose move is
+  // filtered away by the fold or the `Flagged` tab has none on screen; either way it goes to
+  // the top of the list rather than disappearing with its anchor.
+  const anchor = variation && variation.base > 0 ? Math.floor((variation.base - 1) / 2) + 1 : null
+  const orphaned = !!variation && !rows.some((pair) => pair.moveNumber === anchor)
+  const variationRow = variation ? (
+    <Variation variation={variation} onSelectMove={onSelectVariationMove} />
+  ) : null
+
   // Keep the cursor's row in view *inside this box*. `scrollIntoView` would do it by
   // scrolling every scrollable ancestor as well — on this page that means the studio's own
   // columns and the window, so stepping through a game dragged the whole screen about.
@@ -89,7 +122,9 @@ export function MoveList({
     const bottom = top + row.offsetHeight
     if (top < box.scrollTop) box.scrollTop = top
     else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight
-  }, [cursor, tab])
+    // Walking a variation moves nothing in the table, but the row it hangs off — which is
+    // the row it is drawn under — is what has to stay in view while it does.
+  }, [cursor, tab, variation?.cursor, variation?.sans.length])
 
   return (
     <div className={cn('flex min-h-0 flex-col', className)}>
@@ -134,6 +169,7 @@ export function MoveList({
         ) : null}
 
         <div className="flex flex-col px-1.5 font-mono text-[0.78125rem]">
+          {orphaned ? variationRow : null}
           {rows.map((pair) => {
             const isActivePair =
               pair.white?.ply === cursor || pair.black?.ply === cursor
@@ -162,6 +198,7 @@ export function MoveList({
                   <MoveCell move={pair.black} cursor={cursor} onSelectPly={onSelectPly} />
                 </div>
                 {annotated && annotation ? <Annotation annotation={annotation} /> : null}
+                {!orphaned && pair.moveNumber === anchor ? variationRow : null}
               </div>
             )
           })}
@@ -248,6 +285,63 @@ function MoveCell({
       <span className="truncate">{move.san}</span>
       <ClassificationBadge classification={move.classification} size="md" />
     </button>
+  )
+}
+
+/**
+ * The analysis line, indented under the move it branches from and parenthesised the way a
+ * variation is written on paper. Every move is a click that puts the board after it, and the
+ * one the board is on is lit — walking the line with the wheel or the arrow keys moves this
+ * mark along, which is the whole point of keeping the line rather than the position.
+ */
+function Variation({
+  variation,
+  onSelectMove,
+}: {
+  variation: MoveVariation
+  onSelectMove?: (index: number) => void
+}) {
+  return (
+    <div
+      data-testid="move-variation"
+      className="flex gap-2 py-1 pl-[2.625rem] pr-2 font-mono text-[0.6875rem] leading-[1.5]"
+    >
+      <div className="w-0.5 flex-none rounded-sm bg-brilliant opacity-40" />
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-0.5">
+        <span className="text-faint">(</span>
+        {variation.sans.map((san, index) => {
+          const ply = variation.base + index
+          const active = variation.cursor === index + 1
+          return (
+            <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
+              {ply % 2 === 0 || index === 0 ? (
+                <span className="tabular text-faint">
+                  {Math.floor(ply / 2) + 1}
+                  {ply % 2 === 0 ? '.' : '…'}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                disabled={!onSelectMove}
+                onClick={() => onSelectMove?.(index)}
+                title={`${plyLabel(ply)}${san} — analysis`}
+                className={cn(
+                  'rounded-[0.1875rem] px-0.5',
+                  active
+                    ? 'bg-brilliant/15 text-bright'
+                    : onSelectMove
+                      ? 'text-soft-2 hover:text-ink'
+                      : 'text-soft-2',
+                )}
+              >
+                {san}
+              </button>
+            </span>
+          )
+        })}
+        <span className="text-faint">)</span>
+      </div>
+    </div>
   )
 }
 

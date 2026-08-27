@@ -217,6 +217,20 @@ describe('BoardPanel wheel', () => {
     expect(onSeek).toHaveBeenNthCalledWith(3, 2)
   })
 
+  it('hands the step to the page where it has one, rather than seeking the game', () => {
+    // Inside an analysis line a step is a step along the *line*, which only the page knows
+    // how to take — the wheel says which way and nothing else.
+    const onStep = vi.fn()
+    const { onSeek } = renderPanel({ cursor: 1, onStep })
+    const board = screen.getByTestId('board')
+
+    fireEvent.wheel(board, { deltaY: 120 })
+    expect(onStep).toHaveBeenLastCalledWith(1)
+    fireEvent.wheel(board, { deltaY: -120 })
+    expect(onStep).toHaveBeenLastCalledWith(-1)
+    expect(onSeek).not.toHaveBeenCalled()
+  })
+
   it('leaves a pinch-zoom alone', () => {
     const { onSeek } = renderPanel({ cursor: 1 })
     expect(fireEvent.wheel(screen.getByTestId('board'), { deltaY: 120, ctrlKey: true })).toBe(
