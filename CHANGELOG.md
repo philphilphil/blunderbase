@@ -4,6 +4,11 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.2.1 — 2026-08-27
+
+- fixed the server drowning when a remote engine works through a big batch: the games table and dashboard read each game's card (eval curve, worst moments) as stored rows now, written when its analysis finishes, instead of recomputing them from every evaluation on every view — after upgrading, `blunderbase db rebuild-cards` fills them in once for an already-analysed library
+- the queue widget coalesces its refreshes during a batch instead of asking several times a second, and still ticks once a second
+
 ## v0.2.0 — 2026-08-27
 
 - fixed the server melting down when many analyses run at once (runner write storm, UI refetch storm, uncompressed transfers holding connections, stats re-scanned every few seconds)
