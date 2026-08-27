@@ -50,23 +50,35 @@ const FLUSH_MS = 200
 /**
  * How long an expensive read gets to itself after being refetched, by query root.
  *
- * 200ms is the right window for a cheap key, and much too short for these four: `['games']`
+ * 200ms is the right window for a cheap key, and much too short for these: `['games']`
  * sends every loaded page of the infinite `/games?cards=true` query *and* every saved-filter
- * badge count back out at once, and a batch of sixty analyses produces bursts for minutes.
+ * badge count back out at once, and `['analysis']` is the queued/running/done lifecycle of a
+ * batch of sixty analyses, which produces bursts for minutes.
+ *
  * A key inside its cooldown is not dropped — it is held and flushed on the trailing edge, so
  * the state after the last event of a burst is always the one that ends up on screen.
  *
  * Only the whole-prefix key waits. `['games', 'detail', 7]` is one row, a note landing on it
  * is rare, and it should stay instant. `imports()` is spelled `['import']`, hence the key.
+ * `queue()` is the one deliberate exception to "whole-prefix key only": it is not a root, but
+ * `analysis.progress` fires once per analysed ply — many times a second during a batch — so it
+ * gets its own entry rather than joining `['analysis']`, which would need to cool every key
+ * under it (`runs()`, `run()`, …) to avoid dragging a single game's own analysis along.
  */
 const COOLDOWN_MS: Record<string, number> = {
   games: 3_000,
   stats: 3_000,
   explorer: 3_000,
   import: 3_000,
+  analysis: 1_000,
 }
 
+/** Cooldowns for specific keys that are not a whole-prefix root — see `queue()` above. */
+const EXACT_COOLDOWN_MS = new Map<string, number>([[JSON.stringify(queryKeys.queue()), 1_000]])
+
 function cooldownFor(key: QueryKey): number {
+  const exact = EXACT_COOLDOWN_MS.get(JSON.stringify(key))
+  if (exact !== undefined) return exact
   if (key.length !== 1) return 0
   return COOLDOWN_MS[String(key[0])] ?? 0
 }

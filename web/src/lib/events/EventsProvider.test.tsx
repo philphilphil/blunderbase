@@ -151,19 +151,64 @@ describe('EventsProvider', () => {
 
   it('leaves a cheap key on the 200ms batch — no cooldown between bursts', async () => {
     vi.useFakeTimers()
-    const queryFn = vi.fn(async () => 'the queue')
-    const socket = renderProbe(queryFn, queryKeys.queue())
+    const queryFn = vi.fn(async () => 'the runners')
+    const socket = renderProbe(queryFn, queryKeys.runners())
     await act(() => vi.advanceTimersByTimeAsync(0))
     socket().open()
 
-    const progress = { event: 'analysis.progress', run_id: 9, game_id: 4, status: 'running' }
-    for (const ply of [1, 2, 3]) {
-      socket().receive({ ...progress, done: ply, total: 40 })
+    const updated = { event: 'runner.updated', runner_id: 1, name: 'gpu-1', slots: 4 }
+    for (const busy of [1, 2, 3]) {
+      socket().receive({ ...updated, busy, connected: true })
       await act(() => vi.advanceTimersByTimeAsync(1_000))
     }
 
     // One per window rather than one per frame, and no window skipped.
     expect(queryFn).toHaveBeenCalledTimes(4)
+  })
+
+  it('holds the analysis queue to one refetch per cooldown, and one more after the burst', async () => {
+    vi.useFakeTimers()
+    const queryFn = vi.fn(async () => 'the queue')
+    const socket = renderProbe(queryFn, queryKeys.queue())
+    await act(() => vi.advanceTimersByTimeAsync(0))
+    socket().open()
+    expect(queryFn).toHaveBeenCalledTimes(1)
+
+    // A batch in flight: a `progress` frame every 100ms, well inside the 1s cooldown.
+    const progress = { event: 'analysis.progress', run_id: 9, game_id: 4, status: 'running' }
+    for (let ply = 0; ply < 5; ply += 1) {
+      socket().receive({ ...progress, done: ply, total: 40 })
+      await act(() => vi.advanceTimersByTimeAsync(100))
+    }
+    // The first window went straight out (the leading edge); the rest are held.
+    expect(queryFn).toHaveBeenCalledTimes(2)
+
+    // Nothing is dropped: the state after the last frame is fetched on the trailing edge —
+    // once, not once per frame that arrived while the cooldown was running.
+    await act(() => vi.advanceTimersByTimeAsync(1_000))
+    expect(queryFn).toHaveBeenCalledTimes(3)
+    await act(() => vi.advanceTimersByTimeAsync(30_000))
+    expect(queryFn).toHaveBeenCalledTimes(3)
+  })
+
+  it("leaves a game's own analysis runs alone during a queue burst", async () => {
+    vi.useFakeTimers()
+    const queryFn = vi.fn(async () => 'the runs')
+    const socket = renderProbe(queryFn, queryKeys.runs(4, 'quick'))
+    await act(() => vi.advanceTimersByTimeAsync(0))
+    socket().open()
+    expect(queryFn).toHaveBeenCalledTimes(1)
+
+    const progress = { event: 'analysis.progress', run_id: 9, game_id: 4, status: 'running' }
+    for (let ply = 0; ply < 5; ply += 1) {
+      socket().receive({ ...progress, done: ply, total: 40 })
+      await act(() => vi.advanceTimersByTimeAsync(100))
+    }
+    await act(() => vi.advanceTimersByTimeAsync(5_000))
+
+    // `analysis.progress` only ever touches the queue key — a detail key under the same
+    // root is not swept along, cooled or not.
+    expect(queryFn).toHaveBeenCalledTimes(1)
   })
 
   it('reconnects on any other close, which is the backend going away', async () => {
