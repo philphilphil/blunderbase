@@ -49,10 +49,20 @@ export interface ErrorBody {
 
 // --- auth -----------------------------------------------------------------
 
-/** What every `/auth` route answers with: is there a password, and do I have it. */
+/**
+ * What every `/auth` route answers with: is there a password, and do I have it.
+ *
+ * It doubles as the app's bootstrap payload — it is the one call made before anything
+ * renders — so the deployment-wide Maia target elo rides along on it rather than on a
+ * settings endpoint of its own. Optional: a backend that does not publish one (or an
+ * older one that does not know the field) leaves it out, and everything Maia falls back
+ * to the rating the game was played at.
+ */
 export interface AuthStatus {
   setup_required: boolean
   authenticated: boolean
+  /** `config.maia_target_elo` — the one level batch and live Maia are pinned to. */
+  maia_target_elo?: number | null
 }
 
 // --- games ----------------------------------------------------------------
@@ -132,6 +142,43 @@ export interface EngineLine extends Extra {
 export interface MaiaPolicy extends Extra {
   /** rating band -> predicted moves; the exact shape is the engine adapter's. */
   [key: string]: unknown
+}
+
+// --- live Maia (`POST /maia/policy`) --------------------------------------
+
+/** One move the human model offers, as both the stored blob and the live endpoint write it. */
+export interface MaiaPolicyMove {
+  uci: string
+  san?: string | null
+  rank?: number | null
+  /** The policy share, 0..1. Omitted where the build publishes no figure. */
+  p?: number | null
+}
+
+export interface MaiaPolicyRequest {
+  fen: string
+  /** Defaults to `config.maia_target_elo`, then to the owner's rating. */
+  elo?: number | null
+  /** Maximum policy entries; defaults to the batch pass's `MAIA_POLICY_MOVES`. */
+  moves?: number | null
+  /** 0 or absent asks for no rollout. */
+  rollout_plies?: number | null
+}
+
+/**
+ * `409` means no backend-local Maia is available; the caller hides its live section
+ * rather than reporting an error (see `useLiveMaia`).
+ */
+export interface MaiaPolicyResponse extends Extra {
+  /**
+   * The level actually used — the clamped request, or a fixed-weights engine's own level
+   * where its weights name one. Null where such an engine never says which human it is,
+   * and the panel then shows no number rather than one the engine did not honour.
+   */
+  elo: number | null
+  policy: MaiaPolicyMove[]
+  /** The most likely continuation, both sides conditioned at `elo`. Absent when not asked for. */
+  rollout?: MaiaPolicyMove[] | null
 }
 
 export interface MoveRow extends Extra {

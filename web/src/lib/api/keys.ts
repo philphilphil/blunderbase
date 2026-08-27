@@ -90,5 +90,15 @@ export const queryKeys = {
   note: (id: number): QueryKey => ['notes', 'detail', id],
   noteTags: (): QueryKey => ['notes', 'tags'],
 
+  maia: (): QueryKey => ['maia'],
+  /** One entry per position/level, so stepping back into a line is instant. */
+  maiaPolicy: (fen: string, elo: number | null, rolloutPlies: number): QueryKey => [
+    'maia',
+    'policy',
+    fen,
+    elo,
+    rolloutPlies,
+  ],
+
   live: (): QueryKey => ['live'],
 } as const

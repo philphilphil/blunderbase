@@ -11,7 +11,9 @@ import {
   evalCurve,
   formatResult,
   formatVariation,
+  humanMoves,
   maiaLevels,
+  maiaLive,
   nextFlaggedPly,
   pairMoves,
   plyLabel,
@@ -286,6 +288,115 @@ describe('maiaLevels', () => {
     expect(preferredLevel(levels, 1650)?.rating).toBe('1700')
     expect(preferredLevel(levels, 1400)?.rating).toBe('1500')
     expect(preferredLevel([], 1500)).toBeNull()
+  })
+
+  it('prefers the configured target elo where the run was pinned to it', () => {
+    const levels = maiaLevels(policy)
+    // The game was played at 1400, but the deployment analyses at 1700 and the blob has
+    // exactly that key — the panel speaks for the target, not for the old rating.
+    expect(preferredLevel(levels, 1400, 1700)?.rating).toBe('1700')
+  })
+
+  it('falls back to the game’s rating for a legacy run that has no such level', () => {
+    const legacy = maiaLevels({
+      '1300': [{ uci: 'f6e4', san: 'Nxe4', rank: 1, p: 0.3 }],
+      '1500': [{ uci: 'f8e8', san: 'Rfe8', rank: 1, p: 0.4 }],
+    })
+    expect(preferredLevel(legacy, 1450, 1700)?.rating).toBe('1500')
+    // And with neither a target nor a rating, the middle band — unchanged behaviour.
+    expect(preferredLevel(legacy, null, null)?.rating).toBe('1500')
+  })
+})
+
+describe('maiaLive', () => {
+  it('reads the live endpoint into the same shape the stored blob produces', () => {
+    const view = maiaLive({
+      elo: 1700,
+      policy: [
+        { uci: 'g8f6', san: 'Nf6', rank: 1, p: 0.41 },
+        { uci: 'b8c6', san: 'Nc6', rank: 2, p: 0.2 },
+      ],
+      rollout: [
+        { uci: 'g8f6', san: 'Nf6', p: 0.41 },
+        { uci: 'd2d4', san: 'd4', p: 0.33 },
+      ],
+    })
+    expect(view?.level.rating).toBe('1700')
+    expect(view?.level.moves[0]).toEqual({ uci: 'g8f6', san: 'Nf6', rank: 1, probability: 0.41 })
+    expect(view?.rollout.map((move) => move.san)).toEqual(['Nf6', 'd4'])
+  })
+
+  it('survives a build that publishes no probabilities and no rollout', () => {
+    const view = maiaLive({ elo: 1500, policy: [{ uci: 'g8f6', san: 'Nf6' }] })
+    expect(view?.level.moves[0]).toEqual({ uci: 'g8f6', san: 'Nf6', rank: 1, probability: null })
+    expect(view?.rollout).toEqual([])
+  })
+
+  it('carries no rating where the engine that answered would not name its level', () => {
+    // A fixed-weights build whose weights nobody named: the moves are real, the level is
+    // not knowable, and the header says "Maia" rather than a number nothing honoured.
+    const view = maiaLive({ elo: null, policy: [{ uci: 'g8f6', san: 'Nf6', rank: 1, p: 0.4 }] })
+    expect(view?.level.rating).toBeNull()
+    expect(view?.level.moves).toHaveLength(1)
+  })
+
+  it('is nothing at all where there is no policy to show', () => {
+    expect(maiaLive(undefined)).toBeNull()
+    expect(maiaLive({ elo: 1700, policy: [] })).toBeNull()
+  })
+})
+
+describe('humanMoves', () => {
+  const line = buildGameLine(OPENING)
+  const blunder = move(1, 'd5', 'd7d5', {
+    classification: 'blunder',
+    win_loss: 26.3,
+    eval_after_cp: -300,
+    best_lines: [
+      { multipv: 1, cp: 40, mate: null, pv: ['c7c6', 'd2d4'] },
+      { multipv: 2, cp: 120, mate: null, pv: ['e7e6', 'd2d4'] },
+    ],
+  })
+  const level = maiaLevels({
+    '1700': [
+      { uci: 'd7d5', san: 'd5', rank: 1, p: 0.62 },
+      { uci: 'c7c6', san: 'c6', rank: 2, p: 0.2 },
+      { uci: 'e7e6', san: 'e6', rank: 3, p: 0.1 },
+      { uci: 'a7a6', san: 'a6', rank: 4, p: 0.05 },
+    ],
+  })[0]
+
+  it('marks the played move and keeps the backend’s own verdict for it', () => {
+    const rows = humanMoves(level, engineLines(line, 1, blunder), blunder)
+    expect(rows[0]).toMatchObject({
+      san: 'd5',
+      played: true,
+      classification: 'blunder',
+      loss: 26.3,
+    })
+  })
+
+  it('calls the engine’s own top line best, and prices the rest against it', () => {
+    const rows = humanMoves(level, engineLines(line, 1, blunder), blunder)
+    expect(rows[1]).toMatchObject({ san: 'c6', played: false, classification: 'best', multipv: 1 })
+    // 2…e6 is ranked but worse for Black: the score is White's, so a *higher* cp is a loss.
+    expect(rows[2].multipv).toBe(2)
+    expect(rows[2].loss).toBeGreaterThan(0)
+  })
+
+  it('says nothing about a move the engine never ranked', () => {
+    const rows = humanMoves(level, engineLines(line, 1, blunder), blunder)
+    expect(rows[3]).toMatchObject({ san: 'a6', classification: null, loss: null, multipv: null })
+  })
+
+  it('renders without an engine at all — the live column has no lines to cross', () => {
+    const rows = humanMoves(level, [], undefined)
+    expect(rows).toHaveLength(4)
+    expect(rows.every((row) => row.classification === null && !row.played)).toBe(true)
+  })
+
+  it('is empty without a level', () => {
+    expect(humanMoves(null, [], undefined)).toEqual([])
   })
 })
 

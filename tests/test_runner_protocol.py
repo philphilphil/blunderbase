@@ -188,11 +188,29 @@ def test_a_snapshot_carries_lines_in_the_shape_the_database_stores() -> None:
             multipv=4,
             owner_color=Color.BLACK,
         ),
+        _game_plan(maia_target_elo=1700),
     ],
-    ids=["a game", "a bare fen", "chess960"],
+    ids=["a game", "a bare fen", "chess960", "a maia target elo"],
 )
 def test_a_plan_comes_back_the_plan_it_was(plan: RunPlan) -> None:
     assert protocol.decode_plan(protocol.encode_plan(plan)) == plan
+
+
+def test_a_target_elo_crosses_the_wire_so_a_runner_computes_the_same_levels() -> None:
+    """A remote pass has to ask the same levels about the same plies as a local one."""
+    encoded = protocol.decode(
+        protocol.encode(protocol.encode_plan(_game_plan(maia_target_elo=1700)))
+    )
+
+    assert encoded["maia_target_elo"] == 1700
+    assert protocol.decode_plan(encoded).maia_plies() == [0, 1]
+
+
+def test_a_plan_from_a_runner_that_predates_the_target_elo_has_none() -> None:
+    older = protocol.encode_plan(_game_plan())
+    del older["maia_target_elo"]
+
+    assert protocol.decode_plan(older).maia_target_elo is None
 
 
 def test_a_plan_crosses_the_wire_as_json_the_runner_can_read() -> None:

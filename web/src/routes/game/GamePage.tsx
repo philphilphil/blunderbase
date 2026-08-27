@@ -4,10 +4,11 @@ import { useParams } from 'react-router-dom'
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useStreamSession } from '@/lib/analysis'
-import { useGame, useWorstMoments } from '@/lib/api/queries'
+import { useGame, useMaiaTargetElo, useWorstMoments } from '@/lib/api/queries'
 import type { MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
 
+import { buildAnalysisLine, withBoardMove } from './analysisLine'
 import { BoardPanel } from './components/BoardPanel'
 import { EnginePanel } from './components/EnginePanel'
 import { EvalGraph } from './components/EvalGraph'
@@ -24,6 +25,7 @@ import {
   evalAtCursor,
   evalCurve,
   formatGameDate,
+  humanMoves,
   maiaLevels,
   nextFlaggedPly,
   pairMoves,
@@ -41,6 +43,7 @@ import {
 import { buildPgn } from './pgn'
 import { useBoardKeys } from './useBoardKeys'
 import { useDeepAnalysis } from './useDeepAnalysis'
+import { useLiveMaia } from './useLiveMaia'
 
 /** The window `/stats/worst-moments` is asked about for the recurring-mistake card. */
 const RECURRING_DAYS = 30
@@ -79,6 +82,12 @@ function GameStudio({ gameId }: { gameId: number }) {
   const [hints, setHints] = useState(true)
   /** The first move of the engine line being pointed at, previewed on the board. */
   const [hoverMove, setHoverMove] = useState<string | null>(null)
+  /**
+   * The analysis line the reader has played off the game, if any: which game position it
+   * branched from, and the moves played since. Null is "the board is on the game", which
+   * is what keeps Maia on stored data.
+   */
+  const [branch, setBranch] = useState<{ base: number; moves: string[] } | null>(null)
 
   const detail = game.data
   const moves = useMemo<MoveRow[]>(() => detail?.moves ?? [], [detail])
@@ -90,6 +99,9 @@ function GameStudio({ gameId }: { gameId: number }) {
       // A hovered line belongs to the position it was read in: leaving that position drops
       // the preview, even where the pointer never left the row it was drawn from.
       setHoverMove(null)
+      // Any move of the game cursor — a key, the transport, a click in the move list — is a
+      // request to be back on the game, so the analysis line goes with it.
+      setBranch(null)
     },
     [plyCount],
   )
@@ -132,9 +144,67 @@ function GameStudio({ gameId }: { gameId: number }) {
   // The board's arrow is the engine's move *here*, which is the top stored line for this
   // position — not the move that happens next, and nothing at all where no run has looked.
   const engineBest = lines[0]?.firstUci ?? null
-  const maia = useMemo(
-    () => preferredLevel(maiaLevels(upcoming?.maia), detail?.game.rating),
-    [upcoming, detail],
+
+  // --- the analysis board ---------------------------------------------------
+  //
+  // The same board, one branch off the game: `buildAnalysisLine` with no moves is just the
+  // game position, and is built anyway because it also carries the legal destinations
+  // chessground needs to accept the first drag.
+  const analysis = useMemo(
+    () => buildAnalysisLine(line, branch?.base ?? boardIndex, branch?.moves ?? []),
+    [line, branch, boardIndex],
+  )
+  const exploring = (analysis?.moves.length ?? 0) > 0
+  const boardPosition = exploring && analysis ? analysis.position : position
+  const analysisPly = analysis?.ply ?? boardIndex
+
+  /**
+   * Play a line from the position on the board — an engine PV, a Maia rollout, a row.
+   *
+   * Every caller hands over a *prefix* measured from the position the board is showing,
+   * which is `analysis`, the replayed line — not `branch.moves`, the raw list it was
+   * replayed from. The two part company the moment a click lands on a move that is not
+   * legal here (a stale panel, two clicks in one batch): `buildAnalysisLine` drops the
+   * illegal tail, and appending behind that tail would wedge the board on a line no later
+   * move can extend. Building on what was actually replayed heals it on the next click.
+   */
+  const playLine = useCallback(
+    (ucis: string[]) => {
+      if (ucis.length === 0 || !analysis) return
+      setHoverMove(null)
+      setBranch({ base: analysis.base, moves: [...analysis.moves, ...ucis] })
+    },
+    [analysis],
+  )
+
+  const playMove = useCallback(
+    (orig: string, dest: string) => {
+      if (!analysis) return
+      const next = withBoardMove(analysis, orig, dest)
+      if (!next) return
+      setHoverMove(null)
+      setBranch({ base: analysis.base, moves: next })
+    },
+    [analysis],
+  )
+
+  // --- Maia -----------------------------------------------------------------
+  //
+  // One configured target elo drives everything: the batch pass pins the stored blob to it,
+  // and the live endpoint is asked at the same level, so the two columns never speak for
+  // two different humans. A deployment with none falls back to the game's own rating.
+  const targetElo = useMaiaTargetElo()
+  const stored = useMemo(
+    () => preferredLevel(maiaLevels(upcoming?.maia), detail?.game.rating, targetElo),
+    [upcoming, detail, targetElo],
+  )
+  // Positions on the game line are stored data, instant and free; only an analysis position
+  // is worth a query.
+  const live = useLiveMaia(exploring ? boardPosition.fen : null, targetElo)
+  const maia = exploring ? (live.view?.level ?? null) : stored
+  const human = useMemo(
+    () => humanMoves(maia, exploring ? [] : lines, exploring ? undefined : upcoming),
+    [maia, exploring, lines, upcoming],
   )
 
   const annotation = useMemo<MoveAnnotation | null>(() => {
@@ -186,9 +256,9 @@ function GameStudio({ gameId }: { gameId: number }) {
   // opening one per ply.
   const stream = useStreamSession({
     surface: 'game',
-    fen: position?.fen ?? null,
+    fen: boardPosition?.fen ?? null,
     gameId,
-    ply: boardIndex,
+    ply: analysisPly,
   })
 
   useBoardKeys(
@@ -229,8 +299,10 @@ function GameStudio({ gameId }: { gameId: number }) {
   const enginePanel = (
     <EnginePanel
       run={engineRun}
-      lines={lines}
-      ply={boardIndex}
+      // A stored run says nothing about a position it never saw: off the game line the box
+      // empties rather than describing the position the reader has left.
+      lines={exploring ? [] : lines}
+      ply={analysisPly}
       onHoverMove={setHoverMove}
       className={deepRun ? 'border-b border-t-0 border-hairline' : undefined}
     />
@@ -259,10 +331,16 @@ function GameStudio({ gameId }: { gameId: number }) {
           <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
           <BoardPanel
             position={position}
+            analysis={analysis}
+            onPlayMove={playMove}
+            onExitAnalysis={() => setBranch(null)}
             orientation={orientation}
             lastMove={played}
-            upcoming={upcoming}
-            engineBest={engineBest}
+            // The marks and the engine arrow are claims about a position a run has looked
+            // at; on an analysis position there is no such claim, and only Maia's own
+            // (live) arrow is left.
+            upcoming={exploring ? undefined : upcoming}
+            engineBest={exploring ? null : engineBest}
             hoverMove={hoverMove}
             maia={maia}
             win={win}
@@ -312,11 +390,27 @@ function GameStudio({ gameId }: { gameId: number }) {
           {deepRun ? null : enginePanel}
           <InfiniteAnalysisPanel
             stream={stream}
-            fen={position.fen}
-            ply={boardIndex}
+            fen={boardPosition.fen}
+            ply={analysisPly}
             onHoverMove={setHoverMove}
           />
-          {hints && maia ? <MaiaPanel level={maia} played={upcoming} /> : null}
+          {/*
+            The human column beside the engine's own, about the position on the board.
+            Off the game line it is a live query — hidden entirely where the deployment has
+            no Maia to ask (`live.unavailable`), rather than reporting a failure.
+          */}
+          {hints && !(exploring && live.unavailable) ? (
+            <MaiaPanel
+              rating={maia?.rating ?? null}
+              human={human}
+              engine={exploring ? [] : lines}
+              engineName={engineRun?.engine}
+              ply={analysisPly}
+              live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
+              onHoverMove={setHoverMove}
+              onPlayLine={playLine}
+            />
+          ) : null}
         </div>
 
         <NotesColumn

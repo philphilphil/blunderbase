@@ -261,16 +261,36 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
     assert unconfigured.get("/auth/status").json() == {
         "setup_required": True,
         "authenticated": False,
+        "maia_target_elo": None,
     }
 
     response = unconfigured.post("/auth/setup", json={"password": PASSWORD})
 
     assert response.status_code == 200
-    assert response.json() == {"setup_required": False, "authenticated": True}
+    assert response.json() == {
+        "setup_required": False,
+        "authenticated": True,
+        "maia_target_elo": None,
+    }
     assert unconfigured.get("/auth/status").json() == {
         "setup_required": False,
         "authenticated": True,
+        "maia_target_elo": None,
     }
+
+
+def test_the_status_carries_the_deployments_maia_target_elo(settings: Settings) -> None:
+    """The page has this payload before it renders anything, so the Maia panel can pick
+    the stored level nearest the target without a settings endpoint of its own."""
+    settings.analysis_workers = False
+    settings.maia_target_elo = 1700
+    with running_app(create_app(settings)) as client:
+        assert client.get("/auth/status").json()["maia_target_elo"] == 1700
+        assert client.post("/auth/login", json={"password": OWNER_PASSWORD}).json() == {
+            "setup_required": False,
+            "authenticated": True,
+            "maia_target_elo": 1700,
+        }
 
 
 def test_setup_signs_the_browser_in_on_the_spot(unconfigured: TestClient) -> None:

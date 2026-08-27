@@ -20,6 +20,7 @@ from backend.services import analysis as analysis_service
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import import_service
+from backend.services import maia_live as maia_live_service
 from backend.services import notes as notes_service
 from backend.services import runners as runners_service
 from backend.services import stats as stats_service
@@ -104,6 +105,10 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (streams_service.StreamLimitError, 409, "stream_limit"),
     (streams_service.StreamUnavailableError, 409, "stream_unavailable"),
     (streams_service.StreamRequestError, 422, "invalid_request"),
+    # 409 rather than 503: the board hides its live Maia section on it, which is a shape
+    # the deployment is in, not a failure to retry.
+    (maia_live_service.LivePolicyRequestError, 422, "invalid_request"),
+    (maia_live_service.LiveMaiaUnavailableError, 409, "maia_unavailable"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
     (stats_service.UnknownDimensionError, 422, "unknown_dimension"),
     # The two families every service layer raises for "you asked for something that is not

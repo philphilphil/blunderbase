@@ -1,99 +1,394 @@
-import type { MoveRow } from '@/lib/api/types'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+
 import { glyphStyle } from '@/lib/chess/classification'
+import { formatScore, formatWinLoss } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
-import { sameMove, type MaiaLevel } from '../gameModel'
+import type { EngineLineView, HumanMoveView, MaiaMove } from '../gameModel'
 
-const PANEL_MOVES = 3
+/** The human column's own colour — the purple `docs/design/README.md` gives Maia. */
+const MAIA_HUE = 'var(--bb-brilliant)'
 
 /**
- * The human model, as a panel under the engine's own lines: what a player of this rating
- * plays here, and how often. Purple is the Maia/deep hue throughout the app.
+ * A token colour at a fraction of its opacity, mixed rather than hex-suffixed so it stays
+ * right in both themes (the same trick `EnginePanel` uses).
+ */
+function tint(color: string, percent: number): string {
+  return `color-mix(in srgb, ${color} ${percent}%, transparent)`
+}
+
+export interface MaiaLiveState {
+  /** The most likely continuation from here, both sides at the same level. */
+  rollout: MaiaMove[]
+  /** A query is in flight for the position on the board. */
+  pending: boolean
+}
+
+export interface MaiaPanelProps {
+  /** The level the human column speaks for — a stored band, or the live engine's own. */
+  rating: string | null
+  /** The human column, already crossed with the engine's verdicts (`humanMoves`). */
+  human: HumanMoveView[]
+  /** The engine's ranking of the same position; empty off the game line. */
+  engine: EngineLineView[]
+  /** Whichever engine produced those lines. Defaults to the one the design names. */
+  engineName?: string | null
+  /** The ply the position sits at, for numbering a rollout. */
+  ply: number
+  /** Set while the board is off the game line: the panel is reading a live query. */
+  live?: MaiaLiveState | null
+  /** Pointing at a row previews its move on the board; leaving clears it. */
+  onHoverMove?: (uci: string | null) => void
+  /** Play these moves (from the position on the board) onto the analysis board. */
+  onPlayLine?: (ucis: string[]) => void
+  className?: string
+}
+
+/**
+ * What humans play here, beside what the engine plays here.
  *
- * It used to float over the board. It reads better stacked with the two engine panels —
- * the same position, three claims about it — and the board keeps its squares to itself.
+ * Neither column says much alone — "a 1700 plays Nf3, 41%" teaches nothing, and the engine
+ * list is the same list every engine ever printed. Side by side they answer the two
+ * questions the owner actually has: *was my blunder a normal human mistake* (the played
+ * move, tinted with the verdict the engine gave it, beside how many people at my level walk
+ * into it), and *what will a human actually do here* (the distribution, and the rollout of
+ * the line two humans at this level would most likely play out).
  *
- * `played` is the move actually made from this position, so the panel can colour its own
- * prediction with the verdict the engine later gave it — the "it called your move before
- * you made it" line only earns its place when the prediction was the blunder.
+ * On the game line the human column is stored data, instant. Off it, the board is an
+ * analysis board and the column is a live query — see `useLiveMaia`.
  */
 export function MaiaPanel({
-  level,
-  played,
+  rating,
+  human,
+  engine,
+  engineName,
+  ply,
+  live,
+  onHoverMove,
+  onPlayLine,
   className,
-}: {
-  level: MaiaLevel
-  played: MoveRow | undefined
-  className?: string
-}) {
-  const shown = level.moves.slice(0, PANEL_MOVES)
-  const top = shown[0]
-  if (!top) return null
+}: MaiaPanelProps) {
+  // An expansion belongs to the position it was opened in, so it is keyed by position:
+  // the next position matches no key and starts collapsed, with no effect to run.
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const keyOf = (multipv: number) => `${rating ?? ''}:${ply}:${multipv}`
 
-  const playedUci = played?.uci ?? null
-  const predictedThePlayed = playedUci !== null && sameMove(top.uci, playedUci)
-  const verdict = predictedThePlayed ? glyphStyle(played?.classification) : null
+  const rollout = live?.rollout ?? []
+  if (human.length === 0 && engine.length === 0 && !live?.pending) return null
 
   return (
     <div
       className={cn(
-        'flex flex-none flex-col gap-2 border-t border-hairline bg-panel px-3 py-2.5',
+        'flex flex-none flex-col border-t border-hairline bg-panel',
         className,
       )}
       data-testid="maia-panel"
     >
-      <div className="flex items-center gap-[0.4375rem]">
-        <span className="size-1.5 rounded-full bg-brilliant" />
-        <span className="text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-          Maia {level.rating}
-        </span>
-        <div className="flex-1" />
-        <span className="font-mono text-[0.625rem] text-faint">human model</span>
-      </div>
+      <div className="grid grid-cols-2 divide-x divide-line">
+        <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
+          <div className="flex items-center gap-[0.4375rem]">
+            <span className="size-1.5 flex-none rounded-full bg-brilliant" />
+            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+              {rating ? `Maia ${rating}` : 'Maia'}
+            </span>
+            <span className="truncate font-mono text-[0.625rem] text-faint">human</span>
+            <div className="flex-1" />
+            {live ? <LivePill pending={live.pending} /> : null}
+          </div>
 
-      <div className="text-[0.75rem] leading-[1.45] text-body-3">
-        A {level.rating} plays{' '}
-        <span className={cn('font-mono', verdict ? verdict.textClass : 'text-ink')}>{top.san}</span>{' '}
-        here
-        {top.probability !== null ? (
-          <>
-            {' — '}
-            <span className="font-mono tabular text-ink">{percent(top.probability)}</span>
-          </>
+          {human.length === 0 ? (
+            <p className="py-2 text-[0.6875rem] text-dim">
+              {live?.pending ? 'Reading this position…' : 'No human model for this position.'}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {human.map((move) => (
+                <HumanRow
+                  key={move.uci}
+                  move={move}
+                  onHoverMove={onHoverMove}
+                  onPlay={onPlayLine ? () => onPlayLine([move.uci]) : undefined}
+                />
+              ))}
+            </div>
+          )}
+
+          {live && rollout.length > 0 ? (
+            <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
+          ) : null}
+        </section>
+
+        <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
+          <div className="flex items-center gap-[0.4375rem]">
+            <span className="size-1.5 flex-none rounded-full bg-accent-teal" />
+            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+              {engineName || 'Stockfish'}
+            </span>
+            <span className="truncate font-mono text-[0.625rem] text-faint">engine</span>
+          </div>
+
+          {engine.length === 0 ? (
+            <p className="py-2 text-[0.6875rem] text-dim">
+              No stored engine lines for this position.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {engine.map((line) => (
+                <EngineRow
+                  key={`${line.multipv}-${line.firstUci ?? 'x'}`}
+                  line={line}
+                  ply={ply}
+                  open={expanded === keyOf(line.multipv)}
+                  onToggle={() =>
+                    setExpanded((current) =>
+                      current === keyOf(line.multipv) ? null : keyOf(line.multipv),
+                    )
+                  }
+                  onHoverMove={onHoverMove}
+                  onPlayLine={onPlayLine}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+/** The header affordance that says these numbers were computed just now, not stored. */
+function LivePill({ pending }: { pending: boolean }) {
+  return (
+    <span
+      data-testid="maia-live"
+      className="inline-flex flex-none items-center gap-1 rounded-sm border border-brilliant/30 bg-brilliant/10 px-1.5 py-px font-mono text-[0.59375rem] text-brilliant"
+    >
+      <span
+        className={cn('size-1 rounded-full bg-brilliant', pending && 'animate-pulse')}
+        aria-hidden
+      />
+      live
+    </span>
+  )
+}
+
+/**
+ * One human move: how often it is played, and what it costs. The SAN carries the engine's
+ * verdict where the position's stored lines have one — that colour, next to a long bar, is
+ * the whole "everybody at my level walks into this" reading.
+ */
+function HumanRow({
+  move,
+  onHoverMove,
+  onPlay,
+}: {
+  move: HumanMoveView
+  onHoverMove?: (uci: string | null) => void
+  onPlay?: () => void
+}) {
+  const verdict = glyphStyle(move.classification)
+  const hue = verdict?.color ?? MAIA_HUE
+  const share = move.probability ?? 0
+  const loss = move.loss !== null && move.loss >= 0.05 ? formatWinLoss(move.loss) : null
+
+  return (
+    <button
+      type="button"
+      data-testid={move.played ? 'maia-played-row' : 'maia-row'}
+      disabled={!onPlay}
+      onClick={onPlay}
+      onMouseEnter={() => onHoverMove?.(move.uci)}
+      onMouseLeave={() => onHoverMove?.(null)}
+      title={`Play ${move.san} on the analysis board`}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-[0.25rem] border-l-2 px-1 py-[0.1875rem] text-left',
+        move.played ? null : 'border-transparent',
+        onPlay ? 'hover:bg-raised' : 'cursor-default',
+      )}
+      style={move.played ? { borderLeftColor: hue, background: tint(hue, 7) } : undefined}
+    >
+      <span
+        className={cn(
+          'w-11 flex-none truncate font-mono text-[0.6875rem]',
+          verdict ? verdict.textClass : 'text-soft',
+        )}
+      >
+        {move.san}
+      </span>
+      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-[0.125rem] bg-track">
+        <div
+          className="h-full rounded-[0.125rem]"
+          style={{ width: `${Math.min(100, share * 100)}%`, background: hue }}
+        />
+      </div>
+      <span className="w-[1.875rem] flex-none text-right font-mono text-[0.625rem] tabular text-dim">
+        {move.probability === null ? '—' : `${Math.round(move.probability * 100)}%`}
+      </span>
+      <span
+        className={cn(
+          'w-[2.75rem] flex-none text-right font-mono text-[0.625rem] tabular',
+          verdict ? verdict.textClass : 'text-faint',
+        )}
+      >
+        {loss ?? ''}
+      </span>
+    </button>
+  )
+}
+
+/** One engine line: its eval and its first move, expandable to the stored PV. */
+function EngineRow({
+  line,
+  ply,
+  open,
+  onToggle,
+  onHoverMove,
+  onPlayLine,
+}: {
+  line: EngineLineView
+  ply: number
+  open: boolean
+  onToggle: () => void
+  onHoverMove?: (uci: string | null) => void
+  onPlayLine?: (ucis: string[]) => void
+}) {
+  const verdict = line.played ? glyphStyle(line.classification) : null
+  const rest = line.sans.length > 1
+  const Chevron = open ? ChevronDown : ChevronRight
+
+  return (
+    <div
+      onMouseEnter={() => onHoverMove?.(line.firstUci)}
+      onMouseLeave={() => onHoverMove?.(null)}
+      className="flex flex-col"
+    >
+      <div className="flex items-center gap-1.5 rounded-[0.25rem] px-1 py-[0.1875rem]">
+        <span
+          className={cn(
+            'min-w-[2.5rem] flex-none rounded-[0.1875rem] px-1 py-px text-right font-mono text-[0.625rem] tabular',
+            verdict ? '' : line.multipv === 1 ? 'bg-cell-strong text-ink-2' : 'bg-cell text-body-3',
+          )}
+          style={
+            verdict ? { background: tint(verdict.color, 13), color: verdict.color } : undefined
+          }
+        >
+          {formatScore(line.score)}
+        </span>
+        <MoveButton
+          san={line.sans[0] ?? '—'}
+          className={cn('min-w-0 flex-1 text-left', verdict?.textClass)}
+          onPlay={onPlayLine && line.pv.length > 0 ? () => onPlayLine(line.pv.slice(0, 1)) : undefined}
+        />
+        {rest ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-label={open ? 'Hide the line' : 'Show the line'}
+            className="flex-none rounded-[0.1875rem] text-dim hover:text-ink"
+          >
+            <Chevron className="size-3.5" aria-hidden />
+          </button>
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1">
-        {shown.map((move) => {
-          const isPlayed = playedUci !== null && sameMove(move.uci, playedUci)
-          const tone = isPlayed && verdict ? verdict.color : 'var(--bb-faint-2)'
-          const share = move.probability ?? 0
-          return (
-            <div key={move.uci} className="flex items-center gap-2">
-              <span className="w-11 truncate font-mono text-[0.625rem] text-soft">{move.san}</span>
-              <div className="h-1 flex-1 overflow-hidden rounded-[0.125rem] bg-track">
-                <div
-                  className="h-full rounded-[0.125rem]"
-                  style={{ width: `${Math.min(100, share * 100)}%`, background: tone }}
-                />
-              </div>
-              <span className="w-[1.625rem] text-right font-mono text-[0.625rem] tabular text-dim">
-                {move.probability === null ? '—' : Math.round(move.probability * 100)}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {predictedThePlayed ? (
-        <div className="border-t border-line pt-[0.4375rem] text-[0.6875rem] italic text-dim-2">
-          It called your move before you made it.
+      {open && rest ? (
+        <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 px-1 pb-1 pl-[3.25rem]">
+          {line.sans.map((san, index) => (
+            <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
+              <PlyNumber ply={ply + index} first={index === 0} />
+              <MoveButton
+                san={san}
+                onPlay={onPlayLine ? () => onPlayLine(line.pv.slice(0, index + 1)) : undefined}
+              />
+            </span>
+          ))}
         </div>
       ) : null}
     </div>
   )
 }
 
-function percent(probability: number): string {
-  return `${Math.round(probability * 100)}%`
+/**
+ * The rollout: what two humans at this level would most likely play from here. Clicking a
+ * move plays the line up to it onto the analysis board, which re-queries from there — the
+ * line is a suggestion to walk into, not a verdict.
+ */
+function Rollout({
+  rollout,
+  ply,
+  onPlayLine,
+}: {
+  rollout: MaiaMove[]
+  ply: number
+  onPlayLine?: (ucis: string[]) => void
+}) {
+  return (
+    <div
+      data-testid="maia-rollout"
+      className="flex flex-col gap-1 border-t border-line pt-[0.4375rem]"
+    >
+      <span className="font-mono text-[0.59375rem] uppercase tracking-[0.04em] text-faint">
+        likely continuation
+      </span>
+      <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+        {rollout.map((move, index) => (
+          <span key={`${index}-${move.uci}`} className="inline-flex items-baseline gap-1">
+            <PlyNumber ply={ply + index} first={index === 0} />
+            <MoveButton
+              san={move.san}
+              onPlay={
+                onPlayLine
+                  ? () => onPlayLine(rollout.slice(0, index + 1).map((step) => step.uci))
+                  : undefined
+              }
+            />
+            {move.probability === null ? null : (
+              <span className="font-mono text-[0.59375rem] tabular text-faint">
+                {Math.round(move.probability * 100)}%
+              </span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** `12.` for White; Black gets a number only where the line starts on it. */
+function PlyNumber({ ply, first }: { ply: number; first: boolean }) {
+  if (ply % 2 === 1 && !first) return null
+  return (
+    <span className="font-mono text-[0.59375rem] tabular text-faint">
+      {Math.floor(ply / 2) + 1}
+      {ply % 2 === 0 ? '.' : '…'}
+    </span>
+  )
+}
+
+function MoveButton({
+  san,
+  className,
+  onPlay,
+}: {
+  san: string
+  className?: string
+  onPlay?: () => void
+}) {
+  if (!onPlay) {
+    return <span className={cn('font-mono text-[0.6875rem] text-soft', className)}>{san}</span>
+  }
+  return (
+    <button
+      type="button"
+      onClick={onPlay}
+      className={cn(
+        'rounded-[0.1875rem] font-mono text-[0.6875rem] text-soft hover:text-ink hover:underline',
+        className,
+      )}
+    >
+      {san}
+    </button>
+  )
 }

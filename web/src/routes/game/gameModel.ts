@@ -24,12 +24,13 @@ import type {
   EngineLine,
   GameRunSummary,
   GameSummary,
+  MaiaPolicyResponse,
   MomentResponse,
   MoveRow,
   NoteResponse,
 } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
-import type { Score } from '@/lib/chess/evaluation'
+import { winPercent, type Score } from '@/lib/chess/evaluation'
 
 export type Side = 'white' | 'black'
 
@@ -337,6 +338,10 @@ export interface EngineLineView {
   score: Score
   /** The variation in SAN, numbered from the ply it starts on. */
   text: string
+  /** The same variation move by move — what the dual panel makes clickable. */
+  sans: string[]
+  /** Those moves in UCI, so clicking the third SAN can play the first three. */
+  pv: string[]
   /** The first move of the line, in UCI, for the board arrow. */
   firstUci: string | null
   /** Set on the row that is the move actually played from this position. */
@@ -364,13 +369,18 @@ export function engineLines(
   const verdict = move?.classification ?? null
 
   for (const candidate of move?.best_lines ?? []) {
-    const pv = candidateMoves(candidate)
+    const pv = candidateMoves(candidate).slice(0, pvLimit)
     const first = pv[0] ?? null
     const isPlayed = first !== null && played !== null && sameMove(first, played)
+    const sans = sanVariation(line, ply, pv, pvLimit)
     rows.push({
       multipv: candidate.multipv ?? rows.length + 1,
       score: { cp: candidate.cp, mate: candidate.mate },
-      text: formatVariation(ply, sanVariation(line, ply, pv, pvLimit)),
+      text: formatVariation(ply, sans),
+      sans,
+      // A PV whose tail the position rejects is truncated to what actually replayed, so a
+      // click on the last SAN can never play a move that is not there.
+      pv: pv.slice(0, sans.length),
       firstUci: first,
       played: isPlayed,
       classification: isPlayed ? verdict : null,
@@ -380,10 +390,13 @@ export function engineLines(
 
   if (played && rows.length > 0 && !rows.some((row) => row.played)) {
     const after = scoreAfter(move)
+    const sans = sanVariation(line, ply, [played], 1)
     rows.push({
       multipv: rows.length + 1,
       score: after ?? { cp: null, mate: null },
-      text: formatVariation(ply, sanVariation(line, ply, [played], 1)),
+      text: formatVariation(ply, sans),
+      sans,
+      pv: sans.length > 0 ? [played] : [],
       firstUci: played,
       played: true,
       classification: verdict,
@@ -413,9 +426,36 @@ export interface MaiaMove {
 }
 
 export interface MaiaLevel {
-  /** The rating band, as `MoveEval.maia_policy` keys it. */
-  rating: string
+  /**
+   * The rating band, as `MoveEval.maia_policy` keys it. A stored level always has one;
+   * a live one is null where the engine that answered is fixed-weights and never said
+   * which human it plays as, and the header then reads plain "Maia".
+   */
+  rating: string | null
   moves: MaiaMove[]
+}
+
+/**
+ * One list of predicted moves, however it arrived: as a value in the stored
+ * `maia_policy` blob, or as `policy`/`rollout` off `POST /maia/policy`. Both write the
+ * same `{uci, san, rank, p}` entries, and neither is typed on the wire, so both are read
+ * defensively here rather than trusted.
+ */
+export function maiaMoves(value: unknown): MaiaMove[] {
+  if (!Array.isArray(value)) return []
+  const moves: MaiaMove[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const row = entry as { uci?: unknown; san?: unknown; rank?: unknown; p?: unknown }
+    if (typeof row.uci !== 'string') continue
+    moves.push({
+      uci: row.uci,
+      san: typeof row.san === 'string' ? row.san : row.uci,
+      rank: typeof row.rank === 'number' ? row.rank : moves.length + 1,
+      probability: typeof row.p === 'number' ? row.p : null,
+    })
+  }
+  return moves
 }
 
 /** `{"1500": [...]}` as the overlay reads it: levels low to high, moves best-ranked first. */
@@ -423,19 +463,7 @@ export function maiaLevels(policy: MoveRow['maia']): MaiaLevel[] {
   if (!policy || typeof policy !== 'object') return []
   const levels: MaiaLevel[] = []
   for (const [rating, value] of Object.entries(policy)) {
-    if (!Array.isArray(value)) continue
-    const moves: MaiaMove[] = []
-    for (const entry of value) {
-      if (!entry || typeof entry !== 'object') continue
-      const row = entry as { uci?: unknown; san?: unknown; rank?: unknown; p?: unknown }
-      if (typeof row.uci !== 'string') continue
-      moves.push({
-        uci: row.uci,
-        san: typeof row.san === 'string' ? row.san : row.uci,
-        rank: typeof row.rank === 'number' ? row.rank : moves.length + 1,
-        probability: typeof row.p === 'number' ? row.p : null,
-      })
-    }
+    const moves = maiaMoves(value)
     if (moves.length === 0) continue
     moves.sort((left, right) => left.rank - right.rank)
     levels.push({ rating, moves })
@@ -443,13 +471,126 @@ export function maiaLevels(policy: MoveRow['maia']): MaiaLevel[] {
   return levels.sort((left, right) => Number(left.rating) - Number(right.rating))
 }
 
-/** The level closest to the rating the owner played this game at. */
-export function preferredLevel(levels: MaiaLevel[], rating: number | null | undefined): MaiaLevel | null {
+/**
+ * `POST /maia/policy` as the panel reads it — the same `MaiaLevel` the stored blob
+ * produces, so one column renders either, plus the rollout line.
+ */
+export interface MaiaLiveView {
+  level: MaiaLevel
+  /** The most likely continuation from here, both sides at `level.rating`. */
+  rollout: MaiaMove[]
+}
+
+export function maiaLive(response: MaiaPolicyResponse | undefined | null): MaiaLiveView | null {
+  if (!response) return null
+  const moves = maiaMoves(response.policy).sort((left, right) => left.rank - right.rank)
+  if (moves.length === 0) return null
+  return {
+    level: { rating: typeof response.elo === 'number' ? String(response.elo) : null, moves },
+    // The rollout arrives in played order; its `rank` is per-position and means nothing
+    // across plies, so it is deliberately left unsorted.
+    rollout: maiaMoves(response.rollout),
+  }
+}
+
+/**
+ * Which stored level the panel and the board arrow speak for.
+ *
+ * The configured target elo wins where the run was actually made at it — a run pinned to
+ * one level keys the blob by exactly that number. Legacy runs (levels centred on the
+ * rating the game was played at) have no such key, and fall back to the nearest level to
+ * that rating, which is what they were computed for.
+ */
+export function preferredLevel(
+  levels: MaiaLevel[],
+  rating: number | null | undefined,
+  targetElo?: number | null,
+): MaiaLevel | null {
   if (levels.length === 0) return null
+  if (targetElo !== null && targetElo !== undefined) {
+    const pinned = levels.find((level) => Number(level.rating) === targetElo)
+    if (pinned) return pinned
+  }
   if (rating === null || rating === undefined) return levels[Math.floor(levels.length / 2)] ?? null
   return levels.reduce((best, level) =>
     Math.abs(Number(level.rating) - rating) < Math.abs(Number(best.rating) - rating) ? level : best,
   )
+}
+
+/**
+ * Classification thresholds in win-percentage points, mirroring `backend/config.py`'s
+ * defaults. They colour *engine-ranked* human moves only — a guess at what the engine
+ * would have said about a move it ranked but nobody played. Wherever the backend actually
+ * stored a verdict (the played move) that verdict is used instead, so a deployment with
+ * its own thresholds never sees the two disagree about a real move.
+ */
+const LOSS_THRESHOLDS: readonly [number, Classification][] = [
+  [30, 'blunder'],
+  [20, 'mistake'],
+  [10, 'inaccuracy'],
+]
+
+/** One row of the panel's human column: what a human plays, and what it costs. */
+export interface HumanMoveView extends MaiaMove {
+  /** The move actually played from this position. */
+  played: boolean
+  /** The engine's verdict, where this position's stored lines have one. */
+  classification: Classification | null
+  /** Win percentage this move gives away against the engine's top line, where known. */
+  loss: number | null
+  /** The engine's rank for this move, where it ranked it at all. */
+  multipv: number | null
+}
+
+/**
+ * The human column, crossed with the engine's own reading of the same position — the
+ * whole point of the panel: "62% of players at your level play this, and it loses 26%".
+ *
+ * A move the engine never ranked and nobody played gets no verdict at all rather than a
+ * flattering or damning guess.
+ */
+export function humanMoves(
+  level: MaiaLevel | null,
+  lines: EngineLineView[],
+  played: MoveRow | undefined,
+): HumanMoveView[] {
+  if (!level) return []
+  const top = lines.find((row) => row.multipv === 1) ?? lines[0] ?? null
+  const playedUci = played?.uci ?? null
+  const mover: Side = played ? sideOf(played.ply) : 'white'
+  const bestWin = top ? winPercent(toWhite(top.score, mover)) : null
+
+  return level.moves.map((move) => {
+    const ranked = lines.find((row) => row.firstUci && sameMove(row.firstUci, move.uci)) ?? null
+    const isPlayed = playedUci !== null && sameMove(move.uci, playedUci)
+    // The played move's own numbers are the backend's, thresholds and all; only a move
+    // nobody played is scored off the multi-PV spread.
+    const loss = isPlayed
+      ? (played?.win_loss ?? null)
+      : ranked && bestWin !== null
+        ? Math.max(0, bestWin - winPercent(toWhite(ranked.score, mover)))
+        : null
+    const classification = isPlayed
+      ? (played?.classification ?? null)
+      : ranked
+        ? lossClassification(ranked.multipv === 1 ? 0 : loss)
+        : null
+    return {
+      ...move,
+      played: isPlayed,
+      classification,
+      loss,
+      multipv: ranked?.multipv ?? null,
+    }
+  })
+}
+
+function lossClassification(loss: number | null): Classification | null {
+  if (loss === null) return null
+  for (const [threshold, verdict] of LOSS_THRESHOLDS) {
+    if (loss >= threshold) return verdict
+  }
+  return loss <= 0 ? 'best' : 'good'
 }
 
 // --- runs -----------------------------------------------------------------

@@ -17,6 +17,7 @@ from backend.api.web import install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_sessionmaker
+from backend.services import maia_live
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers
@@ -72,6 +73,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await gateway.stop()
         app.state.gateway = None
         await workers.stop()
+        # The warm Maia the analysis board queries is a process this one started and
+        # nothing else will collect.
+        await asyncio.to_thread(maia_live.shutdown)
         events.stop()
         app.state.loop = None
 

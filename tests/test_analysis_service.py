@@ -175,6 +175,80 @@ def test_an_unrated_owner_falls_back_to_the_configured_default() -> None:
     assert analysis.maia_levels(None, (0,), default=1400) == [1400]
 
 
+def test_a_target_elo_is_the_only_level_there_is() -> None:
+    """The rating in the game and the offsets around it are exactly what it replaces."""
+    assert analysis.maia_levels(1200, (-100, 0, 100), target=1700) == [1700]
+
+
+def test_a_target_elo_is_still_clamped_to_what_the_build_declares() -> None:
+    assert analysis.maia_levels(None, (), target=1900, low=1100, high=1500) == [1500]
+    assert analysis.maia_levels(None, (), target=900) == [1100]
+
+
+def _plan(session: Session, settings: Settings, **changes: Any) -> analysis.RunPlan:
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id, settings=settings, **changes)
+    return analysis.build_plan(session, run, settings)
+
+
+def test_without_a_target_maia_is_only_asked_about_the_owners_own_moves(
+    session: Session, tmp_path: Any
+) -> None:
+    plan = _plan(session, Settings(root=tmp_path))
+
+    assert plan.maia_target_elo is None
+    # The owner has White in `_game`, so the even plies are theirs.
+    assert plan.maia_plies() == [0, 2, 4]
+
+
+def test_a_target_elo_asks_about_every_ply_of_both_sides(
+    session: Session, tmp_path: Any
+) -> None:
+    """The "what will a human opposite me fall into" half is a question about their moves."""
+    plan = _plan(session, Settings(root=tmp_path, maia_target_elo=1700))
+
+    assert plan.maia_target_elo == 1700
+    assert plan.maia_plies() == [0, 1, 2, 3, 4, 5]
+
+
+def test_a_game_with_no_owner_covers_every_ply_either_way(tmp_path: Any) -> None:
+    plan = analysis.RunPlan(
+        run_id=1,
+        tier=Tier.QUICK,
+        game_id=7,
+        fen=None,
+        variant="standard",
+        initial_fen=None,
+        moves_uci=("e2e4", "e7e5"),
+        moves_san=("e4", "e5"),
+        position_ids=(None, None, None),
+        ply_start=0,
+        ply_end=2,
+        nodes=1,
+        depth=None,
+        multipv=1,
+        thresholds=THRESHOLDS,
+    )
+    assert plan.maia_plies() == [0, 1]
+
+
+def test_a_position_run_asks_about_the_one_position_it_has(
+    session: Session, tmp_path: Any
+) -> None:
+    _engine(session)
+    settings = Settings(root=tmp_path, maia_target_elo=1700)
+    run = analysis.request_analysis(
+        session,
+        fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        settings=settings,
+    )
+    plan = analysis.build_plan(session, run, settings)
+
+    assert plan.maia_target_elo == 1700
+    assert plan.maia_plies() == [0]
+
+
 # --- enqueueing -----------------------------------------------------------
 
 

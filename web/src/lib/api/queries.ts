@@ -47,6 +47,18 @@ export function useAuthStatus(options?: Options<Awaited<ReturnType<typeof api.au
   return useQuery({ queryKey: queryKeys.auth(), queryFn: api.authStatus, ...options })
 }
 
+/**
+ * The deployment's Maia target elo, off the bootstrap payload every screen already has.
+ *
+ * `useAuthStatus` here subscribes to the query `AuthProvider` mounted rather than issuing
+ * a second one. A backend that publishes no target answers `null`, and every caller falls
+ * back to the rating the game was played at.
+ */
+export function useMaiaTargetElo(): number | null {
+  const { data } = useAuthStatus()
+  return typeof data?.maia_target_elo === 'number' ? data.maia_target_elo : null
+}
+
 function useAuthMutation<Variables>(
   mutationFn: (variables: Variables) => Promise<AuthStatus>,
   options?: UseMutationOptions<AuthStatus, Error, Variables>,
@@ -500,6 +512,44 @@ export function useUpdateNote(
       void client.invalidateQueries({ queryKey: queryKeys.notes() })
       options?.onSuccess?.(...args)
     },
+  })
+}
+
+// --- maia -----------------------------------------------------------------
+
+export interface MaiaPolicyQuery {
+  /** Null keeps the query shut — nothing is asked about "no position". */
+  fen: string | null
+  elo?: number | null
+  moves?: number
+  rolloutPlies?: number
+}
+
+/**
+ * The human model on the position the analysis board is standing on.
+ *
+ * A position never changes its answer, so the result is cached forever under its FEN:
+ * stepping back into a line the reader has already walked costs no round trip. Nothing is
+ * retried — a `409` (no local Maia) is a standing fact about the deployment, not a blip,
+ * and the panel hides itself on it.
+ */
+export function useMaiaPolicy(
+  { fen, elo = null, moves, rolloutPlies = 0 }: MaiaPolicyQuery,
+  options?: Options<Awaited<ReturnType<typeof api.maiaPolicy>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.maiaPolicy(fen ?? '', elo, rolloutPlies),
+    queryFn: () =>
+      api.maiaPolicy({
+        fen: fen ?? '',
+        elo,
+        moves,
+        rollout_plies: rolloutPlies || undefined,
+      }),
+    enabled: fen !== null,
+    retry: false,
+    staleTime: Infinity,
+    ...options,
   })
 }
 

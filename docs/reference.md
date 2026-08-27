@@ -61,7 +61,8 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
 | `BLUNDERBASE_QUICK_NODES` `BLUNDERBASE_DEEP_NODES` `BLUNDERBASE_DEEP_MULTIPV` | `250000` `2000000` `4` | the per-position budget of each tier |
 | `BLUNDERBASE_INACCURACY_THRESHOLD` `…_MISTAKE_…` `…_BLUNDER_…` | `10` `20` `30` | win-percentage points lost by the mover, à la Lichess |
-| `BLUNDERBASE_MAIA_RATING_OFFSETS` | `-100,0,100` | the levels Maia is asked about, around your rating in that game |
+| `BLUNDERBASE_MAIA_TARGET_ELO` | — | the one rating every Maia question is asked at — the rating you are playing towards. Set, it replaces the offsets below: analysis bakes that level into every ply of both sides, and the analysis board queries it live. Clamped to 1100–2000 |
+| `BLUNDERBASE_MAIA_RATING_OFFSETS` | `-100,0,100` | the levels Maia is asked about, around your rating in that game; ignored when a target elo is set |
 
 ## Commands
 

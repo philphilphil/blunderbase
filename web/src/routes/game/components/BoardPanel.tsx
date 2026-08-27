@@ -1,4 +1,5 @@
-import { Check, Loader2 } from 'lucide-react'
+import type { Api } from '@lichess-org/chessground/api'
+import { Check, Loader2, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
@@ -8,12 +9,24 @@ import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
+import type { AnalysisLine } from '../analysisLine'
 import { sameMove, type MaiaLevel, type PlyPosition, type Side } from '../gameModel'
 import type { RunProgress } from '../useDeepAnalysis'
 import { EvalBar } from './EvalBar'
 
 export interface BoardPanelProps {
+  /** The game position the cursor is on. */
   position: PlyPosition
+  /**
+   * The analysis board's own line, when the reader has played off the game. It carries the
+   * position to show and the legal moves chessground needs to accept the next drag; an
+   * empty line (or none) means the board is still on the game.
+   */
+  analysis?: AnalysisLine | null
+  /** A move dragged on the board — how a line is started or extended. */
+  onPlayMove?: (orig: string, dest: string) => void
+  /** Back to the game line. Only offered while there is a line to leave. */
+  onExitAnalysis?: () => void
   orientation: Side
   /** The move that produced this position, for the last-move highlight. */
   lastMove: MoveRow | undefined
@@ -68,6 +81,9 @@ const WHEEL_STEP = 10
  */
 export function BoardPanel({
   position,
+  analysis,
+  onPlayMove,
+  onExitAnalysis,
   orientation,
   lastMove,
   upcoming,
@@ -158,6 +174,21 @@ export function BoardPanel({
     return () => node.removeEventListener('wheel', onWheel)
   }, [])
 
+  // Off the game line the board shows the analysis line's own position, and its last move
+  // is the one the reader just played rather than the game's.
+  const exploring = (analysis?.moves.length ?? 0) > 0
+  const shown = exploring && analysis ? analysis.position : position
+
+  // chessground needs the legal destinations to accept a drag, and `Board` has no prop for
+  // them — it publishes its `Api` for exactly this (the explorer does the same). `set`
+  // deep-merges, so what is written here survives the wrapper's own calls.
+  const boardApi = useRef<Api | null>(null)
+  useEffect(() => {
+    boardApi.current?.set({
+      movable: { free: false, showDests: true, dests: analysis?.dests },
+    })
+  }, [analysis])
+
   return (
     <div ref={column} className={cn('flex flex-col gap-3.5', className)}>
       <div className="flex items-start gap-2.5">
@@ -165,14 +196,19 @@ export function BoardPanel({
         {/* Nothing floats over the squares: Maia's prediction is a panel of its own, under
             the engine lines, and only its target square is marked here. */}
         <Board
-          fen={position.fen}
+          ref={boardApi}
+          fen={shown.fen}
           orientation={orientation}
-          lastMove={lastMove?.uci ?? null}
+          lastMove={exploring && analysis ? analysis.lastMove : (lastMove?.uci ?? null)}
           squares={squares}
           arrows={arrows}
-          turnColor={position.turn}
-          check={position.check ? position.turn : false}
+          turnColor={shown.turn}
+          check={shown.check ? shown.turn : false}
           coordinates="edge"
+          // The game board doubles as the analysis board: a piece dragged from any
+          // position branches off the game rather than being refused.
+          viewOnly={!onPlayMove}
+          onMove={onPlayMove}
           className="min-w-0 flex-1"
         />
       </div>
@@ -234,9 +270,23 @@ export function BoardPanel({
           onRequest={onRequestDeep}
         />
 
+        {exploring && onExitAnalysis ? (
+          <button
+            type="button"
+            onClick={onExitAnalysis}
+            title="Leave the analysis line and go back to the game"
+            className="flex items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant"
+          >
+            <Undo2 className="size-3" aria-hidden />
+            Back to game
+          </button>
+        ) : null}
+
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] tabular text-dim">
-          ply {cursor + 1} / {plyCount}
+          {exploring && analysis
+            ? `analysis +${analysis.moves.length}`
+            : `ply ${cursor + 1} / ${plyCount}`}
         </span>
         <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink">
           {formatScore(score)}

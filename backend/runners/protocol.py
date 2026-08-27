@@ -423,6 +423,10 @@ def encode_plan(plan: RunPlan) -> dict[str, Any]:
         "owner_color": None if plan.owner_color is None else Color(plan.owner_color).value,
         "owner_rating": plan.owner_rating,
         "maia_offsets": list(plan.maia_offsets),
+        # The resolved level list is one number when the deployment configures a target,
+        # so the target itself is what crosses the wire: a runner that has it computes the
+        # same plies at the same level as this host would have.
+        "maia_target_elo": plan.maia_target_elo,
     }
 
 
@@ -466,6 +470,7 @@ def decode_plan(data: Mapping[str, Any]) -> RunPlan:
             ),
             owner_rating=_optional_int(data, "owner_rating"),
             maia_offsets=tuple(int(offset) for offset in data.get("maia_offsets") or ()),
+            maia_target_elo=_optional_int(data, "maia_target_elo"),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ProtocolError(f"plan does not decode: {exc}") from exc

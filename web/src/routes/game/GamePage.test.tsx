@@ -139,10 +139,36 @@ let posted: { url: string; body: unknown }[] = []
 /** Every `/streams` request, method included — an open and a close are not the same call. */
 let streamCalls: { method: string; url: string; body: unknown }[] = []
 
-function stubFetch(overrides: Record<string, unknown> = {}) {
+/** What the live Maia endpoint answers after 1.e4 d5, at the deployment's target elo. */
+const MAIA_LIVE = {
+  elo: 1700,
+  policy: [
+    { uci: 'e4d5', san: 'exd5', rank: 1, p: 0.71 },
+    { uci: 'b1c3', san: 'Nc3', rank: 2, p: 0.12 },
+  ],
+  rollout: [
+    { uci: 'e4d5', san: 'exd5', p: 0.71 },
+    { uci: 'd8d5', san: 'Qxd5', p: 0.64 },
+  ],
+}
+
+function stubFetch(
+  overrides: Record<string, unknown> = {},
+  { maiaStatus = 200 }: { maiaStatus?: number } = {},
+) {
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const method = init?.method ?? 'GET'
+    if (url.includes('/maia/policy')) {
+      posted.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null })
+      if (maiaStatus !== 200) {
+        return json({ error: 'maia_unavailable', detail: 'No local Maia engine.' }, maiaStatus)
+      }
+      return json(MAIA_LIVE)
+    }
+    if (url.includes('/auth/status')) {
+      return json({ setup_required: false, authenticated: true, maia_target_elo: 1700 })
+    }
     if (url.includes('/streams')) {
       const body = init?.body ? JSON.parse(String(init.body)) : null
       streamCalls.push({ method, url, body })
@@ -233,12 +259,15 @@ describe('GamePage', () => {
     expect(screen.getByText('0–1')).toBeInTheDocument()
     expect(screen.getByText(/analysed .* ago/)).toBeInTheDocument()
 
-    // Board is chessground, at the starting position.
-    expect(screen.getByTestId('board').querySelectorAll('piece')).toHaveLength(32)
+    // Board is chessground, at the starting position. The board is playable (a move
+    // branches an analysis line off the game), so chessground keeps a drag ghost of its
+    // own alongside the 32 real pieces.
+    expect(screen.getByTestId('board').querySelectorAll('piece:not(.ghost)')).toHaveLength(32)
     expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
 
     // Engine lines describe the position on the board, from the run that produced them.
-    expect(screen.getByText('stockfish')).toBeInTheDocument()
+    // The dual panel names the same engine over its own column, so there are two.
+    expect(within(screen.getByTestId('engine-panel')).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('MPV 3')).toBeInTheDocument()
 
     // The deep-analysis trigger lives in the board's transport row now, next to Flip and
@@ -500,7 +529,7 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
 
     // Two panels, two claims: what the run concluded, and what an engine could find now.
-    expect(screen.getByText('stockfish')).toBeInTheDocument()
+    expect(within(screen.getByTestId('engine-panel')).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('Analyse this position continuously.')).toBeInTheDocument()
     // Nothing is opened until the reader asks.
     expect(streamCalls).toHaveLength(0)
@@ -561,5 +590,136 @@ describe('GamePage', () => {
     expect(live.queryByText('−0.40')).not.toBeInTheDocument()
     // The stored run's own row for this position, unchanged, says the same number.
     expect(screen.getAllByText('+0.40').length).toBeGreaterThan(1)
+  })
+
+  it('reads the human column at the deployment’s target elo, not at the game’s rating', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({
+        '/games/14': {
+          ...DETAIL,
+          moves: DETAIL.moves.map((row) =>
+            row.ply === 1
+              ? {
+                  ...row,
+                  maia: {
+                    '1500': [{ uci: 'd7d5', san: 'd5', rank: 1, p: 0.62 }],
+                    '1700': [{ uci: 'd7d5', san: 'd5', rank: 1, p: 0.55 }],
+                  },
+                }
+              : row,
+          ),
+        },
+      }),
+    )
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    // The game was played at 1500 and the blob still carries that band, but the pass was
+    // pinned to 1700 — which is the level the panel and the board arrow speak for.
+    await waitFor(() => expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1700'))
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('55%')
+  })
+
+  it('puts the played move beside the engine’s own moves, and marks it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    const panel = screen.getByTestId('maia-panel')
+    // 62% of players at this level walk into the blunder — popularity beside cost is the
+    // whole reason the two columns are one card.
+    expect(panel).toHaveTextContent('62%')
+    expect(within(screen.getByTestId('maia-played-row')).getByText('d5')).toHaveClass(
+      'text-blunder',
+    )
+    // The engine's own column is in the same card, over its stored line.
+    expect(within(panel).getByText('stockfish')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'c6' })).toBeInTheDocument()
+  })
+
+  it('goes live off the game line, and walks the rollout back onto the board', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    // Playing the human column's own move branches an analysis line off the game.
+    await user.click(screen.getByTestId('maia-played-row'))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+
+    // The affordance is immediate; the query behind it is debounced (see `useLiveMaia`),
+    // so a reader clicking through a line does not ask about every position on the way.
+    expect(screen.getByTestId('maia-live')).toBeInTheDocument()
+
+    await waitFor(() =>
+      expect(posted.filter((call) => call.url.includes('/maia/policy'))).toHaveLength(1),
+    )
+    expect(posted.filter((call) => call.url.includes('/maia/policy'))[0].body).toMatchObject({
+      // The position after 1.e4 d5 — not the game position the line left from.
+      fen: 'rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+      elo: 1700,
+      rollout_plies: 8,
+    })
+
+    // The rollout is a line to walk into: clicking its second move plays both.
+    const rollout = within(screen.getByTestId('maia-rollout'))
+    await user.click(rollout.getByRole('button', { name: 'Qxd5' }))
+    expect(screen.getByText('analysis +3')).toBeInTheDocument()
+
+    // And back to the game, where the stored data is instant and nothing is queried.
+    await user.click(screen.getByRole('button', { name: /Back to game/ }))
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+    expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument()
+  })
+
+  it('keeps the analysis board walkable after a click the position cannot take', async () => {
+    // The stub answers every position with the same policy, so deep in a line some of the
+    // moves it offers are no longer legal. A click on one of those must be a no-op and
+    // nothing more: the line the board is actually standing on is what the next click
+    // extends, never the raw list an illegal move was appended to.
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    await user.click(screen.getByTestId('maia-played-row'))
+    const rollout = () => within(screen.getByTestId('maia-rollout'))
+    await waitFor(() => expect(rollout().getByRole('button', { name: 'Qxd5' })).toBeEnabled())
+    await user.click(rollout().getByRole('button', { name: 'Qxd5' }))
+    expect(screen.getByText('analysis +3')).toBeInTheDocument()
+
+    // exd5 belongs to the position two moves back; e4 is empty here, so the board holds.
+    const panel = () => within(screen.getByTestId('maia-panel'))
+    await waitFor(() =>
+      expect(panel().getByTitle('Play exd5 on the analysis board')).toBeEnabled(),
+    )
+    await user.click(panel().getByTitle('Play exd5 on the analysis board'))
+    expect(screen.getByText('analysis +3')).toBeInTheDocument()
+
+    // And the next legal move still plays, rather than landing behind the dead one.
+    await user.click(panel().getByTitle('Play Nc3 on the analysis board'))
+    expect(screen.getByText('analysis +4')).toBeInTheDocument()
+  })
+
+  it('hides the human column entirely where the deployment has no Maia to ask', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', stubFetch({}, { maiaStatus: 409 }))
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+    // Stored data is still there — the 409 is only about positions nobody analysed.
+    expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('maia-played-row'))
+    await waitFor(() =>
+      expect(posted.filter((call) => call.url.includes('/maia/policy'))).toHaveLength(1),
+    )
+    // Degrade, don't error: the card goes, the analysis board stays.
+    await waitFor(() => expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument())
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
   })
 })

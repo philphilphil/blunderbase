@@ -68,8 +68,9 @@ MATE_CP_BASE = 21
 MATE_CP_CAP = 10
 
 # How many moves Maia is asked for per position. The predicted move is the first; the rest
-# are what makes "and a 1700 would have considered" answerable.
-MAIA_POLICY_MOVES = 3
+# are what makes "and a 1700 would have considered" answerable — and what gives the human
+# column of the game panel the same depth as Stockfish's (`DEFAULT_MULTIPV = 5`).
+MAIA_POLICY_MOVES = 5
 SELF_ELO = "SelfElo"
 
 STALE_RUN_MESSAGE = "the process running this pass stopped before it finished"
@@ -244,6 +245,10 @@ class RunPlan:
     owner_color: Color | None = None
     owner_rating: int | None = None
     maia_offsets: tuple[int, ...] = ()
+    # The one level every Maia question in this run is asked at, when the deployment
+    # configures one. It replaces `maia_offsets` and `owner_rating` for the human-move
+    # pass; None is the original rating-centred behaviour.
+    maia_target_elo: int | None = None
 
     @property
     def plies(self) -> range:
@@ -268,10 +273,15 @@ class RunPlan:
         Maia answers "what would a human of this rating have played" — a question about
         the owner, so their opponent's moves are not worth the second engine pass. With no
         owner on the game (an OTB PGN, a stranger's game) every move is fair game.
+
+        A configured target elo widens that to every ply of both sides. The second half of
+        what Maia is for is "what will a human opposite me actually fall into", which is a
+        question about the positions the *opponent* moves in — and the cost is a wash,
+        because a target elo is also one level where the offsets were three.
         """
         if self.is_position_run:
             return [self.ply_start]
-        if self.owner_color is None:
+        if self.owner_color is None or self.maia_target_elo is not None:
             return list(self.plies)
         white = self.owner_color is Color.WHITE
         return [ply for ply in self.plies if (ply % 2 == 0) == white]
@@ -322,8 +332,17 @@ def maia_levels(
     low: int = MAIA_MIN_RATING,
     high: int = MAIA_MAX_RATING,
     default: int = 1500,
+    target: int | None = None,
 ) -> list[int]:
-    """The rating levels to ask Maia about, clamped to what the model can answer."""
+    """The rating levels to ask Maia about, clamped to what the model can answer.
+
+    A `target` is the whole answer on its own: one configured level, the same one for
+    every game, which is what makes two games comparable at all. The rating and the
+    offsets are then not consulted — a spread around the rating someone *has* is exactly
+    the thing a target elo replaces.
+    """
+    if target is not None:
+        return [min(high, max(low, int(target)))]
     base = int(rating if rating is not None else default)
     levels = {min(high, max(low, base + int(offset))) for offset in (offsets or (0,))}
     return sorted(levels)
@@ -890,6 +909,7 @@ def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = N
             thresholds=thresholds,
             owner_rating=resolved.default_owner_rating,
             maia_offsets=offsets,
+            maia_target_elo=resolved.maia_target_elo,
         )
 
     game = session.get(Game, run.game_id)
@@ -938,6 +958,7 @@ def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = N
         owner_color=game.owner_color,
         owner_rating=owner_rating(game, resolved),
         maia_offsets=offsets,
+        maia_target_elo=resolved.maia_target_elo,
     )
 
 
@@ -1003,7 +1024,12 @@ def apply_maia(plan: RunPlan, rows: Sequence[MoveEval], adapter: MaiaAdapter) ->
     concurrency cap, and a worker that held a slot for Stockfish while waiting for one for
     Maia would deadlock the moment the cap is a single process.
     """
-    levels = maia_levels(plan.owner_rating, plan.maia_offsets, **_maia_bounds(adapter))
+    levels = maia_levels(
+        plan.owner_rating,
+        plan.maia_offsets,
+        target=plan.maia_target_elo,
+        **maia_bounds(adapter),
+    )
     if not adapter.supports_rating:
         # Fixed weights are one rating level; asking for three is a configuration error.
         levels = levels[:1]
@@ -1130,8 +1156,12 @@ def _is_best(board: chess.Board, played: str, best: str | None) -> bool:
         return played == best
 
 
-def _maia_bounds(adapter: MaiaAdapter) -> dict[str, int]:
-    """Clamp to the rating range this build declares, where it declares one."""
+def maia_bounds(adapter: MaiaAdapter) -> dict[str, int]:
+    """Clamp to the rating range this build declares, where it declares one.
+
+    Shared with the live policy service, so a level the analysis board reports and a level
+    a stored run keys by are narrowed by the same engine's own declaration.
+    """
     for option in adapter.declared_options():
         if option.name == SELF_ELO and option.min is not None and option.max is not None:
             return {"low": int(option.min), "high": int(option.max)}

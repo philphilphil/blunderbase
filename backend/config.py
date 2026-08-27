@@ -4,7 +4,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,8 +68,15 @@ class Settings(BaseSettings):
     mistake_threshold: float = Field(default=20.0, ge=0, le=100)
     blunder_threshold: float = Field(default=30.0, ge=0, le=100)
 
+    # The one rating every Maia question is asked at — the rating the owner is playing
+    # towards, not the one they have. Set, it replaces the offsets below everywhere: batch
+    # analysis bakes exactly this level into every ply of both sides, and the analysis
+    # board's live queries use it too. Unset keeps the original behaviour, so an install
+    # that never heard of it analyses exactly as it did before.
+    maia_target_elo: int | None = None
     # The rating levels Maia is asked about, as offsets from the owner's rating in the
     # game being analysed. Two or three levels around it is what a coach actually uses.
+    # Ignored when `maia_target_elo` is set.
     maia_rating_offsets: tuple[int, ...] = (-100, 0, 100)
     # Used when the game carries no rating for the owner — an OTB PGN, an unrated game.
     default_owner_rating: int = Field(default=1500, ge=1)
@@ -102,6 +109,20 @@ class Settings(BaseSettings):
 
     host: str = "127.0.0.1"
     port: int = 8765
+
+    @field_validator("maia_target_elo", mode="after")
+    @classmethod
+    def _clamp_target_elo(cls, value: int | None) -> int | None:
+        """A target outside what Maia was trained on is clamped, never refused.
+
+        The same rule the per-game levels have always followed (`analysis.maia_levels`):
+        an owner aiming at 2200 gets Maia's top level rather than a server that will not
+        boot. A build that declares narrower `SelfElo` bounds narrows this further at
+        analysis time.
+        """
+        if value is None:
+            return None
+        return min(MAIA_MAX_RATING, max(MAIA_MIN_RATING, int(value)))
 
     @model_validator(mode="after")
     def _resolve_paths(self) -> Settings:

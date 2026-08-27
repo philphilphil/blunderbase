@@ -23,6 +23,8 @@ import type {
   ImportRequest,
   ImportStarted,
   LiveState,
+  MaiaPolicyRequest,
+  MaiaPolicyResponse,
   MomentResponse,
   MoveEvalResponse,
   NoteCreate,
@@ -257,6 +259,18 @@ export const restartStream = (id: string, body: StreamUpdate) =>
   http.patch<StreamResponse>(`/streams/${id}`, { body })
 
 export const closeStream = (id: string) => http.delete<void>(`/streams/${id}`)
+
+// --- maia -----------------------------------------------------------------
+
+/**
+ * The human model on an arbitrary position — the analysis board's Maia column.
+ *
+ * One shot, not a stream: the query is a 1-node policy read, milliseconds on a warm
+ * engine. `409` means the deployment has no backend-local Maia, which is a reason to
+ * show nothing rather than an error to report.
+ */
+export const maiaPolicy = (body: MaiaPolicyRequest) =>
+  http.post<MaiaPolicyResponse>('/maia/policy', { body })
 
 // --- live -----------------------------------------------------------------
 

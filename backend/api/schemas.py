@@ -51,10 +51,19 @@ class Row(BaseModel):
 
 
 class AuthStatus(BaseModel):
-    """What the page asks before it renders anything: is there a password, and do I have it."""
+    """What the page asks before it renders anything: is there a password, and do I have it.
+
+    It is also the only payload every screen already has by the time it renders, which is
+    why the one piece of deployment-wide configuration the UI needs rides along on it
+    rather than on a settings endpoint that would exist for a single integer.
+    """
 
     setup_required: bool
     authenticated: bool
+    maia_target_elo: int | None = Field(
+        default=None,
+        description="the configured Maia level, or null for the rating-centred behaviour",
+    )
 
 
 class PasswordSetup(Input):
@@ -343,6 +352,41 @@ class PositionAnalysis(Payload):
     win_percent: float | None = None
     best_move: dict[str, Any] | None = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# --- maia -----------------------------------------------------------------
+
+
+class MaiaPolicyRequest(Input):
+    """Ask the human-move model about a position the analysis board made up.
+
+    Only `fen` is required: the level defaults to the deployment's target elo, the width to
+    what a batch pass stores, and no `rollout_plies` means the policy alone.
+    """
+
+    fen: str = Field(min_length=1)
+    elo: int | None = Field(
+        default=None, ge=1, description="clamped to what the build can answer for"
+    )
+    moves: int | None = Field(default=None, ge=1, le=10, description="policy entries wanted")
+    rollout_plies: int = Field(
+        default=0, ge=0, le=20, description="0 for no rollout; both sides play at `elo`"
+    )
+
+
+class MaiaPolicyResponse(Payload):
+    """`services.maia_live.live_policy`: what a human at `elo` plays here, and next.
+
+    `elo` is the level the engine really used — the clamped request for a build that takes
+    one, the level its weights are for where a fixed-weights build names them, and `null`
+    where such a build never says which human it plays as (the panel then shows no number
+    rather than the one nobody honoured). `p` is absent from an entry whose build publishes
+    no policy figure, exactly as in the stored `MoveEval.maia_policy` blob.
+    """
+
+    elo: int | None = None
+    policy: list[dict[str, Any]] = Field(default_factory=list)
+    rollout: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # --- explorer -------------------------------------------------------------

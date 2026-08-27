@@ -700,6 +700,48 @@ async def test_maia_predicts_a_human_move_at_levels_around_the_owners_rating(
     assert [entry["rank"] for entry in first["1612"]] == [1, 2, 3]
 
 
+async def test_a_target_elo_bakes_one_level_into_every_ply_of_both_sides(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """The "exploit humans" half is a question about the positions the opponent moves in."""
+    settings.maia_target_elo = 1700
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _register(
+        db,
+        tmp_path,
+        kind=EngineKind.MAIA,
+        name="Maia",
+        go=[
+            _maia_reply([("e2e4", 31.4), ("d2d4", 22.0)]),
+            _maia_reply([("e7e5", 30.0), ("c7c5", 20.0)]),
+            _maia_reply([("g1f3", 40.0), ("b1c3", 18.0)]),
+            _maia_reply([("b8c6", 35.0), ("g8f6", 20.0)]),
+            _maia_reply([("f1b5", 28.0), ("f1c4", 26.0)]),
+            _maia_reply([("a7a6", 30.0), ("g8f6", 24.0)]),
+        ],
+    )
+    _import_game(db, fixtures_dir)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        rows = analysis.get_move_evals(session, run.id)
+
+    assert run.status is RunStatus.DONE
+    assert [row.ply for row in rows if row.maia_policy] == [0, 1, 2, 3, 4, 5]
+    # One level, the configured one — not a spread around the 1712 the owner had.
+    assert sorted(rows[0].maia_policy) == ["1700"]
+    assert rows[0].maia_policy["1700"][0] == {
+        "uci": "e2e4",
+        "san": "e4",
+        "rank": 1,
+        "p": 0.314,
+    }
+    # The opponent's moves carry a policy too: that is the half the target elo is for.
+    assert rows[1].maia_policy["1700"][0]["uci"] == "e7e5"
+
+
 async def test_a_maia_that_will_not_answer_degrades_instead_of_failing_the_run(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
