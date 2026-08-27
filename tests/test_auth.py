@@ -24,6 +24,7 @@ from backend.db.migrate import alembic_config, upgrade_to_head
 from backend.db.models import AuthSession, Credential
 from backend.db.session import get_engine, get_sessionmaker
 from backend.db.types import utcnow
+from backend.services import app_settings as app_settings_service
 from backend.services import auth as auth_service
 from tests.conftest import OWNER_PASSWORD, running_app
 
@@ -41,6 +42,7 @@ ROUTE_FAMILIES = (
     "/engines",
     "/notes",
     "/live",
+    "/settings",
     "/streams",
     # The plural is the owner's CRUD and is guarded; `/runner` (singular) is the runners'
     # own transport and is not. The two must never be read as one prefix.
@@ -281,9 +283,11 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
 
 def test_the_status_carries_the_deployments_maia_target_elo(settings: Settings) -> None:
     """The page has this payload before it renders anything, so the Maia panel can pick
-    the stored level nearest the target without a settings endpoint of its own."""
+    the stored level nearest the target without waiting on `/settings` to answer."""
     settings.analysis_workers = False
-    settings.maia_target_elo = 1700
+    upgrade_to_head(settings)
+    with get_sessionmaker(settings)() as session:
+        app_settings_service.set_maia_target_elo(session, 1700)
     with running_app(create_app(settings)) as client:
         assert client.get("/auth/status").json()["maia_target_elo"] == 1700
         assert client.post("/auth/login", json={"password": OWNER_PASSWORD}).json() == {

@@ -6,6 +6,8 @@
 import { http, type QueryValue } from './client'
 import type {
   AnalysisRequest,
+  AppSettings,
+  AppSettingsUpdate,
   AuthStatus,
   ComparisonResponse,
   DimensionList,
@@ -80,6 +82,17 @@ export const logout = () => http.post<void>('/auth/logout')
 /** Signs every other browser out and hands this one a fresh cookie. */
 export const changePassword = (current: string, next: string) =>
   http.post<AuthStatus>('/auth/password', { body: { current, new: next } })
+
+// --- settings --------------------------------------------------------------
+
+export const getAppSettings = () => http.get<AppSettings>('/settings')
+
+/**
+ * The whole of the settings, not a patch of them. The answer is what is in force
+ * afterwards: an out-of-range level comes back clamped rather than refused.
+ */
+export const saveAppSettings = (body: AppSettingsUpdate) =>
+  http.put<AppSettings>('/settings', { body })
 
 // --- games ----------------------------------------------------------------
 

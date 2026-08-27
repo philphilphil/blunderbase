@@ -16,6 +16,7 @@ from backend.api.routes import (
     notes,
     runner_gateway,
     runners,
+    settings,
     stats,
     streams,
 )
@@ -34,6 +35,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     maia.router,
     runner_gateway.router,
     runners.router,
+    settings.router,
     streams.router,
     events.router,
 )

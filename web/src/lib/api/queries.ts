@@ -18,6 +18,8 @@ import * as api from './endpoints'
 import { queryKeys } from './keys'
 import type {
   AnalysisRequest,
+  AppSettings,
+  AppSettingsUpdate,
   AuthStatus,
   EngineCreate,
   EngineDeleteResult,
@@ -120,6 +122,37 @@ export function useLogout(options?: UseMutationOptions<void, Error, void>) {
     onError: (...args) => {
       signedOut()
       options?.onError?.(...args)
+    },
+  })
+}
+
+// --- settings --------------------------------------------------------------
+
+/** What the Settings page renders from. One number, so far. */
+export function useAppSettings(options?: Options<Awaited<ReturnType<typeof api.getAppSettings>>>) {
+  return useQuery({ queryKey: queryKeys.settings(), queryFn: api.getAppSettings, ...options })
+}
+
+/**
+ * Save the settings, and make every screen that was rendered against the old ones catch up.
+ *
+ * The Maia target elo is not only this page's: it rides on the bootstrap payload
+ * (`useMaiaTargetElo`) and it is the level the analysis board asks its live questions at.
+ * So the write invalidates `auth` and `maia` as well as its own key, and the game page
+ * picks the new level up without a reload.
+ */
+export function useSaveAppSettings(
+  options?: UseMutationOptions<AppSettings, Error, AppSettingsUpdate>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: AppSettingsUpdate) => api.saveAppSettings(body),
+    ...options,
+    onSuccess: (...args) => {
+      client.setQueryData(queryKeys.settings(), args[0])
+      void client.invalidateQueries({ queryKey: queryKeys.auth() })
+      void client.invalidateQueries({ queryKey: queryKeys.maia() })
+      options?.onSuccess?.(...args)
     },
   })
 }

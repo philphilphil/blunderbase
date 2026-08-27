@@ -22,7 +22,7 @@ from backend.db.enums import (
 )
 from backend.db.models import AnalysisRun, Engine, Game, MoveEval
 from backend.db.types import utcnow
-from backend.services import analysis, explorer
+from backend.services import analysis, app_settings, explorer
 from backend.services.engines import TierUnavailableError
 
 THRESHOLDS = analysis.Thresholds(inaccuracy=10.0, mistake=20.0, blunder=30.0)
@@ -206,7 +206,8 @@ def test_a_target_elo_asks_about_every_ply_of_both_sides(
     session: Session, tmp_path: Any
 ) -> None:
     """The "what will a human opposite me fall into" half is a question about their moves."""
-    plan = _plan(session, Settings(root=tmp_path, maia_target_elo=1700))
+    app_settings.set_maia_target_elo(session, 1700)
+    plan = _plan(session, Settings(root=tmp_path))
 
     assert plan.maia_target_elo == 1700
     assert plan.maia_plies() == [0, 1, 2, 3, 4, 5]
@@ -237,7 +238,8 @@ def test_a_position_run_asks_about_the_one_position_it_has(
     session: Session, tmp_path: Any
 ) -> None:
     _engine(session)
-    settings = Settings(root=tmp_path, maia_target_elo=1700)
+    app_settings.set_maia_target_elo(session, 1700)
+    settings = Settings(root=tmp_path)
     run = analysis.request_analysis(
         session,
         fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",

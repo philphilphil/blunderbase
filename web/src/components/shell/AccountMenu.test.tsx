@@ -79,6 +79,10 @@ describe('AccountMenu', () => {
     await openMenu()
 
     expect(screen.getByRole('menu')).toHaveTextContent('kn1ghtmare')
+    expect(screen.getByRole('menuitem', { name: /^settings$/i })).toHaveAttribute(
+      'href',
+      '/settings',
+    )
     expect(screen.getByRole('menuitem', { name: /connected accounts/i })).toHaveAttribute(
       'href',
       '/import',

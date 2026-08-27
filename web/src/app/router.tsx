@@ -9,6 +9,7 @@ import { GamePage } from '@/routes/game'
 import { GamesPage } from '@/routes/games'
 import { ImportPage } from '@/routes/import'
 import { LivePage } from '@/routes/live'
+import { SettingsPage } from '@/routes/settings'
 import { StatsPage } from '@/routes/stats'
 
 function NotFound() {
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: 'explorer', element: <ExplorerPage /> },
       { path: 'stats', element: <StatsPage /> },
       { path: 'import', element: <ImportPage /> },
+      { path: 'settings', element: <SettingsPage /> },
       { path: 'settings/engines', element: <EnginesPage /> },
       { path: 'live', element: <LivePage /> },
       { path: '*', element: <NotFound /> },

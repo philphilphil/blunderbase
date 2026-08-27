@@ -22,7 +22,7 @@ from backend.db.enums import EngineKind
 from backend.db.migrate import upgrade_to_head
 from backend.db.models import Engine, Runner
 from backend.db.session import get_sessionmaker
-from backend.services import maia_live
+from backend.services import app_settings, maia_live
 from backend.services.maia_live import (
     LiveMaia,
     LiveMaiaUnavailableError,
@@ -241,7 +241,7 @@ def test_the_configured_target_is_the_level_when_nobody_asks_for_one(
 ) -> None:
     log = tmp_path / "engine.log"
     register_maia(session, maia_command(tmp_path, log=log))
-    settings.maia_target_elo = 1700
+    app_settings.set_maia_target_elo(session, 1700)
     live = LiveMaia(settings=settings)
     try:
         answer = live.policy(session, fen=STARTING, moves=2)
@@ -256,7 +256,6 @@ def test_with_no_target_configured_the_level_is_the_default_rating(
     session: Session, tmp_path: Path, settings: Settings
 ) -> None:
     register_maia(session, maia_command(tmp_path))
-    settings.maia_target_elo = None
     settings.default_owner_rating = 1400
     live = LiveMaia(settings=settings)
     try:
@@ -269,7 +268,7 @@ def test_an_asked_for_level_wins_over_the_configured_target(
     session: Session, tmp_path: Path, settings: Settings
 ) -> None:
     register_maia(session, maia_command(tmp_path))
-    settings.maia_target_elo = 1700
+    app_settings.set_maia_target_elo(session, 1700)
     live = LiveMaia(settings=settings)
     try:
         assert live.policy(session, fen=STARTING, elo=1200, moves=2)["elo"] == 1200
@@ -397,19 +396,19 @@ def test_a_fen_that_is_not_a_position_is_the_callers_mistake(
 # --- the endpoint ----------------------------------------------------------
 
 
-def _seed(settings: Settings, path: str | None) -> None:
+def _seed(settings: Settings, path: str | None, *, target_elo: int | None = None) -> None:
     upgrade_to_head(settings)
-    if path is None:
-        return
     with get_sessionmaker(settings)() as session:
-        register_maia(session, path)
+        if target_elo is not None:
+            app_settings.set_maia_target_elo(session, target_elo)
+        if path is not None:
+            register_maia(session, path)
 
 
 @pytest.fixture()
 def api(settings: Settings, tmp_path: Path) -> Iterator[TestClient]:
     settings.analysis_workers = False
-    settings.maia_target_elo = 1700
-    _seed(settings, maia_command(tmp_path))
+    _seed(settings, maia_command(tmp_path), target_elo=1700)
     with running_app(create_app(settings)) as client:
         yield client
 

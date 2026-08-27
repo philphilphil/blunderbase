@@ -51,7 +51,7 @@ export function EnginesPage() {
   return (
     <PageBody>
       <SetPageChrome
-        breadcrumb={[{ label: 'Settings', to: '/settings/engines' }, { label: 'Engines' }]}
+        breadcrumb={[{ label: 'Settings', to: '/settings' }, { label: 'Engines' }]}
       />
       <PageHeader
         title="Engines"

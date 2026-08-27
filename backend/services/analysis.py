@@ -46,6 +46,7 @@ from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING, Settings, get_setti
 from backend.db.enums import Classification, Color, EngineKind, RunStatus, Tier
 from backend.db.models import AnalysisRun, Engine, Game, GamePosition, MoveEval, Position
 from backend.db.types import utcnow
+from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -887,6 +888,9 @@ def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = N
     resolved = settings or get_settings()
     thresholds = Thresholds.from_settings(resolved)
     offsets = tuple(resolved.maia_rating_offsets)
+    # An app setting rather than a variable, so it is read per plan: a run queued after the
+    # owner changed it on the Settings page is analysed at the level they chose.
+    target_elo = app_settings_service.get_maia_target_elo(session)
 
     if run.game_id is None:
         fen = run.fen or ""
@@ -909,7 +913,7 @@ def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = N
             thresholds=thresholds,
             owner_rating=resolved.default_owner_rating,
             maia_offsets=offsets,
-            maia_target_elo=resolved.maia_target_elo,
+            maia_target_elo=target_elo,
         )
 
     game = session.get(Game, run.game_id)
@@ -958,7 +962,7 @@ def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = N
         owner_color=game.owner_color,
         owner_rating=owner_rating(game, resolved),
         maia_offsets=offsets,
-        maia_target_elo=resolved.maia_target_elo,
+        maia_target_elo=target_elo,
     )
 
 

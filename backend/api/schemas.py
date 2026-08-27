@@ -54,8 +54,9 @@ class AuthStatus(BaseModel):
     """What the page asks before it renders anything: is there a password, and do I have it.
 
     It is also the only payload every screen already has by the time it renders, which is
-    why the one piece of deployment-wide configuration the UI needs rides along on it
-    rather than on a settings endpoint that would exist for a single integer.
+    why the one piece of deployment-wide configuration the UI needs rides along on it: the
+    Settings page owns that value (`/settings` below), but every other screen needs it to
+    render and none of them should have to wait on a second call for it.
     """
 
     setup_required: bool
@@ -80,6 +81,35 @@ class PasswordLogin(Input):
 class PasswordChange(Input):
     current: str = Field(min_length=1)
     new: str = Field(min_length=1)
+
+
+# --- settings --------------------------------------------------------------
+
+
+class AppSettings(BaseModel):
+    """Everything the Settings page shows, which is currently one number."""
+
+    maia_target_elo: int | None = Field(
+        default=None,
+        description=(
+            "the one rating every Maia question is asked at, or null for the "
+            "rating-centred behaviour over the owner's own moves"
+        ),
+    )
+
+
+class AppSettingsUpdate(Input):
+    """A change to the settings. Null clears the target back to the default behaviour.
+
+    A PUT carries the whole of the settings rather than a patch of them, so an omitted
+    field means the same as a null one: cleared.
+
+    Out of range is clamped rather than refused, which is the rule every other Maia level
+    in the codebase follows (`services.app_settings`): an owner aiming at 2200 gets Maia's
+    top level, not a form that will not save.
+    """
+
+    maia_target_elo: int | None = None
 
 
 # --- games ----------------------------------------------------------------

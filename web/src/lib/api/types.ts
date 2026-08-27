@@ -53,16 +53,38 @@ export interface ErrorBody {
  * What every `/auth` route answers with: is there a password, and do I have it.
  *
  * It doubles as the app's bootstrap payload — it is the one call made before anything
- * renders — so the deployment-wide Maia target elo rides along on it rather than on a
- * settings endpoint of its own. Optional: a backend that does not publish one (or an
- * older one that does not know the field) leaves it out, and everything Maia falls back
- * to the rating the game was played at.
+ * renders — so the deployment-wide Maia target elo rides along on it. The Settings page
+ * owns that value (`AppSettings` below), but every other screen needs it to render and
+ * none of them should wait on a second call for it. Optional: a backend that publishes no
+ * target (or an older one that does not know the field) leaves it out, and everything
+ * Maia falls back to the rating the game was played at.
  */
 export interface AuthStatus {
   setup_required: boolean
   authenticated: boolean
-  /** `config.maia_target_elo` — the one level batch and live Maia are pinned to. */
+  /** The one level batch and live Maia are pinned to — see `AppSettings`. */
   maia_target_elo?: number | null
+}
+
+// --- settings --------------------------------------------------------------
+
+/**
+ * `GET`/`PUT /settings` — everything the Settings page shows, which is one number.
+ *
+ * Null is not "unset yet" pending a load: it is the deployment's answer that no target is
+ * configured, and Maia is back on the rating each game was played at.
+ */
+export interface AppSettings {
+  maia_target_elo: number | null
+}
+
+/**
+ * A PUT carries the whole of the settings, not a patch of them: `maia_target_elo: null`
+ * clears the target. A value outside 1100–2000 is clamped by the backend rather than
+ * refused, so the response is what is in force — not always what was sent.
+ */
+export interface AppSettingsUpdate {
+  maia_target_elo: number | null
 }
 
 // --- games ----------------------------------------------------------------

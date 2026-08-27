@@ -20,8 +20,9 @@ Three decisions shape this module:
   the board shows and the entries a run stored are the same shape, level key and all —
   including the way a fixed-weights build answers for the single level it *is*.
 
-Nothing here writes to the database; the Session is only used to find out which engine to
-start, on every query, so switching engines in Settings takes effect on the next one.
+Nothing here writes to the database; the Session is only read from, on every query — which
+engine to start and what level to ask it about — so changing either in Settings takes
+effect on the next query rather than on the next restart.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING, Settings, get_settings
 from backend.db.enums import EngineKind
+from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -121,7 +123,7 @@ class LiveMaia:
 
         with self._lock:
             adapter = self._open(engine)
-            level = self._level(adapter, elo)
+            level = self._level(session, adapter, elo)
             reported = _reported_level(adapter, engine, level)
             try:
                 policy = _policy_at(adapter, board, level, wanted)
@@ -252,20 +254,24 @@ class LiveMaia:
             "what a human would play"
         )
 
-    def _level(self, adapter: MaiaAdapter, requested: int | None) -> int:
+    def _level(self, session: Session, adapter: MaiaAdapter, requested: int | None) -> int:
         """The level to *ask* for: the request, the target, or the owner's rating, clamped.
 
         For a build that declares `SelfElo` this is the level it is conditioned on. For a
         fixed-weights build it conditions nothing — it survives only as the key
         `policy_at` files the answer under, which is why what gets reported back is
         `_reported_level`, not this.
+
+        The target is read out of the database on every query, the same way the engine to
+        start is: changing it on the Settings page takes effect on the next thing the board
+        asks, without restarting anything or dropping the warm process.
         """
         from backend.services.analysis import maia_bounds
 
         settings = self._settings or get_settings()
         base = requested
         if base is None:
-            base = settings.maia_target_elo
+            base = app_settings_service.get_maia_target_elo(session)
         if base is None:
             base = settings.default_owner_rating
         bounds = maia_bounds(adapter)

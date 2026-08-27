@@ -100,6 +100,28 @@ class AuthSession(Base):
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
 
+class AppSetting(Base):
+    """One piece of deployment configuration the owner edits on the Settings page.
+
+    Key and value rather than a column apiece: these are single values a person changes
+    from a form, not a schema anything joins against, and the set of them is expected to
+    grow one at a time. `services/app_settings.py` is the only module that reads or writes
+    them, and it is where each key's type and range live.
+
+    An absent row is the setting nobody has chosen, which is why clearing one deletes the
+    row instead of writing a null: "unset" has to be tellable from "set to nothing", and
+    the value column is where a `null` would be indistinguishable from either.
+    """
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+
 class Engine(Base):
     """A configured analysis engine. Managed from the UI, not from a config file."""
 

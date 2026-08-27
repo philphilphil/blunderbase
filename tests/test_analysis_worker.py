@@ -23,7 +23,7 @@ from backend.db.base import Base
 from backend.db.enums import Classification, EngineKind, Platform, RunStatus, Tier
 from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval
 from backend.db.session import create_db_engine
-from backend.services import analysis, import_service
+from backend.services import analysis, app_settings, import_service
 from backend.workers import AnalysisWorkers, analysis_queue
 
 # The fixture game: 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6, six plies and seven positions, the
@@ -704,7 +704,8 @@ async def test_a_target_elo_bakes_one_level_into_every_ply_of_both_sides(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
     """The "exploit humans" half is a question about the positions the opponent moves in."""
-    settings.maia_target_elo = 1700
+    with db() as session:
+        app_settings.set_maia_target_elo(session, 1700)
     _register(db, tmp_path, go=QUICK_REPLIES)
     _register(
         db,

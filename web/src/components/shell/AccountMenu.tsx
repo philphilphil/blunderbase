@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, User, Users } from 'lucide-react'
+import { KeyRound, LogOut, Settings, User, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -33,9 +33,9 @@ const ITEM =
  * something behind it: the owner's session.
  *
  * The chip itself is unchanged — the identity it can honestly show is still the connected
- * chess account, not a user record — and the menu it opens is where signing out and
- * changing the password live, because those are the only two things an owner ever does to
- * their own session.
+ * chess account, not a user record — and the menu it opens is where the deployment's own
+ * settings live alongside signing out and changing the password: everything an owner does
+ * to their installation rather than to their games.
  */
 export function AccountMenu() {
   const profile = useProfile()
@@ -97,6 +97,10 @@ export function AccountMenu() {
           </div>
           <div className="my-0.5 h-px bg-hairline" />
 
+          <Link to="/settings" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
+            <Settings className="size-3.5" aria-hidden />
+            Settings
+          </Link>
           <Link to="/import" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <Users className="size-3.5" aria-hidden />
             Connected accounts

@@ -19,6 +19,9 @@ export const queryKeys = {
    */
   auth: (): QueryKey => ['auth'],
 
+  /** The Settings page's own read. The value it edits also rides on `auth()`. */
+  settings: (): QueryKey => ['settings'],
+
   games: (): QueryKey => ['games'],
   gameList: (query: GameQuery = {}): QueryKey => ['games', 'list', query],
   gameCards: (query: GameQuery = {}): QueryKey => ['games', 'cards', query],
