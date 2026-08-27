@@ -13,6 +13,8 @@ from tests.conftest import running_app
 
 INDEX = "<!doctype html><title>Blunderbase</title><div id=root></div>"
 ASSET = "console.log('blunderbase')"
+# Comfortably over `GZIP_MINIMUM_SIZE`, and repetitive the way a real bundle is.
+BIG_ASSET = "console.log('blunderbase');\n" * 200
 
 
 @pytest.fixture()
@@ -88,6 +90,40 @@ def test_the_api_keeps_the_paths_it_reserved(settings: Settings, built: Path) ->
         assert client.get("/openapi.json").json()["info"]["title"] == "Blunderbase"
         # Nothing the page could claim: a POST is never the static build's.
         assert client.post("/notes", json={"text": "written by hand"}).status_code == 201
+
+
+def test_a_large_response_is_compressed_for_a_client_that_asks(
+    settings: Settings, built: Path
+) -> None:
+    """API JSON and the build's assets both, which is what the middleware's place buys.
+
+    The bytes matter less than the seconds: the connection a handler holds is given back
+    only once the body has gone out, so a payload that is a tenth the size is a pooled
+    connection held a tenth as long.
+    """
+    (built / "assets" / "big-1234.js").write_text(BIG_ASSET)
+    with running_app(create_app(settings)) as client:
+        for path in ("/openapi.json", "/assets/big-1234.js"):
+            response = client.get(path, headers={"accept-encoding": "gzip"})
+            assert response.status_code == 200, path
+            assert response.headers["content-encoding"] == "gzip", path
+            # The transport decodes for us, so the header is the compressed length and
+            # the body is the original one.
+            assert int(response.headers["content-length"]) < len(response.content), path
+
+
+def test_a_client_that_does_not_ask_is_answered_uncompressed(settings: Settings) -> None:
+    with running_app(create_app(settings)) as client:
+        response = client.get("/openapi.json", headers={"accept-encoding": "identity"})
+    assert response.status_code == 200
+    assert "content-encoding" not in response.headers
+
+
+def test_a_short_response_is_not_worth_compressing(settings: Settings) -> None:
+    with running_app(create_app(settings)) as client:
+        response = client.get("/health", headers={"accept-encoding": "gzip"})
+    assert response.json() == {"status": "ok"}
+    assert "content-encoding" not in response.headers
 
 
 def test_nothing_is_served_when_the_web_app_was_never_built(settings: Settings) -> None:

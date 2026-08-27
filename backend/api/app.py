@@ -7,6 +7,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
+from starlette.middleware.gzip import GZipMiddleware
 
 from backend.api.auth import install_auth
 from backend.api.errors import install_error_handlers
@@ -27,6 +28,11 @@ from backend.workers.runner_streams import RemoteStreamBackend
 
 TITLE = "Blunderbase"
 DESCRIPTION = "A personal chess database. Every route is a thin wrapper over `backend.services`."
+
+# Below this a gzip member's own header and trailer cost more than the compression saves,
+# so a short body is sent as it is. Every payload worth the trade — a page of game cards, a
+# stats dimension, the built JavaScript — is far above it.
+GZIP_MINIMUM_SIZE = 1000
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +163,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # prefix has already been stripped from the paths the guard matches.
     install_auth(app, settings)
     app.state.web = install_web(app, settings.web_dist)
+    # Added last so it runs first, outside the page and the guard both: everything this
+    # process sends leaves compressed, the API's JSON and the build's assets alike.
+    #
+    # It is a pool fix as much as a bandwidth one. A handler's Session is released by the
+    # dependency teardown, which FastAPI runs only once the response has been written out,
+    # so a payload that takes seconds to reach a browser on the other side of a network is
+    # a pooled connection held for those seconds. These payloads compress about tenfold and
+    # the hold shrinks with them, which is what stops a batch of analysis requests draining
+    # the pool while the answers are still in flight.
+    #
+    # `text/event-stream` is in Starlette's own exclusion list and a non-HTTP scope is
+    # passed straight through, so neither the MCP transport's streams nor the `/events`
+    # socket are buffered by this.
+    app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_SIZE)
     return app
 
 

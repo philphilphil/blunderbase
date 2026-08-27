@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, replace
+import threading
+import time
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, fields, is_dataclass, replace
 from datetime import UTC, datetime, timedelta
+from enum import Enum
 from typing import Any, NamedTuple
 
 from sqlalchemy import and_, func, or_, select
@@ -64,6 +67,29 @@ LOSS_CLASSIFICATIONS = (
 # Fields that are a level rather than a count, so summing them across buckets is wrong.
 NON_ADDITIVE = frozenset({"key", "end_rating", "rating"})
 
+# How long a computed payload is handed out again before the library is read afresh.
+#
+# Every aggregation here is a scan: `_eval_rows` hydrates every analysed ply of every game
+# that matches, and the dashboard asks for six dimensions at once. The frontend invalidates
+# on a three-second cooldown while an analysis batch runs, so those scans were re-running
+# every three seconds to produce the answer they had just produced — and each one holds a
+# pooled connection for as long as it takes. Ten seconds is the trade: during a batch the
+# numbers lag by at most that, and in exchange the scans stop competing with the batch for
+# the pool. Anything that is not a batch (a filter changed, a dimension opened) is a new
+# key and is computed immediately.
+STATS_CACHE_TTL_SECONDS = 10.0
+# Distinct filter sets are unbounded — the games table narrows by opponent, by ECO, by free
+# text — so entries are capped and the oldest goes when the cap is reached, rather than the
+# cache growing with everything anyone ever asked for.
+STATS_CACHE_MAX_ENTRIES = 64
+
+# The clock the TTL is measured on. Monotonic, so a system clock adjustment cannot strand
+# an entry in the future; named here so a test can hand the cache a clock of its own.
+_clock = time.monotonic
+
+_CACHE_LOCK = threading.Lock()
+_CACHE: dict[tuple[Any, ...], tuple[float, Any]] = {}
+
 
 class UnknownDimensionError(ValueError):
     """The requested stats dimension is not one this service can compute."""
@@ -98,6 +124,17 @@ class GameRow:
     eco: str | None
 
 
+def reset_stats_cache() -> None:
+    """Forget every cached payload.
+
+    The cache is keyed by what was asked for and by nothing that says which library
+    answered, which is what makes it a cache in a process serving one database and a leak
+    anywhere a second one appears. Tests call this between libraries.
+    """
+    with _CACHE_LOCK:
+        _CACHE.clear()
+
+
 def get_stats(
     session: Session,
     dimension: str,
@@ -112,6 +149,9 @@ def get_stats(
     `since` / `until` are shorthand for the same fields on `filters`, so the coach can ask
     for one dimension over one window without building a filter object, and the UI can
     pass the filter set the games table is already showing.
+
+    The answer is cached for `STATS_CACHE_TTL_SECONDS`; an unknown dimension is still
+    rejected before anything is looked up, and a handler that raises caches nothing.
     """
     if dimension in PLANNED_DIMENSIONS:
         raise UnknownDimensionError(
@@ -124,11 +164,17 @@ def get_stats(
         )
 
     scope = _scope(filters, since, until)
-    payload = handler(session, scope, options)
-    payload["dimension"] = dimension
-    payload["since"] = _stamp(scope.since)
-    payload["until"] = _stamp(scope.until)
-    return payload
+
+    def compute() -> dict[str, Any]:
+        payload = handler(session, scope, options)
+        payload["dimension"] = dimension
+        payload["since"] = _stamp(scope.since)
+        payload["until"] = _stamp(scope.until)
+        return payload
+
+    # `options` is part of the key as much as the scope is: `tz_offset` and `thresholds`
+    # change the buckets, and two calls that differ only there are two different answers.
+    return _cached(_cache_key("get_stats", dimension, scope, options), compute)
 
 
 def compare_periods(
@@ -157,9 +203,14 @@ def get_player_profile(session: Session, **options: Any) -> dict[str, Any]:
     """Ratings over time per platform, volume and platforms.
 
     Defined in `backend.services.games`, where the game row it reads lives; re-exposed
-    here because the coach asks for it alongside the other aggregations.
+    here because the coach asks for it alongside the other aggregations — and cached here,
+    because it hydrates every owned game in the library and `/stats/profile` is refetched
+    on the same cooldown as the dimensions beside it.
     """
-    return games_service.get_player_profile(session, **options)
+    return _cached(
+        _cache_key("get_player_profile", options),
+        lambda: games_service.get_player_profile(session, **options),
+    )
 
 
 def get_worst_recent_moments(
@@ -174,9 +225,26 @@ def get_worst_recent_moments(
 
     Ranked by win percentage given away rather than by centipawns, so a swing from +8 to
     +4 does not outrank one from equal to lost.
+
+    Cached like the dimensions are, and keyed on `days` rather than on the moment that
+    window starts at: the start moves with every call and the ranking does not, so keying
+    on the derived timestamp would be a key that never repeats.
     """
     if amount <= 0:
         return []
+    return _cached(
+        _cache_key("get_worst_recent_moments", days, amount, filters, classifications),
+        lambda: _worst_recent_moments(session, days, amount, filters, classifications),
+    )
+
+
+def _worst_recent_moments(
+    session: Session,
+    days: int | None,
+    amount: int,
+    filters: GameFilters | None,
+    classifications: Sequence[Classification],
+) -> list[dict[str, Any]]:
     since = None
     if days is not None:
         since = datetime.now(UTC) - timedelta(days=days)
@@ -424,6 +492,68 @@ def _scope(
     if until is not None:
         scope.until = until
     return scope
+
+
+def _cached(key: tuple[Any, ...], compute: Callable[[], Any]) -> Any:
+    """`compute()`'s answer, recomputed at most once every `STATS_CACHE_TTL_SECONDS`.
+
+    Every caller inside the window is handed the *same* object rather than a copy. That is
+    safe because everything cached here is built out of plain dicts, lists and scalars —
+    no ORM row survives into a payload — and because nothing downstream writes to what it
+    was given: the routes hand the payload to a response model, and the MCP tools copy the
+    fields they want into a payload of their own.
+
+    `compute()` runs outside the lock. Holding it across the scan is the one thing that
+    would make this worse than no cache at all, by queueing a refetch storm behind the
+    first miss instead of letting the hits through. Two callers that miss together both
+    compute and the later writer wins, which costs one duplicate scan and never a wrong
+    answer.
+    """
+    now = _clock()
+    with _CACHE_LOCK:
+        entry = _CACHE.get(key)
+        if entry is not None and entry[0] > now:
+            return entry[1]
+    payload = compute()
+    with _CACHE_LOCK:
+        # Re-inserted rather than assigned, so a refreshed entry goes to the back of the
+        # queue and the cap drops what has genuinely been idle longest.
+        _CACHE.pop(key, None)
+        _CACHE[key] = (_clock() + STATS_CACHE_TTL_SECONDS, payload)
+        while len(_CACHE) > STATS_CACHE_MAX_ENTRIES:
+            _CACHE.pop(next(iter(_CACHE)))
+    return payload
+
+
+def _cache_key(name: str, *parts: Any) -> tuple[Any, ...]:
+    """The name of what was computed, and a stable reading of everything it was given."""
+    return (name, *(_hashable(part) for part in parts))
+
+
+def _hashable(value: Any) -> Any:
+    """A key's worth of a value: hashable, stable across calls, different when it differs.
+
+    A dataclass goes in field by field, so two `GameFilters` that narrow the same way key
+    the same whichever call built them. A datetime goes in as its ISO form and an enum as
+    its string value, so the key does not depend on a tzinfo object's identity. The
+    mapping and sequence arms are for `**options`, which arrives as whatever a caller
+    passed — `thresholds=[150]` is a list, and a list cannot be part of a dict key.
+    """
+    if isinstance(value, Enum):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if is_dataclass(value) and not isinstance(value, type):
+        return tuple(_hashable(getattr(value, field.name)) for field in fields(value))
+    if isinstance(value, Mapping):
+        return tuple((key, _hashable(item)) for key, item in sorted(value.items()))
+    # Before the sequence arm: a string is a sequence, and unrolling it into characters
+    # would key `eco="C6"` the same as `eco=("C", "6")`.
+    if isinstance(value, str | bytes):
+        return value
+    if isinstance(value, Sequence):
+        return tuple(_hashable(item) for item in value)
+    return value
 
 
 def primary_runs() -> Any:

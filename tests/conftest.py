@@ -17,6 +17,7 @@ from backend.config import Settings, get_settings
 from backend.db import models  # noqa: F401  (importing registers every table on Base.metadata)
 from backend.db.base import Base
 from backend.db.session import create_db_engine, reset_engines
+from backend.services.stats import reset_stats_cache
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -26,6 +27,20 @@ OWNER_PASSWORD = "correct-horse-battery"
 # Loopback rather than `testserver`: the session cookie carries `Secure` anywhere else,
 # and a `Secure` cookie is never sent back over the plain HTTP the test transport speaks.
 API_BASE_URL = "http://127.0.0.1:8765"
+
+@pytest.fixture(autouse=True)
+def _fresh_stats_cache() -> Iterator[None]:
+    """No test is answered out of another test's library.
+
+    The stats service keeps its payloads for a few seconds, keyed by the dimension and the
+    filters and by nothing that says which database produced them. One process serves one
+    library, so that is a cache; a suite where every test builds its own is the one place
+    it would be a leak, and this is where it is closed.
+    """
+    reset_stats_cache()
+    yield
+    reset_stats_cache()
+
 
 @pytest.fixture()
 def engine() -> Iterator[Engine]:

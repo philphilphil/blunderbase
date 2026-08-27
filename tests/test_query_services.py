@@ -812,6 +812,149 @@ def test_get_player_profile_is_reachable_from_stats(library: Library) -> None:
     assert stats.get_player_profile(library.session)["volume"]["games"] == 6
 
 
+# --------------------------------------------------------------------- stats cache
+
+
+def counting(monkeypatch: pytest.MonkeyPatch, module: Any, name: str) -> list[int]:
+    """Count the calls into the library a dimension makes, without changing its answer."""
+    original = getattr(module, name)
+    calls = [0]
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        calls[0] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, name, counted)
+    return calls
+
+
+def test_a_repeated_dimension_is_not_recomputed(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The refetch storm: the same question twice in a row is one scan of the library."""
+    calls = counting(monkeypatch, stats, "_eval_rows")
+    first = stats.get_stats(analysed.session, "blunders_by_phase")
+    second = stats.get_stats(analysed.session, "blunders_by_phase")
+    assert calls == [1]
+    assert second is first
+    assert first["total"]["blunder"] == 4
+
+
+def test_a_cached_payload_is_recomputed_once_it_expires(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    moment = [1000.0]
+    monkeypatch.setattr(stats, "_clock", lambda: moment[0])
+    calls = counting(monkeypatch, stats, "_eval_rows")
+
+    stats.get_stats(analysed.session, "blunders_by_phase")
+    moment[0] += stats.STATS_CACHE_TTL_SECONDS / 2
+    stats.get_stats(analysed.session, "blunders_by_phase")
+    assert calls == [1]
+
+    moment[0] += stats.STATS_CACHE_TTL_SECONDS
+    stats.get_stats(analysed.session, "blunders_by_phase")
+    assert calls == [2]
+
+
+def test_resetting_the_cache_asks_the_library_again(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = counting(monkeypatch, stats, "_eval_rows")
+    stats.get_stats(analysed.session, "blunders_by_phase")
+    stats.reset_stats_cache()
+    stats.get_stats(analysed.session, "blunders_by_phase")
+    assert calls == [2]
+
+
+def test_different_filters_are_different_entries(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = counting(monkeypatch, stats, "_eval_rows")
+    everything = stats.get_stats(analysed.session, "blunders_by_phase")
+    rapid = stats.get_stats(
+        analysed.session, "blunders_by_phase", filters=GameFilters(speed=Speed.RAPID)
+    )
+    assert calls == [2]
+    assert rapid["total"]["moves"] < everything["total"]["moves"]
+    # And each is still served from its own entry afterwards.
+    assert stats.get_stats(analysed.session, "blunders_by_phase") is everything
+    assert calls == [2]
+
+
+def test_the_options_are_part_of_the_key(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two calls that differ only in an option are two answers, not one served twice."""
+    games = counting(monkeypatch, stats, "_game_rows")
+    assert stats.get_stats(analysed.session, "performance_by_hour")["tz_offset"] == 0.0
+    assert stats.get_stats(analysed.session, "performance_by_hour", tz_offset=2)["tz_offset"] == 2.0
+    assert games == [2]
+
+    # An option that is a list is still a key: `thresholds` cannot go into one as it is.
+    evals = counting(monkeypatch, stats, "_eval_rows")
+    narrow = stats.get_stats(analysed.session, "time_trouble_loss", thresholds=[150])
+    assert stats.get_stats(analysed.session, "time_trouble_loss", thresholds=[150]) is narrow
+    assert stats.get_stats(analysed.session, "time_trouble_loss")["thresholds"] != [150.0]
+    assert evals == [2]
+
+
+def test_the_cache_is_capped_and_drops_the_oldest(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unbounded filter sets cannot grow it: one more entry pushes the first one out."""
+    calls = counting(monkeypatch, stats, "_eval_rows")
+    cap = stats.STATS_CACHE_MAX_ENTRIES
+    oldest = GameFilters(opponent="opponent-0")
+    for index in range(cap + 1):
+        stats.get_stats(
+            analysed.session,
+            "blunders_by_phase",
+            filters=GameFilters(opponent=f"opponent-{index}"),
+        )
+    assert calls == [cap + 1]
+
+    # The newest is still there.
+    stats.get_stats(
+        analysed.session, "blunders_by_phase", filters=GameFilters(opponent=f"opponent-{cap}")
+    )
+    assert calls == [cap + 1]
+    # The first one asked for is not: it was dropped to make room.
+    stats.get_stats(analysed.session, "blunders_by_phase", filters=oldest)
+    assert calls == [cap + 2]
+
+
+def test_the_moments_are_cached_and_keyed_by_what_was_asked_for(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = counting(monkeypatch, stats, "_eval_rows")
+    moments = stats.get_worst_recent_moments(analysed.session, amount=3)
+    assert stats.get_worst_recent_moments(analysed.session, amount=3) is moments
+    assert calls == [1]
+    assert len(stats.get_worst_recent_moments(analysed.session, amount=1)) == 1
+    assert calls == [2]
+
+
+def test_the_profile_is_cached(analysed: Library, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = counting(monkeypatch, games_service, "get_player_profile")
+    profile = stats.get_player_profile(analysed.session)
+    assert stats.get_player_profile(analysed.session) is profile
+    assert calls == [1]
+    assert profile["volume"]["games"] == 6
+
+
+def test_a_dimension_that_raises_is_never_cached(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An error is not an answer: it is raised again, and it stands in for nothing."""
+    calls = counting(monkeypatch, stats, "_game_rows")
+    for _ in range(2):
+        with pytest.raises(ValueError, match="unknown bucket"):
+            stats.get_stats(analysed.session, "rating_trend", bucket="fortnight")
+    assert stats.get_stats(analysed.session, "rating_trend", bucket="year")["buckets"]
+    assert calls == [1]
+
+
 # --------------------------------------------------------------------------- notes
 
 
