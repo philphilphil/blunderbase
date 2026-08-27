@@ -15,6 +15,11 @@ from backend.config import Settings, get_settings
 # connection, and an analysis run holds one for as long as it buffers its MoveEvals.
 POOL_SIZE = 10
 MAX_OVERFLOW = 50
+# What a caller waits for a connection before it is told there is none. Deliberately short:
+# a pool with nothing left is a server that is already overloaded, and the useful answer is
+# an error the caller sees in seconds rather than sixty request threads each hanging for
+# half a minute on a queue that is not moving.
+POOL_TIMEOUT_SECONDS = 5
 
 SQLITE_PREFIX = "sqlite+pysqlite:///"
 BUSY_TIMEOUT_MS = 5000
@@ -35,12 +40,19 @@ def _install_sqlite_pragmas(engine: Engine) -> None:
     per-connection, so they have to be set on every one the pool opens. The listener is
     bound to the engine rather than to the `Engine` class, so it reaches this engine's
     connections and nobody else's.
+
+    `synchronous=NORMAL` is the pairing WAL is designed for: a commit no longer waits on an
+    fsync, and what that costs is the last few transactions if the *machine* loses power —
+    a process that crashes takes nothing with it, because the WAL is already on disk. For a
+    database of chess games that is the right side of the trade, and it is what stops a
+    burst of small writes serialising into a queue nobody drains in time.
     """
 
     @event.listens_for(engine, "connect")
     def _configure(dbapi_connection: Any, _record: Any) -> None:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
         cursor.close()
@@ -53,7 +65,11 @@ def create_db_engine(url: str, **kwargs: Any) -> Engine:
         path.parent.mkdir(parents=True, exist_ok=True)
     options: dict[str, Any] = {"future": True}
     if "poolclass" not in kwargs:
-        options |= {"pool_size": POOL_SIZE, "max_overflow": MAX_OVERFLOW}
+        options |= {
+            "pool_size": POOL_SIZE,
+            "max_overflow": MAX_OVERFLOW,
+            "pool_timeout": POOL_TIMEOUT_SECONDS,
+        }
     options |= kwargs
     engine = create_engine(url, **options)
     _install_sqlite_pragmas(engine)

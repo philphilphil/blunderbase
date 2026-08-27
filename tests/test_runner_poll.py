@@ -9,6 +9,7 @@ one dispatcher, not two.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -63,6 +64,26 @@ def announce(api: TestClient, token: str, **kwargs: object) -> dict:
     answer = poll_once(api, token, **kwargs)  # type: ignore[arg-type]
     assert answer.status_code == 200, answer.text
     return answer.json()
+
+
+def last_seen(settings: Settings, runner_id: int) -> datetime:
+    with get_sessionmaker(settings)() as session:
+        stamp = runners_service.require_runner(session, runner_id).last_seen_at
+    assert stamp is not None
+    return stamp
+
+
+def blank_beat(settings: Settings, run_id: int) -> None:
+    """Clear a run's beat, so that the next write of it is visible for what it is."""
+    with get_sessionmaker(settings)() as session:
+        analysis.require_run(session, run_id).heartbeat_at = None
+        session.commit()
+
+
+def age_beat(api: TestClient, runner_id: int, run_id: int) -> None:
+    """Age a held attempt out of the beat throttle, the way waiting would."""
+    held = api.app.state.gateway.state(runner_id).runs[run_id]
+    held.beaten -= runner_gateway.HEARTBEAT_WRITE_SECONDS
 
 
 # --- announcing ------------------------------------------------------------
@@ -167,10 +188,55 @@ def test_a_heartbeat_keeps_a_run_alive_and_a_stolen_one_is_taken_back(
         analysis.fail_run(
             session, analysis.require_run(session, run_id), "taken away", retry=False
         )
+    # The theft is only ever noticed by a beat that actually reaches the row, and the beat
+    # above bought this attempt a window of silence.
+    age_beat(api, _runner_id, run_id)
     stolen = poll_heartbeat(api, token, dispatch, done=5, total=9)
 
     assert stolen.json() == {"ok": False, "cancel": True}
     assert api.app.state.gateway.state(_runner_id).busy == 0
+
+
+def test_a_beat_inside_the_window_is_not_a_second_write(
+    api: TestClient, settings: Settings
+) -> None:
+    """A run says it is alive far more often than the sweep asks, and only the first of
+    those says it to the database — the rest are answered from what the gateway already
+    knows, which is what keeps the hottest frame in the protocol off SQLite's one writer."""
+    runner_id, token = register(settings)
+    game_id = seed_game(api)
+    engine_id = announce(api, token)["engines"][0]["engine_id"]
+    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    dispatch = announce(api, token)["dispatch"][0]
+
+    assert poll_heartbeat(api, token, dispatch, done=1, total=9).json()["ok"] is True
+    assert run_row(settings, run_id).heartbeat_at is not None, "the first beat writes"
+    blank_beat(settings, run_id)
+
+    assert poll_heartbeat(api, token, dispatch, done=2, total=9).json()["ok"] is True
+    assert run_row(settings, run_id).heartbeat_at is None, "and the one behind it does not"
+
+    age_beat(api, runner_id, run_id)
+    assert poll_heartbeat(api, token, dispatch, done=3, total=9).json()["ok"] is True
+    assert run_row(settings, run_id).heartbeat_at is not None, "the window closed"
+
+
+def test_a_poll_inside_the_window_does_not_write_last_seen_again(
+    api: TestClient, settings: Settings
+) -> None:
+    """What decides a poller is gone is the gateway's own clock, not this column, so it is
+    written for the Runners page to read rather than on every visit."""
+    runner_id, token = register(settings)
+    announce(api, token)
+    announce(api, token)
+    written = last_seen(settings, runner_id)
+
+    announce(api, token)
+    assert last_seen(settings, runner_id) == written
+
+    api.app.state.gateway.state(runner_id).touched -= runner_gateway.TOUCH_WRITE_SECONDS
+    announce(api, token)
+    assert last_seen(settings, runner_id) > written
 
 
 def test_a_poll_heartbeat_moves_the_progress_bar_the_way_a_socket_one_does(

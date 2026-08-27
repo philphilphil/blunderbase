@@ -12,9 +12,11 @@ Three things shape the module:
   buffers frames for the next `POST /runner/poll`, which is the whole of the difference
   between the two transports. `api/routes/runner_gateway.py` is then a decode-and-delegate
   loop with no scheduling in it.
-- **Every database call goes out to a thread.** A `Session` belongs to one thread and must
-  not be held across an `await`, so each `_`-prefixed helper here is a synchronous unit of
-  work handed to `asyncio.to_thread` whole.
+- **Every database call goes out to a thread — one of four.** A `Session` belongs to one
+  thread and must not be held across an `await`, so each `_`-prefixed helper here is a
+  synchronous unit of work handed to `_db` whole. Those threads are the gateway's own
+  rather than the default executor's, which is what bounds the share of the connection
+  pool a room full of chattering runners can take away from the HTTP routes.
 - **A result is only ever accepted under its attempt token.** The dispatcher hands one out
   with every run; a runner that reconnected twice and finally answers for a run the stale
   sweep took away is told `run_ack{accepted: false}` and the payload is dropped. That is
@@ -30,12 +32,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import hmac
 import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -71,6 +75,21 @@ WS_CLOSE_GOING_AWAY = 1001
 # The shortest gap between two dispatch rounds. A round that has to hand a run back wakes
 # the pump again through `analysis.queued`, and this is what keeps that from being a spin.
 PUMP_FLOOR_SECONDS = 0.2
+# How many threads the gateway may do database work on at once. A Session holds a pool
+# connection for as long as it lives, so this is also the most of the pool the gateway can
+# ever be holding while the HTTP routes want the rest of it.
+DB_THREADS = 4
+# The shortest gap between two writes of a runner's `last_seen_at`. Nothing decides a
+# runner is gone from that column — `beat` times a link out on `state.last_seen`, which is
+# in memory and still moved by every pong — so it is a number the Runners page shows, and
+# half a minute stale is fresher than anyone reading it needs.
+TOUCH_WRITE_SECONDS = 30.0
+# The shortest gap between two writes of one run's `heartbeat_at`. Progress frames arrive
+# every `analysis.PROGRESS_EVERY` plies, which on a fast engine is several a second and was
+# the hottest write in the server. The invariant is that a beat must always land inside
+# `analysis.STALE_AFTER_SECONDS`, since that is the age at which the sweep decides the run
+# was abandoned; a third of it leaves room for two skipped beats and still no false steal.
+HEARTBEAT_WRITE_SECONDS = analysis.STALE_AFTER_SECONDS / 3
 
 WEBSOCKET = "websocket"
 POLL = "poll"
@@ -91,6 +110,8 @@ REASON_SHUTDOWN = "shutdown"
 # A handler registered from outside — the stream backends' seam. Called after whatever
 # built-in handler the type has, and never instead of it.
 Handler = Callable[[int, Mapping[str, Any]], Awaitable[None]]
+
+T = TypeVar("T")
 
 
 class GatewayError(RuntimeError):
@@ -184,6 +205,10 @@ class RemoteRun:
     # one's is. A UI cannot tell where a run executed, and does not need to.
     plan: RunPlan | None = None
     started: float = 0.0
+    # When this attempt's beat last reached the row, rather than every frame that carried
+    # one. Minus infinity so the first progress frame of an attempt always writes: a run
+    # that was just claimed has to say so before anything is throttled away.
+    beaten: float = float("-inf")
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +265,9 @@ class RunnerState:
     # When this link last said anything. A websocket says it with a pong; a poller says it
     # by coming back, and that is the only thing there is to time it out on.
     last_seen: float = field(default_factory=time.monotonic)
+    # When `last_seen` was last written through to the row. Minus infinity so the first
+    # thing this link says lands in the database, however long the link then stays quiet.
+    touched: float = float("-inf")
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     @property
@@ -306,6 +334,7 @@ class RunnerGateway:
         self._stopping = asyncio.Event()
         self._unsubscribe: Callable[[], None] | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._db_executor: ThreadPoolExecutor | None = None
 
     # --- lifecycle --------------------------------------------------------
 
@@ -318,6 +347,22 @@ class RunnerGateway:
         if self._sessions is None:
             self._sessions = get_sessionmaker(self.settings)
         return self._sessions
+
+    async def _db(self, fn: Callable[..., T], *args: Any) -> T:
+        """One synchronous unit of database work, on the gateway's own small pool.
+
+        Not `asyncio.to_thread`: that pool is shared with every other thread the server
+        offloads onto and is sized for tens of them, so a burst of frames became a burst of
+        Sessions, each holding a connection while it queued behind SQLite's single writer,
+        until the routes had none left and every request waited out the pool timeout. Four
+        threads is a ceiling the gateway cannot exceed however loud its runners are.
+        """
+        loop = asyncio.get_running_loop()
+        if self._db_executor is None:
+            self._db_executor = ThreadPoolExecutor(
+                max_workers=DB_THREADS, thread_name_prefix="gateway-db"
+            )
+        return await loop.run_in_executor(self._db_executor, functools.partial(fn, *args))
 
     async def start(self) -> None:
         """Begin dispatching, sweeping and pinging. Called from the app's lifespan."""
@@ -350,6 +395,11 @@ class RunnerGateway:
         # After the loops, so nothing claims a run while the runs are being handed back.
         for runner_id in list(self._states):
             await self.detach(runner_id, reason=REASON_SHUTDOWN)
+        # And after the handbacks, which are the last database work there is: every one of
+        # them is awaited above, shielded, so nothing is still queued for these threads.
+        executor, self._db_executor = self._db_executor, None
+        if executor is not None:
+            executor.shutdown(wait=False, cancel_futures=True)
         self._loop = None
 
     def notify(self) -> None:
@@ -408,13 +458,11 @@ class RunnerGateway:
             )
             self._emit_disconnected(previous, REASON_REPLACED)
 
-        registration = await asyncio.to_thread(
+        registration = await self._db(
             self._register, runner.id, ads, hello.get("slots"), hello.get("version"),
             link.transport,
         )
-        resumed, cancelled = await asyncio.to_thread(
-            self._reconcile, reported, inherited
-        )
+        resumed, cancelled = await self._db(self._reconcile, reported, inherited)
         link.runner_id = runner.id
         link.name = registration.name
         state = RunnerState(
@@ -482,7 +530,7 @@ class RunnerGateway:
         held = {run.run_id: run.attempt_token for run in state.runs.values()}
         # Immediately rather than at the 60s sweep: the gateway knows this runner is gone,
         # and a backlog does not need to wait a minute to find out.
-        release = self._spawn(asyncio.to_thread(self._release_link, runner_id, reason, held))
+        release = self._spawn(self._db(self._release_link, runner_id, reason, held))
         logger.info("runner %r detached: %s", state.name, reason)
         await asyncio.shield(release)
 
@@ -568,16 +616,14 @@ class RunnerGateway:
             return
         state.missed_pings = 0
         state.last_seen = time.monotonic()
-        await asyncio.to_thread(self._touch, runner_id)
+        await self._touched(state)
 
     async def _on_advertise(self, runner_id: int, frame: Mapping[str, Any]) -> None:
         state = self._states.get(runner_id)
         if state is None:
             return
         ads = protocol.decode_ads(frame["engines"])
-        registration = await asyncio.to_thread(
-            self._register_engines, runner_id, ads, state.transport
-        )
+        registration = await self._db(self._register_engines, runner_id, ads, state.transport)
         state.engines = registration.engines
         state.engine_ids = registration.engine_ids
         await self.send(runner_id, protocol.engines_accepted(list(state.engines)))
@@ -587,8 +633,7 @@ class RunnerGateway:
     async def _on_run_progress(self, runner_id: int, frame: Mapping[str, Any]) -> None:
         run_id = int(frame["run_id"])
         token = str(frame["attempt_token"])
-        alive = await asyncio.to_thread(self._heartbeat, run_id, token)
-        if not alive:
+        if not await self._beaten(runner_id, run_id, token):
             # The sweep, or a revoke, took it away while the runner was searching. Telling
             # it now is the difference between one wasted position and one wasted pass.
             await self._release(self._states.get(runner_id), run_id, CANCEL_STOLEN, token)
@@ -605,7 +650,7 @@ class RunnerGateway:
         except protocol.ProtocolError as exc:
             await self._refuse(runner_id, protocol.ERROR_BAD_PAYLOAD, str(exc))
             return
-        accepted, reason = await asyncio.to_thread(
+        accepted, reason = await self._db(
             self._complete, run_id, token, evals, frame.get("note")
         )
         self._forget(runner_id, run_id, token)
@@ -617,7 +662,7 @@ class RunnerGateway:
     async def _on_run_failed(self, runner_id: int, frame: Mapping[str, Any]) -> None:
         run_id = int(frame["run_id"])
         token = str(frame["attempt_token"])
-        accepted, reason = await asyncio.to_thread(
+        accepted, reason = await self._db(
             self._fail,
             run_id,
             token,
@@ -669,7 +714,7 @@ class RunnerGateway:
                 if room <= 0:
                     break
                 try:
-                    claim = await asyncio.to_thread(self._claim, runner_id)
+                    claim = await self._db(self._claim, runner_id)
                 except Exception:
                     logger.exception("the gateway could not claim a run for %r", state.name)
                     claim = None
@@ -682,9 +727,7 @@ class RunnerGateway:
                     # nothing of this claim, so either way the run goes back rather than
                     # the board waiting — its attempt refunded, because nobody ever
                     # started searching it.
-                    await asyncio.to_thread(
-                        self._abandon_held, {claim.run_id: claim.attempt_token}
-                    )
+                    await self._db(self._abandon_held, {claim.run_id: claim.attempt_token})
                     break
                 state.runs[claim.run_id] = RemoteRun(
                     run_id=claim.run_id,
@@ -696,7 +739,7 @@ class RunnerGateway:
                     # The link went while the claim was in flight, so nobody is searching:
                     # straight back to the queue rather than out to the stale sweep.
                     state.runs.pop(claim.run_id, None)
-                    await asyncio.to_thread(self._abandon_held, {claim.run_id: claim.attempt_token})
+                    await self._db(self._abandon_held, {claim.run_id: claim.attempt_token})
                     break
                 dispatched += 1
         if dispatched:
@@ -742,7 +785,7 @@ class RunnerGateway:
             for state in list(self._states.values())
             for run in state.runs.values()
         }
-        stale = await asyncio.to_thread(self._requeue_stale)
+        stale = await self._db(self._requeue_stale)
         for run_id in stale:
             collected = held.get(run_id)
             if collected is not None:
@@ -826,7 +869,7 @@ class RunnerGateway:
         self.notify()
 
     async def _preempt(self, runner_id: int, run_id: int, token: str) -> None:
-        await asyncio.to_thread(self._abandon_held, {run_id: token})
+        await self._db(self._abandon_held, {run_id: token})
         await self.send(runner_id, protocol.run_cancel(run_id=run_id, reason=CANCEL_PREEMPTED))
 
     # --- the poll fallback -------------------------------------------------
@@ -854,16 +897,14 @@ class RunnerGateway:
         else:
             if request.get("engines") is not None:
                 ads = protocol.decode_ads(request["engines"])
-                registration = await asyncio.to_thread(
-                    self._register_engines, runner.id, ads, POLL
-                )
+                registration = await self._db(self._register_engines, runner.id, ads, POLL)
                 state.engines = registration.engines
                 state.engine_ids = registration.engine_ids
-            resumed, cancel = await asyncio.to_thread(
+            resumed, cancel = await self._db(
                 self._reconcile, _active_runs(request.get("active_runs") or ()), dict(state.runs)
             )
             state.runs = resumed
-            await asyncio.to_thread(self._touch, runner.id)
+            await self._touched(state)
 
         # Coming back is the whole of what a poller does to say it is alive.
         state.last_seen = time.monotonic()
@@ -902,8 +943,7 @@ class RunnerGateway:
         executed, and a progress bar must not freeze because the machine working it fell
         back to polling.
         """
-        alive = await asyncio.to_thread(self._heartbeat, run_id, attempt_token)
-        if not alive:
+        if not await self._beaten(runner_id, run_id, attempt_token):
             self._forget(runner_id, run_id, attempt_token)
             return False
         self._progressed(runner_id, run_id, done, total)
@@ -923,11 +963,11 @@ class RunnerGateway:
     ) -> tuple[bool, str | None]:
         """`POST /runner/runs/{id}/complete`, carrying either a success or a failure."""
         if error is None:
-            accepted, reason = await asyncio.to_thread(
+            accepted, reason = await self._db(
                 self._complete, run_id, attempt_token, protocol.decode_evals(evals or []), note
             )
         else:
-            accepted, reason = await asyncio.to_thread(
+            accepted, reason = await self._db(
                 self._fail, run_id, attempt_token, error, stderr, retry
             )
         self._forget(runner_id, run_id, attempt_token)
@@ -935,6 +975,47 @@ class RunnerGateway:
         return accepted, reason
 
     # --- bookkeeping --------------------------------------------------------
+
+    async def _touched(self, state: RunnerState) -> None:
+        """Write `last_seen_at` for a link that has just spoken — at most so often.
+
+        A pong and a poll are how a runner says it is there, and both used to be an UPDATE
+        and a commit each. What actually decides a link is alive is `state.last_seen`, which
+        is in memory and moved by every one of them; the column is what the Runners page
+        prints, so writing it once every `TOUCH_WRITE_SECONDS` says the same thing to the
+        only reader there is at a fraction of the cost to the single writer everything else
+        is queueing behind.
+        """
+        now = time.monotonic()
+        if now - state.touched < TOUCH_WRITE_SECONDS:
+            return
+        state.touched = now
+        await self._db(self._touch, state.runner_id)
+
+    async def _beaten(self, runner_id: int, run_id: int, attempt_token: str) -> bool:
+        """Beat one run's row, at most every `HEARTBEAT_WRITE_SECONDS`. Is it still ours?
+
+        The beat and the question are one statement — `heartbeat_run` writes only where the
+        token still matches — so a skipped write is also a skipped question, and the answer
+        it stands in for is "yes". That is sound because the only thing that takes a run off
+        a runner behind its back is the stale sweep, and the sweep collects a run whose beat
+        is older than `analysis.STALE_AFTER_SECONDS`: inside the interval the row was beaten
+        far too recently for it to have been touched. Every other way a run changes hands —
+        a preemption, a detach, a reconcile — goes through this gateway and takes the run
+        off the slot here, so there is no held attempt left for a frame to ask about.
+
+        An attempt this gateway is not holding is beaten unthrottled: there is no entry to
+        remember the last write on, and the answer is exactly the "not yours any more" the
+        caller is asking for.
+        """
+        state = self._states.get(runner_id)
+        held = None if state is None else state.runs.get(run_id)
+        if held is not None and hmac.compare_digest(held.attempt_token, attempt_token):
+            now = time.monotonic()
+            if now - held.beaten < HEARTBEAT_WRITE_SECONDS:
+                return True
+            held.beaten = now
+        return await self._db(self._heartbeat, run_id, attempt_token)
 
     def _forget(self, runner_id: int, run_id: int, attempt_token: str | None = None) -> None:
         """This attempt is no longer on a slot, whatever became of it.
@@ -1125,8 +1206,22 @@ class RunnerGateway:
                     # letting the runner finish a pass with nowhere to put it.
                     cancelled.append(run_id)
                     continue
+                previous = known.get(run_id)
                 resumed[run_id] = RemoteRun(
-                    run_id=run_id, attempt_token=token, plan=plan, started=time.monotonic()
+                    run_id=run_id,
+                    attempt_token=token,
+                    plan=plan,
+                    started=time.monotonic(),
+                    # An attempt that resumes is the same attempt, and its row was beaten
+                    # whenever it was beaten. Starting the throttle over on every poll —
+                    # which reconciles each time it comes back — would put the write rate
+                    # back on the poll interval rather than on the one chosen for it.
+                    beaten=(
+                        previous.beaten
+                        if previous is not None
+                        and hmac.compare_digest(previous.attempt_token, token)
+                        else float("-inf")
+                    ),
                 )
             for run_id, held in known.items():
                 if run_id in resumed:
