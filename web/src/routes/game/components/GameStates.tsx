@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api/client'
 
-/** The three-column geometry, held while the payload is in flight (design 1c). */
+/** The two-column geometry, held while the payload is in flight (design 1c). */
 export function GameViewSkeleton() {
   return (
     <div className="flex min-h-0 flex-1" data-testid="game-skeleton">
-      <div className="flex shrink-[2] grow-0 basis-[32.75rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem] min-w-[24rem]">
+      <div className="flex shrink-[2] grow-0 basis-[35rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem] min-w-[26.25rem]">
         <div className="flex items-start gap-2.5">
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-4 w-56" />
@@ -24,7 +24,7 @@ export function GameViewSkeleton() {
         <Skeleton className="min-h-[6.875rem] flex-1 rounded-lg" />
       </div>
 
-      <div className="flex min-w-[16rem] flex-1 flex-col border-r border-hairline">
+      <div className="flex min-w-[20rem] flex-1 flex-col">
         <div className="h-[2.375rem] flex-none border-b border-hairline" />
         <div className="flex flex-1 flex-col gap-1.5 p-3">
           {Array.from({ length: 12 }, (_, index) => (
@@ -35,14 +35,6 @@ export function GameViewSkeleton() {
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-[1.625rem] rounded-[0.3125rem]" />
           <Skeleton className="h-[1.625rem] rounded-[0.3125rem]" />
-        </div>
-      </div>
-
-      <div className="flex w-[19.75rem] flex-none flex-col bg-panel">
-        <div className="h-[2.375rem] flex-none border-b border-hairline" />
-        <div className="flex flex-1 flex-col gap-3.5 p-3">
-          <Skeleton className="h-20 rounded-lg" />
-          <Skeleton className="h-16 rounded-lg" />
         </div>
       </div>
     </div>

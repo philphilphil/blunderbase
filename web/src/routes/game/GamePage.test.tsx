@@ -371,31 +371,12 @@ describe('GamePage', () => {
     )
   })
 
-  it('seeks a note to the position it was written about, not one ply past it', async () => {
-    const user = userEvent.setup()
-    renderPage()
-    await user.click(
-      await screen.findByRole('button', { name: /The Scandinavian invites the queen out early/ }),
-    )
-    // The note hangs off the position before 1…d5, so the board stops there and the engine
-    // panel is about the blunder rather than about White's reply.
-    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
-    expect(screen.getByText('played')).toBeInTheDocument()
-  })
-
   it('jumps the board when a move in the list is clicked', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
     await user.click(screen.getByRole('button', { name: 'Qxd5' }))
     expect(screen.getByText('ply 4 / 4')).toBeInTheDocument()
-  })
-
-  it('shows the coach’s notes with their MCP attribution', async () => {
-    renderPage()
-    expect(await screen.findByText(/The Scandinavian invites the queen out early/)).toBeInTheDocument()
-    expect(screen.getAllByText('blunderbase-mcp').length).toBeGreaterThan(0)
-    expect(screen.getByText('via MCP')).toBeInTheDocument()
   })
 
   it('posts a deep run and then reflects the queued run in the chrome', async () => {
@@ -516,7 +497,6 @@ describe('GamePage', () => {
     expect(screen.getByText('Unanalysed')).toBeInTheDocument()
     expect(screen.getByText(/No evaluations yet/)).toBeInTheDocument()
     expect(screen.getByText('No engine lines for this position.')).toBeInTheDocument()
-    expect(screen.getByText(/No notes on this game yet/)).toBeInTheDocument()
     expect(screen.getByText('No engine run')).toBeInTheDocument()
     // The deep pass is the obvious next thing to do, so the button is idle and enabled
     // rather than describing a run that has already happened.

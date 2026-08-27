@@ -61,25 +61,24 @@ describe('the global scale', () => {
   })
 })
 
-describe('the four-column game view at 1440', () => {
+describe('the three-column game view at 1440', () => {
   /**
    * Design 1a has to survive the scale-up without a horizontal scrollbar: the rail plus the
-   * three column floors plus their dividers must fit the 1440 the owner works at. Parsed
+   * two column floors plus their dividers must fit the 1440 the owner works at. Parsed
    * out of the source rather than restated, so a widened column fails here rather than in
    * the browser.
    */
-  it('fits the rail and three column floors inside 1440', () => {
+  it('fits the rail and two column floors inside 1440', () => {
     const page = read('src/routes/game/GamePage.tsx')
     const nav = read('src/components/shell/SideNav.tsx')
 
     const railUnits = Number(nav.match(/<nav className="flex w-(\d+)/)![1]) / 4 // w-50 -> 12.5rem
     const boardFloor = Number(page.match(/min-w-\[([\d.]+)rem\] shrink-\[2\]/)![1])
     const movesFloor = Number(page.match(/min-w-\[([\d.]+)rem\] flex-1/)![1])
-    const notes = Number(page.match(/className="w-\[([\d.]+)rem\] flex-none"/)![1])
 
     const px = (units: number) => units * 16 * ROOT_SCALE
-    const dividers = 3 // one hairline between each pair of columns
-    const total = px(railUnits + boardFloor + movesFloor + notes) + dividers
+    const dividers = 2 // one hairline between each pair of columns
+    const total = px(railUnits + boardFloor + movesFloor) + dividers
 
     expect(total).toBeLessThanOrEqual(1440)
     // …and the floors are still no narrower on screen than the design's 420 / 280.

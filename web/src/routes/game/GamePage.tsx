@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useStreamSession } from '@/lib/analysis'
-import { useGame, useMaiaTargetElo, useWorstMoments } from '@/lib/api/queries'
+import { useGame, useMaiaTargetElo } from '@/lib/api/queries'
 import type { MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
 
@@ -15,7 +15,6 @@ import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
 import { MaiaPanel } from './components/MaiaPanel'
 import { MoveList, type MoveAnnotation } from './components/MoveList'
-import { NotesColumn } from './components/NotesColumn'
 import {
   bestRun,
   buildGameLine,
@@ -30,7 +29,6 @@ import {
   pairMoves,
   preferredLevel,
   previousFlaggedPly,
-  recurringMistake,
   runFor,
   sanVariation,
   scoreAfter,
@@ -44,16 +42,11 @@ import { useBoardKeys } from './useBoardKeys'
 import { useDeepAnalysis } from './useDeepAnalysis'
 import { useLiveMaia } from './useLiveMaia'
 
-/** The window `/stats/worst-moments` is asked about for the recurring-mistake card. */
-const RECURRING_DAYS = 30
-const RECURRING_SAMPLE = 100
-
 /**
  * Design 1a "Studio": board with its eval bar, transport row (with the deep-analysis
  * trigger) and a short eval curve on the left; the paired move table with everything said
  * about the position on the board stacked under it — the run's multi-PV lines, the live
- * search, Maia — in the middle; the coach's notes and the recurring-mistake card on the
- * right.
+ * search, Maia — on the right.
  *
  * The cursor is the ply *last played* (`-1` is the starting position). Everything about the
  * position on the board — the engine lines, Maia's prediction, the flagged-move marks —
@@ -73,7 +66,6 @@ export function GamePage() {
 
 function GameStudio({ gameId }: { gameId: number }) {
   const game = useGame(gameId, { notes: true })
-  const moments = useWorstMoments({ days: RECURRING_DAYS, amount: RECURRING_SAMPLE })
   const deepAnalysis = useDeepAnalysis(gameId)
 
   const [cursor, setCursor] = useState(-1)
@@ -233,10 +225,6 @@ function GameStudio({ gameId }: { gameId: number }) {
     [finishedRuns],
   )
   const engineRun = useMemo(() => runFor(finishedRuns, upcoming), [finishedRuns, upcoming])
-  const recurring = useMemo(
-    () => recurringMistake(moments.data ?? [], gameId, RECURRING_DAYS),
-    [moments.data, gameId],
-  )
 
   // Design 1a's `PGN` affordance in the move-list tab row. No endpoint exports one, so it
   // is assembled from this payload (`./pgn`).
@@ -330,13 +318,14 @@ function GameStudio({ gameId }: { gameId: number }) {
       <div className="flex min-h-0 flex-1">
         {/*
           Column floors are in `rem`, so at the app's scale the board never drops below
-          461 physical pixels and the move table never below 307 — both wider than the
-          420/280 the design set at 100 %. They are 24rem/16rem rather than the design's
-          26.25rem/17.5rem because 1440 − 240 (rail) leaves 1200 for the three columns and
-          the notes column takes 379 of it; the design's floors would have overflowed by
-          ~20px at the new scale.
+          504 physical pixels and the move table never below 384 — both clear of the
+          420/280 the design set at 100 % for these two columns, now that there is no
+          third. 1440 − 240 (rail) leaves 1200 for the pair, and with the notes column
+          gone the ~379px it used to take is free: the board's basis grows from
+          32.75rem to 35rem and its floor from 24rem to the design's own 26.25rem, and
+          the move table's floor grows from 16rem to 20rem.
         */}
-        <div className="flex min-w-[24rem] shrink-[2] grow-0 basis-[32.75rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem]">
+        <div className="flex min-w-[26.25rem] shrink-[2] grow-0 basis-[35rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem]">
           <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
           <BoardPanel
             position={position}
@@ -376,7 +365,7 @@ function GameStudio({ gameId }: { gameId: number }) {
           />
         </div>
 
-        <div className="flex min-w-[16rem] flex-1 flex-col border-r border-hairline">
+        <div className="flex min-w-[20rem] flex-1 flex-col">
           {deepRun ? maiaPanel : null}
           <MoveList
             pairs={pairs}
@@ -403,15 +392,6 @@ function GameStudio({ gameId }: { gameId: number }) {
           */}
           {deepRun ? null : maiaPanel}
         </div>
-
-        <NotesColumn
-          notes={notes}
-          moves={moves}
-          recurring={recurring}
-          recurringPending={moments.isPending}
-          onSelectPly={selectPly}
-          className="w-[19.75rem] flex-none"
-        />
       </div>
     </>
   )
