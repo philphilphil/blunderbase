@@ -311,6 +311,35 @@ def test_an_import_enqueues_a_quick_run_per_game(session: Session, fixtures_dir:
     assert {run.priority for run in runs} == {import_service.QUICK_PRIORITY}
 
 
+def test_an_import_that_skips_evaluation_stores_the_games_and_queues_nothing(
+    session: Session, fixtures_dir: Path
+) -> None:
+    """`analyze=False` is the long first sync of an archive: the games land, and the passes
+    are asked for later over the ones the owner actually wants to look at."""
+    _add_engine(session)
+
+    job = import_service.run_import(
+        session, "pgn", path=_multi_game(fixtures_dir), analyze=False
+    )
+
+    assert job.status is JobStatus.DONE
+    assert job.games_imported == 3
+    assert _count(session, Game) == 3
+    assert _count(session, AnalysisRun) == 0
+
+
+def test_a_later_import_still_evaluates_after_one_that_skipped_it(
+    session: Session, fixtures_dir: Path
+) -> None:
+    """The flag is one sync's, not the database's: the next sync queues its passes again."""
+    _add_engine(session)
+    import_service.run_import(session, "pgn", path=_multi_game(fixtures_dir), analyze=False)
+
+    import_service.run_import(session, "pgn", path=str(fixtures_dir / "analysis_game.pgn"))
+
+    assert _count(session, AnalysisRun) == 1
+
+
 def test_an_enabled_uci_engine_stands_in_when_no_tier_default_is_set(
     session: Session, fixtures_dir: Path
 ) -> None:

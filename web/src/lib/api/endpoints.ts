@@ -46,6 +46,7 @@ import type {
   RunResponse,
   SampleRequest,
   SampleResponse,
+  SearchResponse,
   Source,
   StatsResponse,
   StreamCreate,
@@ -130,7 +131,7 @@ export const startImport = (source: Source, body: ImportRequest = {}) =>
 /** The PGN itself is the request body; `wait` runs the sync inline. */
 export const uploadPgn = (
   pgn: string,
-  query: { wait?: boolean; max_games?: number } = {},
+  query: { wait?: boolean; max_games?: number; analyze?: boolean } = {},
 ) => http.post<ImportStarted>('/import/pgn/upload', { text: pgn, query })
 
 // --- analysis -------------------------------------------------------------
@@ -244,6 +245,17 @@ export const updateNote = (id: number, body: NoteUpdate) =>
 export const deleteNote = (id: number) => http.delete<void>(`/notes/${id}`)
 
 export const listTags = () => http.get<TagCount[]>('/notes/tags')
+
+// --- search ---------------------------------------------------------------
+
+/**
+ * The command palette's one box: games, opponents, openings and notes at once.
+ *
+ * `limit` caps each group on its own (1..20). A query under two characters is answered
+ * with four empty groups by the backend, so nothing here has to guard the first letter.
+ */
+export const search = (q: string, limit?: number) =>
+  http.get<SearchResponse>('/search', { query: { q, limit } })
 
 // --- runners --------------------------------------------------------------
 

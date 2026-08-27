@@ -58,12 +58,20 @@ def run(
     text: str | None = None,
     max_games: int | None = None,
     progress: ProgressHook | None = None,
+    analyze: bool = True,
     **options: Any,
 ) -> ImportResult:
-    """Read one PGN file (or one uploaded blob) and hand every game to the pipeline."""
+    """Read one PGN file (or one uploaded blob) and hand every game to the pipeline.
+
+    `analyze=False` lands the games without queueing the automatic quick pass.
+    """
     if text is not None:
         return ingest_games(
-            session, job, parse_stream(io.StringIO(text), limit=max_games), progress=progress
+            session,
+            job,
+            parse_stream(io.StringIO(text), limit=max_games),
+            progress=progress,
+            analyze=analyze,
         )
     if not path:
         raise ValueError("a pgn import needs either a file path or the file's text")
@@ -72,7 +80,13 @@ def run(
         raise FileNotFoundError(f"no such PGN file: {file}")
     job.message = str(file)
     with file.open("r", encoding="utf-8-sig", errors="replace") as stream:
-        return ingest_games(session, job, parse_stream(stream, limit=max_games), progress=progress)
+        return ingest_games(
+            session,
+            job,
+            parse_stream(stream, limit=max_games),
+            progress=progress,
+            analyze=analyze,
+        )
 
 
 def parse_file(

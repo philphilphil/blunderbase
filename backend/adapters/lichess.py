@@ -114,6 +114,7 @@ def run(
     rated: bool | None = None,
     token: str | None = None,
     progress: ProgressHook | None = None,
+    analyze: bool = True,
     client: httpx.Client | None = None,
     sleep: Callable[[float], None] = time.sleep,
     **options: Any,
@@ -122,7 +123,8 @@ def run(
 
     `since` overrides the stored cursor — a millisecond stamp, an ISO date or datetime, or
     `all` to walk the whole archive again. Nothing is filtered out unless the caller asks
-    for it with `speeds` or `rated`, because a database wants every game.
+    for it with `speeds` or `rated`, because a database wants every game. `analyze=False`
+    lands the games without queueing the automatic quick pass.
     """
     player = (username or "").strip()
     if not player:
@@ -151,7 +153,9 @@ def run(
             sleep=sleep,
         )
         games = parse_stream(lines, cursor=cursor, speeds=speeds)
-        result = ingest_games(session, job, games, progress=progress, accounts=index)
+        result = ingest_games(
+            session, job, games, progress=progress, accounts=index, analyze=analyze
+        )
     finally:
         if owned:
             http.close()

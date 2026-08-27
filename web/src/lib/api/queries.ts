@@ -12,6 +12,7 @@ import {
   type UseMutationOptions,
   type UseQueryOptions,
 } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 
 import { ApiError } from './client'
 import * as api from './endpoints'
@@ -271,13 +272,20 @@ export function useUploadPgn(
   options?: UseMutationOptions<
     Awaited<ReturnType<typeof api.uploadPgn>>,
     Error,
-    { pgn: string; wait?: boolean; max_games?: number }
+    { pgn: string; wait?: boolean; max_games?: number; analyze?: boolean }
   >,
 ) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ pgn, ...query }: { pgn: string; wait?: boolean; max_games?: number }) =>
-      api.uploadPgn(pgn, query),
+    mutationFn: ({
+      pgn,
+      ...query
+    }: {
+      pgn: string
+      wait?: boolean
+      max_games?: number
+      analyze?: boolean
+    }) => api.uploadPgn(pgn, query),
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.imports() })
@@ -496,6 +504,48 @@ export function useDeleteRunner(options?: UseMutationOptions<void, Error, number
       void client.invalidateQueries({ queryKey: queryKeys.queue() })
       options?.onSuccess?.(...args)
     },
+  })
+}
+
+// --- search ---------------------------------------------------------------
+
+/** Under this the backend answers four empty groups, so there is nothing to ask for. */
+const SEARCH_MIN = 2
+/** Long enough that a fast typist makes one request per word, short enough to feel live. */
+const SEARCH_DEBOUNCE_MS = 150
+
+/** `q` as it was a beat ago — one render behind the keystroke, so the key settles. */
+function useDebounced(value: string, delay = SEARCH_DEBOUNCE_MS): string {
+  const [settled, setSettled] = useState(value)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(value), delay)
+    return () => window.clearTimeout(timer)
+  }, [value, delay])
+  return settled
+}
+
+/**
+ * The command palette's four groups, debounced.
+ *
+ * The debounce lives here rather than at the call site because it is part of what the
+ * query *is*: the box is typed into, and every intermediate spelling is a key nobody
+ * wants cached. A query too short to answer is never sent — `enabled` holds it — and the
+ * previous answer stays on screen while the next one is in flight, so the list does not
+ * blank between keystrokes.
+ */
+export function useSearch(
+  q: string,
+  limit = 5,
+  options?: Options<Awaited<ReturnType<typeof api.search>>>,
+) {
+  const settled = useDebounced(q).trim()
+  return useQuery({
+    queryKey: queryKeys.search(settled, limit),
+    queryFn: () => api.search(settled, limit),
+    enabled: settled.length >= SEARCH_MIN,
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
+    ...options,
   })
 }
 

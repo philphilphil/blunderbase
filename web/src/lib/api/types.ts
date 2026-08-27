@@ -284,6 +284,8 @@ export interface ImportRequest {
   text?: string
   since?: string
   max_games?: number
+  /** Left unset by default; `false` lands the games without queueing a quick pass. */
+  analyze?: boolean
   wait?: boolean
 }
 
@@ -814,6 +816,36 @@ export interface StreamResponse extends Extra {
   last_snapshot_at?: string | null
   game_id?: number | null
   ply?: number | null
+}
+
+// --- search (`GET /search`) -----------------------------------------------
+
+/** One opponent the box matched: how often they were played, and how the owner did. */
+export interface OpponentHit extends Extra {
+  name: string
+  games: number
+  /** The owner's score over those games as a percentage — a win a point, a draw half. */
+  score: number
+}
+
+/** One opening the box matched, by name or by ECO prefix. */
+export interface OpeningHit extends Extra {
+  eco: string
+  name: string
+  games: number
+}
+
+/**
+ * `services.search.global_search`: one query, four groups, each capped on its own.
+ *
+ * A query shorter than two characters answers with four empty groups rather than an
+ * error — the box is searched as it is typed.
+ */
+export interface SearchResponse {
+  games: GameSummary[]
+  opponents: OpponentHit[]
+  openings: OpeningHit[]
+  notes: NoteResponse[]
 }
 
 // --- meta -----------------------------------------------------------------

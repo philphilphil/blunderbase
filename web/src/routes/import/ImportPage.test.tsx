@@ -47,6 +47,24 @@ function stubFetch(routes: Record<string, unknown>) {
   )
 }
 
+/** Every POST this page sent to one path: the parsed body of each, in order. */
+function postedTo(path: string): Record<string, unknown>[] {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([input, init]) => String(input).split('?')[0] === path && init?.method === 'POST',
+    )
+    .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>)
+}
+
+/** The same, for a route whose flags travel in the query rather than in a body. */
+function urlsFor(path: string): string[] {
+  return vi
+    .mocked(fetch)
+    .mock.calls.map(([input]) => String(input))
+    .filter((url) => url.split('?')[0] === path)
+}
+
 function renderPage(ui: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -134,6 +152,62 @@ describe('ImportPage', () => {
     })
     await waitFor(() => expect(username.value).toBe('phib'))
     expect(screen.getByRole('button', { name: /Sync/ })).toBeInTheDocument()
+  })
+
+  it('says nothing about evaluation until a sync is asked to skip it', async () => {
+    stubFetch({
+      '/api/import/jobs': [],
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+      '/api/import/lichess': { source: 'lichess', status: 'running', job_id: 9 },
+    })
+    renderPage(<ImportPage />)
+
+    const username = await screen.findByLabelText<HTMLInputElement>('Username', {
+      selector: '#lichess-username',
+    })
+    await waitFor(() => expect(username.value).toBe('phib'))
+    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+
+    // Unticked, the request carries no opinion at all and the backend queues the pass.
+    await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
+    expect(postedTo('/api/import/lichess')[0]).not.toHaveProperty('analyze')
+
+    const skip = screen.getAllByRole('checkbox', { name: 'Skip evaluation' })[0]!
+    await userEvent.click(skip)
+    expect(skip).toHaveAttribute('aria-checked', 'true')
+    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+
+    await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(2))
+    expect(postedTo('/api/import/lichess')[1]).toMatchObject({ username: 'phib', analyze: false })
+  })
+
+  it('carries the same skip into the PGN upload, where it is a query flag', async () => {
+    stubFetch({
+      '/api/import/jobs': [],
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+      '/api/import/pgn/upload': { source: 'pgn', status: 'running', job_id: 10 },
+    })
+    renderPage(<ImportPage />)
+    await screen.findByText('Sync history')
+
+    const file = new File(['[Event "Casual"]\n\n1. e4 e5 *\n'], 'games.pgn', {
+      type: 'text/plain',
+    })
+    await userEvent.upload(screen.getByTestId('pgn-file-input'), file)
+    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
+
+    await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(1))
+    expect(urlsFor('/api/import/pgn/upload')[0]).not.toContain('analyze')
+
+    // The PGN card has its own box, and it is the last of the three on the page.
+    const skip = screen.getAllByRole('checkbox', { name: 'Skip evaluation' }).at(-1)!
+    await userEvent.click(skip)
+    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
+
+    await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(2))
+    expect(urlsFor('/api/import/pgn/upload')[1]).toContain('analyze=false')
   })
 
   it('never seeds the username from a failed sync, whose message is the exception', async () => {

@@ -108,13 +108,15 @@ def run(
     user_agent: str | None = None,
     client: httpx.Client | None = None,
     progress: ProgressHook | None = None,
+    analyze: bool = True,
     **options: Any,
 ) -> ImportResult:
     """Sync one chess.com account: every archive from the cursor's month to the newest.
 
     `cursor` and `since` both override the stored cursor — `since` because that is what the
     CLI calls "resume from this cursor instead of the stored one", and it reads either a
-    cursor or a first month to start from.
+    cursor or a first month to start from. `analyze=False` lands the games without queueing
+    the automatic quick pass.
     """
     name = (username or "").strip()
     if not USERNAME.fullmatch(name):
@@ -156,6 +158,7 @@ def run(
             ),
             progress=progress,
             accounts=index,
+            analyze=analyze,
         )
     finally:
         if owned:

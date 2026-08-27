@@ -144,9 +144,9 @@ class ImportAdapter(Protocol):
     which does the storing. It never aborts the whole sync for one bad game — that goes
     into `ImportResult.errors`.
 
-    `**options` are the CLI flags and API fields the caller passed, plus `progress`, which
-    the adapter forwards to `ingest_games`. Every adapter accepts `**options` so a flag it
-    does not know about is ignored rather than raising.
+    `**options` are the CLI flags and API fields the caller passed, plus `progress` and
+    `analyze`, which the adapter forwards to `ingest_games`. Every adapter accepts
+    `**options` so a flag it does not know about is ignored rather than raising.
     """
 
     def __call__(self, session: Session, job: ImportJob, **options: Any) -> ImportResult: ...
@@ -250,6 +250,7 @@ def ingest_games(
     *,
     progress: ProgressHook | None = None,
     accounts: AccountIndex | None = None,
+    analyze: bool = True,
 ) -> ImportResult:
     """Store a stream of parsed games under one job: dedup, positions, quick-tier run.
 
@@ -257,6 +258,9 @@ def ingest_games(
     one unstorable game costs exactly that game. The counters and the error list are
     written back to the job after each one, which is what makes a long sync's progress
     visible to anything reading the row.
+
+    `analyze=False` stores the games and stops there — no quick pass is queued, and the
+    owner asks for one later over the games they care about.
     """
     if job.id is None:
         session.add(job)
@@ -272,7 +276,7 @@ def ingest_games(
             event = _game_event(job, item.ref, GAME_FAILED, result, error=item.error)
         else:
             try:
-                outcome = ingest_game(session, job, item, accounts)
+                outcome = ingest_game(session, job, item, accounts, analyze=analyze)
             except Exception as exc:
                 session.rollback()
                 error = f"{type(exc).__name__}: {exc}"
@@ -299,11 +303,14 @@ def ingest_game(
     job: ImportJob,
     parsed: ParsedGame,
     accounts: AccountIndex | None = None,
+    *,
+    analyze: bool = True,
 ) -> IngestOutcome:
     """Store one parsed game, or report the one that is already there.
 
     Raises whatever the move list is wrong about — `ingest_games` turns that into a
-    per-game error record.
+    per-game error record. `analyze=False` skips the automatic quick pass; a game that was
+    already stored never gets one either way, because this call did not create it.
     """
     if accounts is None:
         accounts = AccountIndex.load(session)
@@ -355,7 +362,8 @@ def ingest_game(
     session.flush()
 
     store_positions(session, game, rows)
-    enqueue_quick_analysis(session, game)
+    if analyze:
+        enqueue_quick_analysis(session, game)
     return IngestOutcome(game=game, created=True)
 
 

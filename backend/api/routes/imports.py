@@ -66,6 +66,7 @@ async def upload_pgn(
     response: Response,
     wait: bool = False,
     max_games: Annotated[int | None, Query(ge=1)] = None,
+    analyze: bool = True,
 ) -> ImportStarted:
     """The request body is the PGN itself — one game or a thousand, as exported."""
     raw = await request.body()
@@ -75,6 +76,10 @@ async def upload_pgn(
     options: dict[str, Any] = {"text": text}
     if max_games is not None:
         options["max_games"] = max_games
+    # Passed on only when it is switched off, the way `ImportRequest.options` carries it:
+    # an upload that says nothing about evaluation leaves the adapter's default in charge.
+    if not analyze:
+        options["analyze"] = False
     return await _start(request, settings, broker, response, "pgn", options, wait=wait)
 
 

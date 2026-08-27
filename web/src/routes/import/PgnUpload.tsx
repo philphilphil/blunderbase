@@ -6,6 +6,7 @@ import { useUploadPgn } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
 
 import { JobProgress } from './JobProgress'
+import { SkipEvaluation } from './SkipEvaluation'
 import type { SourceProgress } from './useImportProgress'
 
 /** A PGN export is text; a `.pgn` extension is a convention, not a guarantee. */
@@ -25,6 +26,7 @@ export function PgnUpload({ progress }: { progress?: SourceProgress }) {
   const [files, setFiles] = useState<File[]>([])
   const [over, setOver] = useState(false)
   const [readError, setReadError] = useState<string | null>(null)
+  const [skipEvaluation, setSkipEvaluation] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   const upload = useUploadPgn()
 
@@ -53,7 +55,8 @@ export function PgnUpload({ progress }: { progress?: SourceProgress }) {
         setReadError('that file carried no PGN')
         return
       }
-      upload.mutate({ pgn })
+      // `analyze` only ever travels to turn evaluation off; left out, the upload is queued.
+      upload.mutate({ pgn, analyze: skipEvaluation ? false : undefined })
     } catch (error) {
       setReadError(error instanceof Error ? error.message : 'the file could not be read')
     }
@@ -120,6 +123,8 @@ export function PgnUpload({ progress }: { progress?: SourceProgress }) {
             </button>
           </div>
         ) : null}
+
+        <SkipEvaluation checked={skipEvaluation} onChange={setSkipEvaluation} disabled={busy} />
 
         {readError ? <p className="text-[0.6875rem] text-blunder">{readError}</p> : null}
         {upload.isError ? <p className="text-[0.6875rem] text-blunder">{upload.error.message}</p> : null}

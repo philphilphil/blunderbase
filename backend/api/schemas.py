@@ -269,11 +269,19 @@ class ImportRequest(Input):
     text: str | None = Field(default=None, description="PGN text, for the `pgn` source")
     since: str | None = Field(default=None, description="resume from this cursor")
     max_games: int | None = Field(default=None, ge=1)
+    analyze: bool = Field(
+        default=True, description="queue a quick pass over each game as it lands"
+    )
     wait: bool = Field(default=False, description="run the sync inline and return the finished job")
 
     def options(self) -> dict[str, Any]:
         """Only the flags that were given, so an adapter sees its own defaults."""
         given = self.model_dump(exclude={"wait"}, exclude_none=True)
+        # `analyze` is a plain bool, so it is never "not given" the way the rest are: it
+        # travels only when it is switched off, which leaves every adapter's own default —
+        # evaluate — the one that decides, exactly as it did before the flag existed.
+        if given.get("analyze") is not False:
+            given.pop("analyze", None)
         return {key: value for key, value in given.items() if value != ""}
 
 
@@ -910,3 +918,36 @@ class LiveState(Payload):
     text: str | None = None
     viewer_count: int = 0
     updated_at: datetime | None = None
+
+
+# --- search ----------------------------------------------------------------
+
+
+class OpponentHit(BaseModel):
+    """One opponent the search box matched: how often, and how the owner did."""
+
+    name: str
+    games: int
+    # The owner's score over those games as a percentage: a win is a point, a draw half.
+    score: float
+
+
+class OpeningHit(BaseModel):
+    """One opening the search box matched, by name or by ECO prefix."""
+
+    eco: str = ""
+    name: str = ""
+    games: int
+
+
+class SearchResponse(BaseModel):
+    """`services.search.global_search`: one query, four groups, each capped on its own.
+
+    A query too short to answer is four empty groups, not an error — the box searches as
+    it is typed.
+    """
+
+    games: list[GameSummary] = Field(default_factory=list)
+    opponents: list[OpponentHit] = Field(default_factory=list)
+    openings: list[OpeningHit] = Field(default_factory=list)
+    notes: list[NoteResponse] = Field(default_factory=list)

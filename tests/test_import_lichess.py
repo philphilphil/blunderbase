@@ -8,12 +8,12 @@ from typing import Any
 import httpx
 import pytest
 import respx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.adapters import lichess, pgn_import
-from backend.db.enums import JobStatus, Platform, Result, Source, Speed
-from backend.db.models import Account, Game, ImportJob
+from backend.db.enums import EngineKind, JobStatus, Platform, Result, Source, Speed, Tier
+from backend.db.models import Account, AnalysisRun, Engine, Game, ImportJob
 from backend.services.import_service import ImportFailure, ParsedGame, run_import
 
 EXPORT = "https://lichess.org/api/games/user/ExamplePlayer"
@@ -208,6 +208,29 @@ def test_max_games_is_passed_on_and_caps_the_request(session: Session, archive: 
     sync(session, max_games=2)
 
     assert route.calls[0].request.url.params["max"] == "2"
+
+
+@respx.mock
+def test_a_sync_can_store_its_games_without_queueing_a_pass(
+    session: Session, archive: str
+) -> None:
+    """The adapter forwards `analyze` to the pipeline like every other option it is given."""
+    respx.get(EXPORT).mock(return_value=httpx.Response(200, text=archive))
+    session.add(
+        Engine(
+            name="Stockfish",
+            kind=EngineKind.UCI,
+            path="/opt/homebrew/bin/stockfish",
+            default_tier=Tier.QUICK,
+            enabled=True,
+        )
+    )
+    session.commit()
+
+    sync(session, analyze=False)
+
+    assert len(games(session)) == 6
+    assert session.scalar(select(func.count()).select_from(AnalysisRun)) == 0
 
 
 @respx.mock

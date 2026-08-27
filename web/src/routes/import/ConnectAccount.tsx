@@ -11,6 +11,7 @@ import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
 import { JobProgress } from './JobProgress'
+import { SkipEvaluation } from './SkipEvaluation'
 import type { SourceProgress } from './useImportProgress'
 
 /**
@@ -59,6 +60,7 @@ export function ConnectAccount({
   const [username, setUsername] = useState(suggested)
   const [since, setSince] = useState('')
   const [maxGames, setMaxGames] = useState('')
+  const [skipEvaluation, setSkipEvaluation] = useState(false)
   const [advanced, setAdvanced] = useState(false)
   const [invalid, setInvalid] = useState<string | null>(null)
   // The suggestion arrives with the profile, a render or two after the field exists, so
@@ -86,6 +88,8 @@ export function ConnectAccount({
         username: name,
         since: since.trim() || undefined,
         max_games: Number.isFinite(games) && games > 0 ? games : undefined,
+        // Only ever sent to turn evaluation off; left out, the backend queues the pass.
+        analyze: skipEvaluation ? false : undefined,
       },
     })
   }
@@ -124,6 +128,8 @@ export function ConnectAccount({
         </div>
 
         <p className="text-[0.6875rem] leading-[1.5] text-dim">{copy.hint}</p>
+
+        <SkipEvaluation checked={skipEvaluation} onChange={setSkipEvaluation} disabled={running} />
 
         {advanced ? (
           <div className="grid grid-cols-2 gap-2.5">

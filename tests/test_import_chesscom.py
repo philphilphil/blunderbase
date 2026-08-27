@@ -11,8 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.adapters import chesscom
-from backend.db.enums import Color, JobStatus, Platform, Result, Source, Speed
-from backend.db.models import Account, Game, GamePosition
+from backend.db.enums import Color, EngineKind, JobStatus, Platform, Result, Source, Speed, Tier
+from backend.db.models import Account, AnalysisRun, Engine, Game, GamePosition
 from backend.services import import_service
 
 BASE = "https://api.chess.com/pub/player/blunderbase/games"
@@ -292,6 +292,27 @@ def test_a_limit_stops_inside_a_month_and_the_cursor_resumes_there(
     assert (second.games_seen, second.games_imported, second.games_failed) == (4, 2, 2)
     assert second.cursor == f"{FEBRUARY}|3"
     assert _count(session, Game) == 4
+
+
+def test_a_sync_can_store_its_games_without_queueing_a_pass(
+    session: Session, sync: Callable[..., Any]
+) -> None:
+    """The adapter forwards `analyze` to the pipeline like every other option it is given."""
+    session.add(
+        Engine(
+            name="Stockfish",
+            kind=EngineKind.UCI,
+            path="/opt/homebrew/bin/stockfish",
+            default_tier=Tier.QUICK,
+            enabled=True,
+        )
+    )
+    session.commit()
+
+    job = sync(session, analyze=False)
+
+    assert job.games_imported == 4
+    assert _count(session, AnalysisRun) == 0
 
 
 def test_since_names_the_first_month_to_read(

@@ -88,6 +88,9 @@ export const queryKeys = {
   streams: (): QueryKey => ['streams'],
   streamList: (): QueryKey => ['streams', 'list'],
 
+  /** One entry per query text, so re-typing a query the palette already asked is instant. */
+  search: (q: string, limit: number): QueryKey => ['search', q, limit],
+
   notes: (): QueryKey => ['notes'],
   noteList: (query: NoteQuery = {}): QueryKey => ['notes', 'list', query],
   note: (id: number): QueryKey => ['notes', 'detail', id],
