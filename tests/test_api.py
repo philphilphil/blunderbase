@@ -51,6 +51,30 @@ ONE_GAME = """[Event "Casual Blitz game"]
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 1-0
 """
+# Two more against the one opponent the fixture only has a single game with, so the
+# search box has an opponent worth grouping: with the fixture's loss that is 1½/3.
+TWO_MORE_BERLINS = """[Event "Rated Blitz game"]
+[Site "https://lichess.org/qg000007"]
+[Date "2026.04.02"]
+[White "blunderbase"]
+[Black "berlinwall"]
+[Result "1-0"]
+[ECO "C65"]
+[Opening "Ruy Lopez: Berlin Defense"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 1-0
+
+[Event "Rated Blitz game"]
+[Site "https://lichess.org/qg000008"]
+[Date "2026.04.03"]
+[White "berlinwall"]
+[Black "blunderbase"]
+[Result "1/2-1/2"]
+[ECO "C65"]
+[Opening "Ruy Lopez: Berlin Defense"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 1/2-1/2
+"""
 
 
 @pytest.fixture()
@@ -418,6 +442,31 @@ def test_a_pgn_file_can_be_uploaded_as_the_request_body(api: TestClient) -> None
 
     assert response.status_code == 200
     assert response.json()["job"]["games_imported"] == 1
+    # Nothing said about evaluation, so the game landed queued for its quick pass.
+    assert api.get("/analysis/queue").json()["queued"] == 1
+
+
+def test_an_import_can_land_its_games_without_queueing_a_pass(api: TestClient) -> None:
+    """Skip evaluation, as the import page offers it: the games arrive, the queue stays
+    where it was, and the passes are asked for later over the games worth looking at."""
+    response = api.post("/import/pgn", json={"text": ONE_GAME, "wait": True, "analyze": False})
+
+    assert response.status_code == 200
+    assert response.json()["job"]["games_imported"] == 1
+    assert api.get("/games", params={"text": "newcomer"}).json()["total"] == 1
+    assert api.get("/analysis/queue").json()["queued"] == 0
+
+
+def test_an_upload_can_skip_evaluation_too(api: TestClient) -> None:
+    response = api.post(
+        "/import/pgn/upload?wait=true&analyze=false",
+        content=ONE_GAME.encode("utf-8"),
+        headers={"content-type": "application/x-chess-pgn"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["job"]["games_imported"] == 1
+    assert api.get("/analysis/queue").json()["queued"] == 0
 
 
 def test_an_empty_upload_is_refused_before_a_job_row_is_written(api: TestClient) -> None:
@@ -913,6 +962,52 @@ def test_a_note_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
     assert error_of(api.get("/notes/9999")) == "unknown_note"
     assert error_of(api.patch("/notes/9999", json={"text": "x"})) == "unknown_note"
     assert error_of(api.delete("/notes/9999")) == "unknown_note"
+
+
+# --- /search --------------------------------------------------------------
+
+
+def test_a_search_query_too_short_to_answer_comes_back_empty(api: TestClient) -> None:
+    body = api.get("/search", params={"q": "b"}).json()
+
+    assert body == {"games": [], "opponents": [], "openings": [], "notes": []}
+
+
+def test_an_opponent_name_brings_back_the_games_and_one_grouped_row(api: TestClient) -> None:
+    api.post("/import/pgn", json={"text": TWO_MORE_BERLINS, "wait": True})
+
+    body = api.get("/search", params={"q": "berlinwall"}).json()
+
+    assert [game["opponent"] for game in body["games"]] == ["berlinwall"] * 3
+    # A loss, a win and a draw against them: three games, an even record.
+    assert body["opponents"] == [{"name": "berlinwall", "games": 3, "score": 50.0}]
+
+
+def test_an_eco_prefix_surfaces_the_openings_it_names(api: TestClient) -> None:
+    body = api.get("/search", params={"q": "C6"}).json()
+
+    assert body["openings"] == [
+        {"eco": "C60", "name": "Ruy Lopez", "games": 1},
+        {"eco": "C65", "name": "Ruy Lopez: Berlin Defense", "games": 1},
+    ]
+    assert {game["eco"] for game in body["games"]} == {"C60", "C65"}
+
+
+def test_a_note_is_found_by_its_own_text(api: TestClient, seeded: dict[str, int]) -> None:
+    body = api.get("/search", params={"q": "endgames"}).json()
+
+    assert [note["id"] for note in body["notes"]] == [seeded["note_id"]]
+
+
+def test_the_search_limit_caps_every_group_on_its_own(api: TestClient) -> None:
+    wide = api.get("/search", params={"q": "lopez"}).json()
+    assert len(wide["games"]) == 2
+    assert len(wide["openings"]) == 2
+
+    capped = api.get("/search", params={"q": "lopez", "limit": 1}).json()
+    assert len(capped["games"]) == 1
+    assert len(capped["openings"]) == 1
+    assert api.get("/search", params={"q": "lopez", "limit": 21}).status_code == 422
 
 
 # --- /events --------------------------------------------------------------

@@ -52,7 +52,7 @@ beforeEach(() => {
     'GET /api/stats/profile': () =>
       json(200, {
         accounts: [
-          { platform: 'lichess', username: 'kn1ghtmare', is_owner: true, games: 1042 },
+          { id: 1, platform: 'lichess', username: 'kn1ghtmare', is_owner: true, games: 1042 },
         ],
       }),
   }
@@ -75,7 +75,10 @@ async function openMenu() {
 describe('AccountMenu', () => {
   it('carries the connected account and the two things an owner does to a session', async () => {
     draw()
-    await screen.findByText('KN')
+    // The trigger is a person icon, never initials — the name it answers to is the owner's.
+    const trigger = await screen.findByRole('button', { name: /kn1ghtmare · lichess/i })
+    expect(trigger.textContent).toBe('')
+    expect(trigger.querySelector('svg')).not.toBeNull()
     await openMenu()
 
     expect(screen.getByRole('menu')).toHaveTextContent('kn1ghtmare')
@@ -89,6 +92,43 @@ describe('AccountMenu', () => {
     )
     expect(screen.getByRole('menuitem', { name: /change password/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument()
+  })
+
+  it('heads the menu with every connected account, the owner marked', async () => {
+    routes['GET /api/stats/profile'] = () =>
+      json(200, {
+        accounts: [
+          { id: 1, platform: 'lichess', username: 'kn1ghtmare', is_owner: true, games: 1042 },
+          {
+            id: 2,
+            platform: 'chesscom',
+            username: 'sofia_g',
+            display_name: 'Sofia Grover',
+            games: 217,
+          },
+        ],
+      })
+    draw()
+    await screen.findByRole('button', { name: /kn1ghtmare · lichess/i })
+    await openMenu()
+    const menu = screen.getByRole('menu')
+
+    expect(menu).toHaveTextContent('kn1ghtmare')
+    expect(menu).toHaveTextContent('lichess · owner')
+    expect(menu).toHaveTextContent('1,042')
+    // The second account is not the owner's, so it is listed without the mark.
+    expect(menu).toHaveTextContent('Sofia Grover')
+    expect(menu).toHaveTextContent('217')
+    expect(screen.getByText('chesscom')).toBeInTheDocument()
+  })
+
+  it('says so when nothing is connected yet', async () => {
+    routes['GET /api/stats/profile'] = () => json(200, { accounts: [] })
+    draw()
+    await openMenu()
+
+    expect(await screen.findByText('No account connected')).toBeInTheDocument()
+    expect(screen.getByRole('menu')).toHaveTextContent('signed in as the owner')
   })
 
   it('signs out to the login screen and forgets what the session cached', async () => {

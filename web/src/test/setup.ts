@@ -16,6 +16,12 @@ if (!globalThis.ResizeObserver) {
   } as unknown as typeof ResizeObserver
 }
 
+// jsdom lays nothing out, so it has no scrolling either — the command palette keeps its
+// highlight in view with this.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {}
+}
+
 if (!globalThis.matchMedia) {
   Object.defineProperty(globalThis, 'matchMedia', {
     writable: true,

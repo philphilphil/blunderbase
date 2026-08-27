@@ -1,42 +1,17 @@
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useEvents } from '@/lib/events/EventsProvider'
 import { cn } from '@/lib/utils'
 
 import { AccountMenu } from './AccountMenu'
-import { McpIndicator } from './McpStatus'
-import { ThemeToggle } from './ThemeToggle'
+import { useCommandPalette } from './CommandPalette'
 import { QueueIndicator } from './QueueIndicator'
 import { usePageChrome } from './PageChrome'
 
-function ConnectionDot() {
-  const { status, reconnects } = useEvents()
-  const label =
-    status === 'open'
-      ? `live${reconnects > 0 ? ` · reconnected ${reconnects}×` : ''}`
-      : status === 'connecting'
-        ? 'connecting to /events'
-        : 'offline — retrying'
-  return (
-    <span
-      title={label}
-      aria-label={label}
-      className={cn(
-        'size-[0.375rem] rounded-full',
-        status === 'open'
-          ? 'bg-accent-teal'
-          : status === 'connecting'
-            ? 'bg-mistake'
-            : 'bg-blunder',
-      )}
-    />
-  )
-}
-
-/** The 46px titlebar: brand, breadcrumb, then queue / MCP / shortcut / avatar. */
+/** The 46px titlebar: brand, breadcrumb, then page actions / queue / shortcut / account. */
 export function TopBar() {
   const { breadcrumb, actions } = usePageChrome()
+  const palette = useCommandPalette()
 
   return (
     <header className="flex h-[2.875rem] flex-none items-center gap-3.5 border-b border-hairline bg-panel px-4">
@@ -86,13 +61,17 @@ export function TopBar() {
       <div className="flex-1" />
 
       {actions}
-      <ConnectionDot />
-      <ThemeToggle />
       <QueueIndicator />
-      <McpIndicator />
-      <div className="flex items-center gap-1.5 rounded-md border border-edge px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim">
+      {/* The chip was always a label for the shortcut; now it is also the way to press it. */}
+      <button
+        type="button"
+        onClick={palette.open}
+        aria-label="Search everything"
+        title="Search everything (⌘K)"
+        className="flex items-center gap-1.5 rounded-md border border-edge px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim transition-colors hover:border-edge-hover hover:text-ink"
+      >
         ⌘K
-      </div>
+      </button>
       <AccountMenu />
     </header>
   )

@@ -7,14 +7,9 @@ import type { AccountSummary } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 import { ChangePasswordDialog } from '@/routes/auth'
 
-/** `kn1ghtmare` -> `KN`, `Sofia Grover` -> `SG` — the design's 24px avatar square. */
-export function initialsOf(account: AccountSummary | undefined): string {
-  const name = account?.display_name?.trim() || account?.username?.trim()
-  if (!name) return ''
-  const words = name.split(/[\s_.-]+/).filter(Boolean)
-  const initials =
-    words.length > 1 ? `${words[0][0]}${words[1][0]}` : name.replace(/\s/g, '').slice(0, 2)
-  return initials.toUpperCase()
+/** How an account writes its own name: the display name it gave, or the handle. */
+function nameOf(account: AccountSummary): string {
+  return account.display_name ?? account.username
 }
 
 /** The connected account the app is about: the owner's, or the busiest one on record. */
@@ -32,10 +27,11 @@ const ITEM =
  * The 24px avatar square every design frame ends the titlebar with, now that there is
  * something behind it: the owner's session.
  *
- * The chip itself is unchanged — the identity it can honestly show is still the connected
- * chess account, not a user record — and the menu it opens is where the deployment's own
- * settings live alongside signing out and changing the password: everything an owner does
- * to their installation rather than to their games.
+ * The chip is a plain person icon — initials read as an identity the app does not have,
+ * and the accessible name already says whose installation this is. The menu it opens
+ * heads with every connected account, then the deployment's own settings, signing out and
+ * changing the password: everything an owner does to their installation rather than to
+ * their games.
  */
 export function AccountMenu() {
   const profile = useProfile()
@@ -44,9 +40,9 @@ export function AccountMenu() {
   const [changing, setChanging] = useState(false)
   const container = useRef<HTMLDivElement>(null)
 
-  const account = ownerAccount(profile.data?.accounts ?? [])
-  const initials = initialsOf(account)
-  const name = account ? (account.display_name ?? account.username) : null
+  const accounts = profile.data?.accounts ?? []
+  const account = ownerAccount(accounts)
+  const name = account ? nameOf(account) : null
   const label = account
     ? `${name} · ${account.platform}`
     : 'No account connected — connect one on the import page'
@@ -78,7 +74,7 @@ export function AccountMenu() {
         onClick={() => setOpen((was) => !was)}
         className="flex size-6 items-center justify-center rounded-md border border-edge-strong bg-avatar text-[0.625rem] font-semibold text-soft transition-colors hover:border-edge-hover hover:text-ink"
       >
-        {initials || <User className="size-3" aria-hidden />}
+        <User className="size-3" aria-hidden />
       </button>
 
       {open ? (
@@ -87,13 +83,36 @@ export function AccountMenu() {
           aria-label="Account"
           className="bb-card absolute right-0 top-[calc(100%+0.4375rem)] z-40 flex w-[13.5rem] flex-col gap-0.5 p-1 shadow-[0_0.75rem_2rem_var(--bb-shadow)]"
         >
-          <div className="px-2 pb-1 pt-1.5">
-            <p className="truncate text-[0.6875rem] font-medium text-ink">
-              {name ?? 'No account connected'}
-            </p>
-            <p className="truncate text-[0.625rem] text-dim">
-              {account ? account.platform : 'signed in as the owner'}
-            </p>
+          {/*
+            Every connected account, not just the owner's: the import page can attach more
+            than one, and the menu is where you check which of them this library is made of.
+          */}
+          <div className="flex flex-col gap-1 px-2 pb-1 pt-1.5">
+            {accounts.length === 0 ? (
+              <>
+                <p className="truncate text-[0.6875rem] font-medium text-ink">
+                  No account connected
+                </p>
+                <p className="truncate text-[0.625rem] text-dim">signed in as the owner</p>
+              </>
+            ) : (
+              accounts.map((connected) => (
+                <div key={connected.id} className="flex items-baseline gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[0.6875rem] font-medium text-ink">
+                      {nameOf(connected)}
+                    </p>
+                    <p className="truncate text-[0.625rem] text-dim">
+                      {connected.platform}
+                      {connected.is_owner ? ' · owner' : ''}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[0.625rem] tabular text-dim-2">
+                    {connected.games === undefined ? '—' : connected.games.toLocaleString()}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
           <div className="my-0.5 h-px bg-hairline" />
 
