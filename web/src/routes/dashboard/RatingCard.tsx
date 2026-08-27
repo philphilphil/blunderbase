@@ -10,8 +10,9 @@
  * than by the API, and it is anchored on the newest rated game across every series so all
  * the charts are cut at the same instant.
  */
+import { Check } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   ChartContainer,
@@ -24,10 +25,13 @@ import type { Platform, RatingSeries } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
 import { cn } from '@/lib/utils'
 
+import { toggleHiddenSpeed, useHiddenSpeeds } from './ratingSpeeds'
 import {
   DEFAULT_WINDOWS,
   WINDOW_LABELS,
   anchorOf,
+  fullDate,
+  monthYear,
   shortDate,
   windowProse,
   windowRange,
@@ -153,7 +157,14 @@ function Move({ move }: { move: number }) {
   )
 }
 
-function SpeedGraph({ chart }: { chart: SpeedChart }) {
+function SpeedGraph({
+  chart,
+  tick,
+}: {
+  chart: SpeedChart
+  /** The axis formatter the window calls for: days inside a quarter, months beyond it. */
+  tick: (value: string) => string
+}) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -177,7 +188,7 @@ function SpeedGraph({ chart }: { chart: SpeedChart }) {
             axisLine={{ stroke: 'var(--bb-edge)' }}
             tickMargin={scalePx(7)}
             minTickGap={scalePx(44)}
-            tickFormatter={shortDate}
+            tickFormatter={tick}
             tick={{
               fontSize: rem(9.5),
               fill: 'var(--bb-dim-2)',
@@ -197,7 +208,7 @@ function SpeedGraph({ chart }: { chart: SpeedChart }) {
           />
           <ChartTooltip
             cursor={{ stroke: 'var(--bb-edge)' }}
-            labelFormatter={(label) => shortDate(String(label))}
+            labelFormatter={(label) => fullDate(String(label))}
             content={<ChartTooltipContent />}
           />
           {chart.lines.map((line) => (
@@ -221,9 +232,107 @@ function SpeedGraph({ chart }: { chart: SpeedChart }) {
   )
 }
 
+/** The checked/unchecked square in front of a speed row — teal-filled when shown. */
+function CheckboxGlyph({ checked }: { checked: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex size-3.5 flex-none items-center justify-center rounded-sm border',
+        checked
+          ? 'border-accent-teal/40 bg-accent-teal/15 text-accent-teal'
+          : 'border-edge text-transparent',
+      )}
+    >
+      <Check className="size-2.5" strokeWidth={3} />
+    </span>
+  )
+}
+
+/**
+ * Which speeds get a chart, remembered per browser. Lists every speed that *would* chart
+ * (`allCharts`) rather than only the visible ones, so a hidden speed stays reachable to
+ * turn back on.
+ */
+function SpeedsMenu({
+  charts,
+  allCharts,
+  hidden,
+}: {
+  charts: SpeedChart[]
+  allCharts: SpeedChart[]
+  hidden: Set<string>
+}) {
+  const [open, setOpen] = useState(false)
+  const container = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!container.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div ref={container} className="relative flex-none">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+        className="flex items-center gap-1 rounded-md border border-edge px-1.5 py-0.5 text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
+      >
+        speeds
+        {charts.length !== allCharts.length ? (
+          <span className="font-mono tabular text-dim-2">
+            {charts.length}/{allCharts.length}
+          </span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Speeds"
+          className="bb-card absolute right-0 top-[calc(100%+0.4375rem)] z-40 flex w-[10rem] flex-col gap-0.5 p-1 shadow-[0_0.75rem_2rem_var(--bb-shadow)]"
+        >
+          {allCharts.map((chart) => {
+            const checked = !hidden.has(chart.speed)
+            return (
+              <button
+                key={chart.speed}
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={checked}
+                aria-label={speedLabel(chart.speed)}
+                onClick={() => toggleHiddenSpeed(chart.speed)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.6875rem] text-soft transition-colors hover:bg-raised hover:text-ink"
+              >
+                <CheckboxGlyph checked={checked} />
+                <span className="flex-1 truncate">{speedLabel(chart.speed)}</span>
+                <span className="font-mono tabular text-dim-2">{chart.games}</span>
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function RatingCard() {
   const profile = useProfile()
-  const [windowKey, setWindowKey] = useState<WindowKey>('90d')
+  const [windowKey, setWindowKey] = useState<WindowKey>('all')
+  const hidden = useHiddenSpeeds()
 
   const all = profile.data?.ratings ?? []
   const playable = all.filter((series) => series.points.length > 0)
@@ -237,7 +346,8 @@ export function RatingCard() {
   // The profile stamps points as `+00:00` and `windowRange` as `Z`, so the cut is made on
   // parsed time rather than on the strings.
   const cutoff = range.since ? Date.parse(range.since) : null
-  const charts = buildCharts(playable, cutoff)
+  const allCharts = buildCharts(playable, cutoff)
+  const charts = allCharts.filter((chart) => !hidden.has(chart.speed))
 
   return (
     <section className="flex flex-none flex-col gap-3 rounded-xl border border-line bg-panel p-3.5">
@@ -254,6 +364,7 @@ export function RatingCard() {
             label: WINDOW_LABELS[key],
           }))}
         />
+        <SpeedsMenu charts={charts} allCharts={allCharts} hidden={hidden} />
       </header>
 
       {profile.isPending ? (
@@ -267,16 +378,25 @@ export function RatingCard() {
           onRetry={() => void profile.refetch()}
           className="h-[10.625rem] flex-none"
         />
-      ) : charts.length === 0 ? (
+      ) : allCharts.length === 0 ? (
         <EmptyBlock className="h-[10.625rem] flex-none">
           {playable.length === 0
             ? 'No rated games yet, so there is no rating to plot.'
             : `Not enough rated games in ${windowProse(windowKey, anchor)}. Widen the window.`}
         </EmptyBlock>
+      ) : charts.length === 0 ? (
+        <EmptyBlock className="h-[10.625rem] flex-none">
+          Every speed is hidden. Pick one in the speeds menu.
+        </EmptyBlock>
       ) : (
         <div className="flex flex-col gap-3.5">
           {charts.map((chart) => (
-            <SpeedGraph key={chart.speed} chart={chart} />
+            <SpeedGraph
+              key={chart.speed}
+              chart={chart}
+              // A quarter reads in days; a year or the whole archive reads in months.
+              tick={windowKey === '30d' || windowKey === '90d' ? shortDate : monthYear}
+            />
           ))}
         </div>
       )}

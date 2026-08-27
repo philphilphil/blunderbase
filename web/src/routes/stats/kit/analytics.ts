@@ -85,7 +85,7 @@ export function windowProse(
   return `the ${WINDOW_DAYS[window]} days to ${to}`
 }
 
-export const DEFAULT_WINDOWS: WindowKey[] = ['30d', '90d', '1y', 'all']
+export const DEFAULT_WINDOWS: WindowKey[] = ['all', '1y', '90d', '30d']
 
 // --- comparison -----------------------------------------------------------
 
@@ -227,6 +227,30 @@ export function shortDate(value: string | null | undefined): string {
   return stamp.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
+  })
+}
+
+/** `2016-12-07T13:17:53Z` -> `Dec 2016` — the tick for a window long enough that a day
+ * without a year says nothing. */
+export function monthYear(value: string | null | undefined): string {
+  if (!value) return '—'
+  const stamp = new Date(value)
+  if (Number.isNaN(stamp.getTime())) return '—'
+  return stamp.toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+/** `2016-12-07T13:17:53Z` -> `7 Dec 2016` — the tooltip, where there is room to be exact. */
+export function fullDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const stamp = new Date(value)
+  if (Number.isNaN(stamp.getTime())) return '—'
+  return stamp.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   })
 }
 

@@ -1,8 +1,8 @@
 /**
  * Design 2a — the overview.
  *
- * Two columns: the main one carries the recent-games strip, the rating graphs and the
- * worst recent moments; the 326px rail carries the analysis queue and the trend card.
+ * Two columns: the main one carries the rating graphs and the worst recent moments; the
+ * 326px rail carries the recent-games list, the analysis queue and the trend card.
  * Every panel fetches its own data and owns its own loading, empty and error state, so one
  * endpoint being down does not take the page with it.
  */
@@ -15,7 +15,7 @@ import { formatCount, num, numOr, total } from '@/routes/stats/kit/analytics'
 
 import { QueueCard } from './QueueCard'
 import { RatingCard } from './RatingCard'
-import { RecentGamesStrip } from './RecentGamesStrip'
+import { RecentGamesList } from './RecentGamesList'
 import { SyncAllButton } from './SyncAllButton'
 import { TrendsCard } from './TrendsCard'
 import { WorstMomentsRow } from './WorstMomentsRow'
@@ -59,12 +59,12 @@ export function DashboardPage() {
               </div>
             }
           />
-          <RecentGamesStrip />
           <RatingCard />
           <WorstMomentsRow />
         </div>
 
         <aside className="flex w-[20.375rem] flex-none flex-col gap-3.5">
+          <RecentGamesList />
           <QueueCard />
           <TrendsCard />
         </aside>

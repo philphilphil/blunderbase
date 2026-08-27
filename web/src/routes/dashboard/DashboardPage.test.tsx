@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GameCardList } from '@/lib/api/types'
 
-import { RecentGamesStrip } from './RecentGamesStrip'
+import { RecentGamesList } from './RecentGamesList'
 
 const useGameCards = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api/queries', () => ({ useGameCards }))
@@ -23,7 +23,7 @@ function result(state: Partial<UseQueryResult<GameCardList, Error>>) {
 
 const CARDS: GameCardList = {
   total: 15,
-  limit: 5,
+  limit: 12,
   offset: 0,
   games: [
     {
@@ -59,48 +59,50 @@ function draw(state: Partial<UseQueryResult<GameCardList, Error>>) {
   useGameCards.mockReturnValue(result(state))
   return render(
     <MemoryRouter>
-      <RecentGamesStrip />
+      <RecentGamesList />
     </MemoryRouter>,
   )
 }
 
-describe('RecentGamesStrip — component states (design 1c)', () => {
+describe('RecentGamesList — component states (design 2a rail)', () => {
   beforeEach(() => useGameCards.mockReset())
 
-  it('shows placeholder cards while the page is in flight', () => {
+  it('shows placeholder rows while the page is in flight', () => {
     draw({ isPending: true })
     expect(screen.getByTestId('loading')).toBeInTheDocument()
   })
 
-  it('reports a failed fetch instead of an empty strip', () => {
+  it('reports a failed fetch instead of an empty list', () => {
     draw({ isError: true, error: new Error('fetch failed') })
     expect(screen.getByRole('alert')).toHaveTextContent('fetch failed')
   })
 
   it('offers the import when the database is empty', () => {
-    draw({ data: { total: 0, limit: 5, offset: 0, games: [] } })
+    draw({ data: { total: 0, limit: 12, offset: 0, games: [] } })
     expect(screen.getByTestId('empty')).toHaveTextContent(/no games in the database/i)
     expect(screen.getByRole('link', { name: /import games/i })).toHaveAttribute('href', '/import')
   })
 
-  it('draws each game with its result, opponent, opening and worst swing', () => {
+  it('draws each game as a row with its result, opponent and worst swing', () => {
     draw({ data: CARDS })
 
     const game = screen.getByRole('link', { name: /jazzoz/ })
     expect(game).toHaveAttribute('href', '/games/10')
     expect(game).toHaveTextContent('L')
     expect(game).toHaveTextContent('1272')
-    expect(game).toHaveTextContent('B02')
     // 44.2 win percentage points given away, written the way the move list writes it.
     expect(game).toHaveTextContent('−44.2%')
-    expect(game).toHaveTextContent('deep')
+    // Opening/source/tier moved off the row and into the tooltip.
+    expect(game).toHaveAttribute('title', expect.stringContaining('B02'))
+    expect(game).toHaveAttribute('title', expect.stringContaining('deep'))
   })
 
   it('marks a game no engine has been over as unanalysed, with no swing to show', () => {
     draw({ data: CARDS })
     const game = screen.getByRole('link', { name: /pawnshop_hero/ })
-    expect(game).toHaveTextContent('unanalysed')
     expect(game).toHaveTextContent('W')
+    expect(game).toHaveTextContent('—')
+    expect(game).toHaveAttribute('title', expect.stringContaining('unanalysed'))
   })
 
   it('links the whole library, counted', () => {
