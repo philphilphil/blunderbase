@@ -242,19 +242,6 @@ export function evalCurve(moves: MoveRow[]): CurvePoint[] {
   return points
 }
 
-/** Six or so x-axis ticks on move boundaries, the way the design labels the graph. */
-export function curveTicks(plyCount: number, wanted = 6): number[] {
-  const moveCount = Math.max(1, Math.ceil(plyCount / 2))
-  const step = Math.max(1, Math.round(moveCount / Math.max(1, wanted - 1)))
-  const ticks: number[] = []
-  for (let moveNumber = 1; moveNumber <= moveCount; moveNumber += step) {
-    ticks.push((moveNumber - 1) * 2)
-  }
-  const last = (moveCount - 1) * 2
-  if (ticks[ticks.length - 1] !== last) ticks.push(last)
-  return ticks
-}
-
 // --- move list ------------------------------------------------------------
 
 export interface MovePair {

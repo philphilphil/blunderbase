@@ -73,8 +73,9 @@ describe('the three-column game view at 1440', () => {
     const nav = read('src/components/shell/SideNav.tsx')
 
     const railUnits = Number(nav.match(/<nav className="flex w-(\d+)/)![1]) / 4 // w-50 -> 12.5rem
-    const boardFloor = Number(page.match(/min-w-\[([\d.]+)rem\] shrink-\[2\]/)![1])
-    const movesFloor = Number(page.match(/min-w-\[([\d.]+)rem\] flex-1/)![1])
+    // The board column is the one that grows, the move table the one that is sized.
+    const boardFloor = Number(page.match(/min-w-\[([\d.]+)rem\] flex-1/)![1])
+    const movesFloor = Number(page.match(/min-w-\[([\d.]+)rem\] grow-0/)![1])
 
     const px = (units: number) => units * 16 * ROOT_SCALE
     const dividers = 2 // one hairline between each pair of columns

@@ -4,9 +4,9 @@ import { Area, AreaChart, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { GLYPHS, glyphFor, type Glyph } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
-import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
+import { scaleMargin, scalePx } from '@/lib/ui/scale'
 
-import { curveTicks, plyLabel, type CurvePoint } from '../gameModel'
+import { plyLabel, type CurvePoint } from '../gameModel'
 
 const AXIS = 50
 const CURVE = 'var(--bb-text-2)'
@@ -47,7 +47,6 @@ export function EvalGraph({
   onSelectPly: (ply: number) => void
   className?: string
 }) {
-  const ticks = useMemo(() => curveTicks(plyCount), [plyCount])
   const domain = useMemo<[number, number]>(
     () => [points[0]?.ply ?? -1, Math.max(points[points.length - 1]?.ply ?? 0, plyCount - 1)],
     [points, plyCount],
@@ -85,19 +84,10 @@ export function EvalGraph({
               if (Number.isFinite(label)) onSelectPly(label)
             }}
           >
-            <XAxis
-              dataKey="ply"
-              type="number"
-              domain={domain}
-              ticks={ticks}
-              tick={{ fill: 'var(--bb-graph-tick)', fontSize: rem(9) }}
-              tickFormatter={(ply: number) => String(Math.floor(ply / 2) + 1)}
-              tickLine={false}
-              axisLine={false}
-              height={scalePx(11)}
-              tickMargin={scalePx(1)}
-              interval={0}
-            />
+            {/* Hidden, not gone: the numeric ply scale is what click-to-seek and the
+                cursor line position against. The move numbers it used to print said
+                nothing the move table doesn't, and their row goes to the plot. */}
+            <XAxis dataKey="ply" type="number" domain={domain} hide />
             <YAxis type="number" domain={[0, 100]} hide />
 
             <ReferenceLine y={75} stroke="var(--bb-graph-grid)" strokeWidth={1} />

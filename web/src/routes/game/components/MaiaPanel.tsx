@@ -90,7 +90,10 @@ export function MaiaPanel({
   return (
     <div
       className={cn(
-        'flex flex-none flex-col border-t border-hairline bg-panel',
+        // One height for every position: the box sits on top of the move table, and a
+        // height that tracked how many rows the columns happen to have would bounce the
+        // table on every step through the game. A column with more to say scrolls.
+        'flex h-[12rem] flex-none flex-col border-t border-hairline bg-panel',
         className,
       )}
       data-testid="maia-panel"
@@ -98,10 +101,13 @@ export function MaiaPanel({
       {/*
         A quarter to Maia, three to the engine: the human column is single moves and a
         number, the engine column is whole variations, and an even split left the one
-        half-empty while the other wrapped.
+        half-empty while the other wrapped. The quarter has a floor, though — a loss chip,
+        a SAN and a percentage side by side are about 9rem, and below that the column
+        truncates its own header — so in a narrow moves column the engine's rows wrap a
+        line sooner rather than the human rows becoming ellipses.
       */}
-      <div className="grid grid-cols-[1fr_3fr] divide-x divide-line">
-        <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)] divide-x divide-line">
+        <section className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5">
           <div className="flex items-center gap-[0.4375rem]">
             <span className="size-1.5 flex-none rounded-full bg-brilliant" />
             <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
@@ -135,7 +141,7 @@ export function MaiaPanel({
           ) : null}
         </section>
 
-        <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
+        <section className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-[0.4375rem]">
             <span
               className={cn(

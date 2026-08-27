@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
@@ -7,9 +7,11 @@ import { useStreamSession } from '@/lib/analysis'
 import { useGame, useMaiaTargetElo } from '@/lib/api/queries'
 import type { MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
+import { cn } from '@/lib/utils'
 
 import { buildAnalysisLine, withBoardMove } from './analysisLine'
 import { BoardPanel } from './components/BoardPanel'
+import { ColumnSplitter } from './components/ColumnSplitter'
 import { EvalGraph } from './components/EvalGraph'
 import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
@@ -42,6 +44,75 @@ import { isPrefix, useSessionVariations } from './sessionVariations'
 import { useBoardKeys } from './useBoardKeys'
 import { useDeepAnalysis } from './useDeepAnalysis'
 import { useLiveMaia } from './useLiveMaia'
+
+// --- the moves column's width ---------------------------------------------
+//
+// The board takes the spare width and the move table is the column that is *sized*, so the
+// width held here is the move table's. Stored in `rem`, the unit the whole page lays out
+// in: a physical pixel count would stop meaning the same column the moment the root scale
+// moved (`lib/ui/scale.ts`). Page-local state rather than a store — nothing outside this
+// page reads it, and a second tab arranging its own columns differently is not a conflict
+// to reconcile.
+
+export const MOVES_WIDTH_KEY = 'blunderbase.gameMovesWidth'
+/**
+ * What the move column is worth until somebody drags it, read off what it holds rather
+ * than off the window: the Maia panel's `1fr 3fr` grid wants roughly 6.5rem for the human
+ * column ("d5", a percentage, the played mark) and the rest for the engine's own — a SAN
+ * move, its eval chip and two or three plies of line without wrapping — and the move table
+ * under it wants a move number plus two SAN cells wide enough for a glyph and an
+ * annotation. 26rem, which is 499 physical pixels at the app's 120 % scale, seats both
+ * comfortably and is well clear of the 280 the design set for this column; every rem past
+ * it would be spent on whitespace the move table has no use for, and the board wants it.
+ */
+const DEFAULT_MOVES_REM = 26
+const BOARD_FLOOR_REM = 26.25
+const MOVES_FLOOR_REM = 20
+
+function storage(): Storage | null {
+  try {
+    return window.localStorage
+  } catch {
+    // Storage disabled: the splitter still drags, the page just forgets by morning.
+    return null
+  }
+}
+
+/** The rendered size of one `rem` — `index.css` scales the root, so it is not 16px. */
+function rootPx(): number {
+  const size = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+  return Number.isFinite(size) && size > 0 ? size : 16
+}
+
+/** The remembered width, or null for "nobody has moved it" — which is the design's own. */
+function readMovesWidth(): number | null {
+  const store = storage()
+  if (!store) return null
+  try {
+    const raw = store.getItem(MOVES_WIDTH_KEY)
+    if (!raw) return null
+    const width = Number(raw)
+    // Anything that is not a width — a truncated write, an older spelling of the key's
+    // contents — is no width, and the design's basis stands.
+    if (!Number.isFinite(width) || width <= 0) return null
+    // The ceiling needs a container to be measured against and there is none yet; the
+    // floor holds on its own, and the first drag re-clamps against the real row.
+    return Math.max(width, MOVES_FLOOR_REM)
+  } catch {
+    // Corrupt or unreadable: the default layout rather than a throw.
+    return null
+  }
+}
+
+function writeMovesWidth(width: number | null): void {
+  const store = storage()
+  try {
+    if (width === null) store?.removeItem(MOVES_WIDTH_KEY)
+    else store?.setItem(MOVES_WIDTH_KEY, String(width))
+  } catch {
+    // Quota or a private window: the width still holds for this session.
+  }
+}
 
 /**
  * Design 1a "Studio": board with its eval bar, transport row (with the deep-analysis
@@ -93,6 +164,61 @@ function GameStudio({ gameId }: { gameId: number }) {
    * back within the open app (`./sessionVariations`).
    */
   const { kept, keep } = useSessionVariations(gameId)
+
+  // --- the column split -----------------------------------------------------
+  //
+  // The row the two columns sit in, measured rather than remembered: a window resized
+  // between two drags must not leave a stale ceiling behind.
+  const columnsRef = useRef<HTMLDivElement | null>(null)
+  /** The moves column in `rem`; null is "the design's basis", which is also the reset. */
+  const [movesWidth, setMovesWidth] = useState<number | null>(readMovesWidth)
+  const widthRef = useRef(movesWidth)
+  /** The width the drag started from — deltas are measured off it, not off each other, so
+   * dragging past a floor and back does not leave the pointer and the line apart. */
+  const dragBase = useRef(DEFAULT_MOVES_REM)
+
+  /**
+   * A width the layout can actually hold: never under the move table's own floor, and never
+   * so wide that the board drops under its. A row too narrow for both floors gives the move
+   * table its floor and overflows, which is what the CSS `min-w` pair does anyway.
+   */
+  const clampWidth = useCallback((width: number) => {
+    const row = columnsRef.current?.getBoundingClientRect().width ?? 0
+    const available = row > 0 ? row / rootPx() : Number.POSITIVE_INFINITY
+    const ceiling = Math.max(MOVES_FLOOR_REM, available - BOARD_FLOOR_REM)
+    const clamped = Math.min(Math.max(width, MOVES_FLOOR_REM), ceiling)
+    // Three decimals of a `rem` is a fifth of a pixel: enough to drag smoothly, short
+    // enough to read in the DOM and in storage.
+    return Math.round(clamped * 1000) / 1000
+  }, [])
+
+  const startResize = useCallback(() => {
+    dragBase.current = clampWidth(widthRef.current ?? DEFAULT_MOVES_REM)
+  }, [clampWidth])
+
+  /**
+   * The splitter reports raw pointer travel, rightwards positive, and the column it moves
+   * is the one on its *right*: a pointer going right is the move table getting narrower,
+   * so the delta is subtracted rather than added.
+   */
+  const resize = useCallback(
+    (deltaPx: number) => {
+      const next = clampWidth(dragBase.current - deltaPx / rootPx())
+      widthRef.current = next
+      setMovesWidth(next)
+    },
+    [clampWidth],
+  )
+
+  /** Storage is written where the drag settles, not on every pointer move. */
+  const endResize = useCallback(() => writeMovesWidth(widthRef.current), [])
+
+  /** Double-click forgets the width rather than storing the default over it. */
+  const resetWidth = useCallback(() => {
+    widthRef.current = null
+    setMovesWidth(null)
+    writeMovesWidth(null)
+  }, [])
 
   const detail = game.data
   const moves = useMemo<MoveRow[]>(() => detail?.moves ?? [], [detail])
@@ -433,9 +559,8 @@ function GameStudio({ gameId }: { gameId: number }) {
 
   const players = `${detail.game.white ?? '?'} — ${detail.game.black ?? '?'}`
 
-  // Once a deep pass has finished, the multi-PV half of this box is the thing worth reading
-  // first about the position on the board, so it goes above the move table. Before that it
-  // has little to say, and the table keeps the top of the column.
+  // The box sits above the move table whether or not a deep pass has finished: the panel
+  // moving as analysis lands read as a layout bug, so it keeps one place.
   //
   // The human column beside the engine's own is what `hints` turns off; the run's own
   // findings are not a hint and stay either way. Off the game line the human column is a
@@ -454,7 +579,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
       onHoverMove={setHoverMove}
       onPlayLine={playLine}
-      className={deepRun ? 'border-b border-t-0 border-hairline' : undefined}
+      className="border-b border-t-0 border-hairline"
     />
   )
 
@@ -468,17 +593,36 @@ function GameStudio({ gameId }: { gameId: number }) {
         ]}
       />
 
-      <div className="flex min-h-0 flex-1">
+      <div ref={columnsRef} className="flex min-h-0 flex-1">
         {/*
           Column floors are in `rem`, so at the app's scale the board never drops below
           504 physical pixels and the move table never below 384 — both clear of the
           420/280 the design set at 100 % for these two columns, now that there is no
-          third. 1440 − 240 (rail) leaves 1200 for the pair, and with the notes column
-          gone the ~379px it used to take is free: the board's basis grows from
-          32.75rem to 35rem and its floor from 24rem to the design's own 26.25rem, and
-          the move table's floor grows from 16rem to 20rem.
+          third.
+
+          Which of the two takes the spare width is the whole point of the split. The move
+          table is a fixed thing to read — a move number and two SAN cells — and a room's
+          worth of it is whitespace, so it is the column that is *sized*: `grow-0` on
+          `movesWidth`, 26rem until somebody drags it. Everything left over is the board's
+          (`flex-1`), which is the one element on the page that is worth more the larger it
+          is. Growing sideways is not free, though: the board is square, so width is height,
+          and past a point it would push the transport row and the eval curve out of the
+          viewport — which is why `BoardPanel` caps it against `100vh` and centres what it
+          caps. The floors are unchanged.
+
+          Between those two floors the boundary is the reader's: the hairline is a
+          `ColumnSplitter`, and what it drags is `movesWidth` — held here in `rem` and
+          remembered under `blunderbase.gameMovesWidth`. The splitter reports pointer travel
+          and nothing else, so the direction is decided in `resize`: rightwards is a
+          narrower move table. The floors are still the invariant. Every drag is clamped to
+          them against the row's measured width, and the `min-w` pair holds them again in
+          CSS for a width no drag produced. Until something is dragged there is no stored
+          width and the column keeps its own `basis-[26rem]`.
         */}
-        <div className="flex min-w-[26.25rem] shrink-[2] grow-0 basis-[35rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem]">
+        <div
+          data-testid="board-column"
+          className="flex min-w-[26.25rem] flex-1 flex-col gap-3.5 px-5 py-[1.125rem]"
+        >
           <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
           <BoardPanel
             position={position}
@@ -522,8 +666,23 @@ function GameStudio({ gameId }: { gameId: number }) {
           />
         </div>
 
-        <div className="flex min-w-[20rem] flex-1 flex-col">
-          {deepRun ? maiaPanel : null}
+        <ColumnSplitter
+          label="Moves column width"
+          onResizeStart={startResize}
+          onResize={resize}
+          onResizeEnd={endResize}
+          onReset={resetWidth}
+        />
+
+        <div
+          data-testid="moves-column"
+          className={cn(
+            'flex min-w-[20rem] grow-0 flex-col',
+            movesWidth === null && 'basis-[26rem]',
+          )}
+          style={movesWidth === null ? undefined : { flexBasis: `${movesWidth}rem` }}
+        >
+          {maiaPanel}
           <MoveList
             pairs={pairs}
             cursor={cursor}
@@ -548,11 +707,10 @@ function GameStudio({ gameId }: { gameId: number }) {
           />
           {/*
             Two panels, two different claims about the same position: the live search says
-            what an engine is finding right now, and the box above (or below) it says what
-            the stored run concluded and what a human of this rating would play. The
+            what an engine is finding right now, and the box at the top of the column says
+            what the stored run concluded and what a human of this rating would play. The
             deep-analysis trigger lives in the board's transport row now, rather than here.
           */}
-          {deepRun ? null : maiaPanel}
         </div>
       </div>
     </>

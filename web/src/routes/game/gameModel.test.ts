@@ -5,7 +5,6 @@ import type { MomentResponse, MoveRow } from '@/lib/api/types'
 import {
   buildGameLine,
   collapsedThroughMove,
-  curveTicks,
   engineLines,
   evalAtCursor,
   evalCurve,
@@ -146,9 +145,6 @@ describe('evalCurve', () => {
     expect(evalCurve(OPENING)).toEqual([])
   })
 
-  it('puts axis ticks on move boundaries', () => {
-    expect(curveTicks(48)).toEqual([0, 10, 20, 30, 40, 46])
-  })
 })
 
 describe('pairMoves', () => {

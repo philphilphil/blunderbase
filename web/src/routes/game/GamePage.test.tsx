@@ -7,8 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Providers } from '@/app/Providers'
 import type { GameDetail, MoveRow, RunResponse, RunnersStatus } from '@/lib/api/types'
 
-import { GamePage } from './GamePage'
+import { GamePage, MOVES_WIDTH_KEY } from './GamePage'
 import { resetSessionVariations } from './sessionVariations'
+
+// jsdom builds PointerEvents but captures nothing, and the splitter asks for the capture
+// before it reads a single delta.
+if (!Element.prototype.setPointerCapture) {
+  Element.prototype.setPointerCapture = function setPointerCapture() {}
+  Element.prototype.releasePointerCapture = function releasePointerCapture() {}
+  Element.prototype.hasPointerCapture = function hasPointerCapture() {
+    return false
+  }
+}
 
 // The events socket is not what most of these tests are about; a stub that never opens
 // keeps the provider quiet. `emit` is there for the one test that does drive it.
@@ -292,7 +302,7 @@ describe('GamePage', () => {
     expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('leaves the move table on top while nothing has been analysed', async () => {
+  it('keeps the multi-PV box over the move table while nothing has been analysed', async () => {
     vi.stubGlobal(
       'fetch',
       stubFetch({ '/games/14': { ...DETAIL, runs: [] } }),
@@ -300,9 +310,10 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
+    // The box holds one place whether or not a deep pass has landed yet.
     const engine = screen.getByTestId('maia-panel')
     const moveButton = screen.getByRole('button', { name: 'Qxd5' })
-    expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+    expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('steps through plies with the arrow keys and follows with the board', async () => {
@@ -926,5 +937,172 @@ describe('GamePage', () => {
     expect(within(panel()).queryByText(/%$/)).not.toBeInTheDocument()
     expect(within(panel()).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('played')).toBeInTheDocument()
+  })
+})
+
+/**
+ * The clamp is arithmetic over two things jsdom does not have: a laid-out row and a scaled
+ * root. `rowWidth` gives the row the first, and the second is jsdom's own 16px `rem` — so
+ * a 1200px row is 75rem, the move table's floor is 20rem and its ceiling the 48.75rem that
+ * leaves the board its 26.25.
+ */
+function rowWidth(px: number): HTMLElement {
+  const row = screen.getByTestId('moves-column').parentElement!
+  row.getBoundingClientRect = () => new DOMRect(0, 0, px, 800)
+  return screen.getByRole('separator', { name: 'Moves column width' })
+}
+
+function movesColumn(): HTMLElement {
+  return screen.getByTestId('moves-column')
+}
+
+function boardColumn(): HTMLElement {
+  return screen.getByTestId('board-column')
+}
+
+/** A whole drag: down where the line is, out to `to`, and let go. */
+function drag(splitter: HTMLElement, from: number, to: number) {
+  fireEvent.pointerDown(splitter, { button: 0, pointerId: 1, clientX: from })
+  fireEvent.pointerMove(splitter, { pointerId: 1, clientX: to })
+  fireEvent.pointerUp(splitter, { pointerId: 1, clientX: to })
+}
+
+/** jsdom in this setup exposes no `localStorage`, so the tests bring their own. */
+function memoryStorage(): Storage {
+  const map = new Map<string, string>()
+  return {
+    get length() {
+      return map.size
+    },
+    key: (index: number) => [...map.keys()][index] ?? null,
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, String(value)),
+    removeItem: (key: string) => void map.delete(key),
+    clear: () => map.clear(),
+  }
+}
+
+describe('the board/moves splitter', () => {
+  let storage: Storage
+
+  beforeEach(() => {
+    storage = memoryStorage()
+    vi.stubGlobal('localStorage', storage)
+  })
+
+  it('lays the columns out at the design’s basis until the boundary is moved', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    expect(movesColumn()).toHaveClass('basis-[26rem]')
+    expect(movesColumn().style.flexBasis).toBe('')
+  })
+
+  it('leaves the board column to grow into whatever is left', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const splitter = rowWidth(1200)
+
+    // The sized column is the move table's; the board is `flex-1` and carries no width of
+    // its own, before a drag or after one.
+    expect(boardColumn()).toHaveClass('flex-1')
+    expect(boardColumn().style.flexBasis).toBe('')
+    drag(splitter, 560, 460)
+    expect(boardColumn().style.flexBasis).toBe('')
+  })
+
+  it('narrows the moves column with the drag, and stores where it settles', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const splitter = rowWidth(1200)
+
+    fireEvent.pointerDown(splitter, { button: 0, pointerId: 1, clientX: 560 })
+    fireEvent.pointerMove(splitter, { pointerId: 1, clientX: 624 })
+    // Rightwards is the move table getting narrower: 64px is 4rem, off the 26rem the
+    // untouched page was laid out at.
+    expect(movesColumn().style.flexBasis).toBe('22rem')
+    expect(movesColumn()).not.toHaveClass('basis-[26rem]')
+    // Storage is written where the drag settles, not once per pointer move.
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBeNull()
+
+    fireEvent.pointerUp(splitter, { pointerId: 1, clientX: 624 })
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('22')
+  })
+
+  it('widens it again when the drag goes the other way', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const splitter = rowWidth(1200)
+
+    drag(splitter, 560, 460)
+    // 100px leftwards is 6.25rem onto the 26.
+    expect(movesColumn().style.flexBasis).toBe('32.25rem')
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('32.25')
+  })
+
+  it('narrows it no further than the move table’s own floor', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const splitter = rowWidth(1200)
+
+    drag(splitter, 560, 2400)
+    expect(movesColumn().style.flexBasis).toBe('20rem')
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('20')
+  })
+
+  it('widens it no further than the board’s floor allows', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const splitter = rowWidth(1200)
+
+    drag(splitter, 560, -400)
+    // 75rem of row, less the 26.25rem the board never drops under.
+    expect(movesColumn().style.flexBasis).toBe('48.75rem')
+  })
+
+  it('nudges the boundary with the arrow keys without stepping the game', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const splitter = rowWidth(1200)
+
+    fireEvent.keyDown(splitter, { key: 'ArrowRight' })
+    expect(movesColumn().style.flexBasis).toBe('25rem')
+    fireEvent.keyDown(splitter, { key: 'ArrowLeft' })
+    fireEvent.keyDown(splitter, { key: 'ArrowLeft' })
+    expect(movesColumn().style.flexBasis).toBe('27rem')
+    // The board's own arrows are bound on `window`, and did not see these.
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+  })
+
+  it('forgets the width on a double-click, back to the design’s basis', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const splitter = rowWidth(1200)
+
+    drag(splitter, 560, 624)
+    expect(movesColumn().style.flexBasis).toBe('22rem')
+
+    fireEvent.doubleClick(splitter)
+    expect(movesColumn()).toHaveClass('basis-[26rem]')
+    expect(movesColumn().style.flexBasis).toBe('')
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBeNull()
+  })
+
+  it('opens on the width the last visit left it at', async () => {
+    storage.setItem(MOVES_WIDTH_KEY, '30')
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    expect(movesColumn().style.flexBasis).toBe('30rem')
+    expect(movesColumn()).not.toHaveClass('basis-[26rem]')
+  })
+
+  it('falls back to the design’s basis where the stored width is not one', async () => {
+    storage.setItem(MOVES_WIDTH_KEY, 'wide-ish')
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    expect(movesColumn()).toHaveClass('basis-[26rem]')
+    expect(movesColumn().style.flexBasis).toBe('')
   })
 })

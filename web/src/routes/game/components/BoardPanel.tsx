@@ -204,7 +204,43 @@ export function BoardPanel({
 
   return (
     <div ref={column} className={cn('flex flex-col gap-3.5', className)}>
-      <div className="flex items-start gap-2.5">
+      {/*
+        The board column takes the page's spare width now (`GamePage`), and the board is
+        square: every rem of width is a rem of height, and unchecked it would push the
+        transport row and the eval curve off the bottom of the window. So the board is
+        capped against the viewport, the way `/live` caps its own.
+
+        What stands above and below it, in the `rem` everything here is written in:
+
+          2.875  the titlebar (`AppShell`/`TopBar`)
+          2.25   the board column's `py-[1.125rem]`, both ends
+          1.75   its two `gap-3.5`s — header→panel, panel→curve
+          4      the `GameHeaderBar`: three stacked lines over `gap-[0.3125rem]`, and on
+                 the right a tier chip over two mono lines, which is the taller of the two
+          0.875  this panel's own `gap-3.5`, board row → transport row
+          1.75   the transport row: `text-xs` buttons at `py-[0.3125rem]`, plus their border
+          6.5    the eval curve at its `max-h-[6.5rem]` — reserved in full, not at its
+                 ~4.5rem floor, so a grown board never squeezes the graph down to it
+          -----
+          20     which is `calc(100vh-20rem)`
+
+        The cap is on the `Board` element, which is the grid the rank column and the file
+        row live in: its height is its width less 0.125rem (a 0.875rem rail and a 0.375rem
+        gap come off the squares horizontally, a 0.375rem gap and a ~0.75rem file row go on
+        vertically), so the capped board is a hair *shorter* than the room reserved for it.
+        Worked through at a short window — 900 physical pixels, where 1rem is 19.2 — the cap
+        is 516px, the board draws 513.6 tall, and 384px of chrome above and below it leaves
+        2.4px to spare: header, board, transport row and the full-height curve all fit.
+
+        The eval bar is not part of the cap: it is `flex-none` at `w-3.5` beside a
+        `gap-2.5`, so the flex row hands the board what is left of the column after those
+        1.5rem and the bar can never be crowded out. `justify-center` is what a capped board
+        is for — once the board stops growing the leftover width is split either side, so
+        the pair sits in the middle of a wide column instead of hugging its left edge, while
+        the transport row under it (and the header and curve outside this panel) still span
+        the column entire.
+      */}
+      <div className="flex items-start justify-center gap-2.5">
         <EvalBar win={win} score={score} className="self-stretch" />
         {/* Nothing floats over the squares: Maia's prediction is a panel of its own, under
             the engine lines, and only its target square is marked here. */}
@@ -222,7 +258,7 @@ export function BoardPanel({
           // position branches off the game rather than being refused.
           viewOnly={!onPlayMove}
           onMove={onPlayMove}
-          className="min-w-0 flex-1"
+          className="min-w-0 max-w-[min(100%,calc(100vh-20rem))] flex-1"
         />
       </div>
 
