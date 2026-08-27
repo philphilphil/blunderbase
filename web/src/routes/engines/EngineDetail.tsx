@@ -23,8 +23,10 @@ import type {
 import { isRemote, type EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
+import { HostBadge } from './HostBadge'
 import { OptionsEditor } from './OptionsEditor'
 import { SampleResult } from './SampleResult'
+import { Toggle } from './Toggle'
 import { declaredOptions, draftFrom, resolveDraft, type OptionDraft } from './options'
 
 const DEFAULT_NODES = 200_000
@@ -37,40 +39,6 @@ const DEFAULT_MULTIPV = 3
  */
 function autoProbe(engine: EngineResponse): boolean {
   return engine.kind === 'uci'
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-  disabled,
-}: {
-  checked: boolean
-  onChange: (next: boolean) => void
-  label: string
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'inline-flex h-[1.125rem] w-8 flex-none items-center rounded-full border p-px transition-colors disabled:opacity-50',
-        checked ? 'border-accent-teal/40 bg-accent-teal/25' : 'border-edge bg-elevated',
-      )}
-    >
-      <span
-        className={cn(
-          'size-3.5 rounded-full transition-transform',
-          checked ? 'translate-x-3.5 bg-accent-teal' : 'translate-x-0 bg-faint',
-        )}
-      />
-    </button>
-  )
 }
 
 function Section({
@@ -114,6 +82,7 @@ export function EngineDetail({
   host,
   hostKnown,
   tiers,
+  expertMode,
   onDeleted,
 }: {
   engine: EngineResponse
@@ -122,6 +91,8 @@ export function EngineDetail({
   /** Whether `/runners/status` has answered — until it has, `host` says nothing. */
   hostKnown: boolean
   tiers: TierStatusResponse[]
+  /** Whether UCI options and test runs are shown, or just the binary basics. */
+  expertMode: boolean
   onDeleted: () => void
 }) {
   const remote = isRemote(host)
@@ -224,6 +195,7 @@ export function EngineDetail({
         {engine.version ? (
           <span className="truncate font-mono text-[0.65625rem] text-dim">{engine.version}</span>
         ) : null}
+        <HostBadge host={host} />
         <div className="flex-1" />
         <span className="text-[0.6875rem] text-dim">{engine.enabled ? 'Enabled' : 'Disabled'}</span>
         <Toggle
@@ -318,148 +290,168 @@ export function EngineDetail({
         </div>
       </Section>
 
-      <Section
-        title="UCI options"
-        aside={
-          remote ? null : (
-            <div className="flex items-center gap-2">
-              {probe.isFetching ? (
-                <span className="text-[0.65625rem] text-dim">probing…</span>
-              ) : probe.isSuccess ? (
-                <span className="font-mono text-[0.65625rem] text-dim">
-                  {probe.data.name ?? 'unnamed'}
-                  {probe.data.author ? ` · ${probe.data.author.split('(')[0]!.trim()}` : ''}
-                </span>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={probe.isFetching || locked}
-                onClick={() => {
-                  setProbeAsked(true)
-                  void probe.refetch()
-                }}
-              >
-                <RefreshCw aria-hidden />
-                Probe
-              </Button>
-            </div>
-          )
-        }
-      >
-        {remote ? (
-          <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
-            Options come from the runner&rsquo;s own probe.
-          </p>
-        ) : probe.isFetching && !probe.data ? (
-          <div className="flex flex-col gap-2" data-testid="probe-loading">
-            {[0, 1, 2].map((row) => (
-              <Skeleton key={row} className="h-8 w-full" />
-            ))}
-          </div>
-        ) : probe.isError ? (
-          <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-            <p className="text-[0.75rem] text-blunder">The binary could not be probed.</p>
-            <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
-              {probe.error.message}
-            </p>
-          </div>
-        ) : !probe.data ? (
-          <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
-            {engine.kind === 'maia'
-              ? 'Probing a Maia model loads its network first, which takes a while — press Probe when you want to edit its options.'
-              : 'Press Probe to read what this binary declares.'}
-          </p>
-        ) : (
-          <OptionsEditor
-            declared={declared}
-            draft={draft}
-            errors={resolved.errors}
-            onChange={setDraft}
-          />
-        )}
-      </Section>
-
-      {remote ? (
-        <Section title="Test run">
-          <p className="text-[0.6875rem] leading-[1.6] text-dim">
-            A test run starts the binary here;{' '}
-            <span className="font-mono text-soft">{engine.path}</span> is a path on{' '}
-            <span className="font-medium text-soft">{runnerName}</span>.
-          </p>
-        </Section>
-      ) : (
-        <Section title="Test run">
-          <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_5.625rem_4.375rem]">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`engine-${engine.id}-fen`}>Position</Label>
-              <Input
-                id={`engine-${engine.id}-fen`}
-                value={fen}
-                spellCheck={false}
-                className="font-mono"
-                placeholder="starting position"
-                onChange={(event) => setFen(event.target.value)}
-              />
-            </div>
-            {engine.kind === 'maia' ? (
-              <div className="col-span-2 flex flex-col gap-1.5">
-                <Label htmlFor={`engine-${engine.id}-ratings`}>Ratings</Label>
-                <Input
-                  id={`engine-${engine.id}-ratings`}
-                  value={ratings}
-                  className="font-mono"
-                  placeholder="1500 1900"
-                  onChange={(event) => setRatings(event.target.value)}
-                />
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={`engine-${engine.id}-nodes`}>Nodes</Label>
-                  <Input
-                    id={`engine-${engine.id}-nodes`}
-                    value={nodes}
-                    inputMode="numeric"
-                    className="font-mono"
-                    onChange={(event) => setNodes(event.target.value)}
-                  />
+      {expertMode ? (
+        <>
+          <Section
+            title="UCI options"
+            aside={
+              remote ? null : (
+                <div className="flex items-center gap-2">
+                  {probe.isFetching ? (
+                    <span className="text-[0.65625rem] text-dim">probing…</span>
+                  ) : probe.isSuccess ? (
+                    <span className="font-mono text-[0.65625rem] text-dim">
+                      {probe.data.name ?? 'unnamed'}
+                      {probe.data.author ? ` · ${probe.data.author.split('(')[0]!.trim()}` : ''}
+                    </span>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={probe.isFetching || locked}
+                    onClick={() => {
+                      setProbeAsked(true)
+                      void probe.refetch()
+                    }}
+                  >
+                    <RefreshCw aria-hidden />
+                    Probe
+                  </Button>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={`engine-${engine.id}-multipv`}>Lines</Label>
-                  <Input
-                    id={`engine-${engine.id}-multipv`}
-                    value={multipv}
-                    inputMode="numeric"
-                    className="font-mono"
-                    onChange={(event) => setMultipv(event.target.value)}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="flex-1 text-[0.6875rem] text-dim">
-              Runs whether the engine is enabled or not — the point of the button is to decide.
-            </span>
-            <Button type="button" size="sm" disabled={locked || testRun.isPending} onClick={run}>
-              {testRun.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
-              Test run
-            </Button>
-          </div>
-
-          {testRun.isError ? (
-            <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-              <p className="text-[0.75rem] text-blunder">The engine did not answer.</p>
-              <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
-                {testRun.error.message}
+              )
+            }
+          >
+            {remote ? (
+              <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
+                Options come from the runner&rsquo;s own probe.
               </p>
-            </div>
-          ) : null}
-          {testRun.data ? <SampleResult sample={testRun.data} /> : null}
-        </Section>
+            ) : probe.isFetching && !probe.data ? (
+              <div className="flex flex-col gap-2" data-testid="probe-loading">
+                {[0, 1, 2].map((row) => (
+                  <Skeleton key={row} className="h-8 w-full" />
+                ))}
+              </div>
+            ) : probe.isError ? (
+              <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
+                <p className="text-[0.75rem] text-blunder">The binary could not be probed.</p>
+                <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
+                  {probe.error.message}
+                </p>
+              </div>
+            ) : !probe.data ? (
+              <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
+                {engine.kind === 'maia'
+                  ? 'Probing a Maia model loads its network first, which takes a while — press Probe when you want to edit its options.'
+                  : 'Press Probe to read what this binary declares.'}
+              </p>
+            ) : (
+              <OptionsEditor
+                declared={declared}
+                draft={draft}
+                errors={resolved.errors}
+                onChange={setDraft}
+              />
+            )}
+          </Section>
+
+          {remote ? (
+            <Section title="Test run">
+              <p className="text-[0.6875rem] leading-[1.6] text-dim">
+                A test run starts the binary here;{' '}
+                <span className="font-mono text-soft">{engine.path}</span> is a path on{' '}
+                <span className="font-medium text-soft">{runnerName}</span>.
+              </p>
+            </Section>
+          ) : (
+            <Section title="Test run">
+              <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_5.625rem_4.375rem]">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={`engine-${engine.id}-fen`}>Position</Label>
+                  <Input
+                    id={`engine-${engine.id}-fen`}
+                    value={fen}
+                    spellCheck={false}
+                    className="font-mono"
+                    placeholder="starting position"
+                    onChange={(event) => setFen(event.target.value)}
+                  />
+                </div>
+                {engine.kind === 'maia' ? (
+                  <div className="col-span-2 flex flex-col gap-1.5">
+                    <Label htmlFor={`engine-${engine.id}-ratings`}>Ratings</Label>
+                    <Input
+                      id={`engine-${engine.id}-ratings`}
+                      value={ratings}
+                      className="font-mono"
+                      placeholder="1500 1900"
+                      onChange={(event) => setRatings(event.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor={`engine-${engine.id}-nodes`}>Nodes</Label>
+                      <Input
+                        id={`engine-${engine.id}-nodes`}
+                        value={nodes}
+                        inputMode="numeric"
+                        className="font-mono"
+                        onChange={(event) => setNodes(event.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor={`engine-${engine.id}-multipv`}>Lines</Label>
+                      <Input
+                        id={`engine-${engine.id}-multipv`}
+                        value={multipv}
+                        inputMode="numeric"
+                        className="font-mono"
+                        onChange={(event) => setMultipv(event.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="flex-1 text-[0.6875rem] text-dim">
+                  Runs whether the engine is enabled or not — the point of the button is to
+                  decide.
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={locked || testRun.isPending}
+                  onClick={run}
+                >
+                  {testRun.isPending ? (
+                    <Loader2 className="animate-spin" aria-hidden />
+                  ) : (
+                    <Play aria-hidden />
+                  )}
+                  Test run
+                </Button>
+              </div>
+
+              {testRun.isError ? (
+                <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
+                  <p className="text-[0.75rem] text-blunder">The engine did not answer.</p>
+                  <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
+                    {testRun.error.message}
+                  </p>
+                </div>
+              ) : null}
+              {testRun.data ? <SampleResult sample={testRun.data} /> : null}
+            </Section>
+          )}
+        </>
+      ) : (
+        <div className="border-t border-hairline px-3.5 py-3.5">
+          <p className="text-[0.6875rem] leading-[1.6] text-dim">
+            UCI options and test runs live behind expert mode.
+          </p>
+        </div>
       )}
 
       <div className="mt-auto flex items-center gap-2 border-t border-hairline px-3.5 py-2.5">

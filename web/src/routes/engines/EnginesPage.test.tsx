@@ -18,6 +18,23 @@ import { hostByEngineId } from '@/lib/engines/hosts'
 
 import { EngineDetail } from './EngineDetail'
 import { EnginesPage } from './EnginesPage'
+import { ENGINE_EXPERT_MODE_KEY, resetEngineExpertMode, setEngineExpertMode } from './expertMode'
+
+/** jsdom in this setup exposes no `localStorage`, so the tests bring their own (see
+ *  `games/savedFilters.test.ts`). */
+function memoryStorage(): Storage {
+  const map = new Map<string, string>()
+  return {
+    get length() {
+      return map.size
+    },
+    key: (index: number) => [...map.keys()][index] ?? null,
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, String(value)),
+    removeItem: (key: string) => void map.delete(key),
+    clear: () => map.clear(),
+  }
+}
 
 class FakeSocket {
   onopen: (() => void) | null = null
@@ -175,11 +192,14 @@ const PROBE = {
 
 beforeEach(() => {
   release = () => {}
+  vi.stubGlobal('localStorage', memoryStorage())
   vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket)
+  resetEngineExpertMode()
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  resetEngineExpertMode()
 })
 
 describe('EnginesPage', () => {
@@ -215,6 +235,7 @@ describe('EnginesPage', () => {
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
+    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
     const threads = await screen.findByLabelText<HTMLInputElement>('Threads')
@@ -248,6 +269,7 @@ describe('EnginesPage', () => {
         },
       },
     })
+    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
     expect(await screen.findByText('The binary could not be probed.')).toBeInTheDocument()
@@ -276,6 +298,7 @@ describe('EnginesPage', () => {
         lines: [{ multipv: 1, cp: 31, mate: null, pv: ['e2e4', 'e7e5'] }],
       },
     })
+    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
     await userEvent.click(await screen.findByRole('button', { name: 'Test run' }))
@@ -364,6 +387,7 @@ describe('EnginesPage — runners', () => {
         runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
       ]),
     })
+    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
     expect(
@@ -393,6 +417,7 @@ describe('EnginesPage — runners', () => {
       },
       ['/api/runners/status'],
     )
+    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
     // The detail card is up, on a row whose host is not known yet.
@@ -609,6 +634,7 @@ describe('EngineDetail', () => {
             host={hosts.get(7)}
             hostKnown
             tiers={[]}
+            expertMode={false}
             onDeleted={() => {}}
           />
         </MemoryRouter>
@@ -623,5 +649,81 @@ describe('EngineDetail', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Path')).toHaveValue('/opt/sf/stockfish')
     // The header of the same card, which never had a stale copy to disagree with.
     expect(screen.getAllByText('sf-fast').length).toBeGreaterThan(0)
+  })
+})
+
+describe('EnginesPage — expert mode', () => {
+  it('keeps the options editor and test run behind expert mode, off by default', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/tiers': TIERS,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    expect(
+      await screen.findByText('UCI options and test runs live behind expert mode.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText('Threads')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Filter options')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Test run' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Position')).not.toBeInTheDocument()
+  })
+
+  it('reveals the options editor and test run once expert mode is switched on', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/tiers': TIERS,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    await screen.findByText('UCI options and test runs live behind expert mode.')
+    await userEvent.click(screen.getByRole('switch', { name: 'Expert mode' }))
+
+    expect(await screen.findByLabelText('Threads')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Test run' })).toBeInTheDocument()
+    expect(
+      screen.queryByText('UCI options and test runs live behind expert mode.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders already expanded when a prior visit left expert mode on', async () => {
+    window.localStorage.setItem(ENGINE_EXPERT_MODE_KEY, 'true')
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/tiers': TIERS,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    expect(await screen.findByLabelText('Threads')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Test run' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Expert mode' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+  })
+
+  it('round-trips the toggle through localStorage', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/tiers': TIERS,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    const toggle = await screen.findByRole('switch', { name: 'Expert mode' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+    await userEvent.click(toggle)
+    expect(window.localStorage.getItem(ENGINE_EXPERT_MODE_KEY)).toBe('true')
+
+    await userEvent.click(toggle)
+    expect(window.localStorage.getItem(ENGINE_EXPERT_MODE_KEY)).toBe('false')
   })
 })
