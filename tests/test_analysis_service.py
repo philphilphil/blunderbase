@@ -157,8 +157,9 @@ def test_thresholds_come_from_the_app_settings(session: Session) -> None:
 
 
 def test_an_unconfigured_deployment_classifies_by_the_defaults(session: Session) -> None:
+    # Lichess's cuts on the shared win% curve: 5 / 10 / 15 points.
     assert analysis.Thresholds.from_session(session) == analysis.Thresholds(
-        inaccuracy=10.0, mistake=20.0, blunder=30.0
+        inaccuracy=5.0, mistake=10.0, blunder=15.0
     )
 
 

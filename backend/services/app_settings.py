@@ -63,9 +63,12 @@ DEFAULT_OWNER_RATING = "default_owner_rating"
 QUICK_NODES_DEFAULT = 250_000
 DEEP_NODES_DEFAULT = 2_000_000
 DEEP_MULTIPV_DEFAULT = 4
-INACCURACY_DEFAULT = 10.0
-MISTAKE_DEFAULT = 20.0
-BLUNDER_DEFAULT = 30.0
+# Lichess's own judgment thresholds: winning-chance deltas of .1/.2/.3 on its -1..1 scale,
+# which on this 0-100 win-percentage scale are 5/10/15 points. Same curve, same cuts, so a
+# game reads the same here as it does on lichess.org until the owner says otherwise.
+INACCURACY_DEFAULT = 5.0
+MISTAKE_DEFAULT = 10.0
+BLUNDER_DEFAULT = 15.0
 OWNER_RATING_DEFAULT = 1500
 
 # A budget of no nodes at all is not a cheaper pass, it is no pass; there is deliberately
@@ -295,7 +298,7 @@ def _require_rising_thresholds(wanted: Mapping[str, int | float | None]) -> None
         raise SettingsError(
             "the classification thresholds have to rise: inaccuracy < mistake < blunder, "
             f"and {inaccuracy:g} < {mistake:g} < {blunder:g} is not. Every threshold left "
-            "empty is its default (10, 20, 30 win-percentage points)."
+            "empty is its default (5, 10, 15 win-percentage points)."
         )
 
 

@@ -52,10 +52,12 @@ QUICK_REPLIES = [
 EXPECTED = [
     # ply, win_before, win_after, win_loss, classification
     (0, 59.10, 24.89, 34.21, Classification.BLUNDER),
-    (1, 75.11, 45.41, 29.70, Classification.MISTAKE),
+    # 29.7 points was a mistake under the old 10/20/30 defaults; under Lichess's 5/10/15
+    # cuts it is a blunder, and 14.92 moves up from inaccuracy to mistake the same way.
+    (1, 75.11, 45.41, 29.70, Classification.BLUNDER),
     (2, 54.59, 50.00, 4.59, Classification.BEST),
     (3, 50.00, 63.47, 0.00, Classification.GOOD),
-    (4, 36.53, 21.61, 14.92, Classification.INACCURACY),
+    (4, 36.53, 21.61, 14.92, Classification.MISTAKE),
     (5, 78.39, 75.11, 3.28, Classification.GOOD),
 ]
 

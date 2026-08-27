@@ -300,7 +300,8 @@ evaluation is still worth having, and the reason is recorded on the run.
 `win% = 100 / (1 + exp(-0.00368208 × cp))` with the centipawn score clamped to ±1000 and a
 mate in N read as `(21 - min(10, N))` pawns. Both readings of a move are taken in the
 mover's own frame, so `win_loss` is what that player gave away. The thresholds
-(`inaccuracy` / `mistake` / `blunder`, default 10 / 20 / 30 points) are app settings, read
+(`inaccuracy` / `mistake` / `blunder`, default 5 / 10 / 15 points — Lichess's own cuts on
+this curve) are app settings, read
 per plan and refused rather than clamped when they do not rise. Playing the engine's own first choice is checked before them: a top move that still shows
 a large drop is two search depths disagreeing, not a blunder.
 

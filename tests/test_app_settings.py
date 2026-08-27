@@ -37,7 +37,7 @@ def test_nothing_is_configured_until_somebody_configures_it(session: Session) ->
     assert app_settings.get_deep_nodes(session) == app_settings.DEEP_NODES_DEFAULT
     assert app_settings.get_deep_multipv(session) == app_settings.DEEP_MULTIPV_DEFAULT
     assert app_settings.get_default_owner_rating(session) == app_settings.OWNER_RATING_DEFAULT
-    assert app_settings.get_thresholds(session) == (10.0, 20.0, 30.0)
+    assert app_settings.get_thresholds(session) == (5.0, 10.0, 15.0)
 
 
 @pytest.mark.parametrize(

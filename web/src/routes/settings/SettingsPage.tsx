@@ -25,9 +25,9 @@ export const DEFAULTS = {
   quick_nodes: 250_000,
   deep_nodes: 2_000_000,
   deep_multipv: 4,
-  inaccuracy_threshold: 10,
-  mistake_threshold: 20,
-  blunder_threshold: 30,
+  inaccuracy_threshold: 5,
+  mistake_threshold: 10,
+  blunder_threshold: 15,
   default_owner_rating: 1500,
 } as const
 
