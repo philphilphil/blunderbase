@@ -21,28 +21,28 @@ export interface MoveAnnotation {
 export type MoveTab = 'moves' | 'flagged'
 
 /**
- * The analysis line the reader is walking, drawn inline under the move it hangs off. Only
- * the active branch is ever here: the game carries one line, and this is the one detour off
- * it that the board is standing in.
+ * One line in the table, drawn inline under the move it hangs off.
+ *
+ * Every line the session has walked is here, in the order they were walked, and the one the
+ * board is standing in is among them rather than pulled out in front of them: `cursor` says
+ * how far into it the board is, and null says the board is not in this line at all — a line
+ * to look at, and to click back into.
  */
-export interface MoveVariation {
+export interface MoveListVariation {
+  /**
+   * The kept entry (`../sessionVariations`) this row stands for, or null for a line the
+   * store has not been handed yet. It is what a click on a line the board has left names.
+   */
+  id: number | null
   /** The number of game plies the line branches from — its first move is ply `base`. */
   base: number
   /** The line in SAN, whole, however far into it the board currently is. */
   sans: string[]
-  /** How many of its moves are on the board; `0` is the position it branched from. */
-  cursor: number
-}
-
-/**
- * A line walked earlier this session and kept (`../sessionVariations`). The board is not in
- * it, so it has no cursor — it is a line to look at, and to click back into.
- */
-export interface KeptMoveVariation {
-  id: number
-  /** The number of game plies the line branches from — its first move is ply `base`. */
-  base: number
-  sans: string[]
+  /**
+   * How many of its moves are on the board — `0` is the position it branched from — or null
+   * where the board is somewhere else entirely.
+   */
+  cursor: number | null
 }
 
 export interface MoveListProps {
@@ -56,12 +56,13 @@ export interface MoveListProps {
   plyCount: number
   /** The game as PGN, for the tab row's export affordance. Built by `../pgn`. */
   pgn?: string
-  /** The analysis line to draw inline, or null while the board is on the game. */
-  variation?: MoveVariation | null
-  /** Put the board after the `index`-th move of the variation (0-based). */
+  /**
+   * The session's lines, drawn inline under the moves they hang off, oldest first — the one
+   * the board is standing in included, in the place its age gives it.
+   */
+  variations?: readonly MoveListVariation[]
+  /** Put the board after the `index`-th move of the line it is standing in (0-based). */
   onSelectVariationMove?: (index: number) => void
-  /** Lines walked earlier this session, drawn quietly under their own anchors. */
-  kept?: readonly KeptMoveVariation[]
   /** Walk back into kept line `id`, standing after its `index`-th move (0-based). */
   onSelectKeptMove?: (id: number, index: number) => void
   onSelectPly: (ply: number) => void
@@ -74,9 +75,11 @@ export interface MoveListProps {
  * and the moves after the cursor dimmed so the eye stops where the board is.
  *
  * A clicked engine line or Maia rollout is drawn inline as an indented variation under the
- * move it branches from, walkable move by move (`variation`). Every line walked earlier in
- * the session stays listed the same way, a shade quieter and with nothing lit (`kept`), so
- * the table remembers the reading rather than only the last detour.
+ * move it branches from, walkable move by move, and stays listed there for the rest of the
+ * session once the board has left it — a shade quieter, with nothing lit — so the table
+ * remembers the reading rather than only the last detour. `variations` holds them all in
+ * one order, oldest first: a line keeps its place when the board walks back into it, and
+ * only the styling and the lit move move.
  *
  * The design's tab row is `Moves / Variations / Book`, with `PGN` pinned right. `PGN` is
  * here; the other two are not, and are not a matter of layout. A game carries one line —
@@ -95,9 +98,8 @@ export function MoveList({
   flaggedCount,
   plyCount,
   pgn,
-  variation,
+  variations,
   onSelectVariationMove,
-  kept,
   onSelectKeptMove,
   onSelectPly,
   className,
@@ -119,26 +121,26 @@ export function MoveList({
     return !folded || pair.moveNumber > collapsedThrough!
   })
 
-  // Every line on screen: the one the board is standing in leads, so it keeps the place
-  // directly under its move that it has always had, and the kept ones follow it in the
-  // order they were walked.
-  const variations: { anchor: number | null; node: React.ReactNode }[] = []
-  if (variation) {
-    variations.push({
-      anchor: anchorOf(variation.base),
-      node: <Variation key="active" variation={variation} onSelectMove={onSelectVariationMove} />,
-    })
-  }
-  for (const entry of kept ?? []) {
-    variations.push({
+  // Every line on screen, in the order it was handed over — which is the order they were
+  // walked. A line's place is its age and nothing else: walking back into one lights it and
+  // hands it the cursor where it stands, rather than lifting it to the front of its stack.
+  const lines: { anchor: number | null; node: React.ReactNode }[] = []
+  for (const entry of variations ?? []) {
+    const id = entry.id
+    const walking = entry.cursor !== null
+    lines.push({
       anchor: anchorOf(entry.base),
       node: (
         <Variation
-          key={`kept-${entry.id}`}
-          variation={{ base: entry.base, sans: entry.sans, cursor: 0 }}
-          quiet
+          key={id === null ? 'active' : `kept-${id}`}
+          variation={{ base: entry.base, sans: entry.sans, cursor: entry.cursor ?? 0 }}
+          quiet={!walking}
           onSelectMove={
-            onSelectKeptMove ? (index) => onSelectKeptMove(entry.id, index) : undefined
+            walking
+              ? onSelectVariationMove
+              : onSelectKeptMove && id !== null
+                ? (index) => onSelectKeptMove(id, index)
+                : undefined
           }
         />
       ),
@@ -151,15 +153,18 @@ export function MoveList({
   const shown = new Set(rows.map((pair) => pair.moveNumber))
   const orphans: React.ReactNode[] = []
   const anchored = new Map<number, React.ReactNode[]>()
-  for (const entry of variations) {
-    if (entry.anchor === null || !shown.has(entry.anchor)) {
-      orphans.push(entry.node)
+  for (const line of lines) {
+    if (line.anchor === null || !shown.has(line.anchor)) {
+      orphans.push(line.node)
       continue
     }
-    const group = anchored.get(entry.anchor)
-    if (group) group.push(entry.node)
-    else anchored.set(entry.anchor, [entry.node])
+    const group = anchored.get(line.anchor)
+    if (group) group.push(line.node)
+    else anchored.set(line.anchor, [line.node])
   }
+
+  // The line the board is standing in, if any — the one whose walk the scroller follows.
+  const walked = (variations ?? []).find((entry) => entry.cursor !== null)
 
   // Keep the cursor's row in view *inside this box*. `scrollIntoView` would do it by
   // scrolling every scrollable ancestor as well — on this page that means the studio's own
@@ -175,7 +180,7 @@ export function MoveList({
     else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight
     // Walking a variation moves nothing in the table, but the row it hangs off — which is
     // the row it is drawn under — is what has to stay in view while it does.
-  }, [cursor, tab, variation?.cursor, variation?.sans.length])
+  }, [cursor, tab, walked?.cursor, walked?.sans.length])
 
   return (
     <div className={cn('flex min-h-0 flex-col', className)}>
@@ -360,7 +365,8 @@ function Variation({
   quiet,
   onSelectMove,
 }: {
-  variation: MoveVariation
+  /** The line, and how many of its moves the board is standing past (`0` while quiet). */
+  variation: { base: number; sans: string[]; cursor: number }
   quiet?: boolean
   onSelectMove?: (index: number) => void
 }) {

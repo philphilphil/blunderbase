@@ -52,17 +52,6 @@ export interface MaiaPanelProps {
    * the rest of the line to step through, so a click is an entry point rather than a cut.
    */
   onPlayLine?: (ucis: string[], index: number) => void
-  /**
-   * The engine rows' own entry point, where their lines are measured from a different
-   * position than the board's (walking a line, the column keeps describing the position
-   * the line hangs off). Falls back to `onPlayLine`.
-   */
-  onPlayEngineLine?: (ucis: string[], index: number) => void
-  /**
-   * The ply the engine lines start from, where it differs from `ply` — the branch head
-   * while a line is being walked. Defaults to `ply`.
-   */
-  enginePly?: number
   className?: string
 }
 
@@ -93,8 +82,6 @@ export function MaiaPanel({
   live,
   onHoverMove,
   onPlayLine,
-  onPlayEngineLine,
-  enginePly,
   className,
 }: MaiaPanelProps) {
   const rollout = live?.rollout ?? []
@@ -108,7 +95,12 @@ export function MaiaPanel({
       )}
       data-testid="maia-panel"
     >
-      <div className="grid grid-cols-2 divide-x divide-line">
+      {/*
+        A quarter to Maia, three to the engine: the human column is single moves and a
+        number, the engine column is whole variations, and an even split left the one
+        half-empty while the other wrapped.
+      */}
+      <div className="grid grid-cols-[1fr_3fr] divide-x divide-line">
         <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
           <div className="flex items-center gap-[0.4375rem]">
             <span className="size-1.5 flex-none rounded-full bg-brilliant" />
@@ -181,9 +173,9 @@ export function MaiaPanel({
                 <EngineRow
                   key={`${line.multipv}-${line.firstUci ?? 'x'}`}
                   line={line}
-                  ply={enginePly ?? ply}
+                  ply={ply}
                   onHoverMove={onHoverMove}
-                  onPlayLine={onPlayEngineLine ?? onPlayLine}
+                  onPlayLine={onPlayLine}
                 />
               ))}
             </div>
@@ -239,36 +231,40 @@ function HumanRow({
       onMouseLeave={() => onHoverMove?.(null)}
       title={`Play ${move.san} on the analysis board`}
       className={cn(
-        'flex w-full items-center gap-2 rounded-[0.25rem] border-l-2 px-1 py-[0.1875rem] text-left',
+        'relative flex w-full items-baseline gap-1.5 overflow-hidden rounded-[0.25rem] border-l-2 px-1 py-[0.1875rem] text-left',
         move.played ? null : 'border-transparent',
         onPlay ? 'hover:bg-raised' : 'cursor-default',
       )}
       style={move.played ? { borderLeftColor: hue, background: tint(hue, 7) } : undefined}
     >
+      {/* The probability, drawn as a fill behind the row — the narrow column has no room
+          for a bar of its own. */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0"
+        style={{ width: `${Math.min(100, share * 100)}%`, background: tint(hue, 8) }}
+      />
+      {/* The move's cost sits where the engine rows put their eval, so the two columns
+          read the same way: value first, then the move. */}
       <span
         className={cn(
-          'w-11 flex-none truncate font-mono text-[0.6875rem]',
+          'relative min-w-[2.5rem] flex-none rounded-[0.1875rem] px-1 py-px text-right font-mono text-[0.625rem] tabular',
+          verdict ? verdict.textClass : 'text-faint',
+        )}
+        style={verdict ? { background: tint(verdict.color, 13) } : undefined}
+      >
+        {loss ?? ''}
+      </span>
+      <span
+        className={cn(
+          'relative min-w-0 flex-1 truncate font-mono text-[0.6875rem]',
           verdict ? verdict.textClass : 'text-soft',
         )}
       >
         {move.san}
       </span>
-      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-[0.125rem] bg-track">
-        <div
-          className="h-full rounded-[0.125rem]"
-          style={{ width: `${Math.min(100, share * 100)}%`, background: hue }}
-        />
-      </div>
-      <span className="w-[1.875rem] flex-none text-right font-mono text-[0.625rem] tabular text-dim">
+      <span className="relative flex-none text-right font-mono text-[0.625rem] tabular text-dim">
         {move.probability === null ? '—' : `${Math.round(move.probability * 100)}%`}
-      </span>
-      <span
-        className={cn(
-          'w-[2.75rem] flex-none text-right font-mono text-[0.625rem] tabular',
-          verdict ? verdict.textClass : 'text-faint',
-        )}
-      >
-        {loss ?? ''}
       </span>
     </button>
   )

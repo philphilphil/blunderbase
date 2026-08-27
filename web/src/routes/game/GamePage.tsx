@@ -14,7 +14,7 @@ import { EvalGraph } from './components/EvalGraph'
 import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
 import { MaiaPanel } from './components/MaiaPanel'
-import { MoveList, type MoveAnnotation } from './components/MoveList'
+import { MoveList, type MoveAnnotation, type MoveListVariation } from './components/MoveList'
 import {
   bestRun,
   buildGameLine,
@@ -215,23 +215,6 @@ function GameStudio({ gameId }: { gameId: number }) {
     [analysis, keepBranch],
   )
 
-  /**
-   * Walk into one of the stored engine lines. Those lines describe the position the branch
-   * hangs off — not wherever the board stands mid-walk — so entering one replaces the line
-   * being walked from the head, rather than splicing a head-measured line onto a position
-   * it was never about. On the game line the two readings coincide.
-   */
-  const playEngineLine = useCallback(
-    (ucis: string[], index: number) => {
-      if (ucis.length === 0 || !analysis) return
-      // The line standing here is being replaced by another; it stays in the move list.
-      keepBranch()
-      setHoverMove(null)
-      setBranch({ base: analysis.base, moves: [...ucis], cursor: index + 1 })
-    },
-    [analysis, keepBranch],
-  )
-
   /** A drag in the middle of a line truncates it there and continues from the board move. */
   const playMove = useCallback(
     (orig: string, dest: string) => {
@@ -308,34 +291,46 @@ function GameStudio({ gameId }: { gameId: number }) {
   )
 
   /**
-   * The kept lines as the move list draws them: SAN, replayed against *this* game, so a
-   * stored line can never disagree with the position it hangs off (one that no longer
-   * replays at all simply drops out).
+   * Every line of this session's reading, as the move list draws them: SAN, replayed against
+   * *this* game, so a stored line can never disagree with the position it hangs off (one
+   * that no longer replays at all simply drops out).
    *
-   * The line the board is standing in is drawn by `variation` already, so the kept copy of
-   * it is held back while it is active — the two are the same walk whichever of them is the
-   * longer, and the reader should see one row, not the same row twice.
+   * The order is the order they were walked, and entering one does not change it. The line
+   * the board is standing in is drawn in the slot of the kept entry it came out of — lit and
+   * walkable, but exactly where it has always been — because a row that jumps to the front
+   * of its anchor's stack the moment it is clicked is a table that will not hold still.
+   * Only a line the store has never been handed is new enough to go last.
    */
-  const keptLines = useMemo(
-    () =>
-      kept
-        .filter(
-          (entry) =>
-            !(
-              branch &&
-              analysis &&
-              entry.base === analysis.base &&
-              (isPrefix(entry.moves, analysis.moves) || isPrefix(analysis.moves, entry.moves))
-            ),
-        )
-        .map((entry) => ({
-          id: entry.id,
-          base: entry.base,
-          sans: sanVariation(line, entry.base, entry.moves, entry.moves.length),
-        }))
-        .filter((entry) => entry.sans.length > 0),
-    [analysis, branch, kept, line],
-  )
+  const variations = useMemo<MoveListVariation[]>(() => {
+    const walked =
+      branch && analysis && analysis.sans.length > 0
+        ? { base: analysis.base, sans: analysis.sans, cursor: analysis.cursor }
+        : null
+
+    const rows: MoveListVariation[] = []
+    let placed = false
+    for (const entry of kept) {
+      // The active branch and this entry are the same walk whichever of them is the longer,
+      // so the entry hands its row over rather than drawing the line a second time. The
+      // store's own prefix rule leaves at most one such entry.
+      if (
+        walked &&
+        analysis &&
+        entry.base === analysis.base &&
+        (isPrefix(entry.moves, analysis.moves) || isPrefix(analysis.moves, entry.moves))
+      ) {
+        if (!placed) {
+          rows.push({ id: entry.id, ...walked })
+          placed = true
+        }
+        continue
+      }
+      const sans = sanVariation(line, entry.base, entry.moves, entry.moves.length)
+      if (sans.length > 0) rows.push({ id: entry.id, base: entry.base, sans, cursor: null })
+    }
+    if (walked && !placed) rows.push({ id: null, ...walked })
+    return rows
+  }, [analysis, branch, kept, line])
 
   // --- Maia -----------------------------------------------------------------
   //
@@ -452,16 +447,13 @@ function GameStudio({ gameId }: { gameId: number }) {
       human={human}
       showHuman={hints && !(exploring && live.unavailable)}
       run={engineRun}
-      // The stored lines describe the position the branch hangs off, and the game cursor
-      // stays there while a line is walked — so they stay up, the map the reader is
-      // navigating by, rather than emptying the moment a line is entered.
-      engine={lines}
+      // A stored run says nothing about a position it never saw: off the game line the
+      // column empties rather than describing the position the reader has left.
+      engine={exploring ? [] : lines}
       ply={analysisPly}
-      enginePly={analysis?.base ?? analysisPly}
       live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
       onHoverMove={setHoverMove}
       onPlayLine={playLine}
-      onPlayEngineLine={playEngineLine}
       className={deepRun ? 'border-b border-t-0 border-hairline' : undefined}
     />
   )
@@ -540,15 +532,10 @@ function GameStudio({ gameId }: { gameId: number }) {
             flaggedCount={flaggedCount}
             plyCount={plyCount}
             pgn={pgn}
-            // The line the reader is walking, drawn under the move it hangs off, and every
-            // line they walked earlier this session under theirs.
-            variation={
-              branch && analysis && analysis.sans.length > 0
-                ? { base: analysis.base, sans: analysis.sans, cursor: analysis.cursor }
-                : null
-            }
+            // Every line this session has walked, each under the move it hangs off and in
+            // the order they were walked — the one the board is standing in among them.
+            variations={variations}
             onSelectVariationMove={seekVariation}
-            kept={keptLines}
             onSelectKeptMove={enterKeptVariation}
             onSelectPly={selectPly}
             className="min-h-0 flex-1"

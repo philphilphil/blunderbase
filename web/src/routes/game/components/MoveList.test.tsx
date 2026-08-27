@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MoveRow } from '@/lib/api/types'
 
 import { pairMoves } from '../gameModel'
-import { MoveList } from './MoveList'
+import { MoveList, type MoveListVariation } from './MoveList'
 
 function move(ply: number, san: string, extra: Partial<MoveRow> = {}): MoveRow {
   return { ply, move_number: Math.floor(ply / 2) + 1, san, uci: 'e2e4', ...extra }
@@ -202,7 +202,7 @@ describe('MoveList', () => {
     // 1.e4 d5, and a line played off the position after 1.e4 — so it hangs under move 1.
     renderList([move(0, 'e4'), move(1, 'd5'), move(2, 'exd5'), move(3, 'Qxd5')], {
       cursor: 0,
-      variation: { base: 1, sans: ['c6', 'd4', 'Nf6'], cursor: 2 },
+      variations: [{ id: null, base: 1, sans: ['c6', 'd4', 'Nf6'], cursor: 2 }],
     })
 
     const line = screen.getByTestId('move-variation')
@@ -216,7 +216,7 @@ describe('MoveList', () => {
   it('lights the move the board is standing on, and only that one', () => {
     const { rerender } = renderList([move(0, 'e4'), move(1, 'd5')], {
       cursor: 0,
-      variation: { base: 1, sans: ['c6', 'd4'], cursor: 1 },
+      variations: [{ id: null, base: 1, sans: ['c6', 'd4'], cursor: 1 }],
     })
     const lit = () =>
       within(screen.getByTestId('move-variation'))
@@ -234,7 +234,7 @@ describe('MoveList', () => {
         annotation={null}
         flaggedCount={0}
         plyCount={2}
-        variation={{ base: 1, sans: ['c6', 'd4'], cursor: 2 }}
+        variations={[{ id: null, base: 1, sans: ['c6', 'd4'], cursor: 2 }]}
         onSelectPly={vi.fn()}
       />,
     )
@@ -249,7 +249,7 @@ describe('MoveList', () => {
         annotation={null}
         flaggedCount={0}
         plyCount={2}
-        variation={{ base: 1, sans: ['c6', 'd4'], cursor: 0 }}
+        variations={[{ id: null, base: 1, sans: ['c6', 'd4'], cursor: 0 }]}
         onSelectPly={vi.fn()}
       />,
     )
@@ -260,7 +260,7 @@ describe('MoveList', () => {
     const user = userEvent.setup()
     const { onSelectVariationMove } = renderList([move(0, 'e4'), move(1, 'd5')], {
       cursor: 0,
-      variation: { base: 1, sans: ['c6', 'd4'], cursor: 1 },
+      variations: [{ id: null, base: 1, sans: ['c6', 'd4'], cursor: 1 }],
     })
 
     await user.click(within(screen.getByTestId('move-variation')).getByRole('button', { name: 'd4' }))
@@ -269,7 +269,7 @@ describe('MoveList', () => {
 
   it('keeps a line off the starting position at the top of the table', () => {
     renderList([move(0, 'e4'), move(1, 'd5')], {
-      variation: { base: 0, sans: ['d4', 'd5'], cursor: 1 },
+      variations: [{ id: null, base: 0, sans: ['d4', 'd5'], cursor: 1 }],
     })
     const line = screen.getByTestId('move-variation')
     expect(line).toHaveTextContent('(1.d4d5)')
@@ -284,10 +284,10 @@ describe('MoveList', () => {
     // first two hang under move 1, the third under move 1 as well (ply 2 - 1 = 1).
     renderList([move(0, 'e4'), move(1, 'd5'), move(2, 'exd5'), move(3, 'Qxd5')], {
       cursor: 3,
-      kept: [
-        { id: 1, base: 1, sans: ['c6', 'd4'] },
-        { id: 2, base: 1, sans: ['e5'] },
-        { id: 3, base: 3, sans: ['Nc3', 'Qa5'] },
+      variations: [
+        { id: 1, base: 1, sans: ['c6', 'd4'], cursor: null },
+        { id: 2, base: 1, sans: ['e5'], cursor: null },
+        { id: 3, base: 3, sans: ['Nc3', 'Qa5'], cursor: null },
       ],
     })
 
@@ -309,12 +309,14 @@ describe('MoveList', () => {
   it('draws the walked line and the kept ones together, each once', () => {
     renderList([move(0, 'e4'), move(1, 'd5')], {
       cursor: 0,
-      variation: { base: 1, sans: ['c6', 'd4'], cursor: 1 },
-      kept: [{ id: 2, base: 1, sans: ['e5'] }],
+      variations: [
+        { id: 1, base: 1, sans: ['c6', 'd4'], cursor: 1 },
+        { id: 2, base: 1, sans: ['e5'], cursor: null },
+      ],
     })
 
-    // The line being walked keeps its own row and its lit move; the kept one is beside it,
-    // quiet and with nothing lit.
+    // The line being walked keeps its lit move; the kept one is beside it, quiet and with
+    // nothing lit.
     expect(screen.getByTestId('move-variation')).toHaveTextContent('(1…c62.d4)')
     const quiet = screen.getByTestId('kept-variation')
     expect(quiet).toHaveTextContent('(1…e5)')
@@ -323,10 +325,89 @@ describe('MoveList', () => {
         .getAllByRole('button')
         .some((button) => button.className.includes('bg-brilliant')),
     ).toBe(false)
-    // The walked line leads, the kept ones follow it under the same move.
+  })
+
+  it('holds every line in the order it was walked, whichever one the board is in', () => {
+    // Three lines off the position after 1.e4, walked in this order; the board is standing
+    // in the middle one, which is where it was walked and where it stays.
+    const lines: MoveListVariation[] = [
+      { id: 1, base: 1, sans: ['c6', 'd4'], cursor: null },
+      { id: 2, base: 1, sans: ['e5'], cursor: 1 },
+      { id: 3, base: 1, sans: ['Nf6'], cursor: null },
+    ]
+    const { rerender } = renderList([move(0, 'e4'), move(1, 'd5')], { cursor: 0, variations: lines })
+
+    const rows = () =>
+      screen.getAllByTestId(/-variation$/).map((row) => [row.dataset.testid, row.textContent])
+    expect(rows()).toEqual([
+      ['kept-variation', '(1…c62.d4)'],
+      ['move-variation', '(1…e5)'],
+      ['kept-variation', '(1…Nf6)'],
+    ])
+
+    // The board walks into the oldest of them: the hot styling moves to its row, and not
+    // the row itself.
+    rerender(
+      <MoveList
+        pairs={pairMoves([move(0, 'e4'), move(1, 'd5')])}
+        cursor={0}
+        collapsedThrough={null}
+        annotation={null}
+        flaggedCount={0}
+        plyCount={2}
+        variations={lines.map((entry) => ({
+          ...entry,
+          cursor: entry.id === 1 ? 2 : null,
+        }))}
+        onSelectPly={vi.fn()}
+      />,
+    )
+    expect(rows()).toEqual([
+      ['move-variation', '(1…c62.d4)'],
+      ['kept-variation', '(1…e5)'],
+      ['kept-variation', '(1…Nf6)'],
+    ])
     expect(
-      screen.getByTestId('move-variation').compareDocumentPosition(quiet) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      within(screen.getByTestId('move-variation')).getByRole('button', { name: 'd4' }).className,
+    ).toContain('bg-brilliant')
+  })
+
+  it('draws a line the store has not seen yet after the ones it has', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')], {
+      cursor: 0,
+      variations: [
+        { id: 1, base: 1, sans: ['c6'], cursor: null },
+        { id: 2, base: 1, sans: ['e5'], cursor: null },
+        { id: null, base: 1, sans: ['Nf6', 'd4'], cursor: 1 },
+      ],
+    })
+
+    expect(
+      screen.getAllByTestId(/-variation$/).map((row) => [row.dataset.testid, row.textContent]),
+    ).toEqual([
+      ['kept-variation', '(1…c6)'],
+      ['kept-variation', '(1…e5)'],
+      ['move-variation', '(1…Nf62.d4)'],
+    ])
+  })
+
+  it('orders the lines with no move to hang under the same way', () => {
+    // Off the starting position there is no anchor row, so they lead the table — in the
+    // order they were walked, with the newest of them last there too.
+    renderList([move(0, 'e4'), move(1, 'd5')], {
+      variations: [
+        { id: 1, base: 0, sans: ['d4'], cursor: null },
+        { id: null, base: 0, sans: ['c4'], cursor: 1 },
+      ],
+    })
+
+    const rows = screen.getAllByTestId(/-variation$/)
+    expect(rows.map((row) => [row.dataset.testid, row.textContent])).toEqual([
+      ['kept-variation', '(1.d4)'],
+      ['move-variation', '(1.c4)'],
+    ])
+    expect(
+      rows[1]!.compareDocumentPosition(screen.getByText('e4')) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
   })
 
@@ -334,7 +415,7 @@ describe('MoveList', () => {
     const user = userEvent.setup()
     const { onSelectKeptMove } = renderList([move(0, 'e4'), move(1, 'd5')], {
       cursor: 0,
-      kept: [{ id: 9, base: 1, sans: ['c6', 'd4'] }],
+      variations: [{ id: 9, base: 1, sans: ['c6', 'd4'], cursor: null }],
     })
 
     await user.click(
@@ -343,10 +424,24 @@ describe('MoveList', () => {
     expect(onSelectKeptMove).toHaveBeenCalledWith(9, 1)
   })
 
+  it('walks the line the board is in rather than re-entering it, kept row or not', async () => {
+    const user = userEvent.setup()
+    const { onSelectVariationMove, onSelectKeptMove } = renderList(
+      [move(0, 'e4'), move(1, 'd5')],
+      { cursor: 0, variations: [{ id: 7, base: 1, sans: ['c6', 'd4'], cursor: 1 }] },
+    )
+
+    await user.click(
+      within(screen.getByTestId('move-variation')).getByRole('button', { name: 'd4' }),
+    )
+    expect(onSelectVariationMove).toHaveBeenCalledWith(1)
+    expect(onSelectKeptMove).not.toHaveBeenCalled()
+  })
+
   it('keeps a kept line whose anchor is folded away at the top of the table', () => {
     renderList(longGame(), {
       collapsedThrough: 18,
-      kept: [{ id: 1, base: 3, sans: ['Nc3'] }],
+      variations: [{ id: 1, base: 3, sans: ['Nc3'], cursor: null }],
     })
     // Move 2 is behind the fold, so the line leads the list rather than vanishing with it.
     const line = screen.getByTestId('kept-variation')
