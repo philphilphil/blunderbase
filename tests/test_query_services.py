@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -406,12 +406,47 @@ def test_player_profile_series_are_per_platform_and_speed(library: Library) -> N
     assert keyed[("lichess", "bullet")]["games"] == 1
 
 
-def test_player_profile_downsamples_a_long_series(library: Library) -> None:
+def test_player_profile_keeps_a_fully_recent_series_uncapped(library: Library) -> None:
+    """The fixture's games all fall within a year of each other, so a tiny cap doesn't thin them."""
     profile = games_service.get_player_profile(library.session, max_points=2)
     blitz = next(row for row in profile["ratings"] if row["speed"] == "blitz")
     assert blitz["games"] == 3
-    assert len(blitz["points"]) == 2
+    assert len(blitz["points"]) == 3
     assert blitz["points"][-1]["rating"] == 1820
+
+
+def test_downsample_keeps_a_dense_recent_cluster_intact() -> None:
+    """A year-old-plus prefix gets thinned; the last year, however dense, does not."""
+    start = datetime(2021, 1, 1, tzinfo=UTC)
+    old = [
+        {"at": (start + timedelta(days=i)).isoformat(), "rating": 1500 + i, "game_id": i}
+        for i in range(900)
+    ]
+    # A burst of activity in the series' final month, well within the last year.
+    cluster_start_day = 1399
+    cluster = [
+        {
+            "at": (start + timedelta(days=cluster_start_day + i * 30 / 99)).isoformat(),
+            "rating": 2000 + i,
+            "game_id": 900 + i,
+        }
+        for i in range(100)
+    ]
+    points = old + cluster
+
+    result = games_service._downsample(points, 200)
+
+    kept_ats = {point["at"] for point in result}
+    assert {point["at"] for point in cluster} <= kept_ats  # whole recent cluster survives
+    assert result[0]["at"] == points[0]["at"]  # first point of the series is kept
+    assert result[-1]["at"] == points[-1]["at"]  # last point is kept
+    assert [point["at"] for point in result] == sorted(point["at"] for point in result)
+    assert len(kept_ats) == len(result)  # no duplicates
+
+    old_ats = {point["at"] for point in old}
+    kept_old = kept_ats & old_ats
+    assert 0 < len(kept_old) < len(old)  # old prefix thinned, not dropped entirely
+    assert len(result) <= 220  # stays roughly within budget, plus the recency-floor slack
 
 
 # ------------------------------------------------------------------------ explorer

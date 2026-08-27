@@ -572,11 +572,14 @@ async def test_get_player_profile_reports_accounts_ratings_and_volume(
     assert series["points"][0]["at"].endswith("Z")
 
 
-async def test_get_player_profile_thins_a_rating_series(
+async def test_get_player_profile_keeps_a_fully_recent_series_uncapped(
     coach: MCPServer, analysed: dict[str, Game]
 ) -> None:
+    """The fixture's games all fall within a year of each other, so a tiny cap doesn't thin them."""
     payload = await call(coach, "get_player_profile", rating_points=2)
-    assert all(len(series["points"]) <= 2 for series in payload["ratings"])
+    assert all(
+        len(series["points"]) == series["games"] for series in payload["ratings"]
+    )
 
 
 # --- accounts --------------------------------------------------------------

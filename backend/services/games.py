@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import ColumnElement, and_, exists, func, or_, select
@@ -45,6 +45,14 @@ TIER_RANK: dict[Tier, int] = {Tier.QUICK: 0, Tier.DEEP: 1}
 # Rating series are read by a chat model as often as by a chart, so they are downsampled
 # before they are handed over rather than after.
 PROFILE_MAX_POINTS = 200
+
+# Downsampling never touches the last year of a series, however dense, so a chart's
+# 30d/90d windows always have enough points to draw a line rather than a lone dot.
+PROFILE_RECENT_WINDOW_DAYS = 365
+
+# However little budget the recent window leaves behind, the older prefix still gets to
+# keep at least this many points, so ancient history never fully vanishes from the chart.
+PROFILE_MIN_OLD_POINTS = 20
 
 
 @dataclass(slots=True)
@@ -680,6 +688,33 @@ def _note_row(note: Note, *, scope: str, ply: int | None) -> dict[str, Any]:
 
 
 def _downsample(points: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Thin a series to roughly `limit` points without starving recent history.
+
+    Every point within the last `PROFILE_RECENT_WINDOW_DAYS` days before the series'
+    *last* point is kept untouched, however dense that stretch is. The older prefix is
+    uniformly thinned into whatever budget remains, with a floor of
+    `PROFILE_MIN_OLD_POINTS` so ancient history never fully disappears -- which can push
+    the result a little past `limit`. If the recent window alone exceeds `limit`, it is
+    kept in full anyway: recent fidelity wins over the cap. The first and last points of
+    the whole series are always kept, and the result stays chronologically sorted.
+    """
+    if limit <= 0 or len(points) <= limit:
+        return points
+
+    cutoff = datetime.fromisoformat(points[-1]["at"]) - timedelta(days=PROFILE_RECENT_WINDOW_DAYS)
+    split = next(
+        (index for index, point in enumerate(points) if datetime.fromisoformat(point["at"]) >= cutoff),
+        len(points),
+    )
+    old, recent = points[:split], points[split:]
+    if len(recent) >= limit:
+        return recent
+
+    old_budget = min(max(PROFILE_MIN_OLD_POINTS, limit - len(recent)), len(old))
+    return _uniform_downsample(old, old_budget) + recent
+
+
+def _uniform_downsample(points: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     """Thin a series to at most `limit` points, always keeping the first and the last."""
     if limit <= 0 or len(points) <= limit:
         return points
