@@ -12,6 +12,7 @@
  * first game. The groups are only how the flat list is printed.
  */
 import {
+  Bot,
   ChartNoAxesColumn,
   Cpu,
   Download,
@@ -89,6 +90,7 @@ const PAGES: PageRoute[] = [
   { label: 'Import', hint: 'lichess, chess.com, PGN', icon: Download, to: '/import' },
   { label: 'Engines', hint: 'the roster and its tiers', icon: Cpu, to: '/settings/engines' },
   { label: 'Settings', hint: 'the deployment', icon: Settings, to: '/settings' },
+  { label: 'MCP', hint: 'connect your assistant', icon: Bot, to: '/settings/mcp' },
   {
     label: 'Blunder log',
     hint: 'games a blunder was found in',

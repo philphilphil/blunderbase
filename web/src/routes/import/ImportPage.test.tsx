@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { ImportJob } from '@/lib/api/types'
-import { MCP_SERVER_NAME } from '@/lib/mcp/status'
 
 import { ImportPage } from './ImportPage'
 
@@ -252,42 +251,16 @@ describe('ImportPage', () => {
     expect(screen.getAllByRole('button', { name: /Connect/ })).toHaveLength(2)
   })
 
-  it('hands an MCP client a config pointed at this origin, secret left blank', async () => {
+  it('leaves the assistant config to its own page', async () => {
     stubFetch({
       '/api/import/jobs': [],
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
     })
-    const writeText = vi.fn(async (_text: string) => {})
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     renderPage(<ImportPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: /Copy config/ }))
-
-    expect(writeText).toHaveBeenCalledTimes(1)
-    const config = JSON.parse(writeText.mock.calls[0]![0])
-    // The same name the titlebar shows, so the config and the chrome agree.
-    const server = config.mcpServers[MCP_SERVER_NAME]
-    expect(server.type).toBe('http')
-    expect(server.url).toBe(`${window.location.origin}/mcp`)
-    // A placeholder, never the password: this page cannot know it and must not carry it.
-    expect(server.headers.Authorization).toMatch(/^Bearer </)
-    expect(await screen.findByRole('button', { name: /Copied/ })).toBeInTheDocument()
-  })
-
-  it('says so when there is no clipboard to copy the config to', async () => {
-    stubFetch({
-      '/api/import/jobs': [],
-      '/api/stats/profile': PROFILE,
-      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
-    })
-    // An insecure origin, which a self-hosted Blunderbase on a LAN often is.
-    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
-    renderPage(<ImportPage />)
-
-    await userEvent.click(await screen.findByRole('button', { name: /Copy config/ }))
-
-    expect(await screen.findByRole('button', { name: /No clipboard/ })).toBeInTheDocument()
+    await screen.findByText('Sync history')
+    expect(screen.queryByRole('button', { name: /Copy config/ })).not.toBeInTheDocument()
   })
 
   it('opens the per-game failures of a sync that lost games', async () => {
