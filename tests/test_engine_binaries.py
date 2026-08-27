@@ -25,6 +25,7 @@ from backend.db.base import Base
 from backend.db.enums import EngineKind, RunStatus, Tier
 from backend.db.models import AnalysisRun
 from backend.db.session import create_db_engine
+from backend.services import app_settings
 from backend.services.analysis import get_move_evals
 from backend.services.engines import add_engine, sample_eval
 from backend.services.import_service import run_import
@@ -132,9 +133,12 @@ async def test_a_real_quick_pass_runs_a_whole_game_through_the_workers(
     engine = create_db_engine(f"sqlite+pysqlite:///{tmp_path / 'blunderbase.db'}")
     Base.metadata.create_all(engine)
     sessions = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
-    settings = Settings(root=tmp_path, analysis_concurrency=1, quick_nodes=20_000)
+    settings = Settings(root=tmp_path, analysis_concurrency=1)
     try:
         with sessions() as owned:
+            # A budget a real engine gets through in a test: the import queues its quick
+            # pass with whatever is stored when it runs, so this is set before the import.
+            app_settings.set_value(owned, app_settings.QUICK_NODES, 20_000)
             add_engine(
                 owned,
                 name="Stockfish",

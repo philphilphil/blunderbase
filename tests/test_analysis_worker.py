@@ -129,15 +129,7 @@ def db(tmp_path: Path) -> Any:
 
 @pytest.fixture()
 def settings(tmp_path: Path) -> Settings:
-    return Settings(
-        root=tmp_path,
-        analysis_concurrency=1,
-        analysis_poll_seconds=0.01,
-        quick_nodes=5000,
-        deep_nodes=9000,
-        deep_multipv=3,
-        maia_rating_offsets=(-100, 0),
-    )
+    return Settings(root=tmp_path, analysis_concurrency=1, analysis_poll_seconds=0.01)
 
 
 def _register(
@@ -365,7 +357,7 @@ async def test_importing_a_game_queues_a_pass_the_workers_can_actually_run(
     with db() as session:
         queued = session.scalars(select(AnalysisRun)).one()
         assert queued.status is RunStatus.QUEUED
-        assert queued.nodes == settings.quick_nodes or queued.nodes > 0
+        assert queued.nodes == app_settings.QUICK_NODES_DEFAULT
         assert queued.multipv == 1
         assert queued.priority == analysis.QUICK_PRIORITY
 
@@ -387,8 +379,10 @@ async def test_a_deep_pass_covers_only_its_ply_range_with_several_lines(
         session.execute(select(AnalysisRun))  # the import's quick run
         session.query(AnalysisRun).delete()
         session.commit()
+        app_settings.set_value(session, app_settings.DEEP_NODES, 9000)
+        app_settings.set_value(session, app_settings.DEEP_MULTIPV, 3)
         deep = analysis.request_analysis(
-            session, game_id=game.id, tier=Tier.DEEP, ply_range=(2, 5), settings=settings
+            session, game_id=game.id, tier=Tier.DEEP, ply_range=(2, 5)
         )
         deep_id = deep.id
 
@@ -420,9 +414,7 @@ async def test_a_deep_pass_jumps_ahead_of_a_queued_quick_one(
     game = _import_game(db, fixtures_dir)
     with db() as session:
         quick_id = session.scalars(select(AnalysisRun)).one().id
-        deep_id = analysis.request_analysis(
-            session, game_id=game.id, tier=Tier.DEEP, settings=settings
-        ).id
+        deep_id = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
 
     finished: list[int] = []
     cancel = analysis.subscribe(
@@ -663,7 +655,7 @@ async def test_a_stranded_run_that_has_spent_its_retries_is_failed_on_restart(
 # --- Maia -----------------------------------------------------------------
 
 
-async def test_maia_predicts_a_human_move_at_levels_around_the_owners_rating(
+async def test_maia_predicts_a_human_move_at_the_owners_rating(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
     _register(db, tmp_path, go=QUICK_REPLIES)
@@ -674,11 +666,8 @@ async def test_maia_predicts_a_human_move_at_levels_around_the_owners_rating(
         name="Maia",
         go=[
             _maia_reply([("e2e4", 31.4), ("d2d4", 22.0), ("g1f3", 11.5)]),
-            _maia_reply([("e2e4", 30.0), ("d2d4", 25.0), ("c2c4", 9.0)]),
             _maia_reply([("g1f3", 40.0), ("b1c3", 18.0), ("f1c4", 12.0)]),
-            _maia_reply([("g1f3", 41.0), ("d2d4", 17.0), ("f1c4", 13.0)]),
             _maia_reply([("f1c4", 28.0), ("f1b5", 26.0), ("d2d4", 14.0)]),
-            _maia_reply([("f1b5", 30.0), ("f1c4", 24.0), ("d2d4", 12.0)]),
         ],
     )
     _import_game(db, fixtures_dir)
@@ -690,14 +679,14 @@ async def test_maia_predicts_a_human_move_at_levels_around_the_owners_rating(
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE
-    # The owner is White at 1712, so the offsets (-100, 0) ask 1612 and 1712, and only
-    # their own moves are worth a second engine pass.
+    # The owner is White at 1712, so that is the one level asked about, and only their own
+    # moves are worth a second engine pass.
     assert [row.ply for row in rows if row.maia_policy] == [0, 2, 4]
     first = rows[0].maia_policy
-    assert sorted(first) == ["1612", "1712"]
-    assert first["1612"][0]["uci"] == "e2e4"
-    assert first["1612"][0]["p"] == 0.314
-    assert [entry["rank"] for entry in first["1612"]] == [1, 2, 3]
+    assert sorted(first) == ["1712"]
+    assert first["1712"][0]["uci"] == "e2e4"
+    assert first["1712"][0]["p"] == 0.314
+    assert [entry["rank"] for entry in first["1712"]] == [1, 2, 3]
 
 
 async def test_a_target_elo_bakes_one_level_into_every_ply_of_both_sides(

@@ -286,18 +286,22 @@ non-issue: the write lock is held for milliseconds, never for the length of a se
 
 **Two passes, never nested.** Stockfish evaluates, then Maia predicts, each acquiring the
 pool separately. A worker that held one slot while waiting for a second would deadlock the
-moment `analysis_concurrency` is 1. Maia is asked only about the owner's own moves (its
-question is "what would a human of this rating have played"), at the rating levels
-`maia_rating_offsets` puts around the owner's rating in that game, clamped to what the
-build declares it can answer. No Maia engine, or a Maia that will not answer, degrades:
-the evaluation is still worth having, and the reason is recorded on the run.
+moment `analysis_concurrency` is 1. Maia is asked at exactly one rating level, clamped to
+what the build declares it can answer. Without a configured target that level is the
+owner's rating in the game being analysed (`default_owner_rating` where the game carries
+none), and only their own moves are asked about — the question is "what would a human of
+this rating have played", which is a question about them. A `maia_target_elo` set on the
+Settings page replaces that level everywhere and widens the pass to every ply of both
+sides, because "what will a human opposite me fall into" is a question about the positions
+the opponent moves in. No Maia engine, or a Maia that will not answer, degrades: the
+evaluation is still worth having, and the reason is recorded on the run.
 
 **Classification** is win-percentage based, à la Lichess:
 `win% = 100 / (1 + exp(-0.00368208 × cp))` with the centipawn score clamped to ±1000 and a
 mate in N read as `(21 - min(10, N))` pawns. Both readings of a move are taken in the
 mover's own frame, so `win_loss` is what that player gave away. The thresholds
-(`inaccuracy` / `mistake` / `blunder`, default 10 / 20 / 30 points) are configuration.
-Playing the engine's own first choice is checked before them: a top move that still shows
+(`inaccuracy` / `mistake` / `blunder`, default 10 / 20 / 30 points) are app settings, read
+per plan and refused rather than clamped when they do not rise. Playing the engine's own first choice is checked before them: a top move that still shows
 a large drop is two search depths disagreeing, not a blunder.
 
 **Failure.** A crashed engine's stderr goes to a `StderrCapture` — an unlinked temp file

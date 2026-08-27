@@ -168,7 +168,7 @@ def enqueue(settings: Settings, engine_id: int, tier: Tier = Tier.DEEP) -> int:
     """A one-position run bound to the runner's engine, straight into the queue."""
     with get_sessionmaker(settings)() as session:
         run = analysis.request_analysis(
-            session, fen=STARTING_FEN, tier=tier, engine_id=engine_id, settings=settings
+            session, fen=STARTING_FEN, tier=tier, engine_id=engine_id
         )
         return run.id
 

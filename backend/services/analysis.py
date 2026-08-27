@@ -42,7 +42,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy import event as sa_event
 from sqlalchemy.orm import Session
 
-from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING, Settings, get_settings
+from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING
 from backend.db.enums import Classification, Color, EngineKind, RunStatus, Tier
 from backend.db.models import AnalysisRun, Engine, Game, GamePosition, MoveEval, Position
 from backend.db.types import utcnow
@@ -210,13 +210,12 @@ class Thresholds:
     blunder: float
 
     @classmethod
-    def from_settings(cls, settings: Settings | None = None) -> Thresholds:
-        resolved = settings or get_settings()
-        return cls(
-            inaccuracy=resolved.inaccuracy_threshold,
-            mistake=resolved.mistake_threshold,
-            blunder=resolved.blunder_threshold,
-        )
+    def from_session(cls, session: Session) -> Thresholds:
+        """The three in force now. An app setting, so it is read per plan rather than held:
+        a game analysed after the owner moved a threshold is judged by the new one, and one
+        analysed before it keeps what it was judged by."""
+        inaccuracy, mistake, blunder = app_settings_service.get_thresholds(session)
+        return cls(inaccuracy=inaccuracy, mistake=mistake, blunder=blunder)
 
 
 @dataclass(frozen=True, slots=True)
@@ -245,10 +244,9 @@ class RunPlan:
     thresholds: Thresholds
     owner_color: Color | None = None
     owner_rating: int | None = None
-    maia_offsets: tuple[int, ...] = ()
     # The one level every Maia question in this run is asked at, when the deployment
-    # configures one. It replaces `maia_offsets` and `owner_rating` for the human-move
-    # pass; None is the original rating-centred behaviour.
+    # configures one. It replaces `owner_rating` for the human-move pass; None centres that
+    # level on the owner's rating in this game instead.
     maia_target_elo: int | None = None
 
     @property
@@ -277,8 +275,7 @@ class RunPlan:
 
         A configured target elo widens that to every ply of both sides. The second half of
         what Maia is for is "what will a human opposite me actually fall into", which is a
-        question about the positions the *opponent* moves in — and the cost is a wash,
-        because a target elo is also one level where the offsets were three.
+        question about the positions the *opponent* moves in.
         """
         if self.is_position_run:
             return [self.ply_start]
@@ -328,25 +325,21 @@ def classify_move(win_loss: float, *, played_best: bool, thresholds: Thresholds)
 
 def maia_levels(
     rating: int | None,
-    offsets: Sequence[int],
     *,
     low: int = MAIA_MIN_RATING,
     high: int = MAIA_MAX_RATING,
-    default: int = 1500,
+    default: int = app_settings_service.OWNER_RATING_DEFAULT,
     target: int | None = None,
 ) -> list[int]:
-    """The rating levels to ask Maia about, clamped to what the model can answer.
+    """The rating level to ask Maia about, clamped to what the model can answer.
 
-    A `target` is the whole answer on its own: one configured level, the same one for
-    every game, which is what makes two games comparable at all. The rating and the
-    offsets are then not consulted — a spread around the rating someone *has* is exactly
-    the thing a target elo replaces.
+    One level, always — a list because that is what `policy_at` keys its answer by. The
+    configured target is it where there is one, which is what makes two games comparable at
+    all; without one it is the rating the game was played at, and the owner's default
+    rating where the game carries none.
     """
-    if target is not None:
-        return [min(high, max(low, int(target)))]
-    base = int(rating if rating is not None else default)
-    levels = {min(high, max(low, base + int(offset))) for offset in (offsets or (0,))}
-    return sorted(levels)
+    base = target if target is not None else (rating if rating is not None else default)
+    return [min(high, max(low, int(base)))]
 
 
 def _raw_chances(cp: float) -> float:
@@ -368,12 +361,15 @@ def request_analysis(
     nodes: int | None = None,
     depth: int | None = None,
     priority: int | None = None,
-    settings: Settings | None = None,
     commit: bool = True,
 ) -> AnalysisRun:
     """Enqueue one pass. Exactly one of `game_id` and `fen` must be given.
 
     Re-analysis is always a new run; existing runs are never overwritten.
+
+    A run carries the budget it was queued with rather than looking one up when it runs,
+    and that budget is read from the app settings here — so changing it on the Settings
+    page sizes the next run enqueued and leaves everything already in the queue alone.
 
     The engine is resolved now so the row records which engine was meant, but its binary
     is not checked here: enqueueing must stay a cheap write, and a binary that has gone
@@ -384,7 +380,6 @@ def request_analysis(
     with no Maia is refused here when the deployment's only Maia is somewhere else — see
     `_require_one_host`.
     """
-    resolved = settings or get_settings()
     tier = Tier(tier)
     if (game_id is None) == (fen is None):
         raise AnalysisRequestError("a run analyses exactly one of a game or a FEN")
@@ -408,9 +403,9 @@ def request_analysis(
         engine_id=engine.id,
         tier=tier,
         status=RunStatus.QUEUED,
-        nodes=nodes if nodes is not None else _default_nodes(tier, resolved),
+        nodes=nodes if nodes is not None else _default_nodes(session, tier),
         depth=depth,
-        multipv=max(1, multipv if multipv is not None else _default_multipv(tier, resolved)),
+        multipv=max(1, multipv if multipv is not None else _default_multipv(session, tier)),
         ply_start=None if window is None else window[0],
         ply_end=None if window is None else window[1],
         priority=priority if priority is not None else default_priority(tier),
@@ -428,7 +423,6 @@ def enqueue_missing(
     tier: Tier = Tier.QUICK,
     *,
     limit: int | None = None,
-    settings: Settings | None = None,
 ) -> list[AnalysisRun]:
     """Queue a full-game pass for every game that has no live run of this tier.
 
@@ -452,7 +446,7 @@ def enqueue_missing(
     pending = list(session.scalars(statement))
 
     queued = [
-        request_analysis(session, game_id=game_id, tier=tier, settings=settings, commit=False)
+        request_analysis(session, game_id=game_id, tier=tier, commit=False)
         for game_id in pending
     ]
     if queued:
@@ -498,12 +492,16 @@ def default_priority(tier: Tier) -> int:
     return DEEP_PRIORITY if Tier(tier) is Tier.DEEP else QUICK_PRIORITY
 
 
-def _default_nodes(tier: Tier, settings: Settings) -> int:
-    return settings.deep_nodes if tier is Tier.DEEP else settings.quick_nodes
+def _default_nodes(session: Session, tier: Tier) -> int:
+    if tier is Tier.DEEP:
+        return app_settings_service.get_deep_nodes(session)
+    return app_settings_service.get_quick_nodes(session)
 
 
-def _default_multipv(tier: Tier, settings: Settings) -> int:
-    return settings.deep_multipv if tier is Tier.DEEP else 1
+def _default_multipv(session: Session, tier: Tier) -> int:
+    # A quick pass keeps one line: it is the automatic pass on import, and the alternatives
+    # are what someone asks for when they stop to look.
+    return app_settings_service.get_deep_multipv(session) if tier is Tier.DEEP else 1
 
 
 def _require_one_host(session: Session, engine: Engine) -> None:
@@ -883,14 +881,16 @@ def progress_event(plan: RunPlan, done: int, total: int) -> dict[str, Any]:
 # --- planning -------------------------------------------------------------
 
 
-def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = None) -> RunPlan:
-    """Read everything one pass needs out of the database, once."""
-    resolved = settings or get_settings()
-    thresholds = Thresholds.from_settings(resolved)
-    offsets = tuple(resolved.maia_rating_offsets)
-    # An app setting rather than a variable, so it is read per plan: a run queued after the
-    # owner changed it on the Settings page is analysed at the level they chose.
+def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
+    """Read everything one pass needs out of the database, once.
+
+    The thresholds, the target elo and the fallback rating are app settings rather than
+    variables, so they are read here, per plan: a run queued before the owner changed one
+    and analysed after is analysed the way they chose.
+    """
+    thresholds = Thresholds.from_session(session)
     target_elo = app_settings_service.get_maia_target_elo(session)
+    quick_nodes = app_settings_service.get_quick_nodes(session)
 
     if run.game_id is None:
         fen = run.fen or ""
@@ -907,12 +907,11 @@ def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = N
             position_ids=(position_id,),
             ply_start=0,
             ply_end=0,
-            nodes=run.nodes or resolved.quick_nodes,
+            nodes=run.nodes or quick_nodes,
             depth=run.depth,
             multipv=max(1, run.multipv),
             thresholds=thresholds,
-            owner_rating=resolved.default_owner_rating,
-            maia_offsets=offsets,
+            owner_rating=app_settings_service.get_default_owner_rating(session),
             maia_target_elo=target_elo,
         )
 
@@ -955,25 +954,23 @@ def build_plan(session: Session, run: AnalysisRun, settings: Settings | None = N
         position_ids=position_ids,
         ply_start=ply_start,
         ply_end=ply_end,
-        nodes=run.nodes or resolved.quick_nodes,
+        nodes=run.nodes or quick_nodes,
         depth=run.depth,
         multipv=max(1, run.multipv),
         thresholds=thresholds,
         owner_color=game.owner_color,
-        owner_rating=owner_rating(game, resolved),
-        maia_offsets=offsets,
+        owner_rating=owner_rating(session, game),
         maia_target_elo=target_elo,
     )
 
 
-def owner_rating(game: Game, settings: Settings | None = None) -> int:
-    """The rating Maia's levels are centred on: the owner's, else the configured default."""
-    resolved = settings or get_settings()
+def owner_rating(session: Session, game: Game) -> int:
+    """The rating Maia's level is centred on: the owner's, else the configured default."""
     if game.owner_color is Color.WHITE and game.white_rating:
         return int(game.white_rating)
     if game.owner_color is Color.BLACK and game.black_rating:
         return int(game.black_rating)
-    return resolved.default_owner_rating
+    return app_settings_service.get_default_owner_rating(session)
 
 
 # --- computing a run ------------------------------------------------------
@@ -1030,13 +1027,9 @@ def apply_maia(plan: RunPlan, rows: Sequence[MoveEval], adapter: MaiaAdapter) ->
     """
     levels = maia_levels(
         plan.owner_rating,
-        plan.maia_offsets,
         target=plan.maia_target_elo,
         **maia_bounds(adapter),
     )
-    if not adapter.supports_rating:
-        # Fixed weights are one rating level; asking for three is a configuration error.
-        levels = levels[:1]
 
     boards = dict(replay(plan))
     by_ply = {row.ply: row for row in rows}

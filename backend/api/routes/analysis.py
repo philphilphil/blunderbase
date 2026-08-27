@@ -30,9 +30,7 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 @router.post(
     "", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED, summary="Enqueue a pass"
 )
-def enqueue(
-    request: Request, session: SessionDep, settings: SettingsDep, body: AnalysisRequest
-) -> Any:
+def enqueue(request: Request, session: SessionDep, body: AnalysisRequest) -> Any:
     """Queue one run over a game or a FEN. Re-analysis is always a new run."""
     run = analysis_service.request_analysis(
         session,
@@ -45,7 +43,6 @@ def enqueue(
         nodes=body.nodes,
         depth=body.depth,
         priority=body.priority,
-        settings=settings,
     )
     wake_workers(request)
     return run

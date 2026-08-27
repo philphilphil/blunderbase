@@ -59,15 +59,23 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_MCP_BEARER_KEY` | — | overrides the password as `/mcp`'s bearer key; unset, `/mcp` accepts the owner's password as soon as there is one |
 | `BLUNDERBASE_ANALYSIS_CONCURRENCY` | cores − 2 | engine processes at once, across every tier |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
-| `BLUNDERBASE_QUICK_NODES` `BLUNDERBASE_DEEP_NODES` `BLUNDERBASE_DEEP_MULTIPV` | `250000` `2000000` `4` | the per-position budget of each tier |
-| `BLUNDERBASE_INACCURACY_THRESHOLD` `…_MISTAKE_…` `…_BLUNDER_…` | `10` `20` `30` | win-percentage points lost by the mover, à la Lichess |
-| `BLUNDERBASE_MAIA_RATING_OFFSETS` | `-100,0,100` | the levels Maia is asked about, around your rating in that game; ignored when a target elo is set |
 
-The Maia target elo is not a variable: it is the one app setting, stored in the database
-and edited on the Settings page (`GET`/`PUT /api/settings`). Set, it is the single rating
-every Maia question is asked at — analysis bakes that level into every ply of both sides,
-and the analysis board queries it live. Clamped to 1100–2000; cleared, Maia goes back to
-the offsets above, over your own moves only.
+The engine budgets, the classification thresholds and the Maia levels are **not**
+variables. They are app settings: stored in the database, edited on the Settings page
+(`GET`/`PUT /api/settings`, `backend/services/app_settings.py`), and read where they are
+used, so a change takes effect on the next thing you click rather than the next restart.
+Unset means the default in that table, not a null.
+
+| Setting | Default | |
+|---|---|---|
+| `maia_target_elo` | — | the single rating every Maia question is asked at, clamped to 1100–2000; set, analysis bakes it into every ply of both sides and the analysis board queries it live. Cleared, Maia is asked about your own moves only, at one level centred on your rating in that game |
+| `quick_nodes` `deep_nodes` `deep_multipv` | `250000` `2000000` `4` | the per-position budget of each tier, and the lines a deep pass keeps. Read when a run is queued, so they size the next run rather than the queue |
+| `inaccuracy_threshold` `mistake_threshold` `blunder_threshold` | `10` `20` `30` | win-percentage points lost by the mover, à la Lichess. The three have to rise; a set of them that does not is the one change refused rather than clamped |
+| `default_owner_rating` | `1500` | the rating to centre Maia on where the game carries none — an OTB PGN, an unrated game |
+
+Everything else out of range is clamped rather than refused, so what a save answers with is
+what is in force. Budgets and thresholds apply to runs from then on; a game already
+analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 
 ## Commands
 

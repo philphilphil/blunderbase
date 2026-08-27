@@ -10,7 +10,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.config import Settings
 from backend.db.enums import (
     Classification,
     Color,
@@ -143,71 +142,73 @@ def test_the_engines_own_first_choice_is_never_a_blunder() -> None:
     )
 
 
-def test_thresholds_come_from_configuration(tmp_path: Any) -> None:
-    settings = Settings(root=tmp_path, inaccuracy_threshold=5, mistake_threshold=8)
-    thresholds = analysis.Thresholds.from_settings(settings)
+def test_thresholds_come_from_the_app_settings(session: Session) -> None:
+    app_settings.set_value(session, app_settings.INACCURACY_THRESHOLD, 5)
+    app_settings.set_value(session, app_settings.MISTAKE_THRESHOLD, 8)
+    thresholds = analysis.Thresholds.from_session(session)
 
-    assert thresholds.inaccuracy == 5.0
+    assert (thresholds.inaccuracy, thresholds.mistake) == (5.0, 8.0)
+    # The one nobody moved is still the default the store names.
+    assert thresholds.blunder == app_settings.BLUNDER_DEFAULT
     assert (
         analysis.classify_move(6.0, played_best=False, thresholds=thresholds)
         is Classification.INACCURACY
     )
 
 
-def test_thresholds_that_do_not_rise_are_refused(tmp_path: Any) -> None:
-    with pytest.raises(ValueError, match="thresholds must rise"):
-        Settings(root=tmp_path, mistake_threshold=40, blunder_threshold=30)
+def test_an_unconfigured_deployment_classifies_by_the_defaults(session: Session) -> None:
+    assert analysis.Thresholds.from_session(session) == analysis.Thresholds(
+        inaccuracy=10.0, mistake=20.0, blunder=30.0
+    )
 
 
 # --- Maia rating levels ---------------------------------------------------
 
 
-def test_maia_levels_sit_around_the_owners_rating() -> None:
-    assert analysis.maia_levels(1600, (-100, 0, 100)) == [1500, 1600, 1700]
+def test_the_level_is_the_owners_rating_in_that_game() -> None:
+    assert analysis.maia_levels(1600) == [1600]
 
 
-def test_maia_levels_are_clamped_to_what_the_model_can_answer() -> None:
-    assert analysis.maia_levels(1150, (-100, 0, 100)) == [1100, 1150, 1250]
-    assert analysis.maia_levels(2000, (-100, 0, 100)) == [1900, 2000]
+def test_the_level_is_clamped_to_what_the_model_can_answer() -> None:
+    assert analysis.maia_levels(900) == [1100]
+    assert analysis.maia_levels(2400) == [2000]
 
 
 def test_an_unrated_owner_falls_back_to_the_configured_default() -> None:
-    assert analysis.maia_levels(None, (0,), default=1400) == [1400]
+    assert analysis.maia_levels(None, default=1400) == [1400]
 
 
-def test_a_target_elo_is_the_only_level_there_is() -> None:
-    """The rating in the game and the offsets around it are exactly what it replaces."""
-    assert analysis.maia_levels(1200, (-100, 0, 100), target=1700) == [1700]
+def test_a_target_elo_is_the_level_instead(session: Session) -> None:
+    """The rating the game was played at is exactly what a target elo replaces."""
+    assert analysis.maia_levels(1200, target=1700) == [1700]
 
 
 def test_a_target_elo_is_still_clamped_to_what_the_build_declares() -> None:
-    assert analysis.maia_levels(None, (), target=1900, low=1100, high=1500) == [1500]
-    assert analysis.maia_levels(None, (), target=900) == [1100]
+    assert analysis.maia_levels(None, target=1900, low=1100, high=1500) == [1500]
+    assert analysis.maia_levels(None, target=900) == [1100]
 
 
-def _plan(session: Session, settings: Settings, **changes: Any) -> analysis.RunPlan:
+def _plan(session: Session, **changes: Any) -> analysis.RunPlan:
     _engine(session)
     game = _game(session)
-    run = analysis.request_analysis(session, game_id=game.id, settings=settings, **changes)
-    return analysis.build_plan(session, run, settings)
+    run = analysis.request_analysis(session, game_id=game.id, **changes)
+    return analysis.build_plan(session, run)
 
 
 def test_without_a_target_maia_is_only_asked_about_the_owners_own_moves(
-    session: Session, tmp_path: Any
+    session: Session,
 ) -> None:
-    plan = _plan(session, Settings(root=tmp_path))
+    plan = _plan(session)
 
     assert plan.maia_target_elo is None
     # The owner has White in `_game`, so the even plies are theirs.
     assert plan.maia_plies() == [0, 2, 4]
 
 
-def test_a_target_elo_asks_about_every_ply_of_both_sides(
-    session: Session, tmp_path: Any
-) -> None:
+def test_a_target_elo_asks_about_every_ply_of_both_sides(session: Session) -> None:
     """The "what will a human opposite me fall into" half is a question about their moves."""
     app_settings.set_maia_target_elo(session, 1700)
-    plan = _plan(session, Settings(root=tmp_path))
+    plan = _plan(session)
 
     assert plan.maia_target_elo == 1700
     assert plan.maia_plies() == [0, 1, 2, 3, 4, 5]
@@ -234,18 +235,13 @@ def test_a_game_with_no_owner_covers_every_ply_either_way(tmp_path: Any) -> None
     assert plan.maia_plies() == [0, 1]
 
 
-def test_a_position_run_asks_about_the_one_position_it_has(
-    session: Session, tmp_path: Any
-) -> None:
+def test_a_position_run_asks_about_the_one_position_it_has(session: Session) -> None:
     _engine(session)
     app_settings.set_maia_target_elo(session, 1700)
-    settings = Settings(root=tmp_path)
     run = analysis.request_analysis(
-        session,
-        fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        settings=settings,
+        session, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     )
-    plan = analysis.build_plan(session, run, settings)
+    plan = analysis.build_plan(session, run)
 
     assert plan.maia_target_elo == 1700
     assert plan.maia_plies() == [0]
@@ -254,12 +250,12 @@ def test_a_position_run_asks_about_the_one_position_it_has(
 # --- enqueueing -----------------------------------------------------------
 
 
-def test_a_quick_run_carries_the_configured_budget(session: Session, tmp_path: Any) -> None:
+def test_a_quick_run_carries_the_configured_budget(session: Session) -> None:
     _engine(session)
     game = _game(session)
-    settings = Settings(root=tmp_path, quick_nodes=1234)
+    app_settings.set_value(session, app_settings.QUICK_NODES, 1234)
 
-    run = analysis.request_analysis(session, game_id=game.id, settings=settings)
+    run = analysis.request_analysis(session, game_id=game.id)
 
     assert run.tier is Tier.QUICK
     assert run.status is RunStatus.QUEUED
@@ -268,16 +264,22 @@ def test_a_quick_run_carries_the_configured_budget(session: Session, tmp_path: A
     assert (run.ply_start, run.ply_end) == (None, None)
 
 
-def test_a_deep_run_gets_multiple_lines_and_jumps_the_queue(
-    session: Session, tmp_path: Any
-) -> None:
+def test_an_unconfigured_deployment_queues_the_default_budget(session: Session) -> None:
     _engine(session)
     game = _game(session)
-    settings = Settings(root=tmp_path, deep_nodes=999_999, deep_multipv=5)
 
-    run = analysis.request_analysis(
-        session, game_id=game.id, tier=Tier.DEEP, ply_range=(2, 5), settings=settings
-    )
+    run = analysis.request_analysis(session, game_id=game.id)
+
+    assert run.nodes == app_settings.QUICK_NODES_DEFAULT
+
+
+def test_a_deep_run_gets_multiple_lines_and_jumps_the_queue(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    app_settings.set_value(session, app_settings.DEEP_NODES, 999_999)
+    app_settings.set_value(session, app_settings.DEEP_MULTIPV, 5)
+
+    run = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP, ply_range=(2, 5))
 
     assert (run.nodes, run.multipv) == (999_999, 5)
     assert run.priority == analysis.DEEP_PRIORITY > analysis.QUICK_PRIORITY

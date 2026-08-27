@@ -1118,7 +1118,7 @@ class RunnerGateway:
                     cancelled.append(run_id)
                     continue
                 try:
-                    plan = analysis.build_plan(session, run, self.settings)
+                    plan = analysis.build_plan(session, run)
                 except analysis.AnalysisError:
                     # The run is still ours on paper but nothing here can describe it any
                     # more — the game was deleted under it. Cancelling is kinder than
@@ -1153,7 +1153,7 @@ class RunnerGateway:
                 analysis.abandon_run(session, run)
                 return None
             try:
-                plan = analysis.build_plan(session, run, self.settings)
+                plan = analysis.build_plan(session, run)
             except analysis.AnalysisError as exc:
                 # A run this database cannot describe. A second attempt on another machine
                 # would hit exactly the same wall.

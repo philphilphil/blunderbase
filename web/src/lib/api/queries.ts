@@ -128,7 +128,7 @@ export function useLogout(options?: UseMutationOptions<void, Error, void>) {
 
 // --- settings --------------------------------------------------------------
 
-/** What the Settings page renders from. One number, so far. */
+/** What the Settings page renders from: the eight numbers this deployment stores. */
 export function useAppSettings(options?: Options<Awaited<ReturnType<typeof api.getAppSettings>>>) {
   return useQuery({ queryKey: queryKeys.settings(), queryFn: api.getAppSettings, ...options })
 }

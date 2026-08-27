@@ -55,26 +55,11 @@ class Settings(BaseSettings):
     # How long an idle worker waits before looking at the queue again.
     analysis_poll_seconds: float = Field(default=1.0, gt=0)
 
-    # Engine budget per position. Quick is the automatic pass on import and is sized to
-    # keep up with an archive sync; deep is what someone is waiting on.
-    quick_nodes: int = Field(default=250_000, ge=1)
-    deep_nodes: int = Field(default=2_000_000, ge=1)
-    deep_multipv: int = Field(default=4, ge=1, le=10)
-
-    # Move classification thresholds, in win-percentage points lost by the mover (à la
-    # Lichess). Centipawns are deliberately not the unit: they overweight a middlegame
-    # swing between two already-winning positions.
-    inaccuracy_threshold: float = Field(default=10.0, ge=0, le=100)
-    mistake_threshold: float = Field(default=20.0, ge=0, le=100)
-    blunder_threshold: float = Field(default=30.0, ge=0, le=100)
-
-    # The rating levels Maia is asked about, as offsets from the owner's rating in the
-    # game being analysed. Two or three levels around it is what a coach actually uses.
-    # Ignored when the owner has set a Maia target elo on the Settings page — that is an
-    # app setting rather than a variable, and it lives in `services/app_settings.py`.
-    maia_rating_offsets: tuple[int, ...] = (-100, 0, 100)
-    # Used when the game carries no rating for the owner — an OTB PGN, an unrated game.
-    default_owner_rating: int = Field(default=1500, ge=1)
+    # The per-position engine budgets, the classification thresholds and the rating to
+    # centre Maia on when a game carries none are deliberately not here: they are app
+    # settings, stored in the database and edited on the Settings page, because they are
+    # the ones an owner changes as their play changes and a restart is not a thing to ask
+    # of them for that. `services/app_settings.py` owns them and their defaults.
 
     # Guards the MCP streamable-HTTP transport only; the HTTP API binds to loopback.
     # Empty means the remote transport is not configured and must not be served.
@@ -113,15 +98,6 @@ class Settings(BaseSettings):
         self.web_dist = self._resolve(self.web_dist, self.root / "web" / "dist")
         if not self.database_url.strip():
             self.database_url = f"sqlite+pysqlite:///{self.database_path}"
-        return self
-
-    @model_validator(mode="after")
-    def _ordered_thresholds(self) -> Settings:
-        ordered = (self.inaccuracy_threshold, self.mistake_threshold, self.blunder_threshold)
-        if list(ordered) != sorted(ordered):
-            raise ValueError(
-                "classification thresholds must rise: inaccuracy <= mistake <= blunder"
-            )
         return self
 
     def _resolve(self, value: Path | None, fallback: Path) -> Path:

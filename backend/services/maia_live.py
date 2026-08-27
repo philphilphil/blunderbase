@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import Session
 
-from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING, Settings, get_settings
+from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING
 from backend.db.enums import EngineKind
 from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
@@ -84,10 +84,7 @@ class LivePolicyRequestError(LiveMaiaError, ValueError):
 class LiveMaia:
     """A warm Maia session, opened on demand and closed when it goes quiet."""
 
-    def __init__(
-        self, *, settings: Settings | None = None, idle_seconds: float = IDLE_SECONDS
-    ) -> None:
-        self._settings = settings
+    def __init__(self, *, idle_seconds: float = IDLE_SECONDS) -> None:
         self._idle_seconds = float(idle_seconds)
         # Held for the whole of a query: Maia is one process and two boards asking at once
         # would interleave `setoption` with somebody else's `go`.
@@ -262,18 +259,18 @@ class LiveMaia:
         `policy_at` files the answer under, which is why what gets reported back is
         `_reported_level`, not this.
 
-        The target is read out of the database on every query, the same way the engine to
-        start is: changing it on the Settings page takes effect on the next thing the board
-        asks, without restarting anything or dropping the warm process.
+        Both the target and the fallback rating are read out of the database on every
+        query, the same way the engine to start is: changing either on the Settings page
+        takes effect on the next thing the board asks, without restarting anything or
+        dropping the warm process.
         """
         from backend.services.analysis import maia_bounds
 
-        settings = self._settings or get_settings()
         base = requested
         if base is None:
             base = app_settings_service.get_maia_target_elo(session)
         if base is None:
-            base = settings.default_owner_rating
+            base = app_settings_service.get_default_owner_rating(session)
         bounds = maia_bounds(adapter)
         low = int(bounds.get("low", MAIA_MIN_RATING))
         high = int(bounds.get("high", MAIA_MAX_RATING))

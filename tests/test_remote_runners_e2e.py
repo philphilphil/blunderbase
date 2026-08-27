@@ -163,7 +163,7 @@ def runner_row(settings: Settings, name: str) -> Any:
 def enqueue(settings: Settings, engine_id: int) -> int:
     with get_sessionmaker(settings)() as session:
         run = analysis.request_analysis(
-            session, fen=STARTING_FEN, tier=Tier.DEEP, engine_id=engine_id, settings=settings
+            session, fen=STARTING_FEN, tier=Tier.DEEP, engine_id=engine_id
         )
         return run.id
 

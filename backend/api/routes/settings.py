@@ -1,14 +1,17 @@
 """`/settings` — the deployment's own settings, as opposed to its engines.
 
-One number lives here so far: the Maia target elo. It is a stored setting rather than an
-environment variable because it is the one piece of configuration an owner changes as
-their play changes, and a restart is not a thing to ask of them for that. `services/
-app_settings.py` owns what it means; this is the form's two calls over it.
+Eight numbers live here: the Maia target elo, the two node budgets and the deep line
+count, the three classification thresholds, and the rating to fall back on when a game
+carries none. They are stored settings rather than environment variables because they are
+the ones an owner changes as their play changes, and a restart is not a thing to ask of
+them for that. `services/app_settings.py` owns what they mean; this is the form's two
+calls over it.
 
-A PUT is the whole of the settings, not a patch: `maia_target_elo: null` — or an empty
-body — is how the page clears the target and puts Maia back on its rating-centred
-behaviour. A value outside what Maia was trained on is clamped rather than refused, so the
-answer to a PUT is what is actually in force, which is not always what was sent.
+A PUT is the whole of the settings, not a patch: a field sent as null — or left out, or an
+empty body — clears that setting back to its default. A value outside what a setting can
+mean is clamped rather than refused, so the answer to a PUT is what is actually in force,
+which is not always what was sent. The exception is a set of classification thresholds
+that does not rise, which is refused whole with a 422 the page shows against the form.
 """
 
 from __future__ import annotations
@@ -24,12 +27,10 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 @router.get("", response_model=AppSettings, summary="Everything the Settings page shows")
 def get_settings(session: SessionDep) -> AppSettings:
-    return AppSettings(maia_target_elo=app_settings_service.get_maia_target_elo(session))
+    return AppSettings(**app_settings_service.read(session))
 
 
 @router.put("", response_model=AppSettings, summary="Change the settings")
 def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
-    """Answers with what is in force afterwards — the clamped value, or null once cleared."""
-    return AppSettings(
-        maia_target_elo=app_settings_service.set_maia_target_elo(session, body.maia_target_elo)
-    )
+    """Answers with what is in force afterwards — the clamped values, or null once cleared."""
+    return AppSettings(**app_settings_service.replace(session, body.model_dump()))

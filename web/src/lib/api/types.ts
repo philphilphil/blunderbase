@@ -69,23 +69,31 @@ export interface AuthStatus {
 // --- settings --------------------------------------------------------------
 
 /**
- * `GET`/`PUT /settings` — everything the Settings page shows, which is one number.
+ * `GET`/`PUT /settings` — everything the Settings page shows: eight numbers, each of them
+ * nullable.
  *
- * Null is not "unset yet" pending a load: it is the deployment's answer that no target is
- * configured, and Maia is back on the rating each game was played at.
+ * Null is not "unset yet" pending a load: it is the deployment's answer that nobody has
+ * set this one, and what is in force is the default the backend names. The page shows
+ * that default under an empty box rather than pretending to a value.
  */
 export interface AppSettings {
   maia_target_elo: number | null
+  quick_nodes: number | null
+  deep_nodes: number | null
+  deep_multipv: number | null
+  inaccuracy_threshold: number | null
+  mistake_threshold: number | null
+  blunder_threshold: number | null
+  default_owner_rating: number | null
 }
 
 /**
- * A PUT carries the whole of the settings, not a patch of them: `maia_target_elo: null`
- * clears the target. A value outside 1100–2000 is clamped by the backend rather than
- * refused, so the response is what is in force — not always what was sent.
+ * A PUT carries the whole of the settings, not a patch of them: a field sent as null is
+ * cleared back to its default. Out of range is clamped by the backend rather than refused,
+ * so the response is what is in force — not always what was sent. The one refusal is a set
+ * of classification thresholds that does not rise, which comes back as a 422.
  */
-export interface AppSettingsUpdate {
-  maia_target_elo: number | null
-}
+export type AppSettingsUpdate = AppSettings
 
 // --- games ----------------------------------------------------------------
 

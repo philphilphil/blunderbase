@@ -237,12 +237,12 @@ def test_a_different_engine_is_a_different_process(
 
 
 def test_the_configured_target_is_the_level_when_nobody_asks_for_one(
-    session: Session, tmp_path: Path, settings: Settings
+    session: Session, tmp_path: Path
 ) -> None:
     log = tmp_path / "engine.log"
     register_maia(session, maia_command(tmp_path, log=log))
     app_settings.set_maia_target_elo(session, 1700)
-    live = LiveMaia(settings=settings)
+    live = LiveMaia()
     try:
         answer = live.policy(session, fen=STARTING, moves=2)
     finally:
@@ -253,11 +253,11 @@ def test_the_configured_target_is_the_level_when_nobody_asks_for_one(
 
 
 def test_with_no_target_configured_the_level_is_the_default_rating(
-    session: Session, tmp_path: Path, settings: Settings
+    session: Session, tmp_path: Path
 ) -> None:
     register_maia(session, maia_command(tmp_path))
-    settings.default_owner_rating = 1400
-    live = LiveMaia(settings=settings)
+    app_settings.set_value(session, app_settings.DEFAULT_OWNER_RATING, 1400)
+    live = LiveMaia()
     try:
         assert live.policy(session, fen=STARTING, moves=2)["elo"] == 1400
     finally:
@@ -265,11 +265,11 @@ def test_with_no_target_configured_the_level_is_the_default_rating(
 
 
 def test_an_asked_for_level_wins_over_the_configured_target(
-    session: Session, tmp_path: Path, settings: Settings
+    session: Session, tmp_path: Path
 ) -> None:
     register_maia(session, maia_command(tmp_path))
     app_settings.set_maia_target_elo(session, 1700)
-    live = LiveMaia(settings=settings)
+    live = LiveMaia()
     try:
         assert live.policy(session, fen=STARTING, elo=1200, moves=2)["elo"] == 1200
     finally:

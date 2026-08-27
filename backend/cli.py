@@ -291,7 +291,6 @@ def command_analyze(args: argparse.Namespace, settings: Settings) -> int:
                         tier=tier,
                         multipv=args.multipv,
                         nodes=args.nodes,
-                        settings=settings,
                         commit=False,
                     )
                 ]
@@ -304,14 +303,11 @@ def command_analyze(args: argparse.Namespace, settings: Settings) -> int:
                         ply_range=args.ply_range,
                         multipv=args.multipv,
                         nodes=args.nodes,
-                        settings=settings,
                         commit=False,
                     )
                 ]
             else:
-                queued = analysis_service.enqueue_missing(
-                    session, tier, limit=args.limit, settings=settings
-                )
+                queued = analysis_service.enqueue_missing(session, tier, limit=args.limit)
     except (analysis_service.AnalysisRequestError, engines_service.EngineServiceError) as exc:
         print(f"analyze: {exc}")
         return 1

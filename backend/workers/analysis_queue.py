@@ -376,7 +376,7 @@ class AnalysisWorkers:
                 raise analysis.AnalysisError(
                     f"the binary for {engine.name!r} is no longer at {engine.path}"
                 )
-            plan = analysis.build_plan(session, run, self.settings)
+            plan = analysis.build_plan(session, run)
             maia = engines_service.maia_engine_for_host(session, None)
             return RunContext(
                 plan=plan,

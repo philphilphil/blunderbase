@@ -87,29 +87,63 @@ class PasswordChange(Input):
 
 
 class AppSettings(BaseModel):
-    """Everything the Settings page shows, which is currently one number."""
+    """Everything the Settings page shows: eight numbers, each of them nullable.
+
+    Null is never "not loaded yet". It is the deployment saying nobody has set this one,
+    and what is in force is the default `services.app_settings` names — which is why the
+    page can show that default under an empty box rather than pretending to a value.
+    """
 
     maia_target_elo: int | None = Field(
         default=None,
         description=(
-            "the one rating every Maia question is asked at, or null for the "
-            "rating-centred behaviour over the owner's own moves"
+            "the one rating every Maia question is asked at, or null for a level centred "
+            "on the owner's rating in the game, over their own moves"
         ),
+    )
+    quick_nodes: int | None = Field(
+        default=None, description="nodes per position in the automatic pass on import"
+    )
+    deep_nodes: int | None = Field(
+        default=None, description="nodes per position in a deep pass someone is waiting on"
+    )
+    deep_multipv: int | None = Field(
+        default=None, description="how many lines a deep pass keeps per position"
+    )
+    inaccuracy_threshold: float | None = Field(
+        default=None, description="win-percentage points lost that make a move an inaccuracy"
+    )
+    mistake_threshold: float | None = Field(
+        default=None, description="win-percentage points lost that make a move a mistake"
+    )
+    blunder_threshold: float | None = Field(
+        default=None, description="win-percentage points lost that make a move a blunder"
+    )
+    default_owner_rating: int | None = Field(
+        default=None, description="the rating to use where the game itself carries none"
     )
 
 
 class AppSettingsUpdate(Input):
-    """A change to the settings. Null clears the target back to the default behaviour.
+    """A change to the settings. Null clears one back to its default.
 
     A PUT carries the whole of the settings rather than a patch of them, so an omitted
     field means the same as a null one: cleared.
 
-    Out of range is clamped rather than refused, which is the rule every other Maia level
-    in the codebase follows (`services.app_settings`): an owner aiming at 2200 gets Maia's
-    top level, not a form that will not save.
+    Out of range is clamped rather than refused, which is the rule the whole store follows
+    (`services.app_settings`): an owner aiming at 2200 gets Maia's top level, not a form
+    that will not save. The one refusal is a set of classification thresholds that does not
+    rise, because no clamp rescues an inaccuracy that costs more than a blunder.
     """
 
     maia_target_elo: int | None = None
+    quick_nodes: int | None = None
+    deep_nodes: int | None = None
+    deep_multipv: int | None = None
+    inaccuracy_threshold: float | None = None
+    mistake_threshold: float | None = None
+    blunder_threshold: float | None = None
+    default_owner_rating: int | None = None
 
 
 # --- games ----------------------------------------------------------------

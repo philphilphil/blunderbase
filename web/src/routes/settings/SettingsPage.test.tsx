@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import { useMaiaTargetElo } from '@/lib/api/queries'
+import type { AppSettings } from '@/lib/api/types'
 
 import { SettingsPage } from './SettingsPage'
 
@@ -28,25 +29,60 @@ function json(status: number, body: unknown) {
   })
 }
 
-/** The deployment's stored settings, as the backend would keep them across the calls. */
-let target: number | null
+const NOTHING_SET: AppSettings = {
+  maia_target_elo: null,
+  quick_nodes: null,
+  deep_nodes: null,
+  deep_multipv: null,
+  inaccuracy_threshold: null,
+  mistake_threshold: null,
+  blunder_threshold: null,
+  default_owner_rating: null,
+}
 
+/** The deployment's stored settings, as the backend would keep them across the calls. */
+let stored: AppSettings
+
+function clamp(value: number | null, low: number, high: number) {
+  return value === null ? null : Math.min(high, Math.max(low, value))
+}
+
+/** The backend's own rules, as far as the page can tell them apart: clamp, then order. */
 function stubFetch() {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input).split('?')[0]!
     const method = init?.method ?? 'GET'
     if (path.endsWith('/api/settings')) {
       if (method === 'PUT') {
-        const sent = JSON.parse(String(init?.body)) as { maia_target_elo: number | null }
-        target =
-          sent.maia_target_elo === null
-            ? null
-            : Math.min(2000, Math.max(1100, sent.maia_target_elo))
+        const sent = JSON.parse(String(init?.body)) as AppSettings
+        const inaccuracy = clamp(sent.inaccuracy_threshold, 0, 100) ?? 10
+        const mistake = clamp(sent.mistake_threshold, 0, 100) ?? 20
+        const blunder = clamp(sent.blunder_threshold, 0, 100) ?? 30
+        if (!(inaccuracy < mistake && mistake < blunder)) {
+          return json(422, {
+            error: 'invalid_settings',
+            detail: 'the classification thresholds have to rise: inaccuracy < mistake < blunder',
+          })
+        }
+        stored = {
+          maia_target_elo: clamp(sent.maia_target_elo, 1100, 2000),
+          quick_nodes: clamp(sent.quick_nodes, 1, Number.MAX_SAFE_INTEGER),
+          deep_nodes: clamp(sent.deep_nodes, 1, Number.MAX_SAFE_INTEGER),
+          deep_multipv: clamp(sent.deep_multipv, 1, 10),
+          inaccuracy_threshold: clamp(sent.inaccuracy_threshold, 0, 100),
+          mistake_threshold: clamp(sent.mistake_threshold, 0, 100),
+          blunder_threshold: clamp(sent.blunder_threshold, 0, 100),
+          default_owner_rating: clamp(sent.default_owner_rating, 1, Number.MAX_SAFE_INTEGER),
+        }
       }
-      return json(200, { maia_target_elo: target })
+      return json(200, stored)
     }
     if (path.endsWith('/api/auth/status')) {
-      return json(200, { setup_required: false, authenticated: true, maia_target_elo: target })
+      return json(200, {
+        setup_required: false,
+        authenticated: true,
+        maia_target_elo: stored.maia_target_elo,
+      })
     }
     return json(404, { error: 'not_found', detail: path })
   })
@@ -73,17 +109,21 @@ function draw({ withReader = false }: { withReader?: boolean } = {}) {
   return client
 }
 
-function field() {
-  return screen.getByLabelText('Target elo')
+function field(label: string) {
+  return screen.getByLabelText(label)
 }
 
-/** The field once the read has answered — everything before that is a skeleton. */
-function loadedField() {
-  return screen.findByLabelText('Target elo')
+/** A field once the read has answered — everything before that is a skeleton. */
+function loadedField(label: string) {
+  return screen.findByLabelText(label)
+}
+
+function save() {
+  return screen.getByRole('button', { name: /save/i })
 }
 
 beforeEach(() => {
-  target = null
+  stored = { ...NOTHING_SET }
   vi.stubGlobal('WebSocket', FakeSocket)
   stubFetch()
 })
@@ -91,75 +131,133 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('SettingsPage', () => {
-  it('renders the stored level', async () => {
-    target = 1700
-
+  it('renders a card for every group of settings', async () => {
     draw()
 
-    await waitFor(() => expect(field()).toHaveValue(1700))
-    expect(screen.getByText(/in force at 1700/i)).toBeInTheDocument()
+    await loadedField('Target elo')
+
+    expect(screen.getByText('Maia')).toBeInTheDocument()
+    expect(screen.getByText('Analysis')).toBeInTheDocument()
+    expect(screen.getByText('Classification')).toBeInTheDocument()
+    expect(screen.getByText('Defaults')).toBeInTheDocument()
+    for (const label of [
+      'Target elo',
+      'Quick nodes',
+      'Deep nodes',
+      'Deep lines',
+      'Inaccuracy',
+      'Mistake',
+      'Blunder',
+      'Owner rating',
+    ]) {
+      expect(field(label)).toBeInTheDocument()
+    }
   })
 
-  it('says what an unset deployment does instead', async () => {
+  it('renders the stored values', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 1700, quick_nodes: 50000, deep_multipv: 6 }
+
     draw()
 
-    await waitFor(() => expect(field()).toHaveValue(null))
-    expect(screen.getByText(/not set/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument()
+    await waitFor(() => expect(field('Target elo')).toHaveValue(1700))
+    expect(field('Quick nodes')).toHaveValue(50000)
+    expect(field('Deep lines')).toHaveValue(6)
   })
 
-  it('saves a new level', async () => {
+  it('shows the default under a box nobody has set', async () => {
     draw()
 
-    await userEvent.type(await loadedField(), '1700')
-    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await loadedField('Quick nodes')
+    expect(field('Deep nodes')).toHaveValue(null)
+    expect(screen.getByText('Default 250,000')).toBeInTheDocument()
+    expect(screen.getByText('Default 2,000,000')).toBeInTheDocument()
+    expect(screen.getByText('Default 1500')).toBeInTheDocument()
+  })
 
-    await waitFor(() => expect(screen.getByText(/in force at 1700/i)).toBeInTheDocument())
-    expect(target).toBe(1700)
+  it('saves every box in one request', async () => {
+    draw()
+
+    await userEvent.type(await loadedField('Target elo'), '1700')
+    await userEvent.type(field('Quick nodes'), '50000')
+    await userEvent.type(field('Inaccuracy'), '5')
+    await userEvent.click(save())
+
+    await waitFor(() => expect(stored.maia_target_elo).toBe(1700))
+    expect(stored.quick_nodes).toBe(50000)
+    expect(stored.inaccuracy_threshold).toBe(5)
+    // A PUT is the whole of the settings: what was left empty stays cleared.
+    expect(stored.deep_nodes).toBeNull()
   })
 
   // The backend clamps rather than refusing, so the page must show what is in force
   // rather than go on displaying the number that was typed.
-  it('shows the clamped level rather than what was typed', async () => {
+  it('shows the clamped value rather than what was typed', async () => {
     draw()
 
-    await userEvent.type(await loadedField(), '2400')
-    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await userEvent.type(await loadedField('Deep lines'), '99')
+    await userEvent.click(save())
 
-    await waitFor(() => expect(field()).toHaveValue(2000))
-    expect(target).toBe(2000)
+    await waitFor(() => expect(field('Deep lines')).toHaveValue(10))
+    expect(stored.deep_multipv).toBe(10)
   })
 
-  it('clears back to the default behaviour', async () => {
-    target = 1700
+  it('clears a setting when its box is emptied', async () => {
+    stored = { ...NOTHING_SET, quick_nodes: 50000 }
     draw()
-    await waitFor(() => expect(field()).toHaveValue(1700))
+    await waitFor(() => expect(field('Quick nodes')).toHaveValue(50000))
 
-    await userEvent.click(screen.getByRole('button', { name: /clear/i }))
+    await userEvent.clear(field('Quick nodes'))
+    await userEvent.click(save())
 
-    await waitFor(() => expect(field()).toHaveValue(null))
-    expect(target).toBeNull()
-    expect(screen.getByText(/not set/i)).toBeInTheDocument()
+    await waitFor(() => expect(stored.quick_nodes).toBeNull())
+    expect(field('Quick nodes')).toHaveValue(null)
+    expect(screen.getByText('Default 250,000')).toBeInTheDocument()
+  })
+
+  it('shows the refusal when the thresholds do not rise', async () => {
+    draw()
+
+    await userEvent.type(await loadedField('Inaccuracy'), '40')
+    await userEvent.click(save())
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/inaccuracy < mistake < blunder/i)
+    // Refused whole: nothing was stored, and the typing is still there to correct.
+    expect(stored).toEqual(NOTHING_SET)
+    expect(field('Inaccuracy')).toHaveValue(40)
+  })
+
+  it('drops unsaved edits when reverted', async () => {
+    stored = { ...NOTHING_SET, deep_nodes: 900000 }
+    draw()
+    await waitFor(() => expect(field('Deep nodes')).toHaveValue(900000))
+
+    await userEvent.clear(field('Deep nodes'))
+    await userEvent.type(field('Deep nodes'), '1')
+    await userEvent.click(screen.getByRole('button', { name: /revert/i }))
+
+    expect(field('Deep nodes')).toHaveValue(900000)
+    expect(screen.queryByRole('button', { name: /revert/i })).not.toBeInTheDocument()
   })
 
   it('does not offer to save what has not changed', async () => {
-    target = 1700
+    stored = { ...NOTHING_SET, maia_target_elo: 1700 }
     const fetchMock = vi.mocked(fetch)
     draw()
-    await waitFor(() => expect(field()).toHaveValue(1700))
+    await waitFor(() => expect(field('Target elo')).toHaveValue(1700))
 
-    expect(screen.getByRole('button', { name: /save/i })).toBeDisabled()
+    expect(save()).toBeDisabled()
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
   })
 
   it('moves the level every other screen reads, without a reload', async () => {
-    target = 1700
+    stored = { ...NOTHING_SET, maia_target_elo: 1700 }
     draw({ withReader: true })
     await waitFor(() => expect(screen.getByTestId('elsewhere')).toHaveTextContent('1700'))
 
-    await userEvent.clear(await loadedField())
-    await userEvent.type(field(), '1500')
-    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await userEvent.clear(await loadedField('Target elo'))
+    await userEvent.type(field('Target elo'), '1500')
+    await userEvent.click(save())
 
     await waitFor(() => expect(screen.getByTestId('elsewhere')).toHaveTextContent('1500'))
   })

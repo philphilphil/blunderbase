@@ -45,7 +45,6 @@ def _game_plan(**changes: Any) -> RunPlan:
         "thresholds": THRESHOLDS,
         "owner_color": Color.WHITE,
         "owner_rating": 1712,
-        "maia_offsets": (-100, 0, 100),
     }
     return RunPlan(**{**defaults, **changes})
 
@@ -178,7 +177,6 @@ def test_a_snapshot_carries_lines_in_the_shape_the_database_stores() -> None:
             position_ids=(None,),
             owner_color=None,
             owner_rating=None,
-            maia_offsets=(),
         ),
         _game_plan(
             tier=Tier.DEEP,

@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.services import analysis as analysis_service
+from backend.services import app_settings as app_settings_service
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import import_service
@@ -110,6 +111,9 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (maia_live_service.LivePolicyRequestError, 422, "invalid_request"),
     (maia_live_service.LiveMaiaUnavailableError, 409, "maia_unavailable"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
+    # The settings clamp rather than refuse; this is the one set of them that cannot be
+    # clamped into sense, and the page shows the message against the form.
+    (app_settings_service.SettingsError, 422, "invalid_settings"),
     (stats_service.UnknownDimensionError, 422, "unknown_dimension"),
     # The two families every service layer raises for "you asked for something that is not
     # there" and "you asked for it wrongly". Registered last so a typed subclass wins.
