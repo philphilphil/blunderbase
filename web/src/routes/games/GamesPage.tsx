@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { useRequestAnalysis } from '@/lib/api/queries'
+import { useRequestAnalysisBatch } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
 
 import { DebouncedInput, FilterBar } from './components/FilterBar'
@@ -43,7 +43,9 @@ export function GamesPage() {
 
   const library = useGameLibrary(filters)
   const rows = useMemo(() => sortGames(library.games, sort), [library.games, sort])
-  const analysis = useRequestAnalysis()
+  // The row button queues one game through the same call: one id is a batch of one, and
+  // one path here is one receipt and one set of spinning rows.
+  const analysis = useRequestAnalysisBatch()
 
   const setFilters = useCallback(
     (next: LibraryFilters) => {
@@ -98,15 +100,18 @@ export function GamesPage() {
       if (ids.length === 0) return
       setAnalysing((current) => new Set([...current, ...ids]))
       setQueueMessage(null)
+      // The whole selection in one call: the backend queues it in one transaction and
+      // answers with what it took per game, so the receipt is that answer rather than a
+      // tally kept across as many round-trips as there were rows.
       let queued = 0
-      let failed = 0
-      for (const id of ids) {
-        try {
-          await analysis.mutateAsync({ game_id: id, tier })
-          queued += 1
-        } catch {
-          failed += 1
-        }
+      let refused = ids.length
+      try {
+        const receipt = await analysis.mutateAsync({ game_ids: ids, tier })
+        queued = receipt.queued.length
+        refused = receipt.refused.length
+      } catch {
+        // A call that never landed refused the selection whole — a tier with no engine
+        // behind it is the usual reason.
       }
       setAnalysing((current) => {
         const next = new Set(current)
@@ -114,9 +119,9 @@ export function GamesPage() {
         return next
       })
       setQueueMessage(
-        failed === 0
+        refused === 0
           ? `${queued} ${tier} ${queued === 1 ? 'run' : 'runs'} queued`
-          : `${queued} queued, ${failed} refused`,
+          : `${queued} queued, ${refused} refused`,
       )
     },
     [analysis],

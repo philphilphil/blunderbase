@@ -11,11 +11,15 @@ from backend.api.deps import SessionDep, SettingsDep, not_found, ply_range, wake
 from backend.api.routes.runners import live_picture, local_picture
 from backend.api.schemas import (
     AnalysisRequest,
+    BatchAnalysisRequest,
+    BatchAnalysisResponse,
     MoveEvalResponse,
     PositionAnalysis,
     PositionAnalysisRequest,
     QueueDestination,
+    QueuedRun,
     QueueStatus,
+    RefusedGame,
     RunResponse,
 )
 from backend.config import Settings
@@ -46,6 +50,40 @@ def enqueue(request: Request, session: SessionDep, body: AnalysisRequest) -> Any
     )
     wake_workers(request)
     return run
+
+
+@router.post(
+    "/batch",
+    response_model=BatchAnalysisResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Enqueue a pass over each of several games",
+)
+def enqueue_batch(
+    request: Request, session: SessionDep, body: BatchAnalysisRequest
+) -> BatchAnalysisResponse:
+    """Queue one run per game, all of them in one transaction.
+
+    What the games page's selection footer sends: sixty selected games are one call and
+    one commit rather than sixty of each. A game that cannot be queued is named in
+    `refused` instead of failing the rest — 202 is what the batch was accepted as, not a
+    claim that every id in it was.
+    """
+    queued, refused = analysis_service.request_analysis_batch(
+        session,
+        body.game_ids,
+        tier=body.tier,
+        engine_id=body.engine_id,
+        multipv=body.multipv,
+        nodes=body.nodes,
+        depth=body.depth,
+        priority=body.priority,
+    )
+    wake_workers(request)
+    return BatchAnalysisResponse(
+        # Every run a batch queued was queued for a game, so `game_id` is one.
+        queued=[QueuedRun(game_id=run.game_id, run_id=run.id) for run in queued],
+        refused=[RefusedGame(game_id=item.game_id, reason=item.reason) for item in refused],
+    )
 
 
 @router.get("/queue", response_model=QueueStatus, summary="How much work is outstanding")

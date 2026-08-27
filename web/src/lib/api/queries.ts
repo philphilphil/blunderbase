@@ -22,6 +22,7 @@ import type {
   AppSettings,
   AppSettingsUpdate,
   AuthStatus,
+  BatchAnalysisRequest,
   EngineCreate,
   EngineDeleteResult,
   EngineUpdate,
@@ -259,6 +260,25 @@ export function useRequestAnalysis(
   const client = useQueryClient()
   return useMutation({
     mutationFn: (body: AnalysisRequest) => api.requestAnalysis(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** A selection's worth of games, queued in one call. Partly refused is still a success. */
+export function useRequestAnalysisBatch(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.requestAnalysisBatch>>,
+    Error,
+    BatchAnalysisRequest
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: BatchAnalysisRequest) => api.requestAnalysisBatch(body),
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })

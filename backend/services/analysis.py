@@ -418,6 +418,64 @@ def request_analysis(
     return run
 
 
+@dataclass(frozen=True, slots=True)
+class BatchRefusal:
+    """One game a batch could not queue, carrying the refusal the single path gave."""
+
+    game_id: int
+    reason: str
+
+
+def request_analysis_batch(
+    session: Session,
+    game_ids: Sequence[int],
+    *,
+    tier: Tier = Tier.QUICK,
+    engine_id: int | None = None,
+    multipv: int | None = None,
+    nodes: int | None = None,
+    depth: int | None = None,
+    priority: int | None = None,
+) -> tuple[list[AnalysisRun], list[BatchRefusal]]:
+    """Enqueue one pass per game in a single transaction, and report what was refused.
+
+    A game the single-game path will not take — one that is not there — takes itself out
+    of the batch rather than the rest of the selection with it. Everything that could be
+    queued is, and the caller is handed the ids that were not with the reason each was
+    given.
+
+    What is *not* per game still raises: a tier with no usable engine refuses all five
+    hundred ids for the same reason, and saying so once, as the typed conflict the single
+    path already reports, is more use than saying it five hundred times.
+
+    One commit for the whole batch, so the queue grows in one step and a failure leaves no
+    half-queued selection behind. The per-run `analysis.queued` events are buffered on the
+    session and go out after that commit, exactly as a run enqueued on its own does.
+    """
+    queued: list[AnalysisRun] = []
+    refused: list[BatchRefusal] = []
+    for game_id in game_ids:
+        try:
+            queued.append(
+                request_analysis(
+                    session,
+                    game_id=game_id,
+                    tier=tier,
+                    engine_id=engine_id,
+                    multipv=multipv,
+                    nodes=nodes,
+                    depth=depth,
+                    priority=priority,
+                    commit=False,
+                )
+            )
+        except AnalysisRequestError as exc:
+            refused.append(BatchRefusal(game_id=game_id, reason=str(exc)))
+    if queued:
+        session.commit()
+    return queued, refused
+
+
 def enqueue_missing(
     session: Session,
     tier: Tier = Tier.QUICK,

@@ -332,6 +332,11 @@ class ImportStarted(BaseModel):
 
 # --- analysis -------------------------------------------------------------
 
+# How many games one batch may carry. A selection is made by hand on the games page, so
+# the ceiling is only there to keep a stray client from asking for a transaction the size
+# of the library; `blunderbase analyze` with no game is what queues everything.
+MAX_BATCH_GAMES = 500
+
 
 class AnalysisRequest(Input):
     """Enqueue one pass. Exactly one of `game_id` and `fen`."""
@@ -358,6 +363,59 @@ class AnalysisRequest(Input):
         if self.ply_start is None or self.ply_end is None:
             return None
         return self.ply_start, self.ply_end
+
+
+class BatchAnalysisRequest(Input):
+    """Enqueue one pass over each of several games.
+
+    Its own body rather than a third alternative on `AnalysisRequest`, because a batch
+    does not answer with a run: a route here declares one response shape, and a `game_ids`
+    field that silently changed what a 202 carries is a thing neither the OpenAPI schema
+    nor the typed client could describe.
+
+    No ply range and no FEN: a window belongs to one game, and a position is one run.
+    """
+
+    game_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_GAMES)
+    tier: Tier = Tier.QUICK
+    engine_id: int | None = None
+    multipv: int | None = Field(default=None, ge=1)
+    nodes: int | None = Field(default=None, ge=1)
+    depth: int | None = Field(default=None, ge=1)
+    priority: int | None = None
+
+    @model_validator(mode="after")
+    def _distinct_games(self) -> BatchAnalysisRequest:
+        # A selection cannot hold the same game twice, so a repeat is a client bug rather
+        # than a request for two identical runs. Dropped, not refused, and in the order
+        # the batch was asked for.
+        self.game_ids = list(dict.fromkeys(self.game_ids))
+        return self
+
+
+class QueuedRun(BaseModel):
+    """One game of a batch that is now in the queue, and the run that will work it."""
+
+    game_id: int
+    run_id: int
+
+
+class RefusedGame(BaseModel):
+    """One game of a batch that is not, and what the enqueue path said about it."""
+
+    game_id: int
+    reason: str
+
+
+class BatchAnalysisResponse(BaseModel):
+    """What a batch queued and what it would not, in the order the ids were given.
+
+    A refusal is per game — an id that is not there — and never the batch's: everything
+    else queued anyway, which is the whole point of asking for them together.
+    """
+
+    queued: list[QueuedRun] = Field(default_factory=list)
+    refused: list[RefusedGame] = Field(default_factory=list)
 
 
 class RunResponse(Row):

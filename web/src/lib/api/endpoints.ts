@@ -9,6 +9,8 @@ import type {
   AppSettings,
   AppSettingsUpdate,
   AuthStatus,
+  BatchAnalysisRequest,
+  BatchAnalysisResponse,
   ComparisonResponse,
   DimensionList,
   EngineCreate,
@@ -148,6 +150,13 @@ export const uploadPgn = (
 
 export const requestAnalysis = (body: AnalysisRequest) =>
   http.post<RunResponse>('/analysis', { body })
+
+/**
+ * One pass over each of several games, in one call and one transaction. A game that
+ * could not be queued comes back in `refused` rather than failing the rest of them.
+ */
+export const requestAnalysisBatch = (body: BatchAnalysisRequest) =>
+  http.post<BatchAnalysisResponse>('/analysis/batch', { body })
 
 export const getQueue = () => http.get<QueueStatus>('/analysis/queue')
 

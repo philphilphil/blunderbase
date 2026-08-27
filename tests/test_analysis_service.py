@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from sqlalchemy import event as sa_event
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -448,6 +449,82 @@ def test_re_analysis_is_a_new_run_and_keeps_the_old_one(session: Session) -> Non
     assert second.id != first.id
     assert [run.id for run in analysis.list_runs(session, game.id)] == [second.id, first.id]
     assert [run.id for run in analysis.list_runs(session, game.id, Tier.QUICK)] == [first.id]
+
+
+def test_a_batch_queues_every_game_in_one_transaction(session: Session) -> None:
+    """The point of the batch: sixty selected games are one commit, not sixty."""
+    _engine(session)
+    games = [_game(session, plies=plies) for plies in (4, 6, 4)]
+    commits = 0
+
+    @sa_event.listens_for(session, "after_commit")
+    def _count(_session: Session) -> None:
+        nonlocal commits
+        commits += 1
+
+    queued, refused = analysis.request_analysis_batch(
+        session, [game.id for game in games], tier=Tier.DEEP
+    )
+
+    assert [run.game_id for run in queued] == [game.id for game in games]
+    assert refused == []
+    assert commits == 1
+    stored = session.scalars(select(AnalysisRun.id).order_by(AnalysisRun.id)).all()
+    assert list(stored) == [run.id for run in queued]
+
+
+def test_a_batch_queues_what_it_can_and_names_what_it_would_not(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+
+    queued, refused = analysis.request_analysis_batch(session, [game.id, 999])
+
+    assert [run.game_id for run in queued] == [game.id]
+    assert refused == [analysis.BatchRefusal(game_id=999, reason="no game with id 999")]
+    # The refusal took itself out of the batch; it did not roll the queued run back.
+    assert list(session.scalars(select(AnalysisRun.game_id))) == [game.id]
+
+
+def test_a_batch_announces_each_run_once_the_batch_has_committed(session: Session) -> None:
+    """Per-run events, after the commit: the queue widget counts runs, not batches."""
+    _engine(session)
+    games = [_game(session, plies=plies) for plies in (4, 6)]
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        queued, _refused = analysis.request_analysis_batch(
+            session, [games[0].id, 999, games[1].id], tier=Tier.DEEP
+        )
+    finally:
+        cancel()
+
+    assert [event["event"] for event in seen] == [analysis.EVENT_RUN_QUEUED] * 2
+    assert [event["run_id"] for event in seen] == [run.id for run in queued]
+    assert [event["game_id"] for event in seen] == [games[0].id, games[1].id]
+
+
+def test_a_batch_with_nothing_to_queue_commits_nothing(session: Session) -> None:
+    _engine(session)
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        queued, refused = analysis.request_analysis_batch(session, [998, 999])
+    finally:
+        cancel()
+
+    assert queued == []
+    assert [item.game_id for item in refused] == [998, 999]
+    assert seen == []
+
+
+def test_a_batch_refuses_as_a_whole_when_no_engine_serves_the_tier(session: Session) -> None:
+    """Not per game: the reason is the deployment's, and it is the same for every id."""
+    game = _game(session)
+
+    with pytest.raises(TierUnavailableError):
+        analysis.request_analysis_batch(session, [game.id])
 
 
 def test_enqueue_missing_covers_every_game_once(session: Session) -> None:

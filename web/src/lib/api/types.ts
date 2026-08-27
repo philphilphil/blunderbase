@@ -340,6 +340,36 @@ export interface AnalysisRequest {
   priority?: number
 }
 
+/**
+ * One pass over each of several games. Its own body rather than a list on
+ * `AnalysisRequest`, because the answer is not a run — see `BatchAnalysisResponse`.
+ */
+export interface BatchAnalysisRequest {
+  game_ids: number[]
+  tier?: Tier
+  engine_id?: number
+  multipv?: number
+  nodes?: number
+  depth?: number
+  priority?: number
+}
+
+export interface QueuedRun {
+  game_id: number
+  run_id: number
+}
+
+export interface RefusedGame {
+  game_id: number
+  reason: string
+}
+
+/** What a batch queued and what it would not, in the order the ids were given. */
+export interface BatchAnalysisResponse {
+  queued: QueuedRun[]
+  refused: RefusedGame[]
+}
+
 export interface RunResponse {
   id: number
   game_id?: number | null

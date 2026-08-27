@@ -625,6 +625,72 @@ def test_a_run_can_be_enqueued_for_a_game(api: TestClient, seeded: dict[str, int
     assert queue["destinations"][0]["queued"] == 1
 
 
+def test_a_batch_queues_one_run_per_game_in_one_call(api: TestClient) -> None:
+    ids = [game["id"] for game in api.get("/games", params={"limit": 3}).json()["games"]]
+
+    response = api.post("/analysis/batch", json={"game_ids": ids, "tier": "deep"})
+
+    assert response.status_code == 202
+    body = response.json()
+    assert [row["game_id"] for row in body["queued"]] == ids
+    assert len({row["run_id"] for row in body["queued"]}) == 3
+    assert body["refused"] == []
+    # All three landed together: the queue is three deep after the one call.
+    assert api.get("/analysis/queue").json()["queued"] == 3
+    for row in body["queued"]:
+        assert api.get(f"/analysis/runs/{row['run_id']}").json()["tier"] == "deep"
+
+
+def test_a_batch_queues_around_the_game_it_cannot_take(api: TestClient) -> None:
+    """One bad id does not sink the selection it was sitting in."""
+    ids = [game["id"] for game in api.get("/games", params={"limit": 2}).json()["games"]]
+
+    body = api.post("/analysis/batch", json={"game_ids": [ids[0], 9999, ids[1]]}).json()
+
+    assert [row["game_id"] for row in body["queued"]] == ids
+    assert body["refused"] == [{"game_id": 9999, "reason": "no game with id 9999"}]
+    assert api.get("/analysis/queue").json()["queued"] == 2
+
+
+def test_a_batch_needs_at_least_one_game(api: TestClient) -> None:
+    response = api.post("/analysis/batch", json={"game_ids": []})
+
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+    assert api.get("/analysis/queue").json()["queued"] == 0
+
+
+def test_a_batch_takes_no_single_game_field(api: TestClient, seeded: dict[str, int]) -> None:
+    """The two forms are two bodies: `game_id` on a batch is a typo, not an extra game."""
+    response = api.post(
+        "/analysis/batch", json={"game_ids": [seeded["game_id"]], "game_id": seeded["game_id"]}
+    )
+
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+
+
+def test_a_batch_queues_a_repeated_game_once(api: TestClient, seeded: dict[str, int]) -> None:
+    game_id = seeded["game_id"]
+
+    body = api.post("/analysis/batch", json={"game_ids": [game_id, game_id]}).json()
+
+    assert [row["game_id"] for row in body["queued"]] == [game_id]
+    assert api.get("/analysis/queue").json()["queued"] == 1
+
+
+def test_a_batch_with_no_usable_engine_is_the_same_typed_conflict(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    """A tier that refuses every id refuses the batch, rather than listing it 500 times."""
+    api.patch(f"/engines/{seeded['engine_id']}", json={"enabled": False})
+
+    response = api.post("/analysis/batch", json={"game_ids": [seeded["game_id"]]})
+
+    assert response.status_code == 409
+    assert error_of(response) == "tier_unavailable"
+
+
 def test_a_run_over_a_position_takes_no_ply_range(api: TestClient) -> None:
     response = api.post("/analysis", json={"fen": FRENCH, "ply_start": 0, "ply_end": 4})
 
