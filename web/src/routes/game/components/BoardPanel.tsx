@@ -1,12 +1,15 @@
+import { Check, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
-import type { MoveRow } from '@/lib/api/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import type { GameRunSummary, MoveRow, RunResponse } from '@/lib/api/types'
 import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { sameMove, type MaiaLevel, type PlyPosition, type Side } from '../gameModel'
+import type { RunProgress } from '../useDeepAnalysis'
 import { EvalBar } from './EvalBar'
 
 export interface BoardPanelProps {
@@ -34,15 +37,25 @@ export interface BoardPanelProps {
   onHintsChange: (hints: boolean) => void
   onFlip: () => void
   onSeek: (cursor: number) => void
+  /** The newest finished deep run over this game, if there is one. */
+  deepRun: GameRunSummary | null
+  /** A run over this game that is queued or running right now. */
+  deepActiveRun: RunResponse | null
+  /** Live ply counts from `analysis.progress`, while a run is working. */
+  deepProgress: RunProgress | null
+  deepPending: boolean
+  deepError: Error | null
+  onRequestDeep: () => void
   className?: string
 }
 
 /**
  * Wheel travel — in CSS pixels, whatever the device reports in — that counts as one move.
- * A mouse notch is 100 or so and steps once; a trackpad's stream of small deltas is added
- * up to the same threshold and then reset, so one flick is one move rather than ten.
+ * Tuned per-tick rather than per-notch: a mouse's discrete wheel tick is ~15px of deltaY,
+ * so one tick alone crosses this and steps once. A trackpad's stream of small deltas is
+ * added up to the same threshold and then reset, so one flick is one move rather than ten.
  */
-const WHEEL_STEP = 60
+const WHEEL_STEP = 10
 
 /**
  * The board column's middle band: eval bar, board with its overlays, and the transport
@@ -69,6 +82,12 @@ export function BoardPanel({
   onHintsChange,
   onFlip,
   onSeek,
+  deepRun,
+  deepActiveRun,
+  deepProgress,
+  deepPending,
+  deepError,
+  onRequestDeep,
   className,
 }: BoardPanelProps) {
   const squares = useMemo<BoardSquare[]>(() => {
@@ -206,6 +225,15 @@ export function BoardPanel({
           Hints
         </button>
 
+        <DeepButton
+          deepRun={deepRun}
+          activeRun={deepActiveRun}
+          progress={deepProgress}
+          pending={deepPending}
+          error={deepError}
+          onRequest={onRequestDeep}
+        />
+
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] tabular text-dim">
           ply {cursor + 1} / {plyCount}
@@ -215,6 +243,77 @@ export function BoardPanel({
         </span>
       </div>
     </div>
+  )
+}
+
+/**
+ * The deep-analysis trigger: the only place in the game view that writes
+ * `POST /analysis { game_id, tier: "deep" }`. Idle by default, tinted once a deep run has
+ * finished (still clickable — "re-analysis is always a new run"), and disabled with a
+ * progress readout while one is queued or running, whichever tier it is.
+ */
+function DeepButton({
+  deepRun,
+  activeRun,
+  progress,
+  pending,
+  error,
+  onRequest,
+}: {
+  deepRun: GameRunSummary | null
+  activeRun: RunResponse | null
+  progress: RunProgress | null
+  pending: boolean
+  error: Error | null
+  onRequest: () => void
+}) {
+  const busy = activeRun !== null || pending
+  const percent =
+    progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null
+
+  const label = busy ? (
+    <>
+      <Loader2 className="size-3 animate-spin" aria-hidden />
+      {percent !== null ? `${percent}%` : 'Deep'}
+    </>
+  ) : deepRun ? (
+    <>
+      <Check className="size-3" aria-hidden />
+      Deep
+    </>
+  ) : (
+    'Deep'
+  )
+
+  const tooltip = busy
+    ? `${activeRun?.status === 'running' ? 'Analysing' : 'Queued'}${activeRun ? ` · ${activeRun.tier}` : ''}`
+    : error
+      ? error.message
+      : deepRun
+        ? 'Deep analysis complete — click to re-run'
+        : 'Queue a deep analysis pass over this game'
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRequest}
+          className={cn(
+            'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs disabled:cursor-default',
+            error && !busy
+              ? 'border-blunder/30 bg-blunder/5 text-blunder'
+              : deepRun
+                ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
+                : 'border-edge bg-elevated text-soft hover:text-ink',
+          )}
+        >
+          {label}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
   )
 }
 

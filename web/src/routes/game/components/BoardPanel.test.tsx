@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { MoveRow } from '@/lib/api/types'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import type { GameRunSummary, MoveRow, RunResponse } from '@/lib/api/types'
 
 import type { MaiaLevel, PlyPosition } from '../gameModel'
 import { BoardPanel } from './BoardPanel'
@@ -56,26 +57,53 @@ function arrows(): string[] {
 
 function renderPanel(props: Partial<Parameters<typeof BoardPanel>[0]> = {}) {
   const onSeek = vi.fn()
+  const onRequestDeep = vi.fn()
   const view = render(
-    <BoardPanel
-      position={AFTER_E4}
-      orientation="white"
-      lastMove={undefined}
-      upcoming={BLUNDER}
-      engineBest="c7c6"
-      maia={null}
-      win={46}
-      score={{ cp: 40 }}
-      cursor={0}
-      plyCount={4}
-      hints
-      onHintsChange={vi.fn()}
-      onFlip={vi.fn()}
-      onSeek={onSeek}
-      {...props}
-    />,
+    <TooltipProvider delayDuration={0}>
+      <BoardPanel
+        position={AFTER_E4}
+        orientation="white"
+        lastMove={undefined}
+        upcoming={BLUNDER}
+        engineBest="c7c6"
+        maia={null}
+        win={46}
+        score={{ cp: 40 }}
+        cursor={0}
+        plyCount={4}
+        hints
+        onHintsChange={vi.fn()}
+        onFlip={vi.fn()}
+        onSeek={onSeek}
+        deepRun={null}
+        deepActiveRun={null}
+        deepProgress={null}
+        deepPending={false}
+        deepError={null}
+        onRequestDeep={onRequestDeep}
+        {...props}
+      />
+    </TooltipProvider>,
   )
-  return { onSeek, ...view }
+  return { onSeek, onRequestDeep, ...view }
+}
+
+const DEEP_RUN: GameRunSummary = {
+  id: 9,
+  tier: 'deep',
+  status: 'done',
+  multipv: 3,
+  finished_at: '2026-08-20T12:00:00Z',
+}
+
+const ACTIVE_RUN: RunResponse = {
+  id: 11,
+  tier: 'deep',
+  status: 'running',
+  multipv: 3,
+  priority: 0,
+  attempts: 0,
+  created_at: '2026-08-20T12:00:00Z',
 }
 
 describe('BoardPanel arrows', () => {
@@ -96,22 +124,30 @@ describe('BoardPanel arrows', () => {
     expect(arrows()).toEqual(['c7c6:accent', 'd7d5:paleMaia'])
 
     rerender(
-      <BoardPanel
-        position={AFTER_E4}
-        orientation="white"
-        lastMove={undefined}
-        upcoming={BLUNDER}
-        engineBest="d7d5"
-        maia={MAIA}
-        win={46}
-        score={{ cp: 40 }}
-        cursor={0}
-        plyCount={4}
-        hints
-        onHintsChange={vi.fn()}
-        onFlip={vi.fn()}
-        onSeek={vi.fn()}
-      />,
+      <TooltipProvider delayDuration={0}>
+        <BoardPanel
+          position={AFTER_E4}
+          orientation="white"
+          lastMove={undefined}
+          upcoming={BLUNDER}
+          engineBest="d7d5"
+          maia={MAIA}
+          win={46}
+          score={{ cp: 40 }}
+          cursor={0}
+          plyCount={4}
+          hints
+          onHintsChange={vi.fn()}
+          onFlip={vi.fn()}
+          onSeek={vi.fn()}
+          deepRun={null}
+          deepActiveRun={null}
+          deepProgress={null}
+          deepPending={false}
+          deepError={null}
+          onRequestDeep={vi.fn()}
+        />
+      </TooltipProvider>,
     )
     expect(arrows()).toEqual(['d7d5:accent'])
   })
@@ -156,9 +192,9 @@ describe('BoardPanel wheel', () => {
     const { onSeek } = renderPanel({ cursor: 1 })
     const board = screen.getByTestId('board')
 
-    for (let event = 0; event < 7; event += 1) fireEvent.wheel(board, { deltaY: 8 })
+    for (let event = 0; event < 3; event += 1) fireEvent.wheel(board, { deltaY: 3 })
     expect(onSeek).not.toHaveBeenCalled()
-    fireEvent.wheel(board, { deltaY: 8 })
+    fireEvent.wheel(board, { deltaY: 3 })
     expect(onSeek).toHaveBeenCalledTimes(1)
     expect(onSeek).toHaveBeenCalledWith(2)
 
@@ -168,11 +204,61 @@ describe('BoardPanel wheel', () => {
     expect(onSeek).toHaveBeenLastCalledWith(2)
   })
 
+  it('steps once per discrete wheel tick, tuned to a mouse’s ~15px-per-notch delta', () => {
+    const { onSeek } = renderPanel({ cursor: 1 })
+    const board = screen.getByTestId('board')
+
+    fireEvent.wheel(board, { deltaY: 15 })
+    fireEvent.wheel(board, { deltaY: 15 })
+    fireEvent.wheel(board, { deltaY: 15 })
+    expect(onSeek).toHaveBeenCalledTimes(3)
+    expect(onSeek).toHaveBeenNthCalledWith(1, 2)
+    expect(onSeek).toHaveBeenNthCalledWith(2, 2)
+    expect(onSeek).toHaveBeenNthCalledWith(3, 2)
+  })
+
   it('leaves a pinch-zoom alone', () => {
     const { onSeek } = renderPanel({ cursor: 1 })
     expect(fireEvent.wheel(screen.getByTestId('board'), { deltaY: 120, ctrlKey: true })).toBe(
       true,
     )
     expect(onSeek).not.toHaveBeenCalled()
+  })
+})
+
+describe('BoardPanel deep-analysis button', () => {
+  it('is idle when there is no run and none has ever finished', () => {
+    const { onRequestDeep } = renderPanel()
+    const button = screen.getByRole('button', { name: 'Deep' })
+    expect(button).toBeEnabled()
+
+    fireEvent.click(button)
+    expect(onRequestDeep).toHaveBeenCalledTimes(1)
+  })
+
+  it('is disabled and shows progress while a run is queued or running', () => {
+    renderPanel({
+      deepActiveRun: ACTIVE_RUN,
+      deepProgress: { done: 27, total: 50 },
+    })
+    // `54%` replaces the idle label while the run is live.
+    const button = screen.getByRole('button', { name: '54%' })
+    expect(button).toBeDisabled()
+  })
+
+  it('stays disabled without a percent when no progress frame has arrived yet', () => {
+    renderPanel({ deepActiveRun: ACTIVE_RUN })
+    const button = screen.getByRole('button', { name: 'Deep' })
+    expect(button).toBeDisabled()
+  })
+
+  it('shows a done state once a deep run has finished, and stays clickable to re-run', () => {
+    const { onRequestDeep } = renderPanel({ deepRun: DEEP_RUN })
+    const button = screen.getByRole('button', { name: 'Deep' })
+    expect(button).toBeEnabled()
+    expect(button.className).toContain('accent-teal')
+
+    fireEvent.click(button)
+    expect(onRequestDeep).toHaveBeenCalledTimes(1)
   })
 })

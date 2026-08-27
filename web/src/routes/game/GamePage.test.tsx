@@ -240,6 +240,13 @@ describe('GamePage', () => {
     // Engine lines describe the position on the board, from the run that produced them.
     expect(screen.getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('MPV 3')).toBeInTheDocument()
+
+    // The deep-analysis trigger lives in the board's transport row now, next to Flip and
+    // Hints, rather than as a card of its own further down the column.
+    const deepButton = screen.getByRole('button', { name: 'Deep' })
+    expect(
+      screen.getByRole('button', { name: '⇅ Flip' }).parentElement?.contains(deepButton),
+    ).toBe(true)
   })
 
   it('puts the multi-PV box over the move table once a deep pass has run', async () => {
@@ -250,11 +257,6 @@ describe('GamePage', () => {
     const moveButton = screen.getByRole('button', { name: 'Qxd5' })
     // A finished deep run is in the payload, so the lines lead the column.
     expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-
-    // The deep-analysis trigger moved out of the notes column and in with the lines.
-    const trigger = screen.getByRole('button', { name: 'Request deep analysis' })
-    expect(screen.getByText('via MCP').closest('button')?.contains(trigger)).toBeFalsy()
-    expect(engine.parentElement?.contains(trigger)).toBe(true)
   })
 
   it('leaves the move table on top while nothing has been analysed', async () => {
@@ -372,12 +374,12 @@ describe('GamePage', () => {
     const { rerender } = renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.click(screen.getByRole('button', { name: 'Request deep analysis' }))
+    await user.click(screen.getByRole('button', { name: 'Deep' }))
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0].url).toContain('/analysis')
     expect(posted[0].body).toEqual({ game_id: 14, tier: 'deep' })
 
-    // The run list now answers with the queued run; the card and the header follow it.
+    // The run list now answers with the queued run; the button and the header follow it.
     vi.stubGlobal('fetch', stubFetch({ '/analysis/runs': [QUEUED_RUN] }))
     rerender(<div />)
     renderPage()
@@ -388,38 +390,37 @@ describe('GamePage', () => {
 
   it('cannot be pressed into two deep passes while the run list catches up', async () => {
     // `POST /analysis` never dedupes, and `/analysis/runs` only learns about the run a
-    // debounced invalidation and a refetch later. Between the two the trigger must
-    // already be gone, or an impatient second click queues a whole second pass.
+    // debounced invalidation and a refetch later. Between the two the button must already
+    // be disabled, or an impatient second click queues a whole second pass.
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    const trigger = screen.getByRole('button', { name: 'Request deep analysis' })
+    const trigger = screen.getByRole('button', { name: 'Deep' })
     await user.click(trigger)
     await waitFor(() => expect(posted).toHaveLength(1))
 
-    // The run list still answers with [] — only the mutation's own run stands in.
-    expect(screen.queryByRole('button', { name: 'Request deep analysis' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Quick' })).toBeNull()
-    expect(screen.getByText('run #21')).toBeInTheDocument()
+    // The run list still answers with [] — only the mutation's own run stands in, and the
+    // button is disabled while it is active.
+    expect(trigger).toBeDisabled()
 
-    // The button element the user was pointing at is detached; clicking it again is not
-    // a second request.
+    // Clicking a disabled button is not a second request.
     await user.click(trigger).catch(() => {})
     expect(posted).toHaveLength(1)
   })
 
-  it('follows only the run the card is tracking through the progress frames', async () => {
+  it('follows only the run the button is tracking through the progress frames', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.click(screen.getByRole('button', { name: 'Request deep analysis' }))
+    await user.click(screen.getByRole('button', { name: 'Deep' }))
     await waitFor(() => expect(posted).toHaveLength(1))
-    // The mutation's own run stands in until the run list catches up: run 21, deep.
-    expect(await screen.findByText('run #21')).toBeInTheDocument()
+    // The mutation's own run stands in until the run list catches up: run 21, deep. No
+    // progress frame has arrived yet, so the button just sits disabled.
+    expect(screen.getByRole('button', { name: 'Deep' })).toBeDisabled()
 
     const socket = SilentSocket.instances.at(-1)!
-    // The quick pass an import auto-queued over the same game is not this card's run.
+    // The quick pass an import auto-queued over the same game is not this button's run.
     socket.emit({
       event: 'analysis.progress',
       run_id: 99,
@@ -429,8 +430,8 @@ describe('GamePage', () => {
       done: 2,
       total: 4,
     })
-    expect(screen.getByText('run #21')).toBeInTheDocument()
-    expect(screen.queryByText('2/4')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deep' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: '50%' })).toBeNull()
 
     socket.emit({
       event: 'analysis.progress',
@@ -441,7 +442,7 @@ describe('GamePage', () => {
       done: 3,
       total: 4,
     })
-    expect(screen.getByText('3/4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '75%' })).toBeInTheDocument()
 
     // …and the quick run finishing does not wipe the deep run's counter.
     socket.emit({
@@ -451,7 +452,7 @@ describe('GamePage', () => {
       tier: 'quick',
       status: 'done',
     })
-    expect(screen.getByText('3/4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '75%' })).toBeInTheDocument()
   })
 
   it('tells a 404 apart from a failure', async () => {
@@ -488,9 +489,9 @@ describe('GamePage', () => {
     expect(screen.getByText('No engine lines for this position.')).toBeInTheDocument()
     expect(screen.getByText(/No notes on this game yet/)).toBeInTheDocument()
     expect(screen.getByText('No engine run')).toBeInTheDocument()
-    // The deep pass is the obvious next thing to do, so the card offers it rather than
-    // describing a run that has already happened.
-    expect(screen.getByRole('button', { name: 'Request deep analysis' })).toBeInTheDocument()
+    // The deep pass is the obvious next thing to do, so the button is idle and enabled
+    // rather than describing a run that has already happened.
+    expect(screen.getByRole('button', { name: 'Deep' })).toBeEnabled()
   })
 
   it('offers a live search under the stored run, and opens one when asked', async () => {

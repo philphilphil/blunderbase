@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useStreamSession } from '@/lib/analysis'
-import { useGame, useRequestAnalysis, useRuns, useWorstMoments } from '@/lib/api/queries'
-import type { MoveRow, RunResponse, Tier } from '@/lib/api/types'
+import { useGame, useWorstMoments } from '@/lib/api/queries'
+import type { MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
-import { useEventListener } from '@/lib/events/EventsProvider'
-import type { AnalysisProgressEvent, AnalysisRunEvent } from '@/lib/events/types'
 
 import { BoardPanel } from './components/BoardPanel'
-import { DeepAnalysisCard, type RunProgress } from './components/DeepAnalysisCard'
 import { EnginePanel } from './components/EnginePanel'
 import { EvalGraph } from './components/EvalGraph'
 import { GameHeaderBar } from './components/GameHeaderBar'
@@ -43,16 +40,18 @@ import {
 } from './gameModel'
 import { buildPgn } from './pgn'
 import { useBoardKeys } from './useBoardKeys'
+import { useDeepAnalysis } from './useDeepAnalysis'
 
 /** The window `/stats/worst-moments` is asked about for the recurring-mistake card. */
 const RECURRING_DAYS = 30
 const RECURRING_SAMPLE = 100
 
 /**
- * Design 1a "Studio": board with its eval bar and a short eval curve on the left; the
- * paired move table with everything said about the position on the board stacked under it
- * — the run's multi-PV lines, the deep-analysis trigger, the live search, Maia — in the
- * middle; the coach's notes and the recurring-mistake card on the right.
+ * Design 1a "Studio": board with its eval bar, transport row (with the deep-analysis
+ * trigger) and a short eval curve on the left; the paired move table with everything said
+ * about the position on the board stacked under it — the run's multi-PV lines, the live
+ * search, Maia — in the middle; the coach's notes and the recurring-mistake card on the
+ * right.
  *
  * The cursor is the ply *last played* (`-1` is the starting position). Everything about the
  * position on the board — the engine lines, Maia's prediction, the flagged-move marks —
@@ -72,30 +71,18 @@ export function GamePage() {
 
 function GameStudio({ gameId }: { gameId: number }) {
   const game = useGame(gameId, { notes: true })
-  const runs = useRuns(gameId)
   const moments = useWorstMoments({ days: RECURRING_DAYS, amount: RECURRING_SAMPLE })
-  const analysis = useRequestAnalysis()
+  const deepAnalysis = useDeepAnalysis(gameId)
 
   const [cursor, setCursor] = useState(-1)
   const [flipped, setFlipped] = useState(false)
   const [hints, setHints] = useState(true)
   /** The first move of the engine line being pointed at, previewed on the board. */
   const [hoverMove, setHoverMove] = useState<string | null>(null)
-  /** The last `analysis.progress` frame, tagged with the run it belongs to. */
-  const [progress, setProgress] = useState<(RunProgress & { runId: number }) | null>(null)
-  /** The run `POST /analysis` just returned, until `useRuns` reports it. See `activeRun`. */
-  const [requested, setRequested] = useState<RunResponse | null>(null)
 
   const detail = game.data
   const moves = useMemo<MoveRow[]>(() => detail?.moves ?? [], [detail])
   const plyCount = moves.length
-
-  const requestAnalysis = useCallback(
-    (tier: Tier) => {
-      analysis.mutate({ game_id: gameId, tier }, { onSuccess: (run) => setRequested(run) })
-    },
-    [analysis, gameId],
-  )
 
   const seek = useCallback(
     (next: number) => {
@@ -169,50 +156,6 @@ function GameStudio({ gameId }: { gameId: number }) {
       bestSan: best,
     }
   }, [line, played, upcoming])
-
-  const listedRun = useMemo<RunResponse | null>(
-    () => runs.data?.find((run) => run.status === 'queued' || run.status === 'running') ?? null,
-    [runs.data],
-  )
-  // `POST /analysis` never dedupes ("re-analysis is always a new run"), and the run list
-  // only catches up a refetch later — the socket invalidation is debounced on top of that.
-  // The run the mutation just returned stands in until the list has it, so the button
-  // cannot be pressed twice into two full passes over the same game.
-  useEffect(() => {
-    if (requested && runs.data?.some((run) => run.id === requested.id)) setRequested(null)
-  }, [requested, runs.data])
-  const activeRun = listedRun ?? requested
-  const activeRunId = activeRun?.id ?? null
-
-  // Live run status. `analysis.progress` is not a cache invalidation — it arrives once per
-  // analysed ply — so the counter is read straight off the socket.
-  //
-  // Guarded on the run, not only the game: two runs over one game are ordinary (an import
-  // auto-queues a quick pass, and the deep button can be pressed while that is still
-  // going), and a listener that checked `game_id` alone would interleave two counters into
-  // one bar and let whichever run finished first clear the other one's progress.
-  const tracksRun = (frame: AnalysisRunEvent | AnalysisProgressEvent) =>
-    frame.game_id === gameId && activeRunId !== null && frame.run_id === activeRunId
-
-  useEventListener('analysis.progress', (event) => {
-    const frame = event as AnalysisProgressEvent
-    if (!tracksRun(frame)) return
-    setProgress({ runId: frame.run_id, done: frame.done, total: frame.total })
-  })
-  useEventListener('analysis.done', (event) => {
-    if (!tracksRun(event as AnalysisRunEvent)) return
-    setProgress(null)
-  })
-  useEventListener('analysis.failed', (event) => {
-    if (!tracksRun(event as AnalysisRunEvent)) return
-    setProgress(null)
-  })
-  // The counter belongs to one run, so a different run taking the card over starts empty
-  // rather than inheriting the last frame of the one before it.
-  const runProgress: RunProgress | null =
-    progress && progress.runId === activeRunId
-      ? { done: progress.done, total: progress.total }
-      : null
 
   const finishedRuns = useMemo(() => detail?.runs ?? [], [detail])
   const best = useMemo(() => bestRun(finishedRuns), [finishedRuns])
@@ -313,7 +256,7 @@ function GameStudio({ gameId }: { gameId: number }) {
           ~20px at the new scale.
         */}
         <div className="flex min-w-[24rem] shrink-[2] grow-0 basis-[32.75rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem]">
-          <GameHeaderBar game={detail.game} best={best} active={activeRun} />
+          <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
           <BoardPanel
             position={position}
             orientation={orientation}
@@ -330,6 +273,12 @@ function GameStudio({ gameId }: { gameId: number }) {
             onHintsChange={setHints}
             onFlip={() => setFlipped((value) => !value)}
             onSeek={seek}
+            deepRun={deepRun}
+            deepActiveRun={deepAnalysis.activeRun}
+            deepProgress={deepAnalysis.progress}
+            deepPending={deepAnalysis.pending}
+            deepError={deepAnalysis.error}
+            onRequestDeep={deepAnalysis.request}
           />
           <EvalGraph
             points={curve}
@@ -357,21 +306,10 @@ function GameStudio({ gameId }: { gameId: number }) {
             Three panels, three different claims about the same position: the stored run
             says what an analysis pass concluded about the move that was played, the live
             search says what an engine is finding right now, and Maia says what a human of
-            this rating would play. Stacked, never merged — and the deep-analysis trigger
-            sits with them, next to the lines it would deepen, rather than in the notes.
+            this rating would play. Stacked, never merged. The deep-analysis trigger lives
+            in the board's transport row now, rather than down here.
           */}
           {deepRun ? null : enginePanel}
-          <div className="flex-none border-t border-hairline bg-panel p-3">
-            <DeepAnalysisCard
-              deepRun={deepRun}
-              activeRun={activeRun}
-              progress={runProgress}
-              pending={analysis.isPending}
-              error={analysis.error}
-              onRequestDeep={() => requestAnalysis('deep')}
-              onRequestQuick={() => requestAnalysis('quick')}
-            />
-          </div>
           <InfiniteAnalysisPanel
             stream={stream}
             fen={position.fen}
