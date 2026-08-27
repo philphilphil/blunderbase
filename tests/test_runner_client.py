@@ -889,3 +889,43 @@ def test_the_entrypoint_answers_version_without_a_configuration() -> None:
         entrypoint.main(["--version"])
 
     assert exited.value.code == 0
+
+
+# --- dialling out ----------------------------------------------------------------
+
+
+def test_open_socket_only_passes_ssl_for_the_unverified_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """websockets>=14 reads an explicit `ssl=None` as "no TLS" and refuses it for wss://,
+    so the ordinary verified connection must leave the argument out entirely."""
+    import ssl as ssl_module
+
+    import websockets.asyncio.client
+
+    from backend.runners.client import open_socket
+
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def fake_connect(uri: str, **kwargs: Any) -> object:
+        calls.append((uri, kwargs))
+        return object()
+
+    monkeypatch.setattr(websockets.asyncio.client, "connect", fake_connect)
+
+    def dial(server: str, **changes: Any) -> tuple[str, dict[str, Any]]:
+        config = config_for(server, "bb_rnr_token", tmp_path, **changes)
+        asyncio.run(open_socket(config))
+        return calls[-1]
+
+    uri, kwargs = dial("https://blunderbase.example")
+    assert uri == "wss://blunderbase.example/runner/ws"
+    assert "ssl" not in kwargs
+
+    uri, kwargs = dial("http://blunderbase.example")
+    assert uri == "ws://blunderbase.example/runner/ws"
+    assert "ssl" not in kwargs
+
+    uri, kwargs = dial("https://blunderbase.example", verify_tls=False)
+    assert isinstance(kwargs["ssl"], ssl_module.SSLContext)
+    assert kwargs["ssl"].verify_mode == ssl_module.CERT_NONE

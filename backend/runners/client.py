@@ -134,13 +134,18 @@ async def open_socket(config: RunnerConfig) -> Any:
     """Dial the server's `/runner/ws`, bearer token and all."""
     from websockets.asyncio.client import connect
 
-    return await connect(
-        config.ws_url,
-        additional_headers=bearer(config.token),
-        ssl=_ssl_context(config),
-        open_timeout=CONNECT_TIMEOUT,
-        max_size=MAX_FRAME,
-    )
+    options: dict[str, Any] = {
+        "additional_headers": bearer(config.token),
+        "open_timeout": CONNECT_TIMEOUT,
+        "max_size": MAX_FRAME,
+    }
+    # Only an *unverified* context is ever passed. An explicit `ssl=None` is not "use the
+    # default" to websockets>=14 but "no TLS", which it refuses for a wss:// URI — the
+    # ordinary verified case has to leave the argument out altogether.
+    context = _ssl_context(config)
+    if context is not None:
+        options["ssl"] = context
+    return await connect(config.ws_url, **options)
 
 
 def open_http(config: RunnerConfig) -> Any:
@@ -157,7 +162,7 @@ def bearer(token: str) -> dict[str, str]:
 
 
 def _ssl_context(config: RunnerConfig) -> ssl.SSLContext | None:
-    """None for `ws://` and for ordinary `wss://`; an unverified context only if asked.
+    """None — meaning don't pass one — except the unverified context, only if asked.
 
     `verify_tls: false` exists for a runner reaching a server behind a private certificate
     authority. It is a deliberate hole and the docs say so.
