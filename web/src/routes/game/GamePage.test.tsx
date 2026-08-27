@@ -265,9 +265,9 @@ describe('GamePage', () => {
     expect(screen.getByTestId('board').querySelectorAll('piece:not(.ghost)')).toHaveLength(32)
     expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
 
-    // Engine lines describe the position on the board, from the run that produced them.
-    // The dual panel names the same engine over its own column, so there are two.
-    expect(within(screen.getByTestId('engine-panel')).getByText('stockfish')).toBeInTheDocument()
+    // Engine lines describe the position on the board, from the run that produced them —
+    // named, with its spend, over the engine column of the one box that carries them.
+    expect(within(screen.getByTestId('maia-panel')).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('MPV 3')).toBeInTheDocument()
 
     // The deep-analysis trigger lives in the board's transport row now, next to Flip and
@@ -282,7 +282,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    const engine = screen.getByTestId('engine-panel')
+    const engine = screen.getByTestId('maia-panel')
     const moveButton = screen.getByRole('button', { name: 'Qxd5' })
     // A finished deep run is in the payload, so the lines lead the column.
     expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -296,7 +296,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    const engine = screen.getByTestId('engine-panel')
+    const engine = screen.getByTestId('maia-panel')
     const moveButton = screen.getByRole('button', { name: 'Qxd5' })
     expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
   })
@@ -529,7 +529,7 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
 
     // Two panels, two claims: what the run concluded, and what an engine could find now.
-    expect(within(screen.getByTestId('engine-panel')).getByText('stockfish')).toBeInTheDocument()
+    expect(within(screen.getByTestId('maia-panel')).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('Analyse this position continuously.')).toBeInTheDocument()
     // Nothing is opened until the reader asks.
     expect(streamCalls).toHaveLength(0)
@@ -712,14 +712,33 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
     await user.keyboard('j')
     // Stored data is still there — the 409 is only about positions nobody analysed.
-    expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1500')
 
     await user.click(screen.getByTestId('maia-played-row'))
     await waitFor(() =>
       expect(posted.filter((call) => call.url.includes('/maia/policy'))).toHaveLength(1),
     )
-    // Degrade, don't error: the card goes, the analysis board stays.
-    await waitFor(() => expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument())
+    // Degrade, don't error: the human column goes, the box and the analysis board stay.
+    await waitFor(() => expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument())
+    const panel = screen.getByTestId('maia-panel')
+    expect(panel).not.toHaveTextContent('Maia')
+    expect(within(panel).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
+  })
+
+  it('keeps the run’s own findings when the hints are switched off', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    const panel = () => screen.getByTestId('maia-panel')
+    expect(panel()).toHaveTextContent('Maia 1500')
+
+    // Hints are about the human half — what the engine found is not a hint.
+    await user.click(screen.getByRole('button', { name: 'Hints' }))
+    expect(panel()).not.toHaveTextContent('Maia')
+    expect(within(panel()).getByText('stockfish')).toBeInTheDocument()
+    expect(screen.getByText('played')).toBeInTheDocument()
   })
 })

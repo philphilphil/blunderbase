@@ -90,7 +90,7 @@ describe('snapshotFrom', () => {
 
   it('flips a Black-to-move frame into White’s point of view', () => {
     // The wire is side-to-move relative (`adapters/infinite.py` povs every score); every
-    // evaluation this app draws — `EnginePanel` directly above this one included — is
+    // evaluation this app draws — `MaiaPanel`'s engine column included — is
     // White-relative, and two panels printing opposite signs for one position is the bug.
     const frame: StreamSnapshotEvent = {
       event: 'stream.snapshot',

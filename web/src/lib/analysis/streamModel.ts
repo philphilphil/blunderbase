@@ -4,12 +4,12 @@
  * One convention the backend fixes and this module undoes: a snapshot line's `cp`/`mate` is
  * from the **side to move**'s point of view (contracts §1.3 — `adapters/infinite.py` flips
  * every score with `.pov(board.turn)` before it goes on the wire). Everything the app draws
- * is White-relative: the eval graph, the move list, and `EnginePanel` — whose lines are
- * `MoveEval.best_lines`, which `adapters/stockfish.py` writes in White's frame and nothing
- * flips. The live panel sits directly under `EnginePanel` on the game page, so a snapshot
- * kept in the engine's frame would have the two of them print opposite signs for the same
- * position and the same engine on every Black-to-move ply. `snapshotFrom` therefore flips
- * the lines into White's frame, using the frame's *own* FEN to decide.
+ * is White-relative: the eval graph, the move list, and `MaiaPanel`'s engine column — whose
+ * lines are `MoveEval.best_lines`, which `adapters/stockfish.py` writes in White's frame and
+ * nothing flips. The live panel shares the move-list column with that box on the game page,
+ * so a snapshot kept in the engine's frame would have the two of them print opposite signs
+ * for the same position and the same engine on every Black-to-move ply. `snapshotFrom`
+ * therefore flips the lines into White's frame, using the frame's *own* FEN to decide.
  */
 import { Chess, normalizeMove } from 'chessops/chess'
 import { parseFen } from 'chessops/fen'

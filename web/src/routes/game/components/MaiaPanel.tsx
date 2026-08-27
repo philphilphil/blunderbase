@@ -1,18 +1,17 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
-import { useState } from 'react'
-
-import { glyphStyle } from '@/lib/chess/classification'
-import { formatScore, formatWinLoss } from '@/lib/chess/evaluation'
+import type { GameRunSummary } from '@/lib/api/types'
+import { glyphStyle, isFlagged } from '@/lib/chess/classification'
+import { formatNodes, formatScore, formatWinLoss } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
-import type { EngineLineView, HumanMoveView, MaiaMove } from '../gameModel'
+import { plyLabel, type EngineLineView, type HumanMoveView, type MaiaMove } from '../gameModel'
 
 /** The human column's own colour — the purple `docs/design/README.md` gives Maia. */
 const MAIA_HUE = 'var(--bb-brilliant)'
 
 /**
- * A token colour at a fraction of its opacity, mixed rather than hex-suffixed so it stays
- * right in both themes (the same trick `EnginePanel` uses).
+ * A token colour at a fraction of its opacity. The colours are `var(--bb-…)` tokens, so the
+ * design's `rgba(240,82,74,.06)` tints have to be mixed rather than written as a hex-alpha
+ * suffix — and mixing keeps them right in both themes, where the token itself changes.
  */
 function tint(color: string, percent: number): string {
   return `color-mix(in srgb, ${color} ${percent}%, transparent)`
@@ -30,10 +29,16 @@ export interface MaiaPanelProps {
   rating: string | null
   /** The human column, already crossed with the engine's verdicts (`humanMoves`). */
   human: HumanMoveView[]
+  /**
+   * Whether the human column is drawn at all. Off — the `hints` toggle, or a deployment
+   * with no Maia to ask — the engine column stands alone across the box, because what the
+   * run found is not a hint and must not vanish with them.
+   */
+  showHuman?: boolean
   /** The engine's ranking of the same position; empty off the game line. */
   engine: EngineLineView[]
-  /** Whichever engine produced those lines. Defaults to the one the design names. */
-  engineName?: string | null
+  /** The run those lines came from, whose spend the engine column's header reports. */
+  run?: GameRunSummary | null
   /** The ply the position sits at, for numbering a rollout. */
   ply: number
   /** Set while the board is off the game line: the panel is reading a live query. */
@@ -57,25 +62,25 @@ export interface MaiaPanelProps {
  *
  * On the game line the human column is stored data, instant. Off it, the board is an
  * analysis board and the column is a live query — see `useLiveMaia`.
+ *
+ * The engine column is also the run's own box: which run is speaking, what it spent, and
+ * its multi-PV lines for the position on the board, with the move actually played as the
+ * last row, marked `played`, so a blunder reads as "these were the options, this happened".
  */
 export function MaiaPanel({
   rating,
   human,
+  showHuman = true,
   engine,
-  engineName,
+  run,
   ply,
   live,
   onHoverMove,
   onPlayLine,
   className,
 }: MaiaPanelProps) {
-  // An expansion belongs to the position it was opened in, so it is keyed by position:
-  // the next position matches no key and starts collapsed, with no effect to run.
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const keyOf = (multipv: number) => `${rating ?? ''}:${ply}:${multipv}`
-
   const rollout = live?.rollout ?? []
-  if (human.length === 0 && engine.length === 0 && !live?.pending) return null
+  const nodes = formatNodes(run?.nodes)
 
   return (
     <div
@@ -85,53 +90,73 @@ export function MaiaPanel({
       )}
       data-testid="maia-panel"
     >
-      <div className="grid grid-cols-2 divide-x divide-line">
-        <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
-          <div className="flex items-center gap-[0.4375rem]">
-            <span className="size-1.5 flex-none rounded-full bg-brilliant" />
-            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-              {rating ? `Maia ${rating}` : 'Maia'}
-            </span>
-            <span className="truncate font-mono text-[0.625rem] text-faint">human</span>
-            <div className="flex-1" />
-            {live ? <LivePill pending={live.pending} /> : null}
-          </div>
-
-          {human.length === 0 ? (
-            <p className="py-2 text-[0.6875rem] text-dim">
-              {live?.pending ? 'Reading this position…' : 'No human model for this position.'}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {human.map((move) => (
-                <HumanRow
-                  key={move.uci}
-                  move={move}
-                  onHoverMove={onHoverMove}
-                  onPlay={onPlayLine ? () => onPlayLine([move.uci]) : undefined}
-                />
-              ))}
+      <div className={cn('grid divide-x divide-line', showHuman ? 'grid-cols-2' : 'grid-cols-1')}>
+        {showHuman ? (
+          <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
+            <div className="flex items-center gap-[0.4375rem]">
+              <span className="size-1.5 flex-none rounded-full bg-brilliant" />
+              <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+                {rating ? `Maia ${rating}` : 'Maia'}
+              </span>
+              <span className="truncate font-mono text-[0.625rem] text-faint">human</span>
+              <div className="flex-1" />
+              {live ? <LivePill pending={live.pending} /> : null}
             </div>
-          )}
 
-          {live && rollout.length > 0 ? (
-            <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
-          ) : null}
-        </section>
+            {human.length === 0 ? (
+              <p className="py-2 text-[0.6875rem] text-dim">
+                {live?.pending ? 'Reading this position…' : 'No human model for this position.'}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {human.map((move) => (
+                  <HumanRow
+                    key={move.uci}
+                    move={move}
+                    onHoverMove={onHoverMove}
+                    onPlay={onPlayLine ? () => onPlayLine([move.uci]) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+
+            {live && rollout.length > 0 ? (
+              <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="flex min-w-0 flex-col gap-2 px-3 py-2.5">
-          <div className="flex items-center gap-[0.4375rem]">
-            <span className="size-1.5 flex-none rounded-full bg-accent-teal" />
+          <div className="flex flex-wrap items-center gap-[0.4375rem]">
+            <span
+              className={cn(
+                'size-1.5 flex-none rounded-full',
+                run ? 'bg-accent-teal' : 'bg-edge-strong',
+              )}
+            />
             <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-              {engineName || 'Stockfish'}
+              {run?.engine ?? 'No engine run'}
             </span>
-            <span className="truncate font-mono text-[0.625rem] text-faint">engine</span>
+            {/* The run's kind takes the label slot where there is a run to name. */}
+            <span className="truncate font-mono text-[0.625rem] uppercase text-faint">
+              {run?.engine_kind ?? 'engine'}
+            </span>
+            <div className="flex-1" />
+            {run?.depth ? (
+              <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
+            ) : null}
+            {nodes !== '—' ? (
+              <span className="font-mono text-[0.625rem] tabular text-dim">{nodes} nodes</span>
+            ) : null}
+            {run?.multipv ? (
+              <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
+                MPV {run.multipv}
+              </span>
+            ) : null}
           </div>
 
           {engine.length === 0 ? (
-            <p className="py-2 text-[0.6875rem] text-dim">
-              No stored engine lines for this position.
-            </p>
+            <p className="py-2 text-[0.6875rem] text-dim">No engine lines for this position.</p>
           ) : (
             <div className="flex flex-col gap-1">
               {engine.map((line) => (
@@ -139,12 +164,6 @@ export function MaiaPanel({
                   key={`${line.multipv}-${line.firstUci ?? 'x'}`}
                   line={line}
                   ply={ply}
-                  open={expanded === keyOf(line.multipv)}
-                  onToggle={() =>
-                    setExpanded((current) =>
-                      current === keyOf(line.multipv) ? null : keyOf(line.multipv),
-                    )
-                  }
                   onHoverMove={onHoverMove}
                   onPlayLine={onPlayLine}
                 />
@@ -237,74 +256,77 @@ function HumanRow({
   )
 }
 
-/** One engine line: its eval and its first move, expandable to the stored PV. */
+/**
+ * One engine line: its eval, then the whole variation, wrapped. Clicking the Nth move plays
+ * the line up to it onto the analysis board.
+ *
+ * A played move is only drawn in its own colour when the engine had something against it:
+ * playing the top line is not a warning, and `best` is a compliment, so only the flagged
+ * classifications tint the row.
+ */
 function EngineRow({
   line,
   ply,
-  open,
-  onToggle,
   onHoverMove,
   onPlayLine,
 }: {
   line: EngineLineView
   ply: number
-  open: boolean
-  onToggle: () => void
   onHoverMove?: (uci: string | null) => void
   onPlayLine?: (ucis: string[]) => void
 }) {
-  const verdict = line.played ? glyphStyle(line.classification) : null
-  const rest = line.sans.length > 1
-  const Chevron = open ? ChevronDown : ChevronRight
+  const verdict = line.played && isFlagged(line.classification) ? glyphStyle(line.classification) : null
 
   return (
     <div
+      data-testid={line.played ? 'engine-played-line' : undefined}
       onMouseEnter={() => onHoverMove?.(line.firstUci)}
       onMouseLeave={() => onHoverMove?.(null)}
-      className="flex flex-col"
+      title={line.text || plyLabel(ply)}
+      className={cn(
+        'flex items-baseline gap-1.5 rounded-[0.25rem] px-1 py-[0.1875rem]',
+        verdict ? null : 'hover:bg-raised',
+      )}
+      style={verdict ? { background: tint(verdict.color, 6) } : undefined}
     >
-      <div className="flex items-center gap-1.5 rounded-[0.25rem] px-1 py-[0.1875rem]">
-        <span
-          className={cn(
-            'min-w-[2.5rem] flex-none rounded-[0.1875rem] px-1 py-px text-right font-mono text-[0.625rem] tabular',
-            verdict ? '' : line.multipv === 1 ? 'bg-cell-strong text-ink-2' : 'bg-cell text-body-3',
-          )}
-          style={
-            verdict ? { background: tint(verdict.color, 13), color: verdict.color } : undefined
-          }
-        >
-          {formatScore(line.score)}
-        </span>
-        <MoveButton
-          san={line.sans[0] ?? '—'}
-          className={cn('min-w-0 flex-1 text-left', verdict?.textClass)}
-          onPlay={onPlayLine && line.pv.length > 0 ? () => onPlayLine(line.pv.slice(0, 1)) : undefined}
-        />
-        {rest ? (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={open}
-            aria-label={open ? 'Hide the line' : 'Show the line'}
-            className="flex-none rounded-[0.1875rem] text-dim hover:text-ink"
-          >
-            <Chevron className="size-3.5" aria-hidden />
-          </button>
-        ) : null}
-      </div>
-
-      {open && rest ? (
-        <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 px-1 pb-1 pl-[3.25rem]">
-          {line.sans.map((san, index) => (
+      <span
+        className={cn(
+          'min-w-[2.5rem] flex-none rounded-[0.1875rem] px-1 py-px text-right font-mono text-[0.625rem] tabular',
+          verdict ? '' : line.multipv === 1 ? 'bg-cell-strong text-ink-2' : 'bg-cell text-body-3',
+        )}
+        style={verdict ? { background: tint(verdict.color, 13), color: verdict.color } : undefined}
+      >
+        {formatScore(line.score)}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
+        {line.sans.length === 0 ? (
+          <span className="font-mono text-[0.6875rem] text-soft">—</span>
+        ) : (
+          line.sans.map((san, index) => (
             <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
               <PlyNumber ply={ply + index} first={index === 0} />
               <MoveButton
                 san={san}
+                // The verdict belongs to the move that was played, which is the first one.
+                className={index === 0 ? verdict?.textClass : undefined}
                 onPlay={onPlayLine ? () => onPlayLine(line.pv.slice(0, index + 1)) : undefined}
               />
             </span>
-          ))}
-        </div>
+          ))
+        )}
+      </div>
+      {line.played ? (
+        <span
+          className={cn(
+            'flex-none rounded-[0.1875rem] border px-1 py-px font-mono text-[0.59375rem]',
+            verdict ? '' : 'border-edge text-dim',
+          )}
+          style={
+            verdict ? { borderColor: tint(verdict.color, 35), color: verdict.color } : undefined
+          }
+        >
+          played
+        </span>
       ) : null}
     </div>
   )

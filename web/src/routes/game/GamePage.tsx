@@ -10,7 +10,6 @@ import { isFlagged } from '@/lib/chess/classification'
 
 import { buildAnalysisLine, withBoardMove } from './analysisLine'
 import { BoardPanel } from './components/BoardPanel'
-import { EnginePanel } from './components/EnginePanel'
 import { EvalGraph } from './components/EvalGraph'
 import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
@@ -293,17 +292,27 @@ function GameStudio({ gameId }: { gameId: number }) {
 
   const players = `${detail.game.white ?? '?'} — ${detail.game.black ?? '?'}`
 
-  // Once a deep pass has finished, the multi-PV box is the thing worth reading first about
-  // the position on the board, so it goes above the move table. Before that it has little
-  // to say, and the table keeps the top of the column.
-  const enginePanel = (
-    <EnginePanel
+  // Once a deep pass has finished, the multi-PV half of this box is the thing worth reading
+  // first about the position on the board, so it goes above the move table. Before that it
+  // has little to say, and the table keeps the top of the column.
+  //
+  // The human column beside the engine's own is what `hints` turns off; the run's own
+  // findings are not a hint and stay either way. Off the game line the human column is a
+  // live query, dropped entirely where the deployment has no Maia to ask
+  // (`live.unavailable`) rather than reporting a failure.
+  const maiaPanel = (
+    <MaiaPanel
+      rating={maia?.rating ?? null}
+      human={human}
+      showHuman={hints && !(exploring && live.unavailable)}
       run={engineRun}
-      // A stored run says nothing about a position it never saw: off the game line the box
-      // empties rather than describing the position the reader has left.
-      lines={exploring ? [] : lines}
+      // A stored run says nothing about a position it never saw: off the game line the
+      // column empties rather than describing the position the reader has left.
+      engine={exploring ? [] : lines}
       ply={analysisPly}
+      live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
       onHoverMove={setHoverMove}
+      onPlayLine={playLine}
       className={deepRun ? 'border-b border-t-0 border-hairline' : undefined}
     />
   )
@@ -368,7 +377,7 @@ function GameStudio({ gameId }: { gameId: number }) {
         </div>
 
         <div className="flex min-w-[16rem] flex-1 flex-col border-r border-hairline">
-          {deepRun ? enginePanel : null}
+          {deepRun ? maiaPanel : null}
           <MoveList
             pairs={pairs}
             cursor={cursor}
@@ -380,14 +389,6 @@ function GameStudio({ gameId }: { gameId: number }) {
             onSelectPly={selectPly}
             className="min-h-0 flex-1"
           />
-          {/*
-            Three panels, three different claims about the same position: the stored run
-            says what an analysis pass concluded about the move that was played, the live
-            search says what an engine is finding right now, and Maia says what a human of
-            this rating would play. Stacked, never merged. The deep-analysis trigger lives
-            in the board's transport row now, rather than down here.
-          */}
-          {deepRun ? null : enginePanel}
           <InfiniteAnalysisPanel
             stream={stream}
             fen={boardPosition.fen}
@@ -395,22 +396,12 @@ function GameStudio({ gameId }: { gameId: number }) {
             onHoverMove={setHoverMove}
           />
           {/*
-            The human column beside the engine's own, about the position on the board.
-            Off the game line it is a live query — hidden entirely where the deployment has
-            no Maia to ask (`live.unavailable`), rather than reporting a failure.
+            Two panels, two different claims about the same position: the live search says
+            what an engine is finding right now, and the box above (or below) it says what
+            the stored run concluded and what a human of this rating would play. The
+            deep-analysis trigger lives in the board's transport row now, rather than here.
           */}
-          {hints && !(exploring && live.unavailable) ? (
-            <MaiaPanel
-              rating={maia?.rating ?? null}
-              human={human}
-              engine={exploring ? [] : lines}
-              engineName={engineRun?.engine}
-              ply={analysisPly}
-              live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
-              onHoverMove={setHoverMove}
-              onPlayLine={playLine}
-            />
-          ) : null}
+          {deepRun ? null : maiaPanel}
         </div>
 
         <NotesColumn
