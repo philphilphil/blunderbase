@@ -1,4 +1,5 @@
 import type { Api } from '@lichess-org/chessground/api'
+import type { DrawShape } from '@lichess-org/chessground/draw'
 import { Check, Loader2, StickyNote, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 
@@ -40,6 +41,21 @@ export interface BoardPanelProps {
   engineBest: string | null
   /** A line being hovered in one of the engine panels, previewed as its own arrow. */
   hoverMove?: string | null
+  /**
+   * The engine-line preview (`lib/board/useLinePreview.ts`), which the page owns because it
+   * is read in one panel and drawn here.
+   *
+   * A `previewFen` is a position the game does not contain — a line scrubbed to one of its
+   * moves, or played out on the board — so while there is one, everything the panel says
+   * about the *real* position is a claim about a position the board has stepped off, and is
+   * left out. The eval bar, the score chip and the transport row are not: they describe the
+   * position the reader is still on, which is the one they will be back on in a moment.
+   */
+  previewFen?: string | null
+  previewShapes?: DrawShape[]
+  previewLastMove?: [string, string] | null
+  previewCaption?: string | null
+  previewDim?: boolean
   maia: MaiaLevel | null
   win: number | null
   score: Score | null
@@ -83,6 +99,11 @@ export interface BoardPanelProps {
  */
 const WHEEL_STEP = 10
 
+/** Whose move it is in a FEN, straight off its second field. */
+function turnOf(fen: string): Side {
+  return fen.split(/\s+/)[1] === 'b' ? 'black' : 'white'
+}
+
 /**
  * The board column's middle band: eval bar, board with its overlays, and the transport
  * toolbar. Square marks follow design 1c — the flagged move's two squares outlined in its
@@ -102,6 +123,11 @@ export function BoardPanel({
   upcoming,
   engineBest,
   hoverMove,
+  previewFen,
+  previewShapes,
+  previewLastMove,
+  previewCaption,
+  previewDim,
   maia,
   win,
   score,
@@ -201,6 +227,11 @@ export function BoardPanel({
   const exploring = (analysis?.cursor ?? 0) > 0
   const shown = exploring && analysis ? analysis.position : position
 
+  // A previewed position is not on the board's own line at all — it is a line being read,
+  // not one being walked — so the board is that position, unannotated: no marks, no engine
+  // or Maia arrow, nothing draggable. The preview's own shapes are all that is drawn on it.
+  const previewing = previewFen != null
+
   // chessground needs the legal destinations to accept a drag, and `Board` has no prop for
   // them — it publishes its `Api` for exactly this (the explorer does the same). `set`
   // deep-merges, so what is written here survives the wrapper's own calls.
@@ -251,25 +282,55 @@ export function BoardPanel({
         the column entire.
       */}
       <div className="flex items-start justify-center gap-2.5">
-        <EvalBar win={win} score={score} className="self-stretch" />
+        {/* The bar mirrors the board: the side at the bottom of one is at the bottom of the
+            other, so the reader's own side always grows towards them. */}
+        <EvalBar win={win} score={score} orientation={orientation} className="self-stretch" />
         {/* Nothing floats over the squares: Maia's prediction is a panel of its own, under
             the engine lines, and only its target square is marked here. */}
         <Board
           ref={boardApi}
-          fen={shown.fen}
+          fen={previewing ? previewFen : shown.fen}
           orientation={orientation}
-          lastMove={exploring && analysis ? analysis.lastMove : (lastMove?.uci ?? null)}
-          squares={squares}
-          arrows={arrows}
-          turnColor={shown.turn}
-          check={shown.check ? shown.turn : false}
+          lastMove={
+            previewing
+              ? previewLastMove
+              : exploring && analysis
+                ? analysis.lastMove
+                : (lastMove?.uci ?? null)
+          }
+          squares={previewing ? undefined : squares}
+          arrows={previewing ? undefined : arrows}
+          shapes={previewShapes}
+          // Nothing has evaluated the transient position, so nothing is said about it: its
+          // own turn field, and no check.
+          turnColor={previewing ? turnOf(previewFen) : shown.turn}
+          check={previewing ? false : shown.check ? shown.turn : false}
           coordinates="edge"
           // The game board doubles as the analysis board: a piece dragged from any
-          // position branches off the game rather than being refused.
+          // position branches off the game rather than being refused. Not from a preview,
+          // though — the branch does not contain that position, so the drag would land
+          // nowhere. `viewOnly` stays as it is: chessground cannot be reconfigured with it
+          // and would rebuild the whole board on every hover.
           viewOnly={!onPlayMove}
-          onMove={onPlayMove}
-          className="min-w-0 max-w-[min(100%,calc(100vh-20rem))] flex-1"
-        />
+          // The one surface a reader thinks *at*: a right-drag is their own arrow, in the
+          // design's brushes, on top of whatever the engine is saying. Constant, so the
+          // board is never rebuilt for it (chessground reads it only at creation), and dead
+          // anyway on the preview boards, which are view-only.
+          drawable
+          onMove={previewing ? undefined : onPlayMove}
+          className={cn(
+            'min-w-0 max-w-[min(100%,calc(100vh-20rem))] flex-1',
+            previewDim && 'bb-preview-dim',
+          )}
+        >
+          {previewCaption ? (
+            // A scrubbed board must never be mistaken for the game, and the caption is the
+            // only thing on screen that says so — over the squares, where the eye already is.
+            <span className="bb-chip pointer-events-none absolute right-1.5 top-1.5 px-1.5 py-px font-mono text-[0.625rem] text-soft">
+              {previewCaption}
+            </span>
+          ) : null}
+        </Board>
       </div>
 
       <div className="flex items-center gap-2">

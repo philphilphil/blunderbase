@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { useStreamSession } from '@/lib/analysis'
+import { liveBest, useStreamSession } from '@/lib/analysis'
 import {
   useDeleteLine,
   useDeleteNote,
@@ -16,6 +16,8 @@ import {
   useUpdateNote,
 } from '@/lib/api/queries'
 import type { LineResponse, MoveRow } from '@/lib/api/types'
+import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
+import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
 
@@ -174,6 +176,13 @@ function GameStudio({ gameId }: { gameId: number }) {
   const [hints, setHints] = useState(true)
   /** The first move of the engine line being pointed at, previewed on the board. */
   const [hoverMove, setHoverMove] = useState<string | null>(null)
+  /**
+   * The engine line being pointed at, whole — which row, how far into it, and its moves.
+   * `hoverMove` is still Maia's: one move, one arrow. A line has a shape, and the board
+   * draws it through `useLinePreview` below.
+   */
+  const [preview, setPreview] = useState<HoveredLine | null>(null)
+  const previewPrefs = useLinePreviewPrefs()
   /**
    * The analysis line the reader has played off the game, if any: which game position it
    * branched from, the whole line, and how far into it the board stands. Null is "the board
@@ -339,6 +348,8 @@ function GameStudio({ gameId }: { gameId: number }) {
   )
   // The board's arrow is the engine's move *here*, which is the top stored line for this
   // position — not the move that happens next, and nothing at all where no run has looked.
+  // A live search running on this position speaks over it; that is `boardEngineBest`,
+  // derived below because the stream session is opened further down.
   const engineBest = lines[0]?.firstUci ?? null
 
   // --- the analysis board ---------------------------------------------------
@@ -355,6 +366,13 @@ function GameStudio({ gameId }: { gameId: number }) {
   const exploring = (analysis?.cursor ?? 0) > 0
   const boardPosition = exploring && analysis ? analysis.position : position
   const analysisPly = analysis?.ply ?? boardIndex
+  /** What the hovered line draws: the transient position, its shapes, and where it stands. */
+  const previewView = useLinePreview(
+    boardPosition?.fen ?? null,
+    preview,
+    previewPrefs,
+    analysisPly,
+  )
 
   /**
    * Hand the line the reader is walking to the session store, on the way out of it.
@@ -378,6 +396,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       // A hovered line belongs to the position it was read in: leaving that position drops
       // the preview, even where the pointer never left the row it was drawn from.
       setHoverMove(null)
+      setPreview(null)
       // Any move of the game cursor — a key, the transport, a click in the move list — is a
       // request to be back on the game, so the analysis line goes with it. It goes to the
       // kept list rather than nowhere.
@@ -410,6 +429,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       // The line standing here is being replaced by another; it stays in the move list.
       keepBranch()
       setHoverMove(null)
+      setPreview(null)
       setBranch({
         base: analysis.base,
         moves: [...analysis.moves.slice(0, analysis.cursor), ...ucis],
@@ -430,6 +450,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       // The truncated tail is not lost with the drag: the line as it stood is kept.
       keepBranch()
       setHoverMove(null)
+      setPreview(null)
       setBranch({ base: analysis.base, moves: next, cursor: next.length })
     },
     [analysis, keepBranch],
@@ -440,6 +461,7 @@ function GameStudio({ gameId }: { gameId: number }) {
     (index: number) => {
       if (!analysis) return
       setHoverMove(null)
+      setPreview(null)
       setBranch({ base: analysis.base, moves: analysis.moves, cursor: index + 1 })
     },
     [analysis],
@@ -461,6 +483,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       // Clicking into another line is leaving this one, which is what keeps it.
       keepBranch()
       setHoverMove(null)
+      setPreview(null)
       setCursor(Math.max(-1, Math.min(plyCount - 1, target.base - 1)))
       setBranch({ base: target.base, moves: target.moves, cursor: index + 1 })
     },
@@ -482,6 +505,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       }
       const next = analysis.cursor + delta
       setHoverMove(null)
+      setPreview(null)
       if (next < 0) {
         // Off the head of the line and back onto the game: the line stays in the table.
         keepBranch()
@@ -575,6 +599,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       if (!target) return
       keepBranch()
       setHoverMove(null)
+      setPreview(null)
       setCursor(Math.max(-1, Math.min(plyCount - 1, target.base_ply - 1)))
       setBranch({
         base: target.base_ply,
@@ -860,6 +885,21 @@ function GameStudio({ gameId }: { gameId: number }) {
     ply: analysisPly,
   })
 
+  /**
+   * What the board actually points at: the live search's top move while one is running on
+   * the position on the board, and the stored run's otherwise.
+   *
+   * `liveBest` drops a snapshot whose FEN is not this position — the reader scrubs faster
+   * than the search reopens, and a stale arrow from two plies back is worse than no live
+   * arrow at all. Off the game line the stored fallback is nothing, the same as it has
+   * always been: the run never saw that position, so only the live search can speak for it.
+   *
+   * The stored-run box (`MaiaPanel`) is deliberately not told any of this. It is that run's
+   * own box and its header reports whose numbers those are.
+   */
+  const boardEngineBest =
+    liveBest(stream.snapshot, boardPosition?.fen ?? null) ?? (exploring ? null : engineBest)
+
   useBoardKeys(
     {
       step,
@@ -899,6 +939,11 @@ function GameStudio({ gameId }: { gameId: number }) {
   // findings are not a hint and stay either way. Off the game line the human column is a
   // live query, dropped entirely where the deployment has no Maia to ask
   // (`live.unavailable`) rather than reporting a failure.
+  //
+  // Its engine rows are previewed by the same hook as the live panel below: one `preview`
+  // state, one `useLinePreview`, and the namespaced ids (`run:1` here, `live:1` there) are
+  // what keeps the two boxes' line 1 from being the same row. `onHoverMove` stays for the
+  // human column, the compare grid and the rollout, which offer single moves.
   const maiaPanel = (
     <MaiaPanel
       rating={maia?.rating ?? null}
@@ -914,8 +959,14 @@ function GameStudio({ gameId }: { gameId: number }) {
       // column empties rather than describing the position the reader has left.
       engine={exploring ? [] : lines}
       ply={analysisPly}
+      fen={boardPosition.fen}
       live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
+      orientation={orientation}
       onHoverMove={setHoverMove}
+      onHoverLine={setPreview}
+      onStepPreview={previewView.step}
+      previewLine={previewView.line}
+      previewPly={previewView.ply}
       onPlayLine={playLine}
       className="border-b border-t-0 border-hairline"
     />
@@ -978,10 +1029,16 @@ function GameStudio({ gameId }: { gameId: number }) {
             lastMove={played}
             // The marks and the engine arrow are claims about a position a run has looked
             // at; on an analysis position there is no such claim, and only Maia's own
-            // (live) arrow is left.
+            // (live) arrow is left — and the live search's, which is looking at exactly the
+            // position on the board (`boardEngineBest` carries that rule).
             upcoming={exploring ? undefined : upcoming}
-            engineBest={exploring ? null : engineBest}
+            engineBest={boardEngineBest}
             hoverMove={hoverMove}
+            previewFen={previewView.fen}
+            previewShapes={previewView.shapes}
+            previewLastMove={previewView.lastMove}
+            previewCaption={previewView.caption}
+            previewDim={previewView.dim}
             maia={maia}
             win={win}
             score={score}
@@ -1068,11 +1125,22 @@ function GameStudio({ gameId }: { gameId: number }) {
             onAddNote={focusComposer}
             className="min-h-0 flex-1"
           />
+          {/*
+            The whole line, not its first move: `onHoverLine` replaces the single arrow
+            `onHoverMove` drew here, and the preview it feeds is what the board shows. The
+            box above reports the same three gestures from its engine rows, into the same
+            state — the ids are what keeps the two apart.
+          */}
           <InfiniteAnalysisPanel
             stream={stream}
             fen={boardPosition.fen}
             ply={analysisPly}
-            onHoverMove={setHoverMove}
+            orientation={orientation}
+            onHoverLine={setPreview}
+            onStepPreview={previewView.step}
+            onPlayLine={playLine}
+            previewLine={previewView.line}
+            previewPly={previewView.ply}
           />
           {/*
             Two panels, two different claims about the same position: the live search says

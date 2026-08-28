@@ -129,6 +129,47 @@ describe('Board', () => {
     expect(board()).toHaveClass('manipulable')
   })
 
+  it('does not let the reader draw unless the surface asks for it', () => {
+    const api = createRef<Api>()
+    render(<Board ref={api} fen={START} viewOnly={false} onMove={() => {}} />)
+    expect(api.current?.state.drawable.enabled).toBe(false)
+  })
+
+  it('rebuilds the board when `drawable` changes, because chessground only reads it once', () => {
+    // `bindBoard` binds the board's `contextmenu` listener from `drawable.enabled` at
+    // creation and never looks again, so a reconfigure would leave the browser menu on a
+    // board that is supposed to be drawable.
+    const seen: (boolean | undefined)[] = []
+    const record = (api: Api | null) => {
+      if (api) seen.push(api.state.drawable.enabled)
+    }
+    const { rerender } = render(
+      <Board ref={record} fen={START} viewOnly={false} onMove={() => {}} />,
+    )
+    rerender(<Board ref={record} fen={START} viewOnly={false} onMove={() => {}} drawable />)
+    expect(seen).toEqual([false, true])
+  })
+
+  it('keeps the app’s own shapes when the reader is allowed to draw', () => {
+    // The reader's shapes live in `drawable.shapes`; everything this app draws goes through
+    // `setAutoShapes`, which is a separate list.
+    const api = createRef<Api>()
+    render(
+      <Board
+        ref={api}
+        fen={START}
+        viewOnly={false}
+        onMove={() => {}}
+        drawable
+        arrows={[{ from: 'e2', to: 'e4' }]}
+      />,
+    )
+    expect(api.current?.state.drawable.enabled).toBe(true)
+    expect(api.current?.state.drawable.autoShapes).toEqual([
+      { orig: 'e2', dest: 'e4', brush: 'accent' },
+    ])
+  })
+
   it('tears chessground down on unmount and clears the ref', () => {
     const api = createRef<Api>()
     const { unmount } = render(<Board ref={api} fen={START} />)

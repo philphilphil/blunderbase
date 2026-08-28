@@ -51,6 +51,12 @@ export interface BoardProps {
    */
   coordinates?: boolean | CoordinateMode
   viewOnly?: boolean
+  /**
+   * Let the reader draw their own arrows and circles with the right mouse button, the way
+   * every chess site does. Off everywhere by default; chessground also suppresses the
+   * board's context menu when it is on, which is what makes the gesture usable at all.
+   */
+  drawable?: boolean
   animation?: boolean
   animationDuration?: number
   onMove?: (orig: Square, dest: Square) => void
@@ -134,6 +140,7 @@ export function Board({
   check,
   coordinates = true,
   viewOnly = true,
+  drawable = false,
   animation = true,
   animationDuration = 200,
   onMove,
@@ -159,9 +166,14 @@ export function Board({
   )
   const custom = useMemo(() => toCustomHighlights(squares), [squares])
 
-  // Created once and then reconfigured, so animation state survives. `viewOnly` and
-  // `coordinates` are the two chessground writes into the wrapper element itself and
-  // cannot be reconfigured (see `Api.set`), so changing either rebuilds the board.
+  // Created once and then reconfigured, so animation state survives. `viewOnly`,
+  // `coordinates` and `drawable` are the three chessground only reads at creation, so
+  // changing any of them rebuilds the board: the first two it writes into the wrapper
+  // element itself and cannot be reconfigured (see `Api.set`), and `drawable.enabled` is
+  // read by `bindBoard`, which binds the board's `contextmenu` listener once and never
+  // looks again. Note what chessground requires of the third: `bindBoard` returns before
+  // it binds any pointer handler when `viewOnly` is set, so drawing is dead on a view-only
+  // board and `drawable` only means anything on one that is not.
   useEffect(() => {
     if (!host.current) return
     const config: Config = {
@@ -179,7 +191,7 @@ export function Board({
       highlight: { lastMove: true, check: true, custom },
       ...(turnColor ? { turnColor } : {}),
       ...(check === undefined ? {} : { check }),
-      drawable: { enabled: false, visible: true, brushes: BOARD_BRUSHES },
+      drawable: { enabled: drawable, visible: true, brushes: BOARD_BRUSHES },
       movable: {
         free: false,
         events: { after: (orig, dest) => handlers.current.onMove?.(orig, dest) },
@@ -197,7 +209,7 @@ export function Board({
       publish(ref, null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewOnly, inside])
+  }, [viewOnly, inside, drawable])
 
   useEffect(() => {
     const instance = api.current
@@ -224,6 +236,7 @@ export function Board({
     check,
     inside,
     viewOnly,
+    drawable,
     animation,
     animationDuration,
     custom,

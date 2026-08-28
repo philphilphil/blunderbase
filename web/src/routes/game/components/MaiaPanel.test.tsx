@@ -1,8 +1,9 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GameRunSummary } from '@/lib/api/types'
+import { resetLinePreviewPrefs, setLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 
 import type {
   EngineLineView,
@@ -95,6 +96,33 @@ const PLAYED: EngineLineView[] = [
     classification: 'blunder',
   },
 ]
+
+/** jsdom in this setup exposes no `localStorage`, so the tests bring their own. */
+function memoryStorage(): Storage {
+  const values = new Map<string, string>()
+  return {
+    get length() {
+      return values.size
+    },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    removeItem: (key: string) => void values.delete(key),
+    setItem: (key: string, value: string) => void values.set(key, String(value)),
+  }
+}
+
+// The engine column reads the line-preview prefs, so every test starts from the defaults
+// rather than from whatever the one before it left behind.
+beforeEach(() => {
+  vi.stubGlobal('localStorage', memoryStorage())
+  resetLinePreviewPrefs()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  resetLinePreviewPrefs()
+})
 
 describe('MaiaPanel', () => {
   it('puts the human distribution beside the engine’s own moves', () => {
@@ -496,5 +524,130 @@ describe('MaiaPanel compare mode', () => {
     // Hints off is not a reason to lose the run's own findings, compare or not.
     expect(screen.queryByTestId('maia-compare')).not.toBeInTheDocument()
     expect(screen.getByText('stockfish')).toBeInTheDocument()
+  })
+})
+/**
+ * The engine column's three gestures, the same three the live panel offers: the row, a
+ * token, and the wheel. The ids are namespaced (`run:N`) because one `useLinePreview` on the
+ * game page serves this box and the live panel below it, both numbering their lines from 1.
+ */
+describe('MaiaPanel engine line preview', () => {
+  function draw(props: Partial<Parameters<typeof MaiaPanel>[0]> = {}) {
+    return render(
+      <MaiaPanel rating="1700" human={HUMAN} engine={ENGINE} run={RUN} ply={1} {...props} />,
+    )
+  }
+
+  /** The top engine row — the one whose eval is +0.40. */
+  function topRow(): HTMLElement {
+    return screen.getByText('+0.40').closest('div')!
+  }
+
+  function token(row: HTMLElement, k: number): HTMLElement {
+    const found = row.querySelector(`[data-ply="${k}"]`)
+    if (!(found instanceof HTMLElement)) throw new Error(`no token at ply ${k}`)
+    return found
+  }
+
+  it('offers the whole line the pointer is on, and takes it back on leaving', async () => {
+    const onHoverLine = vi.fn()
+    draw({ onHoverLine })
+
+    const row = topRow()
+    await userEvent.hover(row)
+    expect(onHoverLine).toHaveBeenLastCalledWith({
+      line: 'run:1',
+      ply: null,
+      pv: ['c7c6', 'd2d4', 'd7d5'],
+    })
+    await userEvent.unhover(row)
+    expect(onHoverLine).toHaveBeenLastCalledWith(null)
+  })
+
+  it('names the ply under the pointer while scrubbing', async () => {
+    const onHoverLine = vi.fn()
+    draw({ onHoverLine })
+
+    const row = topRow()
+    await userEvent.hover(token(row, 3))
+    expect(onHoverLine).toHaveBeenLastCalledWith({
+      line: 'run:1',
+      ply: 3,
+      pv: ['c7c6', 'd2d4', 'd7d5'],
+    })
+    // Leaving the token leaves the row with it, so the preview is put down entirely.
+    await userEvent.unhover(token(row, 3))
+    expect(onHoverLine).toHaveBeenLastCalledWith(null)
+  })
+
+  it('leaves the tokens alone when scrubbing is off', async () => {
+    setLinePreviewPrefs({ scrub: false })
+    const onHoverLine = vi.fn()
+    draw({ onHoverLine })
+
+    await userEvent.hover(token(topRow(), 3))
+    // Only the row spoke; nothing scrubs, so a ply is not worth reporting.
+    expect(onHoverLine).toHaveBeenCalledTimes(1)
+    expect(onHoverLine).toHaveBeenLastCalledWith({
+      line: 'run:1',
+      ply: null,
+      pv: ['c7c6', 'd2d4', 'd7d5'],
+    })
+  })
+
+  it('steps the preview when the wheel turns over the column', async () => {
+    const onStepPreview = vi.fn()
+    draw({ onHoverLine: vi.fn(), onStepPreview })
+
+    const row = topRow()
+    // Nothing is hovered yet, so the wheel is the column's own scroll.
+    fireEvent.wheel(row, { deltaY: 24 })
+    expect(onStepPreview).not.toHaveBeenCalled()
+
+    await userEvent.hover(row)
+    fireEvent.wheel(row, { deltaY: 24 })
+    // Down is forwards, the way a move list reads.
+    expect(onStepPreview).toHaveBeenCalledWith(1)
+    fireEvent.wheel(row, { deltaY: -24 })
+    expect(onStepPreview).toHaveBeenLastCalledWith(-1)
+  })
+
+  it('marks how far the preview has walked into its own line', () => {
+    draw({ onHoverLine: vi.fn(), previewLine: 'run:1', previewPly: 2 })
+
+    const row = topRow()
+    expect(token(row, 1).className).toContain('text-faint-2')
+    expect(token(row, 2).className).toContain('text-accent-teal')
+    expect(token(row, 3).className).not.toContain('text-faint-2')
+    // The second line is not where the preview stands, so its tokens say nothing.
+    const other = screen.getByText('+1.20').closest('div')!
+    expect(token(other, 1).className).not.toContain('text-faint-2')
+  })
+
+  it('replaces the single arrow rather than drawing one underneath the preview', async () => {
+    const onHoverMove = vi.fn()
+    const onHoverLine = vi.fn()
+    // The human rows are buttons, and a disabled button reports no pointer at all.
+    draw({ onHoverMove, onHoverLine, onPlayLine: vi.fn() })
+
+    await userEvent.hover(topRow())
+    expect(onHoverLine).toHaveBeenCalled()
+    expect(onHoverMove).not.toHaveBeenCalled()
+
+    // The human column is single moves, so the pale arrow is still the right answer there.
+    await userEvent.hover(screen.getByTestId('maia-played-row'))
+    expect(onHoverMove).toHaveBeenLastCalledWith('d7d5')
+  })
+
+  it('reports nothing for a row whose line never replayed', async () => {
+    const onHoverLine = vi.fn()
+    const empty: EngineLineView[] = [
+      { ...ENGINE[0]!, multipv: 1, text: '', sans: [], pv: [], firstUci: 'c7c6' },
+    ]
+    draw({ engine: empty, onHoverLine })
+
+    // A row with no moves has no line to preview and no ply to point at.
+    await userEvent.hover(screen.getByText('+0.40').closest('div')!)
+    expect(onHoverLine).not.toHaveBeenCalled()
   })
 })

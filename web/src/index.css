@@ -534,6 +534,16 @@ cg-board square.bb-maia::after {
   border: 0.125rem solid color-mix(in srgb, var(--bb-brilliant) 70%, transparent);
 }
 
+/*
+ * The line preview's "future overlay" (`lib/board/linePreview.ts`): ghost pieces where the
+ * line leaves them. The ghosts are the point and the pieces standing where they are now are
+ * in the way, so the board's own pieces step back while one is drawn. Only those — the
+ * ghosts are auto-shapes and live in `cg-auto-pieces`, a sibling of `cg-board`.
+ */
+.bb-preview-dim cg-board piece {
+  opacity: 0.35;
+}
+
 .cg-wrap coords {
   font-family: var(--font-mono);
   font-size: 0.5rem;

@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import type { StreamSnapshotEvent } from '@/lib/events/types'
 
-import { formatNps, formatVariation, sanLine, snapshotFrom } from './streamModel'
+import {
+  formatNps,
+  formatVariation,
+  liveBest,
+  sanLine,
+  snapshotFrom,
+  type StreamSnapshot,
+} from './streamModel'
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 /** After 1.e4 c5 2.Nf3 — Black to move, ply 3. */
@@ -118,6 +125,56 @@ describe('snapshotFrom', () => {
       { multipv: 2, cp: null, mate: null, pv: ['b8c6'] },
       { multipv: 3, cp: null, mate: -5, pv: ['e7e6'] },
     ])
+  })
+})
+
+describe('liveBest', () => {
+  function snapshot(overrides: Partial<StreamSnapshot> = {}): StreamSnapshot {
+    return {
+      sessionId: 's1',
+      seq: 4,
+      engineId: 1,
+      engine: 'Stockfish 17',
+      runnerId: null,
+      fen: SICILIAN,
+      multipv: 3,
+      depth: 24,
+      nodes: 1_000,
+      nps: 500,
+      timeMs: 1_000,
+      lines: [
+        { multipv: 2, cp: 21, mate: null, pv: ['b8c6', 'd2d4'] },
+        { multipv: 1, cp: 34, mate: null, pv: ['d7d6', 'd2d4', 'c5d4'] },
+        { multipv: 3, cp: null, mate: 5, pv: ['e7e6'] },
+      ],
+      at: '2026-08-26T10:00:10+00:00',
+      ...overrides,
+    }
+  }
+
+  it('takes the first move of the lowest multipv, whatever order the frame arrived in', () => {
+    expect(liveBest(snapshot(), SICILIAN)).toBe('d7d6')
+  })
+
+  it('says nothing about a position the board is not on', () => {
+    // The reader scrubbed on; the search has not reopened yet.
+    expect(liveBest(snapshot(), START)).toBeNull()
+  })
+
+  it('says nothing without a snapshot, without a position, or without a variation', () => {
+    expect(liveBest(null, SICILIAN)).toBeNull()
+    expect(liveBest(snapshot(), null)).toBeNull()
+    expect(liveBest(snapshot({ lines: [] }), SICILIAN)).toBeNull()
+    const empty = snapshot({ lines: [{ multipv: 1, cp: 0, mate: null, pv: [] }] })
+    expect(liveBest(empty, SICILIAN)).toBeNull()
+  })
+
+  it('skips an empty top line for the best line that does have a move', () => {
+    const lines = [
+      { multipv: 2, cp: 21, mate: null, pv: ['b8c6'] },
+      { multipv: 1, cp: 34, mate: null, pv: [] },
+    ]
+    expect(liveBest(snapshot({ lines }), SICILIAN)).toBe('b8c6')
   })
 })
 

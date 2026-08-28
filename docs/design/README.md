@@ -118,3 +118,24 @@ none of them is a layout problem, so none is fixable in `web/`.
   a `/live` route (or "follow coach" toggle on the game view) renders it and
   animates incoming moves. Live moves are ephemeral analysis-board state —
   never mutate stored games. Reconnect/refresh restores last state.
+
+## Line preview
+
+Hovering an engine line answers "how does this go", not just "what's the first
+move" — prototyped in `prototypes/line-preview.html`, planned in
+`prototypes/line-preview-plan.md`. Three gestures: hovering the **row** draws
+the whole line (layered arrows, a plan overlay, a ghost playthrough, or a peek
+board, per the row mode); hovering a **token** in the line scrubs the board to
+the position after that move; **wheel** over the row steps through it.
+Row modes: **arrows** layers every ply, thinner and fainter with depth;
+**overlay** ghosts each piece onto where the line leaves it, with a trail
+behind it — the plan, not the sequence; **play** auto-plays the line at a
+tempo and snaps back; **peek** pops up a small board with the end position,
+leaving the main board alone; **off** draws nothing. Arrows use
+`previewWhite1..4` (stepped off `--bb-accent`) for White's moves and
+`previewBlack1..4` (stepped off `--bb-deep`) for Black's — deliberately not
+Maia purple, so a preview never reads as a claim about what a human would
+play. The preferences (row mode, scrub, depth, colours, playthrough tempo)
+live in `localStorage`, not `AppSettings` — they are a reading habit for this
+browser, not a fact about the deployment, and screen size and taste are per
+device (Settings → Board).

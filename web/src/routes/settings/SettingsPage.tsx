@@ -24,6 +24,7 @@ import {
 } from '@/lib/api/types'
 import type { AppSettings, AppSettingsUpdate, GamesDeleted } from '@/lib/api/types'
 
+import { BoardPreviewCard } from './BoardPreviewCard'
 import { DeleteAllGamesDialog } from './DeleteAllGamesDialog'
 
 /** What Maia was trained on. Anything outside is clamped by the backend, not refused. */
@@ -611,6 +612,8 @@ export function SettingsPage() {
           </div>
         </form>
       )}
+
+      <BoardPreviewCard />
 
       <DangerZone />
     </PageBody>

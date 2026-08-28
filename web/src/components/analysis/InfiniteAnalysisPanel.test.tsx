@@ -1,12 +1,20 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { StreamSessionApi, StreamSnapshot } from '@/lib/analysis'
 import type { StreamResponse } from '@/lib/api/types'
+import {
+  LINE_PREVIEW_KEY,
+  resetLinePreviewPrefs,
+  setLinePreviewPrefs,
+} from '@/lib/board/linePreviewPrefs'
 import type { EngineHost } from '@/lib/engines/hosts'
 
-import { InfiniteAnalysisPanel } from './InfiniteAnalysisPanel'
+import {
+  InfiniteAnalysisPanel,
+  type InfiniteAnalysisPanelProps,
+} from './InfiniteAnalysisPanel'
 
 /** After 1.e4 c5 2.Nf3 — Black to move, ply 3. */
 const SICILIAN = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
@@ -101,7 +109,62 @@ function streamApi(overrides: Partial<StreamSessionApi> = {}): StreamSessionApi 
   }
 }
 
+/** The top line's PV, which the token gestures are all about. */
+const TOP_PV = ['d7d6', 'd2d4', 'c5d4']
+
+/** The panel mid-search over the three lines above: where every hover test starts. */
+function renderLines(props: Partial<InfiniteAnalysisPanelProps> = {}) {
+  return render(
+    <InfiniteAnalysisPanel
+      stream={streamApi({
+        enabled: true,
+        phase: 'running',
+        session: SESSION,
+        snapshot: SNAPSHOT,
+      })}
+      fen={SICILIAN}
+      ply={3}
+      {...props}
+    />,
+  )
+}
+
+/** The `k`th token (1-based) of a row, the way the preview numbers plies. */
+function token(row: HTMLElement, k: number): HTMLElement {
+  const found = row.querySelector(`[data-ply="${k}"]`)
+  if (!(found instanceof HTMLElement)) throw new Error(`no token at ply ${k}`)
+  return found
+}
+
+/** jsdom in this setup exposes no `localStorage`, so the tests bring their own. */
+function memoryStorage(): Storage {
+  const values = new Map<string, string>()
+  return {
+    get length() {
+      return values.size
+    },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    removeItem: (key: string) => void values.delete(key),
+    setItem: (key: string, value: string) => void values.set(key, String(value)),
+  }
+}
+
 describe('InfiniteAnalysisPanel', () => {
+  beforeEach(() => {
+    // The preview prefs are per browser and shared between tests through one module-level
+    // cache; a test that sets a mode would otherwise pick the next one's answer for it.
+    vi.stubGlobal('localStorage', memoryStorage())
+    localStorage.clear()
+    resetLinePreviewPrefs()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    resetLinePreviewPrefs()
+  })
+
   it('offers the search rather than starting one', async () => {
     const setEnabled = vi.fn()
     render(
@@ -167,14 +230,20 @@ describe('InfiniteAnalysisPanel', () => {
 
     const rows = screen.getAllByTestId('infinite-analysis-line')
     expect(rows).toHaveLength(3)
-    // multipv 1 first, whatever order the frame arrived in.
+    // multipv 1 first, whatever order the frame arrived in. The variation is a row of
+    // tokens now, so it is read off the whole line rather than out of one text node.
     expect(within(rows[0]!).getByText('+0.34')).toBeInTheDocument()
-    expect(within(rows[0]!).getByText('2…d6 3.d4 cxd4')).toBeInTheDocument()
+    expect(within(rows[0]!).getByTestId('infinite-analysis-pv')).toHaveTextContent(
+      '2…d6 3.d4 cxd4',
+    )
     expect(within(rows[1]!).getByText('+0.21')).toBeInTheDocument()
-    expect(within(rows[1]!).getByText('2…Nc6 3.d4')).toBeInTheDocument()
+    expect(within(rows[1]!).getByTestId('infinite-analysis-pv')).toHaveTextContent('2…Nc6 3.d4')
     // Mate wins over centipawns.
     expect(within(rows[2]!).getByText('M5')).toBeInTheDocument()
-    expect(within(rows[2]!).getByText('2…e6')).toBeInTheDocument()
+    expect(within(rows[2]!).getByTestId('infinite-analysis-pv')).toHaveTextContent('2…e6')
+    // Each move is its own token, numbered within the line from 1.
+    expect(token(rows[0]!, 1)).toHaveTextContent('d6')
+    expect(token(rows[0]!, 3)).toHaveTextContent('cxd4')
 
     // The lines reach the panel already in White's frame (`streamModel`); the header still
     // names whose move it is, which the numbers alone do not say.
@@ -189,26 +258,94 @@ describe('InfiniteAnalysisPanel', () => {
 
   it('offers the hovered line’s first move, and takes it back on leaving', async () => {
     const onHoverMove = vi.fn()
-    render(
-      <InfiniteAnalysisPanel
-        stream={streamApi({
-          enabled: true,
-          phase: 'running',
-          session: SESSION,
-          snapshot: SNAPSHOT,
-        })}
-        fen={SICILIAN}
-        ply={3}
-        onHoverMove={onHoverMove}
-      />,
-    )
+    const onHoverLine = vi.fn()
+    renderLines({ onHoverMove, onHoverLine })
 
     const rows = screen.getAllByTestId('infinite-analysis-line')
     await userEvent.hover(rows[1]!)
     // The second-best line, not the first: the arrow follows the pointer.
     expect(onHoverMove).toHaveBeenLastCalledWith('b8c6')
+    // Both callbacks fire: the single arrow is what a surface without a preview draws.
+    expect(onHoverLine).toHaveBeenLastCalledWith({
+      line: 'live:2',
+      ply: null,
+      pv: ['b8c6', 'd2d4'],
+    })
     await userEvent.unhover(rows[1]!)
     expect(onHoverMove).toHaveBeenLastCalledWith(null)
+    expect(onHoverLine).toHaveBeenLastCalledWith(null)
+  })
+
+  it('names the ply under the pointer while scrubbing', async () => {
+    const onHoverLine = vi.fn()
+    renderLines({ onHoverLine })
+
+    const rows = screen.getAllByTestId('infinite-analysis-line')
+    await userEvent.hover(token(rows[0]!, 2))
+    expect(onHoverLine).toHaveBeenLastCalledWith({ line: 'live:1', ply: 2, pv: TOP_PV })
+    // Off the token but still in the row: the row's own answer stands again.
+    await userEvent.unhover(token(rows[0]!, 2))
+    expect(onHoverLine).toHaveBeenLastCalledWith(null)
+  })
+
+  it('leaves the tokens alone when scrubbing is off', async () => {
+    setLinePreviewPrefs({ scrub: false })
+    const onHoverLine = vi.fn()
+    renderLines({ onHoverLine })
+
+    const rows = screen.getAllByTestId('infinite-analysis-line')
+    await userEvent.hover(token(rows[0]!, 2))
+    // Only the row spoke; nothing scrubs, so a ply is not worth reporting.
+    expect(onHoverLine).toHaveBeenCalledTimes(1)
+    expect(onHoverLine).toHaveBeenLastCalledWith({ line: 'live:1', ply: null, pv: TOP_PV })
+  })
+
+  it('enters the line at the token that was clicked', async () => {
+    const onPlayLine = vi.fn()
+    renderLines({ onPlayLine })
+
+    const rows = screen.getAllByTestId('infinite-analysis-line')
+    // The third token is the third ply of the line, which is index 2 to `playLine`.
+    await userEvent.click(token(rows[0]!, 3))
+    expect(onPlayLine).toHaveBeenLastCalledWith(TOP_PV, 2)
+  })
+
+  it('steps the preview when the wheel turns over a row', async () => {
+    const onStepPreview = vi.fn()
+    renderLines({ onHoverLine: vi.fn(), onStepPreview })
+
+    const rows = screen.getAllByTestId('infinite-analysis-line')
+    // Nothing is hovered yet, so the wheel is the page's.
+    fireEvent.wheel(rows[1]!, { deltaY: 24 })
+    expect(onStepPreview).not.toHaveBeenCalled()
+
+    await userEvent.hover(rows[1]!)
+    fireEvent.wheel(rows[1]!, { deltaY: 24 })
+    // Down is forwards, the way a move list reads.
+    expect(onStepPreview).toHaveBeenCalledWith(1)
+    fireEvent.wheel(rows[1]!, { deltaY: -24 })
+    expect(onStepPreview).toHaveBeenLastCalledWith(-1)
+  })
+
+  it('marks how far the preview has walked into its own line', () => {
+    renderLines({ onHoverLine: vi.fn(), previewLine: 'live:1', previewPly: 2 })
+
+    const rows = screen.getAllByTestId('infinite-analysis-line')
+    expect(token(rows[0]!, 1).className).toContain('text-faint-2')
+    expect(token(rows[0]!, 2).className).toContain('text-accent-teal')
+    expect(token(rows[0]!, 3).className).not.toContain('text-faint-2')
+    // Another line is not where the preview stands, so its tokens say nothing.
+    expect(token(rows[1]!, 1).className).not.toContain('text-faint-2')
+  })
+
+  it('cycles the row mode from the header chip', async () => {
+    renderLines({ onHoverLine: vi.fn() })
+
+    await userEvent.click(screen.getByRole('button', { name: 'arrows' }))
+    expect(screen.getByRole('button', { name: 'overlay' })).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(LINE_PREVIEW_KEY) ?? '{}')).toMatchObject({
+      row: 'overlay',
+    })
   })
 
   it('falls back to the raw UCI when the position will not replay', () => {

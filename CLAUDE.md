@@ -62,6 +62,8 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 - Native `select`/`textarea` styled with Tailwind is the norm over heavy widgets.
 - `web/src/lib/api/` is the typed client; `web/src/lib/events/` handles the `/events`
   WebSocket and query invalidation.
+- `web/src/lib/board/linePreview.ts` is the only place engine-line-preview shapes are
+  computed; components pass it prefs and a hover state and hand what comes back to chessground.
 
 ## Where things are
 

@@ -9,6 +9,7 @@ export {
 export {
   formatNps,
   formatVariation,
+  liveBest,
   sanLine,
   snapshotFrom,
   type StreamSnapshot,
