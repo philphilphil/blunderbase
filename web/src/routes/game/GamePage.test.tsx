@@ -1252,6 +1252,26 @@ describe('GamePage notes', () => {
     expect(screen.getByTestId('note-composer')).toBeInTheDocument()
   })
 
+  it('saves a half-written note to its position before the wheel moves the board', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Note' }))
+    const composer = within(screen.getByTestId('note-composer'))
+    await user.type(composer.getByLabelText('Note text'), 'Play c6 here, not d5.')
+
+    // The wheel moves nothing but the board — no click, no focus change — so the composer
+    // has to be told it is being left. The note lands on ply 1, where it was typed.
+    fireEvent.wheel(screen.getByTestId('board'), { deltaY: 120 })
+    expect(screen.getByText('ply 2 / 4')).toBeInTheDocument()
+
+    await waitFor(() => expect(noteBodies()).toHaveLength(1))
+    expect(noteBodies()[0]!.body).toMatchObject({ text: 'Play c6 here, not d5.', ply: 1 })
+  })
+
   it('pins the line first when the note is written inside a variation', async () => {
     const user = userEvent.setup()
     renderPage()

@@ -497,6 +497,21 @@ function GameStudio({ gameId }: { gameId: number }) {
   )
 
   /**
+   * The wheel's step. Every other way off a position takes the keyboard with it — a click
+   * moves focus, and the arrow keys are not shortcuts while a field has it — so the composer
+   * saves itself on the way out. A wheel over the board moves nothing but the board, and a
+   * note half-written on this position would otherwise follow the reader to the next one.
+   * Blurring first writes it where it was meant, then the board moves.
+   */
+  const stepFromBoard = useCallback(
+    (delta: number) => {
+      blurComposer()
+      step(delta)
+    },
+    [blurComposer, step],
+  )
+
+  /**
    * Every line of this session's reading, as the move list draws them: SAN, replayed against
    * *this* game, so a stored line can never disagree with the position it hangs off (one
    * that no longer replays at all simply drops out).
@@ -976,7 +991,7 @@ function GameStudio({ gameId }: { gameId: number }) {
             onHintsChange={setHints}
             onFlip={() => setFlipped((value) => !value)}
             onSeek={seek}
-            onStep={step}
+            onStep={stepFromBoard}
             deepRun={deepRun}
             deepActiveRun={deepAnalysis.activeRun}
             deepProgress={deepAnalysis.progress}
