@@ -1087,6 +1087,30 @@ class RunnerCreated(BaseModel):
     config_yaml: str = Field(description="a paste-ready runner.yaml with the token in it")
 
 
+class McpKeyResponse(Payload):
+    """`services.mcp_keys.key_payload`: one minted `/mcp` bearer key, never its hash.
+
+    `last_used_at` moves at a minute's granularity, which is all the owner needs to tell a
+    key a client still uses from one that can go.
+    """
+
+    id: int
+    name: str
+    created_at: datetime
+    last_used_at: datetime | None = None
+
+
+class McpKeyCreate(Input):
+    name: str = Field(min_length=1, max_length=64)
+
+
+class McpKeyCreated(BaseModel):
+    """The one answer that carries the token. It is not readable again from anywhere."""
+
+    key: McpKeyResponse
+    token: str = Field(description="shown once; paste it into the client's Authorization header")
+
+
 class LocalHost(Payload):
     """`services.runners.local_row`: this machine, described as one more destination."""
 

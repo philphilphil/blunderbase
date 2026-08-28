@@ -18,8 +18,8 @@ from backend.db.session import get_sessionmaker
 from backend.mcp.server import build_server
 from backend.services import auth as auth_service
 
-# The remote transport. One key, checked on every request, in front of an app that binds
-# to a network interface rather than to loopback.
+# The remote transport. A bearer token, checked on every request, in front of an app that
+# binds to a network interface rather than to loopback.
 MCP_PATH = "/mcp"
 SCHEME = "bearer"
 UNAUTHORIZED = {
@@ -35,13 +35,16 @@ class TransportDisabledError(RuntimeError):
 
 
 class BearerGuard:
-    """ASGI middleware demanding one bearer key of every HTTP request.
+    """ASGI middleware demanding a bearer token of every HTTP request.
 
-    The key is the owner's password, verified against the same hash the web session is:
-    one credential, two front doors, nothing extra to configure on a deployment that has
-    been through first-run setup. `BLUNDERBASE_MCP_BEARER_KEY` stays the override — set
-    it and it is the only thing accepted, which is what keeps existing automation and the
-    compose files working while the password changes underneath.
+    Three things open it, tried in this order. `BLUNDERBASE_MCP_BEARER_KEY`, when set, is
+    compared first and in constant time — it costs no database read, and it is what keeps
+    the compose files and existing automation working while everything else changes
+    underneath. Then `verify`, which is `services.auth.verify_bearer`: a key the owner
+    minted on the Settings page, else the owner's password, checked against the same hash
+    the web session is. The environment key is one more accepted token rather than the
+    only one, so a deployment that pins one for automation can still hand a coach a key it
+    can revoke on its own.
 
     It sits outside the MCP app so an unauthenticated caller never reaches the protocol at
     all — not even to be told which tools exist. Lifespan and any other scope pass through
@@ -72,11 +75,13 @@ class BearerGuard:
         token = presented.strip()
         if not token:
             return False
-        if self.key:
-            # Constant time, so a wrong key tells an attacker nothing about how wrong it was.
-            return secrets.compare_digest(token, self.key)
-        # A password check is a scrypt derivation and a database read; neither belongs on
-        # the event loop.
+        # Constant time, so a wrong key tells an attacker nothing about how wrong it was.
+        if self.key and secrets.compare_digest(token, self.key):
+            return True
+        if self.verify is None:
+            return False
+        # A key lookup is a database read and a password check a scrypt derivation on top;
+        # neither belongs on the event loop.
         return await to_thread.run_sync(self.verify, token)
 
     async def reject(self, send: Send) -> None:
@@ -135,7 +140,12 @@ def password_verifier(
     *,
     before_setup: bool = False,
 ) -> Verifier | None:
-    """Check a presented bearer token against the owner's password, or None if there is none.
+    """Check a presented bearer token against the owner's keys and password, or None if
+    there is no password yet.
+
+    No password means no keys either — a key is minted through a route only a signed-in
+    owner reaches — so "setup required" is the whole test for whether a verifier can say
+    yes to anything.
 
     Resolved once, at the point the transport is built, so a database that has never been
     migrated — `blunderbase mcp --transport http` pointed at nothing — is a refusal to

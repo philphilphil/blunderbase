@@ -48,8 +48,12 @@ engine facts and never freestyles chess analysis.
 ```bash
 claude mcp add blunderbase -- uv run --directory /path/to/blunderbase blunderbase mcp
 claude mcp add --transport http blunderbase https://blunderbase.example/mcp \
-  --header "Authorization: Bearer <your password, or BLUNDERBASE_MCP_BEARER_KEY>"
+  --header "Authorization: Bearer <a key from Settings → MCP, or your password>"
 ```
+
+The bearer token is your password, or better, a key minted per client on **Settings →
+MCP** — stored hashed, shown once, revocable without touching the password. See
+[docs/reference.md](docs/reference.md#signing-in).
 
 **Examples:**
 ```
@@ -87,7 +91,7 @@ docker run -d --name blunderbase -p 8765:8765 -v blunderbase-data:/data \
 ```
 
 The first person to open a fresh deployment chooses the password; that password is also
-the MCP bearer key. Back up the `/data` volume and you have backed up everything.
+an MCP bearer token, until you mint per-client keys on Settings → MCP. Back up the `/data` volume and you have backed up everything.
 For TLS termination and reverse-proxy examples see [docs/deploy.md](docs/deploy.md).
 
 ## Project Structure

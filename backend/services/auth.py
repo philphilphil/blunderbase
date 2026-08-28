@@ -19,6 +19,9 @@ Three decisions worth keeping in mind:
   cap is deliberate: the counter is shared with the MCP bearer check, and a stranger
   hammering `/mcp` must not be able to lock the owner out of their own browser for longer
   than one short window.
+
+The MCP bearer check also accepts the keys the owner mints in `services/mcp_keys.py`; see
+`verify_bearer` for the order.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.models import AuthSession, Credential
 from backend.db.types import utcnow
+from backend.services import mcp_keys
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -153,13 +157,20 @@ def change_password(session: Session, current: str, new: str) -> None:
 
 
 def verify_bearer(session: Session, token: str) -> bool:
-    """The MCP bearer key read as the owner's password. Never raises.
+    """Whether an MCP bearer token opens the door: a minted key first, else the password.
 
-    A locked-out credential answers "no" rather than "not now": the transport has one
-    thing to say to a caller it does not recognise, and it is 401.
+    Keys (`services/mcp_keys.py`) are tried first because they are the cheap check — one
+    hash and one indexed read — and because a matching key must not cost a failed attempt
+    on the password's limiter. Anything that is not a key falls through to the password,
+    which is what a fresh deployment has and what a `bb_mcp_`-less token can only be.
+
+    Never raises. A locked-out credential answers "no" rather than "not now": the transport
+    has one thing to say to a caller it does not recognise, and it is 401.
     """
     if not token:
         return False
+    if mcp_keys.authenticate(session, token):
+        return True
     try:
         return verify_password(session, token)
     except LockedOutError:

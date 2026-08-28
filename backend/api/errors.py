@@ -22,6 +22,7 @@ from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import import_service
 from backend.services import maia_live as maia_live_service
+from backend.services import mcp_keys as mcp_keys_service
 from backend.services import notes as notes_service
 from backend.services import runners as runners_service
 from backend.services import stats as stats_service
@@ -102,6 +103,9 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (runners_service.RunnerLockedOutError, 429, "locked_out"),
     (runners_service.RunnerAuthError, 401, "unauthorized"),
     (runners_service.RunnerValidationError, 422, "invalid_runner"),
+    (mcp_keys_service.UnknownMcpKeyError, 404, "unknown_mcp_key"),
+    (mcp_keys_service.DuplicateMcpKeyError, 409, "duplicate_mcp_key"),
+    (mcp_keys_service.McpKeyValidationError, 422, "invalid_mcp_key"),
     (streams_service.UnknownStreamError, 404, "unknown_stream"),
     (streams_service.StreamLimitError, 409, "stream_limit"),
     (streams_service.StreamUnavailableError, 409, "stream_unavailable"),

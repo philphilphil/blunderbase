@@ -170,6 +170,26 @@ class Runner(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
 
+class McpKey(Base):
+    """A bearer key the owner minted for one MCP client, so the password stays theirs.
+
+    The password opens the browser; handing it to every coach configuration that wants
+    `/mcp` means rotating it everywhere the day one of them leaks. A key is a separate,
+    revocable secret per client — and the same rules as `Runner`: only the SHA-256 is
+    kept, 32 random bytes need no scrypt, and the token is shown at the moment it is minted
+    and never again. `last_used_at` is what tells the owner which key they can safely
+    delete.
+    """
+
+    __tablename__ = "mcp_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+
+
 class ImportJob(Base):
     """One sync of one source: its cursor, its counts and its per-game failures."""
 

@@ -91,6 +91,8 @@ export const queryKeys = {
   runnerList: (): QueryKey => ['runners', 'list'],
   runnersStatus: (): QueryKey => ['runners', 'status'],
 
+  mcpKeys: (): QueryKey => ['mcp-keys'],
+
   streams: (): QueryKey => ['streams'],
   streamList: (): QueryKey => ['streams', 'list'],
 

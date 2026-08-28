@@ -66,6 +66,8 @@ def test_indexes_the_hot_queries_need_exist(settings: Settings) -> None:
     assert ("runner_id",) in indexed("engines")
     assert ("name",) in unique("runners")
     assert ("token_hash",) in unique("runners")
+    assert ("name",) in unique("mcp_keys")
+    assert ("key_hash",) in unique("mcp_keys")
 
 
 def test_sqlite_runs_in_wal_mode(settings: Settings) -> None:

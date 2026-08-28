@@ -14,13 +14,18 @@ and every route is behind it except `/health`, `/auth/*`, `/mcp` (which has its 
 guard) and the web app's own files — the page has to load in order to show a login form.
 Five wrong passwords in a row close the door for a few seconds, doubling to five minutes.
 
-**The MCP bearer key is that same password.** Nothing extra to configure: set up the
-deployment in the browser and the coach connects with what you already typed. Changing the
-password changes the key. `BLUNDERBASE_MCP_BEARER_KEY` stays an override — set it and it
-is the only token `/mcp` accepts, which is how automation and the compose files keep
-working while the password changes underneath. `/mcp` is always mounted and answers 401
-to everyone until one of the two exists — so a password chosen in the browser reaches the
-coach immediately, with no restart.
+**The MCP bearer token is that same password, or a key you mint for the client.** Nothing
+extra to configure: set up the deployment in the browser and the coach connects with what
+you already typed. Once more than one client wants in, mint a key per client on
+**Settings → MCP**: `bb_mcp_…`, stored as a SHA-256, shown exactly once, and revocable on
+its own — deleting a key signs out that one client instead of every browser and the other
+coaches. The list shows when each key was last used, so a forgotten one is easy to spot.
+
+`/mcp` accepts, in this order: `BLUNDERBASE_MCP_BEARER_KEY` when set (an extra accepted
+token, not a replacement — it is how automation and the compose files keep working while
+everything else changes), then a stored key, then the password. `/mcp` is always mounted
+and answers 401 to everyone until one of the three exists — so a password chosen in the
+browser reaches the coach immediately, with no restart.
 
 ```bash
 uv run blunderbase set-password    # bootstrap or reset headless; asked twice, never echoed
@@ -55,7 +60,7 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_DATA_DIR` | `<root>/data` | everything written that is not the database |
 | `BLUNDERBASE_WEB_DIST` | `<root>/web/dist` | the built web app; a directory that is not there is simply not served |
 | `BLUNDERBASE_HOST` `BLUNDERBASE_PORT` | `127.0.0.1` `8765` | what `serve` binds |
-| `BLUNDERBASE_MCP_BEARER_KEY` | — | overrides the password as `/mcp`'s bearer key; unset, `/mcp` accepts the owner's password as soon as there is one |
+| `BLUNDERBASE_MCP_BEARER_KEY` | — | one more token `/mcp` accepts, beside the minted keys and the owner's password; for compose files and automation |
 | `BLUNDERBASE_ANALYSIS_CONCURRENCY` | cores − 2 | engine processes at once, across every tier |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
 

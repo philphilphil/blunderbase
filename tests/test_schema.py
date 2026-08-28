@@ -47,6 +47,7 @@ EXPECTED_TABLES = {
     "games",
     "import_jobs",
     "lines",
+    "mcp_keys",
     "move_evals",
     "notes",
     "positions",

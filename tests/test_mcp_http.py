@@ -19,6 +19,7 @@ from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_sessionmaker
 from backend.mcp.http import BearerGuard, TransportDisabledError, create_http_app
 from backend.services import auth as auth_service
+from backend.services import mcp_keys as mcp_keys_service
 
 KEY = "not-the-key-you-are-looking-for"
 PASSWORD = "the-owners-own-password"
@@ -185,10 +186,11 @@ async def test_a_token_that_is_not_the_password_is_refused(
     assert "serverInfo" not in response.text
 
 
-async def test_the_environment_key_overrides_the_password(
+async def test_the_environment_key_works_alongside_the_password(
     remote_settings: Settings, sessions: sessionmaker[Session]
 ) -> None:
-    """Set, it is the only thing accepted — which is what keeps existing automation working."""
+    """Set, it is one more accepted token: the compose files keep working, and so does the
+    owner's own password. What it does not do is turn a wrong token into a right one."""
     with sessions() as session:
         auth_service.set_password(session, PASSWORD)
     app = create_http_app(remote_settings, sessions=sessions, json_response=True)
@@ -200,9 +202,96 @@ async def test_the_environment_key_overrides_the_password(
         with_password = await client.post(
             "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {PASSWORD}"}
         )
+        with_neither = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": "Bearer nearly"}
+        )
 
     assert with_key.status_code == 200
-    assert with_password.status_code == 401
+    assert with_password.status_code == 200
+    assert with_neither.status_code == 401
+
+
+async def test_the_environment_key_alone_is_enough_with_no_password(
+    remote_settings: Settings, sessions: sessionmaker[Session]
+) -> None:
+    """No verifier at all — a database nobody has set up — and the env key still opens."""
+    with sessions() as session:
+        assert auth_service.setup_required(session)
+    app = create_http_app(remote_settings, sessions=sessions, json_response=True)
+
+    async with running(app) as client:
+        with_key = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {KEY}"}
+        )
+        guessed = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": "Bearer nearly"}
+        )
+
+    assert with_key.status_code == 200
+    assert guessed.status_code == 401
+
+
+# --- the bearer key can be a minted key ------------------------------------
+
+
+async def test_a_stored_key_is_accepted_through_the_real_verifier(
+    keyless_settings: Settings, sessions: sessionmaker[Session]
+) -> None:
+    with sessions() as session:
+        auth_service.set_password(session, PASSWORD)
+        _key, token = mcp_keys_service.create_key(session, "laptop")
+    app = create_http_app(keyless_settings, sessions=sessions, json_response=True)
+
+    async with running(app) as client:
+        response = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {token}"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["serverInfo"]["name"] == "blunderbase"
+
+
+async def test_a_revoked_key_is_rejected(
+    keyless_settings: Settings, sessions: sessionmaker[Session]
+) -> None:
+    with sessions() as session:
+        auth_service.set_password(session, PASSWORD)
+        key, token = mcp_keys_service.create_key(session, "laptop")
+    app = create_http_app(keyless_settings, sessions=sessions, json_response=True)
+
+    async with running(app) as client:
+        before = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {token}"}
+        )
+        with sessions() as session:
+            assert mcp_keys_service.delete_key(session, key.id)
+        after = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {token}"}
+        )
+
+    assert before.status_code == 200
+    assert after.status_code == 401
+    assert "serverInfo" not in after.text
+
+
+async def test_a_stored_key_and_the_environment_key_both_open_the_door(
+    remote_settings: Settings, sessions: sessionmaker[Session]
+) -> None:
+    with sessions() as session:
+        auth_service.set_password(session, PASSWORD)
+        _key, token = mcp_keys_service.create_key(session, "laptop")
+    app = create_http_app(remote_settings, sessions=sessions, json_response=True)
+
+    async with running(app) as client:
+        with_env = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {KEY}"}
+        )
+        with_stored = await client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {token}"}
+        )
+
+    assert with_env.status_code == 200
+    assert with_stored.status_code == 200
 
 
 # --- the transport it guards -----------------------------------------------

@@ -1,11 +1,14 @@
-import { Bot, Check, Copy } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bot } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
-import { Button } from '@/components/ui/button'
+import type { McpKeyCreated } from '@/lib/api/types'
 import { MCP_SERVER_NAME } from '@/lib/mcp/status'
+
+import { Snippet } from './CopyButton'
+import { McpKeys } from './McpKeys'
 
 /**
  * The other front door. A client that speaks MCP reads this database the way the app does,
@@ -15,19 +18,22 @@ import { MCP_SERVER_NAME } from '@/lib/mcp/status'
  * else always gets wrong. The server is keyed by the same `MCP_SERVER_NAME` the titlebar
  * shows, so the name in the config a client is handed is the name the chrome talks about.
  *
- * The secret is deliberately a placeholder. `/mcp` accepts the owner's password, so a
- * config with the real one in it is a password on the clipboard and then in a file.
+ * The secret in a snippet is a placeholder unless a key was minted a moment ago. `/mcp`
+ * still accepts the owner's password, but a password in a config file is a password on
+ * disk; a bearer key is what belongs there, and this page is where they are minted. The
+ * token exists in the create response and in this component's state, and nowhere else —
+ * "Done" on the reveal panel drops it and the snippets go back to the placeholder.
  */
-const SECRET = '<your bearer key, or your Blunderbase password>'
+const PLACEHOLDER = '<your bearer key>'
 
-function clientConfig(origin: string): string {
+function clientConfig(origin: string, token: string): string {
   return JSON.stringify(
     {
       mcpServers: {
         [MCP_SERVER_NAME]: {
           type: 'http',
           url: `${origin}/mcp`,
-          headers: { Authorization: `Bearer ${SECRET}` },
+          headers: { Authorization: `Bearer ${token}` },
         },
       },
     },
@@ -36,27 +42,22 @@ function clientConfig(origin: string): string {
   )
 }
 
+function claudeCodeCommand(origin: string, token: string): string {
+  return `claude mcp add --transport http ${MCP_SERVER_NAME} ${origin}/mcp --header "Authorization: Bearer ${token}"`
+}
+
+function codexCommands(origin: string, token: string): string {
+  return [
+    `export BLUNDERBASE_MCP_KEY="${token}"   # add to your shell profile too`,
+    `codex mcp add ${MCP_SERVER_NAME} --url ${origin}/mcp --bearer-token-env-var BLUNDERBASE_MCP_KEY`,
+  ].join('\n')
+}
+
 export function McpPage() {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const config = useMemo(() => clientConfig(window.location.origin), [])
-
-  useEffect(() => () => {
-    if (timer.current !== null) clearTimeout(timer.current)
-  }, [])
-
-  async function copy() {
-    if (timer.current !== null) clearTimeout(timer.current)
-    try {
-      await navigator.clipboard.writeText(config)
-      setState('copied')
-    } catch {
-      // No clipboard permission, or no clipboard at all (an insecure origin) — say so, so
-      // the button is not a no-op. The block below is selectable either way.
-      setState('failed')
-    }
-    timer.current = setTimeout(() => setState('idle'), 1_800)
-  }
+  const [minted, setMinted] = useState<McpKeyCreated | null>(null)
+  const token = minted?.token ?? PLACEHOLDER
+  const origin = window.location.origin
+  const config = useMemo(() => clientConfig(origin, token), [origin, token])
 
   return (
     <PageBody>
@@ -67,41 +68,46 @@ export function McpPage() {
           description="Every game you import is a fact the coach can query over MCP."
         />
 
+        <McpKeys minted={minted} onMinted={setMinted} onDismiss={() => setMinted(null)} />
+
         <section className="flex flex-col rounded-xl border border-line bg-panel">
           <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
             <Bot className="size-3.5 text-faint" aria-hidden />
-            <h2 className="text-xs font-semibold text-ink">Client config</h2>
+            <h2 className="text-xs font-semibold text-ink">Connect a client</h2>
             <div className="flex-1" />
             <span className="font-mono text-[0.625rem] text-dim">streamable HTTP at /mcp</span>
           </div>
 
-          <div className="flex flex-col gap-3 px-3.5 py-3.5">
+          <div className="flex flex-col gap-4 px-3.5 py-3.5">
             <p className="text-[0.71875rem] leading-[1.5] text-dim">
-              Drop this into your MCP client&rsquo;s config and it reads this database over
-              the same URL your browser is on.
+              {minted
+                ? 'These carry the key you just minted; copy them before you press Done.'
+                : 'Mint a key above and these fill in with it; until then the secret is a placeholder to replace.'}{' '}
+              Every client reads this database over the same URL your browser is on.
             </p>
 
-            <pre className="overflow-x-auto rounded-lg border border-hairline bg-elevated px-3 py-2.5 font-mono text-[0.65625rem] leading-[1.6] text-soft">
-              {config}
-            </pre>
+            <Snippet
+              title="Claude Code"
+              text={claudeCodeCommand(origin, token)}
+              copyLabel="Copy command"
+            />
 
-            <div className="flex items-center gap-3">
-              <p className="flex-1 text-[0.6875rem] leading-[1.5] text-faint">
-                The key is{' '}
-                <span className="font-mono text-soft-2">BLUNDERBASE_MCP_BEARER_KEY</span> where
-                the deployment sets one, and your own password where it does not.{' '}
-                <span className="font-mono text-soft-2">make mcp-key</span> prints the local
-                URL and header.
-              </p>
-              <Button type="button" variant="secondary" size="sm" onClick={() => void copy()}>
-                {state === 'copied' ? <Check aria-hidden /> : <Copy aria-hidden />}
-                {state === 'copied'
-                  ? 'Copied'
-                  : state === 'failed'
-                    ? 'No clipboard'
-                    : 'Copy config'}
-              </Button>
-            </div>
+            <Snippet title="Codex" text={codexCommands(origin, token)} copyLabel="Copy commands">
+              Codex only takes the secret from an environment variable, never from the command
+              line, so the first line sets one and the second names it.
+            </Snippet>
+
+            <Snippet title="Any MCP client" text={config} copyLabel="Copy config">
+              Drop this into the client&rsquo;s JSON config.
+            </Snippet>
+
+            <p className="text-[0.6875rem] leading-[1.5] text-faint">
+              Where the deployment sets{' '}
+              <span className="font-mono text-soft-2">BLUNDERBASE_MCP_BEARER_KEY</span> that key
+              is accepted too, and so is your own password — a minted key is just the one that
+              belongs in a file. <span className="font-mono text-soft-2">make mcp-key</span>{' '}
+              prints the local URL and header.
+            </p>
           </div>
         </section>
 

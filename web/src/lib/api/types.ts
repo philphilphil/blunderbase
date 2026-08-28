@@ -1034,6 +1034,26 @@ export interface RunnersStatus {
   queue: QueueTotals
 }
 
+// --- mcp keys -------------------------------------------------------------
+
+/** A bearer key for `/mcp`, minus the secret: only its hash is stored. */
+export interface McpKeyResponse extends Extra {
+  id: number
+  name: string
+  created_at: string
+  last_used_at?: string | null
+}
+
+export interface McpKeyCreate {
+  name: string
+}
+
+/** The one answer that carries the token. It is not readable again from anywhere. */
+export interface McpKeyCreated {
+  key: McpKeyResponse
+  token: string
+}
+
 // --- streams --------------------------------------------------------------
 
 export type StreamSurface = 'game' | 'live'

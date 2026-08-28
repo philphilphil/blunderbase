@@ -37,6 +37,9 @@ import type {
   MaiaFillStatus,
   MaiaPolicyRequest,
   MaiaPolicyResponse,
+  McpKeyCreate,
+  McpKeyCreated,
+  McpKeyResponse,
   MomentResponse,
   MoveEvalResponse,
   NoteCreate,
@@ -393,6 +396,16 @@ export const updateRunner = (id: number, body: RunnerUpdate) =>
   http.patch<RunnerResponse>(`/runners/${id}`, { body })
 
 export const deleteRunner = (id: number) => http.delete<void>(`/runners/${id}`)
+
+// --- mcp keys -------------------------------------------------------------
+
+export const listMcpKeys = () => http.get<McpKeyResponse[]>('/mcp-keys')
+
+/** The one answer that carries a token — nothing stores it, so nothing can show it again. */
+export const createMcpKey = (body: McpKeyCreate) =>
+  http.post<McpKeyCreated>('/mcp-keys', { body })
+
+export const deleteMcpKey = (id: number) => http.delete<void>(`/mcp-keys/${id}`)
 
 // --- streams --------------------------------------------------------------
 

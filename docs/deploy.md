@@ -17,8 +17,8 @@ coach  ──┘
 Everything below is those three rules written out twice, once per proxy.
 
 1. **Pass `Authorization` through untouched.** It is the whole of `/mcp`'s authentication:
-   the bearer key, which is your password unless `BLUNDERBASE_MCP_BEARER_KEY` overrides
-   it. A proxy that consumes the header for its own auth, or clears it, turns every coach
+   the bearer token, which is a key minted on Settings → MCP, your password, or
+   `BLUNDERBASE_MCP_BEARER_KEY`. A proxy that consumes the header for its own auth, or clears it, turns every coach
    request into a 401.
 2. **Do not buffer `/mcp` or `/events`.** `/mcp` answers streamable HTTP — the response is
    a `text/event-stream` that stays open — and `/events` is a WebSocket. A proxy that
@@ -155,7 +155,7 @@ What the failures mean:
 |---|---|
 | `301`/`307` to `/mcp/` | rule 3: a rewrite or a trailing-slash redirect in the proxy |
 | `200` with HTML | the request reached the web app's SPA fallback, not `/mcp` — the location is not matching |
-| `401` with a key you know is right | rule 1: the header is not arriving. `BLUNDERBASE_MCP_BEARER_KEY` set in the container also *replaces* the password as the only accepted token |
+| `401` with a key you know is right | rule 1: the header is not arriving — or the key was revoked on Settings → MCP |
 | the second curl hangs with no output | rule 2: the response is being buffered |
 | `502` after exactly 60s | a read timeout shorter than the coach's longest tool call |
 
@@ -163,7 +163,7 @@ Then add it to a client:
 
 ```bash
 claude mcp add --transport http blunderbase https://blunderbase.example.com/mcp \
-  --header "Authorization: Bearer <your password, or BLUNDERBASE_MCP_BEARER_KEY>"
+  --header "Authorization: Bearer <a key from Settings → MCP, or your password>"
 ```
 
 ## Two settings worth knowing

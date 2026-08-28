@@ -590,10 +590,15 @@ chosen a password the body says `setup_required` rather than `unauthorized`, whi
 the UI knows which screen to show. The check is a database read, so it goes out to a
 worker thread rather than blocking the loop, the same place a `def` handler's queries run.
 
-**The MCP bearer key is the password.** One credential, two front doors: a deployment set
-up through the browser has a remote transport without anyone exporting anything.
-`BLUNDERBASE_MCP_BEARER_KEY` is the override — set, it is the only token accepted, which
-is what keeps existing automation working while the password changes underneath. `/mcp` is
+**The MCP bearer token is the password, or a key minted for the client.** One credential,
+two front doors: a deployment set up through the browser has a remote transport without
+anyone exporting anything. Keys (`services/mcp_keys.py`, the `mcp_keys` table) follow the
+runner-token design — SHA-256 stored, shown once, a row per client so revoking one does not
+sign out every browser — and `services.auth.verify_bearer` tries a key before the
+password so a key never spends a failed attempt on the password's limiter.
+`BLUNDERBASE_MCP_BEARER_KEY` is one more accepted token, checked first and without a
+database read, which is what keeps existing automation working while the rest changes
+underneath. `/mcp` is
 mounted unconditionally — key or no key, password or none yet — because "is there a
 password" is a row rather than a setting, and a row can change while the server is serving.
 The route is added in the lifespan (after the migration) rather than in `create_app`, since

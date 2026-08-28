@@ -31,6 +31,7 @@ import type {
   GamesDeleted,
   ImportRequest,
   LineCreate,
+  McpKeyCreate,
   NoteCreate,
   NoteExportFormat,
   NoteResponse,
@@ -650,6 +651,43 @@ export function useDeleteRunner(options?: UseMutationOptions<void, Error, number
       void client.invalidateQueries({ queryKey: queryKeys.runners() })
       void client.invalidateQueries({ queryKey: queryKeys.engines() })
       void client.invalidateQueries({ queryKey: queryKeys.queue() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+// --- mcp keys -------------------------------------------------------------
+
+export function useMcpKeys(options?: Options<Awaited<ReturnType<typeof api.listMcpKeys>>>) {
+  return useQuery({ queryKey: queryKeys.mcpKeys(), queryFn: api.listMcpKeys, ...options })
+}
+
+/**
+ * Minting a key returns its token once. As with runners the answer is *not* written into
+ * the cache: the token lives in the component's own state and dies with the panel.
+ */
+export function useCreateMcpKey(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.createMcpKey>>, Error, McpKeyCreate>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: McpKeyCreate) => api.createMcpKey(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.mcpKeys() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** A revoke stops the token dead; a client still holding it is refused from the next call. */
+export function useDeleteMcpKey(options?: UseMutationOptions<void, Error, number>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteMcpKey(id),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.mcpKeys() })
       options?.onSuccess?.(...args)
     },
   })
