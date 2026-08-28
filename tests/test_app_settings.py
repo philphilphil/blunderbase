@@ -209,12 +209,17 @@ def test_a_levels_row_edited_by_hand_cannot_break_a_caller(session: Session) -> 
 def test_the_migration_turns_the_old_target_elo_into_the_list(settings: Settings) -> None:
     """A deployment aiming at 1700 keeps aiming at 1700, as the only entry of its list.
 
-    Driven through the real migrations both ways: down one revision, back to the state a
-    deployment from before the list was in, then up again.
+    Driven through the real migrations both ways: back to the state a deployment from
+    before the list was in, then up again.
+
+    The revision is named rather than counted from the head. `-1` was one behind the list
+    migration only for as long as it was the newest one; the next migration to land moved
+    it, and the test went on passing over a downgrade that no longer undid what it meant to
+    (`test_auth` names its revision for the same reason).
     """
     upgrade_to_head(settings)
     config = alembic_config(settings)
-    command.downgrade(config, "-1")
+    command.downgrade(config, "0007_notes_lines")
     with get_sessionmaker(settings)() as session:
         session.execute(text("DELETE FROM app_settings"))
         session.execute(
