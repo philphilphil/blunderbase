@@ -29,11 +29,11 @@ export function EvalBar({
       role="img"
     >
       <div
-        className="absolute inset-x-0 top-0 bg-eval-black transition-[height] duration-200"
+        className="absolute inset-x-0 top-0 bg-side-black transition-[height] duration-200"
         style={{ height: `${100 - white}%` }}
       />
       <div
-        className="absolute inset-x-0 bottom-0 bg-eval-white transition-[height] duration-200"
+        className="absolute inset-x-0 bottom-0 bg-side-white transition-[height] duration-200"
         style={{ height: `${white}%`, opacity: known ? 1 : 0.25 }}
       />
       {known ? (

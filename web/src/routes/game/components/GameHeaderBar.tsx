@@ -1,6 +1,7 @@
+import { SideDot } from '@/components/badges/SideDot'
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { RunStatusBadge, TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
-import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
+import type { Color, GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { formatNodes } from '@/lib/chess/evaluation'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
@@ -51,6 +52,7 @@ export function GameHeaderBar({
 
         <div className="flex flex-wrap items-center gap-2 text-[0.71875rem]">
           <Player
+            side="white"
             name={game.white}
             rating={game.white_rating}
             isOwner={game.color === 'white'}
@@ -58,6 +60,7 @@ export function GameHeaderBar({
           />
           <span className="text-faint-2">vs</span>
           <Player
+            side="black"
             name={game.black}
             rating={game.black_rating}
             isOwner={game.color === 'black'}
@@ -89,12 +92,20 @@ function nodeLabel(run: GameRunSummary): string | null {
   return nodes === '—' ? null : `${nodes}n${multipv}`
 }
 
+/**
+ * One of the two players. The disc in front of the name is which side they had — the same
+ * disc the games table draws in its colour column — and *not* whether they won: a green
+ * dot beside "Black" read as a colour and made the header disagree with the board it sits
+ * above. Winning is said by the name's tone instead, the way the games table says it.
+ */
 function Player({
+  side,
   name,
   rating,
   isOwner,
   won,
 }: {
+  side: Color
   name: string | null | undefined
   rating: number | null | undefined
   isOwner: boolean
@@ -102,8 +113,14 @@ function Player({
 }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={cn('size-[0.4375rem] rounded-full', won ? 'bg-good' : 'bg-edge-strong')} />
-      <span className={cn('truncate', isOwner ? 'font-medium text-ink' : 'text-soft')}>
+      <SideDot side={side} size="sm" />
+      <span
+        className={cn(
+          'truncate',
+          isOwner && 'font-medium',
+          won ? 'text-good' : isOwner ? 'text-ink' : 'text-soft',
+        )}
+      >
         {name ?? 'unknown'}
       </span>
       <span className="font-mono text-[0.65625rem] tabular text-faint">{rating ?? '—'}</span>
