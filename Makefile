@@ -1,5 +1,12 @@
 .PHONY: run backend web install test migrate mcp mcp-http mcp-key release publish
 
+# The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
+# otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
+ifeq ($(OS),Windows_NT)
+export PATH := C:\Program Files\Git\usr\bin;$(PATH)
+SHELL := sh.exe
+endif
+
 KEY_FILE := data/mcp.key
 key = $$(cat $(KEY_FILE))
 
