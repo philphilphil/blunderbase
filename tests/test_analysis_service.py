@@ -664,6 +664,87 @@ def test_a_filled_level_is_merged_over_the_pass_that_was_already_there(
     assert evals[0].eval_before_cp == 12
 
 
+def test_a_fill_says_it_is_one_and_counts_only_the_other_fills(session: Session) -> None:
+    """The event a client draws the queue from: a fill is not a quick pass over the library.
+
+    Both share the quick tier, so the tier alone cannot tell them apart; `maia_only` can,
+    and `outstanding` is the fill's own depth rather than a number an unrelated backfill
+    running alongside it would move.
+    """
+    _engine(session)
+    _maia(session)
+    _analysed(session, _game(session))
+    analysis.request_analysis(session, game_id=_game(session).id)
+    app_settings.set_maia_elos(session, [1500])
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        analysis.queue_maia_fill(session)
+    finally:
+        cancel()
+
+    assert seen == [
+        {
+            "event": analysis.EVENT_BACKFILL,
+            "tier": "quick",
+            "queued": 1,
+            "outstanding": 1,
+            "maia_only": True,
+        }
+    ]
+
+
+def test_a_queued_fill_announces_itself_as_one(session: Session) -> None:
+    """A run row's own events carry it too, which is what the queue widget reads."""
+    _engine(session)
+    _maia(session)
+    _analysed(session, _game(session))
+    app_settings.set_maia_elos(session, [1500])
+    fill = analysis.queue_maia_fill(session)["runs"][0]
+    ordinary = analysis.request_analysis(session, game_id=_game(session).id)
+
+    assert analysis.run_event(analysis.EVENT_RUN_QUEUED, fill)["maia_only"] is True
+    assert analysis.run_event(analysis.EVENT_RUN_QUEUED, ordinary)["maia_only"] is False
+
+
+def test_a_fill_is_not_the_quick_pass_a_backfill_owes_the_game(session: Session) -> None:
+    """A fill searches nothing, so a game whose only quick row is one is still unanalysed."""
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    # Analysed at one phase only, which is not coverage either, and then filled.
+    _analysed(session, game, ("2000",), maia_only=True)
+    app_settings.set_maia_elos(session, [1500])
+    analysis.queue_maia_fill(session)
+
+    assert analysis.count_missing(session) == 1
+    assert [run.game_id for run in analysis.enqueue_missing(session)] == [game.id]
+
+
+def test_stopping_a_backfill_leaves_the_queued_fills_alone(session: Session) -> None:
+    """`cancel_queued` is one tier's stop button; the fill belongs to a pass of its own."""
+    _engine(session)
+    _maia(session)
+    _analysed(session, _game(session))
+    app_settings.set_maia_elos(session, [1500])
+    fill = analysis.queue_maia_fill(session)["runs"][0]
+    # A game nobody has analysed, so the backfill has something of its own to drop.
+    _game(session, plies=6)
+    assert len(analysis.enqueue_missing(session)) == 1
+
+    dropped = analysis.cancel_queued(session)
+
+    assert dropped == 1
+    left = set(
+        session.scalars(select(AnalysisRun.id).where(AnalysisRun.status == RunStatus.QUEUED))
+    )
+    assert left == {fill.id}
+    # And the two counts stay each other's business.
+    assert analysis.outstanding_runs(session) == 0
+    assert analysis.outstanding_runs(session, maia_only=True) == 1
+
+
 # --- enqueueing -----------------------------------------------------------
 
 
@@ -1035,7 +1116,13 @@ def test_a_backfill_announces_the_write_once_and_never_a_run(session: Session) -
         cancel()
 
     assert seen == [
-        {"event": analysis.EVENT_BACKFILL, "tier": "quick", "queued": 3, "outstanding": 3}
+        {
+            "event": analysis.EVENT_BACKFILL,
+            "tier": "quick",
+            "queued": 3,
+            "outstanding": 3,
+            "maia_only": False,
+        }
     ]
 
 
@@ -1094,7 +1181,13 @@ def test_cancelling_a_backfill_leaves_running_and_windowed_runs_alone(session: S
     assert left == {running.id, windowed.id, position.id}
     assert analysis.outstanding_runs(session) == 1
     assert seen == [
-        {"event": analysis.EVENT_BACKFILL, "tier": "quick", "queued": 0, "outstanding": 1}
+        {
+            "event": analysis.EVENT_BACKFILL,
+            "tier": "quick",
+            "queued": 0,
+            "outstanding": 1,
+            "maia_only": False,
+        }
     ]
 
 
@@ -1144,7 +1237,13 @@ def test_clearing_the_queue_drops_every_tier_windowed_and_fill_alike(session: Se
     )
     assert survivors == {running.id}
     assert seen == [
-        {"event": analysis.EVENT_BACKFILL, "tier": "quick", "queued": 0, "outstanding": 1}
+        {
+            "event": analysis.EVENT_BACKFILL,
+            "tier": "quick",
+            "queued": 0,
+            "outstanding": 1,
+            "maia_only": False,
+        }
     ]
 
 

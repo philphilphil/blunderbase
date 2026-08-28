@@ -87,6 +87,12 @@ interface AnalysisBase {
   game_id: number | null
   tier: Tier
   status: RunStatus
+  /**
+   * A Maia fill: the run asks the human-move model about levels the game is missing and
+   * searches nothing. Fills ride in the quick tier's queue, so a reader that goes by
+   * `tier` alone shows one as a quick pass over the game.
+   */
+  maia_only?: boolean
   at?: string
 }
 
@@ -118,6 +124,8 @@ export interface AnalysisBackfillEvent {
   tier: Tier
   queued: number
   outstanding: number
+  /** True for a Maia fill, whose runs share the quick tier but search nothing. */
+  maia_only?: boolean
 }
 
 export type AnalysisEvent = AnalysisRunEvent | AnalysisProgressEvent | AnalysisBackfillEvent

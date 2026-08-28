@@ -307,6 +307,12 @@ export interface MoveRow extends Extra {
 export interface GameRunSummary extends Extra {
   id: number
   tier: Tier
+  /**
+   * A pass that asked the human-move model and searched nothing. It is filed under a tier
+   * to borrow that tier's engine, so the tier alone does not say what the run did; only
+   * a fill carries the key.
+   */
+  maia_only?: boolean
   status: RunStatus
   engine?: string | null
   engine_kind?: EngineKind | null
@@ -499,6 +505,10 @@ export interface RunResponse {
   ply_end?: number | null
   priority: number
   attempts: number
+  /** A Maia fill: this run asks the human-move model and searches nothing. */
+  maia_only?: boolean
+  /** The levels this run was queued for; null means whatever is configured when it runs. */
+  maia_elos?: number[] | null
   created_at: string
   started_at?: string | null
   finished_at?: string | null

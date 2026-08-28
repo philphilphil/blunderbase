@@ -576,7 +576,9 @@ def _missing_games(tier: Tier, *, limit: int | None = None) -> Select[tuple[int]
     "Live" means queued, running or done: a run that failed twice is not retried by a bulk
     command, because whatever is wrong with it will still be wrong. Coverage is a *whole*
     pass, so only a run with both ply bounds NULL counts — a deep look at one phase leaves
-    the game as unanalysed as it was.
+    the game as unanalysed as it was. A Maia fill is not coverage either: it is queued
+    under this tier to borrow its engine and its place in the queue, but it searches
+    nothing, and a game whose only quick-tier row is a fill has still never been analysed.
     """
     covered = (
         select(AnalysisRun.game_id)
@@ -586,6 +588,7 @@ def _missing_games(tier: Tier, *, limit: int | None = None) -> Select[tuple[int]
             AnalysisRun.status != RunStatus.FAILED,
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
+            AnalysisRun.maia_only.is_(False),
         )
         .scalar_subquery()
     )
@@ -601,12 +604,18 @@ def count_missing(session: Session, tier: Tier = Tier.QUICK) -> int:
     return int(total or 0)
 
 
-def outstanding_runs(session: Session, tier: Tier = Tier.QUICK) -> int:
+def outstanding_runs(
+    session: Session, tier: Tier = Tier.QUICK, *, maia_only: bool = False
+) -> int:
     """How deep this tier's full-game queue is: the queued and running rows together.
 
     What a backfill receipt reports and what its event carries. Running rows are in it
     because they are work still to come off the queue, and a client watching a library-wide
     pass wants the number of games it is still waiting for, not the number not yet started.
+
+    `maia_only` picks which of the two kinds of work sharing the tier is being counted: an
+    analysis backfill counts passes that search, a Maia fill counts fills. Neither watcher
+    is told a number the other's work moved.
     """
     total = session.scalar(
         select(func.count())
@@ -617,6 +626,7 @@ def outstanding_runs(session: Session, tier: Tier = Tier.QUICK) -> int:
             AnalysisRun.status.in_([RunStatus.QUEUED, RunStatus.RUNNING]),
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
+            AnalysisRun.maia_only.is_(maia_only),
         )
     )
     return int(total or 0)
@@ -666,7 +676,8 @@ def cancel_queued(session: Session, tier: Tier = Tier.QUICK) -> int:
     already being worked is left to finish, because there is no cancelled status for it to
     move to and one is not worth a migration for the handful of rows in flight. A windowed
     run is a deep look at one phase that somebody asked for by hand and no backfill ever
-    queued, so it stays as well.
+    queued, so it stays as well, and so does a Maia fill: it rides in this tier's queue but
+    belongs to a pass of its own, and `clear_queue` is what takes one of those back.
 
     Announced with the same `analysis.backfill` event the enqueue side emits, for the same
     reason: one frame for the whole write.
@@ -679,6 +690,7 @@ def cancel_queued(session: Session, tier: Tier = Tier.QUICK) -> int:
             AnalysisRun.status == RunStatus.QUEUED,
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
+            AnalysisRun.maia_only.is_(False),
         )
     ).rowcount
     if not dropped:
@@ -693,16 +705,18 @@ def cancel_queued(session: Session, tier: Tier = Tier.QUICK) -> int:
 def clear_queue(session: Session) -> int:
     """Drop every queued run, of any tier, windowed or full-game, fill or not.
 
-    Wider than `cancel_queued`: that one leaves a windowed run and any tier but its own
-    alone, because it is the stop button for one backfill. This is the stop button for the
-    queue itself — the one place an owner who fat-fingered eight hundred Maia-fill runs, or
-    queued the wrong tier over the whole library, can take all of it back at once. A run
+    Wider than `cancel_queued`: that one leaves a windowed run, a Maia fill and any tier
+    but its own alone, because it is the stop button for one backfill. This is the stop
+    button for the queue itself — the one place an owner who fat-fingered eight hundred
+    Maia-fill runs, or queued the wrong tier over the whole library, can take all of it
+    back at once. A run
     already being worked is left to finish, for the reason `cancel_queued` leaves it: there
     is no cancelled status to move it to.
 
     Announced with the same `analysis.backfill` event the other queue-wide writes use, so a
-    client refetches the queue without being handed every dropped row — the tier it carries
-    is nominal here, since nothing about this drop was scoped to one.
+    client refetches the queue without being handed every dropped row — the tier and the
+    `maia_only` it carries are nominal here, since nothing about this drop was scoped to
+    either.
     """
     dropped = session.execute(
         delete(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
@@ -868,7 +882,8 @@ def queue_maia_fill(session: Session, game_ids: Sequence[int] | None = None) -> 
         backfill_event(
             MAIA_FILL_TIER,
             queued=len(queued),
-            outstanding=outstanding_runs(session, MAIA_FILL_TIER),
+            outstanding=outstanding_runs(session, MAIA_FILL_TIER, maia_only=True),
+            maia_only=True,
         ),
     )
     session.commit()
@@ -1311,29 +1326,41 @@ def run_event(event: str, run: AnalysisRun, **extra: Any) -> dict[str, Any]:
         "engine_id": run.engine_id,
         "priority": run.priority,
         "attempts": run.attempts,
+        # What kind of work this is, not only which tier it was filed under: a Maia fill is
+        # a quick-tier row that searches nothing, and a client reading the tier alone
+        # reports it as a quick pass over the game.
+        "maia_only": bool(run.maia_only),
         "at": utcnow().isoformat(),
         **extra,
     }
 
 
-def backfill_event(tier: Tier, *, queued: int, outstanding: int) -> dict[str, Any]:
+def backfill_event(
+    tier: Tier, *, queued: int, outstanding: int, maia_only: bool = False
+) -> dict[str, Any]:
     """The one event a library-wide enqueue or a cancel announces, in place of thousands.
 
     The shape is the contract, because the web client mirrors it by hand and nothing
     generates it from here:
 
-        {"event": "analysis.backfill", "tier": "quick", "queued": 0, "outstanding": 0}
+        {"event": "analysis.backfill", "tier": "quick", "queued": 0, "outstanding": 0,
+         "maia_only": false}
 
     `queued` is how many runs this call added — zero on the cancel path, which took some
     away instead — and `outstanding` is that tier's queued-and-running full-game depth once
-    the write landed. It names no run, deliberately: a client that sees one refetches the
-    queue rather than trying to fold ten thousand rows in one at a time.
+    the write landed. `maia_only` says which of the two passes that share a tier this was:
+    a Maia fill queues quick-tier rows that search nothing, and a client that announced one
+    as "a quick pass over the library" would be describing work nobody asked for.
+
+    It names no run, deliberately: a client that sees one refetches the queue rather than
+    trying to fold ten thousand rows in one at a time.
     """
     return {
         "event": EVENT_BACKFILL,
         "tier": str(Tier(tier)),
         "queued": queued,
         "outstanding": outstanding,
+        "maia_only": maia_only,
     }
 
 
@@ -1345,6 +1372,7 @@ def progress_event(plan: RunPlan, done: int, total: int) -> dict[str, Any]:
         "game_id": plan.game_id,
         "tier": str(plan.tier),
         "status": str(RunStatus.RUNNING),
+        "maia_only": plan.maia_only,
         "done": done,
         "total": total,
         "at": utcnow().isoformat(),

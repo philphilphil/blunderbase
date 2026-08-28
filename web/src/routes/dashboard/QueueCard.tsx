@@ -5,7 +5,7 @@
 import { Link } from 'react-router-dom'
 
 import { QueueDestinations } from '@/components/shell/QueueDestinations'
-import { useGames, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
+import { useGames, useMaiaFill, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
 import type { RunStatus } from '@/lib/api/types'
 import { TIER_STYLES } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
@@ -13,6 +13,15 @@ import { cn } from '@/lib/utils'
 import { Bar, ErrorBlock } from '@/routes/stats/kit/states'
 
 import { useRunActivity, type RunActivity } from './useRunActivity'
+
+/**
+ * What a row calls the work. A Maia fill is queued under the quick tier — for its engine
+ * and for its place behind the deep passes — so the tier is where it was filed, not what
+ * it did: it searches nothing and only asks the human-move model for the levels a game is
+ * missing. Labelling one "quick" is how the card came to report a quick pass over a game
+ * to an owner who had asked for the missing Maia levels and nothing else.
+ */
+const MAIA_CHIP = 'border-brilliant/40 bg-brilliant/10 text-brilliant'
 
 /** How many rows the card shows before it collapses the rest into a count. */
 const ROWS = 4
@@ -54,8 +63,14 @@ function RunRow({
       >
         {label}
       </span>
-      <span className={cn('rounded-sm border px-1.5 py-px text-[0.59375rem]', style.chipClass)}>
-        {run.tier}
+      <span
+        title={run.maiaOnly ? 'the missing Maia levels only; nothing is searched' : undefined}
+        className={cn(
+          'rounded-sm border px-1.5 py-px text-[0.59375rem]',
+          run.maiaOnly ? MAIA_CHIP : style.chipClass,
+        )}
+      >
+        {run.maiaOnly ? 'maia' : run.tier}
       </span>
       {run.status === 'failed' ? (
         <>
@@ -99,6 +114,9 @@ export function QueueCard() {
   // Only to put a name on a run's game; the rows stand without it.
   const games = useGames({ limit: LOOKUP })
   const retry = useRequestAnalysis()
+  // A failed fill is retried as a fill: `retry` would queue a whole engine pass over a
+  // game that has already had one, which is hours of search for the levels it is missing.
+  const refill = useMaiaFill()
 
   const queued = queue.data?.queued ?? 0
   const running = queue.data?.running ?? 0
@@ -171,11 +189,11 @@ export function QueueCard() {
                       ? 'ad-hoc position'
                       : (names.get(run.gameId) ?? `Game #${run.gameId}`)
                   }
-                  retrying={retry.isPending}
+                  retrying={run.maiaOnly ? refill.isPending : retry.isPending}
                   onRetry={() => {
-                    if (run.gameId !== null) {
-                      retry.mutate({ game_id: run.gameId, tier: run.tier })
-                    }
+                    if (run.gameId === null) return
+                    if (run.maiaOnly) refill.mutate([run.gameId])
+                    else retry.mutate({ game_id: run.gameId, tier: run.tier })
                   }}
                 />
               ))}

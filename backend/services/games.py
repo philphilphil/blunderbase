@@ -821,6 +821,9 @@ def _run_summary(run: AnalysisRun) -> dict[str, Any]:
         {
             "id": run.id,
             "tier": str(run.tier),
+            # None rather than False, so `_compact` leaves the key off every ordinary
+            # pass: a run that searched is the reader's default, a fill is what is said.
+            "maia_only": True if run.maia_only else None,
             "status": str(run.status),
             "engine": engine.name if engine is not None else None,
             "engine_kind": str(engine.kind) if engine is not None else None,
