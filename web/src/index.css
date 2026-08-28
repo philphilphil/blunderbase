@@ -90,8 +90,14 @@
   --bb-cell: #181d23; /* engine-panel cell */
   --bb-cell-strong: #1e242b; /* engine-panel cell, top line */
   --bb-eval-track: #1a1e24;
-  --bb-eval-white: #dfe3e8;
-  --bb-eval-black: #20242a;
+  /* how the two sides are drawn wherever one is shown as itself rather than as a
+     surface — the eval bar, the games table's colour column. Unlike a text or a
+     surface token these do *not* swap places between the themes: white is the light
+     one in both, which is the whole point of them being their own names. */
+  --bb-side-white: #dfe3e8;
+  --bb-side-white-edge: #dfe3e8;
+  --bb-side-black: #20242a;
+  --bb-side-black-edge: #3a424b;
   --bb-graph-bg: #0e1216;
   --bb-graph-grid: #1a1f25;
   --bb-graph-axis: #2a313a;
@@ -218,8 +224,10 @@
   --bb-cell: #eaeef3;
   --bb-cell-strong: #dfe5ec;
   --bb-eval-track: #d5dbe2;
-  --bb-eval-white: #ffffff;
-  --bb-eval-black: #4b545e;
+  --bb-side-white: #ffffff;
+  --bb-side-white-edge: #b0b8c2;
+  --bb-side-black: #4b545e;
+  --bb-side-black-edge: #4b545e;
   --bb-graph-bg: #eef1f5;
   --bb-graph-grid: #dfe4ea;
   --bb-graph-axis: #c6ced7;
@@ -307,8 +315,10 @@
   --color-cell: var(--bb-cell);
   --color-cell-strong: var(--bb-cell-strong);
   --color-eval-track: var(--bb-eval-track);
-  --color-eval-white: var(--bb-eval-white);
-  --color-eval-black: var(--bb-eval-black);
+  --color-side-white: var(--bb-side-white);
+  --color-side-white-edge: var(--bb-side-white-edge);
+  --color-side-black: var(--bb-side-black);
+  --color-side-black-edge: var(--bb-side-black-edge);
   --color-graph-bg: var(--bb-graph-bg);
   --color-chip-neutral: var(--bb-chip-neutral);
   --color-chip-info: var(--bb-chip-info);

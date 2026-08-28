@@ -6,6 +6,7 @@ import type * as React from 'react'
 import { memo } from 'react'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
+import { SideDot } from '@/components/badges/SideDot'
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
 import type { GameCard } from '@/lib/api/types'
@@ -108,18 +109,7 @@ export const GameRow = memo(function GameRow({
       </span>
 
       <span style={column('color')} className="flex justify-center">
-        <span
-          aria-label={game.color ?? 'unknown colour'}
-          title={game.color ?? undefined}
-          className={cn(
-            'size-[0.6875rem] rounded-full',
-            game.color === 'white'
-              ? 'bg-ink-2'
-              : game.color === 'black'
-                ? 'border border-edge-hover bg-selected'
-                : 'border border-dashed border-faint',
-          )}
-        />
+        <SideDot side={game.color} />
       </span>
 
       <span
