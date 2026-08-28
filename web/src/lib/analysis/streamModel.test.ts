@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import type { StreamSnapshotEvent } from '@/lib/events/types'
 
+import { whiteWinPercent } from '@/lib/chess/evaluation'
+
 import {
   formatNps,
   formatVariation,
   liveBest,
+  liveScore,
+  liveTop,
   sanLine,
   snapshotFrom,
   type StreamSnapshot,
@@ -175,6 +179,100 @@ describe('liveBest', () => {
       { multipv: 1, cp: 34, mate: null, pv: [] },
     ]
     expect(liveBest(snapshot({ lines }), SICILIAN)).toBe('b8c6')
+  })
+})
+
+describe('liveTop', () => {
+  function snapshot(overrides: Partial<StreamSnapshot> = {}): StreamSnapshot {
+    return {
+      sessionId: 's1',
+      seq: 4,
+      engineId: 1,
+      engine: 'Stockfish 17',
+      runnerId: null,
+      fen: SICILIAN,
+      multipv: 3,
+      depth: 24,
+      nodes: 1_000,
+      nps: 500,
+      timeMs: 1_000,
+      lines: [
+        { multipv: 2, cp: 21, mate: null, pv: ['b8c6', 'd2d4'] },
+        { multipv: 1, cp: 34, mate: null, pv: ['d7d6', 'd2d4', 'c5d4'] },
+        { multipv: 3, cp: null, mate: 5, pv: ['e7e6'] },
+      ],
+      at: '2026-08-26T10:00:10+00:00',
+      ...overrides,
+    }
+  }
+
+  it('takes the lowest multipv, not the first line in the array', () => {
+    expect(liveTop(snapshot(), SICILIAN)).toEqual({
+      multipv: 1,
+      cp: 34,
+      mate: null,
+      pv: ['d7d6', 'd2d4', 'c5d4'],
+    })
+  })
+
+  it('gives nothing for a snapshot about another position', () => {
+    // The reader scrubbed on; the search has not reopened yet.
+    expect(liveTop(snapshot(), START)).toBeNull()
+  })
+
+  it('gives nothing without a snapshot or without a position', () => {
+    expect(liveTop(null, SICILIAN)).toBeNull()
+    expect(liveTop(snapshot(), null)).toBeNull()
+  })
+})
+
+describe('liveScore', () => {
+  it('reads the top line’s cp/mate as they stand, in White’s frame already', () => {
+    // Black to move: `snapshotFrom` has already flipped these lines into White's frame, so
+    // `liveScore` must not flip them a second time — that would silently put White-relative
+    // numbers back into the engine's own (side-to-move) frame on every Black-to-move ply.
+    const snapshot: StreamSnapshot = {
+      sessionId: 's1',
+      seq: 4,
+      engineId: 1,
+      engine: 'Stockfish 17',
+      runnerId: null,
+      fen: SICILIAN,
+      multipv: 1,
+      depth: 24,
+      nodes: 1_000,
+      nps: 500,
+      timeMs: 1_000,
+      // White-relative: Black is a pawn to the good here, so White's cp is negative.
+      lines: [{ multipv: 1, cp: -100, mate: null, pv: ['d7d6'] }],
+      at: '2026-08-26T10:00:10+00:00',
+    }
+    const score = liveScore(snapshot, SICILIAN)
+    expect(score).toEqual({ cp: -100, mate: null })
+    // White is worse off, so White's win percentage sits under 50 — the same sign the panel
+    // prints for this line from `snapshotFrom`'s own White-relative `lines`.
+    expect(whiteWinPercent(score!)).toBeLessThan(50)
+  })
+
+  it('gives nothing for a snapshot about another position, or with no line', () => {
+    const snapshot: StreamSnapshot = {
+      sessionId: 's1',
+      seq: 4,
+      engineId: 1,
+      engine: 'Stockfish 17',
+      runnerId: null,
+      fen: SICILIAN,
+      multipv: 1,
+      depth: 24,
+      nodes: 1_000,
+      nps: 500,
+      timeMs: 1_000,
+      lines: [{ multipv: 1, cp: -100, mate: null, pv: ['d7d6'] }],
+      at: '2026-08-26T10:00:10+00:00',
+    }
+    expect(liveScore(snapshot, START)).toBeNull()
+    expect(liveScore(null, SICILIAN)).toBeNull()
+    expect(liveScore({ ...snapshot, lines: [] }, SICILIAN)).toBeNull()
   })
 })
 

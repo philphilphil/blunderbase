@@ -644,6 +644,45 @@ describe('GamePage', () => {
     expect(screen.getAllByText('+0.40').length).toBeGreaterThan(1)
   })
 
+  it('follows the live search on the board’s eval bar, not the stored eval', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+
+    // Before any live search, the bar says what the game's own run stored for this ply.
+    const bar = () => screen.getByRole('img', { name: /Evaluation/ })
+    expect(bar()).toHaveAttribute('title', expect.stringContaining('+0.40'))
+
+    await user.click(
+      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
+    )
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    const { fen } = streamCalls[0]!.body as { fen: string }
+
+    SilentSocket.instances.at(-1)!.emit({
+      event: 'stream.snapshot',
+      session_id: 'str_1',
+      seq: 1,
+      engine_id: 1,
+      engine: 'stockfish',
+      runner_id: null,
+      fen,
+      multipv: 1,
+      depth: 22,
+      nodes: 1_000,
+      nps: 500,
+      time_ms: 1_000,
+      // Side-to-move (Black) relative: Black up five pawns — wildly unlike the stored
+      // +0.40, so the assertion below can only pass if the bar switched to the live line.
+      lines: [{ multipv: 1, cp: 500, mate: null, pv: ['c7c6'] }],
+      at: new Date().toISOString(),
+    })
+
+    await waitFor(() => expect(bar()).toHaveAttribute('title', expect.stringContaining('−5.00')))
+  })
+
   it('reads the human column at the deployment’s target elo, not at the game’s rating', async () => {
     const user = userEvent.setup()
     vi.stubGlobal(
@@ -726,6 +765,26 @@ describe('GamePage', () => {
     await user.click(screen.getByRole('button', { name: /Back to game/ }))
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
     expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument()
+  })
+
+  it('empties the board’s eval bar once the reader steps off the game line', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+
+    // On the game line, the bar says the stored eval after 1.e4.
+    const bar = () => screen.getByRole('img', { name: /Evaluation/ })
+    expect(bar()).toHaveAttribute('title', expect.stringContaining('+0.40'))
+
+    // Playing the human column's own move branches an analysis line off the game.
+    await user.click(screen.getByTestId('maia-played-row'))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+
+    // No live search is running on the analysis position, so the bar goes to "not
+    // analysed" rather than keep showing the game position's eval under a board that has
+    // left it.
+    expect(bar()).toHaveAttribute('title', 'not analysed')
   })
 
   it('keeps the analysis board walkable after a click the position cannot take', async () => {

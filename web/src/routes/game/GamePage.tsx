@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { liveBest, useStreamSession } from '@/lib/analysis'
+import { liveBest, liveScore, useStreamSession } from '@/lib/analysis'
 import {
   useDeleteLine,
   useDeleteNote,
@@ -19,6 +19,7 @@ import type { LineResponse, MoveRow } from '@/lib/api/types'
 import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
+import { whiteWinPercent } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { buildAnalysisLine, withBoardMove } from './analysisLine'
@@ -900,6 +901,23 @@ function GameStudio({ gameId }: { gameId: number }) {
   const boardEngineBest =
     liveBest(stream.snapshot, boardPosition?.fen ?? null) ?? (exploring ? null : engineBest)
 
+  /**
+   * What the eval bar and the score chip actually describe: the same rule as
+   * `boardEngineBest`, because they are the same claim — a number about the position on the
+   * board, not about the game. The live search wins while one is running on that exact
+   * position; short of that, `score`/`win` are the game's own stored evals, and those are
+   * only true of the game line. Off it (`exploring`) they go to null rather than keep
+   * showing the game position's number under a board that has left it — a stale claim is
+   * worse than an empty one, same as the arrow above.
+   */
+  const boardLiveScore = liveScore(stream.snapshot, boardPosition?.fen ?? null)
+  const boardScore = boardLiveScore ?? (exploring ? null : score)
+  const boardWin = boardLiveScore
+    ? whiteWinPercent(boardLiveScore)
+    : exploring
+      ? null
+      : win
+
   useBoardKeys(
     {
       step,
@@ -1040,8 +1058,8 @@ function GameStudio({ gameId }: { gameId: number }) {
             previewCaption={previewView.caption}
             previewDim={previewView.dim}
             maia={maia}
-            win={win}
-            score={score}
+            win={boardWin}
+            score={boardScore}
             cursor={cursor}
             plyCount={plyCount}
             hints={hints}

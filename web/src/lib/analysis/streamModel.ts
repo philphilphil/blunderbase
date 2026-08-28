@@ -16,7 +16,7 @@ import { parseFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
 import { parseUci } from 'chessops/util'
 
-import { formatNodes } from '@/lib/chess/evaluation'
+import { formatNodes, type Score } from '@/lib/chess/evaluation'
 import type { StreamSnapshotEvent } from '@/lib/events/types'
 import type { StreamLine } from '@/lib/api/types'
 
@@ -110,26 +110,48 @@ export function snapshotFrom(event: StreamSnapshotEvent): StreamSnapshot {
 }
 
 /**
- * The live search's own move in `fen`, in UCI — what the board points at while a search is
- * running on the position it is showing.
+ * The live search's top line for `fen`, or null when the snapshot is about another
+ * position.
  *
  * Staleness is the whole of it. A snapshot carries the position it was searching, and the
  * reader can scrub the move list faster than the search reopens on the new one, so a frame
- * about any other position is dropped rather than drawn: an arrow pointing at a move from
- * two plies back is worse than no live arrow at all, and the caller falls back to the
- * stored run, which is at least a claim about the right position.
+ * about any other position is dropped rather than drawn: an arrow — or an eval bar —
+ * pointing at a position from two plies back is worse than no live answer at all, and the
+ * caller falls back to the stored run, which is at least a claim about the right position.
  *
  * The top line is the one with the lowest `multipv`, not the first in the array — the wire
  * does not promise an order (`InfiniteAnalysisPanel` sorts them for itself).
  */
-export function liveBest(snapshot: StreamSnapshot | null, fen: string | null): string | null {
+export function liveTop(snapshot: StreamSnapshot | null, fen: string | null): StreamLine | null {
   if (!snapshot || !fen || snapshot.fen !== fen) return null
   let top: StreamLine | null = null
   for (const line of snapshot.lines) {
     if (!line.pv?.[0]) continue
     if (!top || line.multipv < top.multipv) top = line
   }
-  return top?.pv[0] ?? null
+  return top
+}
+
+/**
+ * The live search's own move in `fen`, in UCI — what the board points at while a search is
+ * running on the position it is showing. See `liveTop` for the staleness rule this rests on.
+ */
+export function liveBest(snapshot: StreamSnapshot | null, fen: string | null): string | null {
+  return liveTop(snapshot, fen)?.pv[0] ?? null
+}
+
+/**
+ * That line's evaluation, White-relative like everything the app draws.
+ *
+ * `snapshot.lines` are already in White's frame — `snapshotFrom` flips them there once, on
+ * the way in — so this reads `cp`/`mate` straight off the top line with no second flip.
+ * Flipping again here would be right back to the engine's own frame on every Black-to-move
+ * position, silently: the same bug `snapshotFrom`'s doc comment already warns about.
+ */
+export function liveScore(snapshot: StreamSnapshot | null, fen: string | null): Score | null {
+  const top = liveTop(snapshot, fen)
+  if (!top) return null
+  return { cp: top.cp, mate: top.mate }
 }
 
 /** `1840211` -> `1.8M/s`, in the same units the node counts are written in. */

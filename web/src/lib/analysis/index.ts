@@ -10,6 +10,8 @@ export {
   formatNps,
   formatVariation,
   liveBest,
+  liveScore,
+  liveTop,
   sanLine,
   snapshotFrom,
   type StreamSnapshot,
