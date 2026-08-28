@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import { useMaiaTargetElo } from '@/lib/api/queries'
+import { useMaiaElos } from '@/lib/api/queries'
 import type { AppSettings, AppSettingsUpdate, GamesDeleted } from '@/lib/api/types'
 
 import { SettingsPage } from './SettingsPage'
@@ -30,11 +30,12 @@ function json(status: number, body: unknown) {
 }
 
 /**
- * What an install that never opened the page answers with: null everywhere but the target
- * elo, which is always a level — the default one until somebody chooses another.
+ * What an install that never opened the page answers with: null everywhere but the Maia
+ * levels, which are always a level — the default one until somebody chooses another.
  */
 const NOTHING_SET: AppSettings = {
   maia_target_elo: 2000,
+  maia_elos: [2000],
   quick_nodes: null,
   deep_nodes: null,
   deep_multipv: null,
@@ -53,6 +54,10 @@ const WIPED: GamesDeleted = { games: 6, runs: 4, notes: 1, import_jobs: 2 }
 let stored: AppSettings
 /** How many games the library holds — the danger zone reads it, and the wipe empties it. */
 let games: number
+/** How many analysed games are missing one of the configured levels. */
+let missing: number
+/** What the fill queued, so a test can see the button actually asked for the work. */
+let filled: number[] | null | undefined
 
 function clamp(value: number | null, low: number, high: number) {
   return value === null ? null : Math.min(high, Math.max(low, value))
@@ -75,9 +80,21 @@ function stubFetch() {
             detail: 'the classification thresholds have to rise: inaccuracy < mistake < blunder',
           })
         }
+        // The levels are a list, and the list wins: the older single field is what a
+        // client that has only ever known one level sends.
+        const elos = (
+          sent.maia_elos && sent.maia_elos.length > 0
+            ? sent.maia_elos
+            : sent.maia_target_elo === null || sent.maia_target_elo === undefined
+              ? [2000]
+              : [sent.maia_target_elo]
+        )
+          .map((elo) => clamp(elo, 1100, 2000) ?? 2000)
+          .sort((left, right) => left - right)
         stored = {
-          // Cleared is not a state the target elo has: null is the default level.
-          maia_target_elo: clamp(sent.maia_target_elo, 1100, 2000) ?? 2000,
+          // Cleared is not a state the levels have: null is the default level.
+          maia_target_elo: elos[0]!,
+          maia_elos: elos,
           quick_nodes: clamp(sent.quick_nodes, 1, Number.MAX_SAFE_INTEGER),
           deep_nodes: clamp(sent.deep_nodes, 1, Number.MAX_SAFE_INTEGER),
           deep_multipv: clamp(sent.deep_multipv, 1, 10),
@@ -88,6 +105,15 @@ function stubFetch() {
         }
       }
       return json(200, stored)
+    }
+    if (path.endsWith('/api/analysis/maia-fill/status')) {
+      return json(200, { missing_games: missing, configured: stored.maia_elos ?? [] })
+    }
+    if (path.endsWith('/api/analysis/maia-fill')) {
+      filled = (JSON.parse(String(init?.body ?? '{}')) as { game_ids?: number[] }).game_ids
+      const queued = missing
+      missing = 0
+      return json(202, { queued, already_complete: games - queued })
     }
     if (path.endsWith('/api/games/delete-all')) {
       const sent = JSON.parse(String(init?.body)) as { password: string }
@@ -105,6 +131,7 @@ function stubFetch() {
         setup_required: false,
         authenticated: true,
         maia_target_elo: stored.maia_target_elo,
+        maia_elos: stored.maia_elos,
       })
     }
     return json(404, { error: 'not_found', detail: path })
@@ -113,10 +140,10 @@ function stubFetch() {
   return fetchMock
 }
 
-/** The target elo as every other screen reads it — off the bootstrap payload. */
+/** The Maia levels as every other screen reads them — off the bootstrap payload. */
 function Elsewhere() {
-  const elo = useMaiaTargetElo()
-  return <div data-testid="elsewhere">{elo === null ? 'none' : String(elo)}</div>
+  const elos = useMaiaElos()
+  return <div data-testid="elsewhere">{elos === null ? 'none' : elos.join(' ')}</div>
 }
 
 function draw({ withReader = false }: { withReader?: boolean } = {}) {
@@ -145,9 +172,18 @@ function save() {
   return screen.getByRole('button', { name: /save/i })
 }
 
+/** The level chips, in the order the card shows them. */
+function chips() {
+  return [...screen.getByTestId('maia-elos').querySelectorAll('span')]
+    .map((chip) => chip.textContent?.trim() ?? '')
+    .filter((text) => /^\d+$/.test(text))
+}
+
 beforeEach(() => {
   stored = { ...NOTHING_SET }
   games = 6
+  missing = 3
+  filled = undefined
   vi.stubGlobal('WebSocket', FakeSocket)
   stubFetch()
 })
@@ -158,14 +194,14 @@ describe('SettingsPage', () => {
   it('renders a card for every group of settings', async () => {
     draw()
 
-    await loadedField('Target elo')
+    await loadedField('Add a level')
 
     expect(screen.getByText('Maia')).toBeInTheDocument()
     expect(screen.getByText('Analysis')).toBeInTheDocument()
     expect(screen.getByText('Classification')).toBeInTheDocument()
     expect(screen.getByText('Defaults')).toBeInTheDocument()
     for (const label of [
-      'Target elo',
+      'Add a level',
       'Quick nodes',
       'Deep nodes',
       'Deep lines',
@@ -179,12 +215,18 @@ describe('SettingsPage', () => {
   })
 
   it('renders the stored values', async () => {
-    stored = { ...NOTHING_SET, maia_target_elo: 1700, quick_nodes: 50000, deep_multipv: 6 }
+    stored = {
+      ...NOTHING_SET,
+      maia_target_elo: 1500,
+      maia_elos: [1500, 1700],
+      quick_nodes: 50000,
+      deep_multipv: 6,
+    }
 
     draw()
 
-    await waitFor(() => expect(field('Target elo')).toHaveValue(1700))
-    expect(field('Quick nodes')).toHaveValue(50000)
+    await waitFor(() => expect(field('Quick nodes')).toHaveValue(50000))
+    expect(chips()).toEqual(['1500', '1700'])
     expect(field('Deep lines')).toHaveValue(6)
   })
 
@@ -198,37 +240,112 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Default 1500')).toBeInTheDocument()
   })
 
-  it('shows the pinned level in the box on a deployment nobody configured', async () => {
+  it('shows the pinned level on a deployment nobody configured', async () => {
     draw()
 
-    // Not an empty box: there is no such thing as asking Maia at no rating.
-    await waitFor(() => expect(field('Target elo')).toHaveValue(2000))
-    expect(screen.getByText('Default 2000')).toBeInTheDocument()
+    // Not an empty list: there is no such thing as asking Maia at no rating.
+    await waitFor(() => expect(chips()).toEqual(['2000']))
+    expect(screen.getByText(/never none/)).toBeInTheDocument()
   })
 
-  it('puts the level back to the default when its box is emptied', async () => {
-    stored = { ...NOTHING_SET, maia_target_elo: 1700 }
+  it('adds a level, and saves the whole list', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 1700, maia_elos: [1700] }
     draw()
-    await waitFor(() => expect(field('Target elo')).toHaveValue(1700))
+    await waitFor(() => expect(chips()).toEqual(['1700']))
 
-    await userEvent.clear(field('Target elo'))
+    await userEvent.type(field('Add a level'), '1200')
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    // Sorted, because order carries nothing — the set is the setting.
+    expect(chips()).toEqual(['1200', '1700'])
+
     await userEvent.click(save())
+    await waitFor(() => expect(stored.maia_elos).toEqual([1200, 1700]))
+    // The list is what was sent, and the single-level field follows it.
+    expect(stored.maia_target_elo).toBe(1200)
+  })
 
-    await waitFor(() => expect(stored.maia_target_elo).toBe(2000))
-    expect(field('Target elo')).toHaveValue(2000)
+  it('adds the level on Enter rather than saving the form around it', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 1700, maia_elos: [1700] }
+    const fetchMock = vi.mocked(fetch)
+    draw()
+    await waitFor(() => expect(chips()).toEqual(['1700']))
+
+    await userEvent.type(field('Add a level'), '1200{Enter}')
+
+    expect(chips()).toEqual(['1200', '1700'])
+    // Not saved: the list is still a draft, and Save is what commits it.
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+  })
+
+  it('rounds a typed level onto the grid Maia’s weights are named on', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 1700, maia_elos: [1700] }
+    draw()
+    await waitFor(() => expect(chips()).toEqual(['1700']))
+
+    await userEvent.type(await loadedField('Add a level'), '1234')
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    expect(chips()).toEqual(['1250', '1700'])
+  })
+
+  it('adds the owner’s own rating in one click', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 2000, maia_elos: [2000], default_owner_rating: 1680 }
+    draw()
+    await waitFor(() => expect(chips()).toEqual(['2000']))
+
+    // Rounded to the grid, and named on the button so it is a level rather than a promise.
+    await userEvent.click(screen.getByRole('button', { name: 'Your rating (1700)' }))
+    expect(chips()).toEqual(['1700', '2000'])
+    // Offered once: there is nothing to add a second time.
+    expect(screen.queryByRole('button', { name: /your rating/i })).not.toBeInTheDocument()
+  })
+
+  it('removes a level, but never the last one', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 1500, maia_elos: [1500, 1700] }
+    draw()
+    await waitFor(() => expect(chips()).toEqual(['1500', '1700']))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove 1500' }))
+    expect(chips()).toEqual(['1700'])
+    expect(screen.getByRole('button', { name: 'Remove 1700' })).toBeDisabled()
+
+    await userEvent.click(save())
+    await waitFor(() => expect(stored.maia_elos).toEqual([1700]))
+  })
+
+  it('stops at five levels', async () => {
+    stored = { ...NOTHING_SET, maia_elos: [1100, 1300, 1500, 1700, 1900] }
+    draw()
+    await waitFor(() => expect(chips()).toHaveLength(5))
+
+    expect(field('Add a level')).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^add$/i })).toBeDisabled()
+    expect(screen.getByText(/5 levels is the most/)).toBeInTheDocument()
+  })
+
+  it('queues the missing levels over the library, and says what it queued', async () => {
+    draw()
+    const fill = await screen.findByRole('button', { name: /fill in missing maia levels/i })
+    expect(await screen.findByText('3 games missing a level')).toBeInTheDocument()
+
+    await userEvent.click(fill)
+
+    // The whole library, not a selection: the button is about the deployment's levels.
+    await waitFor(() => expect(filled).toBeUndefined())
+    expect(await screen.findByRole('status')).toHaveTextContent('Queued 3 games')
+    await waitFor(() =>
+      expect(screen.getByText('every analysed game has every level')).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('button', { name: /fill in missing maia levels/i })).toBeDisabled()
   })
 
   it('saves every box in one request', async () => {
     draw()
 
-    await userEvent.clear(await loadedField('Target elo'))
-    await userEvent.type(field('Target elo'), '1700')
-    await userEvent.type(field('Quick nodes'), '50000')
+    await userEvent.type(await loadedField('Quick nodes'), '50000')
     await userEvent.type(field('Inaccuracy'), '5')
     await userEvent.click(save())
 
-    await waitFor(() => expect(stored.maia_target_elo).toBe(1700))
-    expect(stored.quick_nodes).toBe(50000)
+    await waitFor(() => expect(stored.quick_nodes).toBe(50000))
     expect(stored.inaccuracy_threshold).toBe(5)
     // A PUT is the whole of the settings: what was left empty stays cleared.
     expect(stored.deep_nodes).toBeNull()
@@ -286,10 +403,10 @@ describe('SettingsPage', () => {
   })
 
   it('does not offer to save what has not changed', async () => {
-    stored = { ...NOTHING_SET, maia_target_elo: 1700 }
+    stored = { ...NOTHING_SET, maia_target_elo: 1700, maia_elos: [1700] }
     const fetchMock = vi.mocked(fetch)
     draw()
-    await waitFor(() => expect(field('Target elo')).toHaveValue(1700))
+    await waitFor(() => expect(chips()).toEqual(['1700']))
 
     expect(save()).toBeDisabled()
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
@@ -354,15 +471,17 @@ describe('SettingsPage', () => {
     }
   })
 
-  it('moves the level every other screen reads, without a reload', async () => {
-    stored = { ...NOTHING_SET, maia_target_elo: 1700 }
+  it('moves the levels every other screen reads, without a reload', async () => {
+    stored = { ...NOTHING_SET, maia_target_elo: 1700, maia_elos: [1700] }
     draw({ withReader: true })
     await waitFor(() => expect(screen.getByTestId('elsewhere')).toHaveTextContent('1700'))
 
-    await userEvent.clear(await loadedField('Target elo'))
-    await userEvent.type(field('Target elo'), '1500')
+    await userEvent.type(await loadedField('Add a level'), '1500')
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
     await userEvent.click(save())
 
-    await waitFor(() => expect(screen.getByTestId('elsewhere')).toHaveTextContent('1500'))
+    // The analysis board asks its live questions at these levels, so the bootstrap payload
+    // has to carry the new list rather than the one this browser started with.
+    await waitFor(() => expect(screen.getByTestId('elsewhere')).toHaveTextContent('1500 1700'))
   })
 })

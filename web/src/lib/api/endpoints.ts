@@ -3,7 +3,7 @@
  * `backend/api/schemas.py`. Nothing here caches — that is TanStack Query's job in
  * `queries.ts`.
  */
-import { http, type QueryValue } from './client'
+import { apiUrl, http, requestDownload, type QueryValue } from './client'
 import type {
   AnalysisRequest,
   AppSettings,
@@ -30,20 +30,28 @@ import type {
   ImportJob,
   ImportRequest,
   ImportStarted,
+  LineCreate,
+  LineResponse,
   LiveState,
+  MaiaFillReceipt,
+  MaiaFillStatus,
   MaiaPolicyRequest,
   MaiaPolicyResponse,
   MomentResponse,
   MoveEvalResponse,
   NoteCreate,
+  NoteExportFormat,
   NoteResponse,
+  NoteScope,
   NoteUpdate,
   PositionAnalysis,
   PositionOccurrence,
   ProbeRequest,
   ProbeResponse,
   ProfileResponse,
+  QueueCleared,
   QueueStatus,
+  ResurfaceResponse,
   RunnerCreate,
   RunnerCreated,
   RunnerResponse,
@@ -179,6 +187,12 @@ export const startBackfill = (tier: Tier = 'quick') =>
 export const cancelBackfill = (tier: Tier = 'quick') =>
   http.post<BackfillCancelled>('/analysis/backfill/cancel', { body: { tier } })
 
+/**
+ * Drops everything still queued, whatever tier or shape it is queued in — the undo for a
+ * queue built up by mistake. Runs already on an engine are left to finish.
+ */
+export const clearQueue = () => http.post<QueueCleared>('/analysis/queue/clear')
+
 export const listRuns = (gameId: number, tier?: Tier) =>
   http.get<RunResponse[]>('/analysis/runs', { query: { game_id: gameId, tier } })
 
@@ -192,6 +206,19 @@ export const getRunEvals = (
 
 export const analyzePosition = (fen: string, nodes?: number) =>
   http.post<PositionAnalysis>('/analysis/position', { body: { fen, nodes } })
+
+/** How many analysed games are missing one of the configured Maia levels. */
+export const getMaiaFillStatus = () => http.get<MaiaFillStatus>('/analysis/maia-fill/status')
+
+/**
+ * Add the missing Maia levels to games that already have a pass — a Maia-only run per
+ * game, merged into what is stored, so a new level costs minutes rather than a re-analysis
+ * of the library. No ids means every analysed game.
+ */
+export const maiaFill = (gameIds?: number[]) =>
+  http.post<MaiaFillReceipt>('/analysis/maia-fill', {
+    body: gameIds && gameIds.length > 0 ? { game_ids: gameIds } : {},
+  })
 
 // --- explorer -------------------------------------------------------------
 
@@ -262,16 +289,31 @@ export const testRunEngine = (id: number, body: SampleRequest = {}) =>
 
 export interface NoteQuery {
   query?: string
+  /** Notes carrying *every* one of these tags. */
   tags?: string[]
   since?: string
   until?: string
   game_id?: number
+  /** Notes on exactly this position. */
   fen?: string
+  /** Which anchors the note has — see `NoteScope`. */
+  scope?: NoteScope
+  /** Notes pinned to one kept variation. */
+  line_id?: number
+  /** True for only the notes that know their position, false for only those that do not. */
+  has_position?: boolean
   limit?: number
 }
 
+/** `NoteQuery` minus the page size: an export is a document, and the backend caps it. */
+export type NoteExportQuery = Omit<NoteQuery, 'limit'>
+
+function noteParams(query: NoteQuery | NoteExportQuery = {}): Record<string, QueryValue> {
+  return query as Record<string, QueryValue>
+}
+
 export const searchNotes = (query: NoteQuery = {}) =>
-  http.get<NoteResponse[]>('/notes', { query: query as Record<string, QueryValue> })
+  http.get<NoteResponse[]>('/notes', { query: noteParams(query) })
 
 export const getNote = (id: number) => http.get<NoteResponse>(`/notes/${id}`)
 
@@ -283,6 +325,47 @@ export const updateNote = (id: number, body: NoteUpdate) =>
 export const deleteNote = (id: number) => http.delete<void>(`/notes/${id}`)
 
 export const listTags = () => http.get<TagCount[]>('/notes/tags')
+
+/**
+ * The notes worth re-reading: ones whose position came back in a recently imported game,
+ * and ones nobody has touched in three weeks. Each item says which of the two it is.
+ */
+export const resurfaceNotes = (limit?: number) =>
+  http.get<ResurfaceResponse>('/notes/resurface', { query: { limit } })
+
+/** The href of an export, for a link that wants one. `exportNotes` is what a button uses. */
+export const exportNotesUrl = (format: NoteExportFormat = 'md', query: NoteExportQuery = {}) =>
+  apiUrl('/notes/export', { ...noteParams(query), format })
+
+/**
+ * The notes the same filters would list, as a document to keep — Markdown for a person,
+ * PGN for a board program.
+ *
+ * Fetched rather than linked to: a link cannot report a failure (the browser would navigate
+ * to the error body) and cannot read the filename the backend chose. Hand the result to
+ * `saveDownload` from `./client` to put it on disk.
+ */
+export const exportNotes = (format: NoteExportFormat = 'md', query: NoteExportQuery = {}) =>
+  requestDownload('/notes/export', {
+    query: { ...noteParams(query), format },
+    fallbackName: format === 'pgn' ? 'blunderbase-notes.pgn' : 'blunderbase-notes.md',
+  })
+
+// --- lines ----------------------------------------------------------------
+
+/**
+ * Pin a variation off a game. Idempotent by shape rather than by id — a line already
+ * covered by a kept one comes back as that one, and a longer one extends it — so pinning
+ * the same branch twice is one row, and the answer says which row it is.
+ */
+export const saveLine = (body: LineCreate) => http.post<LineResponse>('/lines', { body })
+
+/** Every kept variation of a game, each with the notes hanging off it. */
+export const listLines = (gameId: number) =>
+  http.get<LineResponse[]>(`/games/${gameId}/lines`)
+
+/** Unpin it. Notes written about the line survive with their `line_id` cleared. */
+export const deleteLine = (id: number) => http.delete<void>(`/lines/${id}`)
 
 // --- search ---------------------------------------------------------------
 

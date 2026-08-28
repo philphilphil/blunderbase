@@ -110,6 +110,56 @@ describe('invalidationsFor — notes', () => {
     const keys = invalidationsFor({ ...note, event: 'note.created', game_id: null })
     expect(names(keys)).toEqual([JSON.stringify(queryKeys.notes())])
   })
+
+  it('takes the kept lines with it when the note is about a variation', () => {
+    const keys = invalidationsFor({ ...note, event: 'note.created', game_id: 42, line_id: 8 })
+    expect(has(keys, queryKeys.lines())).toBe(true)
+    expect(has(keys, ['games', 'detail', 42])).toBe(true)
+  })
+
+  it('leaves the lines alone for a note that pinned none', () => {
+    const keys = invalidationsFor({ ...note, event: 'note.updated', game_id: 42 })
+    expect(has(keys, queryKeys.lines())).toBe(false)
+  })
+
+  it('treats a forgotten note like a written one — the anchors are all it carries', () => {
+    const keys = invalidationsFor({
+      event: 'note.deleted',
+      note_id: 12,
+      game_id: 42,
+      line_id: 8,
+    })
+    expect(has(keys, queryKeys.notes())).toBe(true)
+    expect(has(keys, queryKeys.lines())).toBe(true)
+    expect(has(keys, ['games', 'detail', 42])).toBe(true)
+    expect(has(keys, queryKeys.games())).toBe(false)
+  })
+})
+
+describe('invalidationsFor — lines', () => {
+  const line: AnyEvent = {
+    event: 'line.created',
+    line_id: 8,
+    game_id: 42,
+    base_ply: 24,
+    moves: ['e2e4', 'e7e5'],
+    sans: ['e4', 'e5'],
+    created_at: '2026-08-25T10:00:00Z',
+    updated_at: '2026-08-25T10:00:00Z',
+  }
+
+  it('refetches the lines, their notes and the one game the variation hangs off', () => {
+    const keys = invalidationsFor(line)
+    expect(has(keys, queryKeys.lines())).toBe(true)
+    expect(has(keys, queryKeys.notes())).toBe(true)
+    expect(has(keys, ['games', 'detail', 42])).toBe(true)
+  })
+
+  it('refetches the notes on an unpin too — a note survives the line it was pinned to', () => {
+    const keys = invalidationsFor({ event: 'line.deleted', line_id: 8, game_id: 42 })
+    expect(has(keys, queryKeys.notes())).toBe(true)
+    expect(has(keys, queryKeys.games())).toBe(false)
+  })
 })
 
 describe('invalidationsFor — runners', () => {

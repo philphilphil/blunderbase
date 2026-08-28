@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   MAX_KEPT_VARIATIONS,
+  dropVariation,
   isPrefix,
   keepVariation,
   resetSessionVariations,
@@ -98,5 +99,22 @@ describe('sessionVariations', () => {
     expect(isPrefix(['a', 'b'], ['a'])).toBe(false)
     expect(isPrefix(['b'], ['a', 'b'])).toBe(false)
     expect(isPrefix([], ['a'])).toBe(true)
+  })
+})
+
+describe('dropVariation', () => {
+  it('forgets one line and leaves the rest where they are', () => {
+    keepVariation(1, 0, ['e2e4'])
+    keepVariation(1, 2, ['g1f3'])
+    const [first, second] = read(1)
+    dropVariation(1, first!.id)
+    expect(read(1).map((kept) => kept.id)).toEqual([second!.id])
+  })
+
+  it('says nothing about an id it does not hold, so pinning twice is not an error', () => {
+    keepVariation(1, 0, ['e2e4'])
+    dropVariation(1, 999)
+    dropVariation(2, 1)
+    expect(read(1)).toHaveLength(1)
   })
 })

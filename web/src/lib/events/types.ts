@@ -4,7 +4,9 @@
  */
 import type {
   JobStatus,
+  LineResponse,
   LiveState,
+  NoteSource,
   RunStatus,
   RunnerTransport,
   Source,
@@ -27,6 +29,9 @@ export const EVENT_NAMES = [
   'analysis.backfill',
   'note.created',
   'note.updated',
+  'note.deleted',
+  'line.created',
+  'line.deleted',
   'live.updated',
   'stream.started',
   'stream.snapshot',
@@ -117,16 +122,57 @@ export interface AnalysisBackfillEvent {
 
 export type AnalysisEvent = AnalysisRunEvent | AnalysisProgressEvent | AnalysisBackfillEvent
 
-export interface NoteEvent {
+/**
+ * A note written or rewritten — the whole note payload, flat, with `note_id` for its id.
+ * The coach over MCP writes these, and so does another tab.
+ */
+export interface NoteWrittenEvent {
   event: 'note.created' | 'note.updated'
   note_id: number
   text: string
   tags: string[]
   game_id: number | null
   position_id: number | null
+  line_id?: number | null
+  /** A half-move count: 0 is the start, `n` the position after `n` half-moves. */
+  ply?: number | null
+  source?: NoteSource
+  fen?: string | null
+  line?: LineResponse | null
   created_at: string
   updated_at: string
 }
+
+/** A note forgotten. Only the anchors, because the note itself is gone. */
+export interface NoteDeletedEvent {
+  event: 'note.deleted'
+  note_id: number
+  game_id: number | null
+  line_id: number | null
+}
+
+export type NoteEvent = NoteWrittenEvent | NoteDeletedEvent
+
+/** A variation pinned — the whole line payload, flat, with `line_id` for its id. */
+export interface LineCreatedEvent {
+  event: 'line.created'
+  line_id: number
+  game_id: number
+  base_ply: number
+  moves: string[]
+  sans: string[]
+  created_at: string
+  updated_at: string
+}
+
+/** A variation unpinned. Notes about it survive with their `line_id` cleared. */
+export interface LineDeletedEvent {
+  event: 'line.deleted'
+  line_id: number
+  game_id: number
+}
+
+export type LineEvent = LineCreatedEvent | LineDeletedEvent
 
 export type LiveUpdatedEvent = { event: 'live.updated' } & LiveState
 
@@ -219,6 +265,7 @@ export type BlunderbaseEvent =
   | ImportEvent
   | AnalysisEvent
   | NoteEvent
+  | LineEvent
   | LiveUpdatedEvent
   | StreamEvent
   | RunnerEvent

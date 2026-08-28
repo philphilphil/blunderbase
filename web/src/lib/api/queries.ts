@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
-import { ApiError } from './client'
+import { ApiError, type Download } from './client'
 import * as api from './endpoints'
 import { queryKeys } from './keys'
 import { DEFAULT_MAIA_TARGET_ELO } from './types'
@@ -30,7 +30,10 @@ import type {
   GameFilters,
   GamesDeleted,
   ImportRequest,
+  LineCreate,
   NoteCreate,
+  NoteExportFormat,
+  NoteResponse,
   NoteUpdate,
   RunnerCreate,
   RunnerUpdate,
@@ -54,16 +57,28 @@ export function useAuthStatus(options?: Options<Awaited<ReturnType<typeof api.au
 }
 
 /**
- * The one level this deployment asks Maia at, off the bootstrap payload every screen
- * already has.
+ * Every level this deployment asks Maia at, off the bootstrap payload every screen already
+ * has — lowest first, and never empty once it has landed.
  *
- * `useAuthStatus` here subscribes to the query `AuthProvider` mounted rather than issuing
- * a second one. `null` is the payload not having landed yet, never a deployment without a
- * level: there is always a level.
+ * `useAuthStatus` here subscribes to the query `AuthProvider` mounted rather than issuing a
+ * second one. `null` is the payload not having arrived yet, never a deployment without
+ * levels: there are always levels. A deployment that predates the list (or a status this
+ * client made up for itself, signed out) is read as the single level it does name.
+ */
+export function useMaiaElos(): number[] | null {
+  const { data } = useAuthStatus()
+  if (!data) return null
+  const elos = data.maia_elos
+  if (Array.isArray(elos) && elos.length > 0) return elos
+  return typeof data.maia_target_elo === 'number' ? [data.maia_target_elo] : null
+}
+
+/**
+ * The first of `useMaiaElos` — kept for the screens that show a single level, and for the
+ * one place a level has to be named without a choice.
  */
 export function useMaiaTargetElo(): number | null {
-  const { data } = useAuthStatus()
-  return typeof data?.maia_target_elo === 'number' ? data.maia_target_elo : null
+  return useMaiaElos()?.[0] ?? null
 }
 
 function useAuthMutation<Variables>(
@@ -147,10 +162,11 @@ export function useAppSettings(options?: Options<Awaited<ReturnType<typeof api.g
 /**
  * Save the settings, and make every screen that was rendered against the old ones catch up.
  *
- * The Maia target elo is not only this page's: it rides on the bootstrap payload
- * (`useMaiaTargetElo`) and it is the level the analysis board asks its live questions at.
- * So the write invalidates `auth` and `maia` as well as its own key, and the game page
- * picks the new level up without a reload.
+ * The Maia levels are not only this page's: they ride on the bootstrap payload
+ * (`useMaiaElos`) and they are the levels the analysis board asks its live questions at.
+ * So the write invalidates `auth` and `maia` as well as its own key — and `analysis`, whose
+ * `maia-fill` count is an answer about the levels that were just changed — and the game
+ * page picks them up without a reload.
  */
 export function useSaveAppSettings(
   options?: UseMutationOptions<AppSettings, Error, AppSettingsUpdate>,
@@ -163,6 +179,7 @@ export function useSaveAppSettings(
       client.setQueryData(queryKeys.settings(), args[0])
       void client.invalidateQueries({ queryKey: queryKeys.auth() })
       void client.invalidateQueries({ queryKey: queryKeys.maia() })
+      void client.invalidateQueries({ queryKey: queryKeys.maiaFill() })
       options?.onSuccess?.(...args)
     },
   })
@@ -341,6 +358,24 @@ export function useCancelBackfill(
   const client = useQueryClient()
   return useMutation({
     mutationFn: (tier: Tier) => api.cancelBackfill(tier),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * The undo for a queue built up by mistake: every tier, windowed or full-game, fill or
+ * not. What an engine already has claimed is left to finish — see `api.clearQueue`.
+ */
+export function useClearQueue(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.clearQueue>>, Error, void>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.clearQueue(),
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
@@ -675,10 +710,41 @@ export function useNotes(
   })
 }
 
+/** One note by id — what `/notes?note=12` from the command palette lands on. */
+export function useNote(id: number, options?: Options<Awaited<ReturnType<typeof api.getNote>>>) {
+  return useQuery({
+    queryKey: queryKeys.note(id),
+    queryFn: () => api.getNote(id),
+    ...options,
+  })
+}
+
 export function useNoteTags(options?: Options<Awaited<ReturnType<typeof api.listTags>>>) {
   return useQuery({ queryKey: queryKeys.noteTags(), queryFn: api.listTags, ...options })
 }
 
+/**
+ * The notes worth re-reading — a recurrence in a recent game, or three weeks of silence.
+ *
+ * Under `['notes']`, so writing a note refreshes the section: what the owner has just
+ * rewritten is no longer stale, and the list should stop saying so.
+ */
+export function useResurfacedNotes(
+  limit?: number,
+  options?: Options<Awaited<ReturnType<typeof api.resurfaceNotes>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.noteResurface(limit ?? null),
+    queryFn: () => api.resurfaceNotes(limit),
+    ...options,
+  })
+}
+
+/**
+ * Write a note. What it touches depends on what it landed on, which the answer names: a
+ * note on a game rides in that game's detail payload, and a note that pinned a variation
+ * has just created a line the game page renders.
+ */
 export function useSaveNote(
   options?: UseMutationOptions<Awaited<ReturnType<typeof api.saveNote>>, Error, NoteCreate>,
 ) {
@@ -687,7 +753,7 @@ export function useSaveNote(
     mutationFn: (body: NoteCreate) => api.saveNote(body),
     ...options,
     onSuccess: (...args) => {
-      void client.invalidateQueries({ queryKey: queryKeys.notes() })
+      noteWritten(client, args[0])
       options?.onSuccess?.(...args)
     },
   })
@@ -705,7 +771,117 @@ export function useUpdateNote(
     mutationFn: ({ id, body }: { id: number; body: NoteUpdate }) => api.updateNote(id, body),
     ...options,
     onSuccess: (...args) => {
+      noteWritten(client, args[0])
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * Forget a note. The answer is a 204, so nothing here knows what the note hung on: every
+ * game detail and every line list goes back to the server rather than the one that held it.
+ */
+export function useDeleteNote(options?: UseMutationOptions<void, Error, number>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteNote(id),
+    ...options,
+    onSuccess: (...args) => {
+      for (const queryKey of [
+        queryKeys.notes(),
+        queryKeys.lines(),
+        queryKeys.gameDetails(),
+      ]) {
+        void client.invalidateQueries({ queryKey })
+      }
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * The filtered notes as a document — Markdown or PGN. A mutation rather than a query
+ * because it is an action with no cached answer; hand the result to `saveDownload`.
+ */
+export function useExportNotes(
+  options?: UseMutationOptions<
+    Download,
+    Error,
+    { format?: NoteExportFormat; query?: api.NoteExportQuery }
+  >,
+) {
+  return useMutation({
+    mutationFn: ({
+      format = 'md',
+      query = {},
+    }: {
+      format?: NoteExportFormat
+      query?: api.NoteExportQuery
+    }) => api.exportNotes(format, query),
+    ...options,
+  })
+}
+
+/** What one note write makes stale: the notes, its game's detail, and any line it pinned. */
+function noteWritten(client: ReturnType<typeof useQueryClient>, note: NoteResponse): void {
+  const keys = [queryKeys.notes()]
+  if (typeof note.line_id === 'number') keys.push(queryKeys.lines())
+  if (typeof note.game_id === 'number') keys.push(queryKeys.gameDetail(note.game_id))
+  for (const queryKey of keys) void client.invalidateQueries({ queryKey })
+}
+
+// --- lines ----------------------------------------------------------------
+
+/** The variations kept on a game, each with its notes. */
+export function useGameLines(
+  gameId: number,
+  options?: Options<Awaited<ReturnType<typeof api.listLines>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.gameLines(gameId),
+    queryFn: () => api.listLines(gameId),
+    ...options,
+  })
+}
+
+/**
+ * Pin a variation. The answer is the row that now holds it, which may be one that was
+ * already there (a prefix) or one just extended — so the caller reads the id off the
+ * answer rather than assuming a new line.
+ */
+export function useSaveLine(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.saveLine>>, Error, LineCreate>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: LineCreate) => api.saveLine(body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.lines() })
+      void client.invalidateQueries({ queryKey: queryKeys.gameDetail(args[0].game_id) })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * Unpin a variation. Its notes survive with their `line_id` cleared, so the notes move
+ * too — a note that was a line note is a game note afterwards.
+ */
+export function useDeleteLine(
+  options?: UseMutationOptions<void, Error, { id: number; gameId?: number }>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }: { id: number; gameId?: number }) => api.deleteLine(id),
+    ...options,
+    onSuccess: (...args) => {
+      const gameId = args[1].gameId
+      void client.invalidateQueries({ queryKey: queryKeys.lines() })
       void client.invalidateQueries({ queryKey: queryKeys.notes() })
+      void client.invalidateQueries({
+        queryKey: typeof gameId === 'number' ? queryKeys.gameDetail(gameId) : queryKeys.gameDetails(),
+      })
       options?.onSuccess?.(...args)
     },
   })
@@ -716,29 +892,45 @@ export function useUpdateNote(
 export interface MaiaPolicyQuery {
   /** Null keeps the query shut — nothing is asked about "no position". */
   fen: string | null
+  /** One level. The single-level spelling of `elos`, kept because callers still use it. */
   elo?: number | null
+  /** Every level wanted, in one call. Null or empty asks the deployment's configured ones. */
+  elos?: number[] | null
   moves?: number
   rolloutPlies?: number
 }
 
 /**
- * The human model on the position the analysis board is standing on.
+ * The human model on the position the analysis board is standing on — every level asked
+ * for in one request.
  *
- * A position never changes its answer, so the result is cached forever under its FEN:
- * stepping back into a line the reader has already walked costs no round trip. Nothing is
- * retried — a `409` (no local Maia) is a standing fact about the deployment, not a blip,
- * and the panel hides itself on it.
+ * A position never changes its answer, so the result is cached forever under its FEN and
+ * levels: stepping back into a line the reader has already walked costs no round trip.
+ * Several levels are one query rather than one per level because they are one call on the
+ * backend — a single warm process under a single lock — and because a comparison whose
+ * columns arrive one at a time reads as five loading panels.
+ *
+ * Nothing is retried: a `409` (no local Maia) is a standing fact about the deployment, not
+ * a blip, and the panel hides itself on it.
  */
 export function useMaiaPolicy(
-  { fen, elo = null, moves, rolloutPlies = 0 }: MaiaPolicyQuery,
+  { fen, elo = null, elos = null, moves, rolloutPlies = 0 }: MaiaPolicyQuery,
   options?: Options<Awaited<ReturnType<typeof api.maiaPolicy>>>,
 ) {
+  // Sorted and deduped here rather than at the call site, so that two callers asking for
+  // the same levels in a different order share one cache entry and one request.
+  const wanted = levelsAsked(elos, elo)
+  // One level goes on the wire as `elo` rather than as a list of one: it is the request
+  // this endpoint has always answered, and it keeps a single-level board's traffic
+  // byte-for-byte what it was.
+  const single = wanted?.length === 1 ? wanted[0] : undefined
   return useQuery({
-    queryKey: queryKeys.maiaPolicy(fen ?? '', elo, rolloutPlies),
+    queryKey: queryKeys.maiaPolicy(fen ?? '', wanted, rolloutPlies),
     queryFn: () =>
       api.maiaPolicy({
         fen: fen ?? '',
-        elo,
+        elo: single,
+        elos: single === undefined ? (wanted ?? undefined) : undefined,
         moves,
         rollout_plies: rolloutPlies || undefined,
       }),
@@ -746,6 +938,53 @@ export function useMaiaPolicy(
     retry: false,
     staleTime: Infinity,
     ...options,
+  })
+}
+
+/** The levels a query is about: `elos` if it named any, else `elo`, else the configured ones. */
+function levelsAsked(elos: number[] | null | undefined, elo: number | null): number[] | null {
+  if (elos && elos.length > 0) return [...new Set(elos)].sort((left, right) => left - right)
+  return elo === null ? null : [elo]
+}
+
+/**
+ * How many analysed games are missing one of the configured levels — the number the fill
+ * button labels itself with.
+ *
+ * Under `['analysis']`, so it catches up on its own as the fill's runs come back.
+ */
+export function useMaiaFillStatus(
+  options?: Options<Awaited<ReturnType<typeof api.getMaiaFillStatus>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.maiaFill(),
+    queryFn: api.getMaiaFillStatus,
+    ...options,
+  })
+}
+
+/**
+ * Queue the missing Maia levels over the library (or over the games named).
+ *
+ * The answer is counts rather than runs, so the queue is what the caller watches from
+ * here — and pressing twice queues the work once, because a fill already in flight counts
+ * as complete.
+ */
+export function useMaiaFill(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.maiaFill>>,
+    Error,
+    number[] | undefined
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (gameIds?: number[]) => api.maiaFill(gameIds),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
   })
 }
 

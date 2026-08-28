@@ -18,7 +18,9 @@ Three decisions shape this module:
   than showing an error nobody can act on.
 - **`policy_at` is the one policy call.** It is what the batch pass uses, so the entries
   the board shows and the entries a run stored are the same shape, level key and all —
-  including the way a fixed-weights build answers for the single level it *is*.
+  including the way a fixed-weights build answers for the single level it *is*. Every
+  configured level is asked in one call, on the one warm process under the one lock, because
+  the reading that teaches something is the comparison between them.
 
 Nothing here writes to the database; the Session is only read from, on every query — which
 engine to start and what level to ask it about — so changing either in Settings takes
@@ -30,6 +32,7 @@ from __future__ import annotations
 import logging
 import re
 import threading
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import Session
@@ -101,17 +104,29 @@ class LiveMaia:
         *,
         fen: str,
         elo: int | None = None,
+        elos: Sequence[int] | None = None,
         moves: int | None = None,
         rollout_plies: int = 0,
     ) -> dict[str, Any]:
-        """One position's human-move policy, and optionally the line it leads to.
+        """One position's human-move policy per level, and optionally the lines they lead to.
 
-        `elo` defaults to the configured target, then to the owner's default rating, and is
-        clamped to what this build declares it can answer for. What comes *back* is the
-        level the engine actually played as, which for a fixed-weights build is not the
-        number that was asked for at all (`_reported_level`) — so the board never labels a
-        column with a human this engine never imitated, and reports no number rather than a
-        wrong one where the build's own level is nowhere written down.
+        The levels default to the ones configured in Settings — all of them, in one call and
+        on the one warm process under the one lock, because the board's whole question is
+        "and what would a *weaker* human play here" and two round trips per position would
+        double the cost of asking it. `elo` is the older way of naming a single one and still
+        works.
+
+        Every level is clamped to what this build declares it can answer for, and what comes
+        *back* per level is the level the engine actually played as, which for a fixed-weights
+        build is not the number that was asked for at all (`_reported_level`) — so the board
+        never labels a column with a human this engine never imitated, and reports no number
+        rather than a wrong one where the build's own level is nowhere written down. Such a
+        build answers with one level however many were asked for: it is one rating, and
+        showing the same policy in five columns would invent a comparison.
+
+        The answer carries `levels` — one entry per level, keyed by it — plus the first
+        level's own `elo`/`policy`/`rollout` at the top, which is the shape the board read
+        before there was more than one.
         """
         board = read_board(fen)
         wanted = max(1, int(moves) if moves is not None else _policy_moves())
@@ -120,18 +135,57 @@ class LiveMaia:
 
         with self._lock:
             adapter = self._open(engine)
-            level = self._level(session, adapter, elo)
-            reported = _reported_level(adapter, engine, level)
+            levels = self._levels(session, adapter, elo=elo, elos=elos)
             try:
-                policy = _policy_at(adapter, board, level, wanted)
-                rollout = self._rollout(adapter, board, level, plies)
+                answers = self._answers(adapter, engine, board, levels, wanted, plies)
             except LiveMaiaUnavailableError:
                 # The process is the suspect, not the position: drop it so the next query
                 # starts a fresh one rather than talking to a corpse.
                 self._close()
                 raise
             self._arm_idle_timer()
-        return {"elo": reported, "policy": policy, "rollout": rollout}
+        first = next(iter(answers.values()))
+        return {
+            "elo": first["elo"],
+            "policy": first["policy"],
+            "rollout": first["rollout"],
+            "levels": answers,
+        }
+
+    def _answers(
+        self,
+        adapter: MaiaAdapter,
+        engine: Engine,
+        board: chess.Board,
+        levels: Sequence[int],
+        moves: int,
+        plies: int,
+    ) -> dict[str, dict[str, Any]]:
+        """One entry per level the engine can honour, keyed by the level asked for.
+
+        Keyed by the *request*, not by the reported level, so a caller that asked about 1500
+        finds its answer where it put the question — the honest reading of what played is
+        the entry's own `elo`. A fixed-weights build is the exception: it plays one rating,
+        so it answers once, under the level its weights name where they name one.
+        """
+        if not adapter.supports_rating:
+            reported = _reported_level(adapter, engine, levels[0])
+            key = str(reported if reported is not None else levels[0])
+            return {
+                key: {
+                    "elo": reported,
+                    "policy": _policy_at(adapter, board, levels[0], moves),
+                    "rollout": self._rollout(adapter, board, levels[0], plies),
+                }
+            }
+        return {
+            str(level): {
+                "elo": _reported_level(adapter, engine, level),
+                "policy": _policy_at(adapter, board, level, moves),
+                "rollout": self._rollout(adapter, board, level, plies),
+            }
+            for level in levels
+        }
 
     def _rollout(
         self, adapter: MaiaAdapter, board: chess.Board, level: int, plies: int
@@ -251,31 +305,44 @@ class LiveMaia:
             "what a human would play"
         )
 
-    def _level(self, session: Session, adapter: MaiaAdapter, requested: int | None) -> int:
-        """The level to *ask* for: what the caller asked for, else the target, clamped.
+    def _levels(
+        self,
+        session: Session,
+        adapter: MaiaAdapter,
+        *,
+        elo: int | None = None,
+        elos: Sequence[int] | None = None,
+    ) -> list[int]:
+        """The levels to *ask* for: what the caller asked for, else the configured ones.
 
-        The target is the deployment's one Maia level, so a board nobody has given a level
-        speaks for the same human the stored runs do; a caller that names one is exploring
-        another rating deliberately, and gets it.
+        The configured levels are the deployment's own, so a board nobody has given a level
+        speaks for the same humans the stored runs do; a caller that names some is exploring
+        other ratings deliberately, and gets them.
 
-        For a build that declares `SelfElo` this is the level it is conditioned on. For a
-        fixed-weights build it conditions nothing — it survives only as the key
+        For a build that declares `SelfElo` these are the levels it is conditioned on. For a
+        fixed-weights build they condition nothing — one of them survives as the key
         `policy_at` files the answer under, which is why what gets reported back is
-        `_reported_level`, not this.
+        `_reported_level`, not these.
 
-        The target is read out of the database on every query, the same way the engine to
-        start is: changing it on the Settings page takes effect on the next thing the board
-        asks, without restarting anything or dropping the warm process.
+        Read out of the database on every query, the same way the engine to start is:
+        changing them on the Settings page takes effect on the next thing the board asks,
+        without restarting anything or dropping the warm process.
         """
         from backend.services.analysis import maia_bounds
 
-        base = requested
-        if base is None:
-            base = app_settings_service.get_maia_target_elo(session)
+        if elos:
+            base = list(elos)
+        elif elo is not None:
+            base = [elo]
+        else:
+            base = app_settings_service.get_maia_elos(session)
         bounds = maia_bounds(adapter)
         low = int(bounds.get("low", MAIA_MIN_RATING))
         high = int(bounds.get("high", MAIA_MAX_RATING))
-        return min(high, max(low, int(base)))
+        # Cleaned first, so a caller cannot ask for fifty levels and hold the one warm
+        # process for fifty policy queries; then pulled into what this build can answer.
+        cleaned = app_settings_service.clean_maia_elos(base)
+        return sorted({min(high, max(low, int(level))) for level in cleaned})
 
 
 # --- module-level helpers --------------------------------------------------
@@ -368,11 +435,14 @@ def live_policy(
     *,
     fen: str,
     elo: int | None = None,
+    elos: Sequence[int] | None = None,
     moves: int | None = None,
     rollout_plies: int = 0,
 ) -> dict[str, Any]:
     """The endpoint's whole implementation, on the process-wide warm session."""
-    return _LIVE.policy(session, fen=fen, elo=elo, moves=moves, rollout_plies=rollout_plies)
+    return _LIVE.policy(
+        session, fen=fen, elo=elo, elos=elos, moves=moves, rollout_plies=rollout_plies
+    )
 
 
 def shutdown() -> None:

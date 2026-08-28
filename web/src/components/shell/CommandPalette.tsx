@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils'
 import { paramsFromFilters } from '@/routes/games/filters'
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
 import { useSavedFilters } from '@/routes/games/savedFilters'
+import { noteHref, oneLine } from '@/routes/notes/grouping'
 import { REPORTS } from '@/routes/stats/reports'
 
 /** Under this the backend answers four empty groups, so the box says so itself. */
@@ -86,6 +87,7 @@ const PAGES: PageRoute[] = [
   { label: 'Games', hint: 'the library', icon: Library, to: '/games' },
   { label: 'Openings', hint: 'the explorer', icon: Network, to: '/explorer' },
   { label: 'Stats', hint: 'reports over the library', icon: ChartNoAxesColumn, to: '/stats' },
+  { label: 'Notes', hint: 'everything written down', icon: StickyNote, to: '/notes' },
   { label: 'Live', hint: 'the game being played now', icon: Radio, to: '/live' },
   { label: 'Import', hint: 'lichess, chess.com, PGN', icon: Download, to: '/import' },
   { label: 'Engines', hint: 'the roster and its tiers', icon: Cpu, to: '/settings/engines' },
@@ -164,12 +166,6 @@ function gameHint(game: GameSummary): string {
   return parts.join(' · ')
 }
 
-/** A note is one line here, however many it has stored. */
-function noteLabel(note: NoteResponse): string {
-  const line = note.text.split('\n', 1)[0]?.trim() ?? ''
-  return line.length > 80 ? `${line.slice(0, 79)}…` : line || 'note'
-}
-
 function searchItems(
   games: GameSummary[],
   opponents: OpponentHit[],
@@ -216,17 +212,17 @@ function searchItems(
   }
 
   for (const note of notes) {
-    // A note pinned to a position rather than a game has nowhere in the app to land, so
-    // it is not offered as a row — a jump list whose rows do not jump is worse than short.
-    if (!note.game_id) continue
+    // Every note lands somewhere now: one that knows its game opens that game at the ply
+    // it is about, and one pinned to a bare position opens the notes screen on itself
+    // (`noteHref`), where the position is drawn and the note can be rewritten.
     items.push({
       id: `note:${note.id}`,
       group: 'Notes',
-      label: noteLabel(note),
+      label: oneLine(note),
       hint: note.tags.length ? note.tags.join(' · ') : 'note',
       trailing: formatGameDate(note.updated_at),
       icon: StickyNote,
-      to: `/games/${note.game_id}`,
+      to: noteHref(note),
     })
   }
 

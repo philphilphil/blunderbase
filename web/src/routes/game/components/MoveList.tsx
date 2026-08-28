@@ -1,3 +1,4 @@
+import { Pin, PinOff, StickyNote } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
@@ -7,6 +8,7 @@ import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { plyLabel, type MovePair } from '../gameModel'
+import type { NoteRow } from '../notesModel'
 
 /** The inline note design 1a puts under a flagged move: what it cost and what was better. */
 export interface MoveAnnotation {
@@ -18,7 +20,7 @@ export interface MoveAnnotation {
   bestSan: string | null
 }
 
-export type MoveTab = 'moves' | 'flagged'
+export type MoveTab = 'moves' | 'flagged' | 'notes'
 
 /**
  * One line in the table, drawn inline under the move it hangs off.
@@ -34,15 +36,34 @@ export interface MoveListVariation {
    * store has not been handed yet. It is what a click on a line the board has left names.
    */
   id: number | null
+  /**
+   * The pinned line (`POST /lines`) this row stands for, where the server holds it. Null
+   * for a line that only this session knows about.
+   */
+  lineId?: number | null
   /** The number of game plies the line branches from — its first move is ply `base`. */
   base: number
   /** The line in SAN, whole, however far into it the board currently is. */
   sans: string[]
   /**
+   * The same line in UCI. Nothing in the table reads it — it rides along so that a click on
+   * the pin affordance can name the line to keep without the page having to look it up
+   * again by shape.
+   */
+  moves?: readonly string[]
+  /**
    * How many of its moves are on the board — `0` is the position it branched from — or null
    * where the board is somewhere else entirely.
    */
   cursor: number | null
+  /**
+   * How many of `sans` are actually pinned. `0` is "not pinned at all"; a number short of
+   * `sans.length` is "pinned, and since walked further", which the pin affordance offers to
+   * extend rather than to undo.
+   */
+  pinnedThrough?: number
+  /** Indices into `sans` that carry a note, drawn as a mark on that move. */
+  noted?: readonly number[]
 }
 
 export interface MoveListProps {
@@ -65,7 +86,21 @@ export interface MoveListProps {
   onSelectVariationMove?: (index: number) => void
   /** Walk back into kept line `id`, standing after its `index`-th move (0-based). */
   onSelectKeptMove?: (id: number, index: number) => void
+  /** The same, for a line only the server holds — one this session has never walked. */
+  onSelectLineMove?: (lineId: number, index: number) => void
+  /** Pin a variation, or extend a pin the walk has grown past. Hidden without it. */
+  onPinVariation?: (variation: MoveListVariation) => void
+  /** Unpin a variation the server holds. */
+  onUnpinVariation?: (lineId: number) => void
   onSelectPly: (ply: number) => void
+  /** This game's notes, in reading order (`notesModel.noteRows`) — the `Notes` tab. */
+  notes?: readonly NoteRow[]
+  /** Mainline move indices that carry a note (`notesModel.notedMoveIndices`). */
+  notedMoves?: ReadonlySet<number>
+  /** Jump to where a note hangs — its ply, or into the line it pinned. */
+  onSelectNote?: (note: NoteRow) => void
+  /** Open the composer on the position the board is showing. */
+  onAddNote?: () => void
   className?: string
 }
 
@@ -87,8 +122,10 @@ export interface MoveListProps {
  * accepts one — so a `Variations` tab would be an empty room. `Book` is a per-position
  * question the backend answers over `/explorer`, which is a screen of its own with a board
  * to walk; duplicating a slice of it under the move list would be a second, worse explorer.
- * The slot they leave carries `Flagged` instead: the game's mistakes, which is what the
- * whole screen is for and what the design's own eval graph and glyph badges point at.
+ * The slot they leave carries `Flagged` and `Notes` instead: the game's mistakes, which is
+ * what the whole screen is for and what the design's own eval graph and glyph badges point
+ * at, and what the owner has written down about it — the one thing on this page that is
+ * theirs rather than an engine's, and the reason a variation is worth pinning at all.
  */
 export function MoveList({
   pairs,
@@ -101,7 +138,14 @@ export function MoveList({
   variations,
   onSelectVariationMove,
   onSelectKeptMove,
+  onSelectLineMove,
+  onPinVariation,
+  onUnpinVariation,
   onSelectPly,
+  notes,
+  notedMoves,
+  onSelectNote,
+  onAddNote,
   className,
 }: MoveListProps) {
   const [tab, setTab] = useState<MoveTab>('moves')
@@ -127,21 +171,26 @@ export function MoveList({
   const lines: { anchor: number | null; node: React.ReactNode }[] = []
   for (const entry of variations ?? []) {
     const id = entry.id
+    const lineId = entry.lineId ?? null
     const walking = entry.cursor !== null
     lines.push({
       anchor: anchorOf(entry.base),
       node: (
         <Variation
-          key={id === null ? 'active' : `kept-${id}`}
-          variation={{ base: entry.base, sans: entry.sans, cursor: entry.cursor ?? 0 }}
+          key={id !== null ? `kept-${id}` : lineId !== null ? `line-${lineId}` : 'active'}
+          variation={entry}
           quiet={!walking}
           onSelectMove={
             walking
               ? onSelectVariationMove
               : onSelectKeptMove && id !== null
                 ? (index) => onSelectKeptMove(id, index)
-                : undefined
+                : onSelectLineMove && lineId !== null
+                  ? (index) => onSelectLineMove(lineId, index)
+                  : undefined
           }
+          onPin={onPinVariation}
+          onUnpin={onUnpinVariation}
         />
       ),
     })
@@ -194,6 +243,14 @@ export function MoveList({
             <span className="ml-1.5 font-mono text-[0.625rem] tabular text-blunder">{flaggedCount}</span>
           ) : null}
         </Tab>
+        <Tab active={tab === 'notes'} onClick={() => setTab('notes')}>
+          Notes
+          {notes && notes.length > 0 ? (
+            <span className="ml-1.5 font-mono text-[0.625rem] tabular text-accent-teal">
+              {notes.length}
+            </span>
+          ) : null}
+        </Tab>
         <div className="flex-1" />
         <div className="flex items-center gap-2.5 font-mono text-[0.625rem] tabular text-faint">
           <span>{plyCount} plies</span>
@@ -202,6 +259,10 @@ export function MoveList({
       </div>
 
       <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto py-0.5">
+        {tab === 'notes' ? (
+          <NotesPane notes={notes} onSelectNote={onSelectNote} onAddNote={onAddNote} />
+        ) : (
+          <>
         {folded ? (
           <button
             type="button"
@@ -250,8 +311,18 @@ export function MoveList({
                   >
                     {pair.moveNumber}.
                   </span>
-                  <MoveCell move={pair.white} cursor={cursor} onSelectPly={onSelectPly} />
-                  <MoveCell move={pair.black} cursor={cursor} onSelectPly={onSelectPly} />
+                  <MoveCell
+                    move={pair.white}
+                    cursor={cursor}
+                    noted={pair.white ? notedMoves?.has(pair.white.ply) : false}
+                    onSelectPly={onSelectPly}
+                  />
+                  <MoveCell
+                    move={pair.black}
+                    cursor={cursor}
+                    noted={pair.black ? notedMoves?.has(pair.black.ply) : false}
+                    onSelectPly={onSelectPly}
+                  />
                 </div>
                 {annotated && annotation ? <Annotation annotation={annotation} /> : null}
                 {anchored.get(pair.moveNumber)}
@@ -259,7 +330,91 @@ export function MoveList({
             )
           })}
         </div>
+          </>
+        )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * The `Notes` tab: what the owner has written about this game, in the order a reader walks
+ * it — the game's own notes by position, then the ones hanging off pinned variations.
+ *
+ * Each row is a jump: to the ply the note is about, or into the line it pinned, which is
+ * what makes a note worth writing on this screen rather than in a document. Editing and
+ * deleting live on `/notes`, where there is room for a board and a text box; here a note is
+ * a bookmark into the game.
+ */
+function NotesPane({
+  notes,
+  onSelectNote,
+  onAddNote,
+}: {
+  notes?: readonly NoteRow[]
+  onSelectNote?: (note: NoteRow) => void
+  onAddNote?: () => void
+}) {
+  if (!notes || notes.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2.5 px-3 py-6">
+        <p className="text-center text-[0.71875rem] text-dim">Nothing written about this game.</p>
+        {onAddNote ? (
+          <button
+            type="button"
+            onClick={onAddNote}
+            className="flex items-center gap-1 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink"
+          >
+            <StickyNote className="size-3" aria-hidden />
+            Note this position
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div data-testid="game-notes" className="flex flex-col gap-1 px-1.5 py-1">
+      {notes.map((row) => (
+        <button
+          key={row.note.id}
+          type="button"
+          onClick={() => onSelectNote?.(row)}
+          disabled={!onSelectNote}
+          className={cn(
+            'flex flex-col gap-1 rounded-[0.3125rem] px-2 py-1.5 text-left',
+            onSelectNote && 'hover:bg-raised',
+          )}
+        >
+          <span className="flex items-baseline gap-2 font-mono text-[0.6875rem]">
+            <span
+              className={cn('tabular', row.onLine ? 'text-brilliant' : 'text-accent-teal')}
+              title={row.onLine ? 'On a pinned variation' : 'On the game'}
+            >
+              {row.context ?? '—'}
+            </span>
+            {row.onLine ? <span className="text-faint-2">variation</span> : null}
+            {row.source && row.source !== 'web' ? (
+              <span className="text-faint-2">{row.source}</span>
+            ) : null}
+          </span>
+          <span className="whitespace-pre-wrap font-sans text-[0.71875rem] leading-[1.45] text-body">
+            {row.note.text}
+          </span>
+          {row.note.tags.length > 0 ? (
+            <span className="flex flex-wrap gap-1">
+              {row.note.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-sm border border-edge bg-chip-info px-1 font-mono text-[0.625rem] text-dim"
+                >
+                  {tag}
+                </span>
+              ))}
+            </span>
+          ) : null}
+        </button>
+      ))}
     </div>
   )
 }
@@ -313,10 +468,13 @@ function PgnButton({ pgn }: { pgn?: string }) {
 function MoveCell({
   move,
   cursor,
+  noted,
   onSelectPly,
 }: {
   move: MoveRow | undefined
   cursor: number
+  /** A note hangs on the position this move produced — marked, not spelled out. */
+  noted?: boolean
   onSelectPly: (ply: number) => void
 }) {
   if (!move?.san) return <span className="flex-1 px-1" />
@@ -328,7 +486,7 @@ function MoveCell({
     <button
       type="button"
       onClick={() => onSelectPly(move.ply)}
-      title={`${plyLabel(move.ply)}${move.san}`}
+      title={`${plyLabel(move.ply)}${move.san}${noted ? ' — noted' : ''}`}
       className={cn(
         'flex h-5 flex-1 items-center gap-[0.3125rem] rounded-[0.25rem] px-1 text-left',
         active
@@ -340,7 +498,25 @@ function MoveCell({
     >
       <span className="truncate">{move.san}</span>
       <ClassificationBadge classification={move.classification} size="md" />
+      {noted ? <NoteMark /> : null}
     </button>
+  )
+}
+
+/**
+ * "Something is written about this position" — a dot, not a badge.
+ *
+ * The move list is dense and already carries a glyph column; a note is not a verdict on the
+ * move and must not compete with one, so it is the smallest mark that can be seen at all,
+ * in the accent the Notes tab uses for the game's own notes.
+ */
+function NoteMark() {
+  return (
+    <span
+      aria-hidden
+      title="Noted"
+      className="size-1 flex-none rounded-full bg-accent-teal opacity-80"
+    />
   )
 }
 
@@ -364,25 +540,44 @@ function Variation({
   variation,
   quiet,
   onSelectMove,
+  onPin,
+  onUnpin,
 }: {
   /** The line, and how many of its moves the board is standing past (`0` while quiet). */
-  variation: { base: number; sans: string[]; cursor: number }
+  variation: MoveListVariation
   quiet?: boolean
   onSelectMove?: (index: number) => void
+  onPin?: (variation: MoveListVariation) => void
+  onUnpin?: (lineId: number) => void
 }) {
+  const cursor = variation.cursor ?? 0
+  const lineId = variation.lineId ?? null
+  const pinnedThrough = variation.pinnedThrough ?? 0
+  const noted = new Set(variation.noted ?? [])
+
   return (
     <div
       data-testid={quiet ? 'kept-variation' : 'move-variation'}
-      className="flex gap-2 py-1 pl-[2.625rem] pr-2 font-mono text-[0.6875rem] leading-[1.5]"
+      data-pinned={lineId !== null ? 'true' : undefined}
+      className="group/line flex gap-2 py-1 pl-[2.625rem] pr-2 font-mono text-[0.6875rem] leading-[1.5]"
     >
+      {/*
+        The rail is what says at a glance whether a line is only today's reading or something
+        the owner decided to keep: a pinned line's rail is solid, a session line's is the
+        same hairline it has always been. Nothing else about the row changes, because a
+        pinned line is read exactly like an unpinned one.
+      */}
       <div
-        className={cn('w-0.5 flex-none rounded-sm bg-brilliant', quiet ? 'opacity-20' : 'opacity-40')}
+        className={cn(
+          'w-0.5 flex-none rounded-sm bg-brilliant',
+          lineId !== null ? (quiet ? 'opacity-60' : 'opacity-90') : quiet ? 'opacity-20' : 'opacity-40',
+        )}
       />
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-0.5">
         <span className={quiet ? 'text-faint-2' : 'text-faint'}>(</span>
         {variation.sans.map((san, index) => {
           const ply = variation.base + index
-          const active = !quiet && variation.cursor === index + 1
+          const active = !quiet && cursor === index + 1
           return (
             <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
               {ply % 2 === 0 || index === 0 ? (
@@ -395,9 +590,9 @@ function Variation({
                 type="button"
                 disabled={!onSelectMove}
                 onClick={() => onSelectMove?.(index)}
-                title={`${plyLabel(ply)}${san} — ${quiet ? 'kept line' : 'analysis'}`}
+                title={`${plyLabel(ply)}${san} — ${quiet ? 'kept line' : 'analysis'}${noted.has(index) ? ', noted' : ''}`}
                 className={cn(
-                  'rounded-[0.1875rem] px-0.5',
+                  'inline-flex items-center gap-0.5 rounded-[0.1875rem] px-0.5',
                   active
                     ? 'bg-brilliant/15 text-bright'
                     : quiet
@@ -408,13 +603,82 @@ function Variation({
                 )}
               >
                 {san}
+                {noted.has(index) ? <NoteMark /> : null}
               </button>
             </span>
           )
         })}
         <span className={quiet ? 'text-faint-2' : 'text-faint'}>)</span>
+        <PinButton
+          variation={variation}
+          lineId={lineId}
+          pinnedThrough={pinnedThrough}
+          onPin={onPin}
+          onUnpin={onUnpin}
+        />
       </div>
     </div>
+  )
+}
+
+/**
+ * Keep this line, or stop keeping it — the one affordance that turns a session's reading
+ * into something the database holds.
+ *
+ * Three states, because there are three things a line can be. Unpinned offers the pin.
+ * Pinned offers to take it back. And pinned-but-since-extended offers the pin again, which
+ * the backend's own prefix rule turns into "the same row, longer" rather than a second line
+ * — so "extend" needs no endpoint of its own, only a button that says what it does.
+ */
+function PinButton({
+  variation,
+  lineId,
+  pinnedThrough,
+  onPin,
+  onUnpin,
+}: {
+  variation: MoveListVariation
+  lineId: number | null
+  pinnedThrough: number
+  onPin?: (variation: MoveListVariation) => void
+  onUnpin?: (lineId: number) => void
+}) {
+  const pinned = lineId !== null
+  const extendable = pinned && pinnedThrough < variation.sans.length
+
+  if (pinned && !extendable) {
+    if (!onUnpin) return null
+    return (
+      <button
+        type="button"
+        onClick={() => onUnpin(lineId)}
+        aria-label="Unpin this line"
+        title="Stop keeping this line"
+        className="ml-0.5 text-brilliant/70 hover:text-blunder"
+      >
+        <PinOff className="size-2.5" aria-hidden />
+      </button>
+    )
+  }
+
+  if (!onPin) return null
+  return (
+    <button
+      type="button"
+      onClick={() => onPin(variation)}
+      aria-label={extendable ? 'Extend the pin to the whole line' : 'Pin this line'}
+      title={
+        extendable
+          ? 'Kept only as far as its first moves — pin the rest'
+          : 'Keep this line with the game'
+      }
+      className={cn(
+        'ml-0.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/line:opacity-100',
+        extendable ? 'text-brilliant/70 hover:text-brilliant' : 'text-faint hover:text-brilliant',
+      )}
+    >
+      <Pin className="size-2.5" aria-hidden />
+    </button>
   )
 }
 

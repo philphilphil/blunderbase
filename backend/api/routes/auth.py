@@ -22,11 +22,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def signed_in(session: SessionDep) -> AuthStatus:
     """The answer to every call that ends with a cookie in hand."""
-    return AuthStatus(
-        setup_required=False,
-        authenticated=True,
-        maia_target_elo=app_settings_service.get_maia_target_elo(session),
-    )
+    elos = app_settings_service.get_maia_elos(session)
+    return AuthStatus(setup_required=False, authenticated=True, **_maia(elos))
 
 
 @router.get("/status", response_model=AuthStatus, summary="Is there a password, and do I have it")
@@ -36,8 +33,17 @@ def auth_status(session: SessionDep, request: Request) -> AuthStatus:
         setup_required=required,
         authenticated=not required
         and auth_service.validate_session(session, request.cookies.get(COOKIE_NAME)),
-        maia_target_elo=app_settings_service.get_maia_target_elo(session),
+        **_maia(app_settings_service.get_maia_elos(session)),
     )
+
+
+def _maia(elos: list[int]) -> dict[str, object]:
+    """The deployment's Maia levels as the bootstrap payload carries them.
+
+    Both fields, from the one read: the list every screen renders the level picker from, and
+    its first entry for a client that only ever showed one number.
+    """
+    return {"maia_target_elo": elos[0], "maia_elos": elos}
 
 
 @router.post("/setup", response_model=AuthStatus, summary="Choose the owner's password")

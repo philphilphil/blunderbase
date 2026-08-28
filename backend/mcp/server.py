@@ -8,7 +8,7 @@ from mcp.types import TextContent
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import Platform, Result, Tier
+from backend.db.enums import NoteSource, Platform, Result, Tier
 from backend.db.session import get_sessionmaker
 from backend.mcp import arguments as args
 from backend.mcp import payloads
@@ -25,6 +25,7 @@ from backend.services import analysis as analysis_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services import live as live_service
+from backend.services import maia_live as maia_live_service
 from backend.services import notes as notes_service
 from backend.services import runners as runners_service
 from backend.services import stats as stats_service
@@ -49,6 +50,11 @@ DEFAULT_CONTINUATIONS = 12
 MAX_CONTINUATIONS = 40
 DEFAULT_NOTES = 20
 MAX_NOTES = 100
+DEFAULT_RESURFACE = 8
+MAX_RESURFACE = 40
+# An export is a document rather than a listing, and a document the size of the whole
+# memory is one nobody reads. This is the ceiling; the filters are the answer.
+MAX_EXPORT_NOTES = 200
 DEFAULT_RATING_POINTS = 24
 MAX_RATING_POINTS = 200
 
@@ -78,7 +84,12 @@ of it a move gave away, and a classification only appears on an inaccuracy, mist
 blunder. Start wide (get_last_games, get_worst_recent_moments, get_stats) and drill down
 (get_game, opening_explorer, find_positions) rather than pulling whole games first.
 Deep analysis is queued, not immediate: request_analysis returns a run id to poll.
-Write what you learn down with save_note, and open a session with search_notes.
+Write what you learn down with save_note, and open a session with search_notes or
+resurface_notes; a note can be pinned to a variation as well as to a move (save_line,
+get_lines), and export_notes hands the memory back as one document.
+Maia is asked at every level this deployment is configured for, so the reading is a
+comparison: get_game carries them all per ply, maia_policy asks a live position, and
+maia_fill backfills a level a game was analysed before.
 The owner may have Blunderbase open beside this chat: show_game, show_position, make_move
 and annotate drive the board they are looking at, so show a position rather than spelling
 one out. Those moves are an analysis board — they never change a stored game."""
@@ -452,12 +463,16 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
         ply_end: int | None = None,
         multipv: int | None = None,
         nodes: int | None = None,
+        elos: list[int] | None = None,
     ) -> TextContent:
         """Queue an engine pass over one game or one position and get a run id back.
         Deep analysis takes minutes, so this never blocks: poll get_analysis_status, and
         read the result with get_game once it is done. A ply range (half-moves, end
-        exclusive) analyses one phase deeply. Re-analysis never overwrites an old run."""
+        exclusive) analyses one phase deeply. Re-analysis never overwrites an old run.
+        `elos` asks Maia at those ratings for this run only; left out, the run uses the
+        deployment's configured levels, which is what keeps games comparable."""
         window = args.ply_range(ply_start, ply_end)
+        levels = args.ratings(elos)
         wanted = args.tier(tier)
         position = args.fen(fen, required=False)
         with coach.session() as session:
@@ -481,6 +496,7 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
                 ply_range=window,
                 multipv=multipv,
                 nodes=nodes,
+                elos=levels,
             )
             payload = {
                 "run_id": run.id,
@@ -492,8 +508,22 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
                 "multipv": run.multipv,
                 "ply_start": run.ply_start,
                 "ply_end": run.ply_end,
+                "maia_elos": run.maia_elos,
                 "queue": analysis_service.queue_depth(session),
             }
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def clear_queue() -> TextContent:
+        """Drop every run still queued, of any tier, windowed or full-game, fill or not —
+        the undo for a queue built up by mistake, such as a fill or a backfill fired at the
+        wrong scope. A run a worker has already claimed is left to finish, since there is
+        no cancelled status to move it to. Answers how many rows went and how deep the
+        queue still is."""
+        with coach.session() as session:
+            dropped = analysis_service.clear_queue(session)
+            payload = {"dropped": dropped, "queue": analysis_service.queue_depth(session)}
         return payloads.result(payload)
 
     @server.tool()
@@ -540,6 +570,61 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
             payload = analysis_service.analyze_position(session, str(position), nodes)
         return payloads.result(payload)
 
+    @server.tool()
+    @guarded
+    def maia_policy(
+        fen: str,
+        elos: list[int] | None = None,
+        moves: int | None = None,
+        rollout_plies: int = 0,
+    ) -> TextContent:
+        """What a human of a given rating would actually play in a position — the other
+        half of analyze_position, which answers what is *best*. One entry per level under
+        `levels`, keyed by the rating, each with the most likely moves and their policy
+        share; `rollout_plies` also plays the line out with both sides at that level.
+        Levels default to the deployment's configured ones, so a comparison between them
+        is one call. Answers engine_unavailable where no human-move model is installed
+        here; a stored game's human-move data comes off get_game instead of from this."""
+        position = args.fen(fen)
+        levels = args.ratings(elos)
+        with coach.session() as session:
+            payload = maia_live_service.live_policy(
+                session,
+                fen=str(position),
+                elos=levels,
+                # The policy width the batch pass stores, and a rollout no longer than the
+                # live surface will play out however long a turn asks for.
+                moves=(
+                    None
+                    if moves is None
+                    else args.capped(moves, analysis_service.MAIA_POLICY_MOVES, 10)
+                ),
+                rollout_plies=(
+                    args.capped(rollout_plies, 0, maia_live_service.MAX_ROLLOUT_PLIES)
+                    if rollout_plies
+                    else 0
+                ),
+            )
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def maia_fill(game_ids: list[int] | None = None) -> TextContent:
+        """Fill in the Maia levels the library was never analysed at. After a level is
+        added in Settings, the games already analysed carry the old ones only; this queues
+        a human-move-only pass over each of them — no Stockfish, so it is minutes rather
+        than a weekend — and the new level is merged into what is already stored. Answers
+        how many games were queued and how many already had every level."""
+        wanted = [int(game_id) for game_id in (game_ids or ())] or None
+        with coach.session() as session:
+            receipt = analysis_service.queue_maia_fill(session, wanted)
+            payload = {
+                "queued": receipt["queued"],
+                "already_complete": receipt["already_complete"],
+                **analysis_service.maia_fill_status(session),
+            }
+        return payloads.result(payload)
+
 
 # --- memory ----------------------------------------------------------------
 
@@ -552,25 +637,137 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
         tags: list[str] | None = None,
         game_id: int | None = None,
         fen: str | None = None,
+        ply: int | None = None,
+        line: list[str] | None = None,
+        base_ply: int = 0,
+        from_live: bool = False,
     ) -> TextContent:
         """Write something down: what you worked on, a plan, a weakness, a session
         summary. Tags are how you find it again, so use consistent ones. A note can hang
-        off a game, off a position, or off neither."""
+        off a game, off a position, off a variation, or off nothing. `ply` is a half-move
+        count into the game (0 is the starting position), which is what makes a note land
+        on the move it is about. `line` is a variation in UCI played from `base_ply` of
+        that game — it is kept as a real line, so the note has something to point at.
+        `from_live` writes the note against the board you and the owner are looking at
+        right now, moves you have played on it included; nothing else needs to be given."""
         position = args.fen(fen, required=False)
+        moves = args.moves(line)
         with coach.session() as session:
             if game_id is not None and games_service.get_game(session, int(game_id)) is None:
                 raise CoachError(
                     UNKNOWN_GAME, f"no game with id {game_id}", game_id=int(game_id)
                 )
+            if moves and game_id is None and not from_live:
+                raise CoachError(BAD_ARGUMENT, "a line needs the game_id it branches off")
             note = notes_service.save_note(
                 session,
                 text,
                 args.tags(tags),
                 game_id=int(game_id) if game_id is not None else None,
                 fen=position,
+                ply=int(ply) if ply is not None else None,
+                line=(
+                    {"game_id": int(game_id), "base_ply": int(base_ply), "moves": moves}
+                    if moves and game_id is not None
+                    else None
+                ),
+                source=NoteSource.MCP,
+                from_live=bool(from_live),
             )
             payload = notes_service.note_payload(note)
         return payloads.result(payloads.note_row(payload))
+
+    @server.tool()
+    @guarded
+    def save_line(game_id: int, base_ply: int, moves: list[str]) -> TextContent:
+        """Keep a variation off one of the owner's games so it is still there tomorrow:
+        `moves` in UCI, played from the position `base_ply` half-moves into the game. Use
+        it for a line worth coming back to, then hang a note off it with save_note. A line
+        already covered by a kept one comes back as that one rather than as a duplicate."""
+        wanted = args.moves(moves)
+        if not wanted:
+            raise CoachError(BAD_ARGUMENT, "a line needs at least one move in UCI")
+        with coach.session() as session:
+            line = notes_service.save_line(session, int(game_id), int(base_ply), wanted)
+            payload = notes_service.line_payload(line, with_notes=True)
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def get_lines(game_id: int) -> TextContent:
+        """The variations kept on one game, in SAN as well as UCI, each with the notes
+        written about it. This is the reading of a game that survived the session it
+        happened in — check it before working through the same game again."""
+        with coach.session() as session:
+            if games_service.get_game(session, int(game_id)) is None:
+                raise CoachError(
+                    UNKNOWN_GAME, f"no game with id {game_id}", game_id=int(game_id)
+                )
+            rows = [
+                notes_service.line_payload(line, with_notes=True)
+                for line in notes_service.get_lines(session, int(game_id))
+            ]
+        return payloads.result({"lines": rows, "count": len(rows)})
+
+    @server.tool()
+    @guarded
+    def resurface_notes(limit: int = DEFAULT_RESURFACE) -> TextContent:
+        """Notes worth re-reading now, with the reason each came back up: `recurred` means
+        the position it is about turned up again in a game imported in the last month (the
+        game ids come with it), `stale` means nobody has touched it in three weeks. Open a
+        session with this next to search_notes — it is the half the owner has forgotten."""
+        count = args.capped(limit, DEFAULT_RESURFACE, MAX_RESURFACE)
+        with coach.session() as session:
+            items = [
+                {
+                    "note": payloads.note_row(item["note"]),
+                    "reason": item["reason"],
+                    "games": item["games"],
+                }
+                for item in notes_service.resurface_notes(session, count)
+            ]
+        return payloads.result({"items": items, "count": len(items)})
+
+    @server.tool()
+    @guarded
+    def export_notes(
+        format: str = "md",
+        query: str | None = None,
+        tags: list[str] | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        game_id: int | None = None,
+        fen: str | None = None,
+        scope: str | None = None,
+        limit: int = MAX_EXPORT_NOTES,
+    ) -> TextContent:
+        """The notes the same filters as search_notes would find, as one document:
+        'md' for Markdown to hand over or paste into a summary, 'pgn' for a file a board
+        program opens, with each note as a comment at the move it is about. Returns the
+        document itself, so ask for a narrow filter unless you want everything."""
+        wanted = str(format).strip().casefold()
+        if wanted not in notes_service.EXPORT_FORMATS:
+            raise CoachError(
+                BAD_ARGUMENT,
+                f"unknown format {format!r}",
+                allowed=sorted(notes_service.EXPORT_FORMATS),
+            )
+        position = args.fen(fen, required=False)
+        count = args.capped(limit, MAX_EXPORT_NOTES, MAX_EXPORT_NOTES)
+        with coach.session() as session:
+            found = notes_service.search_notes(
+                session,
+                query=query,
+                tags=args.tags(tags),
+                since=args.when(since, "since"),
+                until=args.when(until, "until"),
+                game_id=int(game_id) if game_id is not None else None,
+                fen=position,
+                scope=scope,
+                limit=count,
+            )
+            document = notes_service.export_notes(session, found, fmt=wanted)
+        return TextContent(type="text", text=document)
 
     @server.tool()
     @guarded
@@ -581,12 +778,15 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
         until: str | None = None,
         game_id: int | None = None,
         fen: str | None = None,
+        scope: str | None = None,
+        line_id: int | None = None,
         limit: int = DEFAULT_NOTES,
     ) -> TextContent:
         """What was written down before — start a session with this. Free text, tags
         (all of them must match), a date window ('30d' works), a game or a position;
-        newest first. With no arguments it returns the most recent notes and every tag
-        in use."""
+        newest first. `scope` narrows by what a note is attached to rather than to what:
+        'game', 'position', 'line' or 'free'. With no arguments it returns the most recent
+        notes and every tag in use."""
         position = args.fen(fen, required=False)
         count = args.capped(limit, DEFAULT_NOTES, MAX_NOTES)
         with coach.session() as session:
@@ -598,11 +798,13 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                 until=args.when(until, "until"),
                 game_id=int(game_id) if game_id is not None else None,
                 fen=position,
+                scope=scope,
+                line_id=int(line_id) if line_id is not None else None,
                 limit=count,
             )
             rows = [payloads.note_row(notes_service.note_payload(note)) for note in found]
             payload = {"notes": rows, "count": len(rows)}
-            if not any((query, tags, since, until, game_id, fen)):
+            if not any((query, tags, since, until, game_id, fen, scope, line_id)):
                 payload["tags"] = notes_service.list_tags(session)
         return payloads.result(payload)
 

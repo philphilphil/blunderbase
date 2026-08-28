@@ -1,5 +1,8 @@
+import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useQueueStatus } from '@/lib/api/queries'
+import { useClearQueue, useQueueStatus } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
 
 import { QueueDestinations } from './QueueDestinations'
@@ -27,37 +30,94 @@ export function QueueIndicator({ className }: { className?: string }) {
     : 'analysis queue'
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div
-          className={cn(
-            'flex items-center gap-2 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem]',
-            className,
-          )}
-        >
-          <span className={cn('text-[0.6875rem]', idle ? 'text-dim-2' : 'text-soft')}>
-            {idle ? 'Idle' : 'Analysing'}
-          </span>
-          <div className="h-[0.1875rem] w-16 overflow-hidden rounded-sm bg-edge">
-            <div
-              className={cn(
-                'h-full transition-[width] duration-500',
-                data?.workers === false ? 'bg-mistake' : 'bg-accent-teal',
-              )}
-              style={{ width: total === 0 ? '0%' : `${Math.round((running / total) * 100)}%` }}
-            />
-          </div>
-          <span
-            className={cn('font-mono text-[0.6875rem] tabular', idle ? 'text-faint' : 'text-ink')}
+    <div className="flex items-center gap-1.5">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              'flex items-center gap-2 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem]',
+              className,
+            )}
           >
-            {running}/{total}
-          </span>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-[15rem]">
-        <p>{summary}</p>
-        <QueueDestinations destinations={destinations} dense className="mt-1.5" />
-      </TooltipContent>
-    </Tooltip>
+            <span className={cn('text-[0.6875rem]', idle ? 'text-dim-2' : 'text-soft')}>
+              {idle ? 'Idle' : 'Analysing'}
+            </span>
+            <div className="h-[0.1875rem] w-16 overflow-hidden rounded-sm bg-edge">
+              <div
+                className={cn(
+                  'h-full transition-[width] duration-500',
+                  data?.workers === false ? 'bg-mistake' : 'bg-accent-teal',
+                )}
+                style={{ width: total === 0 ? '0%' : `${Math.round((running / total) * 100)}%` }}
+              />
+            </div>
+            <span
+              className={cn(
+                'font-mono text-[0.6875rem] tabular',
+                idle ? 'text-faint' : 'text-ink',
+              )}
+            >
+              {running}/{total}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[15rem]">
+          <p>{summary}</p>
+          {queued > 0 ? (
+            <p className="mt-1 text-faint">
+              Clear drops what is still queued; a run already being worked finishes.
+            </p>
+          ) : null}
+          <QueueDestinations destinations={destinations} dense className="mt-1.5" />
+        </TooltipContent>
+      </Tooltip>
+      {queued > 0 ? <ClearQueueButton queued={queued} /> : null}
+    </div>
+  )
+}
+
+/** How long the armed "Clear 825?" waits for its second click before standing down. */
+const ARMED_MS = 4000
+
+/**
+ * The undo for a queue built up by mistake — eight hundred Maia-fill runs from one press.
+ * Two clicks, no dialog: the first turns the button into the question with the count in it,
+ * the second drops everything still queued. Left alone, it stands down by itself.
+ */
+function ClearQueueButton({ queued }: { queued: number }) {
+  const [armed, setArmed] = useState(false)
+  const clear = useClearQueue({ onSettled: () => setArmed(false) })
+
+  useEffect(() => {
+    if (!armed) return
+    const timer = window.setTimeout(() => setArmed(false), ARMED_MS)
+    return () => window.clearTimeout(timer)
+  }, [armed])
+
+  const pending = clear.isPending
+  return (
+    <button
+      type="button"
+      data-testid="clear-queue"
+      disabled={pending}
+      aria-label={armed ? `Clear ${queued} queued runs` : 'Clear the analysis queue'}
+      title={armed ? undefined : 'Drop everything still queued'}
+      onClick={() => {
+        if (!armed) {
+          setArmed(true)
+          return
+        }
+        clear.mutate()
+      }}
+      className={cn(
+        'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] transition-colors disabled:opacity-60',
+        armed
+          ? 'border-blunder/40 bg-blunder/10 text-blunder hover:bg-blunder/20'
+          : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
+      )}
+    >
+      {pending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+      {armed ? `Clear ${queued}?` : 'Clear'}
+    </button>
   )
 }

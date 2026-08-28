@@ -340,6 +340,84 @@ def test_the_level_a_fixed_weights_build_reports_can_come_from_its_uci_name(
     assert live.policy(session, fen=STARTING, elo=1700, moves=2)["elo"] == 1100
 
 
+# --- several levels at once -----------------------------------------------
+
+
+def test_every_configured_level_is_answered_in_one_query(session: Session, tmp_path: Path) -> None:
+    """The board's question is the comparison, so one call carries every column of it."""
+    log = tmp_path / "engine.log"
+    register_maia(session, maia_command(tmp_path, log=log))
+    app_settings.set_maia_elos(session, [1300, 1900])
+    live = LiveMaia()
+    try:
+        answer = live.policy(session, fen=STARTING, moves=2)
+    finally:
+        live.shutdown()
+
+    assert sorted(answer["levels"]) == ["1300", "1900"]
+    assert answer["levels"]["1300"]["elo"] == 1300
+    assert [entry["uci"] for entry in answer["levels"]["1300"]["policy"]] == ["e2e4", "d2d4"]
+    assert [entry["uci"] for entry in answer["levels"]["1900"]["policy"]] == ["e2e4"]
+    # The top of the answer is the first level, which is the shape a single-level board read.
+    assert answer["elo"] == 1300
+    assert answer["policy"] == answer["levels"]["1300"]["policy"]
+    # One process, conditioned once per level rather than started once per level.
+    conditioned = commands(log, "setoption")
+    assert "setoption name SelfElo value 1300" in conditioned
+    assert "setoption name SelfElo value 1900" in conditioned
+    assert len({entry["pid"] for entry in read_log(log)}) == 1
+
+
+def test_the_levels_a_caller_names_win_over_the_configured_ones(
+    session: Session, tmp_path: Path, live: LiveMaia
+) -> None:
+    register_maia(session, maia_command(tmp_path))
+    app_settings.set_maia_elos(session, [1500, 1900])
+
+    answer = live.policy(session, fen=STARTING, elos=[1200], moves=1)
+
+    assert sorted(answer["levels"]) == ["1200"]
+    assert answer["elo"] == 1200
+
+
+def test_every_level_gets_its_own_rollout(session: Session, tmp_path: Path) -> None:
+    """A rollout is a line two humans play, so it is per level rather than shared."""
+    # Two levels, each asked about the position and then about the two rollout plies: the
+    # same three replies twice over, all of them legal wherever the line has got to.
+    register_maia(session, maia_command(tmp_path, go=[*OPENING[:3], *OPENING[:3]]))
+    app_settings.set_maia_elos(session, [1500, 1900])
+    live = LiveMaia()
+    try:
+        answer = live.policy(session, fen=STARTING, moves=2, rollout_plies=2)
+    finally:
+        live.shutdown()
+
+    assert [step["san"] for step in answer["levels"]["1500"]["rollout"]] == ["e4", "e5"]
+    assert [step["san"] for step in answer["levels"]["1900"]["rollout"]] == ["e4", "e5"]
+    assert answer["rollout"] == answer["levels"]["1500"]["rollout"]
+
+
+def test_a_fixed_weights_build_answers_once_however_many_levels_are_asked_for(
+    session: Session, tmp_path: Path
+) -> None:
+    """It is one rating: five identical columns would invent a comparison."""
+    register_maia(
+        session,
+        maia_command(tmp_path, options=fixed_weights(), name="lc0"),
+        name="maia-1500",
+    )
+    app_settings.set_maia_elos(session, [1100, 1900])
+    live = LiveMaia()
+    try:
+        answer = live.policy(session, fen=STARTING, moves=2)
+    finally:
+        live.shutdown()
+
+    # Keyed by the level its weights name, not by either level that was asked for.
+    assert sorted(answer["levels"]) == ["1500"]
+    assert answer["elo"] == 1500
+
+
 # --- when there is nothing to ask -----------------------------------------
 
 
@@ -426,6 +504,32 @@ def test_the_endpoint_answers_the_shape_the_board_builds_against(api: TestClient
     assert [entry["rank"] for entry in body["policy"]] == [1, 2]
     assert body["policy"][0]["p"] == 0.41
     assert [entry["san"] for entry in body["rollout"]] == ["e4", "e5", "Nf3"]
+
+
+def test_the_endpoint_carries_a_level_per_configured_elo(
+    settings: Settings, tmp_path: Path
+) -> None:
+    """What the game panel's compare grid reads: one entry per level, keyed by it."""
+    settings.analysis_workers = False
+    upgrade_to_head(settings)
+    with get_sessionmaker(settings)() as session:
+        app_settings.set_maia_elos(session, [1500, 1900])
+        register_maia(session, maia_command(tmp_path))
+    with running_app(create_app(settings)) as client:
+        body = client.post("/api/maia/policy", json={"fen": STARTING, "moves": 2}).json()
+
+    assert sorted(body["levels"]) == ["1500", "1900"]
+    assert [entry["san"] for entry in body["levels"]["1500"]["policy"]] == ["e4", "d4"]
+    assert body["levels"]["1900"]["elo"] == 1900
+    assert body["elo"] == 1500
+
+
+def test_the_endpoint_takes_the_levels_the_board_asks_for(api: TestClient) -> None:
+    body = api.post(
+        "/api/maia/policy", json={"fen": STARTING, "elos": [1300, 1300, 1700], "moves": 1}
+    ).json()
+
+    assert sorted(body["levels"]) == ["1300", "1700"]
 
 
 def test_the_bare_router_path_answers_too(api: TestClient) -> None:

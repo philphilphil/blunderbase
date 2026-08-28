@@ -422,11 +422,15 @@ def encode_plan(plan: RunPlan) -> dict[str, Any]:
         },
         "owner_color": None if plan.owner_color is None else Color(plan.owner_color).value,
         "owner_rating": plan.owner_rating,
-        # The deployment's one Maia level. It crosses the wire because the runner has no
-        # settings of its own to read it out of, and clamping it to what the build declares
-        # happens there — so the runner asks the same plies at the same level this host
-        # would have.
+        # The deployment's Maia levels. They cross the wire because the runner has no
+        # settings of its own to read them out of, and clamping them to what the build
+        # declares happens there — so the runner asks the same plies at the same levels this
+        # host would have. `maia_target_elo` is the first of them, kept for a runner that
+        # predates the list; a runner that predates *it* is not a thing that exists.
         "maia_target_elo": plan.maia_target_elo,
+        "maia_elos": list(plan.maia_elos),
+        # A pass that asks Maia and nothing else, over a game that was searched already.
+        "maia_only": plan.maia_only,
     }
 
 
@@ -470,6 +474,10 @@ def decode_plan(data: Mapping[str, Any]) -> RunPlan:
             ),
             owner_rating=_optional_int(data, "owner_rating"),
             maia_target_elo=_int(data, "maia_target_elo"),
+            # Absent from a frame an older host encoded: the single target elo is then the
+            # whole of the levels, which is exactly what that host meant by it.
+            maia_elos=tuple(int(level) for level in (data.get("maia_elos") or ())),
+            maia_only=bool(data.get("maia_only")),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ProtocolError(f"plan does not decode: {exc}") from exc

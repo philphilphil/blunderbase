@@ -146,8 +146,31 @@ def ply_range(start: int | None, end: int | None) -> tuple[int, int] | None:
     return int(start), int(end)
 
 
+def ratings(value: Sequence[int] | int | None, field: str = "elos") -> list[int] | None:
+    """Maia levels as a list of ints, or None where the caller named none.
+
+    Clamped and deduped downstream, in `app_settings.clean_maia_elos`, which is the one
+    place that knows what a level may be; this only refuses what is not a number at all.
+    """
+    if value is None:
+        return None
+    wanted = [value] if isinstance(value, int) else list(value)
+    levels: list[int] = []
+    for entry in wanted:
+        try:
+            levels.append(int(entry))
+        except (TypeError, ValueError):
+            raise CoachError(BAD_ARGUMENT, f"{field} takes ratings, not {entry!r}") from None
+    return levels or None
+
+
 def tags(value: Sequence[str] | None) -> list[str]:
     return [str(tag).strip() for tag in (value or ()) if str(tag).strip()]
+
+
+def moves(value: Sequence[str] | None) -> list[str]:
+    """A variation as UCI strings. Legality is the service's to check against the game."""
+    return [str(uci).strip() for uci in (value or ()) if str(uci).strip()]
 
 
 def period(start: str | None, end: str | None, field: str) -> tuple[datetime, datetime]:

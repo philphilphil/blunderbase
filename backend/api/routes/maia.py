@@ -24,7 +24,12 @@ router = APIRouter(prefix="/maia", tags=["maia"])
 
 @router.post("/policy", response_model=MaiaPolicyResponse, summary="Ask Maia about a position")
 def policy(session: SessionDep, body: MaiaPolicyRequest) -> Any:
-    """One position's human-move policy, and optionally the line two humans would play.
+    """One position's policy per level, and optionally the line two humans would play.
+
+    Every level the deployment is configured for in one call — `levels` keyed by the level,
+    and the first of them at the top of the answer as well, which is what the board read
+    before there was more than one. One call because it is one warm process behind one lock:
+    asking for five levels one request at a time would serialise the same work five times.
 
     A plain `def`, so FastAPI runs it in a worker thread: the query holds a lock and talks
     to a subprocess, and a debounced board must not be able to stall the loop while it
@@ -34,6 +39,7 @@ def policy(session: SessionDep, body: MaiaPolicyRequest) -> Any:
         session,
         fen=body.fen,
         elo=body.elo,
+        elos=body.elos,
         moves=body.moves,
         rollout_plies=body.rollout_plies,
     )

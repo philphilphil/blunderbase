@@ -1,5 +1,5 @@
 import type { Api } from '@lichess-org/chessground/api'
-import { Check, Loader2, Undo2 } from 'lucide-react'
+import { Check, Loader2, StickyNote, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
@@ -65,6 +65,13 @@ export interface BoardPanelProps {
   deepPending: boolean
   deepError: Error | null
   onRequestDeep: () => void
+  /**
+   * Write a note about the position on the board. The transport row is where it belongs: a
+   * note is about *this* position, and this is the row that says which position that is.
+   */
+  onNote?: () => void
+  /** Whether the composer is open, so the button reads as the toggle it is. */
+  noting?: boolean
   className?: string
 }
 
@@ -111,6 +118,8 @@ export function BoardPanel({
   deepPending,
   deepError,
   onRequestDeep,
+  onNote,
+  noting,
   className,
 }: BoardPanelProps) {
   const squares = useMemo<BoardSquare[]>(() => {
@@ -221,8 +230,9 @@ export function BoardPanel({
           1.75   the transport row: `text-xs` buttons at `py-[0.3125rem]`, plus their border
           6.5    the eval curve at its `max-h-[6.5rem]` — reserved in full, not at its
                  ~4.5rem floor, so a grown board never squeezes the graph down to it
+          7      the note composer at its `h-[6rem]`, plus the `gap-3.5` before the curve
           -----
-          20     which is `calc(100vh-20rem)`
+          27     which is `calc(100vh-20rem)`
 
         The cap is on the `Board` element, which is the grid the rank column and the file
         row live in: its height is its width less 0.125rem (a 0.875rem rail and a 0.375rem
@@ -318,6 +328,24 @@ export function BoardPanel({
           error={deepError}
           onRequest={onRequestDeep}
         />
+
+        {onNote ? (
+          <button
+            type="button"
+            onClick={onNote}
+            aria-pressed={noting}
+            title="Write a note about this position"
+            className={cn(
+              'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs',
+              noting
+                ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
+                : 'border-edge bg-elevated text-soft hover:text-ink',
+            )}
+          >
+            <StickyNote className="size-3" aria-hidden />
+            Note
+          </button>
+        ) : null}
 
         {inLine && onExitAnalysis ? (
           <button

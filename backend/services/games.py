@@ -286,7 +286,8 @@ def merge_run_evals(
     `runs` is applied in order, so whatever comes last wins; a run that only covers a ply
     window only overwrites that window. A run that carries no Maia policy leaves the
     policy from an earlier run in place, which is what makes a Stockfish pass over a game
-    Maia has already seen additive rather than destructive.
+    Maia has already seen additive rather than destructive — and a run that carries only
+    some of the levels adds those levels rather than dropping the rest.
     """
     if not runs:
         return {}, {}
@@ -305,7 +306,11 @@ def merge_run_evals(
             if _carries_eval(row) or row.ply not in evals:
                 evals[row.ply] = row
             if row.maia_policy:
-                maia[row.ply] = row.maia_policy
+                # Merged by level rather than replaced: a later run that computed only the
+                # levels the game was missing — what `analysis.queue_maia_fill` queues —
+                # adds its columns to the ones an older run already stored, and a run that
+                # recomputed a level it shares wins that level alone.
+                maia[row.ply] = {**maia.get(row.ply, {}), **row.maia_policy}
     return evals, maia
 
 
@@ -326,10 +331,15 @@ def _carries_eval(row: MoveEval) -> bool:
 
 
 def game_notes(session: Session, game_id: int) -> list[dict[str, Any]]:
-    """Notes on the game, plus notes on any position the game reached."""
+    """Notes on the game, plus notes on any position the game reached.
+
+    A note that names a ply or a variation carries them here too: the move list draws a
+    marker where a note hangs, and it has no second call to find out where that is.
+    """
     rows: list[dict[str, Any]] = []
     for note in session.scalars(select(Note).where(Note.game_id == game_id)):
-        rows.append(_note_row(note, scope="game", ply=None))
+        scope = "line" if note.line_id is not None else "game"
+        rows.append(_note_row(note, scope=scope, ply=note.ply))
 
     attached = (
         select(Note, func.min(GamePosition.ply))
@@ -341,8 +351,11 @@ def game_notes(session: Session, game_id: int) -> list[dict[str, Any]]:
         )
         .group_by(Note.id)
     )
-    for note, ply in session.execute(attached):
-        rows.append(_note_row(note, scope="position", ply=ply))
+    for note, reached in session.execute(attached):
+        # `reached` and not `note.ply`: the query above excludes this game's own notes, so
+        # the note's ply counts half-moves into *another* game and says nothing about where
+        # this one arrived. Same-game notes carry their own ply, from the loop above.
+        rows.append(_note_row(note, scope="position", ply=reached))
 
     rows.sort(key=lambda row: row["created_at"], reverse=True)
     return rows
@@ -829,6 +842,8 @@ def _note_row(note: Note, *, scope: str, ply: int | None) -> dict[str, Any]:
             "tags": list(note.tags or ()),
             "scope": scope,
             "ply": ply,
+            "line_id": note.line_id,
+            "source": str(note.source),
             "created_at": _stamp(note.created_at),
             "updated_at": _stamp(note.updated_at),
         }

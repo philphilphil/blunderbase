@@ -60,8 +60,16 @@ export interface ErrorBody {
 export interface AuthStatus {
   setup_required: boolean
   authenticated: boolean
-  /** The one level batch and live Maia are pinned to — see `AppSettings`. */
+  /** The first of `maia_elos` — for a screen that shows a single level. */
   maia_target_elo: number
+  /**
+   * Every rating this deployment asks Maia at, lowest first.
+   *
+   * Optional only because the client makes one `AuthStatus` up rather than reading it (the
+   * signed-out one, where the deployment's levels are not knowable): every answer the
+   * backend sends carries the list.
+   */
+  maia_elos?: number[]
 }
 
 // --- settings --------------------------------------------------------------
@@ -72,6 +80,13 @@ export interface AuthStatus {
  * place it makes an `AuthStatus` up rather than reading one: a session it just lost.
  */
 export const DEFAULT_MAIA_TARGET_ELO = 2000
+
+/** The band Maia's weights cover (`backend/config.py`), and the step a level is picked in. */
+export const MAIA_MIN_ELO = 1100
+export const MAIA_MAX_ELO = 2000
+export const MAIA_ELO_STEP = 50
+/** How many levels one deployment may ask about at once (`services/app_settings.py`). */
+export const MAX_MAIA_ELOS = 5
 
 /**
  * `GET`/`PUT /settings` — everything the Settings page shows: eight numbers, seven of them
@@ -86,7 +101,16 @@ export const DEFAULT_MAIA_TARGET_ELO = 2000
  * back to the default, and the default is what answers.
  */
 export interface AppSettings {
+  /** The first of `maia_elos`, for a caller that shows a single level. */
   maia_target_elo: number
+  /**
+   * Every rating Maia is asked at, lowest first — one to five of them, and never empty:
+   * there is no such thing as a deployment that asks Maia at no rating.
+   *
+   * Optional in the type rather than in the answer, so that a client which builds settings
+   * it was not told (a test fixture, an optimistic write) does not have to invent a list.
+   */
+  maia_elos?: number[]
   quick_nodes: number | null
   deep_nodes: number | null
   deep_multipv: number | null
@@ -210,19 +234,23 @@ export interface MaiaPolicyMove {
 
 export interface MaiaPolicyRequest {
   fen: string
-  /** Defaults to the deployment's `maia_target_elo` — the level everything else is asked at. */
+  /** One level. The older spelling of `elos: [elo]`, kept because it still works. */
   elo?: number | null
+  /**
+   * Every level wanted, in one call — omitted, the deployment's configured ones.
+   *
+   * One call rather than one per level on purpose: behind the endpoint is a single warm
+   * process under a single lock, so asking separately serialises the same work.
+   */
+  elos?: number[] | null
   /** Maximum policy entries; defaults to the batch pass's `MAIA_POLICY_MOVES`. */
   moves?: number | null
   /** 0 or absent asks for no rollout. */
   rollout_plies?: number | null
 }
 
-/**
- * `409` means no backend-local Maia is available; the caller hides its live section
- * rather than reporting an error (see `useLiveMaia`).
- */
-export interface MaiaPolicyResponse extends Extra {
+/** One level's answer: what a human of that rating plays here, and what follows. */
+export interface MaiaLevelPolicy extends Extra {
   /**
    * The level actually used — the clamped request, or a fixed-weights engine's own level
    * where its weights name one. Null where such an engine never says which human it is,
@@ -232,6 +260,21 @@ export interface MaiaPolicyResponse extends Extra {
   policy: MaiaPolicyMove[]
   /** The most likely continuation, both sides conditioned at `elo`. Absent when not asked for. */
   rollout?: MaiaPolicyMove[] | null
+}
+
+/**
+ * `409` means no backend-local Maia is available; the caller hides its live section
+ * rather than reporting an error (see `useLiveMaia`).
+ *
+ * `levels` is one entry per level asked about, keyed by the level *asked for* — so a
+ * caller finds its answer where it put the question, and reads the entry's own `elo` for
+ * what actually played. The top-level `elo`/`policy`/`rollout` are the first of them,
+ * which is the shape the board read before there was more than one level. A fixed-weights
+ * build answers with one entry however many were asked for: it is one rating, and the same
+ * policy in five columns would invent a comparison.
+ */
+export interface MaiaPolicyResponse extends MaiaLevelPolicy {
+  levels?: Record<string, MaiaLevelPolicy>
 }
 
 export interface MoveRow extends Extra {
@@ -349,6 +392,8 @@ export interface AnalysisRequest {
   nodes?: number
   depth?: number
   priority?: number
+  /** Maia levels for this run alone; omitted, it uses the deployment's configured ones. */
+  elos?: number[]
 }
 
 /**
@@ -363,6 +408,31 @@ export interface BatchAnalysisRequest {
   nodes?: number
   depth?: number
   priority?: number
+  /** Maia levels for these runs alone; omitted, they use the configured ones. */
+  elos?: number[]
+}
+
+/**
+ * `POST /analysis/maia-fill` — add the configured Maia levels to games that already have a
+ * pass, without redoing the search. No games named means every analysed game.
+ */
+export interface MaiaFillRequest {
+  game_ids?: number[]
+}
+
+/**
+ * What a fill queued. `already_complete` counts the games that have every configured level
+ * *including* the ones whose fill is still in the queue, so pressing twice queues it once.
+ */
+export interface MaiaFillReceipt {
+  queued: number
+  already_complete: number
+}
+
+/** What the fill button shows before anybody presses it. */
+export interface MaiaFillStatus {
+  missing_games: number
+  configured: number[]
 }
 
 export interface QueuedRun {
@@ -402,6 +472,15 @@ export interface BackfillStarted {
 /** Cancelling drops what is still queued; what is already running is left to finish. */
 export interface BackfillCancelled {
   tier: Tier
+  dropped: number
+  outstanding: number
+}
+
+/**
+ * The whole-queue reset: every tier and every shape of queued run, dropped in one call.
+ * No `tier` — unlike `BackfillCancelled`, this was never scoped to one.
+ */
+export interface QueueCleared {
   dropped: number
   outstanding: number
 }
@@ -700,21 +779,105 @@ export interface TierStatusResponse {
 
 // --- notes ----------------------------------------------------------------
 
-export interface NoteResponse {
+/** Who wrote a note: this app, the coach over MCP, or a snapshot of the live board. */
+export type NoteSource = 'web' | 'mcp' | 'live'
+
+export const NOTE_SOURCES: readonly NoteSource[] = ['web', 'mcp', 'live']
+
+/**
+ * Which anchors a note has, as `GET /notes?scope=` names them: `game` is about a game,
+ * `position` about a FEN and no game, `line` about a kept variation, `free` about nothing
+ * but itself.
+ */
+export type NoteScope = 'game' | 'position' | 'line' | 'free'
+
+export const NOTE_SCOPES: readonly NoteScope[] = ['game', 'position', 'line', 'free']
+
+/** Just enough of a game to label a note with it (`services.notes.game_brief`). */
+export interface NoteGameBrief extends Extra {
+  id: number
+  white?: string | null
+  black?: string | null
+  result?: string | null
+  /** The day it was played, `YYYY-MM-DD`, or null for a game that carries no date. */
+  date?: string | null
+}
+
+/**
+ * One kept variation off a game — `POST /lines`, `GET /games/{id}/lines`.
+ *
+ * `base_ply` is the mainline ply it branches from (0 from the start) and `moves` is UCI.
+ * `sans` is the same line in SAN, derived by the backend at read time rather than stored,
+ * so it is shorter than `moves` for a line whose game no longer replays it.
+ */
+export interface LineResponse extends Extra {
+  id: number
+  game_id: number
+  base_ply: number
+  moves: string[]
+  sans: string[]
+  created_at: string
+  updated_at: string
+  /** Only where the route carries them: `POST /lines` and `GET /games/{id}/lines`. */
+  notes?: NoteResponse[]
+}
+
+/**
+ * The variation to keep. Deduped by shape rather than by id: a line already covered by a
+ * kept one comes back as that one, and a line that continues a kept one extends it — so
+ * pinning the same branch twice keeps one row.
+ */
+export interface LineCreate {
+  game_id: number
+  base_ply?: number
+  moves: string[]
+}
+
+/**
+ * A note with its anchors resolved: the FEN of the position, the whole line and a small
+ * summary of the game ride along, so nothing that renders a note has to fetch them.
+ *
+ * `ply` is a half-move **count**, not a move index — 0 is the starting position and `n` the
+ * position after `n` half-moves. On a line note it is `line.base_ply + k`: the position
+ * after `k` moves of the variation.
+ */
+export interface NoteResponse extends Extra {
   id: number
   text: string
   tags: string[]
   game_id?: number | null
   position_id?: number | null
+  line_id?: number | null
+  ply?: number | null
+  source?: NoteSource
+  fen?: string | null
+  line?: LineResponse | null
+  game?: NoteGameBrief | null
   created_at: string
   updated_at: string
 }
 
+/**
+ * A note and as much of a position as the writer could name. Every anchor is optional and
+ * they compose.
+ */
 export interface NoteCreate {
   text: string
   tags?: string[]
   game_id?: number | null
   fen?: string | null
+  /** The mainline ply the note is about, or the index into `line` (`base_ply + k`). */
+  ply?: number | null
+  /** Pin the note to a variation that is already kept. */
+  line_id?: number | null
+  /** Keep this variation first, then pin the note to it — a note on a line always pins it. */
+  line?: LineCreate | null
+  source?: NoteSource
+  /**
+   * Snapshot the live board instead of naming a position: its FEN, the game it is
+   * following and, off the mainline, the departure as a kept line. `source` becomes `live`.
+   */
+  from_live?: boolean
 }
 
 export interface NoteUpdate {
@@ -726,6 +889,25 @@ export interface TagCount {
   tag: string
   notes: number
 }
+
+/** Why a note came back up: its position recurred in a recent game, or it has gone quiet. */
+export type ResurfaceReason = 'recurred' | 'stale'
+
+export interface ResurfaceItem extends Extra {
+  note: NoteResponse
+  reason: ResurfaceReason
+  /** For `recurred`, the games the position turned up in. Empty for `stale`. */
+  games: number[]
+}
+
+export interface ResurfaceResponse {
+  items: ResurfaceItem[]
+}
+
+/** `md` for a person to read, `pgn` for a board program to open. */
+export type NoteExportFormat = 'md' | 'pgn'
+
+export const NOTE_EXPORT_FORMATS: readonly NoteExportFormat[] = ['md', 'pgn']
 
 // --- live -----------------------------------------------------------------
 

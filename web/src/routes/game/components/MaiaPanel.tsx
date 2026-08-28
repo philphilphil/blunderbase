@@ -1,9 +1,18 @@
+import { ChevronDown, Columns3 } from 'lucide-react'
+
 import type { GameRunSummary } from '@/lib/api/types'
 import { glyphStyle, isFlagged } from '@/lib/chess/classification'
 import { formatNodes, formatScore, formatWinLoss } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
-import { plyLabel, type EngineLineView, type HumanMoveView, type MaiaMove } from '../gameModel'
+import {
+  plyLabel,
+  type EngineLineView,
+  type HumanMoveView,
+  type MaiaComparisonColumn,
+  type MaiaLevelOption,
+  type MaiaMove,
+} from '../gameModel'
 
 /** The human column's own colour — the purple `docs/design/README.md` gives Maia. */
 const MAIA_HUE = 'var(--bb-brilliant)'
@@ -29,6 +38,19 @@ export interface MaiaPanelProps {
   rating: string | null
   /** The human column, already crossed with the engine's verdicts (`humanMoves`). */
   human: HumanMoveView[]
+  /**
+   * Every level the reader may switch to here: what this position carries, plus the levels
+   * the deployment is configured for but this run was never made at, which are offered
+   * disabled rather than hidden (`maiaLevelOptions`). Fewer than two, and the header is the
+   * plain label it always was — there is nothing to switch between.
+   */
+  levels?: MaiaLevelOption[]
+  onSelectLevel?: (elo: number) => void
+  /** The human column is every level side by side rather than the one that is selected. */
+  compare?: boolean
+  onCompareChange?: (next: boolean) => void
+  /** One column per level, for the compare grid (`maiaComparison`). */
+  comparison?: MaiaComparisonColumn[]
   /**
    * Whether the human column has anything to say. Off — the `hints` toggle, or a
    * deployment with no Maia to ask — the column keeps its place and its header but shows
@@ -71,10 +93,21 @@ export interface MaiaPanelProps {
  * The engine column is also the run's own box: which run is speaking, what it spent, and
  * its multi-PV lines for the position on the board, with the move actually played as the
  * last row, marked `played`, so a blunder reads as "these were the options, this happened".
+ *
+ * Compare mode is the third question, the one a single level cannot answer: *at which level
+ * does this stop being the move people play*. Several levels' distributions only mean
+ * anything against each other, so the grid takes the whole card while it is on — the
+ * engine's verdict is already in every column's colour, and five columns squeezed into a
+ * quarter of the width would be five ellipses.
  */
 export function MaiaPanel({
   rating,
   human,
+  levels = [],
+  onSelectLevel,
+  compare = false,
+  onCompareChange,
+  comparison = [],
   showHuman = true,
   engine,
   run,
@@ -86,6 +119,10 @@ export function MaiaPanel({
 }: MaiaPanelProps) {
   const rollout = live?.rollout ?? []
   const nodes = formatNodes(run?.nodes)
+  const comparing = showHuman && compare && comparison.length > 1
+  // The toggle stays offered while compare is on even with nothing to compare here, so a
+  // position with one level is never a position the reader cannot get out of.
+  const canCompare = onCompareChange !== undefined && (comparison.length > 1 || compare)
 
   return (
     <div
@@ -106,20 +143,36 @@ export function MaiaPanel({
         truncates its own header — so in a narrow moves column the engine's rows wrap a
         line sooner rather than the human rows becoming ellipses.
       */}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)] divide-x divide-line">
+      <div
+        className={cn(
+          'grid min-h-0 flex-1 divide-x divide-line',
+          comparing ? 'grid-cols-1' : 'grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)]',
+        )}
+      >
         <section className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5">
-          <div className="flex items-center gap-[0.4375rem]">
+          <div className="flex flex-nowrap items-center gap-[0.4375rem]">
             <span className="size-1.5 flex-none rounded-full bg-brilliant" />
-            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-              {rating ? `Maia ${rating}` : 'Maia'}
-            </span>
-            <span className="truncate font-mono text-[0.625rem] text-faint">human</span>
+            {/*
+              The visible label is the level itself, with the picker laid over it: the
+              header has room for one reading of who this column speaks for, and "Maia
+              1700" is that reading whether or not it can be changed.
+            */}
+            <LevelLabel
+              rating={rating}
+              levels={comparing ? [] : levels}
+              onSelectLevel={onSelectLevel}
+            />
             <div className="flex-1" />
             {showHuman && live ? <LivePill pending={live.pending} /> : null}
+            {canCompare && onCompareChange ? (
+              <CompareToggle on={compare} onChange={onCompareChange} />
+            ) : null}
           </div>
 
           {/* Switched off, the column holds its place and says nothing at all. */}
-          {!showHuman ? null : human.length === 0 ? (
+          {!showHuman ? null : comparing ? (
+            <CompareGrid columns={comparison} onHoverMove={onHoverMove} onPlayLine={onPlayLine} />
+          ) : human.length === 0 ? (
             <p className="py-2 text-[0.6875rem] text-dim">
               {live?.pending ? 'Reading this position…' : '–'}
             </p>
@@ -141,54 +194,264 @@ export function MaiaPanel({
           ) : null}
         </section>
 
-        <section className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5">
-          <div className="flex flex-wrap items-center gap-[0.4375rem]">
-            <span
-              className={cn(
-                'size-1.5 flex-none rounded-full',
-                run ? 'bg-accent-teal' : 'bg-edge-strong',
-              )}
-            />
-            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-              {run?.engine ?? 'No engine run'}
-            </span>
-            {/*
-              The label is the column's category, paired with the human column's own —
-              never the run's protocol kind, which lives on the engines page.
-            */}
-            <span className="truncate font-mono text-[0.625rem] text-faint">engine</span>
-            <div className="flex-1" />
-            {run?.depth ? (
-              <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
-            ) : null}
-            {nodes !== '—' ? (
-              <span className="font-mono text-[0.625rem] tabular text-dim">{nodes} nodes</span>
-            ) : null}
-            {run?.multipv ? (
-              <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
-                MPV {run.multipv}
+        {comparing ? null : (
+          <section className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5">
+            <div className="flex flex-wrap items-center gap-[0.4375rem]">
+              <span
+                className={cn(
+                  'size-1.5 flex-none rounded-full',
+                  run ? 'bg-accent-teal' : 'bg-edge-strong',
+                )}
+              />
+              <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+                {run?.engine ?? 'No engine run'}
               </span>
-            ) : null}
-          </div>
-
-          {engine.length === 0 ? (
-            <p className="py-2 text-[0.6875rem] text-dim">–</p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {engine.map((line) => (
-                <EngineRow
-                  key={`${line.multipv}-${line.firstUci ?? 'x'}`}
-                  line={line}
-                  ply={ply}
-                  onHoverMove={onHoverMove}
-                  onPlayLine={onPlayLine}
-                />
-              ))}
+              {/*
+                The label is the column's category, paired with the human column's own —
+                never the run's protocol kind, which lives on the engines page.
+              */}
+              <div className="flex-1" />
+              {run?.depth ? (
+                <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
+              ) : null}
+              {nodes !== '—' ? (
+                <span className="font-mono text-[0.625rem] tabular text-dim">{nodes} nodes</span>
+              ) : null}
+              {run?.multipv ? (
+                <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
+                  MPV {run.multipv}
+                </span>
+              ) : null}
             </div>
-          )}
-        </section>
+
+            {engine.length === 0 ? (
+              <p className="py-2 text-[0.6875rem] text-dim">–</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {engine.map((line) => (
+                  <EngineRow
+                    key={`${line.multipv}-${line.firstUci ?? 'x'}`}
+                    line={line}
+                    ply={ply}
+                    onHoverMove={onHoverMove}
+                    onPlayLine={onPlayLine}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Who the column speaks for, and the switch that changes it.
+ *
+ * A native `select` laid over the label rather than beside it: the header is one line at
+ * 11px with a live pill and a compare toggle already on it, and a second visible control
+ * would take the label's room. The label is what is read; the select is what is clicked,
+ * and it brings the platform's own keyboard handling, its scroll and its disabled options
+ * with it. A level the position has no data for is offered and disabled — the fix is a
+ * fresh pass, and hiding it would make a level the owner configured look impossible.
+ */
+function LevelLabel({
+  rating,
+  levels,
+  onSelectLevel,
+}: {
+  rating: string | null
+  levels: MaiaLevelOption[]
+  onSelectLevel?: (elo: number) => void
+}) {
+  const label = rating ? `Maia ${rating}` : 'Maia'
+  const pickable = levels.length > 1 && onSelectLevel !== undefined
+  if (!pickable) {
+    return (
+      <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+        {label}
+      </span>
+    )
+  }
+  return (
+    <span
+      data-testid="maia-level-picker"
+      className="relative inline-flex min-w-0 items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised"
+    >
+      <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+        {label}
+      </span>
+      <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
+      <select
+        aria-label="Maia level"
+        title="Which level the human column speaks for"
+        value={rating ?? ''}
+        onChange={(event) => onSelectLevel(Number(event.target.value))}
+        className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
+      >
+        {/* A live answer from a fixed-weights build names no level; the box still has to
+            have the value it is showing, or the platform picks one nobody asked for. */}
+        {rating === null ? <option value="">Maia</option> : null}
+        {levels.map((option) => (
+          <option key={option.elo} value={String(option.elo)} disabled={!option.available}>
+            {option.available ? String(option.elo) : `${option.elo} — re-analyse to add`}
+          </option>
+        ))}
+      </select>
+    </span>
+  )
+}
+
+/** One level, or all of them side by side. */
+function CompareToggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="maia-compare-toggle"
+      aria-pressed={on}
+      title={on ? 'Read one level at a time' : 'Compare the levels side by side'}
+      aria-label={on ? 'Read one level at a time' : 'Compare the levels side by side'}
+      onClick={() => onChange(!on)}
+      className={cn(
+        'inline-flex flex-none items-center rounded-sm border px-1 py-px',
+        on
+          ? 'border-brilliant/40 bg-brilliant/12 text-brilliant'
+          : 'border-edge text-dim hover:border-edge-hover hover:text-soft',
+      )}
+    >
+      <Columns3 className="size-3" aria-hidden />
+    </button>
+  )
+}
+
+/**
+ * Every level's reading of one position, one column each.
+ *
+ * The columns are the comparison, so they are equal-width and read across: the same move on
+ * the same row of two columns is the same move at two levels, and a move that is top at
+ * 1100 and absent at 2000 is the answer to "was this a normal mistake" without a sentence
+ * having to say so.
+ */
+function CompareGrid({
+  columns,
+  onHoverMove,
+  onPlayLine,
+}: {
+  columns: MaiaComparisonColumn[]
+  onHoverMove?: (uci: string | null) => void
+  onPlayLine?: (ucis: string[], index: number) => void
+}) {
+  return (
+    <div
+      data-testid="maia-compare"
+      className="grid min-w-0 gap-x-3"
+      style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+    >
+      {columns.map((column, index) => (
+        <CompareColumn
+          key={column.rating ?? `unnamed-${index}`}
+          column={column}
+          onHoverMove={onHoverMove}
+          onPlayLine={onPlayLine}
+        />
+      ))}
+    </div>
+  )
+}
+
+function CompareColumn({
+  column,
+  onHoverMove,
+  onPlayLine,
+}: {
+  column: MaiaComparisonColumn
+  onHoverMove?: (uci: string | null) => void
+  onPlayLine?: (ucis: string[], index: number) => void
+}) {
+  const played = column.played
+  const listed = played !== null && column.moves.some((move) => move.uci === played.uci)
+
+  return (
+    <div
+      data-testid="maia-compare-column"
+      data-rating={column.rating ?? ''}
+      className="flex min-w-0 flex-col gap-0.5"
+    >
+      <span className="truncate border-b border-line pb-1 font-mono text-[0.625rem] font-semibold text-brilliant">
+        {column.rating ?? 'Maia'}
+      </span>
+      {column.moves.length === 0 ? (
+        <span className="py-1 font-mono text-[0.625rem] text-dim">–</span>
+      ) : (
+        column.moves.map((move) => (
+          <CompareRow
+            key={move.uci}
+            move={move}
+            onHoverMove={onHoverMove}
+            onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
+          />
+        ))
+      )}
+      {/* The played move is on every column whether or not the level ranked it: a level
+          that puts it seventh is exactly the level worth reading. */}
+      {played && !listed ? (
+        <div data-testid="maia-compare-played" className="mt-0.5 border-t border-line pt-0.5">
+          <CompareRow
+            move={played}
+            onHoverMove={onHoverMove}
+            onPlay={onPlayLine ? () => onPlayLine([played.uci], 0) : undefined}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** One move of one compare column: its rank at this level, the SAN, its share. */
+function CompareRow({
+  move,
+  onHoverMove,
+  onPlay,
+}: {
+  move: HumanMoveView
+  onHoverMove?: (uci: string | null) => void
+  onPlay?: () => void
+}) {
+  const verdict = glyphStyle(move.classification)
+  const hue = verdict?.color ?? MAIA_HUE
+
+  return (
+    <button
+      type="button"
+      data-testid={move.played ? 'maia-compare-played-row' : 'maia-compare-row'}
+      disabled={!onPlay}
+      onClick={onPlay}
+      onMouseEnter={() => onHoverMove?.(move.uci)}
+      onMouseLeave={() => onHoverMove?.(null)}
+      title={`Play ${move.san} on the analysis board`}
+      className={cn(
+        'relative flex w-full items-baseline gap-1 overflow-hidden rounded-[0.1875rem] border-l-2 px-1 py-px text-left',
+        move.played ? null : 'border-transparent',
+        onPlay ? 'hover:bg-raised' : 'cursor-default',
+      )}
+      style={move.played ? { borderLeftColor: hue, background: tint(hue, 7) } : undefined}
+    >
+      <span className="relative w-3 flex-none font-mono text-[0.59375rem] tabular text-faint">
+        {move.rank}
+      </span>
+      <span
+        className={cn(
+          'relative min-w-0 flex-1 truncate font-mono text-[0.625rem]',
+          verdict ? verdict.textClass : 'text-soft',
+        )}
+      >
+        {move.san}
+      </span>
+      <span className="relative flex-none font-mono text-[0.59375rem] tabular text-dim">
+        {move.probability === null ? '—' : `${Math.round(move.probability * 100)}%`}
+      </span>
+    </button>
   )
 }
 

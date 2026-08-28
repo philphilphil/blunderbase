@@ -13,6 +13,7 @@ from backend.db.enums import (
     Color,
     EngineKind,
     JobStatus,
+    NoteSource,
     Platform,
     Result,
     RunStatus,
@@ -27,6 +28,7 @@ from backend.db.models import (
     Game,
     GamePosition,
     ImportJob,
+    Line,
     MoveEval,
     Note,
     Position,
@@ -44,6 +46,7 @@ EXPECTED_TABLES = {
     "game_positions",
     "games",
     "import_jobs",
+    "lines",
     "move_evals",
     "notes",
     "positions",
@@ -145,11 +148,17 @@ def seed(session: Session) -> dict[str, int]:
         best_lines=[{"multipv": 1, "cp": 28, "mate": None, "pv": ["e7e5", "g1f3"]}],
         maia_policy={"1700": [{"uci": "e7e5", "p": 0.31}]},
     )
+    line = Line(game_id=game.id, base_ply=1, moves=["g1f3", "d7d6"])
+    session.add(line)
+    session.flush()
     note = Note(
         text="Keeps playing the Najdorf without the …e5 plan.",
         tags=["opening", "najdorf"],
         game_id=game.id,
         position_id=position.id,
+        line_id=line.id,
+        ply=2,
+        source=NoteSource.MCP,
     )
     session.add_all([move_eval, note])
     session.commit()
@@ -163,6 +172,7 @@ def seed(session: Session) -> dict[str, int]:
         "game_position": game_position.id,
         "run": run.id,
         "move_eval": move_eval.id,
+        "line": line.id,
         "note": note.id,
     }
 
@@ -233,9 +243,18 @@ def test_every_table_roundtrips(sessions: sessionmaker[Session]) -> None:
         ]
         assert move_eval.maia_policy == {"1700": [{"uci": "e7e5", "p": 0.31}]}
 
+        line = reader.get(Line, ids["line"])
+        assert line is not None
+        assert (line.game_id, line.base_ply) == (game.id, 1)
+        assert line.moves == ["g1f3", "d7d6"]
+        assert line.created_at.tzinfo is UTC
+
         note = reader.get(Note, ids["note"])
         assert note is not None
         assert note.tags == ["opening", "najdorf"]
+        assert (note.line_id, note.ply) == (ids["line"], 2)
+        assert note.source is NoteSource.MCP
+        assert note.line is not None and note.line.moves == ["g1f3", "d7d6"]
         assert note.created_at.tzinfo is UTC
         assert note.updated_at.tzinfo is UTC
 
@@ -305,5 +324,34 @@ def test_deleting_a_game_takes_its_analysis_with_it(sessions: sessionmaker[Sessi
         assert reader.get(AnalysisRun, ids["run"]) is None
         assert reader.get(MoveEval, ids["move_eval"]) is None
         assert reader.get(GamePosition, ids["game_position"]) is None
+        # A line only exists because of its game, so it goes with it.
+        assert reader.get(Line, ids["line"]) is None
         # Positions outlive the games that reached them; that is the point of the table.
         assert reader.get(Position, ids["position"]) is not None
+
+
+def test_a_note_outlives_the_line_it_was_written_about(sessions: sessionmaker[Session]) -> None:
+    """Unpinning a variation must not take the thinking that was written about it."""
+    with sessions() as writer:
+        ids = seed(writer)
+        note = writer.get(Note, ids["note"])
+        assert note is not None
+        # The game would cascade the note away; this is about the line alone.
+        note.game_id = None
+        line = writer.get(Line, ids["line"])
+        assert line is not None
+        writer.delete(line)
+        writer.commit()
+
+    with sessions() as reader:
+        note = reader.get(Note, ids["note"])
+        assert note is not None
+        assert note.line_id is None
+        assert note.ply == 2
+
+
+def test_the_source_of_a_note_is_validated_in_python(session: Session) -> None:
+    session.add(Note(text="from nowhere", source="telepathy"))
+    with pytest.raises(StatementError):
+        session.flush()
+    session.rollback()

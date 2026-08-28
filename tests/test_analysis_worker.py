@@ -24,6 +24,7 @@ from backend.db.enums import Classification, EngineKind, Platform, RunStatus, Ti
 from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval
 from backend.db.session import create_db_engine
 from backend.services import analysis, app_settings, import_service
+from backend.services import games as games_service
 from backend.workers import AnalysisWorkers, analysis_queue
 
 # The fixture game: 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6, six plies and seven positions, the
@@ -736,6 +737,90 @@ async def test_a_target_elo_bakes_one_level_into_every_ply_of_both_sides(
     }
     # The opponent's moves carry a policy too: that is the half the target elo is for.
     assert rows[1].maia_policy["1700"][0]["uci"] == "e7e5"
+
+
+# The human moves worth naming in each of the fixture game's six positions. Both are legal
+# where they are asked about, which is what lets the same script serve any number of levels.
+MAIA_PER_PLY = [
+    [("e2e4", 31.4), ("d2d4", 22.0)],
+    [("e7e5", 30.0), ("c7c5", 20.0)],
+    [("g1f3", 40.0), ("b1c3", 18.0)],
+    [("b8c6", 35.0), ("g8f6", 20.0)],
+    [("f1b5", 28.0), ("f1c4", 26.0)],
+    [("a7a6", 30.0), ("g8f6", 24.0)],
+]
+
+
+def _maia_script(levels: int = 1) -> list[dict[str, Any]]:
+    """One reply per ply per level, in the order `apply_maia` asks for them."""
+    return [_maia_reply(moves) for moves in MAIA_PER_PLY for _ in range(levels)]
+
+
+async def test_every_configured_level_is_baked_into_every_ply(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """Two levels are what makes the comparison readable: both, on every ply, in one pass."""
+    with db() as session:
+        app_settings.set_maia_elos(session, [1500, 1900])
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _register(db, tmp_path, kind=EngineKind.MAIA, name="Maia", go=_maia_script(levels=2))
+    _import_game(db, fixtures_dir)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        rows = analysis.get_move_evals(session, run.id)
+
+    assert run.status is RunStatus.DONE
+    assert [row.ply for row in rows if row.maia_policy] == [0, 1, 2, 3, 4, 5]
+    assert all(sorted(row.maia_policy) == ["1500", "1900"] for row in rows)
+    assert rows[0].maia_policy["1500"][0]["uci"] == "e2e4"
+    assert rows[1].maia_policy["1900"][0]["uci"] == "e7e5"
+
+
+async def test_a_fill_pass_adds_a_level_without_searching_again(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """The point of the fill: a level the library never had, without a second Stockfish pass.
+
+    The search engine is scripted for exactly one pass over the game. The fill run reaching
+    `done` with rows that carry a policy and no evaluation is the proof that it never asked
+    it a second time.
+    """
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _register(db, tmp_path, kind=EngineKind.MAIA, name="Maia", go=_maia_script())
+    game = _import_game(db, fixtures_dir)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        searched = session.scalars(select(AnalysisRun)).one()
+        app_settings.set_maia_elos(session, [1500, MAIA_MAX_RATING])
+        assert analysis.maia_fill_status(session) == {
+            "missing_games": 1,
+            "configured": [1500, MAIA_MAX_RATING],
+        }
+        assert analysis.queue_maia_fill(session)["queued"] == 1
+
+    await _drain(settings, db)
+
+    with db() as session:
+        fill = session.scalars(
+            select(AnalysisRun).where(AnalysisRun.id != searched.id)
+        ).one()
+        rows = analysis.get_move_evals(session, fill.id)
+        detail = games_service.get_game_detail(session, game.id)
+
+    assert fill.status is RunStatus.DONE
+    assert fill.maia_only is True
+    # Only the missing level, and nothing about the moves themselves.
+    assert all(sorted(row.maia_policy) == ["1500"] for row in rows)
+    assert all(row.eval_before_cp is None and row.classification is None for row in rows)
+    # And the game now reads as though both levels had been analysed at once.
+    assert sorted(detail["moves"][0]["maia"]) == ["1500", str(MAIA_MAX_RATING)]
+    assert detail["moves"][0]["classification"] == str(Classification.BLUNDER)
+    assert analysis.maia_fill_status(session)["missing_games"] == 0
 
 
 async def test_a_maia_that_will_not_answer_degrades_instead_of_failing_the_run(

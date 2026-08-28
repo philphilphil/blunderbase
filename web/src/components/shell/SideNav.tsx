@@ -19,6 +19,7 @@ import {
   Library,
   Radio,
   Network,
+  StickyNote,
 } from 'lucide-react'
 import type { ComponentType, ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
@@ -51,6 +52,7 @@ const WORKSPACE: NavItem[] = [
   { to: '/games', label: 'Games', icon: Library },
   { to: '/explorer', label: 'Openings', icon: Network },
   { to: '/stats', label: 'Stats', icon: ChartNoAxesColumn },
+  { to: '/notes', label: 'Notes', icon: StickyNote },
   { to: '/live', label: 'Live', icon: Radio },
 ]
 
@@ -178,7 +180,7 @@ function EngineRoster() {
           <span
             className={cn(
               'mx-1 size-1.5 flex-none rounded-full',
-              engine.enabled ? 'bg-accent-teal' : 'bg-faint',
+              engine.enabled ? 'bg-emerald-400 shadow-[0_0_0.375rem_0.0625rem] shadow-emerald-400/70' : 'bg-faint',
             )}
           />
           <span className="truncate">{engine.name}</span>

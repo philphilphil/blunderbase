@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 import { ApiError } from '@/lib/api/client'
 import { useMaiaPolicy } from '@/lib/api/queries'
 
-import { maiaLive, type MaiaLiveView } from './gameModel'
+import { maiaLiveLevels, nearestLevel, type MaiaLiveView } from './gameModel'
 
 /** How long the board has to sit still before the position is worth asking about. */
 export const LIVE_DEBOUNCE_MS = 300
@@ -24,6 +24,9 @@ export const LIVE_DEBOUNCE_MS = 300
 export const ROLLOUT_PLIES = 8
 
 export interface LiveMaia {
+  /** Every configured level, answered in one query — the columns of a comparison. */
+  views: MaiaLiveView[]
+  /** The one the panel is reading: the reader's pick among `views`, else the first. */
   view: MaiaLiveView | null
   /** A query is in flight, or one is about to be: the panel says so rather than blinking. */
   pending: boolean
@@ -42,10 +45,23 @@ export function useDebounced<T>(value: T, ms: number): T {
   return settled
 }
 
-export function useLiveMaia(fen: string | null, elo: number | null): LiveMaia {
+/**
+ * Every configured level in one query, and the one of them the panel is showing.
+ *
+ * One request rather than one per level: behind the endpoint is a single warm process under
+ * a single lock, so five separate questions would serialise the same work and land as five
+ * loading columns. `pick` only chooses among the answers — it never narrows the question,
+ * because the comparison wants all of them and switching level must not cost a round trip.
+ */
+export function useLiveMaia(
+  fen: string | null,
+  elos: number | readonly number[] | null,
+  pick: number | null = null,
+): LiveMaia {
+  const wanted = typeof elos === 'number' ? [elos] : elos === null ? null : [...elos]
   const settled = useDebounced(fen, LIVE_DEBOUNCE_MS)
   const asked = fen === null ? null : settled
-  const query = useMaiaPolicy({ fen: asked, elo, rolloutPlies: ROLLOUT_PLIES })
+  const query = useMaiaPolicy({ fen: asked, elos: wanted, rolloutPlies: ROLLOUT_PLIES })
   // What the cache holds answers for `asked`, which lags the board by the debounce window
   // (and answers instantly, from cache, for a position walked back to). A policy for the
   // position the reader has just left is not a weaker answer, it is the wrong one: an
@@ -55,8 +71,14 @@ export function useLiveMaia(fen: string | null, elo: number | null): LiveMaia {
   const current = asked === fen
 
   const unavailable = query.error instanceof ApiError && query.error.status === 409
+  const views = unavailable || !current ? [] : maiaLiveLevels(query.data)
+  const picked = nearestLevel(
+    views.map((view) => view.level),
+    pick,
+  )
   return {
-    view: unavailable || !current ? null : maiaLive(query.data),
+    views,
+    view: views.find((view) => view.level === picked) ?? views[0] ?? null,
     pending: fen !== null && (!current || query.isFetching),
     unavailable,
   }

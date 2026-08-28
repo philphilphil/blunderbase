@@ -1,11 +1,21 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useStreamSession } from '@/lib/analysis'
-import { useGame, useMaiaTargetElo } from '@/lib/api/queries'
-import type { MoveRow } from '@/lib/api/types'
+import {
+  useDeleteLine,
+  useDeleteNote,
+  useGame,
+  useGameLines,
+  useMaiaElos,
+  useNoteTags,
+  useSaveLine,
+  useSaveNote,
+  useUpdateNote,
+} from '@/lib/api/queries'
+import type { LineResponse, MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
 
@@ -17,19 +27,21 @@ import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
 import { MaiaPanel } from './components/MaiaPanel'
 import { MoveList, type MoveAnnotation, type MoveListVariation } from './components/MoveList'
+import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
 import {
   bestRun,
   buildGameLine,
-  collapsedThroughMove,
   engineLines,
   evalAtCursor,
   evalCurve,
   formatGameDate,
   humanMoves,
+  maiaComparison,
+  maiaLevelFor,
+  maiaLevelOptions,
   maiaLevels,
   nextFlaggedPly,
   pairMoves,
-  preferredLevel,
   previousFlaggedPly,
   runFor,
   sanVariation,
@@ -39,8 +51,18 @@ import {
   type GameNote,
   type Side,
 } from './gameModel'
+import { setMaiaCompare, setMaiaEloPick, useMaiaCompare, useMaiaEloPick } from './maiaPreferences'
+import {
+  noteAtTarget,
+  noteRows,
+  noteTarget,
+  notedLineIndices,
+  notedMoveIndices,
+  type NoteRow,
+} from './notesModel'
 import { buildPgn } from './pgn'
-import { isPrefix, useSessionVariations } from './sessionVariations'
+import { useSessionVariations } from './sessionVariations'
+import { variationRows } from './variationRows'
 import { useBoardKeys } from './useBoardKeys'
 import { useDeepAnalysis } from './useDeepAnalysis'
 import { useLiveMaia } from './useLiveMaia'
@@ -136,6 +158,13 @@ export function GamePage() {
   return <GameStudio key={gameId} gameId={gameId} />
 }
 
+/** A positive integer out of a query parameter, or null for anything else. */
+function intParam(raw: string | null): number | null {
+  if (raw === null) return null
+  const value = Number(raw)
+  return Number.isInteger(value) && value >= 0 ? value : null
+}
+
 function GameStudio({ gameId }: { gameId: number }) {
   const game = useGame(gameId, { notes: true })
   const deepAnalysis = useDeepAnalysis(gameId)
@@ -163,7 +192,38 @@ function GameStudio({ gameId }: { gameId: number }) {
    * left them. Held outside the component, so they survive navigating to another game and
    * back within the open app (`./sessionVariations`).
    */
-  const { kept, keep } = useSessionVariations(gameId)
+  const { kept, keep, drop } = useSessionVariations(gameId)
+  /**
+   * The lines pinned to this game on the server, and the notes hanging off them. They are
+   * the same rows as the session's own in the move list — only their staying power differs
+   * — so they are folded together in `./variationRows` rather than drawn twice.
+   */
+  const gameLines = useGameLines(gameId)
+  const saveLine = useSaveLine()
+  const removeLine = useDeleteLine()
+  const saveNote = useSaveNote()
+  const updateNote = useUpdateNote()
+  const removeNote = useDeleteNote()
+  const tags = useNoteTags()
+  /**
+   * The composer is always on screen under the board — a note is read in the same glance
+   * as the position it is about, with no click in between. The Note button, the move
+   * list's "add" and a Notes-tab row all just put the keyboard in it.
+   */
+  const focusComposer = useCallback(() => {
+    document.getElementById(COMPOSER_TEXT_ID)?.focus()
+  }, [])
+  const blurComposer = useCallback(() => {
+    const box = document.getElementById(COMPOSER_TEXT_ID)
+    if (box && box === document.activeElement) box.blur()
+  }, [])
+  /**
+   * A note the reader named rather than a position they walked to — the Notes tab hands one
+   * over, and where a position carries two notes it decides which of them the composer is
+   * rewriting. Never cleared: it only counts while it is still the note on the target
+   * (`noteAtTarget`), so a stale id costs nothing.
+   */
+  const [preferredNote, setPreferredNote] = useState<number | null>(null)
 
   // --- the column split -----------------------------------------------------
   //
@@ -231,17 +291,37 @@ function GameStudio({ gameId }: { gameId: number }) {
     () => sortNotes((detail?.notes ?? []) as GameNote[]),
     [detail],
   )
-  const notedPlies = useMemo(
-    () =>
-      notes
-        .map((note) => note.ply)
-        .filter((ply): ply is number => typeof ply === 'number'),
-    [notes],
+  /** The pinned lines, or an empty list while they are in flight. */
+  const persisted = useMemo<LineResponse[]>(() => gameLines.data ?? [], [gameLines.data])
+  /**
+   * Every note this game carries, from both places one can arrive from: the game payload
+   * (`?notes=true`, which already includes the notes pinned to its lines) and the lines
+   * payload (which carries them again, with the line). Deduped by id, game payload first —
+   * it is the one that knows a position note's ply in *this* game.
+   */
+  const allNotes = useMemo<GameNote[]>(() => {
+    const byId = new Map<number, GameNote>()
+    for (const note of notes) byId.set(note.id, note)
+    for (const pinned of persisted) {
+      for (const note of pinned.notes ?? []) {
+        if (!byId.has(note.id)) byId.set(note.id, { ...note, scope: 'line' } as GameNote)
+      }
+    }
+    return [...byId.values()]
+  }, [notes, persisted])
+  const noteList = useMemo<NoteRow[]>(
+    () => noteRows(allNotes, persisted, moves),
+    [allNotes, persisted, moves],
   )
-  const collapsedThrough = useMemo(
-    () => collapsedThroughMove(moves, notedPlies),
-    [moves, notedPlies],
-  )
+  /** Every tag the owner has ever used, for the composer's suggestions. */
+  const tagNames = useMemo(() => (tags.data ?? []).map((row) => row.tag), [tags.data])
+  /** Which mainline moves carry a note, and which move of which line does. */
+  const notedMoves = useMemo(() => notedMoveIndices(allNotes, persisted), [allNotes, persisted])
+  const notedByLine = useMemo(() => notedLineIndices(persisted), [persisted])
+  // The opening is never folded away: a move list that hides moves 1–18 behind a
+  // "collapsed" rule cost a click on every game, and the Notes tab now does the job of
+  // pointing at where the game got interesting.
+  const collapsedThrough = null
   const flaggedCount = useMemo(
     () => moves.filter((move) => isFlagged(move.classification)).length,
     [moves],
@@ -427,55 +507,292 @@ function GameStudio({ gameId }: { gameId: number }) {
    * of its anchor's stack the moment it is clicked is a table that will not hold still.
    * Only a line the store has never been handed is new enough to go last.
    */
-  const variations = useMemo<MoveListVariation[]>(() => {
-    const walked =
-      branch && analysis && analysis.sans.length > 0
-        ? { base: analysis.base, sans: analysis.sans, cursor: analysis.cursor }
-        : null
+  const rows = useMemo(
+    () =>
+      variationRows({
+        line,
+        persisted,
+        kept,
+        walked:
+          branch && analysis && analysis.sans.length > 0
+            ? {
+                base: analysis.base,
+                moves: analysis.moves,
+                sans: analysis.sans,
+                cursor: analysis.cursor,
+              }
+            : null,
+        notedByLine,
+      }),
+    [analysis, branch, kept, line, notedByLine, persisted],
+  )
+  const variations = useMemo<MoveListVariation[]>(
+    () =>
+      rows.map((row) => ({
+        id: row.keptId,
+        lineId: row.lineId,
+        base: row.base,
+        moves: row.moves,
+        sans: row.sans,
+        cursor: row.cursor,
+        pinnedThrough: row.pinnedThrough,
+        noted: row.noted,
+      })),
+    [rows],
+  )
+  /** The row the board is standing in, which is the one a pin or a note would act on. */
+  const walkedRow = useMemo(() => rows.find((row) => row.cursor !== null) ?? null, [rows])
 
-    const rows: MoveListVariation[] = []
-    let placed = false
-    for (const entry of kept) {
-      // The active branch and this entry are the same walk whichever of them is the longer,
-      // so the entry hands its row over rather than drawing the line a second time. The
-      // store's own prefix rule leaves at most one such entry.
-      if (
-        walked &&
-        analysis &&
-        entry.base === analysis.base &&
-        (isPrefix(entry.moves, analysis.moves) || isPrefix(analysis.moves, entry.moves))
-      ) {
-        if (!placed) {
-          rows.push({ id: entry.id, ...walked })
-          placed = true
-        }
-        continue
+  // --- pinned lines and notes -----------------------------------------------
+
+  /**
+   * Walk into a line the server holds, standing after `movesIn` of its moves.
+   *
+   * The same arithmetic as `enterKeptVariation`: a branch hangs off the game position after
+   * `base` plies, and the page derives that position from `cursor + 1`, so the game cursor
+   * goes one ply short of the base — which is also where stepping back out of the line
+   * lands. The whole line is handed to the branch, not the part being entered, so the tail
+   * is still there to step through.
+   */
+  const enterLine = useCallback(
+    (lineId: number, movesIn: number) => {
+      const target = persisted.find((entry) => entry.id === lineId)
+      if (!target) return
+      keepBranch()
+      setHoverMove(null)
+      setCursor(Math.max(-1, Math.min(plyCount - 1, target.base_ply - 1)))
+      setBranch({
+        base: target.base_ply,
+        moves: target.moves,
+        cursor: Math.max(0, Math.min(target.moves.length, movesIn)),
+      })
+    },
+    [keepBranch, persisted, plyCount],
+  )
+
+  /**
+   * Keep a line with the game — or extend a pin the reading has grown past, which is the
+   * same call: the backend folds a line that continues a kept one into that row.
+   *
+   * The session store hands the line over on success rather than keeping a second copy of
+   * what the server now holds. It may well be handed back the moment the reader steps out
+   * of the line again, which the fold absorbs.
+   */
+  const pinVariation = useCallback(
+    (variation: MoveListVariation) => {
+      const moves = [...(variation.moves ?? [])]
+      if (moves.length === 0) return
+      saveLine.mutate(
+        { game_id: gameId, base_ply: variation.base, moves },
+        {
+          onSuccess: () => {
+            if (variation.id !== null) drop(variation.id)
+          },
+        },
+      )
+    },
+    [drop, gameId, saveLine],
+  )
+
+  const unpinVariation = useCallback(
+    (lineId: number) => removeLine.mutate({ id: lineId, gameId }),
+    [gameId, removeLine],
+  )
+
+  /**
+   * What a new note would hang on: the position on the board, and off the game's own line
+   * the whole walk as a variation to pin. Derived rather than chosen — see `./notesModel`.
+   */
+  const target = useMemo(
+    () =>
+      noteTarget({
+        gameId,
+        moves,
+        boardIndex,
+        fen: boardPosition.fen,
+        branch:
+          analysis && analysis.cursor > 0
+            ? {
+                base: analysis.base,
+                moves: analysis.moves,
+                sans: analysis.sans,
+                cursor: analysis.cursor,
+              }
+            : null,
+      }),
+    [analysis, boardIndex, boardPosition, gameId, moves],
+  )
+
+  /**
+   * The note already hanging where the composer is pointed, which it rewrites rather than
+   * laying a second one beside. Only this game's own: a note that came here because some
+   * other game reached the same position belongs to that game (`./notesModel`).
+   */
+  const editedNote = useMemo(
+    () =>
+      noteAtTarget({
+        target,
+        notes: allNotes,
+        lines: persisted,
+        lineId: walkedRow?.lineId ?? null,
+        preferId: preferredNote,
+      }),
+    [allNotes, persisted, preferredNote, target, walkedRow],
+  )
+
+  /** Forget the note the composer is on. The composer goes with it. */
+  const forgetNote = useCallback(
+    (id: number) => removeNote.mutate(id),
+    [removeNote],
+  )
+
+  const writeNote = useCallback(
+    (text: string, noteTags: string[], id: number | null) => {
+      if (id !== null) {
+        // A rewrite of the note that is already there: it keeps the anchor it was written
+        // with — the ply, the FEN, the line it pinned — and only the words change.
+        updateNote.mutate({ id, body: { text, tags: noteTags } })
+        return
       }
-      const sans = sanVariation(line, entry.base, entry.moves, entry.moves.length)
-      if (sans.length > 0) rows.push({ id: entry.id, base: entry.base, sans, cursor: null })
+      saveNote.mutate(
+        {
+          text,
+          tags: noteTags,
+          game_id: gameId,
+          fen: target.fen,
+          ply: target.ply,
+          line: target.line,
+          source: 'web',
+        },
+        {
+          onSuccess: () => {
+            // The note has just pinned the walk, so the session's copy of it is redundant.
+            if (target.line && walkedRow?.keptId !== null && walkedRow?.keptId !== undefined) {
+              drop(walkedRow.keptId)
+            }
+          },
+        },
+      )
+    },
+    [drop, gameId, saveNote, target, updateNote, walkedRow],
+  )
+
+  // --- arriving from somewhere else ----------------------------------------
+  //
+  // `/games/{id}?ply=12` opens on the position after twelve half-moves, and `&line=3` opens
+  // inside pinned line 3 (with `ply` then naming a position *in* the line, `base_ply + k`,
+  // which is the same count a note carries). It is how the Notes page and the command
+  // palette hand a position over, so the two must agree about what a `ply` is: everywhere
+  // notes are concerned it is a half-move **count**, and the board's cursor is one less.
+  //
+  // Read once, applied once — a link is where the reader arrived, not a leash. Everything
+  // they do afterwards moves the board freely, and the URL is deliberately not rewritten to
+  // follow: this page has no business owning the address bar mid-review.
+  const [params] = useSearchParams()
+  const [requested] = useState(() => ({
+    ply: intParam(params.get('ply')),
+    line: intParam(params.get('line')),
+  }))
+  const arrived = useRef(false)
+  useEffect(() => {
+    if (arrived.current || !detail) return
+    const { ply, line: lineId } = requested
+    if (ply === null && lineId === null) {
+      arrived.current = true
+      return
     }
-    if (walked && !placed) rows.push({ id: null, ...walked })
-    return rows
-  }, [analysis, branch, kept, line])
+    // A line deep-link cannot be honoured before the lines are in; a bare ply can.
+    if (lineId !== null && gameLines.isPending) return
+    arrived.current = true
+
+    const target = lineId === null ? undefined : persisted.find((entry) => entry.id === lineId)
+    if (target) {
+      setCursor(Math.max(-1, Math.min(plyCount - 1, target.base_ply - 1)))
+      setBranch({
+        base: target.base_ply,
+        moves: target.moves,
+        // No ply with the line means "the whole line"; a ply names a position inside it.
+        cursor:
+          ply === null
+            ? target.moves.length
+            : Math.max(0, Math.min(target.moves.length, ply - target.base_ply)),
+      })
+      return
+    }
+    // A line that is no longer pinned still leaves a position worth opening on.
+    if (ply !== null) setCursor(Math.max(-1, Math.min(plyCount - 1, ply - 1)))
+  }, [detail, gameLines.isPending, persisted, plyCount, requested])
+
+  /**
+   * A note in the Notes tab is a bookmark: jump to its ply, or into the line it pinned —
+   * and open it, which is what picking a note out of a list means. A note that came in on a
+   * position this game merely reached belongs to another game and is only a jump.
+   */
+  const selectNote = useCallback(
+    (row: NoteRow) => {
+      if (row.anchor.kind !== 'loose' && row.note.scope !== 'position') {
+        setPreferredNote(row.note.id)
+        focusComposer()
+      }
+      if (row.anchor.kind === 'line') {
+        if (row.anchor.index === 0) {
+          seek(row.anchor.base - 1)
+          return
+        }
+        enterLine(row.anchor.lineId, row.anchor.index)
+        return
+      }
+      if (row.anchor.kind === 'mainline') seek(row.anchor.count - 1)
+    },
+    [enterLine, focusComposer, seek],
+  )
 
   // --- Maia -----------------------------------------------------------------
   //
-  // One target elo drives everything: the batch pass pins the stored blob to it, and the
-  // live endpoint is asked at the same level, so the two columns never speak for two
-  // different humans. Runs stored before it was pinned are keyed by whatever level they
-  // were computed at, which is what `preferredLevel` falls back to.
-  const targetElo = useMaiaTargetElo()
+  // The configured levels drive everything: the batch pass stores a policy per level, and
+  // the live endpoint is asked at all of them in one call, so the panel can switch level or
+  // compare them without a round trip and the two halves of the card never speak for two
+  // different humans. Runs stored before a level was configured are keyed by whatever they
+  // were computed at, which is what `preferredLevel` falls back to; the reader's own pick
+  // (`maiaPreferences`) wins over both, resolved against what this position actually has.
+  const elos = useMaiaElos()
+  const targetElo = elos?.[0] ?? null
+  const pick = useMaiaEloPick()
+  const compare = useMaiaCompare()
+  const storedLevels = useMemo(() => maiaLevels(upcoming?.maia), [upcoming])
   const stored = useMemo(
-    () => preferredLevel(maiaLevels(upcoming?.maia), detail?.game.rating, targetElo),
-    [upcoming, detail, targetElo],
+    () => maiaLevelFor(storedLevels, pick, detail?.game.rating, targetElo),
+    [storedLevels, pick, detail, targetElo],
   )
   // Positions on the game line are stored data, instant and free; only an analysis position
   // is worth a query.
-  const live = useLiveMaia(exploring ? boardPosition.fen : null, targetElo)
+  const live = useLiveMaia(
+    exploring ? boardPosition.fen : null,
+    elos,
+    // Off the game line there is no game rating to fall back on, so the pick falls back to
+    // the deployment's first level rather than to the middle of what came back.
+    pick ?? targetElo,
+  )
   const maia = exploring ? (live.view?.level ?? null) : stored
   const human = useMemo(
     () => humanMoves(maia, exploring ? [] : lines, exploring ? undefined : upcoming),
     [maia, exploring, lines, upcoming],
+  )
+  // The levels on offer, and the comparison across them, are the same derivation whether
+  // the position is stored or live — only where the levels came from differs.
+  const maiaLevelsHere = useMemo(
+    () => (exploring ? live.views.map((view) => view.level) : storedLevels),
+    [exploring, live.views, storedLevels],
+  )
+  const levelOptions = useMemo(() => maiaLevelOptions(maiaLevelsHere, elos), [maiaLevelsHere, elos])
+  const comparison = useMemo(
+    () =>
+      maiaComparison(
+        maiaLevelsHere,
+        exploring ? [] : lines,
+        exploring ? undefined : upcoming,
+      ),
+    [maiaLevelsHere, exploring, lines, upcoming],
   )
 
   const annotation = useMemo<MoveAnnotation | null>(() => {
@@ -571,6 +888,11 @@ function GameStudio({ gameId }: { gameId: number }) {
     <MaiaPanel
       rating={maia?.rating ?? null}
       human={human}
+      levels={levelOptions}
+      onSelectLevel={setMaiaEloPick}
+      compare={compare}
+      onCompareChange={setMaiaCompare}
+      comparison={comparison}
       showHuman={hints && !(exploring && live.unavailable)}
       run={engineRun}
       // A stored run says nothing about a position it never saw: off the game line the
@@ -622,7 +944,11 @@ function GameStudio({ gameId }: { gameId: number }) {
         */}
         <div
           data-testid="board-column"
-          className="flex min-w-[26.25rem] flex-1 flex-col gap-3.5 px-5 py-[1.125rem]"
+          // `min-h-0` and `overflow-hidden`: the row is exactly the viewport's height and
+          // the board in it is sized by its width, so a column that is allowed to grow past
+          // its box grows silently *below the fold* — which is where the eval curve and the
+          // composer's own save button used to end up. Clipped, an overrun is visible.
+          className="flex min-h-0 min-w-[26.25rem] flex-1 flex-col gap-3.5 overflow-hidden px-5 py-[1.125rem]"
         >
           <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
           <BoardPanel
@@ -657,14 +983,33 @@ function GameStudio({ gameId }: { gameId: number }) {
             deepPending={deepAnalysis.pending}
             deepError={deepAnalysis.error}
             onRequestDeep={deepAnalysis.request}
+            onNote={focusComposer}
           />
-          <EvalGraph
-            points={curve}
-            plyCount={plyCount}
-            cursor={cursor}
-            onSelectPly={selectPly}
-            className="flex-1"
-          />
+          {/*
+            The composer sits to the right of the eval curve under the transport row, always: the
+            note on a position is read in the same glance as the position, and side by side
+            the pair costs no more height than the curve did alone.
+          */}
+          <div className="flex min-h-0 flex-1 gap-3.5">
+            <EvalGraph
+              points={curve}
+              plyCount={plyCount}
+              cursor={cursor}
+              onSelectPly={selectPly}
+              className="min-w-0 flex-1 basis-1/2"
+            />
+            <NoteComposer
+              target={target}
+              note={editedNote}
+              knownTags={tagNames}
+              pending={saveNote.isPending || updateNote.isPending}
+              error={saveNote.error ?? updateNote.error ?? removeNote.error}
+              onSave={writeNote}
+              onDelete={forgetNote}
+              onClose={blurComposer}
+              className="max-h-[6.5rem] min-w-0 flex-1 basis-1/2"
+            />
+          </div>
         </div>
 
         <ColumnSplitter
@@ -697,7 +1042,14 @@ function GameStudio({ gameId }: { gameId: number }) {
             variations={variations}
             onSelectVariationMove={seekVariation}
             onSelectKeptMove={enterKeptVariation}
+            onSelectLineMove={(lineId, index) => enterLine(lineId, index + 1)}
+            onPinVariation={pinVariation}
+            onUnpinVariation={unpinVariation}
             onSelectPly={selectPly}
+            notes={noteList}
+            notedMoves={notedMoves}
+            onSelectNote={selectNote}
+            onAddNote={focusComposer}
             className="min-h-0 flex-1"
           />
           <InfiniteAnalysisPanel

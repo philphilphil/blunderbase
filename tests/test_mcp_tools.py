@@ -13,6 +13,7 @@ from mcp.types import CallToolResult, TextContent, Tool
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.config import MAIA_MAX_RATING
 from backend.db.enums import (
     Classification,
     EngineKind,
@@ -46,10 +47,17 @@ TOOLS = {
     "opening_explorer",
     "get_stats",
     "request_analysis",
+    "clear_queue",
     "get_analysis_status",
     "analyze_position",
+    "maia_policy",
+    "maia_fill",
     "save_note",
     "search_notes",
+    "save_line",
+    "get_lines",
+    "resurface_notes",
+    "export_notes",
     "show_game",
     "show_position",
     "make_move",
@@ -696,6 +704,59 @@ async def test_request_analysis_queues_a_run_and_hands_back_its_id(
     assert run is not None and run.game_id == game.id
 
 
+async def test_request_analysis_takes_the_levels_to_ask_maia_about(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    """A coach exploring another rating gets it for that run, without moving the setting."""
+    payload = await call(
+        coach, "request_analysis", game_id=analysed["qg000001"].id, elos=[1300, 900]
+    )
+
+    # Clamped to what the model can answer, exactly as the setting is.
+    assert payload["maia_elos"] == [1100, 1300]
+
+
+def _maia_row(session: Session) -> Engine:
+    engine = Engine(name="maia-test", kind=EngineKind.MAIA, path="/nonexistent/lc0")
+    session.add(engine)
+    session.commit()
+    return engine
+
+
+async def test_maia_fill_queues_the_levels_the_library_is_missing(
+    coach: MCPServer, analysed: dict[str, Game], session: Session
+) -> None:
+    _maia_row(session)
+
+    payload = await call(coach, "maia_fill")
+
+    # Two analysed games, neither carrying the configured level.
+    assert payload["queued"] == 2
+    assert payload["already_complete"] == 0
+    # The status the button shows afterwards rides along: there is nothing left to queue.
+    assert payload["missing_games"] == 0
+    assert payload["configured"] == [MAIA_MAX_RATING]
+
+
+async def test_maia_fill_can_be_narrowed_to_one_game(
+    coach: MCPServer, analysed: dict[str, Game], session: Session
+) -> None:
+    _maia_row(session)
+
+    payload = await call(coach, "maia_fill", game_ids=[analysed["qg000001"].id])
+
+    assert payload["queued"] == 1
+
+
+async def test_maia_fill_with_no_human_move_model_says_so(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await failure(coach, "maia_fill")
+
+    assert payload["error"] == "bad_argument"
+    assert "no human-move model" in payload["message"]
+
+
 async def test_request_analysis_takes_a_ply_range(
     coach: MCPServer, analysed: dict[str, Game]
 ) -> None:
@@ -743,6 +804,18 @@ async def test_a_full_queue_is_a_structured_error(
     payload = await failure(coach, "request_analysis", game_id=analysed["qg000006"].id)
     assert payload["error"] == "queue_full"
     assert payload["queued"] == 1
+
+
+async def test_clear_queue_drops_every_tier_and_says_how_many(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    await call(coach, "request_analysis", game_id=analysed["qg000001"].id)
+    await call(coach, "request_analysis", game_id=analysed["qg000006"].id, tier="deep")
+
+    payload = await call(coach, "clear_queue")
+
+    assert payload["dropped"] == 2
+    assert payload["queue"] == {"queued": 0, "running": 0}
 
 
 async def test_get_analysis_status_reports_a_run(
@@ -862,6 +935,110 @@ async def test_search_notes_narrows_by_date(coach: MCPServer, analysed: dict[str
     await call(coach, "save_note", text="today's note")
     assert (await call(coach, "search_notes", since="1d"))["count"] == 1
     assert (await call(coach, "search_notes", until="2020-01-01"))["count"] == 0
+
+
+async def test_save_note_lands_on_a_ply(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    game = analysed["qg000001"]
+    payload = await call(
+        coach, "save_note", text="this is where it went wrong", game_id=game.id, ply=5
+    )
+    assert payload["ply"] == 5
+    # A ply names a position, so the note knows the FEN without being told it.
+    assert payload["fen"]
+    assert payload["source"] == "mcp"
+
+
+async def test_save_note_pins_the_line_it_is_about(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game = analysed["qg000001"]
+    payload = await call(
+        coach,
+        "save_note",
+        text="d6 holds the centre",
+        game_id=game.id,
+        base_ply=3,
+        line=["d7d6", "d2d4"],
+    )
+    assert payload["line"]["sans"] == ["d6", "d4"]
+    assert payload["line"]["base_ply"] == 3
+    # The tip of the line is where the note landed.
+    assert payload["ply"] == 5
+
+    kept = await call(coach, "get_lines", game_id=game.id)
+    assert kept["count"] == 1
+    assert [note["text"] for note in kept["lines"][0]["notes"]] == ["d6 holds the centre"]
+
+
+async def test_save_line_folds_a_line_that_is_already_kept(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game = analysed["qg000001"]
+    first = await call(coach, "save_line", game_id=game.id, base_ply=3, moves=["d7d6", "d2d4"])
+    shorter = await call(coach, "save_line", game_id=game.id, base_ply=3, moves=["d7d6"])
+    assert shorter["id"] == first["id"]
+    longer = await call(
+        coach, "save_line", game_id=game.id, base_ply=3, moves=["d7d6", "d2d4", "e5d4"]
+    )
+    assert longer["id"] == first["id"]
+    assert longer["moves"] == ["d7d6", "d2d4", "e5d4"]
+    assert (await call(coach, "get_lines", game_id=game.id))["count"] == 1
+
+
+async def test_save_line_refuses_a_move_that_could_not_be_played(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game = analysed["qg000001"]
+    payload = await failure(coach, "save_line", game_id=game.id, base_ply=3, moves=["e2e4"])
+    assert payload["error"] == "bad_argument"
+
+
+async def test_search_notes_narrows_by_scope(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    game = analysed["qg000001"]
+    await call(coach, "save_note", text="a plan", tags=["plan"])
+    await call(coach, "save_note", text="about this game", game_id=game.id)
+    await call(
+        coach, "save_note", text="about this line", game_id=game.id, base_ply=3, line=["d7d6"]
+    )
+
+    assert (await call(coach, "search_notes", scope="free"))["count"] == 1
+    assert (await call(coach, "search_notes", scope="line"))["count"] == 1
+    by_game = await call(coach, "search_notes", scope="game")
+    assert [note["text"] for note in by_game["notes"]] == ["about this game"]
+
+
+async def test_resurface_notes_says_why_each_note_came_back(
+    coach: MCPServer, analysed: dict[str, Game], session: Session
+) -> None:
+    """A position note whose position is in a freshly imported game is the recurrence."""
+    game = analysed["qg000001"]
+    await call(coach, "save_note", text="the Berlin start", fen=START_FEN)
+
+    payload = await call(coach, "resurface_notes")
+    assert payload["count"] == 1
+    item = payload["items"][0]
+    assert item["reason"] == "recurred"
+    assert game.id in item["games"]
+
+
+async def test_export_notes_hands_back_the_document(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game = analysed["qg000001"]
+    await call(coach, "save_note", text="watch the c-file", game_id=game.id, ply=4)
+
+    markdown = await invoke(coach, "export_notes", {"format": "md"})
+    assert not markdown.is_error
+    body = text_of(markdown)
+    assert "# Blunderbase notes" in body
+    assert "watch the c-file" in body
+    assert f"/games/{game.id}" in body
+
+    pgn = text_of(await invoke(coach, "export_notes", {"format": "pgn"}))
+    assert "{ watch the c-file }" in pgn
+
+    bad = await failure(coach, "export_notes", format="docx")
+    assert bad["error"] == "bad_argument"
 
 
 # --- runners ---------------------------------------------------------------

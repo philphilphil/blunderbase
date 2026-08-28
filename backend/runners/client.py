@@ -1011,6 +1011,9 @@ class RunnerClient:
                 del self._runs[job.run_id]
 
     async def _analyse(self, job: Job) -> list[MoveEval]:
+        if job.plan.maia_only:
+            # A Maia-only fill pass searches nothing; its rows are carriers for the policy.
+            return analysis.policy_rows(job.plan)
         loop = asyncio.get_running_loop()
 
         def progress(done: int, total: int) -> None:
@@ -1028,7 +1031,9 @@ class RunnerClient:
             return None
 
         def work(adapter: Adapter) -> int:
-            return analysis.apply_maia(job.plan, evals, adapter)  # type: ignore[arg-type]
+            # The spec goes along: a fixed-weights Maia's own level is named by its weights
+            # file or its options, not only by the process's UCI id.
+            return analysis.apply_maia(job.plan, evals, adapter, job.maia)  # type: ignore[arg-type]
 
         try:
             await self._with_engine(job.maia, work)

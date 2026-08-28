@@ -11,13 +11,15 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from alembic import command
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from backend.api.app import create_app
 from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING, Settings
 from backend.db.enums import Color, EngineKind, Result, Source, Tier
+from backend.db.migrate import alembic_config, upgrade_to_head
 from backend.db.models import AnalysisRun, AppSetting, Engine, Game
 from backend.db.session import get_sessionmaker
 from backend.services import analysis, app_settings
@@ -26,9 +28,13 @@ from tests.conftest import running_app
 # Every key cleared, which is what an install that never opened the page has stored.
 NOTHING_SET: dict[str, None] = {key: None for key in app_settings.KEYS}
 
-# The same install as the endpoint answers it. The target elo is the one setting answered
-# with the level in force rather than with the row, because Maia is always asked at one.
-UNCONFIGURED: dict[str, Any] = {**NOTHING_SET, app_settings.MAIA_TARGET_ELO: MAIA_MAX_RATING}
+# The same install as the endpoint answers it. The Maia levels are the one setting answered
+# with what is in force rather than with the row, because Maia is always asked at a rating.
+UNCONFIGURED: dict[str, Any] = {
+    **NOTHING_SET,
+    app_settings.MAIA_TARGET_ELO: MAIA_MAX_RATING,
+    app_settings.MAIA_ELOS: [MAIA_MAX_RATING],
+}
 
 # --- the service ----------------------------------------------------------
 
@@ -130,6 +136,115 @@ def test_a_row_edited_by_hand_cannot_break_a_caller(session: Session) -> None:
     assert app_settings.get_maia_target_elo(session) == MAIA_MAX_RATING
 
 
+# --- the Maia levels -------------------------------------------------------
+
+
+def test_an_install_that_configured_nothing_asks_maia_at_its_top_level(session: Session) -> None:
+    assert app_settings.get_maia_elos(session) == [MAIA_MAX_RATING]
+    assert app_settings.get_maia_target_elo(session) == MAIA_MAX_RATING
+
+
+def test_the_levels_come_back_sorted_deduped_and_clamped(session: Session) -> None:
+    """Out of range is pulled in, not refused, and the order is the one a column reads in."""
+    assert app_settings.set_maia_elos(session, [1900, 800, 1500, 1900, 2400]) == [
+        MAIA_MIN_RATING,
+        1500,
+        1900,
+        MAIA_MAX_RATING,
+    ]
+    assert app_settings.get_maia_elos(session) == [MAIA_MIN_RATING, 1500, 1900, MAIA_MAX_RATING]
+    # The first of them is what a caller that shows one level reads.
+    assert app_settings.get_maia_target_elo(session) == MAIA_MIN_RATING
+
+
+def test_more_levels_than_a_deployment_may_carry_keeps_the_lowest(session: Session) -> None:
+    given = [1100, 1200, 1300, 1400, 1500, 1600, 1700]
+
+    assert app_settings.set_maia_elos(session, given) == given[: app_settings.MAX_MAIA_ELOS]
+
+
+def test_levels_that_are_not_ratings_are_dropped_rather_than_refused(session: Session) -> None:
+    assert app_settings.clean_maia_elos(["1500", None, True, 1500]) == [1500]
+    assert app_settings.clean_maia_elos([]) == [MAIA_MAX_RATING]
+    assert app_settings.clean_maia_elos("all of them") == [MAIA_MAX_RATING]
+
+
+def test_clearing_the_levels_puts_them_back_to_the_default(session: Session) -> None:
+    app_settings.set_maia_elos(session, [1500, 1900])
+
+    assert app_settings.set_maia_elos(session, None) == [MAIA_MAX_RATING]
+    assert session.scalars(select(AppSetting)).all() == []
+
+
+def test_the_target_elo_is_the_list_of_one_it_means(session: Session) -> None:
+    """The single-level setter and the list are one state, not two that can disagree."""
+    assert app_settings.set_maia_target_elo(session, 1700) == 1700
+    assert app_settings.get_maia_elos(session) == [1700]
+
+    app_settings.set_maia_elos(session, [1300, 1700])
+
+    assert app_settings.get_maia_target_elo(session) == 1300
+
+
+def test_a_target_elo_row_from_before_the_list_is_still_read(session: Session) -> None:
+    """A row written by hand, or by a version that only knew one level."""
+    session.add(AppSetting(key=app_settings.MAIA_TARGET_ELO, value=1700))
+    session.commit()
+
+    assert app_settings.get_maia_elos(session) == [1700]
+
+
+def test_a_levels_row_edited_by_hand_cannot_break_a_caller(session: Session) -> None:
+    session.add(AppSetting(key=app_settings.MAIA_ELOS, value="1500 and 1900"))
+    session.commit()
+
+    assert app_settings.get_maia_elos(session) == [MAIA_MAX_RATING]
+
+    session.get(AppSetting, app_settings.MAIA_ELOS).value = [9000, 1500]
+    session.commit()
+
+    assert app_settings.get_maia_elos(session) == [1500, MAIA_MAX_RATING]
+
+
+def test_the_migration_turns_the_old_target_elo_into_the_list(settings: Settings) -> None:
+    """A deployment aiming at 1700 keeps aiming at 1700, as the only entry of its list.
+
+    Driven through the real migrations both ways: down one revision, back to the state a
+    deployment from before the list was in, then up again.
+    """
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "-1")
+    with get_sessionmaker(settings)() as session:
+        session.execute(text("DELETE FROM app_settings"))
+        session.execute(
+            text(
+                "INSERT INTO app_settings (key, value, updated_at) "
+                "VALUES ('maia_target_elo', '1700', :now)"
+            ),
+            {"now": "2026-08-01 12:00:00"},
+        )
+        session.commit()
+
+    command.upgrade(config, "head")
+
+    with get_sessionmaker(settings)() as session:
+        assert app_settings.get_maia_elos(session) == [1700]
+        # The old key is gone, so the two can never disagree about what is in force.
+        assert session.get(AppSetting, app_settings.MAIA_TARGET_ELO) is None
+        assert session.get(AppSetting, app_settings.MAIA_ELOS).value == [1700]
+
+
+def test_the_migration_leaves_an_unconfigured_deployment_unconfigured(
+    settings: Settings,
+) -> None:
+    upgrade_to_head(settings)
+
+    with get_sessionmaker(settings)() as session:
+        assert session.scalars(select(AppSetting)).all() == []
+        assert app_settings.get_maia_elos(session) == [MAIA_MAX_RATING]
+
+
 def test_a_whole_replacement_clears_what_it_leaves_out(session: Session) -> None:
     app_settings.set_value(session, app_settings.DEEP_NODES, 5_000_000)
 
@@ -205,7 +320,8 @@ def test_a_put_stores_the_values_and_answers_with_them(api: TestClient) -> None:
     response = api.put("/api/settings", json=body)
 
     assert response.status_code == 200, response.text
-    assert response.json() == {**body, "inaccuracy_threshold": 5.0}
+    # The one level asked for is the whole of the levels in force.
+    assert response.json() == {**body, "inaccuracy_threshold": 5.0, "maia_elos": [1700]}
     assert api.get("/api/settings").json()["deep_multipv"] == 6
 
 
@@ -234,6 +350,36 @@ def test_null_puts_the_level_back_to_the_default(api: TestClient) -> None:
 
     assert api.put("/api/settings", json={"maia_target_elo": None}).json() == UNCONFIGURED
     assert api.get("/api/settings").json()["maia_target_elo"] == MAIA_MAX_RATING
+
+
+def test_a_put_stores_the_whole_list_of_levels(api: TestClient) -> None:
+    answered = api.put("/api/settings", json={"maia_elos": [1900, 1500, 1500]}).json()
+
+    assert answered["maia_elos"] == [1500, 1900]
+    assert answered["maia_target_elo"] == 1500
+    assert api.get("/api/settings").json()["maia_elos"] == [1500, 1900]
+
+
+def test_a_put_that_names_only_the_old_target_elo_means_that_one_level(api: TestClient) -> None:
+    """The field a client from before the list sent still says what it always said."""
+    assert api.put("/api/settings", json={"maia_target_elo": 1700}).json()["maia_elos"] == [1700]
+
+
+def test_a_put_that_names_neither_clears_the_levels(api: TestClient) -> None:
+    api.put("/api/settings", json={"maia_elos": [1500, 1900]})
+
+    assert api.put("/api/settings", json={"quick_nodes": 1000}).json()["maia_elos"] == [
+        MAIA_MAX_RATING
+    ]
+
+
+def test_the_bootstrap_payload_carries_every_level(api: TestClient) -> None:
+    api.put("/api/settings", json={"maia_elos": [1500, 1900]})
+
+    status = api.get("/api/auth/status").json()
+
+    assert status["maia_elos"] == [1500, 1900]
+    assert status["maia_target_elo"] == 1500
 
 
 def test_thresholds_that_do_not_rise_are_a_422(api: TestClient) -> None:

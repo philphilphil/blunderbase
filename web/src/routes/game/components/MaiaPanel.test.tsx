@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { GameRunSummary } from '@/lib/api/types'
 
-import type { EngineLineView, HumanMoveView } from '../gameModel'
+import type {
+  EngineLineView,
+  HumanMoveView,
+  MaiaComparisonColumn,
+  MaiaLevelOption,
+} from '../gameModel'
 import { MaiaPanel } from './MaiaPanel'
 
 /** The run the engine column speaks for, and what it spent getting there. */
@@ -130,7 +135,6 @@ describe('MaiaPanel', () => {
     const panel = screen.getByTestId('maia-panel')
     // The column label pairs with the human column's — the run's protocol kind stays on
     // the engines page.
-    expect(within(panel).getByText('engine')).toBeInTheDocument()
     expect(within(panel).queryByText('uci')).not.toBeInTheDocument()
     expect(within(panel).getByText('d20')).toBeInTheDocument()
     expect(within(panel).getByText('400k nodes')).toBeInTheDocument()
@@ -282,5 +286,215 @@ describe('MaiaPanel', () => {
     expect(within(panel).queryByText('No human model for this position.')).not.toBeInTheDocument()
     expect(panel).toHaveTextContent('stockfish')
     expect(within(panel).getByText('+0.40')).toBeInTheDocument()
+  })
+})
+
+/** Three configured levels, one of which this position was never analysed at. */
+const LEVELS: MaiaLevelOption[] = [
+  { elo: 1100, available: true },
+  { elo: 1500, available: false },
+  { elo: 1700, available: true },
+]
+
+/** The same position read at two levels: popular below, barely considered above. */
+const COMPARISON: MaiaComparisonColumn[] = [
+  {
+    rating: '1100',
+    moves: [
+      {
+        uci: 'd7d5',
+        san: 'd5',
+        rank: 1,
+        probability: 0.71,
+        played: true,
+        classification: 'blunder',
+        loss: 26.3,
+        multipv: null,
+      },
+      {
+        uci: 'a7a6',
+        san: 'a6',
+        rank: 2,
+        probability: 0.12,
+        played: false,
+        classification: null,
+        loss: null,
+        multipv: null,
+      },
+    ],
+    played: {
+      uci: 'd7d5',
+      san: 'd5',
+      rank: 1,
+      probability: 0.71,
+      played: true,
+      classification: 'blunder',
+      loss: 26.3,
+      multipv: null,
+    },
+  },
+  {
+    rating: '1700',
+    moves: [
+      {
+        uci: 'c7c6',
+        san: 'c6',
+        rank: 1,
+        probability: 0.51,
+        played: false,
+        classification: 'best',
+        loss: 0,
+        multipv: 1,
+      },
+    ],
+    played: {
+      uci: 'd7d5',
+      san: 'd5',
+      rank: 6,
+      probability: 0.03,
+      played: true,
+      classification: 'blunder',
+      loss: 26.3,
+      multipv: null,
+    },
+  },
+]
+
+describe('MaiaPanel level picker', () => {
+  it('reads the level it is showing, and offers the others', () => {
+    render(
+      <MaiaPanel
+        rating="1700"
+        human={HUMAN}
+        levels={LEVELS}
+        onSelectLevel={vi.fn()}
+        engine={ENGINE}
+        ply={1}
+      />,
+    )
+
+    // The label is still the reading of who this column speaks for; the switch is over it.
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1700')
+    const picker = screen.getByLabelText('Maia level')
+    expect(picker).toHaveValue('1700')
+    // A configured level this position has no data at is offered, disabled, and says what
+    // would fix it — hiding it would make a level the owner chose look impossible.
+    const missing = within(picker).getByRole('option', { name: /1500 — re-analyse to add/ })
+    expect(missing).toBeDisabled()
+    expect(within(picker).getByRole('option', { name: '1100' })).toBeEnabled()
+  })
+
+  it('hands the picked level over as a number', async () => {
+    const onSelectLevel = vi.fn()
+    render(
+      <MaiaPanel
+        rating="1700"
+        human={HUMAN}
+        levels={LEVELS}
+        onSelectLevel={onSelectLevel}
+        engine={ENGINE}
+        ply={1}
+      />,
+    )
+
+    await userEvent.selectOptions(screen.getByLabelText('Maia level'), '1100')
+    expect(onSelectLevel).toHaveBeenCalledWith(1100)
+  })
+
+  it('is plain text where there is nothing to switch between', () => {
+    render(
+      <MaiaPanel
+        rating="1700"
+        human={HUMAN}
+        levels={[{ elo: 1700, available: true }]}
+        onSelectLevel={vi.fn()}
+        engine={ENGINE}
+        ply={1}
+      />,
+    )
+    expect(screen.queryByLabelText('Maia level')).not.toBeInTheDocument()
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1700')
+  })
+})
+
+describe('MaiaPanel compare mode', () => {
+  function draw(props: Partial<Parameters<typeof MaiaPanel>[0]> = {}) {
+    return render(
+      <MaiaPanel
+        rating="1100"
+        human={HUMAN}
+        levels={LEVELS}
+        onSelectLevel={vi.fn()}
+        comparison={COMPARISON}
+        onCompareChange={vi.fn()}
+        engine={ENGINE}
+        run={RUN}
+        ply={1}
+        {...props}
+      />,
+    )
+  }
+
+  it('offers the comparison only once there is more than one level to compare', () => {
+    draw({ comparison: [COMPARISON[0]!] })
+    expect(screen.queryByTestId('maia-compare-toggle')).not.toBeInTheDocument()
+  })
+
+  it('turns compare on through the header', async () => {
+    const onCompareChange = vi.fn()
+    draw({ onCompareChange })
+
+    const toggle = screen.getByTestId('maia-compare-toggle')
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(toggle)
+    expect(onCompareChange).toHaveBeenCalledWith(true)
+  })
+
+  it('reads every level side by side, and gives the card over to it', () => {
+    draw({ compare: true })
+
+    const columns = screen.getAllByTestId('maia-compare-column')
+    expect(columns.map((column) => column.dataset.rating)).toEqual(['1100', '1700'])
+    expect(within(columns[0]!).getByText('d5')).toBeInTheDocument()
+    expect(within(columns[0]!).getByText('71%')).toBeInTheDocument()
+    expect(within(columns[1]!).getByText('c6')).toBeInTheDocument()
+
+    // The engine column has stood down: the verdict it carries is in every column's
+    // colour, and five columns in a quarter of the width would be five ellipses.
+    expect(screen.queryByText('stockfish')).not.toBeInTheDocument()
+    expect(screen.getByTestId('maia-compare-toggle')).toHaveAttribute('aria-pressed', 'true')
+    // Nothing to switch to while every level is on screen at once.
+    expect(screen.queryByLabelText('Maia level')).not.toBeInTheDocument()
+  })
+
+  it('puts the played move on the column that did not rank it, with its rank there', () => {
+    draw({ compare: true })
+
+    const columns = screen.getAllByTestId('maia-compare-column')
+    // 1100 has it at the top of the list already — no second row for it.
+    expect(within(columns[0]!).queryByTestId('maia-compare-played')).not.toBeInTheDocument()
+    expect(within(columns[0]!).getByTestId('maia-compare-played-row')).toHaveTextContent('d5')
+
+    // 1700 puts it sixth: that is the whole comparison, so it is on the column anyway.
+    const trailing = within(columns[1]!).getByTestId('maia-compare-played')
+    expect(trailing).toHaveTextContent('d5')
+    expect(trailing).toHaveTextContent('6')
+    expect(trailing).toHaveTextContent('3%')
+    expect(within(trailing).getByText('d5')).toHaveClass('text-blunder')
+  })
+
+  it('walks a compared move onto the analysis board', async () => {
+    const onPlayLine = vi.fn()
+    draw({ compare: true, onPlayLine })
+
+    await userEvent.click(screen.getByTitle('Play c6 on the analysis board'))
+    expect(onPlayLine).toHaveBeenLastCalledWith(['c7c6'], 0)
+  })
+
+  it('keeps the two columns where the human half is switched off', () => {
+    draw({ compare: true, showHuman: false })
+    // Hints off is not a reason to lose the run's own findings, compare or not.
+    expect(screen.queryByTestId('maia-compare')).not.toBeInTheDocument()
+    expect(screen.getByText('stockfish')).toBeInTheDocument()
   })
 })

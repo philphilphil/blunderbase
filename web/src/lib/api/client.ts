@@ -121,6 +121,92 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (raw ? JSON.parse(raw) : undefined) as T
 }
 
+/**
+ * The absolute URL of a backend path — what a link, an `href` or a manual download needs.
+ *
+ * The same base and the same query encoding every request uses, so a URL built here and a
+ * request made through `request()` cannot disagree about where a route lives.
+ */
+export function apiUrl(path: string, query?: Record<string, QueryValue>): string {
+  return `${API_BASE}${path}${toQuery(query)}`
+}
+
+/** A document the backend handed over as an attachment, ready to be saved. */
+export interface Download {
+  blob: Blob
+  /** The name the backend chose in `content-disposition`, or the fallback asked for. */
+  filename: string
+  mediaType: string
+}
+
+/** `filename="notes.md"` out of a `content-disposition` header, if it says one. */
+function attachmentName(header: string | null): string | null {
+  if (!header) return null
+  const quoted = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header)
+  return quoted?.[1] ? decodeURIComponent(quoted[1].trim()) : null
+}
+
+/**
+ * A request whose answer is a document rather than JSON — the notes export.
+ *
+ * A plain `<a href>` would fetch it too, and with the session cookie: what it cannot do is
+ * report a failure (the browser would navigate to the error body) or read the filename the
+ * backend chose. So the bytes come through `fetch` like everything else, and the caller is
+ * handed a blob plus that name.
+ */
+export async function requestDownload(
+  path: string,
+  options: Omit<RequestOptions, 'method'> & { fallbackName?: string } = {},
+): Promise<Download> {
+  const { query, body, text, signal, fallbackName = 'download' } = options
+  const headers: Record<string, string> = { accept: '*/*' }
+  let payload: BodyInit | undefined
+  if (text !== undefined) {
+    headers['content-type'] = 'text/plain; charset=utf-8'
+    payload = text
+  } else if (body !== undefined) {
+    headers['content-type'] = 'application/json'
+    payload = JSON.stringify(body)
+  }
+
+  const response = await fetch(apiUrl(path, query), {
+    method: payload === undefined ? 'GET' : 'POST',
+    headers,
+    body: payload,
+    signal,
+  })
+  if (!response.ok) {
+    const failure = await readError(response)
+    if (failure.status === 401 && isSessionLoss(failure.error)) {
+      reportSessionLost(failure.error)
+    }
+    throw failure
+  }
+  const blob = await response.blob()
+  return {
+    blob,
+    filename: attachmentName(response.headers.get('content-disposition')) ?? fallbackName,
+    mediaType: response.headers.get('content-type') ?? blob.type,
+  }
+}
+
+/**
+ * Hand a fetched document to the browser as a file. The one DOM detail that belongs with
+ * the transport rather than with a screen: every caller that downloads wants exactly this.
+ */
+export function saveDownload({ blob, filename }: Download): void {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.append(link)
+  link.click()
+  link.remove()
+  // Revoked on the next tick rather than immediately: Safari reads the URL after the click
+  // returns, and a revoked blob URL downloads nothing at all.
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
 export const http = {
   get: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body' | 'text'>) =>
     request<T>(path, { ...options, method: 'GET' }),

@@ -11,6 +11,9 @@ from sqlalchemy import event as sa_event
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.adapters.maia import PolicyMove
+from backend.adapters.pool import EngineSpec
+from backend.adapters.stockfish import UciOption
 from backend.config import MAIA_MAX_RATING
 from backend.db.enums import (
     Classification,
@@ -24,6 +27,7 @@ from backend.db.enums import (
 from backend.db.models import AnalysisRun, Engine, Game, MoveEval
 from backend.db.types import utcnow
 from backend.services import analysis, app_settings, explorer
+from backend.services import games as games_service
 from backend.services.engines import TierUnavailableError
 
 THRESHOLDS = analysis.Thresholds(inaccuracy=10.0, mistake=20.0, blunder=30.0)
@@ -169,8 +173,18 @@ def test_an_unconfigured_deployment_classifies_by_the_defaults(session: Session)
 
 
 def test_the_level_is_the_target_and_nothing_else() -> None:
-    """One level per deployment is what makes two games comparable at all."""
+    """The deployment's levels are what makes two games comparable at all."""
     assert analysis.maia_levels(1700) == [1700]
+
+
+def test_every_configured_level_is_asked_about_sorted_and_deduped() -> None:
+    assert analysis.maia_levels([1900, 1500, 1900]) == [1500, 1900]
+
+
+def test_several_levels_are_each_clamped_to_what_the_build_declares() -> None:
+    assert analysis.maia_levels([1200, 1900], low=1300, high=1700) == [1300, 1700]
+    # Two levels that clamp onto each other are one level, not the same column twice.
+    assert analysis.maia_levels([1800, 1900], low=1100, high=1500) == [1500]
 
 
 def test_the_level_is_clamped_to_what_the_model_can_answer() -> None:
@@ -231,6 +245,43 @@ def test_a_game_with_no_owner_is_asked_about_the_same_way(tmp_path: Any) -> None
     assert plan.maia_plies() == [0, 1]
 
 
+def test_a_plan_carries_every_configured_level(session: Session) -> None:
+    app_settings.set_maia_elos(session, [1500, 1900])
+    plan = _plan(session)
+
+    assert plan.maia_elos == (1500, 1900)
+    assert plan.maia_ratings() == [1500, 1900]
+    # The single-level field is the first of them, which is what crosses the wire.
+    assert plan.maia_target_elo == 1500
+
+
+def test_a_run_queued_for_particular_levels_keeps_them(session: Session) -> None:
+    """An override belongs to the run, not to the deployment: the settings do not move."""
+    _engine(session)
+    game = _game(session)
+    app_settings.set_maia_elos(session, [1900])
+
+    run = analysis.request_analysis(session, game_id=game.id, elos=[1300, 900])
+
+    # Cleaned on the way in, exactly as the setting is.
+    assert run.maia_elos == [1100, 1300]
+    assert analysis.build_plan(session, run).maia_ratings() == [1100, 1300]
+    assert app_settings.get_maia_elos(session) == [1900]
+
+
+def test_a_run_that_names_no_levels_is_analysed_at_the_configured_ones(
+    session: Session,
+) -> None:
+    """The point of a setting: a run queued before it moved is analysed the way it is now."""
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+    app_settings.set_maia_elos(session, [1500, 1900])
+
+    assert run.maia_elos is None
+    assert analysis.build_plan(session, run).maia_ratings() == [1500, 1900]
+
+
 def test_a_position_run_asks_about_the_one_position_it_has(session: Session) -> None:
     _engine(session)
     app_settings.set_maia_target_elo(session, 1700)
@@ -241,6 +292,376 @@ def test_a_position_run_asks_about_the_one_position_it_has(session: Session) -> 
 
     assert plan.maia_target_elo == 1700
     assert plan.maia_plies() == [0]
+
+
+# --- asking Maia about the plies ------------------------------------------
+
+
+class _FakeMaia:
+    """A Maia adapter with no process behind it: exactly what `apply_maia` leans on.
+
+    `asked` records the levels of every query, which is how "one query per ply, carrying
+    every level" and "a fixed-weights build is asked for one" are checkable at all.
+    """
+
+    def __init__(
+        self,
+        *,
+        supports_rating: bool = True,
+        name: str = "lc0 maia-2",
+        bounds: tuple[int, int] | None = None,
+    ) -> None:
+        self.name = name
+        self._supports = supports_rating
+        self._bounds = bounds
+        self.asked: list[list[int]] = []
+
+    def declared_options(self) -> tuple[UciOption, ...]:
+        if not self._supports or self._bounds is None:
+            return ()
+        low, high = self._bounds
+        return (UciOption(name="SelfElo", type="spin", default=low, min=low, max=high),)
+
+    @property
+    def supports_rating(self) -> bool:
+        return self._supports
+
+    def policy_at(
+        self, board: Any, ratings: Any, *, multipv: int | None = None
+    ) -> dict[str, list[PolicyMove]]:
+        levels = [int(rating) for rating in ratings]
+        self.asked.append(levels)
+        assert self._supports or len(levels) == 1, "one rating only, or the real one raises"
+        return {
+            str(level): [PolicyMove(rank=1, uci="e2e4", san="e4", probability=level / 10_000)]
+            for level in levels
+        }
+
+
+def _rows(plan: analysis.RunPlan) -> list[MoveEval]:
+    return [MoveEval(run_id=plan.run_id, ply=ply) for ply in plan.maia_plies()]
+
+
+def test_every_configured_level_is_stored_on_every_ply(session: Session) -> None:
+    app_settings.set_maia_elos(session, [1500, 1900])
+    plan = _plan(session)
+    rows = _rows(plan)
+    adapter = _FakeMaia()
+
+    assert analysis.apply_maia(plan, rows, adapter) == 6  # type: ignore[arg-type]
+    assert sorted(rows[0].maia_policy) == ["1500", "1900"]
+    assert rows[0].maia_policy["1900"][0]["p"] == 0.19
+    # One query per ply, carrying both levels — not one pass of the game per level.
+    assert adapter.asked == [[1500, 1900]] * 6
+
+
+def test_the_levels_asked_for_are_clamped_to_what_the_build_declares(
+    session: Session,
+) -> None:
+    app_settings.set_maia_elos(session, [1500, 1900])
+    plan = _plan(session)
+    rows = _rows(plan)
+    adapter = _FakeMaia(bounds=(1100, 1500))
+
+    analysis.apply_maia(plan, rows, adapter)  # type: ignore[arg-type]
+
+    assert sorted(rows[0].maia_policy) == ["1500"]
+    assert adapter.asked[0] == [1500]
+
+
+def test_a_fixed_weights_build_computes_its_own_level_and_skips_the_rest(
+    session: Session, caplog: pytest.LogCaptureFixture
+) -> None:
+    """One rating is what it is. The run does not fail over it; it says so once."""
+    app_settings.set_maia_elos(session, [1100, 1500, 1900])
+    plan = _plan(session)
+    rows = _rows(plan)
+    adapter = _FakeMaia(supports_rating=False, name="lc0 maia-1500")
+
+    with caplog.at_level(logging.WARNING, logger="backend.services.analysis"):
+        assert analysis.apply_maia(plan, rows, adapter) == 6  # type: ignore[arg-type]
+
+    assert sorted(rows[0].maia_policy) == ["1500"]
+    assert adapter.asked == [[1500]] * 6
+    # One warning for the run, not one per ply.
+    warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "1100, 1900" in warnings[0].getMessage()
+
+
+def test_a_fixed_weights_build_that_names_no_level_stores_nothing(
+    session: Session,
+) -> None:
+    """Nothing names the rating it plays, so every level would be a guess at a label."""
+    app_settings.set_maia_elos(session, [1500, 1900])
+    plan = _plan(session)
+    rows = _rows(plan)
+    adapter = _FakeMaia(supports_rating=False, name="lc0")
+
+    assert analysis.apply_maia(plan, rows, adapter) == 0  # type: ignore[arg-type]
+
+    assert not rows[0].maia_policy
+    assert adapter.asked == []
+
+
+def test_a_fixed_weights_build_reads_its_level_off_the_engine_it_was_started_from(
+    session: Session,
+) -> None:
+    """The UCI id says nothing; the weights file on the command line says 1500."""
+    app_settings.set_maia_elos(session, [1500, 1900])
+    plan = _plan(session)
+    rows = _rows(plan)
+    adapter = _FakeMaia(supports_rating=False, name="lc0")
+    spec = EngineSpec.build(
+        "/usr/bin/lc0", options={"WeightsFile": "/opt/maia/maia-1500.pb.gz"}, name="Maia"
+    )
+
+    analysis.apply_maia(plan, rows, adapter, spec)  # type: ignore[arg-type]
+
+    assert sorted(rows[0].maia_policy) == ["1500"]
+    assert adapter.asked == [[1500]] * 6
+
+
+def test_one_foreign_level_on_a_fixed_weights_build_is_skipped_not_relabelled(
+    session: Session, caplog: pytest.LogCaptureFixture
+) -> None:
+    """What a fill run asks: only the missing level, which this build cannot play.
+
+    Storing its own 1500 policy under "1900" would be a column the reader cannot see
+    through and no later run would correct, since the key looks present forever.
+    """
+    app_settings.set_maia_elos(session, [1500, 1900])
+    plan = _plan(session, elos=[1900])
+    rows = _rows(plan)
+    adapter = _FakeMaia(supports_rating=False, name="lc0 maia-1500")
+
+    with caplog.at_level(logging.WARNING, logger="backend.services.analysis"):
+        assert analysis.apply_maia(plan, rows, adapter) == 0  # type: ignore[arg-type]
+
+    assert not rows[0].maia_policy
+    assert adapter.asked == []
+    warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "1900" in warnings[0].getMessage()
+
+
+def test_a_pass_adds_its_levels_to_the_ones_a_row_already_carries(session: Session) -> None:
+    """What makes a fill run additive: the levels it did not compute stay where they are."""
+    app_settings.set_maia_elos(session, [1900])
+    plan = _plan(session)
+    rows = _rows(plan)
+    rows[0].maia_policy = {"1100": [{"uci": "d2d4", "rank": 1}]}
+
+    analysis.apply_maia(plan, rows, _FakeMaia())  # type: ignore[arg-type]
+
+    assert sorted(rows[0].maia_policy) == ["1100", "1900"]
+    assert rows[0].maia_policy["1100"][0]["uci"] == "d2d4"
+
+
+def test_the_rows_of_a_maia_only_pass_carry_no_evaluation(session: Session) -> None:
+    plan = _plan(session)
+    rows = analysis.policy_rows(plan)
+
+    assert [row.ply for row in rows] == [0, 1, 2, 3, 4, 5]
+    assert [row.move_uci for row in rows[:2]] == ["e2e4", "e7e5"]
+    # Nothing about the move itself, which is what keeps the merge treating these rows as
+    # carriers for a policy rather than as an answer that displaces the run that searched.
+    assert all(row.eval_before_cp is None and row.best_move_uci is None for row in rows)
+    assert all(row.win_loss is None and row.classification is None for row in rows)
+
+
+# --- filling in the missing levels ----------------------------------------
+
+
+def _maia(session: Session) -> Engine:
+    return _engine(
+        session, name="Maia", kind=EngineKind.MAIA, path="/usr/bin/lc0", default_tier=None
+    )
+
+
+def _analysed(
+    session: Session,
+    game: Game,
+    levels: tuple[str, ...] = ("2000",),
+    *,
+    maia_only: bool = False,
+    status: RunStatus = RunStatus.DONE,
+    elos: list[int] | None = None,
+) -> AnalysisRun:
+    """A finished run over `game` whose rows carry a policy at each of `levels`.
+
+    `elos` is what the run was *asked* for, which is not always what it managed to store.
+    """
+    run = AnalysisRun(
+        game_id=game.id,
+        tier=Tier.QUICK,
+        status=status,
+        nodes=1,
+        multipv=1,
+        maia_only=maia_only,
+        maia_elos=elos,
+    )
+    session.add(run)
+    session.flush()
+    session.add(
+        MoveEval(
+            run_id=run.id,
+            ply=0,
+            move_uci="e2e4",
+            eval_before_cp=None if maia_only else 12,
+            maia_policy={level: [{"uci": "e2e4", "rank": 1}] for level in levels} or None,
+        )
+    )
+    session.commit()
+    return run
+
+
+def test_the_status_counts_the_games_missing_a_configured_level(session: Session) -> None:
+    _engine(session)
+    _maia(session)
+    _analysed(session, _game(session))
+    app_settings.set_maia_elos(session, [1500, 2000])
+
+    assert analysis.maia_fill_status(session) == {
+        "missing_games": 1,
+        "configured": [1500, 2000],
+    }
+
+
+def test_a_fill_queues_a_maia_only_pass_for_the_levels_that_are_missing(
+    session: Session,
+) -> None:
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    analysed = _analysed(session, game)
+    app_settings.set_maia_elos(session, [1500, 2000])
+
+    receipt = analysis.queue_maia_fill(session)
+
+    assert (receipt["queued"], receipt["already_complete"]) == (1, 0)
+    queued = session.scalars(select(AnalysisRun).where(AnalysisRun.id != analysed.id)).one()
+    assert queued.maia_only is True
+    # Only the missing level: the one the game already carries is not recomputed.
+    assert queued.maia_elos == [1500]
+    assert queued.status is RunStatus.QUEUED
+    assert (queued.ply_start, queued.ply_end) == (None, None)
+    # And the pass that was already done is left exactly as it was.
+    assert session.scalars(select(MoveEval).where(MoveEval.run_id == analysed.id)).one()
+
+
+def test_a_game_that_carries_every_level_is_left_alone(session: Session) -> None:
+    _engine(session)
+    _maia(session)
+    _analysed(session, _game(session), ("1500", "2000"))
+    app_settings.set_maia_elos(session, [1500, 2000])
+
+    assert analysis.maia_fill_status(session)["missing_games"] == 0
+    assert analysis.queue_maia_fill(session) == {
+        "queued": 0,
+        "already_complete": 1,
+        "runs": [],
+    }
+
+
+def test_pressing_the_button_twice_queues_the_work_once(session: Session) -> None:
+    _engine(session)
+    _maia(session)
+    _analysed(session, _game(session))
+    app_settings.set_maia_elos(session, [1500, 2000])
+    analysis.queue_maia_fill(session)
+
+    again = analysis.queue_maia_fill(session)
+
+    assert (again["queued"], again["already_complete"]) == (0, 1)
+    assert analysis.maia_fill_status(session)["missing_games"] == 0
+
+
+def test_a_fill_can_be_narrowed_to_named_games(session: Session) -> None:
+    _engine(session)
+    _maia(session)
+    first = _game(session, plies=6)
+    second = _game(session, plies=4)
+    _analysed(session, first)
+    _analysed(session, second)
+    app_settings.set_maia_elos(session, [1500])
+
+    assert analysis.queue_maia_fill(session, [second.id])["queued"] == 1
+    queued = session.scalars(
+        select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
+    ).one()
+    assert queued.game_id == second.id
+
+
+def test_a_finished_fill_settles_the_level_it_went_looking_for(session: Session) -> None:
+    """The guard against the button re-queueing the whole library on every press.
+
+    A deployment whose Maia plays one rating cannot store 1900 however often it is asked,
+    so a level that a finished fill run went after counts as settled whether it landed or
+    not — otherwise the count never falls and each press queues the identical work again.
+    """
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    _analysed(session, game, ("1500",))
+    _analysed(session, game, (), maia_only=True, elos=[1900])
+    app_settings.set_maia_elos(session, [1500, 1900])
+
+    assert analysis.maia_fill_status(session)["missing_games"] == 0
+    assert analysis.queue_maia_fill(session)["queued"] == 0
+
+
+def test_a_full_run_that_stored_no_policy_is_still_a_fill(session: Session) -> None:
+    """Asking is only settling for a fill run: a pass whose Maia was down still needs one."""
+    _engine(session)
+    _maia(session)
+    _analysed(session, _game(session), (), elos=[1500])
+    app_settings.set_maia_elos(session, [1500])
+
+    assert analysis.maia_fill_status(session)["missing_games"] == 1
+
+
+def test_a_game_nobody_has_analysed_is_not_a_fill(session: Session) -> None:
+    """A game with no pass at all needs a whole pass, which is what a backfill is for."""
+    _engine(session)
+    _maia(session)
+    _game(session)
+    app_settings.set_maia_elos(session, [1500])
+
+    assert analysis.maia_fill_status(session)["missing_games"] == 0
+    assert analysis.queue_maia_fill(session)["queued"] == 0
+
+
+def test_a_fill_with_no_human_move_model_is_refused_whole(session: Session) -> None:
+    _engine(session)
+    _analysed(session, _game(session))
+    app_settings.set_maia_elos(session, [1500])
+
+    with pytest.raises(analysis.AnalysisRequestError, match="no human-move model"):
+        analysis.queue_maia_fill(session)
+
+    assert (
+        session.scalars(select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)).all()
+        == []
+    )
+
+
+def test_a_filled_level_is_merged_over_the_pass_that_was_already_there(
+    session: Session,
+) -> None:
+    """The whole point: the game reads as though both levels had been analysed at once."""
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    searched = _analysed(session, game, ("2000",))
+    filled = _analysed(session, game, ("1500",), maia_only=True)
+
+    evals, maia = games_service.merge_run_evals(session, [searched, filled])
+
+    assert sorted(maia[0]) == ["1500", "2000"]
+    # The carrier row never displaces the run that said something about the move.
+    assert evals[0].run_id == searched.id
+    assert evals[0].eval_before_cp == 12
 
 
 # --- enqueueing -----------------------------------------------------------
@@ -685,6 +1106,56 @@ def test_cancelling_with_nothing_queued_says_nothing(session: Session) -> None:
 
     try:
         assert analysis.cancel_queued(session) == 0
+    finally:
+        cancel()
+
+    assert seen == []
+
+
+def test_clearing_the_queue_drops_every_tier_windowed_and_fill_alike(session: Session) -> None:
+    """The reset button reaches further than `cancel_queued`: nothing queued survives it."""
+    _engine(session)
+    _maia(session)
+    games = [_game(session, plies=plies) for plies in (4, 6, 4, 4)]
+    analysis.request_analysis(session, game_id=games[0].id)
+    analysis.request_analysis(session, game_id=games[1].id, tier=Tier.DEEP)
+    analysis.request_analysis(session, game_id=games[2].id, ply_range=(0, 4))
+    _analysed(session, games[3])
+    app_settings.set_maia_elos(session, [1500])
+    fill = analysis.queue_maia_fill(session)["runs"][0]
+    assert fill.maia_only is True
+    # One of the four queued rows is claimed, whichever the priority order picks; the
+    # point of this test is that `clear_queue` does not care which shape the rest are.
+    running = analysis.claim_next_run(session)
+    assert running is not None
+    assert analysis.queue_depth(session) == {"queued": 3, "running": 1}
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        dropped = analysis.clear_queue(session)
+    finally:
+        cancel()
+
+    assert dropped == 3
+    assert analysis.queue_depth(session) == {"queued": 0, "running": 1}
+    survivors = set(
+        session.scalars(select(AnalysisRun.id).where(AnalysisRun.status != RunStatus.DONE))
+    )
+    assert survivors == {running.id}
+    assert seen == [
+        {"event": analysis.EVENT_BACKFILL, "tier": "quick", "queued": 0, "outstanding": 1}
+    ]
+
+
+def test_clearing_an_empty_queue_says_nothing(session: Session) -> None:
+    _engine(session)
+    _game(session)
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        assert analysis.clear_queue(session) == 0
     finally:
         cancel()
 

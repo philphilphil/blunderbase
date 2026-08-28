@@ -12,6 +12,7 @@ import { useEvents, useLiveUpdates } from '@/lib/events/EventsProvider'
 import { cn } from '@/lib/utils'
 
 import { CoachComment } from './CoachComment'
+import { SaveMoment } from './SaveMoment'
 import { SessionMeta } from './SessionMeta'
 import { boardArrows, boardSquares, describeSession, orientationFor } from './live'
 
@@ -116,6 +117,7 @@ export function LivePage() {
           <p className="text-[0.78125rem] text-dim">{describeSession(state, game)}</p>
         </div>
         <div className="flex-1" />
+        <SaveMoment active={active} />
         <button
           type="button"
           onClick={() => setFlipped((value) => !value)}

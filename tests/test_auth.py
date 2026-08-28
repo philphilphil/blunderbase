@@ -264,6 +264,7 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
         "setup_required": True,
         "authenticated": False,
         "maia_target_elo": MAIA_MAX_RATING,
+        "maia_elos": [MAIA_MAX_RATING],
     }
 
     response = unconfigured.post("/auth/setup", json={"password": PASSWORD})
@@ -273,11 +274,13 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
         "setup_required": False,
         "authenticated": True,
         "maia_target_elo": MAIA_MAX_RATING,
+        "maia_elos": [MAIA_MAX_RATING],
     }
     assert unconfigured.get("/auth/status").json() == {
         "setup_required": False,
         "authenticated": True,
         "maia_target_elo": MAIA_MAX_RATING,
+        "maia_elos": [MAIA_MAX_RATING],
     }
 
 
@@ -294,6 +297,7 @@ def test_the_status_carries_the_deployments_maia_target_elo(settings: Settings) 
             "setup_required": False,
             "authenticated": True,
             "maia_target_elo": 1700,
+            "maia_elos": [1700],
         }
 
 

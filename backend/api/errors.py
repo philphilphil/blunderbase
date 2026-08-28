@@ -111,6 +111,8 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (maia_live_service.LivePolicyRequestError, 422, "invalid_request"),
     (maia_live_service.LiveMaiaUnavailableError, 409, "maia_unavailable"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
+    (notes_service.LineNotFoundError, 404, "unknown_line"),
+    (notes_service.UnknownGameError, 404, "unknown_game"),
     # The settings clamp rather than refuse; this is the one set of them that cannot be
     # clamped into sense, and the page shows the message against the form.
     (app_settings_service.SettingsError, 422, "invalid_settings"),

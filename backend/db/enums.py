@@ -44,6 +44,19 @@ class Speed(StrEnum):
     CORRESPONDENCE = "correspondence"
 
 
+class NoteSource(StrEnum):
+    """Which surface wrote a note down.
+
+    Worth a column because the three read differently: the web note was typed while
+    looking at the board, the MCP one is what the coach concluded, and the live one is a
+    moment somebody grabbed mid-session and has not come back to yet.
+    """
+
+    WEB = "web"
+    MCP = "mcp"
+    LIVE = "live"
+
+
 class Tier(StrEnum):
     """How much engine budget one analysis pass gets."""
 

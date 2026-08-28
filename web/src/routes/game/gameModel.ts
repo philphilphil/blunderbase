@@ -24,6 +24,7 @@ import type {
   EngineLine,
   GameRunSummary,
   GameSummary,
+  MaiaLevelPolicy,
   MaiaPolicyResponse,
   MomentResponse,
   MoveRow,
@@ -39,8 +40,14 @@ export type Side = 'white' | 'black'
  * the foreign keys, plus where it hangs in this game. Not the `/notes` shape.
  */
 export interface GameNote extends NoteResponse {
-  scope?: 'game' | 'position'
-  /** The first ply of this game that reached the noted position; absent for game notes. */
+  /** `line` where the note is pinned to a kept variation off this game. */
+  scope?: 'game' | 'position' | 'line'
+  /**
+   * The half-move **count** the note is about — `0` the starting position, `n` the position
+   * after `n` half-moves, `line.base_ply + k` on a line note. For a position note the
+   * backend fills in the first count of this game that reached the noted position. See
+   * `./notesModel` for the conversion to a `MoveRow.ply`.
+   */
   ply?: number | null
 }
 
@@ -468,20 +475,90 @@ export interface MaiaLiveView {
   rollout: MaiaMove[]
 }
 
-export function maiaLive(response: MaiaPolicyResponse | undefined | null): MaiaLiveView | null {
-  if (!response) return null
-  const moves = maiaMoves(response.policy).sort((left, right) => left.rank - right.rank)
+/** One entry of the response — a level's own policy — as a view, or nothing to show. */
+function liveView(value: MaiaLevelPolicy | null | undefined): MaiaLiveView | null {
+  if (!value || typeof value !== 'object') return null
+  const moves = maiaMoves(value.policy).sort((left, right) => left.rank - right.rank)
   if (moves.length === 0) return null
   return {
-    level: { rating: typeof response.elo === 'number' ? String(response.elo) : null, moves },
+    // The level *asked for* is deliberately not a fallback here: a fixed-weights build
+    // answers under the key it was asked at while naming no level of its own, and a column
+    // headed 1700 by a build that never claimed 1700 is a comparison nobody made.
+    level: { rating: typeof value.elo === 'number' ? String(value.elo) : null, moves },
     // The rollout arrives in played order; its `rank` is per-position and means nothing
     // across plies, so it is deliberately left unsorted.
-    rollout: maiaMoves(response.rollout),
+    rollout: maiaMoves(value.rollout),
   }
 }
 
 /**
- * Which stored level the panel and the board arrow speak for.
+ * Every level one live query answered with, lowest first — the columns of a comparison.
+ *
+ * The endpoint keys `levels` by the level asked about and repeats the first of them at the
+ * top of the payload, which is the shape the board read before there was more than one
+ * level; both are read here so an older deployment still answers. A build with fixed
+ * weights answers with one level however many were asked for, and duplicates are folded,
+ * so the number of columns is what the engine could actually distinguish — never the
+ * number of questions.
+ */
+export function maiaLiveLevels(response: MaiaPolicyResponse | undefined | null): MaiaLiveView[] {
+  if (!response) return []
+  const entries =
+    response.levels && typeof response.levels === 'object' ? Object.values(response.levels) : []
+  const views: MaiaLiveView[] = []
+  const seen = new Set<string>()
+  for (const entry of entries.length > 0 ? entries : [response]) {
+    const view = liveView(entry as MaiaLevelPolicy)
+    if (!view) continue
+    const key = view.level.rating ?? ''
+    if (seen.has(key)) continue
+    seen.add(key)
+    views.push(view)
+  }
+  return views.sort((left, right) => ratingOrder(left.level) - ratingOrder(right.level))
+}
+
+/** A level's place in a list of them; an unnamed level sorts last. */
+function ratingOrder(level: MaiaLevel): number {
+  const rating = levelElo(level)
+  return rating === null ? Number.POSITIVE_INFINITY : rating
+}
+
+/** A level's rating as a number, or null where the engine named none. */
+export function levelElo(level: MaiaLevel): number | null {
+  if (level.rating === null) return null
+  const elo = Number(level.rating)
+  return Number.isFinite(elo) ? elo : null
+}
+
+/** The first level of a live answer — for a caller that shows one. */
+export function maiaLive(response: MaiaPolicyResponse | undefined | null): MaiaLiveView | null {
+  return maiaLiveLevels(response)[0] ?? null
+}
+
+/**
+ * The level nearest `elo` among the ones actually there — exactly it, where it is one of
+ * them.
+ *
+ * A pick of 1900 against a run that only holds 1500 and 1700 reads 1700 rather than
+ * nothing: what the pick names is which human the column speaks for, and the nearest human
+ * on hand is a better answer than an empty column. Null only where there is no named level
+ * at all to fall back to.
+ */
+export function nearestLevel(
+  levels: MaiaLevel[],
+  elo: number | null | undefined,
+): MaiaLevel | null {
+  if (elo === null || elo === undefined) return null
+  const named = levels.filter((level) => levelElo(level) !== null)
+  if (named.length === 0) return null
+  return named.reduce((best, level) =>
+    Math.abs(levelElo(level)! - elo) < Math.abs(levelElo(best)! - elo) ? level : best,
+  )
+}
+
+/**
+ * Which stored level the panel and the board arrow speak for when nobody has picked one.
  *
  * The configured target elo wins where the run was actually made at it — a run pinned to
  * one level keys the blob by exactly that number. Legacy runs (levels centred on the
@@ -494,14 +571,74 @@ export function preferredLevel(
   targetElo?: number | null,
 ): MaiaLevel | null {
   if (levels.length === 0) return null
+  const middle = levels[Math.floor(levels.length / 2)] ?? null
   if (targetElo !== null && targetElo !== undefined) {
-    const pinned = levels.find((level) => Number(level.rating) === targetElo)
+    const pinned = levels.find((level) => levelElo(level) === targetElo)
     if (pinned) return pinned
   }
-  if (rating === null || rating === undefined) return levels[Math.floor(levels.length / 2)] ?? null
-  return levels.reduce((best, level) =>
-    Math.abs(Number(level.rating) - rating) < Math.abs(Number(best.rating) - rating) ? level : best,
-  )
+  if (rating === null || rating === undefined) return middle
+  return nearestLevel(levels, rating) ?? middle
+}
+
+/**
+ * The level the panel shows: the reader's own pick where they have made one, resolved
+ * against the levels this position actually carries, and the deployment's preference where
+ * they have not.
+ *
+ * The pick is a standing choice across games (`maiaPreferences`), so it routinely names a
+ * level a given run was never made at — which is why it resolves to the nearest rather
+ * than to nothing.
+ */
+export function maiaLevelFor(
+  levels: MaiaLevel[],
+  pick: number | null | undefined,
+  rating: number | null | undefined,
+  targetElo: number | null | undefined,
+): MaiaLevel | null {
+  if (pick !== null && pick !== undefined) {
+    const picked = nearestLevel(levels, pick)
+    if (picked) return picked
+  }
+  return preferredLevel(levels, rating, targetElo)
+}
+
+/** One entry of the level dropdown. */
+export interface MaiaLevelOption {
+  /** The level, as the dropdown's value and as the pick is remembered. */
+  elo: number
+  /**
+   * False for a level the deployment is configured for that this position has no data at:
+   * offered and disabled, because the fix is a fresh pass rather than another click.
+   */
+  available: boolean
+}
+
+/**
+ * The levels a reader may pick between here: what this position actually has, and what the
+ * deployment is configured for.
+ *
+ * The two are not the same list and neither contains the other. A run made before a level
+ * was configured carries bands nobody asks for any more — still readable, so still
+ * offered. A level configured after the run has no data here at all — offered too, but
+ * disabled, because otherwise a level the owner has chosen looks like a level Maia cannot
+ * answer at.
+ */
+export function maiaLevelOptions(
+  levels: MaiaLevel[],
+  configured: readonly number[] | null | undefined,
+): MaiaLevelOption[] {
+  const present = new Set<number>()
+  for (const level of levels) {
+    const elo = levelElo(level)
+    if (elo !== null) present.add(elo)
+  }
+  const all = new Set<number>(present)
+  for (const elo of configured ?? []) {
+    if (Number.isFinite(elo)) all.add(elo)
+  }
+  return [...all]
+    .sort((left, right) => left - right)
+    .map((elo) => ({ elo, available: present.has(elo) }))
 }
 
 /**
@@ -568,6 +705,47 @@ export function humanMoves(
       classification,
       loss,
       multipv: ranked?.multipv ?? null,
+    }
+  })
+}
+
+/** How many moves a comparison column lists — enough for a distribution, not a table. */
+export const COMPARE_MOVES = 3
+
+/** One level's column of the comparison grid. */
+export interface MaiaComparisonColumn {
+  /** The level this column speaks for; null where the engine named none. */
+  rating: string | null
+  /** The likeliest moves at this level, best first. */
+  moves: HumanMoveView[]
+  /**
+   * The played move as this level saw it, wherever it ranked. Kept beside `moves` rather
+   * than only inside them, because the interesting column is the one that did *not* rank
+   * it: "a 1900 barely considers this" is the comparison, and a column that simply left it
+   * out would read as a level with no opinion.
+   */
+  played: HumanMoveView | null
+}
+
+/**
+ * The compare grid: the same position read by every level at once.
+ *
+ * One `humanMoves` per level over the one engine reading of the position — the engine's
+ * verdicts do not change with the level, only who plays into them, which is precisely what
+ * the grid puts side by side.
+ */
+export function maiaComparison(
+  levels: MaiaLevel[],
+  lines: EngineLineView[],
+  played: MoveRow | undefined,
+  limit = COMPARE_MOVES,
+): MaiaComparisonColumn[] {
+  return levels.map((level) => {
+    const rows = humanMoves(level, lines, played)
+    return {
+      rating: level.rating,
+      moves: rows.slice(0, limit),
+      played: rows.find((row) => row.played) ?? null,
     }
   })
 }

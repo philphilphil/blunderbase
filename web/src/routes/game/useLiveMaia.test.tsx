@@ -98,4 +98,39 @@ describe('useLiveMaia', () => {
     expect(result.current.view).toBeNull()
     await waitFor(() => expect(result.current.view?.level.moves[0]?.uci).toBe('d7d5'))
   })
+
+  it('asks every configured level in one request, and shows the one that was picked', async () => {
+    const bodies: { elo?: number; elos?: number[] }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { elos?: number[] }
+        bodies.push(body)
+        return new Response(
+          JSON.stringify({
+            elo: 1100,
+            policy: [{ uci: 'b8c6', san: 'Nc6', rank: 1, p: 0.3 }],
+            levels: {
+              '1100': { elo: 1100, policy: [{ uci: 'b8c6', san: 'Nc6', rank: 1, p: 0.3 }] },
+              '1900': { elo: 1900, policy: [{ uci: 'g8f6', san: 'Nf6', rank: 1, p: 0.5 }] },
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      }),
+    )
+
+    const { result } = renderHook(() => useLiveMaia(AFTER_E4, [1100, 1900], 1900), {
+      wrapper: wrapper(),
+    })
+
+    await waitFor(() => expect(result.current.views).toHaveLength(2))
+    // One request for both levels — the endpoint is a single warm process under one lock,
+    // so two questions would only serialise the same work.
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]!.elos).toEqual([1100, 1900])
+    // The pick chooses among the answers; the comparison still has all of them.
+    expect(result.current.view?.level.rating).toBe('1900')
+    expect(result.current.views.map((view) => view.level.rating)).toEqual(['1100', '1900'])
+  })
 })

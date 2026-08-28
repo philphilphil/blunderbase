@@ -1,4 +1,4 @@
-import { Loader2, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { Loader2, Plus, RotateCcw, Save, Trash2, Wand2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -8,15 +8,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAppSettings, useGames, useSaveAppSettings } from '@/lib/api/queries'
-import { DEFAULT_MAIA_TARGET_ELO } from '@/lib/api/types'
+import {
+  useAppSettings,
+  useGames,
+  useMaiaFill,
+  useMaiaFillStatus,
+  useSaveAppSettings,
+} from '@/lib/api/queries'
+import {
+  DEFAULT_MAIA_TARGET_ELO,
+  MAIA_ELO_STEP,
+  MAIA_MAX_ELO,
+  MAIA_MIN_ELO,
+  MAX_MAIA_ELOS,
+} from '@/lib/api/types'
 import type { AppSettings, AppSettingsUpdate, GamesDeleted } from '@/lib/api/types'
 
 import { DeleteAllGamesDialog } from './DeleteAllGamesDialog'
 
 /** What Maia was trained on. Anything outside is clamped by the backend, not refused. */
-export const MIN_TARGET_ELO = 1100
-export const MAX_TARGET_ELO = 2000
+export const MIN_TARGET_ELO = MAIA_MIN_ELO
+export const MAX_TARGET_ELO = MAIA_MAX_ELO
 
 /**
  * The defaults the backend falls back to under an empty box (`services/app_settings.py`).
@@ -46,15 +58,6 @@ interface Field {
   step: number
   /** What is in force when the box is empty, spelled the way the row wants it read. */
   unset: string
-}
-
-const MAIA_FIELD: Field = {
-  key: 'maia_target_elo',
-  label: 'Target elo',
-  min: MIN_TARGET_ELO,
-  max: MAX_TARGET_ELO,
-  step: 50,
-  unset: `Default ${DEFAULTS.maia_target_elo}`,
 }
 
 const ANALYSIS_FIELDS: Field[] = [
@@ -119,12 +122,11 @@ const DEFAULTS_FIELDS: Field[] = [
   },
 ]
 
-const FIELDS: Field[] = [
-  MAIA_FIELD,
-  ...ANALYSIS_FIELDS,
-  ...CLASSIFICATION_FIELDS,
-  ...DEFAULTS_FIELDS,
-]
+/**
+ * Every plain-number field. The Maia levels are not among them: they are a list, edited as
+ * chips, and the one setting whose PUT value is not the text of a box.
+ */
+const FIELDS: Field[] = [...ANALYSIS_FIELDS, ...CLASSIFICATION_FIELDS, ...DEFAULTS_FIELDS]
 
 /**
  * The stored value as the box shows it: empty is "nobody has set this one". The target elo
@@ -147,6 +149,192 @@ function parse(text: string): number | null {
 /** A count with the noun it counts, so no sentence has to say "1 games". */
 function plural(count: number, one: string, many = `${one}s`): string {
   return `${count.toLocaleString('en-US')} ${count === 1 ? one : many}`
+}
+
+// --- the Maia levels -------------------------------------------------------
+
+/**
+ * A level as the list keeps it: on the 50-point grid Maia's weights are named on, inside
+ * the band they cover. The backend clamps too — this only stops the box offering a level
+ * that would come back as a different number.
+ */
+function normalizeElo(value: number): number {
+  const stepped = Math.round(value / MAIA_ELO_STEP) * MAIA_ELO_STEP
+  return Math.min(MAIA_MAX_ELO, Math.max(MAIA_MIN_ELO, stepped))
+}
+
+/** The levels in force, sorted and deduped the way the backend stores them. */
+function storedElos(settings: AppSettings | undefined): number[] {
+  if (!settings) return []
+  const elos = settings.maia_elos
+  if (Array.isArray(elos) && elos.length > 0) {
+    return [...new Set(elos)].sort((left, right) => left - right)
+  }
+  return [settings.maia_target_elo]
+}
+
+/**
+ * The levels this deployment asks Maia at — a list rather than a number, because the
+ * interesting reading of a move is rarely one level's ("62% of 1500s play this, and 8% of
+ * 2000s do" is the reading, and it needs both).
+ *
+ * Chips rather than five boxes: the levels are a set, order carries nothing, and adding one
+ * is the common action while editing one in place is not an action at all — a level is a
+ * name for a set of weights, so a mistyped level is removed and re-added.
+ */
+function MaiaLevels({
+  elos,
+  ownerRating,
+  onChange,
+}: {
+  elos: number[]
+  ownerRating: number
+  onChange: (next: number[]) => void
+}) {
+  const [text, setText] = useState('')
+  const full = elos.length >= MAX_MAIA_ELOS
+  const typed = parse(text)
+  const candidate = typed === null ? null : normalizeElo(typed)
+  const addable = candidate !== null && !full && !elos.includes(candidate)
+  // The owner's own rating, on the grid: the level that answers "would a player like me
+  // have played this", which is the first level anybody wants and the fiddliest to type.
+  const mine = normalizeElo(ownerRating)
+  const quick = full || elos.includes(mine) ? null : mine
+
+  function add(elo: number) {
+    onChange([...new Set([...elos, elo])].sort((left, right) => left - right))
+    setText('')
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex min-h-6 flex-wrap items-center gap-1.5" data-testid="maia-elos">
+        {elos.length === 0 ? (
+          <span className="font-mono text-[0.625rem] text-dim-2">no levels</span>
+        ) : (
+          elos.map((elo) => (
+            <span
+              key={elo}
+              className="inline-flex items-center gap-1 rounded-full border border-brilliant/35 bg-brilliant/10 py-0.5 pl-2 pr-1 font-mono text-[0.6875rem] tabular text-brilliant"
+            >
+              {elo}
+              <button
+                type="button"
+                aria-label={`Remove ${elo}`}
+                // Never none: there is no such thing as a deployment that asks Maia at no
+                // rating, so the last chip is not removable — it is replaced.
+                disabled={elos.length < 2}
+                onClick={() => onChange(elos.filter((each) => each !== elo))}
+                className="rounded-full p-px text-brilliant/70 hover:bg-brilliant/20 hover:text-brilliant disabled:pointer-events-none disabled:opacity-40"
+              >
+                <X className="size-2.5" aria-hidden />
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex w-24 flex-none flex-col gap-1.5">
+          <Label htmlFor="maia-level">Add a level</Label>
+          <Input
+            id="maia-level"
+            type="number"
+            inputMode="numeric"
+            min={MAIA_MIN_ELO}
+            max={MAIA_MAX_ELO}
+            step={MAIA_ELO_STEP}
+            value={text}
+            placeholder={String(mine)}
+            autoComplete="off"
+            disabled={full}
+            className="w-full font-mono tabular"
+            onChange={(event) => setText(event.target.value)}
+            // Enter in this box adds the level rather than saving the form: the box is a
+            // list's entry field, and a Save that swallowed the typed level would store the
+            // list without it.
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              if (addable && candidate !== null) add(candidate)
+            }}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!addable}
+          onClick={() => (candidate === null ? undefined : add(candidate))}
+        >
+          <Plus aria-hidden />
+          Add
+        </Button>
+        {quick === null ? null : (
+          <Button type="button" variant="ghost" size="sm" onClick={() => add(quick)}>
+            {`Your rating (${quick})`}
+          </Button>
+        )}
+        {full ? (
+          <span className="text-[0.625rem] leading-[1.5] text-dim-2">
+            {`${MAX_MAIA_ELOS} levels is the most one pass can afford.`}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Add the configured levels to games that already have a pass.
+ *
+ * A separate action from Save on purpose: changing the levels changes what the *next* pass
+ * stores, and a library of a few thousand games is not something a Save button should
+ * silently start work over. What this queues is Maia-only — the search is not redone — so
+ * it is minutes rather than the weekend a re-analysis would take, and the count says
+ * whether there is anything to do at all.
+ */
+function MaiaFill() {
+  const status = useMaiaFillStatus()
+  const fill = useMaiaFill()
+  const missing = status.data?.missing_games ?? null
+  const receipt = fill.data ?? null
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={fill.isPending || missing === 0}
+          onClick={() => fill.mutate(undefined)}
+        >
+          {fill.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Wand2 aria-hidden />}
+          Fill in missing Maia levels
+        </Button>
+        {missing === null ? null : (
+          <span className="font-mono text-[0.625rem] tabular text-dim-2">
+            {missing === 0
+              ? 'every analysed game has every level'
+              : `${plural(missing, 'game')} missing a level`}
+          </span>
+        )}
+      </div>
+      {receipt ? (
+        <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
+          {receipt.queued === 0
+            ? 'Nothing to queue — every analysed game already has every level.'
+            : `Queued ${plural(receipt.queued, 'game')}; ${plural(receipt.already_complete, 'game')} already complete.`}
+        </p>
+      ) : null}
+      {fill.isError ? (
+        <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
+          {fill.error.message}
+        </p>
+      ) : null}
+    </div>
+  )
 }
 
 /**
@@ -228,11 +416,23 @@ function DangerZone() {
  */
 export function SettingsPage() {
   const settings = useAppSettings()
-  const save = useSaveAppSettings({ onSuccess: () => setDraft({}) })
+  const save = useSaveAppSettings({
+    onSuccess: () => {
+      setDraft({})
+      setElos(null)
+    },
+  })
   const [draft, setDraft] = useState<Partial<Record<Key, string>>>({})
+  // The levels are a list rather than the text of a box, so they draft on their own; null
+  // is "showing what the server said", exactly as a missing key is for the boxes.
+  const [elos, setElos] = useState<number[] | null>(null)
 
   const text = (key: Key) => draft[key] ?? storedText(settings.data, key)
-  const dirty = FIELDS.some((field) => text(field.key) !== storedText(settings.data, field.key))
+  const stored = storedElos(settings.data)
+  const levels = elos ?? stored
+  const dirty =
+    FIELDS.some((field) => text(field.key) !== storedText(settings.data, field.key)) ||
+    levels.join(',') !== stored.join(',')
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -240,7 +440,10 @@ export function SettingsPage() {
     // Spelled out rather than folded over `FIELDS`: a PUT is the whole of the settings,
     // and this is the one place that has to name every one of them.
     const body: AppSettingsUpdate = {
-      maia_target_elo: parse(text('maia_target_elo')),
+      // The list is what is sent; the older single-level field goes as null, which the
+      // backend reads as "the list said it" rather than as a level being cleared.
+      maia_elos: levels,
+      maia_target_elo: null,
       quick_nodes: parse(text('quick_nodes')),
       deep_nodes: parse(text('deep_nodes')),
       deep_multipv: parse(text('deep_multipv')),
@@ -316,13 +519,23 @@ export function SettingsPage() {
               <CardHeader className="flex-col items-stretch gap-1">
                 <CardTitle>Maia</CardTitle>
                 <CardDescription>
-                  The one rating Maia is asked at everywhere — the batch pass over both sides
-                  of every game, and the analysis board&rsquo;s live column. Set it to the
-                  rating you are playing towards; one level for every game is what makes two
-                  of them comparable. Emptied, it goes back to {DEFAULTS.maia_target_elo}.
+                  The ratings Maia is asked at everywhere — the batch pass over both sides of
+                  every game, and the analysis board&rsquo;s live column. One is the rating
+                  you are playing towards; a second and a third are what make a move&rsquo;s
+                  popularity a curve rather than a number. Up to {MAX_MAIA_ELOS}, and never
+                  none: cleared, they go back to {DEFAULTS.maia_target_elo}.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-4">{row(MAIA_FIELD)}</CardContent>
+              <CardContent className="flex flex-col gap-3">
+                <MaiaLevels
+                  elos={levels}
+                  ownerRating={
+                    parse(text('default_owner_rating')) ?? DEFAULTS.default_owner_rating
+                  }
+                  onChange={setElos}
+                />
+                <MaiaFill />
+              </CardContent>
             </Card>
 
             <Card>

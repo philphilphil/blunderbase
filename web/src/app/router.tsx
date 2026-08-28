@@ -11,6 +11,7 @@ import { HelpPage } from '@/routes/help'
 import { ImportPage } from '@/routes/import'
 import { LivePage } from '@/routes/live'
 import { McpPage } from '@/routes/mcp'
+import { NotesPage } from '@/routes/notes'
 import { SettingsPage } from '@/routes/settings'
 import { StatsPage } from '@/routes/stats'
 
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: 'games', element: <GamesPage /> },
       { path: 'games/:id', element: <GamePage /> },
       { path: 'explorer', element: <ExplorerPage /> },
+      { path: 'notes', element: <NotesPage /> },
       { path: 'stats', element: <StatsPage /> },
       { path: 'import', element: <ImportPage /> },
       { path: 'settings', element: <SettingsPage /> },

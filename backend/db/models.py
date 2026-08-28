@@ -22,6 +22,7 @@ from backend.db.enums import (
     Color,
     EngineKind,
     JobStatus,
+    NoteSource,
     Platform,
     Result,
     RunStatus,
@@ -333,6 +334,16 @@ class AnalysisRun(Base):
     ply_end: Mapped[int | None] = mapped_column(Integer)
     # Higher runs first: deep jobs jump the FIFO queue because someone is waiting on them.
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # A pass that asks Maia and nothing else: no search, and its rows carry a policy and no
+    # evaluation. What "fill in the missing Maia levels" queues over a game that has already
+    # been searched, so the levels are added without paying for Stockfish twice.
+    maia_only: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    # The Maia levels this run was queued for, where they are not the deployment's current
+    # ones: a fill run's missing levels, or an explicit override. NULL means "whatever is
+    # configured when the plan is built".
+    maia_elos: Mapped[list[int] | None] = mapped_column(JSON)
     # A crashed engine buys one retry; after that the run stays failed.
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Written by every claim. A result is only accepted while the run is `running` under
@@ -394,8 +405,53 @@ class MoveEval(Base):
     position: Mapped[Position | None] = relationship()
 
 
+class Line(Base):
+    """A variation off a stored game: the moves somebody actually walked from one position.
+
+    A game carries one line of play and there is nowhere in `games` to put a second, so
+    every variation the owner clicked through has always died with the tab. This is where
+    the ones worth keeping go: `base_ply` names the mainline position it branches from —
+    the position *after* that many half-moves, 0 being the start — and `moves` is the
+    variation in UCI, replayed against the game rather than stored as a second board.
+
+    Kept deliberately flat rather than as a move tree. What a reader wants back is "the
+    line I looked at", and a list of lines off their branch points is that, with no tree to
+    merge and no ordering to preserve. Two lines off the same position where one is the
+    head of the other are one line walked twice, which `services.notes.save_line` folds
+    into the longer of them — the same rule the move list applies to unsaved variations.
+    """
+
+    __tablename__ = "lines"
+    __table_args__ = (Index("ix_lines_game_id", "game_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    game_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False
+    )
+    base_ply: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    moves: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    game: Mapped[Game] = relationship()
+    notes: Mapped[list[Note]] = relationship(back_populates="line")
+
+
 class Note(Base):
-    """Coach-written memory: free text plus tags, attached to a game, a position or nothing."""
+    """Coach-written memory: free text plus tags, attached to a game, a position or nothing.
+
+    Three anchors, and a note may carry any combination of them. `game_id` says which game
+    it is about, `position_id` which position (that is what makes a note resurface when the
+    same position turns up in a new game), and `line_id` which variation. `ply` reads
+    against whichever of the first two applies: a half-move count into the game's mainline,
+    or — with `line_id` set — a half-move count on the same scale as the line's `base_ply`,
+    so `ply == base_ply` is the branch point and `base_ply + k` is k moves into the line.
+
+    `source` is who wrote it, which is worth keeping because the three surfaces mean
+    different things by a note; see `db.enums.NoteSource`.
+    """
 
     __tablename__ = "notes"
     __table_args__ = (
@@ -408,6 +464,15 @@ class Note(Base):
     tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     game_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("games.id", ondelete="CASCADE"))
     position_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("positions.id"))
+    # SET NULL rather than CASCADE: unpinning a line must not silently take the thinking
+    # that was written about it, and a note whose line is gone still says something.
+    line_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("lines.id", ondelete="SET NULL")
+    )
+    ply: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[NoteSource] = mapped_column(
+        EnumString(NoteSource), nullable=False, default=NoteSource.WEB
+    )
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
@@ -415,3 +480,9 @@ class Note(Base):
 
     game: Mapped[Game | None] = relationship()
     position: Mapped[Position | None] = relationship()
+    line: Mapped[Line | None] = relationship(back_populates="notes")
+
+
+# The notes full-text index is not a table SQLAlchemy can declare, so importing it here is
+# what registers the hook that builds it alongside the tables that are.
+from backend.db import fts  # noqa: E402, F401  (registers the notes_fts after_create hook)

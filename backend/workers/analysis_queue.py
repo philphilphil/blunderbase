@@ -274,6 +274,10 @@ class AnalysisWorkers:
 
     async def _analyse(self, context: RunContext) -> list[MoveEval]:
         plan = context.plan
+        if plan.maia_only:
+            # A fill pass has nothing to search: the game was evaluated by the run this one
+            # adds Maia levels to. Its rows are empty carriers for the policy.
+            return analysis.policy_rows(plan)
 
         def work(adapter: Adapter) -> list[MoveEval]:
             return analysis.analyse_plan(
@@ -293,7 +297,9 @@ class AnalysisWorkers:
         plan = context.plan
 
         def work(adapter: Adapter) -> int:
-            return analysis.apply_maia(plan, evals, adapter)  # type: ignore[arg-type]
+            # The spec goes along: a fixed-weights Maia's own level is named by its weights
+            # file or its options, not only by the process's UCI id.
+            return analysis.apply_maia(plan, evals, adapter, context.maia_spec)  # type: ignore[arg-type]
 
         try:
             await self._with_engine(context.maia_spec, work)
@@ -378,6 +384,14 @@ class AnalysisWorkers:
                 )
             plan = analysis.build_plan(session, run)
             maia = engines_service.maia_engine_for_host(session, None)
+            if plan.maia_only and maia is None:
+                # A fill pass is nothing but its Maia levels, so a host with no model to ask
+                # would store a run's worth of empty rows and call it done. Failed without a
+                # retry, like every other run this database cannot describe.
+                raise analysis.AnalysisError(
+                    "this pass asks the human-move model and nothing else, and there is no "
+                    "Maia on this host to ask"
+                )
             return RunContext(
                 plan=plan,
                 spec=engines_service.spec_for(engine),

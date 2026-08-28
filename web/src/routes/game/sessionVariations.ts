@@ -100,6 +100,19 @@ export function keepVariation(
   notify()
 }
 
+/**
+ * Forget one kept line — what pinning it is: the server holds it now, so the session store
+ * has no business holding a second copy of the same walk. Silent about an id it does not
+ * have, so a pin that lands twice is not an error.
+ */
+export function dropVariation(gameId: number, id: number): void {
+  const current = read(gameId)
+  const next = current.filter((kept) => kept.id !== id)
+  if (next.length === current.length) return
+  store.set(gameId, next)
+  notify()
+}
+
 /** Test seam: forget every kept line, as a reload would. */
 export function resetSessionVariations(): void {
   store.clear()
@@ -111,9 +124,11 @@ export interface SessionVariations {
   /** The game's kept lines, oldest first. */
   kept: KeptVariation[]
   keep: (base: number, moves: readonly string[]) => void
+  /** Forget one, because the server has taken it over. */
+  drop: (id: number) => void
 }
 
-/** The kept lines for one game, and the way to add to them. */
+/** The kept lines for one game, and the way to add to and remove from them. */
 export function useSessionVariations(gameId: number): SessionVariations {
   const snapshot = useCallback(() => read(gameId), [gameId])
   const kept = useSyncExternalStore(subscribe, snapshot, () => EMPTY)
@@ -121,5 +136,6 @@ export function useSessionVariations(gameId: number): SessionVariations {
     (base: number, moves: readonly string[]) => keepVariation(gameId, base, moves),
     [gameId],
   )
-  return { kept, keep }
+  const drop = useCallback((id: number) => dropVariation(gameId, id), [gameId])
+  return { kept, keep, drop }
 }

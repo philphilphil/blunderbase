@@ -5,7 +5,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import type { GameDetail, MoveRow, RunResponse, RunnersStatus } from '@/lib/api/types'
+import type {
+  GameDetail,
+  LineResponse,
+  MoveRow,
+  NoteResponse,
+  RunResponse,
+  RunnersStatus,
+} from '@/lib/api/types'
 
 import { GamePage, MOVES_WIDTH_KEY } from './GamePage'
 import { resetSessionVariations } from './sessionVariations'
@@ -147,6 +154,30 @@ const RUNNERS_STATUS: RunnersStatus = {
 }
 
 let posted: { url: string; body: unknown }[] = []
+/**
+ * The pinned lines the stubbed backend is holding. Set by the tests that care; the fold of
+ * pinned and session lines is exercised as a pure function in `variationRows.test.ts`, so
+ * what these tests are about is the wiring — what is drawn, and what is written.
+ */
+let lineRows: LineResponse[] = []
+
+const NOTE_TAGS = [{ tag: 'opening', notes: 3 }]
+
+/** `POST /notes` answered the way the backend does: the note with its anchors resolved. */
+function savedNote(body: Record<string, unknown>): NoteResponse {
+  const now = new Date().toISOString()
+  return {
+    id: 99,
+    text: String(body.text ?? ''),
+    tags: (body.tags as string[] | undefined) ?? [],
+    game_id: (body.game_id as number | undefined) ?? null,
+    ply: (body.ply as number | undefined) ?? null,
+    line_id: body.line ? 7 : ((body.line_id as number | undefined) ?? null),
+    source: 'web',
+    created_at: now,
+    updated_at: now,
+  }
+}
 /** Every `/streams` request, method included — an open and a close are not the same call. */
 let streamCalls: { method: string; url: string; body: unknown }[] = []
 
@@ -204,6 +235,30 @@ function stubFetch(
       }
       return json([])
     }
+    if (url.includes('/notes/tags')) return json(NOTE_TAGS)
+    // `/games/14/lines` would otherwise be answered by the `/games/14` fragment below, and
+    // a game detail is not a list of lines.
+    if (url.includes('/lines') || url.includes('/notes')) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null
+      if (method === 'POST') {
+        posted.push({ url, body })
+        return url.includes('/notes')
+          ? json(savedNote(body ?? {}), 201)
+          : json(lineRows[0] ?? { id: 7, game_id: 14, base_ply: 0, moves: [], sans: [] }, 201)
+      }
+      if (method === 'DELETE') {
+        posted.push({ url, body: null })
+        return new Response(null, { status: 204 })
+      }
+      // Only an override that names this collection: `'/games/14'` is a fragment of
+      // `/games/14/lines` too, and a game detail is not a list of lines.
+      for (const [fragment, payload] of Object.entries(overrides)) {
+        if ((fragment.includes('/lines') || fragment.includes('/notes')) && url.includes(fragment)) {
+          return json(payload)
+        }
+      }
+      return json(url.includes('/lines') ? lineRows : [])
+    }
     if (method === 'POST') {
       posted.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null })
       return json(QUEUED_RUN, 202)
@@ -228,13 +283,13 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-function renderPage() {
+function renderPage(entry = '/games/14') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   })
   return render(
     <Providers client={client}>
-      <MemoryRouter initialEntries={['/games/14']}>
+      <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route path="/games/:id" element={<GamePage />} />
         </Routes>
@@ -246,6 +301,7 @@ function renderPage() {
 beforeEach(() => {
   posted = []
   streamCalls = []
+  lineRows = []
   SilentSocket.instances = []
   // Kept lines are session-scoped, and a test file is one session: each test starts on a
   // game nobody has read yet.
@@ -778,7 +834,6 @@ describe('GamePage', () => {
     // the analysis board stay.
     await waitFor(() => expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument())
     const panel = screen.getByTestId('maia-panel')
-    expect(within(panel).getByText('human')).toBeInTheDocument()
     expect(
       within(panel).queryByText('No human model for this position.'),
     ).not.toBeInTheDocument()
@@ -933,7 +988,6 @@ describe('GamePage', () => {
     // Hints are about the human half's content — its column keeps its place, and what the
     // engine found is not a hint.
     await user.click(screen.getByRole('button', { name: 'Hints' }))
-    expect(within(panel()).getByText('human')).toBeInTheDocument()
     expect(within(panel()).queryByText(/%$/)).not.toBeInTheDocument()
     expect(within(panel()).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('played')).toBeInTheDocument()
@@ -1104,5 +1158,280 @@ describe('the board/moves splitter', () => {
 
     expect(movesColumn()).toHaveClass('basis-[26rem]')
     expect(movesColumn().style.flexBasis).toBe('')
+  })
+})
+
+/**
+ * Notes and pinned lines on the game screen. The folding of pinned, kept and walked lines is
+ * a pure function with its own file (`variationRows.test.ts`), and so is where a note hangs
+ * (`notesModel.test.ts`); what is tested here is the wiring — what reaches the screen, what
+ * is written to the server, and where a link drops the reader.
+ */
+describe('GamePage notes', () => {
+  /** The pinned line 1…c6 2.d4 off the position the blunder was played from. */
+  const PINNED: LineResponse = {
+    id: 7,
+    game_id: 14,
+    base_ply: 1,
+    moves: ['c7c6', 'd2d4'],
+    sans: ['c6', 'd4'],
+    created_at: '2026-08-01T09:00:00Z',
+    updated_at: '2026-08-01T09:00:00Z',
+  }
+
+  function notesTab() {
+    return screen.getByRole('button', { name: /^Notes/ })
+  }
+
+  function noteBodies(): { url: string; body: Record<string, unknown> }[] {
+    return posted
+      .filter((call) => call.url.includes('/notes') && !call.url.includes('/notes/tags'))
+      .map((call) => ({ url: call.url, body: call.body as Record<string, unknown> }))
+  }
+
+  it('lists the game’s notes in the Notes tab, with the move each is about', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // The payload's one note sits at count 1 — the position after 1.e4.
+    expect(notesTab()).toHaveTextContent('Notes1')
+    await user.click(notesTab())
+    const list = within(screen.getByTestId('game-notes'))
+    expect(list.getByText(/The Scandinavian invites the queen out early/)).toBeInTheDocument()
+    expect(list.getByText('1.e4')).toBeInTheDocument()
+    expect(list.getByText('opening')).toBeInTheDocument()
+  })
+
+  it('jumps to the ply a note is about when it is clicked', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.click(notesTab())
+
+    await user.click(screen.getByText(/The Scandinavian invites the queen out early/))
+    // Count 1 is the position after one half-move, which is `ply 1 / 4` on the transport.
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+  })
+
+  it('marks the mainline move a note hangs off', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // 1.e4 produced the noted position, so it is e4 that is marked, not d5.
+    expect(screen.getByTitle('1.e4 — noted')).toBeInTheDocument()
+    expect(screen.getByTitle('1…d5')).toBeInTheDocument()
+  })
+
+  it('writes a note about the position on the board', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    // The board on the position 1…d5 was played from.
+    await user.keyboard('j')
+
+    await user.click(screen.getByRole('button', { name: 'Note' }))
+    const composer = within(screen.getByTestId('note-composer'))
+
+    await user.type(composer.getByLabelText('Note text'), 'Play c6 here, not d5.')
+    await user.type(composer.getByLabelText('Tags'), 'scandinavian{Enter}')
+    await user.click(composer.getByRole('button', { name: /Save note/ }))
+
+    await waitFor(() => expect(noteBodies()).toHaveLength(1))
+    expect(noteBodies()[0]!.body).toMatchObject({
+      text: 'Play c6 here, not d5.',
+      tags: ['scandinavian'],
+      game_id: 14,
+      ply: 1,
+      source: 'web',
+    })
+    // On the game's own line nothing is pinned.
+    expect(noteBodies()[0]!.body.line).toBeNull()
+    // The composer closes on a save rather than leaving the text sitting there.
+    // The composer stays on screen after a save: the note is read where it was written.
+    expect(screen.getByTestId('note-composer')).toBeInTheDocument()
+  })
+
+  it('pins the line first when the note is written inside a variation', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+    // Walk one move into the run's line 1…c6 2.d4.
+    await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Note' }))
+    expect(screen.getByTestId('note-composer')).toHaveTextContent('pins the line')
+    await user.type(screen.getByLabelText('Note text'), 'The Caro is the move.')
+    await user.click(screen.getByRole('button', { name: /Save note/ }))
+
+    await waitFor(() => expect(noteBodies()).toHaveLength(1))
+    expect(noteBodies()[0]!.body).toMatchObject({
+      ply: 2,
+      // The whole walk is pinned, tail and all — not only the move the board stands on.
+      line: { game_id: 14, base_ply: 1, moves: ['c7c6', 'd2d4'] },
+    })
+  })
+
+  it('offers the composer’s tag suggestions from the tags already in use', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.click(screen.getByRole('button', { name: 'Note' }))
+
+    // The suggestions are offered to the tag box while it is being used: over a composer
+    // this short they would otherwise be sitting on top of the note itself.
+    await user.click(screen.getByLabelText('Tags'))
+    const suggestions = await screen.findByTestId('tag-suggestions')
+    await user.click(within(suggestions).getByRole('button', { name: 'opening' }))
+    await user.type(screen.getByLabelText('Note text'), 'Book move.')
+    await user.click(screen.getByRole('button', { name: /Save note/ }))
+
+    await waitFor(() => expect(noteBodies()).toHaveLength(1))
+    expect(noteBodies()[0]!.body.tags).toEqual(['opening'])
+  })
+
+  it('pins a line the session walked, and hands it over to the server', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('j')
+    await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
+
+    await user.click(screen.getByRole('button', { name: 'Pin this line' }))
+    await waitFor(() =>
+      expect(posted.filter((call) => call.url.endsWith('/lines'))).toHaveLength(1),
+    )
+    expect(posted.find((call) => call.url.endsWith('/lines'))?.body).toEqual({
+      game_id: 14,
+      base_ply: 1,
+      moves: ['c7c6', 'd2d4'],
+    })
+  })
+
+  it('draws a line the server holds, and unpins it on request', async () => {
+    lineRows = [PINNED]
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Pinned lines arrive with the game rather than having to be walked again.
+    const row = await screen.findByTestId('kept-variation')
+    expect(row).toHaveTextContent('(1…c62.d4)')
+    expect(row.dataset.pinned).toBe('true')
+
+    await user.click(screen.getByRole('button', { name: 'Unpin this line' }))
+    await waitFor(() =>
+      expect(posted.some((call) => call.url.includes('/lines/7'))).toBe(true),
+    )
+  })
+
+  it('walks into a line the server holds like one of the session’s own', async () => {
+    lineRows = [PINNED]
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await screen.findByTestId('kept-variation')
+
+    await user.click(
+      within(screen.getByTestId('kept-variation')).getByRole('button', { name: 'd4' }),
+    )
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+    // Drawn once, lit, and no longer listed as a line the board has left.
+    expect(screen.queryByTestId('kept-variation')).not.toBeInTheDocument()
+    expect(screen.getByTestId('move-variation')).toHaveTextContent('(1…c62.d4)')
+  })
+
+  it('marks the line move a pinned note hangs off, and lists it after the game’s own', async () => {
+    lineRows = [
+      {
+        ...PINNED,
+        notes: [
+          {
+            id: 12,
+            text: 'This is the whole point of the Caro.',
+            tags: [],
+            game_id: 14,
+            line_id: 7,
+            ply: 2,
+            created_at: '2026-08-02T10:00:00Z',
+            updated_at: '2026-08-02T10:00:00Z',
+          },
+        ],
+      },
+    ]
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const row = await screen.findByTestId('kept-variation')
+
+    // Count 2 is one move into a line off ply 1, so it is 1…c6 that carries the mark.
+    expect(within(row).getByRole('button', { name: 'c6' }).title).toContain('noted')
+    expect(within(row).getByRole('button', { name: 'd4' }).title).not.toContain('noted')
+
+    await user.click(notesTab())
+    const list = within(screen.getByTestId('game-notes'))
+    expect(list.getByText('variation')).toBeInTheDocument()
+    // The game's own note leads; the variation's is the aside under it.
+    const bodies = screen.getByTestId('game-notes').textContent ?? ''
+    expect(bodies.indexOf('Scandinavian invites')).toBeLessThan(
+      bodies.indexOf('whole point of the Caro'),
+    )
+  })
+
+  it('walks into the line a note pinned when that note is clicked', async () => {
+    lineRows = [
+      {
+        ...PINNED,
+        notes: [
+          {
+            id: 12,
+            text: 'This is the whole point of the Caro.',
+            tags: [],
+            game_id: 14,
+            line_id: 7,
+            ply: 3,
+            created_at: '2026-08-02T10:00:00Z',
+            updated_at: '2026-08-02T10:00:00Z',
+          },
+        ],
+      },
+    ]
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await screen.findByTestId('kept-variation')
+    await user.click(notesTab())
+
+    await user.click(screen.getByText('This is the whole point of the Caro.'))
+    // Count 3 off a line based at ply 1 is two moves in.
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+  })
+
+  it('opens on the ply a link named', async () => {
+    renderPage('/games/14?ply=3')
+    await screen.findByText('Scandinavian Defense')
+    expect(screen.getByText('ply 3 / 4')).toBeInTheDocument()
+  })
+
+  it('opens inside the line a link named, at the position it named', async () => {
+    lineRows = [PINNED]
+    renderPage('/games/14?ply=2&line=7')
+    await screen.findByText('Scandinavian Defense')
+    await waitFor(() => expect(screen.getByText('analysis +1')).toBeInTheDocument())
+    expect(screen.getByTestId('move-variation')).toHaveTextContent('(1…c62.d4)')
+  })
+
+  it('falls back to the ply where the line a link named is no longer pinned', async () => {
+    renderPage('/games/14?ply=2&line=7')
+    await screen.findByText('Scandinavian Defense')
+    await waitFor(() => expect(screen.getByText('ply 2 / 4')).toBeInTheDocument())
+  })
+
+  it('leaves the board alone where the link names nothing', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
   })
 })

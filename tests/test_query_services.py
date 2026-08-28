@@ -7,13 +7,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
     Classification,
     Color,
     EngineKind,
+    NoteSource,
     Platform,
     Result,
     RunStatus,
@@ -24,6 +25,7 @@ from backend.db.enums import (
 from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval, Note, Position
 from backend.services import explorer, notes, stats
 from backend.services import games as games_service
+from backend.services import live as live_service
 from backend.services.games import GameFilters
 from backend.services.import_service import run_import
 
@@ -1189,3 +1191,314 @@ def test_deleting_a_game_takes_its_notes_with_it(library: Library) -> None:
     session.delete(game)
     session.commit()
     assert session.scalars(select(Note)).all() == []
+
+
+# --------------------------------------------------------------------------- lines
+
+
+def test_a_line_is_kept_with_its_moves_in_san(library: Library) -> None:
+    game = library["qg000001"]
+    line = notes.save_line(library.session, game.id, 3, ["d7d6", "d2d4"])
+    assert (line.game_id, line.base_ply) == (game.id, 3)
+    payload = notes.line_payload(line)
+    assert payload["moves"] == ["d7d6", "d2d4"]
+    assert payload["sans"] == ["d6", "d4"]
+
+
+def test_a_line_already_kept_is_not_kept_twice(library: Library) -> None:
+    """Prefix in, the stored one comes back; extension in, the stored one grows."""
+    session = library.session
+    game = library["qg000001"]
+    first = notes.save_line(session, game.id, 3, ["d7d6", "d2d4"])
+    assert notes.save_line(session, game.id, 3, ["d7d6"]).id == first.id
+    grown = notes.save_line(session, game.id, 3, ["d7d6", "d2d4", "e5d4"])
+    assert grown.id == first.id
+    assert grown.moves == ["d7d6", "d2d4", "e5d4"]
+    # A different branch point is a different line, however the moves read.
+    other = notes.save_line(session, game.id, 5, ["g8f6", "e1g1"])
+    assert other.id != first.id
+    assert [line.id for line in notes.get_lines(session, game.id)] == [first.id, other.id]
+
+
+def test_a_line_that_could_not_have_been_played_is_refused(library: Library) -> None:
+    with pytest.raises(ValueError):
+        notes.save_line(library.session, library["qg000001"].id, 3, ["e2e4"])
+    with pytest.raises(ValueError, match="at least one move"):
+        notes.save_line(library.session, library["qg000001"].id, 3, [])
+    with pytest.raises(notes.UnknownGameError):
+        notes.save_line(library.session, 9999, 0, ["e2e4"])
+
+
+def test_unpinning_a_line_keeps_the_note_written_about_it(library: Library) -> None:
+    session = library.session
+    game = library["qg000001"]
+    note = notes.save_note(
+        session, "d6 holds", line={"game_id": game.id, "base_ply": 3, "moves": ["d7d6"]}
+    )
+    line_id = note.line_id
+    assert line_id is not None
+    assert notes.delete_line(session, line_id) is True
+    assert notes.delete_line(session, line_id) is False
+    session.refresh(note)
+    assert note.line_id is None
+    assert note.text == "d6 holds"
+
+
+def test_a_note_on_a_line_pins_it_and_lands_on_its_tip(library: Library) -> None:
+    session = library.session
+    game = library["qg000001"]
+    note = notes.save_note(
+        session,
+        "the whole point of the line",
+        line={"game_id": game.id, "base_ply": 3, "moves": ["d7d6", "d2d4"]},
+    )
+    assert note.game_id == game.id
+    assert note.ply == 5
+    # A line note knows its own position, which is what makes it resurface like a FEN one.
+    assert note.position_id is not None
+    payload = notes.note_payload(note)
+    assert payload["line"]["sans"] == ["d6", "d4"]
+    assert payload["game"]["white"] == "blunderbase"
+
+    inside = notes.save_note(session, "and here", line_id=note.line_id, ply=4)
+    assert inside.ply == 4
+    with pytest.raises(ValueError, match="outside line"):
+        notes.save_note(session, "nowhere", line_id=note.line_id, ply=9)
+    with pytest.raises(notes.LineNotFoundError):
+        notes.save_note(session, "nowhere", line_id=9999)
+
+
+def test_a_note_on_a_ply_takes_the_position_of_that_ply(library: Library) -> None:
+    session = library.session
+    game = library["qg000001"]
+    note = notes.save_note(session, "the tempo goes here", game_id=game.id, ply=4)
+    assert note.position_id is not None
+    assert notes.note_payload(note)["fen"] is not None
+    with pytest.raises(ValueError, match="outside game"):
+        notes.save_note(session, "past the end", game_id=game.id, ply=99)
+
+
+TRANSPOSITION_PGN = """[Event "Direct"]
+[Site "https://lichess.org/tp000001"]
+[Date "2026.02.01"]
+[White "blunderbase"]
+[Black "ruyfan"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 1-0
+
+[Event "The long way round"]
+[Site "https://lichess.org/tp000002"]
+[Date "2026.02.02"]
+[White "blunderbase"]
+[Black "ruyfan"]
+[Result "0-1"]
+
+1. Nf3 Nc6 2. Ng1 Nb8 3. e4 e5 4. Nf3 Nc6 5. Bc4 0-1
+"""
+
+
+def test_a_position_note_lands_on_the_ply_this_game_reached_it(session: Session) -> None:
+    """A transposition: the note's own ply counts half-moves into the *other* game.
+
+    Both games stand in the same position — one after five half-moves, one after nine — and
+    the move list draws the marker where this game arrived, not where the note was written.
+    """
+    job = run_import(session, Source.PGN, text=TRANSPOSITION_PGN, analyze=False)
+    assert job.games_imported == 2, job.errors
+    direct, long_way = session.scalars(select(Game).order_by(Game.id)).all()
+    note = notes.save_note(session, "the Italian bishop", game_id=long_way.id, ply=9)
+    assert note.ply == 9 and note.position_id is not None
+
+    rows = games_service.game_notes(session, direct.id)
+
+    assert [row["scope"] for row in rows] == ["position"]
+    assert rows[0]["ply"] == 5
+    # And the game it was written against still reports its own ply, from the other loop.
+    own = games_service.game_notes(session, long_way.id)
+    assert [(row["scope"], row["ply"]) for row in own] == [("game", 9)]
+
+
+def test_the_game_notes_a_line_note_shows_up_in(library: Library) -> None:
+    session = library.session
+    game = library["qg000001"]
+    branch = {"game_id": game.id, "base_ply": 3, "moves": ["d7d6"]}
+    notes.save_note(session, "on the line", line=branch)
+    rows = games_service.game_notes(session, game.id)
+    assert [row["scope"] for row in rows] == ["line"]
+    assert rows[0]["ply"] == 4
+    assert rows[0]["line_id"]
+
+
+# --------------------------------------------------------------------------- notes: scope
+
+
+def test_search_narrows_by_scope_and_by_line(library: Library) -> None:
+    session = library.session
+    game = library["qg000001"]
+    free = notes.save_note(session, "a plan for the month", ["plan"])
+    on_game = notes.save_note(session, "about the game", game_id=game.id)
+    on_position = notes.save_note(session, "about a position", fen=ENDGAME_FEN)
+    on_line = notes.save_note(
+        session, "about a line", line={"game_id": game.id, "base_ply": 3, "moves": ["d7d6"]}
+    )
+
+    def ids(**filters: object) -> list[int]:
+        return [note.id for note in notes.search_notes(session, **filters)]  # type: ignore[arg-type]
+
+    assert ids(scope="free") == [free.id]
+    assert ids(scope="game") == [on_game.id]
+    assert ids(scope="position") == [on_position.id]
+    assert ids(scope="line") == [on_line.id]
+    assert ids(line_id=on_line.line_id) == [on_line.id]
+    assert set(ids(has_position=True)) == {on_position.id, on_line.id}
+    assert set(ids(has_position=False)) == {free.id, on_game.id}
+    with pytest.raises(ValueError, match="unknown scope"):
+        notes.search_notes(session, scope="sideways")
+
+
+def test_free_text_search_survives_a_database_without_the_index(session: Session) -> None:
+    """FTS5 is an optimisation, not a dependency: the fallback has to find the same note."""
+    from backend.db import fts
+
+    notes.save_note(session, "The Berlin Defense keeps biting me", ["opening"])
+    with session.begin_nested():
+        fts.drop_notes_fts(session.connection())
+    notes._FTS_READY.clear()
+
+    found = notes.search_notes(session, query="berlin")
+    assert [note.text for note in found] == ["The Berlin Defense keeps biting me"]
+
+
+def test_a_note_from_the_live_board_snapshots_what_is_on_it(library: Library) -> None:
+    """The one write where the caller names nothing: the board already says where it is."""
+    session = library.session
+    game = library["qg000001"]
+    try:
+        live_service.show_game(session, game.id, 4)
+        live_service.make_move("f1c4")
+        note = notes.save_note(session, "why not the Italian here", from_live=True)
+    finally:
+        live_service.clear()
+
+    assert note.game_id == game.id
+    assert note.source is NoteSource.LIVE
+    assert note.position_id is not None
+    # The board left the game, so the departure is kept as a line and the note sits on it.
+    assert note.line is not None
+    assert note.line.base_ply == 4
+    assert note.line.moves == ["f1c4"]
+    assert note.ply == 5
+
+
+def test_a_note_from_an_empty_live_board_is_refused(session: Session) -> None:
+    live_service.clear()
+    with pytest.raises(live_service.NoLivePositionError):
+        notes.save_note(session, "about nothing", from_live=True)
+
+
+# --------------------------------------------------------------------------- resurfacing
+
+
+def test_a_position_note_resurfaces_with_the_games_it_came_back_in(library: Library) -> None:
+    session = library.session
+    notes.save_note(session, "the starting position, again", fen=START_EPD)
+    notes.save_note(session, "nothing to do with a board")
+
+    items = notes.resurface_notes(session)
+    assert [item["reason"] for item in items] == ["recurred"]
+    assert items[0]["note"]["text"] == "the starting position, again"
+    # Every fixture game starts from it.
+    assert len(items[0]["games"]) == len(library.all)
+
+
+def test_a_note_nobody_has_touched_resurfaces_as_stale(session: Session) -> None:
+    fresh = notes.save_note(session, "written today", ["plan"])
+    old = notes.save_note(session, "written in January", ["plan"])
+    session.execute(
+        update(Note)
+        .where(Note.id == old.id)
+        .values(updated_at=datetime.now(UTC) - timedelta(days=60))
+    )
+    session.commit()
+
+    items = notes.resurface_notes(session)
+    assert [item["note"]["id"] for item in items] == [old.id]
+    assert items[0]["reason"] == "stale"
+    assert fresh.id not in [item["note"]["id"] for item in items]
+    assert notes.resurface_notes(session, 0) == []
+
+
+# --------------------------------------------------------------------------- export
+
+
+def test_markdown_export_groups_notes_under_their_game(library: Library) -> None:
+    session = library.session
+    game = library["qg000001"]
+    notes.save_note(session, "the tempo goes here", ["plan"], game_id=game.id, ply=4)
+    notes.save_note(
+        session, "d6 holds", line={"game_id": game.id, "base_ply": 3, "moves": ["d7d6", "d2d4"]}
+    )
+    notes.save_note(session, "this endgame", fen=ENDGAME_FEN)
+    notes.save_note(session, "a plan for the month", ["plan"])
+
+    document = notes.export_notes(session, notes.search_notes(session), fmt="md")
+    assert "# Blunderbase notes" in document
+    assert "## blunderbase – ruyfan, 1-0 (2026-01-05)" in document
+    assert f"[/games/{game.id}](/games/{game.id})" in document
+    # The move a note is about is named the way a person writes it.
+    assert "**2... Nc6** — the tempo goes here" in document
+    # A note on a variation is labelled by the variation's move, not by the game's.
+    assert "**3. d4** — d6 holds" in document
+    assert "line: 2... d6 3. d4" in document
+    assert "#plan" in document
+    assert "## Positions" in document
+    assert "## Free notes" in document
+    assert "a plan for the month" in document
+
+
+def test_pgn_export_reads_back_as_pgn(library: Library) -> None:
+    """The point of the PGN is that another program opens it, so parse it back."""
+    import io
+
+    import chess.pgn
+
+    session = library.session
+    game = library["qg000001"]
+    notes.save_note(session, "the tempo goes here", game_id=game.id, ply=4)
+    notes.save_note(
+        session, "d6 holds", line={"game_id": game.id, "base_ply": 3, "moves": ["d7d6", "d2d4"]}
+    )
+    notes.save_note(session, "this endgame", fen=ENDGAME_FEN)
+    notes.save_note(session, "a plan for the month")
+
+    document = notes.export_notes(session, notes.search_notes(session), fmt="pgn")
+    stream = io.StringIO(document)
+    parsed = []
+    while (entry := chess.pgn.read_game(stream)) is not None:
+        parsed.append(entry)
+    assert len(parsed) == 3
+
+    first = parsed[0]
+    assert first.headers["White"] == "blunderbase"
+    assert first.headers["Site"] == f"/games/{game.id}"
+    comments = [node.comment for node in first.mainline() if node.comment]
+    assert "the tempo goes here" in comments
+    # The kept line came out as a real variation, with its note inside it.
+    at_branch = list(first.mainline())[2]
+    assert len(at_branch.variations) == 2
+    variation = at_branch.variations[1]
+    assert variation.san() == "d6"
+    assert variation.variations[0].comment == "d6 holds"
+
+    from_position = parsed[1]
+    assert "Variant" not in from_position.headers
+    assert from_position.headers["SetUp"] == "1"
+    assert from_position.headers["FEN"].startswith("6k1/5ppp")
+    assert from_position.comment == "this endgame"
+    assert parsed[2].comment == "a plan for the month"
+
+
+def test_an_unknown_export_format_is_refused(session: Session) -> None:
+    with pytest.raises(ValueError, match="unknown export format"):
+        notes.export_notes(session, [], fmt="docx")

@@ -10,6 +10,7 @@ from mcp.types import CallToolResult, TextContent
 from backend.services import analysis as analysis_service
 from backend.services import engines as engines_service
 from backend.services import live as live_service
+from backend.services import maia_live as maia_live_service
 from backend.services import notes as notes_service
 from backend.services import stats as stats_service
 
@@ -62,10 +63,16 @@ TRANSLATIONS: tuple[tuple[type[Exception], str], ...] = (
     (analysis_service.AnalysisRequestError, BAD_ARGUMENT),
     (analysis_service.AnalysisError, ENGINE_FAILED),
     (engines_service.TierUnavailableError, ENGINE_UNAVAILABLE),
+    # A deployment with no local Maia has less to answer with, not a broken tool: the code
+    # is the one a coach already knows for "there is no engine here to ask".
+    (maia_live_service.LivePolicyRequestError, BAD_FEN),
+    (maia_live_service.LiveMaiaUnavailableError, ENGINE_UNAVAILABLE),
     (engines_service.UnknownEngineError, NOT_FOUND),
     (engines_service.EngineServiceError, ENGINE_FAILED),
     (stats_service.UnknownDimensionError, UNKNOWN_DIMENSION),
     (notes_service.NoteNotFoundError, UNKNOWN_NOTE),
+    (notes_service.LineNotFoundError, NOT_FOUND),
+    (notes_service.UnknownGameError, UNKNOWN_GAME),
     (live_service.UnknownLiveGameError, UNKNOWN_GAME),
     (live_service.IllegalMoveError, ILLEGAL_MOVE),
     (live_service.NoLivePositionError, NO_LIVE_POSITION),

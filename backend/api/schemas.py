@@ -22,6 +22,7 @@ from backend.db.enums import (
     Color,
     EngineKind,
     JobStatus,
+    NoteSource,
     Platform,
     RunStatus,
     Source,
@@ -62,7 +63,11 @@ class AuthStatus(BaseModel):
     setup_required: bool
     authenticated: bool
     maia_target_elo: int = Field(
-        description="the one rating every Maia question on this deployment is asked at",
+        description="the first rating every Maia question on this deployment is asked at",
+    )
+    maia_elos: list[int] = Field(
+        default_factory=list,
+        description="every rating this deployment asks Maia at, lowest first",
     )
 
 
@@ -93,13 +98,19 @@ class AppSettings(BaseModel):
     `services.app_settings` names, which is why the page can show that default under an
     empty box rather than pretending to a value.
 
-    The target elo is the exception: every Maia question is asked at a rating, so the
-    answer is the rating in force rather than the row behind it. Clearing it on a PUT is
-    still how it goes back to the default, and what comes back is that default.
+    The Maia levels are the exception: every Maia question is asked at a rating, so the
+    answer is the ratings in force rather than the row behind them. Clearing them on a PUT is
+    still how they go back to the default, and what comes back is that default.
+    `maia_target_elo` is the first of `maia_elos` — the same value, for a caller that only
+    ever shows one level.
     """
 
     maia_target_elo: int = Field(
-        description="the one rating every Maia question is asked at, both sides of the board",
+        description="the first of `maia_elos`, for a caller that shows a single level",
+    )
+    maia_elos: list[int] = Field(
+        default_factory=list,
+        description="every rating Maia is asked at, both sides of the board, lowest first",
     )
     quick_nodes: int | None = Field(
         default=None, description="nodes per position in the automatic pass on import"
@@ -137,6 +148,11 @@ class AppSettingsUpdate(Input):
     """
 
     maia_target_elo: int | None = None
+    maia_elos: list[int] | None = Field(
+        default=None,
+        description="one to five ratings; a longer list keeps the lowest, out of range is "
+        "clamped, and null clears them back to the default",
+    )
     quick_nodes: int | None = None
     deep_nodes: int | None = None
     deep_multipv: int | None = None
@@ -351,6 +367,10 @@ class AnalysisRequest(Input):
     nodes: int | None = Field(default=None, ge=1)
     depth: int | None = Field(default=None, ge=1)
     priority: int | None = None
+    elos: list[int] | None = Field(
+        default=None,
+        description="Maia levels for this run alone; omitted, it uses the configured ones",
+    )
 
     @model_validator(mode="after")
     def _paired_ply_range(self) -> AnalysisRequest:
@@ -383,6 +403,10 @@ class BatchAnalysisRequest(Input):
     nodes: int | None = Field(default=None, ge=1)
     depth: int | None = Field(default=None, ge=1)
     priority: int | None = None
+    elos: list[int] | None = Field(
+        default=None,
+        description="Maia levels for these runs alone; omitted, they use the configured ones",
+    )
 
     @model_validator(mode="after")
     def _distinct_games(self) -> BatchAnalysisRequest:
@@ -391,6 +415,37 @@ class BatchAnalysisRequest(Input):
         # the batch was asked for.
         self.game_ids = list(dict.fromkeys(self.game_ids))
         return self
+
+
+class MaiaFillRequest(Input):
+    """Fill in the Maia levels the library was never analysed at.
+
+    No games given means every analysed game, which is what the Settings page sends: the
+    point of the button is a library that speaks for the same set of humans throughout.
+    """
+
+    game_ids: list[int] | None = Field(
+        default=None, description="omit for every analysed game", min_length=1
+    )
+
+
+class MaiaFillReceipt(Payload):
+    """What a fill queued, and how much of the library needed nothing.
+
+    `already_complete` counts the games that have every configured level — including the
+    ones whose fill is still in the queue from an earlier press, so pressing twice queues
+    the work once.
+    """
+
+    queued: int = 0
+    already_complete: int = 0
+
+
+class MaiaFillStatus(Payload):
+    """What the fill button shows before anybody presses it."""
+
+    missing_games: int = 0
+    configured: list[int] = Field(default_factory=list)
 
 
 class QueuedRun(BaseModel):
@@ -462,6 +517,19 @@ class BackfillCancelled(BaseModel):
     """
 
     tier: Tier
+    dropped: int
+    outstanding: int
+
+
+class QueueCleared(BaseModel):
+    """How many queued runs the whole-queue reset took back, and what is left working.
+
+    Unlike `BackfillCancelled`, this carries no tier: the drop was not scoped to one, so
+    `dropped` covers every tier and every shape of run — windowed, full-game, Maia-fill
+    alike. `outstanding` is what a worker had already claimed, left to finish — see
+    `analysis.clear_queue`.
+    """
+
     dropped: int
     outstanding: int
 
@@ -565,6 +633,10 @@ class MaiaPolicyRequest(Input):
     elo: int | None = Field(
         default=None, ge=1, description="clamped to what the build can answer for"
     )
+    elos: list[int] | None = Field(
+        default=None,
+        description="several levels in one query; omitted, the deployment's configured ones",
+    )
     moves: int | None = Field(default=None, ge=1, le=10, description="policy entries wanted")
     rollout_plies: int = Field(
         default=0, ge=0, le=20, description="0 for no rollout; both sides play at `elo`"
@@ -584,6 +656,11 @@ class MaiaPolicyResponse(Payload):
     elo: int | None = None
     policy: list[dict[str, Any]] = Field(default_factory=list)
     rollout: list[dict[str, Any]] = Field(default_factory=list)
+    levels: dict[str, Any] = Field(
+        default_factory=dict,
+        description="one {elo, policy, rollout} per level asked about, keyed by the level; "
+        "the top-level fields are the first of these",
+    )
 
 
 # --- explorer -------------------------------------------------------------
@@ -763,21 +840,78 @@ class TierStatusResponse(BaseModel):
 # --- notes ----------------------------------------------------------------
 
 
-class NoteResponse(BaseModel):
+class LineResponse(Payload):
+    """`services.notes.line_payload`: one kept variation off a game.
+
+    `sans` is derived at read time rather than stored — see the service — so it can never
+    disagree with the game the line hangs off.
+    """
+
+    id: int
+    game_id: int
+    base_ply: int = 0
+    moves: list[str] = Field(default_factory=list)
+    sans: list[str] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+    notes: list[NoteResponse] = Field(default_factory=list)
+
+
+class LineCreate(Input):
+    """The variation to keep: where it branches from, and how it went."""
+
+    game_id: int
+    base_ply: int = Field(default=0, ge=0)
+    moves: list[str] = Field(min_length=1)
+
+
+class NoteResponse(Payload):
+    """`services.notes.note_payload`.
+
+    Permissive rather than strict because the anchors come resolved: the FEN of the
+    position, a small summary of the game and the whole line ride along, so a client that
+    renders a note never has to fetch the three things it is about.
+    """
+
     id: int
     text: str
     tags: list[str] = Field(default_factory=list)
     game_id: int | None = None
     position_id: int | None = None
+    line_id: int | None = None
+    ply: int | None = None
+    source: str = "web"
+    fen: str | None = None
+    line: LineResponse | None = None
+    game: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
 
 
+class NoteLineInput(Input):
+    """A variation a note is being written about, persisted before the note is."""
+
+    game_id: int
+    base_ply: int = Field(default=0, ge=0)
+    moves: list[str] = Field(min_length=1)
+
+
 class NoteCreate(Input):
+    """A note and as much of a position as the writer could name.
+
+    Every anchor is optional and they compose; `from_live` fills in whatever the caller did
+    not name from the board the coach and the owner are looking at.
+    """
+
     text: str = Field(min_length=1)
     tags: list[str] = Field(default_factory=list)
     game_id: int | None = None
     fen: str | None = None
+    ply: int | None = Field(default=None, ge=0)
+    line_id: int | None = None
+    line: NoteLineInput | None = None
+    source: NoteSource = NoteSource.WEB
+    from_live: bool = False
 
 
 class NoteUpdate(Input):
@@ -788,6 +922,18 @@ class NoteUpdate(Input):
 class TagCount(BaseModel):
     tag: str
     notes: int
+
+
+class ResurfaceItem(Payload):
+    """One note worth re-reading, and why it came back up."""
+
+    note: NoteResponse
+    reason: str
+    games: list[int] = Field(default_factory=list)
+
+
+class ResurfaceResponse(BaseModel):
+    items: list[ResurfaceItem] = Field(default_factory=list)
 
 
 # --- runner gateway -------------------------------------------------------

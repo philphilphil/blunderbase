@@ -5,13 +5,17 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are eight of them, in four groups.
+There are nine of them, in four groups.
 
-**The Maia target elo.** The single rating every Maia question is asked at — the rating
-the owner is playing towards, not the one they have. Batch analysis bakes that level into
-every ply of both sides, and the analysis board's live queries use it too, so no two
-surfaces ever speak for two different humans. An install that never opened the Settings
-page is pinned to the top of what Maia can answer, 2000.
+**The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
+is playing towards and the ones they want to contrast with, not the one they have. Batch
+analysis bakes *every* configured level into every ply of both sides, and the analysis
+board's live queries ask the same set, so no two surfaces ever speak for two different
+humans. It is a list rather than a number because the interesting reading is a comparison:
+what a 1500 plays here and what a 1900 plays here, side by side. One to five of them, each
+clamped to what Maia can answer; an install that never opened the Settings page is pinned
+to the top of that range alone, [2000]. `maia_target_elo` survives as the first of them,
+which is what every caller that only ever wanted one level still reads.
 
 **The analysis budgets** — `quick_nodes`, `deep_nodes`, `deep_multipv`. What one position
 costs in each tier, and how many lines a deep run keeps. Read when a run is enqueued, so
@@ -49,6 +53,10 @@ from backend.db.models import AppSetting
 # --- the keys -------------------------------------------------------------
 
 MAIA_TARGET_ELO = "maia_target_elo"
+# The list that replaced it. Not one of `SETTINGS`: those are single numbers with a clamp
+# and a range, and this is a set of them, so it is read and written by its own pair of
+# functions rather than through `set_value` / `replace`.
+MAIA_ELOS = "maia_elos"
 QUICK_NODES = "quick_nodes"
 DEEP_NODES = "deep_nodes"
 DEEP_MULTIPV = "deep_multipv"
@@ -69,6 +77,9 @@ INACCURACY_DEFAULT = 5.0
 MISTAKE_DEFAULT = 10.0
 BLUNDER_DEFAULT = 15.0
 OWNER_RATING_DEFAULT = 1500
+# The levels an install that configured nothing asks Maia at: the top of what the model can
+# answer, and only that one. The same default the single target elo had, as a list of one.
+MAIA_ELOS_DEFAULT: tuple[int, ...] = (MAIA_MAX_RATING,)
 
 # A budget of no nodes at all is not a cheaper pass, it is no pass; there is deliberately
 # no ceiling, because how long the owner is willing to wait is theirs to decide.
@@ -79,6 +90,10 @@ MAX_MULTIPV = 10
 MIN_THRESHOLD = 0.0
 MAX_THRESHOLD = 100.0
 MIN_OWNER_RATING = 1
+# How many Maia levels one deployment may carry. Every level is a full extra policy query
+# per ply of every run, so this is a budget as much as a UI limit; five columns is also
+# about as many as the game panel can put side by side and still be read.
+MAX_MAIA_ELOS = 5
 
 
 class SettingsError(ValueError):
@@ -177,10 +192,74 @@ def read(session: Session) -> dict[str, int | float | None]:
     return {key: _clean(BY_KEY[key], rows.get(key)) for key in KEYS}
 
 
+def clean_maia_elos(values: object) -> list[int]:
+    """Whatever was given as the deployment's Maia levels, as levels it can have.
+
+    Sorted, deduped, each pulled inside what the model can answer for, and no more than
+    `MAX_MAIA_ELOS` of them — the lowest ones win a list that is too long, because a
+    truncation has to be decided somewhere and dropping the top of the range keeps the
+    levels nearest the owner's own play. Anything that is not a rating is dropped rather
+    than refused, and a list with nothing left in it is the default: there is no such thing
+    as a deployment that asks Maia at no rating at all.
+    """
+    if isinstance(values, bool) or isinstance(values, int | float):
+        values = [values]
+    if not isinstance(values, list | tuple):
+        return list(MAIA_ELOS_DEFAULT)
+    setting = BY_KEY[MAIA_TARGET_ELO]
+    levels = {
+        int(setting.clamp(value))
+        for value in values
+        if not isinstance(value, bool) and isinstance(value, int | float)
+    }
+    if not levels:
+        return list(MAIA_ELOS_DEFAULT)
+    return sorted(levels)[:MAX_MAIA_ELOS]
+
+
+def get_maia_elos(session: Session) -> list[int]:
+    """Every rating Maia is asked at on this deployment, lowest first.
+
+    The list row if there is one, else the single target elo an install from before the
+    list existed still has (a migration converts it, so that fallback is for a row written
+    by hand), else the default. Cleaned on the way out as well as on the way in, because
+    this is JSON in a database a person can open.
+    """
+    row = session.get(AppSetting, MAIA_ELOS)
+    if row is not None:
+        cleaned = clean_maia_elos(row.value)
+        if cleaned:
+            return cleaned
+    legacy = stored(session, MAIA_TARGET_ELO)
+    if legacy is not None:
+        return [int(legacy)]
+    return list(MAIA_ELOS_DEFAULT)
+
+
+def set_maia_elos(session: Session, values: object | None) -> list[int]:
+    """Store the levels, or clear them. Returns the levels in force afterwards.
+
+    Clearing writes no row, exactly as the single settings do: "nobody chose" and "chose
+    nothing" are one state, and the state is the default. The legacy `maia_target_elo` row
+    goes on every write, so the two keys can never disagree about what is in force.
+    """
+    session.execute(delete(AppSetting).where(AppSetting.key.in_((MAIA_ELOS, MAIA_TARGET_ELO))))
+    if values is None:
+        session.commit()
+        return list(MAIA_ELOS_DEFAULT)
+    levels = clean_maia_elos(values)
+    session.add(AppSetting(key=MAIA_ELOS, value=levels))
+    session.commit()
+    return levels
+
+
 def get_maia_target_elo(session: Session) -> int:
-    """The one rating every Maia question is asked at, chosen or defaulted."""
-    value = stored(session, MAIA_TARGET_ELO)
-    return MAIA_MAX_RATING if value is None else int(value)
+    """The first rating Maia is asked at — what a caller that wants one level reads.
+
+    Kept because plenty of them do: a runner plan carries one level over the wire for a
+    client that predates the list, and a surface that shows a single number shows this one.
+    """
+    return get_maia_elos(session)[0]
 
 
 def get_quick_nodes(session: Session) -> int:
@@ -248,13 +327,12 @@ def set_value(session: Session, key: str, value: int | float | None) -> int | fl
 
 
 def set_maia_target_elo(session: Session, value: int | None) -> int:
-    """The target elo, chosen or put back to the default. Returns what is in force after.
+    """Ask Maia at this one level and nothing else. Returns the level in force after.
 
-    None is not a third state here: it clears the row, and the level in force is the
-    default the key names.
+    The list, set to one entry — which is what "the target elo" now means. None is not a
+    third state here: it clears the row, and the level in force is the default.
     """
-    stored_value = set_value(session, MAIA_TARGET_ELO, value)
-    return MAIA_MAX_RATING if stored_value is None else int(stored_value)
+    return set_maia_elos(session, None if value is None else [value])[0]
 
 
 def replace(

@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.app import create_app
 from backend.api.schemas import MAX_BATCH_GAMES
-from backend.config import Settings
+from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.enums import (
     Classification,
     Color,
@@ -52,6 +52,7 @@ from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
 
 OWNER = "blunderbase"
 FRENCH = "rnbqkbnr/pppp1ppp/4p3/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 2"
+START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 ONE_GAME = """[Event "Casual Blitz game"]
 [Site "https://lichess.org/upload01"]
 [Date "2026.04.01"]
@@ -720,6 +721,63 @@ def test_a_batch_still_stops_at_five_hundred_games(api: TestClient) -> None:
     assert api.get("/analysis/queue").json()["queued"] == 0
 
 
+def _register_maia(settings: Settings, engine_command: str) -> None:
+    """A human-move model on this host, which a fill has to have something to ask."""
+    with get_sessionmaker(settings)() as session:
+        session.add(
+            Engine(
+                name="Maia",
+                kind=EngineKind.MAIA,
+                path=engine_command,
+                options={},
+                enabled=True,
+            )
+        )
+        session.commit()
+
+
+def test_the_fill_status_counts_the_games_missing_a_level(api: TestClient) -> None:
+    """`seeded` finished one run, and it carries no Maia policy at all."""
+    assert api.get("/analysis/maia-fill/status").json() == {
+        "missing_games": 1,
+        "configured": [MAIA_MAX_RATING],
+    }
+
+
+def test_a_fill_queues_a_maia_only_pass_and_then_has_nothing_left(
+    api: TestClient, settings: Settings, engine_command: str
+) -> None:
+    _register_maia(settings, engine_command)
+
+    response = api.post("/analysis/maia-fill")
+
+    assert response.status_code == 202, response.text
+    assert response.json() == {"queued": 1, "already_complete": 0}
+    assert api.get("/analysis/queue").json()["queued"] == 1
+    # The work is on its way, so pressing the button again queues nothing.
+    assert api.get("/analysis/maia-fill/status").json()["missing_games"] == 0
+    assert api.post("/analysis/maia-fill").json() == {"queued": 0, "already_complete": 1}
+
+
+def test_a_fill_can_be_asked_for_particular_games(
+    api: TestClient, settings: Settings, engine_command: str, seeded: dict[str, int]
+) -> None:
+    _register_maia(settings, engine_command)
+
+    body = api.post("/analysis/maia-fill", json={"game_ids": [seeded["game_id"]]}).json()
+
+    assert body == {"queued": 1, "already_complete": 0}
+
+
+def test_a_fill_with_no_human_move_model_is_a_422(api: TestClient) -> None:
+    response = api.post("/analysis/maia-fill")
+
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+    assert "no human-move model" in response.json()["detail"]
+    assert api.get("/analysis/queue").json()["queued"] == 0
+
+
 def test_the_backfill_preview_counts_the_games_with_no_pass(api: TestClient) -> None:
     """`seeded` finished a quick run over exactly one of its games; the rest are the work."""
     total = api.get("/games", params={"limit": 1}).json()["total"]
@@ -796,6 +854,59 @@ def test_cancelling_a_backfill_leaves_a_running_and_a_windowed_run(
     with get_sessionmaker(settings)() as session:
         survived = set(session.scalars(select(AnalysisRun.id).where(AnalysisRun.status != "done")))
         assert survived == {claimed_id, windowed["id"]}
+
+
+def test_clearing_the_queue_drops_every_tier_and_kind_of_run(
+    api: TestClient, settings: Settings, engine_command: str, seeded: dict[str, int]
+) -> None:
+    """Wider than `/backfill/cancel`: a quick backfill, a deep one, a window and a fill all go."""
+    _register_maia(settings, engine_command)
+    api.post("/analysis/backfill")
+    api.post("/analysis/backfill", json={"tier": "deep"})
+    api.post(
+        "/analysis", json={"game_id": seeded["game_id"], "ply_start": 0, "ply_end": 4}
+    )
+    api.post("/analysis/maia-fill")
+    queued = api.get("/analysis/queue").json()["queued"]
+    assert queued > 0
+
+    body = api.post("/analysis/queue/clear").json()
+
+    assert body == {"dropped": queued, "outstanding": 0}
+    assert api.get("/analysis/queue").json()["queued"] == 0
+
+
+def test_clearing_the_queue_leaves_a_running_run_to_finish(
+    settings: Settings, api: TestClient
+) -> None:
+    """The reset button is not a stop button for what an engine has already claimed."""
+    api.post("/analysis/backfill")
+    api.post("/analysis/backfill", json={"tier": "deep"})
+    with get_sessionmaker(settings)() as session:
+        claimed = session.scalars(
+            select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED).order_by(
+                AnalysisRun.id
+            )
+        ).first()
+        assert claimed is not None
+        claimed.status = RunStatus.RUNNING
+        session.commit()
+        claimed_id = claimed.id
+
+    body = api.post("/analysis/queue/clear").json()
+
+    assert body["outstanding"] == 1
+    with get_sessionmaker(settings)() as session:
+        survived = set(session.scalars(select(AnalysisRun.id).where(AnalysisRun.status != "done")))
+        assert survived == {claimed_id}
+    queue = api.get("/analysis/queue").json()
+    assert (queue["queued"], queue["running"]) == (0, 1)
+
+
+def test_clearing_an_empty_queue_drops_nothing(api: TestClient) -> None:
+    body = api.post("/analysis/queue/clear").json()
+
+    assert body == {"dropped": 0, "outstanding": 0}
 
 
 def test_a_run_over_a_position_takes_no_ply_range(api: TestClient) -> None:
@@ -1226,6 +1337,166 @@ def test_a_note_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
     assert error_of(api.get("/notes/9999")) == "unknown_note"
     assert error_of(api.patch("/notes/9999", json={"text": "x"})) == "unknown_note"
     assert error_of(api.delete("/notes/9999")) == "unknown_note"
+
+
+def test_a_note_can_land_on_a_move_of_a_game(api: TestClient, seeded: dict[str, int]) -> None:
+    body = api.post(
+        "/notes", json={"text": "the tempo goes here", "game_id": seeded["game_id"], "ply": 4}
+    ).json()
+
+    assert body["ply"] == 4
+    # A ply names a position, so the note comes back knowing the FEN and the game.
+    assert body["fen"]
+    assert body["game"]["id"] == seeded["game_id"]
+    assert body["source"] == "web"
+    detail = api.get(f"/games/{seeded['game_id']}").json()
+    written = next(note for note in detail["notes"] if note["id"] == body["id"])
+    assert written["ply"] == 4
+
+
+def test_a_note_on_a_variation_pins_the_variation(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    game_id = seeded["game_id"]
+    body = api.post(
+        "/notes",
+        json={
+            "text": "d6 holds the centre",
+            "line": {"game_id": game_id, "base_ply": 3, "moves": ["d7d6", "d2d4"]},
+        },
+    ).json()
+
+    assert body["line"]["sans"] == ["d6", "d4"]
+    assert body["ply"] == 5
+    kept = api.get(f"/games/{game_id}/lines").json()
+    assert [line["id"] for line in kept] == [body["line"]["id"]]
+    assert [note["text"] for note in kept[0]["notes"]] == ["d6 holds the centre"]
+
+    # Unpinning the line leaves the thinking behind.
+    assert api.delete(f"/lines/{body['line']['id']}").status_code == 204
+    assert api.get(f"/games/{game_id}/lines").json() == []
+    assert api.get(f"/notes/{body['id']}").json()["line_id"] is None
+
+
+def test_a_kept_line_is_not_kept_twice(api: TestClient, seeded: dict[str, int]) -> None:
+    game_id = seeded["game_id"]
+    first = api.post(
+        "/lines", json={"game_id": game_id, "base_ply": 3, "moves": ["d7d6"]}
+    ).json()
+    longer = api.post(
+        "/lines", json={"game_id": game_id, "base_ply": 3, "moves": ["d7d6", "d2d4"]}
+    ).json()
+
+    assert longer["id"] == first["id"]
+    assert longer["sans"] == ["d6", "d4"]
+    assert len(api.get(f"/games/{game_id}/lines").json()) == 1
+
+
+def test_a_line_on_a_game_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
+    response = api.post("/lines", json={"game_id": 9999, "base_ply": 0, "moves": ["e2e4"]})
+    assert response.status_code == 404
+    assert error_of(response) == "unknown_game"
+    assert error_of(api.delete("/lines/9999")) == "unknown_line"
+
+
+def test_a_line_that_could_not_have_been_played_is_refused(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    response = api.post(
+        "/lines", json={"game_id": seeded["game_id"], "base_ply": 3, "moves": ["e2e4"]}
+    )
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+
+
+def test_notes_are_narrowed_by_scope(api: TestClient, seeded: dict[str, int]) -> None:
+    game_id = seeded["game_id"]
+    api.post("/notes", json={"text": "a plan for the month"})
+    api.post(
+        "/notes",
+        json={"text": "on a line", "line": {"game_id": game_id, "base_ply": 3, "moves": ["d7d6"]}},
+    )
+
+    assert [note["text"] for note in api.get("/notes", params={"scope": "free"}).json()] == [
+        "a plan for the month"
+    ]
+    assert [note["text"] for note in api.get("/notes", params={"scope": "line"}).json()] == [
+        "on a line"
+    ]
+    # The seeded note is the game-scoped one.
+    scoped = api.get("/notes", params={"scope": "game"}).json()
+    assert [note["id"] for note in scoped] == [seeded["note_id"]]
+    assert error_of(api.get("/notes", params={"scope": "sideways"})) == "invalid_request"
+
+
+def test_resurfaced_notes_name_the_games_the_position_came_back_in(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    api.post("/notes", json={"text": "how every one of these starts", "fen": START})
+    api.post("/notes", json={"text": "nothing to do with a board"})
+
+    items = api.get("/notes/resurface").json()["items"]
+    assert [item["reason"] for item in items] == ["recurred"]
+    assert items[0]["note"]["text"] == "how every one of these starts"
+    assert len(items[0]["games"]) == 6
+
+
+def test_notes_export_as_markdown_and_as_pgn(api: TestClient, seeded: dict[str, int]) -> None:
+    game_id = seeded["game_id"]
+    api.post("/notes", json={"text": "watch the c-file", "game_id": game_id, "ply": 4})
+
+    markdown = api.get("/notes/export", params={"format": "md"})
+    assert markdown.headers["content-type"].startswith("text/markdown")
+    assert "attachment" in markdown.headers["content-disposition"]
+    assert "# Blunderbase notes" in markdown.text
+    assert "watch the c-file" in markdown.text
+
+    pgn = api.get("/notes/export", params={"format": "pgn", "game_id": game_id})
+    assert pgn.headers["content-type"].startswith("application/x-chess-pgn")
+    assert "{ watch the c-file }" in pgn.text
+
+    assert error_of(api.get("/notes/export", params={"format": "docx"})) == "invalid_request"
+
+
+def test_a_note_can_be_written_from_the_live_board(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    """"Save this moment": the board says which game and which position, so the body need
+    only carry the text."""
+    with get_sessionmaker(api.app.state.settings)() as session:
+        live_service.show_game(session, seeded["game_id"], 4)
+    live_service.make_move("f1c4")
+
+    body = api.post("/notes", json={"text": "why not the Italian", "from_live": True}).json()
+
+    assert body["game_id"] == seeded["game_id"]
+    assert body["source"] == "live"
+    assert body["ply"] == 5
+    assert body["line"]["moves"] == ["f1c4"]
+    assert body["fen"]
+
+
+def test_the_events_socket_sees_a_line_and_a_deletion(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    with api.websocket_connect("/events", headers=socket_headers(api)) as socket:
+        line = api.post(
+            "/lines", json={"game_id": seeded["game_id"], "base_ply": 3, "moves": ["d7d6"]}
+        ).json()
+        created = _drain(socket, "line.created")[-1]
+        api.delete(f"/lines/{line['id']}")
+        removed = _drain(socket, "line.deleted")[-1]
+        api.delete(f"/notes/{seeded['note_id']}")
+        forgotten = _drain(socket, "note.deleted")[-1]
+
+    assert created["line_id"] == line["id"]
+    assert created["moves"] == ["d7d6"]
+    assert removed == {
+        "event": "line.deleted",
+        "line_id": line["id"],
+        "game_id": seeded["game_id"],
+    }
+    assert forgotten["note_id"] == seeded["note_id"]
 
 
 # --- /search --------------------------------------------------------------

@@ -55,11 +55,26 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
         queryKeys.explorer(),
       ]
 
-    // A note the coach wrote over MCP. Notes ride along in the game detail payload, so
-    // that one game is refetched, but the games *table* is untouched.
+    // A note the coach wrote over MCP, or one written in another tab. Notes ride along in
+    // the game detail payload, so that one game is refetched, but the games *table* is
+    // untouched. A note pinned to a variation also changes what that game's kept lines
+    // carry, which is its own prefix — so only a note that names a line pays for it.
     case 'note.created':
-    case 'note.updated': {
+    case 'note.updated':
+    case 'note.deleted': {
       const keys: QueryKey[] = [queryKeys.notes()]
+      const anchors = event as { game_id?: number | null; line_id?: number | null }
+      if (typeof anchors.line_id === 'number') keys.push(queryKeys.lines())
+      if (typeof anchors.game_id === 'number') keys.push(['games', 'detail', anchors.game_id])
+      return keys
+    }
+
+    // A variation kept or unpinned: the lines, the notes hanging off them — unpinning
+    // clears a note's `line_id` rather than deleting the note — and the one game, whose
+    // detail payload names its notes.
+    case 'line.created':
+    case 'line.deleted': {
+      const keys: QueryKey[] = [queryKeys.lines(), queryKeys.notes()]
       const gameId = (event as { game_id?: number | null }).game_id
       if (typeof gameId === 'number') keys.push(['games', 'detail', gameId])
       return keys

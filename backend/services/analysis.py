@@ -33,10 +33,10 @@ import logging
 import math
 import secrets
 import threading
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy import event as sa_event
@@ -251,8 +251,16 @@ class RunPlan:
     # and they cross the wire to a runner with the rest of it.
     owner_color: Color | None = None
     owner_rating: int | None = None
-    # The one level every Maia question in this run is asked at, both sides of the board.
+    # The first level every Maia question in this run is asked at, both sides of the board.
+    # Kept alongside `maia_elos` because it is what crosses the wire to a runner that
+    # predates the list, and what every reader of a single level still reads.
     maia_target_elo: int = MAIA_MAX_RATING
+    # Every level this run asks about, lowest first. Empty means "the target and only it",
+    # which is what a plan decoded from an older runner arrives as.
+    maia_elos: tuple[int, ...] = ()
+    # A pass that asks Maia and nothing else: no search, and rows that carry a policy and
+    # no evaluation, merged over what the game was already analysed with.
+    maia_only: bool = False
 
     @property
     def plies(self) -> range:
@@ -270,6 +278,10 @@ class RunPlan:
         if self.is_position_run:
             return range(0, 1)
         return range(self.ply_start, self.ply_end + 1)
+
+    def maia_ratings(self) -> list[int]:
+        """The levels this run asks Maia about, whatever it was given them as."""
+        return list(self.maia_elos) or [self.maia_target_elo]
 
     def maia_plies(self) -> list[int]:
         """The plies Maia is asked about: every one of them, both sides of the board.
@@ -323,20 +335,26 @@ def classify_move(win_loss: float, *, played_best: bool, thresholds: Thresholds)
 
 
 def maia_levels(
-    target: int,
+    target: int | Sequence[int],
     *,
     low: int = MAIA_MIN_RATING,
     high: int = MAIA_MAX_RATING,
 ) -> list[int]:
-    """The rating level to ask Maia about, clamped to what the model can answer.
+    """The rating levels to ask Maia about, clamped to what the model can answer.
 
-    One level, always — a list because that is what `policy_at` keys its answer by. It is
-    the deployment's target and nothing else, which is what makes two games comparable at
-    all: a move that Maia's answer changed between them is the play changing, not the
-    question. The clamp is the build's, since a level outside what it declares it can
-    answer is a number it would ignore.
+    The deployment's configured levels and nothing else, which is what makes two games
+    comparable at all: a move whose Maia answer changed between them is the play changing,
+    not the question. Several of them because the reading that teaches something is a
+    comparison — what a 1500 plays here next to what a 1900 plays here — and one because
+    that is all most deployments want.
+
+    Sorted, deduped, and clamped to the build's own declared range, since a level outside
+    what it says it can answer is a number it would ignore. A single int is accepted as the
+    list of one it means.
     """
-    return [min(high, max(low, int(target)))]
+    wanted = [target] if isinstance(target, int) else list(target)
+    levels = {min(high, max(low, int(level))) for level in wanted}
+    return sorted(levels) or [min(high, max(low, MAIA_MAX_RATING))]
 
 
 def _raw_chances(cp: float) -> float:
@@ -391,6 +409,8 @@ def _queued_row(
     fen: str | None = None,
     window: tuple[int, int] | None = None,
     depth: int | None = None,
+    maia_only: bool = False,
+    maia_elos: Sequence[int] | None = None,
 ) -> AnalysisRun:
     """The one place a queued run row is built, so the single and bulk paths cannot drift."""
     return AnalysisRun(
@@ -405,6 +425,10 @@ def _queued_row(
         ply_start=None if window is None else window[0],
         ply_end=None if window is None else window[1],
         priority=defaults.priority,
+        maia_only=maia_only,
+        # NULL rather than the levels in force: a run that names none is analysed at
+        # whatever is configured when it runs, which is the whole point of a setting.
+        maia_elos=None if maia_elos is None else list(maia_elos),
     )
 
 
@@ -420,6 +444,7 @@ def request_analysis(
     nodes: int | None = None,
     depth: int | None = None,
     priority: int | None = None,
+    elos: Sequence[int] | None = None,
     commit: bool = True,
     announce: bool = True,
 ) -> AnalysisRun:
@@ -439,6 +464,10 @@ def request_analysis(
     human-move passes happen in one process on one machine, so a search engine on a host
     with no Maia is refused here when the deployment's only Maia is somewhere else — see
     `_require_one_host`.
+
+    `elos` overrides the Maia levels for this run alone — one caller asking "and what would
+    a 1300 have played" without moving the deployment's own levels. Given none, the run
+    carries no levels and is analysed at whatever is configured when it is worked.
 
     `announce=False` queues the run silently. Only a bulk path passes it, and only because
     it announces the whole write once instead; a run enqueued on its own always says so.
@@ -461,7 +490,14 @@ def request_analysis(
     defaults = _run_defaults(
         session, tier, engine_id=engine_id, nodes=nodes, multipv=multipv, priority=priority
     )
-    run = _queued_row(defaults, game_id=game_id, fen=fen, window=window, depth=depth)
+    run = _queued_row(
+        defaults,
+        game_id=game_id,
+        fen=fen,
+        window=window,
+        depth=depth,
+        maia_elos=None if elos is None else app_settings_service.clean_maia_elos(list(elos)),
+    )
     session.add(run)
     session.flush()
     if announce:
@@ -489,6 +525,7 @@ def request_analysis_batch(
     nodes: int | None = None,
     depth: int | None = None,
     priority: int | None = None,
+    elos: Sequence[int] | None = None,
 ) -> tuple[list[AnalysisRun], list[BatchRefusal]]:
     """Enqueue one pass per game in a single transaction, and report what was refused.
 
@@ -519,6 +556,7 @@ def request_analysis_batch(
                     nodes=nodes,
                     depth=depth,
                     priority=priority,
+                    elos=elos,
                     commit=False,
                 )
             )
@@ -650,6 +688,200 @@ def cancel_queued(session: Session, tier: Tier = Tier.QUICK) -> int:
     )
     session.commit()
     return int(dropped)
+
+
+def clear_queue(session: Session) -> int:
+    """Drop every queued run, of any tier, windowed or full-game, fill or not.
+
+    Wider than `cancel_queued`: that one leaves a windowed run and any tier but its own
+    alone, because it is the stop button for one backfill. This is the stop button for the
+    queue itself — the one place an owner who fat-fingered eight hundred Maia-fill runs, or
+    queued the wrong tier over the whole library, can take all of it back at once. A run
+    already being worked is left to finish, for the reason `cancel_queued` leaves it: there
+    is no cancelled status to move it to.
+
+    Announced with the same `analysis.backfill` event the other queue-wide writes use, so a
+    client refetches the queue without being handed every dropped row — the tier it carries
+    is nominal here, since nothing about this drop was scoped to one.
+    """
+    dropped = session.execute(
+        delete(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
+    ).rowcount
+    if not dropped:
+        return 0
+    depth = queue_depth(session)
+    emit_on_commit(
+        session,
+        backfill_event(Tier.QUICK, queued=0, outstanding=depth["queued"] + depth["running"]),
+    )
+    session.commit()
+    return int(dropped)
+
+
+# --- filling in the Maia levels a game was never analysed at ---------------
+
+# A fill run searches nothing, so the tier it is queued under only decides which engine row
+# it names and where it sits in the queue: behind the deep passes somebody is waiting on.
+MAIA_FILL_TIER = Tier.QUICK
+
+
+def maia_fill_targets(
+    session: Session, game_ids: Sequence[int] | None = None
+) -> tuple[dict[int, list[int]], int]:
+    """Which analysed games are missing which configured Maia levels, and how many are not.
+
+    A run asks every ply about the same levels, so one row of it answers for the whole run:
+    the levels a game has are the ones `_settled_maia_levels` reports, read off one
+    representative row per run. That is a query the size of the library's *runs* rather than
+    of its plies, which is what makes this answerable for a button that shows a count.
+
+    A game whose fill is already queued or running counts as needing nothing: the levels are
+    on their way, and clicking the button twice must not queue the work twice.
+    """
+    configured = app_settings_service.get_maia_elos(session)
+    wanted = [str(level) for level in configured]
+    only = None if game_ids is None else {int(game_id) for game_id in game_ids}
+
+    analysed = select(AnalysisRun.game_id).where(
+        AnalysisRun.game_id.is_not(None), AnalysisRun.status == RunStatus.DONE
+    )
+    pending = select(AnalysisRun.game_id).where(
+        AnalysisRun.game_id.is_not(None),
+        AnalysisRun.maia_only.is_(True),
+        AnalysisRun.status.in_([RunStatus.QUEUED, RunStatus.RUNNING]),
+    )
+    if only is not None:
+        analysed = analysed.where(AnalysisRun.game_id.in_(only))
+        pending = pending.where(AnalysisRun.game_id.in_(only))
+
+    games = sorted({int(game_id) for game_id in session.scalars(analysed.distinct())})
+    queued = {int(game_id) for game_id in session.scalars(pending.distinct())}
+    have = _settled_maia_levels(session, games)
+
+    targets: dict[int, list[int]] = {}
+    complete = 0
+    for game_id in games:
+        missing = [
+            level
+            for level, key in zip(configured, wanted, strict=True)
+            if key not in have.get(game_id, frozenset())
+        ]
+        if not missing or game_id in queued:
+            complete += 1
+        else:
+            targets[game_id] = missing
+    return targets, complete
+
+
+def _settled_maia_levels(session: Session, game_ids: Sequence[int]) -> dict[int, set[str]]:
+    """The Maia levels a game has nothing left to ask for, as the keys a policy is stored under.
+
+    Two sources, because a level can be settled without ever landing. The keys a game's
+    finished runs actually stored, plus the levels a finished *fill* run was asked for: a
+    fill run exists only to add levels, so once one has completed, asking again would queue
+    the identical work. Where the deployment's Maia cannot play a level at all — one
+    fixed-weights weights file against several configured levels — that is the difference
+    between one fill per game and the button re-queueing the whole library on every press,
+    forever, since the level it wants can never appear in a stored policy.
+
+    A full run's levels are deliberately *not* settled by having been asked for: a game
+    analysed while Maia was down or misconfigured stored no policy through no fault of the
+    level, and that is exactly what the fill button is for.
+    """
+    if not game_ids:
+        return {}
+    representative = (
+        select(MoveEval.run_id.label("run_id"), func.min(MoveEval.id).label("eval_id"))
+        .where(MoveEval.maia_policy.is_not(None))
+        .group_by(MoveEval.run_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(AnalysisRun.game_id, MoveEval.maia_policy)
+        .join(representative, representative.c.run_id == AnalysisRun.id)
+        .join(MoveEval, MoveEval.id == representative.c.eval_id)
+        .where(
+            AnalysisRun.status == RunStatus.DONE,
+            AnalysisRun.game_id.in_(list(game_ids)),
+        )
+    ).all()
+    levels: dict[int, set[str]] = {}
+    for game_id, policy in rows:
+        if isinstance(policy, dict):
+            levels.setdefault(int(game_id), set()).update(str(key) for key in policy)
+
+    asked = session.execute(
+        select(AnalysisRun.game_id, AnalysisRun.maia_elos).where(
+            AnalysisRun.status == RunStatus.DONE,
+            AnalysisRun.maia_only.is_(True),
+            AnalysisRun.game_id.in_(list(game_ids)),
+            AnalysisRun.maia_elos.is_not(None),
+        )
+    ).all()
+    for game_id, elos in asked:
+        levels.setdefault(int(game_id), set()).update(str(level) for level in (elos or []))
+    return levels
+
+
+def maia_fill_status(session: Session, game_ids: Sequence[int] | None = None) -> dict[str, Any]:
+    """What the "fill in the missing levels" button shows before anybody presses it."""
+    targets, _complete = maia_fill_targets(session, game_ids)
+    return {
+        "missing_games": len(targets),
+        "configured": app_settings_service.get_maia_elos(session),
+    }
+
+
+def queue_maia_fill(session: Session, game_ids: Sequence[int] | None = None) -> dict[str, Any]:
+    """Queue a Maia-only pass over every analysed game missing a configured level.
+
+    The point is what it does *not* do: no search. Adding a level to a library that has
+    already been evaluated is a question for the human-move model alone, and re-running
+    Stockfish over ten thousand games to key one more policy under a new number would cost
+    days for nothing. Each queued run therefore carries `maia_only` and the levels that
+    game is missing, and stores rows that hold a policy and no evaluation, which
+    `games.merge_run_evals` folds over what is already there.
+
+    Refused whole where there is no human-move model at all: a fill with nothing to ask is
+    a queue full of runs that will each degrade to "predictions skipped".
+    """
+    if _enabled_maia(session) is None:
+        raise AnalysisRequestError(
+            "no human-move model is registered, so there are no Maia levels to fill in; "
+            "register a Maia engine first"
+        )
+    targets, complete = maia_fill_targets(session, game_ids)
+    if not targets:
+        return {"queued": 0, "already_complete": complete, "runs": []}
+
+    defaults = _run_defaults(session, MAIA_FILL_TIER)
+    queued = [
+        _queued_row(defaults, game_id=game_id, maia_only=True, maia_elos=missing)
+        for game_id, missing in sorted(targets.items())
+    ]
+    session.add_all(queued)
+    session.flush()
+    # One frame for the whole write, exactly as a backfill announces itself: a fill over a
+    # whole library is thousands of rows, and a client that hears it refetches the queue.
+    emit_on_commit(
+        session,
+        backfill_event(
+            MAIA_FILL_TIER,
+            queued=len(queued),
+            outstanding=outstanding_runs(session, MAIA_FILL_TIER),
+        ),
+    )
+    session.commit()
+    return {"queued": len(queued), "already_complete": complete, "runs": queued}
+
+
+def _enabled_maia(session: Session) -> Engine | None:
+    """Any enabled human-move model at all, wherever it lives."""
+    return session.scalars(
+        select(Engine)
+        .where(Engine.enabled.is_(True), Engine.kind == EngineKind.MAIA)
+        .order_by(Engine.id)
+    ).first()
 
 
 def ply_window(ply_count: int, ply_range: tuple[int, int] | None) -> tuple[int, int] | None:
@@ -1125,12 +1357,15 @@ def progress_event(plan: RunPlan, done: int, total: int) -> dict[str, Any]:
 def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
     """Read everything one pass needs out of the database, once.
 
-    The thresholds, the target elo and the fallback rating are app settings rather than
+    The thresholds, the Maia levels and the fallback rating are app settings rather than
     variables, so they are read here, per plan: a run queued before the owner changed one
-    and analysed after is analysed the way they chose now.
+    and analysed after is analysed the way they chose now. The exception is a run that was
+    queued *for* particular levels — a fill run, or an explicit override — which carries
+    them on its row and is not re-pointed at whatever is configured when it finally runs.
     """
     thresholds = Thresholds.from_session(session)
-    target_elo = app_settings_service.get_maia_target_elo(session)
+    elos = maia_levels(run.maia_elos or app_settings_service.get_maia_elos(session))
+    target_elo = elos[0]
     quick_nodes = app_settings_service.get_quick_nodes(session)
 
     if run.game_id is None:
@@ -1154,6 +1389,8 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
             thresholds=thresholds,
             owner_rating=app_settings_service.get_default_owner_rating(session),
             maia_target_elo=target_elo,
+            maia_elos=tuple(elos),
+            maia_only=bool(run.maia_only),
         )
 
     game = session.get(Game, run.game_id)
@@ -1202,6 +1439,8 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
         owner_color=game.owner_color,
         owner_rating=owner_rating(session, game),
         maia_target_elo=target_elo,
+        maia_elos=tuple(elos),
+        maia_only=bool(run.maia_only),
     )
 
 
@@ -1259,24 +1498,152 @@ def analyse_plan(
     ]
 
 
-def apply_maia(plan: RunPlan, rows: Sequence[MoveEval], adapter: MaiaAdapter) -> int:
+def apply_maia(
+    plan: RunPlan,
+    rows: Sequence[MoveEval],
+    adapter: MaiaAdapter,
+    engine: WeightsSource | None = None,
+) -> int:
     """Add Maia's predicted human moves to the rows of the plies it is asked about.
+
+    Every configured level, on the one warm process, ply by ply: `policy_at` conditions the
+    engine per level and hands back one policy per level, so the row ends up with the whole
+    comparison — `{"1500": [...], "1900": [...]}` — rather than one column of it.
 
     Runs after the evaluation pass rather than beside it: the two engines share one
     concurrency cap, and a worker that held a slot for Stockfish while waiting for one for
     Maia would deadlock the moment the cap is a single process.
+
+    A row that already carries a policy keeps the levels this pass did not compute, which
+    is what makes a Maia-only fill run additive: it merges its levels into what is there.
+
+    `engine` is the spec, config or row the process was started from, where the caller has
+    one: a fixed-weights build's own rating is usually named by its weights file rather than
+    by the UCI id, and that decides which levels it can honestly answer for.
     """
-    levels = maia_levels(plan.maia_target_elo, **maia_bounds(adapter))
+    levels = _levels_this_build_can_answer(plan, adapter, engine)
+    if not levels:
+        # Nothing this build can honour, so nothing to ask it: `policy_at([])` raises, and a
+        # level keyed under a number the engine did not play is worse than no column at all.
+        # The run still succeeds — its evaluations never depended on Maia.
+        return 0
 
     boards = dict(replay(plan))
     by_ply = {row.ply: row for row in rows}
     wanted = [ply for ply in plan.maia_plies() if ply in by_ply and ply in boards]
     for ply in wanted:
         policy = adapter.policy_at(boards[ply], levels, multipv=MAIA_POLICY_MOVES)
-        by_ply[ply].maia_policy = {
-            level: [move.as_dict() for move in moves] for level, moves in policy.items()
-        }
+        row = by_ply[ply]
+        merged = dict(row.maia_policy or {})
+        merged.update(
+            {level: [move.as_dict() for move in moves] for level, moves in policy.items()}
+        )
+        row.maia_policy = merged
     return len(wanted)
+
+
+def _levels_this_build_can_answer(
+    plan: RunPlan, adapter: MaiaAdapter, engine: WeightsSource | None = None
+) -> list[int]:
+    """The plan's levels narrowed to the ones this engine can actually be asked for.
+
+    A Maia-2/3 build takes a rating, so all of them stand, clamped to the range it declares.
+    A classic `maia-1500.pb.gz` *is* one rating and conditions nothing: it answers for its
+    own level and for no other, and a level it was handed anyway comes back as its own
+    policy filed under someone else's number — a "1900" column that is really 1500, which
+    the reader has no way to see through and no later run would correct. So a level this
+    build cannot play is skipped, never relabelled, whether one was asked for or five, and
+    the log says once which went. Never a failure: a deployment with a fixed-weights Maia is
+    one with fewer columns to compare, not a broken one, and the run's evaluations do not
+    depend on this at all.
+    """
+    levels = maia_levels(plan.maia_ratings(), **maia_bounds(adapter))
+    if adapter.supports_rating:
+        return levels
+    own = _adapter_level(adapter, engine)
+    kept = [own] if own is not None and own in levels else []
+    skipped = [level for level in levels if level not in kept]
+    if skipped:
+        logger.warning(
+            "run %s: %r plays one rating only (%s), so %s %s skipped; register one Maia "
+            "engine per weights file to cover several levels",
+            plan.run_id,
+            adapter.name or "the human-move model",
+            own if own is not None else "unknown",
+            ", ".join(str(level) for level in skipped),
+            "was" if len(skipped) == 1 else "were",
+        )
+    return kept
+
+
+class WeightsSource(Protocol):
+    """Whatever knows where a Maia's weights came from, in any of the shapes we hold one.
+
+    An `EngineSpec` in the worker, a runner's `EngineConfig`, an `Engine` row: all three
+    name a path, a name and a bag of options, which is where a one-rating build's own level
+    is written down when the process's UCI id does not carry it.
+    """
+
+    name: str
+    path: str
+
+
+def _adapter_level(adapter: MaiaAdapter, engine: WeightsSource | None = None) -> int | None:
+    """The rating a fixed-weights build plays at, read off whatever names its weights.
+
+    The same sources the live board reads, in the same order of truthfulness: the command
+    line loads a named weights file, an option may point at one, and the row's name and the
+    engine's UCI id are what an owner called it. Where nothing names a level the answer is
+    None, and the caller skips the level rather than guessing.
+    """
+    from backend.services.maia_live import FIXED_LEVEL_PATTERN
+
+    for text in (
+        getattr(engine, "path", "") or "",
+        *(value for value in _option_values(engine) if isinstance(value, str)),
+        getattr(engine, "name", "") or "",
+        adapter.name or "",
+    ):
+        found = FIXED_LEVEL_PATTERN.search(text)
+        if found is not None:
+            return int(found.group(1))
+    return None
+
+
+def _option_values(engine: WeightsSource | None) -> list[Any]:
+    """The option values of an engine however it keeps them: a mapping, or name/value pairs."""
+    options: Any = getattr(engine, "option_dict", None)
+    if options is None:
+        options = getattr(engine, "options", None) or {}
+    if isinstance(options, Mapping):
+        return list(options.values())
+    return [value for _name, value in options]
+
+
+def policy_rows(plan: RunPlan) -> list[MoveEval]:
+    """The rows a Maia-only pass fills in: one per ply it asks about, and no evaluation.
+
+    A fill run has nothing to search — the game was searched already — so it stores rows
+    that carry a policy and nothing else. `games.merge_run_evals` knows that shape: a row
+    with no evaluation on it never displaces the run that has one, and its policy levels
+    are merged over the levels the older runs stored. That is what makes "fill in the
+    missing levels" additive rather than a second full pass over the library.
+    """
+    boards = dict(replay(plan))
+    rows = []
+    for ply in plan.maia_plies():
+        if ply not in boards:
+            continue
+        rows.append(
+            MoveEval(
+                run_id=plan.run_id,
+                ply=ply,
+                position_id=plan.position_ids[ply] if ply < len(plan.position_ids) else None,
+                move_uci=plan.moves_uci[ply] if ply < len(plan.moves_uci) else None,
+                move_san=plan.moves_san[ply] if ply < len(plan.moves_san) else None,
+            )
+        )
+    return rows
 
 
 def replay(plan: RunPlan) -> Iterator[tuple[int, chess.Board]]:

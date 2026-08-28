@@ -36,6 +36,11 @@ export const queryKeys = {
   analysis: (): QueryKey => ['analysis'],
   queue: (): QueryKey => ['analysis', 'queue'],
   backfill: (tier: Tier): QueryKey => ['analysis', 'backfill', tier],
+  /**
+   * Under `['analysis']` on purpose: every analysis event marks it stale, so the count on
+   * the fill button catches up as the runs it queued come back.
+   */
+  maiaFill: (): QueryKey => ['analysis', 'maia-fill'],
   runs: (gameId: number, tier?: Tier): QueryKey => ['analysis', 'runs', gameId, tier ?? null],
   run: (runId: number): QueryKey => ['analysis', 'run', runId],
   runEvals: (runId: number, window: { ply_start?: number; ply_end?: number } = {}): QueryKey => [
@@ -96,16 +101,28 @@ export const queryKeys = {
   noteList: (query: NoteQuery = {}): QueryKey => ['notes', 'list', query],
   note: (id: number): QueryKey => ['notes', 'detail', id],
   noteTags: (): QueryKey => ['notes', 'tags'],
+  noteResurface: (limit: number | null = null): QueryKey => ['notes', 'resurface', limit],
+
+  /**
+   * Kept variations. Their own prefix rather than a corner of `['games']`: pinning a line
+   * changes no game row, and every note event that names a line invalidates this alone.
+   */
+  lines: (): QueryKey => ['lines'],
+  gameLines: (gameId: number): QueryKey => ['lines', 'game', gameId],
 
   maia: (): QueryKey => ['maia'],
-  /** One entry per position/level, so stepping back into a line is instant. */
-  maiaPolicy: (fen: string, elo: number | null, rolloutPlies: number): QueryKey => [
-    'maia',
-    'policy',
-    fen,
-    elo,
-    rolloutPlies,
-  ],
+  /**
+   * One entry per position and set of levels, so stepping back into a line is instant.
+   *
+   * The levels are part of the key rather than a filter over one answer: a query for
+   * 1500-and-1900 and a query for 1500 alone are different requests, and the second must
+   * not read the first's cache entry as though it had asked for one level.
+   */
+  maiaPolicy: (
+    fen: string,
+    elos: readonly number[] | null,
+    rolloutPlies: number,
+  ): QueryKey => ['maia', 'policy', fen, elos, rolloutPlies],
 
   live: (): QueryKey => ['live'],
 } as const

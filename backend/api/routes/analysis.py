@@ -17,9 +17,13 @@ from backend.api.schemas import (
     BackfillRequest,
     BatchAnalysisRequest,
     BatchAnalysisResponse,
+    MaiaFillReceipt,
+    MaiaFillRequest,
+    MaiaFillStatus,
     MoveEvalResponse,
     PositionAnalysis,
     PositionAnalysisRequest,
+    QueueCleared,
     QueueDestination,
     QueuedRun,
     QueueStatus,
@@ -51,6 +55,7 @@ def enqueue(request: Request, session: SessionDep, body: AnalysisRequest) -> Any
         nodes=body.nodes,
         depth=body.depth,
         priority=body.priority,
+        elos=body.elos,
     )
     wake_workers(request)
     return run
@@ -81,12 +86,51 @@ def enqueue_batch(
         nodes=body.nodes,
         depth=body.depth,
         priority=body.priority,
+        elos=body.elos,
     )
     wake_workers(request)
     return BatchAnalysisResponse(
         # Every run a batch queued was queued for a game, so `game_id` is one.
         queued=[QueuedRun(game_id=run.game_id, run_id=run.id) for run in queued],
         refused=[RefusedGame(game_id=item.game_id, reason=item.reason) for item in refused],
+    )
+
+
+@router.get(
+    "/maia-fill/status",
+    response_model=MaiaFillStatus,
+    summary="How many games are missing a configured Maia level",
+)
+def maia_fill_status(session: SessionDep) -> MaiaFillStatus:
+    """What the "fill in the missing levels" button shows before anybody presses it.
+
+    Read off the same statement the fill enqueues with, so the number on the button and the
+    number of runs it writes are answers to one question.
+    """
+    return MaiaFillStatus.model_validate(analysis_service.maia_fill_status(session))
+
+
+@router.post(
+    "/maia-fill",
+    response_model=MaiaFillReceipt,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Add the missing Maia levels to games that already have a pass",
+)
+def maia_fill(
+    request: Request, session: SessionDep, body: MaiaFillRequest | None = None
+) -> MaiaFillReceipt:
+    """Queue a Maia-only pass over every analysed game missing a configured level.
+
+    Not a re-analysis: adding a level to a library that has already been evaluated is a
+    question for the human-move model alone, so these runs search nothing and store rows
+    that carry a policy over the top of what is there. That is the difference between adding
+    a Maia level in minutes and re-analysing the library over a weekend.
+    """
+    game_ids = (body or MaiaFillRequest()).game_ids
+    receipt = analysis_service.queue_maia_fill(session, game_ids)
+    wake_workers(request)
+    return MaiaFillReceipt(
+        queued=receipt["queued"], already_complete=receipt["already_complete"]
     )
 
 
@@ -155,6 +199,24 @@ def cancel_backfill(session: SessionDep, body: BackfillRequest | None = None) ->
         dropped=dropped,
         outstanding=analysis_service.outstanding_runs(session, tier),
     )
+
+
+@router.post(
+    "/queue/clear",
+    response_model=QueueCleared,
+    summary="Take everything still queued back out, whatever tier or shape it is",
+)
+def clear_queue(session: SessionDep) -> QueueCleared:
+    """Drop every queued run in one call — the undo for a queue built up by mistake.
+
+    Not scoped to a tier the way `/backfill/cancel` is: a queue that took on eight hundred
+    Maia-fill runs by accident, or the wrong tier over the whole library, is emptied in one
+    write regardless of what filled it. A run already claimed by a worker is left to finish,
+    same as a backfill's cancel — there is nowhere else for it to go.
+    """
+    dropped = analysis_service.clear_queue(session)
+    depth = analysis_service.queue_depth(session)
+    return QueueCleared(dropped=dropped, outstanding=depth["queued"] + depth["running"])
 
 
 @router.get("/queue", response_model=QueueStatus, summary="How much work is outstanding")
