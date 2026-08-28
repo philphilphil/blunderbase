@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Area, AreaChart, ReferenceLine, XAxis, YAxis } from 'recharts'
 
+import { SideDot } from '@/components/badges/SideDot'
+import type { Color } from '@/lib/api/types'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { GLYPHS, glyphFor, type Glyph } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
@@ -10,24 +12,68 @@ import { plyLabel, type CurvePoint } from '../gameModel'
 
 const AXIS = 50
 const CURVE = 'var(--bb-text-2)'
-/** The design's flat area fill, not a gradient. */
-const FILL = 'color-mix(in srgb, var(--bb-text-2) 16%, transparent)'
+/**
+ * Flat fills, one per side, in the side tokens so the areas stay white-above / black-below
+ * in both themes. White is mixed harder because the light theme's graph background is
+ * itself nearly white.
+ */
+const FILL_WHITE = 'color-mix(in srgb, var(--bb-side-white) 55%, transparent)'
+const FILL_BLACK = 'color-mix(in srgb, var(--bb-side-black) 85%, transparent)'
 const GRAPH_BG = 'var(--bb-graph-bg)'
 /** The design marks — and its legend explains — only these two. */
 const MARKED: readonly Glyph[] = ['blunder', 'mistake']
 
 const CONFIG: ChartConfig = { win: { label: 'White', color: CURVE } }
 
+/**
+ * A curve point split into the half above and the half below the axis, so each half can
+ * carry its own fill. Points where the curve crosses the axis are synthesised (fractional
+ * ply, no move) so the clamped halves meet exactly on the line instead of cutting the
+ * corner.
+ */
+interface SeriesPoint extends CurvePoint {
+  above: number
+  below: number
+}
+
 interface DotProps {
   cx?: number
   cy?: number
-  payload?: CurvePoint
+  payload?: SeriesPoint
+}
+
+function splitSeries(points: CurvePoint[]): SeriesPoint[] {
+  const out: SeriesPoint[] = []
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]
+    if (i > 0) {
+      const q = points[i - 1]
+      if ((q.win - AXIS) * (p.win - AXIS) < 0) {
+        const t = (AXIS - q.win) / (p.win - q.win)
+        const ply = q.ply + t * (p.ply - q.ply)
+        out.push({ ply, win: AXIS, san: null, classification: null, above: AXIS, below: AXIS })
+      }
+    }
+    out.push({ ...p, above: Math.max(p.win, AXIS), below: Math.min(p.win, AXIS) })
+  }
+  return out
+}
+
+/** Even plies are White's moves — `plyLabel` prints them as `N.`, odd ones as `N…`. */
+function mover(ply: number): 'white' | 'black' {
+  return ply % 2 === 0 ? 'white' : 'black'
 }
 
 /**
  * The filled eval area chart from design 1a: White's win percentage against ply, filled to
- * the midline so advantage reads as area above the axis, blunders and mistakes marked
- * where they happened, and a dashed teal cursor on the ply the board is showing.
+ * the midline, blunders and mistakes marked where they happened, and a dashed teal cursor
+ * on the ply the board is showing.
+ *
+ * Who is ahead is said by colour, not by a caption: the area above the axis is filled in
+ * the white side tone and the area below in the black one, with a side dot pinned to each
+ * edge of the plot as the key. A mark is a plain disc in the severity colour: whose
+ * blunder it was is already told by the direction the curve jumps, so the dot does not
+ * repeat it. "Only mine" hides the opponent's marks for going over one's own game.
  *
  * Kept deliberately short — it is a shape to glance at, not a chart to read numbers off,
  * and the height it used to take belongs to the board above it. Clicking anywhere on the
@@ -37,6 +83,7 @@ export function EvalGraph({
   points,
   plyCount,
   cursor,
+  ownerSide,
   onSelectPly,
   className,
 }: {
@@ -44,6 +91,8 @@ export function EvalGraph({
   plyCount: number
   /** The ply last played; `-1` for the starting position. */
   cursor: number
+  /** The side the owner played; `null` for a game no account claims a side of. */
+  ownerSide: Color | null
   onSelectPly: (ply: number) => void
   className?: string
 }) {
@@ -51,6 +100,11 @@ export function EvalGraph({
     () => [points[0]?.ply ?? -1, Math.max(points[points.length - 1]?.ply ?? 0, plyCount - 1)],
     [points, plyCount],
   )
+  const series = useMemo(() => splitSeries(points), [points])
+  // "Only mine" hides the opponent's marks. Off by default: the whole game is the usual
+  // view, the filter is for going over one's own mistakes.
+  const [onlyMine, setOnlyMine] = useState(false)
+  const markedSide = onlyMine && ownerSide ? ownerSide : null
 
   return (
     <div
@@ -61,10 +115,20 @@ export function EvalGraph({
     >
       <div className="flex items-center gap-2">
         <span className="text-[0.6875rem] font-medium text-soft">Evaluation</span>
-        <span className="font-mono text-[0.625rem] text-faint">white advantage above axis</span>
         <div className="flex-1" />
         <Marker color={GLYPHS.blunder.color} label="blunder" />
         <Marker color={GLYPHS.mistake.color} label="mistake" />
+        {ownerSide ? (
+          <label className="ml-1 inline-flex cursor-pointer select-none items-center gap-1 text-[0.625rem] text-dim">
+            <input
+              type="checkbox"
+              checked={onlyMine}
+              onChange={(e) => setOnlyMine(e.target.checked)}
+              className="size-2.5 accent-accent"
+            />
+            only mine
+          </label>
+        ) : null}
       </div>
 
       {points.length === 0 ? (
@@ -72,16 +136,22 @@ export function EvalGraph({
           No evaluations yet — run an analysis pass to draw the curve.
         </div>
       ) : (
-        <ChartContainer
-          config={CONFIG}
-          className="min-h-[2.875rem] w-full flex-1 aspect-auto rounded-md bg-graph-bg [&_.recharts-surface]:cursor-crosshair"
-        >
+        <div className="relative min-h-[2.875rem] min-w-0 flex-1">
+          {/* The key to the fills: white's half is the top, black's the bottom. Pinned outside
+              the chart so recharts never re-layouts around them. */}
+          <SideDot side="white" size="sm" className="pointer-events-none absolute left-1 top-1 z-10" />
+          <SideDot side="black" size="sm" className="pointer-events-none absolute bottom-1 left-1 z-10" />
+          <ChartContainer
+            config={CONFIG}
+            className="h-full w-full aspect-auto rounded-md bg-graph-bg [&_.recharts-surface]:cursor-crosshair"
+          >
           <AreaChart
-            data={points}
+            data={series}
             margin={scaleMargin({ top: 4, right: 0, bottom: 2, left: 0 })}
             onClick={(state: { activeLabel?: string | number }) => {
               const label = Number(state?.activeLabel)
-              if (Number.isFinite(label)) onSelectPly(label)
+              // A synthesised axis crossing has a fractional ply; land on the nearest move.
+              if (Number.isFinite(label)) onSelectPly(Math.round(label))
             }}
           >
             {/* Hidden, not gone: the numeric ply scale is what click-to-seek and the
@@ -103,6 +173,10 @@ export function EvalGraph({
               />
             ) : null}
 
+            {/* The two half-fills carry no stroke of their own: clamped to the axis, their
+                outline would run flat along it. The third series draws the curve and marks. */}
+            <Area type="linear" dataKey="above" baseValue={AXIS} stroke="none" fill={FILL_WHITE} isAnimationActive={false} dot={false} activeDot={false} />
+            <Area type="linear" dataKey="below" baseValue={AXIS} stroke="none" fill={FILL_BLACK} isAnimationActive={false} dot={false} activeDot={false} />
             <Area
               type="linear"
               dataKey="win"
@@ -110,25 +184,30 @@ export function EvalGraph({
               stroke={CURVE}
               strokeWidth={scalePx(1.6)}
               strokeLinejoin="round"
-              fill={FILL}
+              fill="none"
               isAnimationActive={false}
-              activeDot={{ r: scalePx(3), fill: 'var(--bb-accent)', stroke: GRAPH_BG, strokeWidth: scalePx(1.5) }}
-              dot={(props: DotProps) => <ClassificationDot {...props} />}
+              activeDot={false}
+              dot={(props: DotProps) => <ClassificationDot {...props} side={markedSide} />}
             />
           </AreaChart>
-        </ChartContainer>
+          </ChartContainer>
+        </div>
       )}
     </div>
   )
 }
 
-/** A blunder or mistake mark — the two the legend names. Every other ply draws nothing. */
-function ClassificationDot({ cx, cy, payload }: DotProps) {
+/**
+ * A blunder or mistake mark — the two the legend names; every other ply draws nothing, and
+ * so does the opponent's when `side` narrows the marks to one player.
+ */
+function ClassificationDot({ cx, cy, payload, side: only }: DotProps & { side: Color | null }) {
   const glyph = glyphFor(payload?.classification)
   const key = `dot-${payload?.ply ?? 'x'}`
   if (!glyph || !MARKED.includes(glyph) || cx === undefined || cy === undefined) {
     return <g key={key} />
   }
+  if (only && mover(payload!.ply) !== only) return <g key={key} />
   return (
     <circle
       key={key}

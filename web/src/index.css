@@ -160,7 +160,8 @@
  * The neutral ramp is inverted by contrast rank rather than by hue, so a token
  * that was the quietest label in the dark is still the quietest label here; the
  * teal and purple keep their identity and are darkened only as far as WCAG AA
- * on `--bb-void` demands (accent 4.65:1, deep 5.01:1, blunder 5.05:1). Only the
+ * on `--bb-void` demands (accent 4.65:1, deep 5.01:1); blunder and mistake keep
+ * their saturated hues instead, see below. Only the
  * raw palette is redefined — every alias below picks the new values up.
  * ----------------------------------------------------------------------- */
 :root.light {
@@ -202,9 +203,12 @@
   --bb-accent-hover: #086a70;
   --bb-accent-link: #096f75;
   --bb-accent-ink: #ffffff;
-  --bb-blunder: #c62f26;
+  /* Blunder and mistake stay the saturated red and orange of the dark theme rather than
+     being darkened for AA: as marks on the board and the eval curve they are colour first,
+     and a brick red and a brown were read as the wrong hues. As text they sit below 4.5:1. */
+  --bb-blunder: #e5332a;
   --bb-blunder-ink: #ffffff;
-  --bb-mistake: #96590a;
+  --bb-mistake: #f27a1a;
   --bb-inaccuracy: #77650c;
   --bb-good: #2f7343;
   --bb-info: #33697f;

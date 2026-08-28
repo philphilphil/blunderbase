@@ -1010,6 +1010,7 @@ function GameStudio({ gameId }: { gameId: number }) {
               points={curve}
               plyCount={plyCount}
               cursor={cursor}
+              ownerSide={detail?.game.color ?? null}
               onSelectPly={selectPly}
               className="min-w-0 flex-1 basis-1/2"
             />
