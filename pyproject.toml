@@ -1,6 +1,6 @@
 [project]
 name = "blunderbase"
-version = "0.3.0"
+version = "0.3.1"
 description = "A personal chess database with an AI coach as its centerpiece"
 readme = "README.md"
 requires-python = ">=3.12"
