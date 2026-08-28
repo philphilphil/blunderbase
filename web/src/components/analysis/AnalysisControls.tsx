@@ -53,17 +53,15 @@ function Toggle({
 }
 
 /**
- * How one engine reads in the picker. An engine that cannot drive a board right now keeps
- * its place in the list, disabled, wearing the backend's own sentence for why — a name
- * quietly missing would look like the engine had been deleted.
+ * How one engine reads in the picker. Only engines that can drive a board right now are
+ * listed — the picker is a choice, and a row that cannot be chosen is noise in it. Why an
+ * engine is queue-only is the Engines page's business.
  */
 export function engineOptionLabel(host: EngineHost): string {
   // The host is always named, `local` included: a list that only qualifies the remote ones
   // reads as though the bare names were somehow the default, and two engines of the same
   // name on two machines is the ordinary case this picker exists for.
-  const where = ` · ${host.runnerName ?? 'local'}`
-  const why = host.streams ? '' : ` — ${host.streamsReason ?? 'unavailable'}`
-  return `${host.name}${where}${why}`
+  return `${host.name} · ${host.runnerName ?? 'local'}`
 }
 
 // Pickers you can actually hit: a 2rem row, text at the size the rest of the panel reads
@@ -114,11 +112,13 @@ export function AnalysisControls({
         className={cn(SELECT_CLASS, 'min-w-40 flex-1 truncate')}
       >
         <option value="">{deepName ? `deep tier — ${deepName}` : 'deep tier'}</option>
-        {stream.engines.map((host) => (
-          <option key={host.engineId} value={String(host.engineId)} disabled={!host.streams}>
-            {engineOptionLabel(host)}
-          </option>
-        ))}
+        {stream.engines
+          .filter((host) => host.streams)
+          .map((host) => (
+            <option key={host.engineId} value={String(host.engineId)}>
+              {engineOptionLabel(host)}
+            </option>
+          ))}
       </select>
 
       <select

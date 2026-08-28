@@ -237,15 +237,12 @@ describe('InfiniteAnalysisPanel', () => {
     expect(screen.queryAllByTestId('infinite-analysis-line')).toHaveLength(0)
   })
 
-  it('keeps a queue-only engine in the picker, disabled, with the reason', () => {
+  it('lists only the engines that can drive a board', () => {
     render(<InfiniteAnalysisPanel stream={streamApi()} fen={SICILIAN} />)
 
     const picker = screen.getByRole('combobox', { name: 'Engine' })
-    const option = within(picker).getByRole('option', {
-      name: 'sf-remote · gpu-box — queue only — gpu-box is connected over polling',
-    })
-    expect(option).toBeDisabled()
-    // The one that can take it is not.
+    // The queue-only engine is not offered at all — the picker is a choice, not a roster.
+    expect(within(picker).queryByRole('option', { name: /sf-remote/ })).not.toBeInTheDocument()
     expect(within(picker).getByRole('option', { name: 'stockfish · local' })).toBeEnabled()
     // The default is the deep tier, resolved by the server.
     expect(picker).toHaveValue('')

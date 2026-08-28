@@ -1,5 +1,95 @@
 # Blunderbase — project instructions
 
+A personal chess database with an AI coach: games are imported, Stockfish (and Maia) run
+over every one as it arrives, and a web app and an MCP server read the same store. One
+owner, one password, one container. `README.md` is the front page; the docs under `docs/`
+are the detail (see "Where things are").
+
+## Stack
+
+- **Backend** `backend/` — Python 3.12, FastAPI, SQLAlchemy 2 (sync), Alembic, SQLite in
+  WAL mode. Package manager is **uv**; `pyproject.toml` + `uv.lock` are the manifests.
+- **Frontend** `web/` — React 19 + TypeScript, Vite, Tailwind CSS 4, shadcn/Radix,
+  chessground + chessops. Package manager is **pnpm** (10.33.0, pinned in `Dockerfile`
+  and CI). Lint is oxlint, tests are vitest + testing-library.
+- **MCP** is built into the backend (`backend/mcp/`), stdio for local clients and
+  streamable HTTP at `/mcp` inside the serve process.
+- **Ship** — `docker/` holds the Dockerfile, both compose files and the entrypoint. The
+  image is built from the repository root (`docker build -f docker/Dockerfile .`). A GitHub
+  release builds and pushes `ghcr.io/philphilphil/blunderbase` and tells Komodo to redeploy.
+
+## Commands
+
+```bash
+make install          # uv sync + pnpm install
+make run              # migrate, backend on :8765 (API + /events + /mcp), Vite on :5273
+make test             # uv run pytest + pnpm test
+uv run ruff check backend tests           # what CI lints
+cd web && pnpm lint && pnpm typecheck     # what CI checks on the frontend
+uv run pytest -m engine                   # tests that want a real Stockfish/Maia binary (not in CI)
+uv run alembic revision --autogenerate -m "..."   # new migration; alembic.ini at the root is for this
+```
+
+Run the relevant suite before calling a change done. Frontend tests live beside the file
+they test (`Foo.test.tsx` next to `Foo.tsx`); backend tests live in `tests/`.
+
+## Architecture rules (the ones that bite)
+
+Full reasoning in `docs/ARCHITECTURE.md`. The short version:
+
+- **`backend/services/` is the only place business logic lives.** A "blunder", a "recent
+  game", a stat — defined once, there. `api/` and `mcp/` are thin wrappers over services
+  and never import `backend.db.models`, write a query or open their own Session. That is
+  what keeps the browser and the coach from disagreeing.
+- Nothing in `services/` imports FastAPI or the MCP SDK; every service function takes an
+  explicit `Session` as its first argument.
+- `backend/adapters/` (Lichess, chess.com, PGN, UCI engines, Maia) knows nothing about the
+  database — it fetches, parses or drives a subprocess and hands back plain data.
+- The database layer is **sync** SQLAlchemy. Workers are asyncio tasks that do DB work in a
+  thread (`asyncio.to_thread`), never through an async Session.
+- Migrations use `render_as_batch=True` (SQLite). A run's budget is copied onto the run
+  row when it is queued, not looked up when it executes.
+- Analysis has two tiers, `quick` and `deep`; both add a Maia pass when a Maia engine is
+  enabled. A `maia_only` run is a fill pass that adds levels to an already-evaluated game.
+
+## Frontend conventions
+
+- **Colours come from `web/src/index.css` only.** Every colour is a `--bb-*` token with a
+  semantic alias (`bg-elevated`, `text-dim`, `border-edge-strong`, …); no component names a
+  hex. Dark is the default theme, `:root.light` overrides. Design source: `docs/design/`.
+- Components carry a doc comment saying *why* they are shaped the way they are; keep that
+  habit — the reasoning is the part that is not obvious from the JSX.
+- Native `select`/`textarea` styled with Tailwind is the norm over heavy widgets.
+- `web/src/lib/api/` is the typed client; `web/src/lib/events/` handles the `/events`
+  WebSocket and query invalidation.
+
+## Where things are
+
+| Need | Look in |
+|------|---------|
+| Code shape, invariants, why sync SQLAlchemy | `docs/ARCHITECTURE.md` |
+| Auth, engines, configuration, CLI, releases, testing | `docs/reference.md` |
+| Reverse proxy / TLS in front of the container | `docs/deploy.md` |
+| Remote engine runners (yaml, container, troubleshooting) | `docs/runners.md` |
+| Design tokens, layout decisions, brand assets | `docs/design/README.md` |
+| Image, compose files, entrypoint | `docker/` |
+| CI and the release-to-deploy pipeline | `.github/workflows/` |
+
+## Working here
+
+- Small, whole changes. Do not leave TODOs for the next agent; either do the thing or say
+  in the reply what was left out and why.
+- Edit files with the Edit tool; never rewrite an existing file with a script. Development
+  is mostly on macOS and sometimes on a Windows checkout with `core.autocrlf=true`, where a
+  whole-file rewrite flips line endings and shows up as a bogus diff. `*.sh` is forced to
+  LF by `.gitattributes` because `docker/entrypoint.sh` and `scripts/*.sh` run under `sh`.
+- Do not commit unless asked. When asked, plain imperative subjects in the style of the
+  log (`fix(web): …`, `chore: …`).
+- **Releases are always triggered by the owner.** Never write the changelog, run
+  `make release` or `make publish` on your own initiative — only when told to, and then
+  follow the steps below.
+- Do not touch `CHANGELOG.md` per commit — see below.
+
 ## Changelog
 
 `CHANGELOG.md` keeps one short line per change, newest first, under `## Unreleased`.

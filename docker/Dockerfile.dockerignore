@@ -1,5 +1,9 @@
 # An allowlist: `data/` is the owner's real database and their whole game archive, and
 # nothing outside these paths is needed to build the image.
+#
+# Named `Dockerfile.dockerignore` because the Dockerfile lives in docker/ while the build
+# context is the repository root: BuildKit reads `<Dockerfile>.dockerignore` beside the
+# Dockerfile before it looks for one at the context root. Paths are context-relative.
 *
 !backend/
 !web/

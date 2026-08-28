@@ -1,7 +1,7 @@
 # Architecture
 
-Decisions made in phase 1 that everything later has to live with. The product design
-lives in `docs/superpowers/specs/`; this file is only about the shape of the code.
+Decisions made in phase 1 that everything later has to live with. The visual design lives
+in `docs/design/`; this file is only about the shape of the code.
 
 ## One service layer, three consumers
 

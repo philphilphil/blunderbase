@@ -2,6 +2,11 @@
 
 # One image, one port, one process: the API, the `/events` socket, the built web app and
 # — when a bearer key is set — the MCP transport are all served by the same uvicorn.
+#
+# Built from the repository root, not from this folder — every COPY below is root-relative:
+#   docker build -f docker/Dockerfile .
+# The compose files beside this one set that context, and `Dockerfile.dockerignore` is the
+# allowlist BuildKit applies to it.
 
 FROM node:22-bookworm-slim AS web-build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \

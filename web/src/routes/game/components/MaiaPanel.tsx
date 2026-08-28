@@ -269,17 +269,20 @@ function LevelLabel({
   const pickable = levels.length > 1 && onSelectLevel !== undefined
   if (!pickable) {
     return (
-      <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+      <span className="flex-none whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
         {label}
       </span>
     )
   }
   return (
+    // `flex-none` and no truncation: the label is four digits and a word, and it was the
+    // one thing on this row that ellipsised ("Maia 20…") while the spacer beside it still
+    // had room to give. What yields in a narrow column is the spacer, never the name.
     <span
       data-testid="maia-level-picker"
-      className="relative inline-flex min-w-0 items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised"
+      className="relative inline-flex flex-none items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised"
     >
-      <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+      <span className="whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
         {label}
       </span>
       <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />

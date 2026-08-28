@@ -92,12 +92,12 @@ connection with the same token, and a second connection takes the runner over.
 
 ## As a container
 
-`docker-compose.runner.yml` in the repository root is the same thing as a container: the
-same image, a different command, no ports and no volumes but the yaml.
+`docker/docker-compose.runner.yml` is the same thing as a container: the same image, a
+different command, no ports and no volumes but the yaml.
 
 ```console
-$ cp runner.yaml ./runner.yaml          # beside the compose file
-$ BLUNDERBASE_RUNNER_TOKEN=bb_rnr_… docker compose -f docker-compose.runner.yml up -d
+$ cp runner.yaml docker/runner.yaml     # beside the compose file
+$ BLUNDERBASE_RUNNER_TOKEN=bb_rnr_… docker compose -f docker/docker-compose.runner.yml up -d
 ```
 
 The image ships Stockfish at `/usr/games/stockfish`. A Maia build and its weights are yours

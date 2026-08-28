@@ -1,8 +1,11 @@
 services:
   blunderbase:
     image: ghcr.io/philphilphil/blunderbase:latest
-    # Build the image here instead of pulling it: docker compose build
-    build: .
+    # Build the image here instead of pulling it: docker compose -f docker/docker-compose.yml build
+    # The context is the repository root; everything Docker-related lives in this folder.
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: blunderbase
     restart: unless-stopped
     ports:

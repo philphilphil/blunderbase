@@ -139,6 +139,11 @@ export function NoteComposer({
 
   const ready = text.trim().length > 0 && !pending
 
+  // Whether what is in the box differs from what was last loaded into it — the one thing a
+  // blur-save must never do is write a note nobody changed.
+  const dirty =
+    text.trim() !== loaded.text.trim() || !sameTags(tags, loaded.tags) || draft.trim().length > 0
+
   function save() {
     if (!ready) return
     // A tag half-typed and never committed is still a tag the reader meant.
@@ -153,6 +158,15 @@ export function NoteComposer({
         'flex min-h-0 flex-col gap-1.5 overflow-y-auto rounded-md border border-hairline bg-elevated px-3 py-1.5',
         className,
       )}
+      // Leaving the composer saves it: clicking a move, the board, or anywhere else. The
+      // button stays for the reader who wants to see it happen, but a note should not be
+      // lost to a click elsewhere. Focus moving *within* the composer (text → tags → button)
+      // is not leaving, and a box with nothing changed writes nothing.
+      onBlur={(event) => {
+        const next = event.relatedTarget
+        if (next instanceof Node && event.currentTarget.contains(next)) return
+        if (dirty && ready) save()
+      }}
     >
       <textarea
         id={COMPOSER_TEXT_ID}
@@ -207,7 +221,10 @@ export function NoteComposer({
         ) : null}
         {!error && suggestions.length > 0 && (tagging || draft.trim().length > 0) ? (
           <div
-            className="absolute inset-x-0 bottom-full mb-1 flex flex-wrap gap-1 rounded-md border border-hairline bg-raised px-1.5 py-1 shadow-md"
+            // `bg-selected` and a strong edge, not `bg-raised`: the strip floats over the
+            // composer's own `bg-elevated`, and two shades one step apart read as one surface
+            // with some words on it rather than a list laid on top.
+            className="absolute inset-x-0 bottom-full mb-1 flex flex-wrap gap-1 rounded-md border border-edge-strong bg-selected px-1.5 py-1 shadow-lg"
             data-testid="tag-suggestions"
           >
             {suggestions.map((tag) => (
@@ -218,7 +235,7 @@ export function NoteComposer({
                 // anywhere to land.
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => addTag(tag)}
-                className="rounded-sm border border-hairline px-1.5 py-0.5 font-mono text-[0.6875rem] text-faint hover:text-ink"
+                className="rounded-sm border border-edge bg-elevated px-1.5 py-0.5 font-mono text-[0.6875rem] text-soft hover:border-accent-teal/50 hover:text-ink"
               >
                 {tag}
               </button>
@@ -231,10 +248,11 @@ export function NoteComposer({
               is the one on screen. Only what is not obvious is said. */}
           {/* Only a new note pins anything: a rewrite of one already on this line is a
               `PATCH` of its words, and the line it hangs on was pinned when it was written. */}
+          {/* No "edit" either: a box that comes up already filled in says so by itself,
+              and the delete button beside Save is only there for a note that exists. */}
           {target.line && editing === null ? (
             <span className="text-brilliant">pins the line</span>
           ) : null}
-          {editing === null ? null : <span className="text-accent-teal">edit</span>}
         </h2>
 
         {tags.map((tag) => (

@@ -399,12 +399,15 @@ function NavFooter() {
         </a>
         <span className="flex-1" />
         <ConnectionDot />
-        <span
-          className="font-mono text-[0.625rem] text-dim-2"
-          title={`Blunderbase ${VERSION_LABEL}`}
+        <a
+          href={`${REPO}/blob/main/CHANGELOG.md`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-[0.625rem] text-dim-2 transition-colors hover:text-ink"
+          title={`Blunderbase ${VERSION_LABEL} — what changed`}
         >
           {VERSION_LABEL}
-        </span>
+        </a>
       </div>
     </div>
   )
