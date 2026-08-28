@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Blunderbase — engine line preview prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Tokens lifted from web/src/index.css so the prototype sits in the real palette. */
+  :root {
+    --void: #08090b; --panel: #0b0d10; --surface: #0e1013; --elevated: #12151a; --raised: #14181d;
+    --edge: #22272f; --edge-strong: #2c333c; --line: #1f242b;
+    --text: #e7eaef; --body: #c8cfd8; --body-3: #b6bec9; --muted: #949ca8; --dim: #646c78; --dim-2: #5c646f;
+    --accent: #3ecfd6; --accent-ink: #062a2c; --blunder: #f0524a; --good: #9ec49a; --brilliant: #b287ff;
+    --board-light: #a7b3bb; --board-dark: #5c6a73;
+    --cell: #181d23; --cell-strong: #1e242b; --row-active: #151b22;
+    --side-w: #3ecfd6; --side-b: #d98cff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--void); color: var(--body); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .mono { font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace; }
+  header { padding: 14px 22px; border-bottom: 1px solid var(--edge); display: flex; align-items: baseline; gap: 14px; }
+  header h1 { margin: 0; font-size: 15px; color: var(--text); font-weight: 600; }
+  header span { color: var(--dim); font-size: 12px; }
+  main { display: grid; grid-template-columns: auto minmax(360px, 460px) 280px; gap: 22px; padding: 22px; align-items: start; }
+  @media (max-width: 1200px) { main { grid-template-columns: 1fr; } }
+
+  /* Board */
+  .board { position: relative; width: min(600px, 92vw); aspect-ratio: 1; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--edge); }
+  .board .squares { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); }
+  .board .sq { background: var(--board-light); }
+  .board .sq.d { background: var(--board-dark); }
+  .board .sq.hl { box-shadow: inset 0 0 0 100px rgb(62 207 214 / .28); }
+  .board .sq.hl-src { box-shadow: inset 0 0 0 100px rgb(62 207 214 / .16); }
+  .board .pieces, .board svg { position: absolute; inset: 0; pointer-events: none; }
+  .board .piece { position: absolute; left: 0; top: 0; width: 12.5%; height: 12.5%; transition: transform .22s ease, opacity .22s ease; will-change: transform; }
+  .board.instant .piece { transition: none; }
+  .board .piece img { width: 100%; height: 100%; display: block; }
+  .board .piece.gone { opacity: 0; transform-origin: center; }
+  .board svg { width: 100%; height: 100%; }
+  .board.dimmed .pieces { opacity: .35; transition: opacity .2s; }
+  .board .pieces { transition: opacity .2s; }
+  .mini .board { width: 200px; box-shadow: 0 0 0 1px var(--edge-strong); }
+
+  /* Engine panel, shaped like InfiniteAnalysisPanel */
+  .panel { background: var(--surface); border: 1px solid var(--edge); border-radius: 6px; overflow: visible; }
+  .panel .head { padding: 8px 12px; border-bottom: 1px solid var(--edge); display: flex; justify-content: space-between; font-size: 11.5px; color: var(--dim); }
+  .panel .head b { color: var(--muted); font-weight: 500; }
+  .row { position: relative; display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 0; border-bottom: 1px solid var(--line); cursor: default; }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--row-active); }
+  .row .eval { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 6px; background: var(--cell); color: var(--body-3); font-size: 13px; }
+  .row:first-child .eval { background: var(--cell-strong); color: var(--text); }
+  .row .eval small { font-size: 10px; color: var(--dim-2); }
+  .row .pv { padding: 9px 12px; font-size: 13px; color: var(--body-3); line-height: 1.7; }
+  .row .pv .n { color: var(--dim-2); margin-right: 2px; }
+  .row .pv .t { padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
+  .row .pv .t:hover, .row .pv .t.on { background: var(--accent); color: var(--accent-ink); }
+  .row .pv .t.passed { color: var(--dim); }
+  .row .pv .t.w:not(.on):not(.passed) { color: var(--text); }
+  .row .peek { position: absolute; left: 58px; top: 100%; z-index: 5; padding: 8px; background: var(--panel); border: 1px solid var(--edge-strong); border-radius: 6px; box-shadow: 0 10px 30px rgb(0 0 0 / .5); display: none; }
+  .row .peek.show { display: block; }
+  .row .peek .cap { margin-top: 6px; font-size: 11px; color: var(--muted); text-align: center; }
+  .status { margin-top: 10px; font-size: 12px; color: var(--dim); min-height: 1.4em; }
+  .status b { color: var(--muted); font-weight: 500; }
+
+  /* Options */
+  .opts { background: var(--surface); border: 1px solid var(--edge); border-radius: 6px; padding: 14px; font-size: 12.5px; }
+  .opts h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .opts .modes { display: grid; gap: 4px; margin-bottom: 14px; }
+  .opts .modes label { display: block; padding: 7px 9px; border-radius: 4px; border: 1px solid var(--edge); background: var(--elevated); cursor: pointer; }
+  .opts .modes label:has(input:checked) { border-color: var(--accent); background: var(--raised); color: var(--text); }
+  .opts .modes input { display: none; }
+  .opts .modes small { display: block; color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .opts .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .opts .field:first-of-type { border-top: 0; }
+  .opts .field span.v { color: var(--muted); min-width: 44px; text-align: right; }
+  .opts input[type=range] { width: 120px; accent-color: var(--accent); }
+  .opts input[type=checkbox] { accent-color: var(--accent); }
+  .opts .field.off { opacity: .35; pointer-events: none; }
+  .opts .seg { display: inline-flex; border: 1px solid var(--edge); border-radius: 4px; overflow: hidden; }
+  .opts .seg label { padding: 3px 8px; cursor: pointer; }
+  .opts .seg label:has(input:checked) { background: var(--raised); color: var(--text); }
+  .opts .seg input { display: none; }
+  .hint { margin: 12px 0 0; color: var(--dim); font-size: 11.5px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Engine line preview — prototype</h1>
+  <span>Najdorf after 5…a6 · hover the lines on the right · switch modes on the far right</span>
+</header>
+<main>
+  <div>
+    <div class="board" id="main"></div>
+    <div class="status" id="status"></div>
+  </div>
+  <section class="panel" id="panel">
+    <div class="head"><span><b>Stockfish 17</b> · depth 24 · MultiPV 3</span><span class="mono">1.2 Mn/s</span></div>
+    <div id="rows"></div>
+  </section>
+  <aside class="opts" id="opts">
+    <h2>Preview mode</h2>
+    <div class="modes">
+      <label><input type="radio" name="mode" value="arrows" checked>Layered arrows<small>Every ply as an arrow, fading with depth</small></label>
+      <label><input type="radio" name="mode" value="play">Ghost playthrough<small>Auto-plays the line while you hover</small></label>
+      <label><input type="radio" name="mode" value="scrub">Scrub by token<small>Hover a move → board after that move</small></label>
+      <label><input type="radio" name="mode" value="ghost">Future overlay<small>Ghost pieces where they end up, with trails</small></label>
+      <label><input type="radio" name="mode" value="peek">Peek board<small>Popover with the end position</small></label>
+    </div>
+    <h2>Options</h2>
+    <div class="field" data-for="arrows ghost peek"><label>Depth (plies)</label><input type="range" id="depth" min="1" max="18" value="8"><span class="v" id="depthV">8</span></div>
+    <div class="field" data-for="play"><label>Tempo</label><input type="range" id="tempo" min="150" max="1200" step="50" value="450"><span class="v" id="tempoV">450 ms</span></div>
+    <div class="field" data-for="scrub"><label>Look-ahead arrows</label><input type="range" id="look" min="0" max="4" value="2"><span class="v" id="lookV">2</span></div>
+    <div class="field" data-for="arrows ghost scrub play"><label>Number badges</label><input type="checkbox" id="numbers" checked></div>
+    <div class="field" data-for="arrows ghost scrub play"><label>Label style</label><span class="seg"><label><input type="radio" name="label" value="move" checked>7…</label><label><input type="radio" name="label" value="ply">ply</label></span></div>
+    <div class="field" data-for="arrows ghost scrub play"><label>Colour by side</label><input type="checkbox" id="bySide" checked></div>
+    <div class="field" data-for="arrows ghost"><label>Fade with depth</label><input type="checkbox" id="fade" checked></div>
+    <div class="field" data-for="play"><label>Arrow one move ahead</label><input type="checkbox" id="ahead" checked></div>
+    <div class="field" data-for="play"><label>Loop</label><input type="checkbox" id="loop"></div>
+    <div class="field" data-for="play"><label>Start delay</label><input type="range" id="delay" min="0" max="800" step="50" value="250"><span class="v" id="delayV">250 ms</span></div>
+    <div class="field" data-for="ghost"><label>Dim current pieces</label><input type="checkbox" id="dimNow" checked></div>
+    <div class="field" data-for="peek scrub play"><label>Wheel over a row steps</label><input type="checkbox" id="wheel" checked></div>
+    <p class="hint" id="hint"></p>
+  </aside>
+</main>
+
+<script>
+// ---------- Data ----------
+const FEN = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6';
+const LINES = [
+  { cp: 35, depth: 24,
+    uci: 'c1e3 e7e5 d4b3 c8e6 f2f3 f8e7 d1d2 e8g8 e1c1 b8d7 g2g4 b7b5 g4g5 b5b4 c3e2 f6e8 f3f4 a6a5'.split(' '),
+    san: 'Be3 e5 Nb3 Be6 f3 Be7 Qd2 O-O O-O-O Nbd7 g4 b5 g5 b4 Ne2 Ne8 f4 a5'.split(' ') },
+  { cp: 31, depth: 24,
+    uci: 'c1g5 e7e6 f2f4 f8e7 d1f3 d8c7 e1c1 b8d7 h2h4 b7b5'.split(' '),
+    san: 'Bg5 e6 f4 Be7 Qf3 Qc7 O-O-O Nbd7 h4 b5'.split(' ') },
+  { cp: 22, depth: 23,
+    uci: 'f1e2 e7e5 d4b3 f8e7 e1g1 e8g8 c1e3 c8e6 a2a4 b8d7'.split(' '),
+    san: 'Be2 e5 Nb3 Be7 O-O O-O Be3 Be6 a4 Nbd7'.split(' ') },
+];
+const PIECE_URL = t => `https://lichess1.org/assets/piece/cburnett/${t === t.toUpperCase() ? 'w' : 'b'}${t.toUpperCase()}.svg`;
+const GLYPH = { K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟' };
+
+// ---------- Minimal position model (no legality — the PVs are already legal) ----------
+const FILES = 'abcdefgh';
+const fr = sq => [FILES.indexOf(sq[0]), 8 - +sq[1]];       // visual col, row (row 0 = rank 8)
+function parseFen(fen) {
+  const [placement, turn, , , , full] = fen.split(' ');
+  const pieces = new Map(); let id = 0;
+  placement.split('/').forEach((row, r) => { let f = 0; for (const ch of row) { if (/\d/.test(ch)) f += +ch; else pieces.set('p' + id++, { type: ch, sq: FILES[f++] + (8 - r) }); } });
+  return { pieces, turn, full: +full, last: null, movedId: null, capturedId: null };
+}
+function apply(pos, uci) {
+  const pieces = new Map([...pos.pieces].map(([k, v]) => [k, { ...v }]));
+  const at = sq => { for (const [id, p] of pieces) if (p.sq === sq) return id; return null; };
+  const from = uci.slice(0, 2), to = uci.slice(2, 4), promo = uci[4];
+  const mover = at(from); if (!mover) return { ...pos, pieces };
+  const mp = pieces.get(mover), white = mp.type === mp.type.toUpperCase();
+  let cap = at(to);
+  if (mp.type.toLowerCase() === 'p' && from[0] !== to[0] && !cap) cap = at(to[0] + from[1]); // en passant
+  if (cap) pieces.delete(cap);
+  mp.sq = to; if (promo) mp.type = white ? promo.toUpperCase() : promo;
+  if (mp.type.toLowerCase() === 'k' && Math.abs(FILES.indexOf(from[0]) - FILES.indexOf(to[0])) === 2) {
+    const [rf, rt] = to[0] === 'g' ? ['h', 'f'] : ['a', 'd']; const rook = at(rf + from[1]); if (rook) pieces.get(rook).sq = rt + from[1];
+  }
+  return { pieces, turn: pos.turn === 'w' ? 'b' : 'w', full: pos.full + (pos.turn === 'b' ? 1 : 0), last: [from, to], movedId: mover, capturedId: cap };
+}
+const BASE = parseFen(FEN);
+for (const line of LINES) { line.positions = [BASE]; for (const u of line.uci) line.positions.push(apply(line.positions.at(-1), u)); }
+
+// ply is 1-based within the line
+function labelFor(ply) {
+  if (opt.label === 'ply') return String(ply);
+  const whiteToMove = BASE.turn === 'w';
+  const isWhite = whiteToMove ? ply % 2 === 1 : ply % 2 === 0;
+  const moveNo = BASE.full + Math.floor((ply - (whiteToMove ? 1 : 0)) / 2);
+  return isWhite ? `${moveNo}` : `${moveNo}…`;
+}
+const sideOf = ply => (BASE.turn === 'w' ? ply % 2 === 1 : ply % 2 === 0) ? 'w' : 'b';
+const colorFor = ply => opt.bySide ? (sideOf(ply) === 'w' ? 'var(--side-w)' : 'var(--side-b)') : 'var(--accent)';
+
+// ---------- Board renderer: divs for pieces (animatable), SVG for shapes ----------
+class Board {
+  constructor(el) {
+    this.el = el; el.innerHTML = '';
+    const sqs = document.createElement('div'); sqs.className = 'squares'; this.sqEls = {};
+    for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) { const d = document.createElement('div'); d.className = 'sq' + ((r + f) % 2 ? ' d' : ''); sqs.appendChild(d); this.sqEls[FILES[f] + (8 - r)] = d; }
+    this.piecesEl = document.createElement('div'); this.piecesEl.className = 'pieces';
+    this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); this.svg.setAttribute('viewBox', '0 0 8 8');
+    el.append(sqs, this.piecesEl, this.svg); this.nodes = new Map();
+  }
+  setPosition(pos, { instant = false } = {}) {
+    this.el.classList.toggle('instant', instant);
+    for (const [id, p] of pos.pieces) {
+      let n = this.nodes.get(id);
+      if (!n) {
+        n = document.createElement('div'); n.className = 'piece';
+        const img = document.createElement('img'); img.draggable = false;
+        img.onerror = () => { n.textContent = GLYPH[p.type]; n.style.cssText += 'font-size:40px;display:flex;align-items:center;justify-content:center;color:#111'; };
+        n.appendChild(img); this.piecesEl.appendChild(n); this.nodes.set(id, n);
+      }
+      const img = n.querySelector('img'); if (img && img.dataset.t !== p.type) { img.dataset.t = p.type; img.src = PIECE_URL(p.type); }
+      const [f, r] = fr(p.sq); n.style.transform = `translate(${f * 100}%, ${r * 100}%)`; n.classList.remove('gone');
+    }
+    for (const [id, n] of this.nodes) if (!pos.pieces.has(id)) n.classList.add('gone');
+    for (const el of Object.values(this.sqEls)) el.classList.remove('hl', 'hl-src');
+    if (pos.last) { this.sqEls[pos.last[0]].classList.add('hl-src'); this.sqEls[pos.last[1]].classList.add('hl'); }
+    if (instant) requestAnimationFrame(() => this.el.classList.remove('instant'));
+  }
+  clearShapes() { this.svg.innerHTML = ''; }
+  /** arrows: {from,to,color,opacity,width,label} */
+  arrow(a) {
+    const c = sq => fr(sq).map(v => v + .5);
+    const [x1, y1] = c(a.from), [x2, y2] = c(a.to);
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+    const w = a.width ?? .16, head = Math.max(.32, w * 2.4), gap = .36;
+    const tx = x2 - ux * gap, ty = y2 - uy * gap;        // arrow tip stops short of the square centre
+    const bx = tx - ux * head, by = ty - uy * head;      // base of the head
+    const g = this.g(a.opacity ?? 1);
+    g.appendChild(this.node('line', { x1: x1 + ux * .3, y1: y1 + uy * .3, x2: bx, y2: by, stroke: a.color, 'stroke-width': w, 'stroke-linecap': 'round' }));
+    const px = -uy * head * .55, py = ux * head * .55;
+    g.appendChild(this.node('polygon', { points: `${tx},${ty} ${bx + px},${by + py} ${bx - px},${by - py}`, fill: a.color }));
+    if (a.label != null) this.badge(g, x1 + dx * .55, y1 + dy * .55, a.label, a.color);
+  }
+  badge(g, x, y, text, color) {
+    g.appendChild(this.node('circle', { cx: x, cy: y, r: .21, fill: 'var(--panel)', stroke: color, 'stroke-width': .04 }));
+    const t = this.node('text', { x, y: y + .085, 'text-anchor': 'middle', 'font-size': .24, 'font-weight': 600, fill: 'var(--text)', 'font-family': 'ui-monospace, Menlo, Consolas, monospace' });
+    t.textContent = text; g.appendChild(t);
+  }
+  ghost(p, { label, color, opacity = .7 }) {
+    const [f, r] = fr(p.sq); const g = this.g(opacity);
+    g.appendChild(this.node('rect', { x: f + .04, y: r + .04, width: .92, height: .92, rx: .1, fill: 'none', stroke: color, 'stroke-width': .05, 'stroke-dasharray': '.12 .08' }));
+    g.appendChild(this.node('image', { x: f, y: r, width: 1, height: 1, href: PIECE_URL(p.type) }));
+    if (label != null) this.badge(g, f + .8, r + .2, label, color);
+  }
+  trail(sqs, color, opacity) {
+    const g = this.g(opacity);
+    const pts = sqs.map(sq => fr(sq).map(v => v + .5));
+    g.appendChild(this.node('polyline', { points: pts.map(p => p.join(',')).join(' '), fill: 'none', stroke: color, 'stroke-width': .07, 'stroke-dasharray': '.18 .12', 'stroke-linejoin': 'round' }));
+    for (const [x, y] of pts.slice(0, -1)) g.appendChild(this.node('circle', { cx: x, cy: y, r: .09, fill: color }));
+  }
+  cross(sq, color) {
+    const [f, r] = fr(sq); const g = this.g(.8); const a = .3;
+    for (const s of [1, -1]) g.appendChild(this.node('line', { x1: f + .5 - a, y1: r + .5 - s * a, x2: f + .5 + a, y2: r + .5 + s * a, stroke: color, 'stroke-width': .08, 'stroke-linecap': 'round' }));
+  }
+  g(opacity) { const g = this.node('g', { opacity }); this.svg.appendChild(g); return g; }
+  node(tag, attrs) { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; }
+}
+
+// ---------- Options ----------
+const opt = { mode: 'arrows', depth: 8, tempo: 450, look: 2, numbers: true, label: 'move', bySide: true, fade: true, ahead: true, loop: false, delay: 250, dimNow: true, wheel: true };
+const HINTS = {
+  arrows: 'Hover a row. Every ply becomes an arrow; later plies are thinner and fainter. Good for "where does this go", bad past ~8 plies — hence the depth cap.',
+  play: 'Hover a row and wait for the start delay. The board plays the line at the tempo; the arrow one move ahead leads your eye. Leaving the row snaps back.',
+  scrub: 'Hover a single move in the text: the board shows the position after it, with look-ahead arrows for what follows. Wheel steps ply by ply. Hovering the row but no token shows only the first move, as today.',
+  ghost: 'The current position stays. Pieces that move in the line appear as ghosts where they end up after N plies, with a trail through the squares they visit and a cross where something is captured. Shows the plan rather than the moves.',
+  peek: 'The main board keeps a single first-move arrow; a small board pops out of the row with the position after N plies. Hover a token to scrub the mini board instead.',
+};
+function bind(id, key, fmt) {
+  const el = document.getElementById(id);
+  const read = () => { opt[key] = el.type === 'checkbox' ? el.checked : +el.value; const v = document.getElementById(id + 'V'); if (v) v.textContent = fmt ? fmt(opt[key]) : opt[key]; refresh(); };
+  el.addEventListener('input', read); read();
+}
+function bindAll() {
+  bind('depth', 'depth'); bind('tempo', 'tempo', v => v + ' ms'); bind('look', 'look'); bind('numbers', 'numbers'); bind('bySide', 'bySide');
+  bind('fade', 'fade'); bind('ahead', 'ahead'); bind('loop', 'loop'); bind('delay', 'delay', v => v + ' ms'); bind('dimNow', 'dimNow'); bind('wheel', 'wheel');
+  for (const r of document.querySelectorAll('input[name=mode]')) r.addEventListener('change', () => { opt.mode = r.value; syncOpts(); clearHover(); refresh(); });
+  for (const r of document.querySelectorAll('input[name=label]')) r.addEventListener('change', () => { opt.label = r.value; refresh(); });
+}
+function syncOpts() {
+  for (const f of document.querySelectorAll('.opts .field')) f.classList.toggle('off', !f.dataset.for.split(' ').includes(opt.mode));
+  document.getElementById('hint').textContent = HINTS[opt.mode];
+}
+
+// ---------- Panel ----------
+const main = new Board(document.getElementById('main'));
+main.setPosition(BASE, { instant: true });
+const rowsEl = document.getElementById('rows');
+const rowState = [];
+LINES.forEach((line, li) => {
+  const row = document.createElement('div'); row.className = 'row';
+  const ev = document.createElement('div'); ev.className = 'eval mono'; ev.innerHTML = `${line.cp > 0 ? '+' : ''}${(line.cp / 100).toFixed(2)}<small>d${line.depth}</small>`;
+  const pv = document.createElement('div'); pv.className = 'pv mono';
+  line.san.forEach((san, i) => {
+    const ply = i + 1; const side = sideOf(ply);
+    if (side === 'w' || i === 0) { const n = document.createElement('span'); n.className = 'n'; n.textContent = side === 'w' ? `${labelMove(ply)}.` : `${labelMove(ply)}…`; pv.appendChild(n); }
+    const t = document.createElement('span'); t.className = 't ' + side; t.textContent = san; t.dataset.ply = ply;
+    t.addEventListener('mouseenter', () => onHover(li, ply)); pv.append(t, ' ');
+  });
+  const peek = document.createElement('div'); peek.className = 'peek'; const pb = document.createElement('div'); pb.className = 'mini'; const pbb = document.createElement('div'); pbb.className = 'board'; pb.appendChild(pbb); const cap = document.createElement('div'); cap.className = 'cap mono'; peek.append(pb, cap);
+  row.append(ev, pv, peek); rowsEl.appendChild(row);
+  row.addEventListener('mouseenter', () => onHover(li, null));
+  row.addEventListener('mouseleave', clearHover);
+  pv.addEventListener('mouseleave', () => { if (hover.line === li) onHover(li, null); });
+  row.addEventListener('wheel', e => { if (!opt.wheel || !['scrub', 'peek', 'play'].includes(opt.mode)) return; e.preventDefault(); step(li, Math.sign(e.deltaY)); }, { passive: false });
+  rowState.push({ row, pv, peek, cap, mini: new Board(pbb) });
+});
+function labelMove(ply) { const whiteToMove = BASE.turn === 'w'; return BASE.full + Math.floor((ply - (whiteToMove ? 1 : 0)) / 2); }
+
+// ---------- Hover state machine ----------
+const hover = { line: null, ply: null, playPly: 0, timer: null, delayTimer: null };
+const status = document.getElementById('status');
+function onHover(li, ply) {
+  const changedLine = hover.line !== li;
+  hover.line = li; hover.ply = ply;
+  if (opt.mode === 'play') { if (changedLine) startPlay(li); return; }
+  if (opt.mode === 'scrub' || opt.mode === 'peek') hover.playPly = ply ?? 0;
+  refresh();
+}
+function clearHover() {
+  stopPlay(); hover.line = null; hover.ply = null; hover.playPly = 0;
+  for (const s of rowState) { s.peek.classList.remove('show'); for (const t of s.pv.querySelectorAll('.t')) t.classList.remove('on', 'passed'); }
+  refresh();
+}
+function step(li, dir) {
+  const max = LINES[li].uci.length;
+  if (opt.mode === 'play') stopPlay(true);
+  hover.playPly = Math.max(0, Math.min(max, (hover.playPly || 0) + dir)); hover.ply = hover.playPly || null;
+  refresh();
+}
+function startPlay(li) {
+  stopPlay(); hover.playPly = 0; refresh();
+  hover.delayTimer = setTimeout(() => {
+    const tick = () => {
+      const max = LINES[li].uci.length;
+      if (hover.playPly >= max) { if (opt.loop) { hover.timer = setTimeout(() => { hover.playPly = 0; refresh(); hover.timer = setTimeout(tick, opt.tempo); }, opt.tempo * 2); } return; }
+      hover.playPly++; refresh(); hover.timer = setTimeout(tick, opt.tempo);
+    };
+    tick();
+  }, opt.delay);
+}
+function stopPlay(keepPos) { clearTimeout(hover.timer); clearTimeout(hover.delayTimer); hover.timer = hover.delayTimer = null; if (!keepPos) hover.playPly = 0; }
+
+// ---------- Render ----------
+function refresh() {
+  main.clearShapes(); main.el.classList.remove('dimmed');
+  for (const s of rowState) { s.peek.classList.remove('show'); for (const t of s.pv.querySelectorAll('.t')) t.classList.remove('on', 'passed'); }
+  if (hover.line == null) { main.setPosition(BASE); status.textContent = ''; return; }
+  const line = LINES[hover.line], n = line.uci.length, st = rowState[hover.line];
+  const depth = Math.min(opt.depth, n);
+  const arrowAt = (ply, i, count) => {
+    const t = count > 1 ? i / (count - 1) : 0;
+    main.arrow({ from: line.uci[ply - 1].slice(0, 2), to: line.uci[ply - 1].slice(2, 4), color: colorFor(ply),
+      opacity: opt.fade ? 1 - .7 * t : .95, width: opt.fade ? .18 - .1 * t : .15, label: opt.numbers ? labelFor(ply) : null });
+  };
+  const markTokens = ply => st.pv.querySelectorAll('.t').forEach(t => { const p = +t.dataset.ply; t.classList.toggle('on', p === ply); t.classList.toggle('passed', p < ply); });
+
+  switch (opt.mode) {
+    case 'arrows': {
+      main.setPosition(BASE);
+      for (let i = depth; i >= 1; i--) arrowAt(i, i - 1, depth); // deepest first so early arrows paint on top
+      status.innerHTML = `Line ${hover.line + 1} · first <b>${depth}</b> of ${n} plies as arrows`;
+      break;
+    }
+    case 'play': {
+      const ply = hover.playPly; main.setPosition(line.positions[ply]); markTokens(ply);
+      if (opt.ahead && ply < n) { const u = line.uci[ply]; main.arrow({ from: u.slice(0, 2), to: u.slice(2, 4), color: colorFor(ply + 1), opacity: .9, width: .16, label: opt.numbers ? labelFor(ply + 1) : null }); }
+      status.innerHTML = ply === 0 ? `Line ${hover.line + 1} · starting…` : `Line ${hover.line + 1} · after <b>${labelFor(ply)} ${line.san[ply - 1]}</b> (${ply}/${n})`;
+      break;
+    }
+    case 'scrub': {
+      const ply = hover.playPly; main.setPosition(line.positions[ply]); markTokens(ply);
+      if (ply === 0) { arrowAt(1, 0, 1); status.innerHTML = `Line ${hover.line + 1} · hover a move to scrub`; break; }
+      const look = Math.min(opt.look, n - ply);
+      for (let i = look; i >= 1; i--) { const p = ply + i; const t = look > 1 ? (i - 1) / (look - 1) : 0; const u = line.uci[p - 1]; main.arrow({ from: u.slice(0, 2), to: u.slice(2, 4), color: colorFor(p), opacity: 1 - .6 * t, width: .17 - .08 * t, label: opt.numbers ? labelFor(p) : null }); }
+      status.innerHTML = `Line ${hover.line + 1} · after <b>${labelFor(ply)} ${line.san[ply - 1]}</b> · ${look} look-ahead`;
+      break;
+    }
+    case 'ghost': {
+      main.setPosition(BASE); if (opt.dimNow) main.el.classList.add('dimmed');
+      const end = line.positions[depth];
+      const paths = new Map(); // id -> [{sq, ply}]
+      for (let p = 1; p <= depth; p++) { const pos = line.positions[p], prev = line.positions[p - 1];
+        for (const [id, pc] of pos.pieces) { const before = prev.pieces.get(id); if (before && before.sq !== pc.sq) { if (!paths.has(id)) paths.set(id, [{ sq: before.sq, ply: 0 }]); paths.get(id).push({ sq: pc.sq, ply: p }); } }
+        if (pos.capturedId) { const sq = prev.pieces.get(pos.capturedId).sq; main.cross(sq, 'var(--blunder)'); }
+      }
+      for (const [id, path] of paths) {
+        const arrival = path.at(-1).ply, t = depth > 1 ? (arrival - 1) / (depth - 1) : 0, op = opt.fade ? 1 - .55 * t : .9;
+        if (path.length > 2) main.trail(path.map(x => x.sq), colorFor(arrival), op * .9);
+        else main.arrow({ from: path[0].sq, to: path[1].sq, color: colorFor(arrival), opacity: op * .55, width: .08 });
+        const pc = end.pieces.get(id); if (pc) main.ghost(pc, { label: opt.numbers ? labelFor(arrival) : null, color: colorFor(arrival), opacity: op });
+      }
+      status.innerHTML = `Line ${hover.line + 1} · where things stand after <b>${depth}</b> plies (${labelFor(depth)} ${line.san[depth - 1]})`;
+      break;
+    }
+    case 'peek': {
+      main.setPosition(BASE); arrowAt(1, 0, 1);
+      const ply = hover.playPly || depth; markTokens(hover.playPly);
+      st.mini.setPosition(line.positions[ply]); st.cap.textContent = `after ${labelFor(ply)} ${line.san[ply - 1]}`; st.peek.classList.add('show');
+      status.innerHTML = `Line ${hover.line + 1} · peek after <b>${ply}</b> plies · hover a move to scrub`;
+      break;
+    }
+  }
+}
+bindAll(); syncOpts(); refresh();
+</script>
+</body>
+</html>
