@@ -1,3 +1,6 @@
+// Setup for the tests that render. The environment-agnostic half lives next door.
+import './setup.node'
+
 import '@testing-library/jest-dom/vitest'
 
 import { cleanup } from '@testing-library/react'

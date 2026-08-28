@@ -1,0 +1,54 @@
+name: release
+
+# Publishing a GitHub release is the deploy button. `make release` only moves the version
+# and cuts the tag locally; pushing that tag publishes nothing on its own. That split is
+# deliberate — the tag records what the code was, the release says it should go live.
+on:
+  release:
+    types: [published]
+  # Redeploy whatever `latest` currently is, without cutting anything. For when the
+  # server drifted, not for shipping code.
+  workflow_dispatch:
+
+jobs:
+  ci:
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      packages: write
+
+  deploy:
+    # A prerelease publishes its image but never moves `latest`, and `latest` is what the
+    # stack pulls — so there would be nothing new to deploy.
+    needs: ci
+    if: >-
+      !cancelled()
+      && (needs.ci.result == 'success' || needs.ci.result == 'skipped')
+      && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    concurrency:
+      group: komodo-blunderbase
+      cancel-in-progress: false
+    env:
+      KOMODO_URL: ${{ secrets.KOMODO_URL }}
+      KOMODO_API_KEY: ${{ secrets.KOMODO_API_KEY }}
+      KOMODO_API_SECRET: ${{ secrets.KOMODO_API_SECRET }}
+      KOMODO_STACK: blunderbase
+    steps:
+      - name: Pull image on target server
+        run: |
+          curl -fsS --show-error --max-time 600 \
+            -X POST "$KOMODO_URL/execute/PullStack" \
+            -H 'Content-Type: application/json' \
+            -H "X-Api-Key: $KOMODO_API_KEY" \
+            -H "X-Api-Secret: $KOMODO_API_SECRET" \
+            -d "{\"stack\":\"$KOMODO_STACK\"}"
+      - name: Redeploy stack
+        run: |
+          curl -fsS --show-error --max-time 600 \
+            -X POST "$KOMODO_URL/execute/DeployStack" \
+            -H 'Content-Type: application/json' \
+            -H "X-Api-Key: $KOMODO_API_KEY" \
+            -H "X-Api-Secret: $KOMODO_API_SECRET" \
+            -d "{\"stack\":\"$KOMODO_STACK\"}"

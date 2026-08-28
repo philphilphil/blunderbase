@@ -1,0 +1,6 @@
+# `sh` reads a trailing CR as part of the command, so a shell script checked out with
+# CRLF is a broken shell script — `#!/bin/sh\r` is not an interpreter that exists. This
+# repository is developed on Windows with core.autocrlf=true, `make release` runs a
+# script from that checkout, and `docker build` copies the entrypoint out of the working
+# tree rather than out of the index. All three want LF.
+*.sh text eol=lf
