@@ -99,10 +99,11 @@ fi
 git tag -a "$tag" -m "Blunderbase $tag"
 
 cat <<EOF
-release: $tag committed and tagged locally. Publish it with
-  git push origin main --follow-tags
+release: $tag committed and tagged locally. Nothing has left the machine — look at it,
+then ship it with
 
-Pushing the tag publishes nothing. The GitHub release is the deploy button — cut it
-once the tag is up:
-  gh release create $tag --title "Blunderbase $tag" --notes-from-tag
+  make publish
+
+which pushes the tag and opens the GitHub release. That release, not the tag, is what
+builds the image and tells Komodo to pull.
 EOF

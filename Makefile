@@ -1,4 +1,4 @@
-.PHONY: run backend web install test migrate mcp mcp-http mcp-key release
+.PHONY: run backend web install test migrate mcp mcp-http mcp-key release publish
 
 KEY_FILE := data/mcp.key
 key = $$(cat $(KEY_FILE))
@@ -54,6 +54,12 @@ mcp-key: $(KEY_FILE)
 # Windows checkout, and this is a repository that gets released from one.
 release:
 	@BB_V='$(v)' BB_DRY='$(DRY)' sh scripts/release.sh $(filter v%,$(MAKECMDGOALS))
+
+# `make publish` — push the tag `make release` cut and open the GitHub release that
+# ships it. This is the step that leaves the machine: the release is what builds the
+# image, moves `latest` and tells Komodo to pull. `DRY=1` shows the notes and stops.
+publish:
+	@BB_DRY='$(DRY)' sh scripts/publish.sh
 
 # `make release v0.2.0` names the version as a goal; this swallows it so make does not go
 # looking for a rule to build it. Nothing else in here is spelled v-something.
