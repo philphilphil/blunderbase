@@ -36,14 +36,6 @@ jobs:
       KOMODO_API_SECRET: ${{ secrets.KOMODO_API_SECRET }}
       KOMODO_STACK: blunderbase
     steps:
-      - name: Pull image on target server
-        run: |
-          curl -fsS --show-error --max-time 600 \
-            -X POST "$KOMODO_URL/execute/PullStack" \
-            -H 'Content-Type: application/json' \
-            -H "X-Api-Key: $KOMODO_API_KEY" \
-            -H "X-Api-Secret: $KOMODO_API_SECRET" \
-            -d "{\"stack\":\"$KOMODO_STACK\"}"
       - name: Redeploy stack
         run: |
           curl -fsS --show-error --max-time 600 \
