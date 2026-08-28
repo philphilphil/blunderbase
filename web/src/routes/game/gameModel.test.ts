@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import type { MomentResponse, MoveRow } from '@/lib/api/types'
+import type { GameRunSummary, MomentResponse, MoveRow } from '@/lib/api/types'
 
 import {
+  bestRun,
   buildGameLine,
   collapsedThroughMove,
   engineLines,
@@ -429,5 +430,36 @@ describe('formatResult', () => {
     expect(formatResult('0-1')).toBe('0–1')
     expect(formatResult('1/2-1/2')).toBe('½–½')
     expect(formatResult('*')).toBe('·')
+  })
+})
+
+describe('bestRun', () => {
+  /** The run rows a game detail carries, as `games._run_summary` sends them. */
+  function finished(overrides: Partial<GameRunSummary>): GameRunSummary {
+    return {
+      id: 1,
+      tier: 'quick',
+      status: 'done',
+      finished_at: '2026-01-01T00:00:00Z',
+      ...overrides,
+    }
+  }
+
+  it('takes the newest run of the deepest tier', () => {
+    const older = finished({ id: 1, tier: 'deep', finished_at: '2026-01-01T00:00:00Z' })
+    const newer = finished({ id: 2, tier: 'deep', finished_at: '2026-02-01T00:00:00Z' })
+    expect(bestRun([older, newer, finished({ id: 3 })])?.id).toBe(2)
+  })
+
+  it('never reports a Maia fill as the pass the game had', () => {
+    // The header would otherwise say the game was analysed at the moment the missing
+    // levels landed, at a node budget the fill carries on its row and never spent.
+    const pass = finished({ id: 1, nodes: 250_000, finished_at: '2026-01-01T00:00:00Z' })
+    const fill = finished({ id: 2, maia_only: true, finished_at: '2026-03-01T00:00:00Z' })
+    expect(bestRun([pass, fill])?.id).toBe(1)
+  })
+
+  it('leaves a game whose only run is a fill without a pass to report', () => {
+    expect(bestRun([finished({ id: 2, maia_only: true })])).toBeNull()
   })
 })

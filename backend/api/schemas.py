@@ -548,6 +548,11 @@ class RunResponse(Row):
     ply_end: int | None = None
     priority: int = 0
     attempts: int = 0
+    # A pass that asks the human-move model and nothing else. It is queued under a tier to
+    # borrow that tier's engine and its place in the queue, so the tier alone does not say
+    # what the run did: `maia_only` is what tells a fill from an analysis pass.
+    maia_only: bool = False
+    maia_elos: list[int] | None = None
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None

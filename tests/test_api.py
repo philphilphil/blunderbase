@@ -1593,6 +1593,7 @@ def test_the_events_socket_sees_one_frame_for_a_whole_backfill(api: TestClient) 
         "tier": "quick",
         "queued": receipt["queued"],
         "outstanding": receipt["outstanding"],
+        "maia_only": False,
     }
 
 

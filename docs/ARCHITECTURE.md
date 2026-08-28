@@ -314,8 +314,8 @@ pass was taken away from it, it did not fail.
 
 **Events.** `analysis.subscribe(hook)` receives every lifecycle transition as a plain
 dict: `analysis.queued` / `.running` / `.progress` / `.done` / `.failed`, each carrying
-`run_id`, `game_id`, `fen`, `tier`, `status`, `engine_id`, `priority`, `attempts` and
-`at`, plus `evals` on done, `error` / `stderr` / `will_retry` on failed, and `done` /
+`run_id`, `game_id`, `fen`, `tier`, `status`, `engine_id`, `priority`, `attempts`,
+`maia_only` and `at`, plus `evals` on done, `error` / `stderr` / `will_retry` on failed, and `done` /
 `total` on progress. Events are emitted from whichever thread reached the transition, so
 the WebSocket layer has to bounce them onto its own loop. A subscriber that raises is
 ignored — it must never be able to fail a run. `analysis.queued` waits for the transaction
@@ -324,7 +324,7 @@ one that stores the game — so a rolled-back import never announces a run id th
 exist.
 
 A library-wide write announces itself differently. `analysis.backfill` carries `tier`,
-`queued` and `outstanding` and names no run at all, because the alternative is ten thousand
+`queued`, `outstanding` and `maia_only`, and names no run at all, because the alternative is ten thousand
 `analysis.queued` frames down every open socket in one burst — the shape of storm this
 deployment has fallen over on before. `POST /analysis/backfill` queues a full-game pass over
 every game with no live run of a tier, uncapped (`/analysis/batch` keeps its five-hundred
@@ -332,6 +332,15 @@ ceiling: that one serves a selection made by hand), `GET /analysis/backfill` is 
 button labels itself with, and `POST /analysis/backfill/cancel` drops what is still queued
 while leaving the runs a worker already claimed to finish — there is no cancelled status to
 move them to. A client that sees the event refetches the queue.
+
+Two passes share the quick tier, and `maia_only` is what tells them apart. A Maia fill
+(`POST /analysis/maia-fill`) is queued under that tier only to borrow its engine and its
+place behind the deep passes; it searches nothing and asks the human-move model for the
+levels a game is missing. So the tier a run was filed under does not say what it did: a
+client that labels a fill by its tier reports a quick pass over a game nobody asked to
+re-analyse, coverage counts that treated one as a pass would leave the game permanently
+out of a backfill, and `/analysis/backfill/cancel` leaves fills alone — `POST
+/analysis/queue/clear` is what takes those back.
 
 **Where the workers run.** The FastAPI lifespan starts and stops a set
 (`analysis_workers = false` turns that off), and `blunderbase analyze` starts the same set

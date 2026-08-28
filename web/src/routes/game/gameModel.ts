@@ -766,10 +766,18 @@ export function runFor(runs: GameRunSummary[], move: MoveRow | undefined): GameR
   return runs.find((run) => run.id === move.run_id) ?? null
 }
 
-/** The deepest tier that has finished over this game — what the header chip reports. */
+/**
+ * The deepest tier that has finished over this game — what the header chip reports.
+ *
+ * Maia fills are left out of it entirely. A fill is filed under the quick tier and carries
+ * that tier's node budget on its row, but it searched nothing, so letting one win the
+ * "newest run" contest would have the header claim the game was analysed at 250k nodes at
+ * the moment the missing Maia levels landed.
+ */
 export function bestRun(runs: GameRunSummary[]): GameRunSummary | null {
-  const deep = runs.filter((run) => run.tier === 'deep')
-  const pool = deep.length > 0 ? deep : runs
+  const searched = runs.filter((run) => !run.maia_only)
+  const deep = searched.filter((run) => run.tier === 'deep')
+  const pool = deep.length > 0 ? deep : searched
   return (
     pool.reduce<GameRunSummary | null>((best, run) => {
       if (!best) return run

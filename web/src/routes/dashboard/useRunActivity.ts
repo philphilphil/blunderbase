@@ -16,6 +16,11 @@ export interface RunActivity {
   runId: number
   gameId: number | null
   tier: Tier
+  /**
+   * A Maia fill rather than an engine pass. Fills are queued under the quick tier for its
+   * engine and its place in the queue, so `tier` is not what a row should be labelled by.
+   */
+  maiaOnly: boolean
   status: RunStatus
   /** 0..100 while a run is executing, null before it reports any progress. */
   progress: number | null
@@ -32,6 +37,7 @@ function isAnalysisEvent(event: AnyEvent): event is AnyEvent & {
   game_id?: number | null
   tier?: Tier
   status?: RunStatus
+  maia_only?: boolean
   done?: number
   total?: number
   error?: string
@@ -66,6 +72,7 @@ export function useRunActivity(): RunActivity[] {
         runId: event.run_id,
         gameId: event.game_id ?? previous?.gameId ?? null,
         tier: event.tier ?? previous?.tier ?? 'quick',
+        maiaOnly: event.maia_only ?? previous?.maiaOnly ?? false,
         status,
         progress:
           event.event === 'analysis.progress' && typeof event.total === 'number' && event.total > 0

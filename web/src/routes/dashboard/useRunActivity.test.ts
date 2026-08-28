@@ -148,6 +148,41 @@ describe('useRunActivity', () => {
     expect(result.current[0].gameId).toBe(12)
   })
 
+  it('remembers that a run is a Maia fill, whatever tier it was filed under', () => {
+    const { result } = renderHook(() => useRunActivity())
+    emit({
+      event: 'analysis.queued',
+      run_id: 8,
+      game_id: 3,
+      tier: 'quick',
+      status: 'queued',
+      maia_only: true,
+    })
+    expect(result.current[0]).toMatchObject({ tier: 'quick', maiaOnly: true })
+
+    // The later frames of the same run need not repeat it.
+    emit({
+      event: 'analysis.done',
+      run_id: 8,
+      game_id: 3,
+      tier: 'quick',
+      status: 'done',
+    })
+    expect(result.current[0]).toMatchObject({ status: 'done', maiaOnly: true })
+  })
+
+  it('treats a run that says nothing about it as an ordinary pass', () => {
+    const { result } = renderHook(() => useRunActivity())
+    emit({
+      event: 'analysis.queued',
+      run_id: 2,
+      game_id: 1,
+      tier: 'quick',
+      status: 'queued',
+    })
+    expect(result.current[0].maiaOnly).toBe(false)
+  })
+
   it('ignores a frame that is not an analysis run', () => {
     const { result } = renderHook(() => useRunActivity())
     const handler = listeners.get('analysis.done')
