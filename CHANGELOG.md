@@ -4,6 +4,11 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.3.1 — 2026-08-28
+
+- Fixed Maia fills being reported as quick passes
+- Fixed a game's colour dot showing the wrong side
+
 ## v0.3.0 — 2026-08-28
 
 - Added notes on moves, positions and variations, with a Notes page and export
