@@ -1,12 +1,10 @@
 name: ci
-
 on:
   push:
     branches: [main]
     # `make release` cuts these; they publish the semver image tags below.
     tags: ['v*.*.*']
   pull_request:
-
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -17,7 +15,6 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run ruff check backend tests
-
   sqlite:
     runs-on: ubuntu-latest
     steps:
@@ -27,7 +24,6 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run pytest
-
   docker:
     # The published artifact, built only from a main — or a release tag — that the whole
     # suite has passed on. A pull request builds nothing: the image is what someone else
@@ -52,14 +48,18 @@ jobs:
         id: meta
         with:
           images: ghcr.io/philphilphil/blunderbase
-          # `latest` is what compose pulls and only main moves it; the commit tag is what a
-          # rollback names. A `vX.Y.Z` push adds `X.Y.Z` and the floating `X.Y` — the
-          # action leaves both off for a prerelease, so `v1.2.0-rc.1` publishes only itself.
+          # `latest` is what compose pulls, and only a release tag moves it — a main push
+          # publishes a commit tag and nothing else. The commit tag is what a rollback
+          # names. A `vX.Y.Z` push adds `X.Y.Z` and the floating `X.Y`; the action leaves
+          # both off for a prerelease, so `v1.2.0-rc.1` publishes only itself and never
+          # moves `latest`. `latest=false` is load-bearing: the default `latest=auto`
+          # would re-add it on any semver tag, rc's included, and undo the guard below.
+          flavor: latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -69,10 +69,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
   deploy:
-    # Only main moves `latest`, and `latest` is what the stack pulls — so a tag push
-    # publishes its image but deliberately does not redeploy.
+    # Only a non-prerelease tag moves `latest`, and `latest` is what the stack pulls — so
+    # a main push publishes its image but deliberately does not redeploy.
     needs: docker
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     concurrency:
       group: komodo-blunderbase
@@ -91,7 +91,6 @@ jobs:
             -H "X-Api-Key: $KOMODO_API_KEY" \
             -H "X-Api-Secret: $KOMODO_API_SECRET" \
             -d "{\"stack\":\"$KOMODO_STACK\"}"
-
       - name: Redeploy stack
         run: |
           curl -fsS --show-error --max-time 600 \
