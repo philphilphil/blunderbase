@@ -4,6 +4,19 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.4.0 — 2026-08-28
+
+- Added engine line previews on hover, with a Board settings card
+- Added drawing your own arrows and circles with right-click
+- Added per-client MCP keys, minted on Settings → MCP
+- Changed the eval bar to fill from your own side
+- Changed the eval graph to fill by side, with an "only mine" filter
+- Fixed the eval bar ignoring the live analysis
+- Fixed a wheel step over the board losing an unsaved note
+- Fixed the engine picker offering engines that cannot stream
+- Fixed the Maia level label truncating
+- Fixed a note not saving when the composer loses focus
+
 ## v0.3.1 — 2026-08-28
 
 - Fixed Maia fills being reported as quick passes
