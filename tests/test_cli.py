@@ -68,6 +68,14 @@ def test_db_upgrade_is_a_subcommand(settings: Settings) -> None:
     assert (args.command, args.db_command) == ("db", "upgrade")
 
 
+def test_demo_create_defaults_to_a_second_database(settings: Settings) -> None:
+    args = build_parser(settings).parse_args(["demo", "create"])
+    assert args.source_path == settings.database_path
+    assert args.output == settings.data_dir / "demo.db"
+    assert args.games == 72
+    assert args.force is False
+
+
 def test_db_rebuild_cards_fills_the_column_for_a_library_analysed_before_it(
     settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

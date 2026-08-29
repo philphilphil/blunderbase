@@ -101,7 +101,7 @@ analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 `uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`,
 `accounts <list|add|reconcile>`, `analyze` (queue a
 tier and drain it in this process), `mcp [--transport stdio|http]`, `set-password`,
-`db upgrade`. The
+`db upgrade`, `db rebuild-cards`, and `demo create`. The
 queue is `analysis_runs` rows rather than a broker, so `blunderbase analyze` is safe to
 run while the server is up, and nothing is lost across a restart.
 
@@ -110,6 +110,17 @@ already stored under it — that is what fills in the colour, opponent and ratin
 archive imported before any account said which player was you. `accounts reconcile` runs
 the same repair for every account; it is idempotent, and never revises a game whose side
 is already known.
+
+`demo create` reads a varied sample of analyzed games from `BLUNDERBASE_DB_PATH` and writes
+`<data-dir>/demo.db`. Use `--games N` to size it, `--as-of YYYY-MM-DD` to pin the fake date
+range, `--from` or `--output` to choose either file, and `--force` to explicitly replace an
+old output. It reconstructs PGNs without comments and fabricates all identifying metadata;
+credentials and personal notes are never copied. Run the result as an ordinary deployment:
+
+```bash
+uv run blunderbase demo create --games 72
+BLUNDERBASE_DB_PATH=data/demo.db uv run blunderbase serve
+```
 
 ## Cutting a release
 

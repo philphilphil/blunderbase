@@ -67,6 +67,20 @@ the `/data` volume" is the whole backup story. The rules that follow from it:
 - Migrations run with `render_as_batch=True`, because SQLite has no `ALTER` worth the name
   and a change to a column is a table copy.
 
+### Demo data is another deployment
+
+`blunderbase demo create` writes a separate SQLite file rather than adding demo rows and a
+filter to the personal library. This preserves the one-file invariant: each running process
+still has one database, every existing service remains unaware of demo data, and fake ratings
+cannot leak into real stats. The command reads analyzed standard games from the source and
+retains only chess facts (moves and evaluations). It rebuilds PGNs and replaces identities,
+ratings, dates, source IDs, accounts, engine configuration, Maia policies and notes.
+
+The resulting file is the seed for screenshots now and for a read-only demo deployment later.
+Read-only behavior and authentication bypass do not belong in the seed generator; they belong
+at the future demo-mode write/auth seams, so a locally served seed behaves like a normal
+deployment until that mode exists.
+
 WAL, `foreign_keys=ON` and a busy timeout are set by a `connect` event installed in
 `backend.db.session.create_db_engine`. They are per-connection pragmas, so they have to be
 set on every connection the pool opens; the listener is bound to the engine instance

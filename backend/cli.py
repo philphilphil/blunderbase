@@ -4,6 +4,8 @@ import argparse
 import asyncio
 import getpass
 from collections.abc import Sequence
+from datetime import date
+from pathlib import Path
 from typing import Any
 
 from backend import __version__
@@ -39,6 +41,13 @@ def _ply_range(value: str) -> tuple[int, int]:
     if window[0] < 0 or window[1] <= window[0]:
         raise argparse.ArgumentTypeError("START must be below END and not negative")
     return window
+
+
+def _date(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("expected YYYY-MM-DD") from None
 
 
 def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
@@ -136,6 +145,32 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     db_commands.add_parser("upgrade", help="apply pending migrations")
     db_commands.add_parser(
         "rebuild-cards", help="recompute the stored card of every analysed game"
+    )
+
+    demo = commands.add_parser("demo", help="build an anonymous database for screenshots")
+    demo_commands = demo.add_subparsers(dest="demo_command", required=True)
+    create_demo = demo_commands.add_parser(
+        "create", help="copy chess facts into a separate database and fake every identity"
+    )
+    create_demo.add_argument(
+        "--from",
+        dest="source_path",
+        type=Path,
+        default=settings.database_path,
+        help="source library; defaults to BLUNDERBASE_DB_PATH",
+    )
+    create_demo.add_argument(
+        "--output",
+        type=Path,
+        default=settings.data_dir / "demo.db",
+        help="new demo database; defaults to <data-dir>/demo.db",
+    )
+    create_demo.add_argument("--games", type=_positive_int, default=72, metavar="N")
+    create_demo.add_argument(
+        "--as-of", type=_date, help="newest fake game date; defaults to today"
+    )
+    create_demo.add_argument(
+        "--force", action="store_true", help="replace an existing output database"
     )
 
     return parser
@@ -393,6 +428,30 @@ def command_db(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def command_demo(args: argparse.Namespace, settings: Settings) -> int:
+    """Build the isolated library used for screenshots and the eventual demo mode."""
+    from backend.services.demo import DemoDataError, create_demo_database
+
+    try:
+        summary = create_demo_database(
+            args.source_path,
+            args.output,
+            game_count=args.games,
+            as_of=args.as_of,
+            force=args.force,
+        )
+    except DemoDataError as exc:
+        print(f"demo: {exc}")
+        return 1
+    print(f"demo database: {summary.path}")
+    print(
+        f"{summary.games} games, {summary.analyzed} analyzed, "
+        f"{summary.deep} deep, {summary.notes} notes"
+    )
+    print(f"serve it with BLUNDERBASE_DB_PATH={summary.path} blunderbase serve")
+    return 0
+
+
 COMMANDS = {
     "serve": command_serve,
     "import": command_import,
@@ -402,6 +461,7 @@ COMMANDS = {
     "mcp": command_mcp,
     "set-password": command_set_password,
     "db": command_db,
+    "demo": command_demo,
 }
 
 
