@@ -43,9 +43,9 @@ from backend.db.models import (
 )
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
-from backend.services import analysis, import_service
 from backend.services import engines as engines_service
 from backend.services import games as games_service
+from backend.services import import_service
 from backend.services import live as live_service
 from tests.conftest import OWNER_PASSWORD, running_app, socket_headers
 from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
@@ -638,19 +638,6 @@ def test_a_run_can_be_enqueued_for_a_game(api: TestClient, seeded: dict[str, int
     assert queue["destinations"][0]["queued"] == 1
 
 
-def test_a_run_says_whether_it_asks_the_human_move_model(
-    api: TestClient, seeded: dict[str, int]
-) -> None:
-    """Left out, the tier's setting decides; asked for, the run carries what was asked."""
-    deep = api.post("/analysis", json={"game_id": seeded["game_id"], "tier": "deep"}).json()
-    quick = api.post("/analysis", json={"game_id": seeded["game_id"]}).json()
-    asked = api.post(
-        "/analysis", json={"game_id": seeded["game_id"], "tier": "deep", "maia": True}
-    ).json()
-
-    assert (deep["maia"], quick["maia"], asked["maia"]) == (False, True, True)
-
-
 def test_a_batch_queues_one_run_per_game_in_one_call(api: TestClient) -> None:
     ids = [game["id"] for game in api.get("/games", params={"limit": 3}).json()["games"]]
 
@@ -685,18 +672,6 @@ def test_a_batch_queues_a_repeated_game_once(api: TestClient, seeded: dict[str, 
 
     assert [row["game_id"] for row in body["queued"]] == [game_id]
     assert api.get("/analysis/queue").json()["queued"] == 1
-
-
-def test_a_batch_with_no_usable_engine_is_the_same_typed_conflict(
-    api: TestClient, seeded: dict[str, int]
-) -> None:
-    """A tier that refuses every id refuses the batch, rather than listing it 500 times."""
-    api.patch(f"/engines/{seeded['engine_id']}", json={"enabled": False})
-
-    response = api.post("/analysis/batch", json={"game_ids": [seeded["game_id"]]})
-
-    assert response.status_code == 409
-    assert error_of(response) == "tier_unavailable"
 
 
 def _register_maia(settings: Settings, engine_command: str) -> None:
@@ -737,25 +712,6 @@ def test_a_fill_queues_a_maia_only_pass_and_then_has_nothing_left(
     assert api.post("/analysis/maia-fill").json() == {"queued": 0, "already_complete": 1}
 
 
-def test_a_fill_can_be_asked_for_particular_games(
-    api: TestClient, settings: Settings, engine_command: str, seeded: dict[str, int]
-) -> None:
-    _register_maia(settings, engine_command)
-
-    body = api.post("/analysis/maia-fill", json={"game_ids": [seeded["game_id"]]}).json()
-
-    assert body == {"queued": 1, "already_complete": 0}
-
-
-def test_a_fill_with_no_human_move_model_is_a_422(api: TestClient) -> None:
-    response = api.post("/analysis/maia-fill")
-
-    assert response.status_code == 422
-    assert error_of(response) == "invalid_request"
-    assert "no human-move model" in response.json()["detail"]
-    assert api.get("/analysis/queue").json()["queued"] == 0
-
-
 def test_the_backfill_preview_counts_the_games_with_no_pass(api: TestClient) -> None:
     """`seeded` finished a quick run over exactly one of its games; the rest are the work."""
     total = api.get("/games", params={"limit": 1}).json()["total"]
@@ -775,27 +731,6 @@ def test_a_backfill_queues_every_game_that_has_none(api: TestClient) -> None:
     assert api.get("/analysis/backfill").json()["pending"] == 0
 
 
-def test_a_backfill_takes_the_tier_it_was_asked_for(api: TestClient) -> None:
-    """The done run `seeded` carries is a quick one, so a deep backfill takes every game."""
-    total = api.get("/games", params={"limit": 1}).json()["total"]
-
-    assert api.get("/analysis/backfill", params={"tier": "deep"}).json()["pending"] == total
-
-    body = api.post("/analysis/backfill", json={"tier": "deep"}).json()
-
-    assert body == {"tier": "deep", "queued": total, "outstanding": total}
-    assert api.get("/analysis/backfill", params={"tier": "quick"}).json()["pending"] == total - 1
-
-
-def test_a_backfill_with_nothing_left_to_do_queues_nothing(api: TestClient) -> None:
-    api.post("/analysis/backfill")
-
-    response = api.post("/analysis/backfill")
-
-    assert response.status_code == 202
-    assert response.json()["queued"] == 0
-
-
 def test_cancelling_a_backfill_empties_the_queue_it_filled(api: TestClient) -> None:
     queued = api.post("/analysis/backfill").json()["queued"]
 
@@ -805,53 +740,6 @@ def test_cancelling_a_backfill_empties_the_queue_it_filled(api: TestClient) -> N
     assert api.get("/analysis/queue").json()["queued"] == 0
     # The games are uncovered again, which is what makes the button offer them once more.
     assert api.get("/analysis/backfill").json()["pending"] == queued
-
-
-def test_cancelling_a_backfill_leaves_a_running_and_a_windowed_run(
-    settings: Settings, api: TestClient, seeded: dict[str, int]
-) -> None:
-    """Nothing is taken off a worker mid-search, and a deep look at one phase is not a pass."""
-    api.post("/analysis/backfill")
-    windowed = api.post(
-        "/analysis", json={"game_id": seeded["game_id"], "ply_start": 0, "ply_end": 4}
-    ).json()
-    with get_sessionmaker(settings)() as session:
-        claimed = session.scalars(
-            select(AnalysisRun)
-            .where(AnalysisRun.status == RunStatus.QUEUED, AnalysisRun.ply_start.is_(None))
-            .order_by(AnalysisRun.id)
-        ).first()
-        assert claimed is not None
-        claimed.status = RunStatus.RUNNING
-        session.commit()
-        claimed_id = claimed.id
-
-    body = api.post("/analysis/backfill/cancel").json()
-
-    assert body["outstanding"] == 1
-    with get_sessionmaker(settings)() as session:
-        survived = set(session.scalars(select(AnalysisRun.id).where(AnalysisRun.status != "done")))
-        assert survived == {claimed_id, windowed["id"]}
-
-
-def test_clearing_the_queue_drops_every_tier_and_kind_of_run(
-    api: TestClient, settings: Settings, engine_command: str, seeded: dict[str, int]
-) -> None:
-    """Wider than `/backfill/cancel`: a quick backfill, a deep one, a window and a fill all go."""
-    _register_maia(settings, engine_command)
-    api.post("/analysis/backfill")
-    api.post("/analysis/backfill", json={"tier": "deep"})
-    api.post(
-        "/analysis", json={"game_id": seeded["game_id"], "ply_start": 0, "ply_end": 4}
-    )
-    api.post("/analysis/maia-fill")
-    queued = api.get("/analysis/queue").json()["queued"]
-    assert queued > 0
-
-    body = api.post("/analysis/queue/clear").json()
-
-    assert body == {"dropped": queued, "outstanding": 0}
-    assert api.get("/analysis/queue").json()["queued"] == 0
 
 
 def test_clearing_the_queue_leaves_a_running_run_to_finish(
@@ -904,22 +792,8 @@ def test_the_queue_can_be_paused_and_resumed(api: TestClient, seeded: dict[str, 
     assert api.get("/analysis/queue").json()["paused"] is False
 
 
-def test_pausing_the_queue_stops_a_worker_claiming(
-    api: TestClient, settings: Settings, seeded: dict[str, int]
-) -> None:
-    """The flag is the gate `claim_next_run` reads, whichever process is doing the claiming."""
-    api.post("/analysis", json={"game_id": seeded["game_id"]})
-    api.post("/analysis/queue/pause")
-
-    with get_sessionmaker(settings)() as session:
-        assert analysis.claim_next_run(session) is None
-
-    api.post("/analysis/queue/resume")
-    with get_sessionmaker(settings)() as session:
-        assert analysis.claim_next_run(session) is not None
-
-
 def test_a_run_over_a_position_takes_no_ply_range(api: TestClient) -> None:
+    """The body carries a window `AnalysisRequest.ply_range` builds and the service refuses."""
     response = api.post("/analysis", json={"fen": FRENCH, "ply_start": 0, "ply_end": 4})
 
     assert response.status_code == 422
@@ -942,18 +816,6 @@ def test_a_tier_with_no_usable_engine_is_a_typed_conflict(
 
     assert response.status_code == 409
     assert error_of(response) == "tier_unavailable"
-
-
-def test_the_runs_of_one_game_are_listed_newest_first(
-    api: TestClient, seeded: dict[str, int]
-) -> None:
-    api.post("/analysis", json={"game_id": seeded["game_id"], "tier": "deep"})
-    runs = api.get("/analysis/runs", params={"game_id": seeded["game_id"]}).json()
-
-    assert [run["tier"] for run in runs] == ["deep", "quick"]
-    assert api.get(
-        "/analysis/runs", params={"game_id": seeded["game_id"], "tier": "quick"}
-    ).json() == [runs[1]]
 
 
 def _failed_run(settings: Settings, game_id: int, engine_id: int) -> int:

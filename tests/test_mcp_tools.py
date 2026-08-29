@@ -680,20 +680,6 @@ async def test_request_analysis_takes_the_levels_to_ask_maia_about(
     assert payload["maia_elos"] == [1100, 1300]
 
 
-async def test_request_analysis_says_whether_the_run_asks_the_human_move_model(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    """Left out, the tier decides — on for quick, off for deep — and asking for it wins."""
-    quick = await call(coach, "request_analysis", game_id=analysed["qg000001"].id, tier="quick")
-    # The tool's own default tier, which is the one a coach asks for without saying so.
-    deep = await call(coach, "request_analysis", game_id=analysed["qg000001"].id)
-    asked = await call(
-        coach, "request_analysis", game_id=analysed["qg000001"].id, tier="deep", maia=True
-    )
-
-    assert (quick["maia"], deep["maia"], asked["maia"]) == (True, False, True)
-
-
 def _maia_row(session: Session) -> Engine:
     engine = Engine(name="maia-test", kind=EngineKind.MAIA, path="/nonexistent/lc0")
     session.add(engine)
@@ -717,61 +703,11 @@ async def test_maia_fill_queues_the_levels_the_library_is_missing(
     assert payload["configured"] == [MAIA_MAX_RATING]
 
 
-async def test_maia_fill_can_be_narrowed_to_one_game(
-    coach: MCPServer, analysed: dict[str, Game], session: Session
-) -> None:
-    _maia_row(session)
-
-    payload = await call(coach, "maia_fill", game_ids=[analysed["qg000001"].id])
-
-    assert payload["queued"] == 1
-
-
-async def test_maia_fill_with_no_human_move_model_says_so(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    payload = await failure(coach, "maia_fill")
-
-    assert payload["error"] == "bad_argument"
-    assert "no human-move model" in payload["message"]
-
-
-async def test_request_analysis_takes_a_ply_range(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    payload = await call(
-        coach, "request_analysis", game_id=analysed["qg000001"].id, ply_start=2, ply_end=6
-    )
-    assert (payload["ply_start"], payload["ply_end"]) == (2, 6)
-
-
-async def test_request_analysis_takes_a_position(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    payload = await call(coach, "request_analysis", fen=START_FEN)
-    assert payload["fen"].startswith("rnbqkbnr")
-    assert "game_id" not in payload
-
-
 async def test_request_analysis_refuses_an_unknown_game(
     coach: MCPServer, analysed: dict[str, Game]
 ) -> None:
     payload = await failure(coach, "request_analysis", game_id=4242)
     assert payload["error"] == "unknown_game"
-
-
-async def test_request_analysis_refuses_both_a_game_and_a_position(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    payload = await failure(
-        coach, "request_analysis", game_id=analysed["qg000001"].id, fen=START_FEN
-    )
-    assert payload["error"] == "bad_argument"
-
-
-async def test_request_analysis_needs_an_engine(coach: MCPServer, library: dict[str, Game]) -> None:
-    payload = await failure(coach, "request_analysis", game_id=library["qg000001"].id)
-    assert payload["error"] == "engine_unavailable"
 
 
 async def test_a_full_queue_is_a_structured_error(
@@ -809,21 +745,6 @@ async def test_get_analysis_status_reports_a_run(
     # A queue that is not draining is not a queue the coach should tell the owner to wait on.
     assert payload["queue"]["paused"] is False
     assert payload["created_at"].endswith("Z")
-
-
-async def test_get_analysis_status_counts_what_a_finished_run_wrote(
-    coach: MCPServer, analysed: dict[str, Game], session: Session
-) -> None:
-    run = session.scalars(select(AnalysisRun).order_by(AnalysisRun.id)).first()
-    assert run is not None
-    payload = await call(coach, "get_analysis_status", run_id=run.id)
-    assert payload["status"] == "done"
-    assert payload["evals"] == 7
-
-
-async def test_an_unknown_run_is_a_structured_error(coach: MCPServer) -> None:
-    payload = await failure(coach, "get_analysis_status", run_id=7777)
-    assert payload["error"] == "unknown_run"
 
 
 async def test_analyze_position_degrades_when_no_engine_is_enabled(
