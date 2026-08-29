@@ -21,6 +21,7 @@ import {
   preferredLevel,
   previousFlaggedPly,
   recurringMistake,
+  runFor,
   sameMove,
   sanVariation,
   scoreAfter,
@@ -460,6 +461,19 @@ describe('formatResult', () => {
     expect(formatResult('0-1')).toBe('0–1')
     expect(formatResult('1/2-1/2')).toBe('½–½')
     expect(formatResult('*')).toBe('·')
+  })
+})
+
+describe('runFor', () => {
+  const RUN: GameRunSummary = { id: 5, tier: 'deep', status: 'done' }
+
+  it('leaves a ply without a run rather than handing back what it could not find', () => {
+    // A run row can be gone while the moves it evaluated still carry its `run_id` — the
+    // engine panel reads this to name an engine, so `undefined` would print as one.
+    expect(runFor([RUN], move(0, 'e4', 'e2e4', { run_id: 5 }))).toBe(RUN)
+    expect(runFor([], move(0, 'e4', 'e2e4', { run_id: 5 }))).toBeNull()
+    expect(runFor([RUN], move(0, 'e4', 'e2e4'))).toBeNull()
+    expect(runFor([RUN], undefined)).toBeNull()
   })
 })
 
