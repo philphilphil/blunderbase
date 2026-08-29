@@ -4,6 +4,20 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.5.0 — 2026-08-29
+
+- Added an Analysis page with coverage, failed runs and a costed backfill
+- Added running Stockfish in this browser tab as a runner
+- Added engine roles for Quick, Deep and Human moves
+- Added switches for whether quick and deep passes run Maia
+- Changed Engines to show the roles, your engines and every machine
+- Changed the sidebar to unfold each section's own pages
+- Changed Import to one table with a row per source
+- Changed errors without their own panel to appear as toasts
+- Fixed the analysis board offering engines whose host never streams
+- Fixed a game reporting no Maia levels, so fills redid finished work
+- Removed the Settings page; each part moved to where it is used
+
 ## v0.4.0 — 2026-08-28
 
 - Added engine line previews on hover, with a Board settings card
