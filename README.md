@@ -12,21 +12,21 @@
 
 ## Features
 - Import games from lichess, chess.com and PGNs
-- Analyze your games with or without an engine
+- Analyze your games with multiple engines
 - Support for maia3 at multiple ELO's to see what humans would have played
-- Take notes on positions
-- Awesome Engine-Line visualizer 
+- Take notes on positions and variations
+- Awesome Engine-Line visualizer
 - Full MCP support to discuss games with an AI-Agent and a shared live board
-- Remote-Engine-Runner to use your copmanies idling inference server CPUs for your hobbies 
+- Local engines and stockfish wasm
+- Remote-Engine-Runner to use your company's idle inference-server-CPUs for your hobbies
 - Opening explorer with win-stats over your own games
 - Fully self-hostable, easiest via docker
 
-<!-- screenshots
 <p align="center">
-  <img src="docs/media/dashboard.png" alt="Dashboard" width="400" />
-  <img src="docs/media/game_view.png" alt="Game view" width="400" />
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard" />
+  <img src="docs/screenshots/game.png" alt="Game view" />
+  <img src="docs/screenshots/stats.png" alt="Stats" />
 </p>
--->
 
 ## MCP
 
