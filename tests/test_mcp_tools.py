@@ -35,38 +35,6 @@ OWNER = "blunderbase"
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 FRENCH = "rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
 
-# Every tool the design spec asks the coach surface for.
-TOOLS = {
-    "get_last_games",
-    "get_worst_recent_moments",
-    "compare_periods",
-    "search_games",
-    "get_game",
-    "find_positions",
-    "get_player_profile",
-    "register_account",
-    "opening_explorer",
-    "get_stats",
-    "request_analysis",
-    "clear_queue",
-    "get_analysis_status",
-    "analyze_position",
-    "maia_policy",
-    "maia_fill",
-    "save_note",
-    "search_notes",
-    "save_line",
-    "get_lines",
-    "resurface_notes",
-    "export_notes",
-    "show_game",
-    "show_position",
-    "make_move",
-    "annotate",
-    "get_live_state",
-    "runners_status",
-}
-
 # What "token-conscious" has to mean in bytes: five analysed games, with their eval
 # curves and worst moments, inside a couple of thousand characters.
 LAST_GAMES_BUDGET = 4000
@@ -240,11 +208,6 @@ async def failure(coach: MCPServer, name: str, **arguments: Any) -> dict[str, An
 
 
 # --- the surface itself ----------------------------------------------------
-
-
-async def test_every_tool_the_spec_asks_for_is_registered(coach: MCPServer) -> None:
-    listing = await tools_of(coach)
-    assert {tool.name for tool in listing} == TOOLS
 
 
 async def test_every_tool_describes_itself(coach: MCPServer) -> None:

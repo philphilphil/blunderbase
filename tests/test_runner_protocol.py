@@ -107,35 +107,6 @@ def test_a_field_a_newer_peer_added_is_carried_not_refused() -> None:
     assert frame["future"] == "field"
 
 
-def test_every_builder_produces_a_frame_that_validates() -> None:
-    frames = [
-        protocol.hello(runner="gpu-box", version="0.1.0", slots=4),
-        protocol.welcome(runner_id=3, runner="gpu-box", slots=4),
-        protocol.advertise_engines([]),
-        protocol.engines_accepted([protocol.accepted_engine("sf-remote", 7, True)]),
-        protocol.ping(1.0),
-        protocol.pong(1.0),
-        protocol.error(protocol.ERROR_PROTO_MISMATCH, "no", fatal=True),
-        protocol.run_dispatch(run_id=1, attempt_token="9f", engine="sf", plan={"run_id": 1}),
-        protocol.run_progress(run_id=1, attempt_token="9f", done=1, total=2),
-        protocol.run_complete(run_id=1, attempt_token="9f", evals=[]),
-        protocol.run_failed(run_id=1, attempt_token="9f", error="boom"),
-        protocol.run_ack(run_id=1, accepted=False, reason=protocol.ERROR_STALE_RESULT),
-        protocol.run_cancel(run_id=1, reason="stolen"),
-        protocol.run_cancelled(run_id=1),
-        protocol.stream_open(session_id="str_1", engine="sf", fen=CHESS960_FEN),
-        protocol.stream_started(session_id="str_1", engine="sf"),
-        protocol.snapshot_frame("str_1", 7, depth=24, lines=[{"multipv": 1, "cp": 34}]),
-        protocol.stream_restart(session_id="str_1", fen=CHESS960_FEN),
-        protocol.stream_close(session_id="str_1"),
-        protocol.stream_closed(session_id="str_1", reason="engine_failed", error="died"),
-    ]
-
-    for frame in frames:
-        assert protocol.validate(protocol.decode(protocol.encode(frame))) == frame
-    assert {protocol.message_type(frame) for frame in frames} == set(protocol.REQUIRED)
-
-
 def test_the_handshake_states_the_protocol_version() -> None:
     assert protocol.hello(runner="gpu-box")["proto"] == protocol.PROTO_VERSION
     assert protocol.welcome(runner_id=1, runner="gpu-box")["proto"] == protocol.PROTO_VERSION

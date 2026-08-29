@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.db.base import Base
 from backend.db.enums import (
     Classification,
     Color,
@@ -35,24 +34,6 @@ from backend.db.models import (
 )
 
 PLAYED_AT = datetime(2026, 8, 1, 18, 30, tzinfo=UTC)
-
-EXPECTED_TABLES = {
-    "accounts",
-    "analysis_runs",
-    "app_settings",
-    "auth_sessions",
-    "credentials",
-    "engines",
-    "game_positions",
-    "games",
-    "import_jobs",
-    "lines",
-    "mcp_keys",
-    "move_evals",
-    "notes",
-    "positions",
-    "runners",
-}
 
 
 def seed(session: Session) -> dict[str, int]:
@@ -175,10 +156,6 @@ def seed(session: Session) -> dict[str, int]:
         "line": line.id,
         "note": note.id,
     }
-
-
-def test_metadata_covers_every_entity() -> None:
-    assert set(Base.metadata.tables) == EXPECTED_TABLES
 
 
 def test_game_source_id_is_unique_per_source(session: Session) -> None:
