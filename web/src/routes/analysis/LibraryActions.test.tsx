@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { BACKFILL_RUN_KEY, resetBackfillRun } from '@/lib/analysis'
 import type { AnalysisCoverage } from '@/lib/api/types'
 
 import { LibraryActions } from './LibraryActions'
@@ -90,31 +89,12 @@ beforeEach(() => {
   started = []
   queued = 0
   filled = undefined
-  // The takeover records the run it started in storage; jsdom here has none of its own.
-  vi.stubGlobal('localStorage', memoryStorage())
-  resetBackfillRun()
   stubFetch()
 })
 
 afterEach(() => {
-  resetBackfillRun()
   vi.unstubAllGlobals()
 })
-
-/** jsdom in this setup exposes no `localStorage` (see `games/savedFilters.test.ts`). */
-function memoryStorage(): Storage {
-  const map = new Map<string, string>()
-  return {
-    get length() {
-      return map.size
-    },
-    key: (index: number) => [...map.keys()][index] ?? null,
-    getItem: (key: string) => map.get(key) ?? null,
-    setItem: (key: string, value: string) => void map.set(key, String(value)),
-    removeItem: (key: string) => void map.delete(key),
-    clear: () => map.clear(),
-  }
-}
 
 describe('LibraryActions', () => {
   it('puts the count and the wall-clock estimate on every button', () => {
@@ -155,29 +135,36 @@ describe('LibraryActions', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /backfill deep/i }))
 
-    // Asked first: a pass this long is a decision about the week, not a click.
-    const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveTextContent(/many times what a quick one does/i)
-    expect(dialog).toHaveTextContent('7,253 games get a deep pass')
-    expect(started).toEqual([])
-
-    await userEvent.click(screen.getByRole('button', { name: /start the pass/i }))
-
     await waitFor(() => expect(started).toEqual([{ tier: 'deep' }]))
-    // And it goes through the takeover, exactly as the library screen's button does.
-    expect(JSON.parse(localStorage.getItem(BACKFILL_RUN_KEY) ?? 'null')).toMatchObject({
-      tier: 'deep',
-      total: 12,
-    })
+    // The runs go into the ordinary queue, and the card says what it put there.
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Queued 12 games; 12 runs outstanding at this tier.',
+    )
   })
 
   it('starts a quick backfill under the quick tier', async () => {
     draw()
 
     await userEvent.click(screen.getByRole('button', { name: /backfill quick/i }))
-    await userEvent.click(screen.getByRole('button', { name: /start the pass/i }))
 
     await waitFor(() => expect(started).toEqual([{ tier: 'quick' }]))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Queued 12 games; 12 runs outstanding at this tier.',
+    )
+  })
+
+  /**
+   * The press is the whole gesture. A pass is ordinary queued work now — watched from the
+   * titlebar's queue widget and stopped from the card next door — so nothing stands
+   * between the button and the POST.
+   */
+  it('asks nothing before it queues the pass', async () => {
+    draw()
+
+    await userEvent.click(screen.getByRole('button', { name: /backfill deep/i }))
+
+    await waitFor(() => expect(started).toEqual([{ tier: 'deep' }]))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('offers no backfill for a tier with nothing outstanding', () => {

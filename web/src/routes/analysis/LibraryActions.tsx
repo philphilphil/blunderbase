@@ -1,9 +1,8 @@
 import { Loader2, ListX, Microscope, Wand2, Zap } from 'lucide-react'
-import { useState, type ComponentType, type ReactNode } from 'react'
+import { type ComponentType, type ReactNode } from 'react'
 
-import { ConfirmBackfill } from '@/components/analysis/ConfirmBackfill'
 import { Button } from '@/components/ui/button'
-import { useClearQueue, useMaiaFill, useQueueStatus } from '@/lib/api/queries'
+import { useClearQueue, useMaiaFill, useQueueStatus, useStartBackfill } from '@/lib/api/queries'
 import type { AnalysisCoverage, Tier } from '@/lib/api/types'
 import { formatCount } from '@/routes/games/format'
 
@@ -21,10 +20,12 @@ import { estimateLabel } from './estimate'
  * costs. The estimate sits *on* the button rather than in a footnote because the moment it
  * is worth reading is the moment before the click.
  *
- * Starting a backfill goes through `ConfirmBackfill` and `startBackfillRun` exactly as the
- * library screen's button does — the takeover that unmounts the shell is what keeps ten
- * thousand `analysis.done` frames from refetching every mounted page, which is a real
- * production incident and not a stylistic choice.
+ * Starting a backfill queues ordinary runs and nothing more: the press POSTs and the pass
+ * sits in the same queue an import's passes sit in, watched from the titlebar's queue
+ * widget and stopped from the card next door. The burst of `analysis.done` frames that
+ * produces is absorbed where every other burst is — the invalidation coalescing and the
+ * per-root cooldowns in `lib/events/EventsProvider.tsx` (`FLUSH_MS`, `COOLDOWN_MS`) — so
+ * the app has no reason to hide itself while a pass drains.
  */
 
 /** A count with the noun it counts, so no sentence has to say "1 games". */
@@ -74,7 +75,7 @@ function ActionCard({
   )
 }
 
-/** One of the two backfills: the count, the estimate, and the confirm before the takeover. */
+/** One of the two backfills: the count, the estimate, and the press that fills the queue. */
 function BackfillCard({
   tier,
   pending,
@@ -86,7 +87,9 @@ function BackfillCard({
   seconds: number | null
   concurrency: number
 }) {
-  const [asking, setAsking] = useState(false)
+  // One mutation per card, so the quick card's receipt is never the deep card's.
+  const start = useStartBackfill()
+  const receipt = start.data ?? null
   const deep = tier === 'deep'
 
   return (
@@ -100,21 +103,39 @@ function BackfillCard({
       }
       figure={pending === 0 ? 'nothing left' : plural(pending, 'game')}
       estimate={estimateLabel(seconds, concurrency)}
+      footer={
+        <>
+          {receipt ? (
+            <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
+              {receipt.queued === 0
+                ? 'Nothing to queue — every game already has a pass of this tier.'
+                : `Queued ${plural(receipt.queued, 'game')}; ${plural(receipt.outstanding, 'run')} outstanding at this tier.`}
+            </p>
+          ) : null}
+          {start.isError ? (
+            <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
+              {start.error.message}
+            </p>
+          ) : null}
+        </>
+      }
     >
       <Button
         type="button"
         variant="outline"
         size="sm"
-        disabled={pending === 0}
-        onClick={() => setAsking(true)}
+        disabled={start.isPending || pending === 0}
+        onClick={() => start.mutate(tier)}
       >
-        {deep ? <Microscope aria-hidden /> : <Zap aria-hidden />}
-        {deep ? 'Backfill deep…' : 'Backfill quick…'}
+        {start.isPending ? (
+          <Loader2 className="animate-spin" aria-hidden />
+        ) : deep ? (
+          <Microscope aria-hidden />
+        ) : (
+          <Zap aria-hidden />
+        )}
+        {deep ? 'Backfill deep' : 'Backfill quick'}
       </Button>
-
-      {asking && pending > 0 ? (
-        <ConfirmBackfill tier={tier} pending={pending} onClose={() => setAsking(false)} />
-      ) : null}
     </ActionCard>
   )
 }

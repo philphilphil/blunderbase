@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
-import { useBackfillRun } from '@/lib/analysis'
 import { browserRunner } from '@/lib/runner'
 
-import { BackfillTakeover } from './BackfillTakeover'
 import { CommandPaletteProvider } from './CommandPalette'
 import { NavDrawer, SideNav } from './SideNav'
 import { TopBar } from './TopBar'
@@ -41,9 +39,6 @@ const TOAST_CLASSES = {
  * it is up is the shell's state and not the titlebar's: the button that opens it is in the
  * titlebar but the drawer itself covers everything, and the two would otherwise have to
  * reach across the layout for each other.
- *
- * A whole-library analysis pass replaces all of it — see `BackfillTakeover`. The route
- * stays in the URL underneath, so releasing puts the owner back on the page they left.
  */
 export function AppShell() {
   // If a browser runner is installed in this browser, this is where it comes back: the
@@ -57,9 +52,6 @@ export function AppShell() {
   const [navOpen, setNavOpen] = useState(false)
   const closeNav = useCallback(() => setNavOpen(false), [])
   const openNav = useCallback(() => setNavOpen(true), [])
-
-  const backfill = useBackfillRun()
-  if (backfill) return <BackfillTakeover run={backfill} />
 
   return (
     <CommandPaletteProvider>

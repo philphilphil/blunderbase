@@ -375,9 +375,10 @@ export function useRequestAnalysisBatch(
  * page's backfill cards are labelled with.
  *
  * The key lives under `['analysis']`, so every analysis event marks it stale, which is
- * what keeps those labels honest as games trickle in. Nothing has to guard it against the
- * pass itself: the takeover unmounts the page the buttons are on, and an invalidation with
- * no observer refetches nothing.
+ * what keeps those labels honest as games trickle in. That includes the pass the buttons
+ * themselves started: the page stays mounted while a backfill drains, so the count comes
+ * back down and the buttons relabel themselves as it goes, which is the point. The
+ * `['analysis']` cooldown is what keeps that cheap under the burst.
  */
 export function useBackfillPreview(
   tier: Tier,
@@ -401,21 +402,6 @@ export function useStartBackfill(
   const client = useQueryClient()
   return useMutation({
     mutationFn: (tier: Tier) => api.startBackfill(tier),
-    ...options,
-    onSuccess: (...args) => {
-      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
-      options?.onSuccess?.(...args)
-    },
-  })
-}
-
-/** Drops what the pass still has queued; what an engine already has stays until it ends. */
-export function useCancelBackfill(
-  options?: UseMutationOptions<Awaited<ReturnType<typeof api.cancelBackfill>>, Error, Tier>,
-) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (tier: Tier) => api.cancelBackfill(tier),
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
