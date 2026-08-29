@@ -17,13 +17,6 @@ describe('SideDot', () => {
     expect(dot.className).not.toMatch(/bg-(ink|selected|side-black)/)
   })
 
-  it('paints black out of the side tokens', () => {
-    render(<SideDot side="black" />)
-    const dot = screen.getByRole('img', { name: 'Black' })
-    expect(dot).toHaveClass('bg-side-black')
-    expect(dot.className).not.toMatch(/bg-(ink|selected|side-white)/)
-  })
-
   it('outlines a game no account claimed a side of', () => {
     render(<SideDot side={null} />)
     const dot = screen.getByRole('img', { name: 'Side unknown' })

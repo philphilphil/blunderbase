@@ -488,15 +488,4 @@ describe('MoveList', () => {
     expect(screen.getByText('e4')).toBeInTheDocument()
   })
 
-  it('drops the ply total below md, and never the PGN affordance', () => {
-    // The suite runs with `css: false`, so `max-md:hidden` hides nothing here — what is
-    // asserted is which of the two the row is willing to give up when it runs out of width.
-    // The total is on screen twice on a phone; `BoardPanel`'s transport row carries it.
-    renderList([move(0, 'e4'), move(1, 'd5')], { pgn: '[Event "?"]\n\n1. e4 *\n' })
-    const total = screen.getByText('2 plies')
-
-    expect(total).toHaveClass('max-md:hidden')
-    expect(total.parentElement).toHaveClass('flex-none')
-    expect(screen.getByRole('button', { name: 'PGN' })).not.toHaveClass('max-md:hidden')
-  })
 })

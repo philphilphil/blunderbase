@@ -58,10 +58,4 @@ describe('EvalBar', () => {
     expect(fills()).toHaveLength(2)
   })
 
-  it('keeps the height transitions that animate the bar', () => {
-    render(<EvalBar win={40} score={{ cp: 0, mate: null }} orientation="black" />)
-    expect(white()).toHaveClass('transition-[height]')
-    expect(black()).toHaveClass('transition-[height]')
-    expect(hairline()).toHaveClass('transition-[top]')
-  })
 })

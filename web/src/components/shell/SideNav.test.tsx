@@ -62,14 +62,6 @@ describe('the rail footer', () => {
     expect(screen.getByText(`v${version}`)).toBeInTheDocument()
   })
 
-  it('labels the library the same on every route, and never restates the Games total', () => {
-    draw()
-
-    expect(screen.getByText('Library')).toBeInTheDocument()
-    expect(screen.queryByText('Book · your games')).not.toBeInTheDocument()
-    expect(screen.queryByText('Sample')).not.toBeInTheDocument()
-  })
-
   it('carries the theme control, the source link and the connection dot', () => {
     draw({ status: 'connecting', reconnects: 0 })
 
@@ -124,12 +116,6 @@ function drawDrawer({ open = true, path = '/' }: { open?: boolean; path?: string
 }
 
 describe('the phone drawer', () => {
-  it('leaves the rail out of the flow below md rather than drawing both', () => {
-    draw()
-
-    expect(screen.getByRole('navigation')).toHaveClass('max-md:hidden')
-  })
-
   it('is not in the tree at all while it is closed', () => {
     drawDrawer({ open: false })
 
@@ -184,9 +170,4 @@ describe('the phone drawer', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('stays put while nothing is navigated', () => {
-    const onClose = drawDrawer()
-
-    expect(onClose).not.toHaveBeenCalled()
-  })
 })

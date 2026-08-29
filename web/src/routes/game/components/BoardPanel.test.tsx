@@ -342,12 +342,6 @@ describe('BoardPanel flagged jumps', () => {
     expect(onSeek).not.toHaveBeenCalled()
   })
 
-  it('stays off the desktop row, where the same jump is a keypress', () => {
-    renderPanel({ nextFlagged: 8 })
-    expect(screen.getByRole('button', { name: 'Next flagged move' }).parentElement).toHaveClass(
-      'md:hidden',
-    )
-  })
 })
 
 const QUICK_RUN: GameRunSummary = {

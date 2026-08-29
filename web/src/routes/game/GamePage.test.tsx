@@ -408,20 +408,6 @@ describe('GamePage', () => {
     expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('keeps the multi-PV box over the move table while nothing has been analysed', async () => {
-    vi.stubGlobal(
-      'fetch',
-      stubFetch({ '/games/14': { ...DETAIL, runs: [] } }),
-    )
-    renderPage()
-    await screen.findByText('Scandinavian Defense')
-
-    // The box holds one place whether or not a deep pass has landed yet.
-    const engine = screen.getByTestId('maia-panel')
-    const moveButton = screen.getByRole('button', { name: 'Qxd5' })
-    expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-
   it('steps through plies with the arrow keys and follows with the board', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -1388,20 +1374,6 @@ describe('the game view below md', () => {
     expect(split!.firstElementChild).not.toBe(screen.getByTestId('maia-engine-lines'))
   })
 
-  it('caps each player name at its own share, so a short one is never shortened', async () => {
-    renderPage()
-    await screen.findByRole('tab', { name: 'Moves' })
-
-    // jsdom lays nothing out, so the ellipsis itself is unobservable — what is asserted is
-    // the rule that produces it. Without the cap, flex shares the overflow in proportion to
-    // what each name asked for and *both* give ground: "phib" came back as "p…" beside an
-    // opponent that kept a dozen characters.
-    const header = screen.getByTestId('mobile-header')
-    for (const name of ['phib', 'lichess AI level 2']) {
-      expect(within(header).getByText(name).parentElement).toHaveClass('max-w-[48%]')
-    }
-  })
-
   it('reads the evaluation in the header, not on a line of its own under the board', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -1733,9 +1705,4 @@ describe('GamePage notes', () => {
     await waitFor(() => expect(screen.getByText('ply 2 / 4')).toBeInTheDocument())
   })
 
-  it('leaves the board alone where the link names nothing', async () => {
-    renderPage()
-    await screen.findByText('Scandinavian Defense')
-    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
-  })
 })

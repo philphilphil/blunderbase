@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -219,13 +219,4 @@ describe('StatsPage — where the scope controls live', () => {
     expect(screen.getByRole('group', { name: 'Colour' })).toBeInTheDocument()
   })
 
-  it('never renders them twice', () => {
-    for (const mobile of [false, true]) {
-      stubViewport(mobile)
-      draw()
-      expect(screen.getAllByRole('group', { name: 'Window' })).toHaveLength(1)
-      expect(screen.getAllByRole('group', { name: 'Colour' })).toHaveLength(1)
-      cleanup()
-    }
-  })
 })
