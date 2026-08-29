@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -164,7 +164,10 @@ describe('<ThemeToggle>', () => {
 
     media.set(true)
     expect(await screen.findByTitle('Match the system — currently light')).toBeInTheDocument()
-    expect(document.documentElement.classList.contains('light')).toBe(true)
+    // The title is render output; the class is written by an effect, which can land a tick
+    // later on a loaded machine. Waiting for it rather than reading it straight after the
+    // title is what stops this test flaking in CI.
+    await waitFor(() => expect(document.documentElement.classList.contains('light')).toBe(true))
   })
 
   it('ignores the OS once a theme is picked explicitly', async () => {
