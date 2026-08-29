@@ -4,6 +4,16 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.7.0 — 2026-08-29
+
+- Added pausing and resuming the analysis queue
+- Added player mistake counts and ACPL to game analysis
+- Added filtering games by any completed analysis
+- Changed eval graphs to focus on your mistakes
+- Fixed plain time controls displaying seconds instead of minutes
+- Fixed live analysis headers overflowing narrow screens
+- Fixed the spelling of multiple inaccuracies
+
 ## v0.6.0 — 2026-08-29
 
 - Added a phone layout with a tabbed game view
