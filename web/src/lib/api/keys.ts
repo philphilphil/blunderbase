@@ -19,7 +19,7 @@ export const queryKeys = {
    */
   auth: (): QueryKey => ['auth'],
 
-  /** The Settings page's own read. The value it edits also rides on `auth()`. */
+  /** The analysis configuration read. Its Maia values also ride on `auth()`. */
   settings: (): QueryKey => ['settings'],
 
   games: (): QueryKey => ['games'],

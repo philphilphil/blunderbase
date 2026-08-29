@@ -146,8 +146,9 @@ describe('LibraryActions', () => {
   })
 
   /**
-   * The pass the app could not start. `AnalyseAllButton` hard-codes the quick tier and
-   * there was no tier picker anywhere, which is how 7,253 games came to have no deep pass.
+   * The pass the app could not start. The library's old "Analyse all" hard-coded the quick
+   * tier and there was no tier picker anywhere, which is how 7,253 games came to have no
+   * deep pass.
    */
   it('starts a deep backfill under the deep tier', async () => {
     draw()

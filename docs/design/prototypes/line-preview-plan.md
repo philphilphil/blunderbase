@@ -137,9 +137,11 @@ so a stale or hand-edited value falls back to defaults. Test the fallback and th
 - Peek: `components/board/MiniBoard.tsx` inside a Radix HoverCard/Popover anchored to the
   row, fed the preview FEN; main board keeps the single first-move arrow. Lives in the panel.
 
-### 5. Settings → "Board" card
+### 5. The preview settings
 
-New `Card` in `routes/settings/SettingsPage.tsx`: row-hover mode `select`, scrub toggle +
+`components/analysis/LinePreviewSettings.tsx`, opened from the gear beside the analysis
+panel (it began as a "Board" card on the since-removed Settings page): row-hover mode
+`select`, scrub toggle +
 look-ahead, depth range, badges + label-style segmented control, colour by side, fade,
 playthrough tempo/delay/loop/ahead (shown when `row === 'play'`), dim pieces (when
 `overlay`). Native `select`/`input[type=range]` per the frontend conventions. One test that

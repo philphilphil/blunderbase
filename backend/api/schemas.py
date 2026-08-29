@@ -57,7 +57,7 @@ class AuthStatus(BaseModel):
 
     It is also the only payload every screen already has by the time it renders, which is
     why the one piece of deployment-wide configuration the UI needs rides along on it: the
-    Settings page owns that value (`/settings` below), but every other screen needs it to
+    Maia page owns that value (`/settings` below), but every other screen needs it to
     render and none of them should have to wait on a second call for it.
     """
 
@@ -92,9 +92,9 @@ class PasswordChange(Input):
 
 
 class AppSettings(BaseModel):
-    """Everything the Settings page shows: eleven numbers.
+    """Everything the Engine passes and Maia pages show.
 
-    Ten of them are nullable, and null is never "not loaded yet" — it is the deployment
+    Nine of them are nullable, and null is never "not loaded yet" — it is the deployment
     saying nobody has set this one, and what is in force is the default
     `services.app_settings` names, which is why the page can show that default under an
     empty box rather than pretending to a value.
@@ -143,9 +143,6 @@ class AppSettings(BaseModel):
     blunder_threshold: float | None = Field(
         default=None, description="win-percentage points lost that make a move a blunder"
     )
-    default_owner_rating: int | None = Field(
-        default=None, description="the rating to use where the game itself carries none"
-    )
 
 
 class AppSettingsUpdate(Input):
@@ -182,7 +179,6 @@ class AppSettingsUpdate(Input):
     inaccuracy_threshold: float | None = None
     mistake_threshold: float | None = None
     blunder_threshold: float | None = None
-    default_owner_rating: int | None = None
 
 
 # --- games ----------------------------------------------------------------
@@ -453,7 +449,7 @@ class BatchAnalysisRequest(Input):
 class MaiaFillRequest(Input):
     """Fill in the Maia levels the library was never analysed at.
 
-    No games given means every analysed game, which is what the Settings page sends: the
+    No games given means every analysed game, which is what the Analysis page sends: the
     point of the button is a library that speaks for the same set of humans throughout.
     """
 
@@ -510,7 +506,7 @@ class BackfillRequest(Input):
     """Which tier a backfill is over. Its own body so the two verbs read the same.
 
     A backfill takes no game ids and no budget: the selection *is* "everything with no
-    pass yet", and a run's nodes and multipv are the ones the Settings page is showing at
+    pass yet", and a run's nodes and multipv are the ones the Engine passes page shows at
     the moment the button is pressed. Nothing else belongs in this body, and an empty one
     means the quick tier.
     """

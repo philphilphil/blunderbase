@@ -41,7 +41,7 @@ class BearerGuard:
     compared first and in constant time — it costs no database read, and it is what keeps
     the compose files and existing automation working while everything else changes
     underneath. Then `verify`, which is `services.auth.verify_bearer`: a key the owner
-    minted on the Settings page, else the owner's password, checked against the same hash
+    minted on the Assistant page, else the owner's password, checked against the same hash
     the web session is. The environment key is one more accepted token rather than the
     only one, so a deployment that pins one for automation can still hand a coach a key it
     can revoke on its own.

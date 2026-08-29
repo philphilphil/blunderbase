@@ -156,7 +156,7 @@ export function useLogout(options?: UseMutationOptions<void, Error, void>) {
 
 // --- settings --------------------------------------------------------------
 
-/** What the Settings page renders from: the eight numbers this deployment stores. */
+/** What the analysis configuration pages render from. */
 export function useAppSettings(options?: Options<Awaited<ReturnType<typeof api.getAppSettings>>>) {
   return useQuery({ queryKey: queryKeys.settings(), queryFn: api.getAppSettings, ...options })
 }
@@ -371,12 +371,12 @@ export function useRequestAnalysisBatch(
 }
 
 /**
- * How many games a whole-library pass of this tier would take on — the number the
- * "Analyse all" button labels itself with.
+ * How many games a whole-library pass of this tier would take on — the number the Analysis
+ * page's backfill cards are labelled with.
  *
  * The key lives under `['analysis']`, so every analysis event marks it stale, which is
- * what keeps that label honest as games trickle in. Nothing has to guard it against the
- * pass itself: the takeover unmounts the page the button is on, and an invalidation with
+ * what keeps those labels honest as games trickle in. Nothing has to guard it against the
+ * pass itself: the takeover unmounts the page the buttons are on, and an invalidation with
  * no observer refetches nothing.
  */
 export function useBackfillPreview(

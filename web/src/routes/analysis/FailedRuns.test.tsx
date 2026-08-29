@@ -154,7 +154,7 @@ describe('FailedRuns', () => {
     expect(alert).toHaveTextContent('still has no engine that can take them')
     expect(screen.getByRole('link', { name: /register or enable an engine/i })).toHaveAttribute(
       'href',
-      '/settings/engines',
+      '/engines',
     )
   })
 

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
  * what reads as on or off, and the button around it is a full row-height hit target so the
  * switch is no harder to hit than the pickers beside it.
  *
- * Exported because the Settings page needs the same switch beside a label and a caption,
+ * Exported because the Maia configuration needs the same switch beside a label and a caption,
  * and a third spelling of an on/off track is a third thing to keep in step with the theme.
  */
 export function Toggle({

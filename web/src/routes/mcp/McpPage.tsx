@@ -61,7 +61,7 @@ export function McpPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: 'Settings', to: '/settings' }, { label: 'MCP' }]} />
+      <SetPageChrome breadcrumb={[{ label: 'Assistant' }]} />
       <div className="flex max-w-4xl flex-col gap-4">
         <PageHeader
           title="Connect your assistant"

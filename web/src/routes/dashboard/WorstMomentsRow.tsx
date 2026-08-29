@@ -157,7 +157,7 @@ export function WorstMomentsRow({ className }: { className?: string }) {
           to="/games?has_blunders=true"
           className="text-[0.6875rem] text-accent-teal hover:text-accent-link"
         >
-          blunder log
+          all blunders
         </Link>
       </div>
       {query.isPending ? (

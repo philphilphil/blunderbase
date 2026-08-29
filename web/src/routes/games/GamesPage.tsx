@@ -17,7 +17,6 @@ import { ApiError } from '@/lib/api/client'
 import { useRequestAnalysisBatch } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
 
-import { AnalyseAllButton } from './components/AnalyseAllButton'
 import { DebouncedInput, FilterBar } from './components/FilterBar'
 import { GamesTable } from './components/GamesTable'
 import { SelectionFooter } from './components/SelectionFooter'
@@ -187,8 +186,6 @@ export function GamesPage() {
               Clear {active}
             </button>
           ) : null}
-
-          <AnalyseAllButton />
 
           <Link
             to="/import"

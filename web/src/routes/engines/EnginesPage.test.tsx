@@ -96,7 +96,7 @@ function requestedPaths(fetchMock: ReturnType<typeof stubFetch>): string[] {
 }
 
 /** `at` is the URL the page starts on — the tab lives in a search param. */
-function renderPage(ui: ReactNode, at = '/settings/engines') {
+function renderPage(ui: ReactNode, at = '/engines') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
@@ -116,7 +116,7 @@ async function openMoreSettings(name: string) {
 }
 
 /** The Machines half: runners, this browser, tokens. */
-const MACHINES = '/settings/engines?tab=machines'
+const MACHINES = '/engines?tab=machines'
 
 const STOCKFISH: EngineResponse = {
   id: 1,

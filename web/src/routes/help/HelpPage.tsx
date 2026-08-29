@@ -126,9 +126,9 @@ export function HelpPage() {
         </div>
 
         <p className="text-[0.6875rem] text-faint">
-          Change any of these numbers in{' '}
-          <Link to="/settings" className="text-accent-teal hover:text-accent-link">
-            Settings
+          Change these numbers under{' '}
+          <Link to="/analysis/engine" className="text-accent-teal hover:text-accent-link">
+            Engine passes
           </Link>
           .
         </p>

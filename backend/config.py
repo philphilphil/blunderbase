@@ -61,7 +61,8 @@ class Settings(BaseSettings):
 
     # The per-position engine budgets, the classification thresholds and the rating to
     # centre Maia on when a game carries none are deliberately not here: they are app
-    # settings, stored in the database and edited on the Settings page, because they are
+    # settings, stored in the database and edited on the analysis configuration pages,
+    # because they are
     # the ones an owner changes as their play changes and a restart is not a thing to ask
     # of them for that. `services/app_settings.py` owns them and their defaults.
 

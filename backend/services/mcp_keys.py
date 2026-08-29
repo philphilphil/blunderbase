@@ -7,7 +7,7 @@ signing every browser out. The design is `services/runners.py`'s token, not
 `services/auth.py`'s password:
 
 - **The token is the identity, the name is a label.** `bb_mcp_` and 32 random bytes,
-  shown exactly once; the name is for the list on the Settings page and for knowing which
+  shown exactly once; the name is for the list on the Assistant page and for knowing which
   row to revoke.
 - **Stored as a SHA-256, compared in constant time.** There is nothing to brute-force in
   32 random bytes, so no scrypt, and the hash is what the lookup keys on — the token itself

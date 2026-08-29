@@ -74,7 +74,7 @@ directory are local snapshots pulled 2026-08-25.
 Designed (Turn 1 + Turn 2, all on the 1a direction): **Game view** (flagship),
 **Dashboard** (2a), **Games library** (2b), **Opening explorer** (2c),
 **Stats** (2d). Frontend v1 builds all of these plus **Import** and
-**Settings → Engines**, which have no dedicated design turn — derive them
+**Engines**, which has no dedicated design turn — derive it
 from the established system (same shell, cards, tables, badges).
 
 Libraries, not wheel-reinvention: chessground (board), Recharts via shadcn/ui
@@ -138,4 +138,4 @@ Maia purple, so a preview never reads as a claim about what a human would
 play. The preferences (row mode, scrub, depth, colours, playthrough tempo)
 live in `localStorage`, not `AppSettings` — they are a reading habit for this
 browser, not a fact about the deployment, and screen size and taste are per
-device (Settings → Board).
+device (the line-preview control beside a live analysis panel).

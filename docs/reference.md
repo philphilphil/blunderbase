@@ -17,7 +17,7 @@ Five wrong passwords in a row close the door for a few seconds, doubling to five
 **The MCP bearer token is that same password, or a key you mint for the client.** Nothing
 extra to configure: set up the deployment in the browser and the coach connects with what
 you already typed. Once more than one client wants in, mint a key per client on
-**Settings → MCP**: `bb_mcp_…`, stored as a SHA-256, shown exactly once, and revocable on
+**Assistant**: `bb_mcp_…`, stored as a SHA-256, shown exactly once, and revocable on
 its own — deleting a key signs out that one client instead of every browser and the other
 coaches. The list shows when each key was last used, so a forgotten one is easy to spot.
 
@@ -38,7 +38,7 @@ browser out.
 
 ## Engines
 
-Engines are rows, not configuration: **Settings → Engines**, give it a path (a file, a
+Engines are rows, not configuration: on **Engines**, give one a path (a file, a
 command line, or a name on `PATH`), and Blunderbase probes the binary, reads the options
 it declares and validates what you set against them. The owner assigns one engine to each
 of Quick, Deep and Human moves; nothing falls back. If the engine assigned to a role is
@@ -78,9 +78,10 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
 
 The engine budgets, the classification thresholds and everything about the Maia pass are
-**not** variables. They are app settings: stored in the database, edited on the Settings page
-(`GET`/`PUT /api/settings`, `backend/services/app_settings.py`), and read where they are
-used, so a change takes effect on the next thing you click rather than the next restart.
+**not** variables. They are stored in the database, edited under **Analysis → Engine
+passes** and **Analysis → Maia** (`GET`/`PUT /api/settings`,
+`backend/services/app_settings.py`), and read where they are used, so a change takes
+effect on the next thing you click rather than the next restart.
 Unset means the default in that table, not a null.
 
 | Setting | Default | |
@@ -90,7 +91,6 @@ Unset means the default in that table, not a null.
 | `maia_both_sides` | `1` | ask Maia about every ply, both colours. `0` asks about your own moves only and halves what the pass costs; you lose "what will a human opposite me fall into", which is a question about the positions your opponent moves in. Read per plan, not at enqueue |
 | `quick_nodes` `deep_nodes` `deep_multipv` | `250000` `2000000` `4` | the per-position budget of each tier, and the lines a deep pass keeps. Read when a run is queued, so they size the next run rather than the queue |
 | `inaccuracy_threshold` `mistake_threshold` `blunder_threshold` | `5` `10` `15` | win-percentage points lost by the mover — Lichess's own cuts on the same curve. The three have to rise; a set of them that does not is the one change refused rather than clamped |
-| `default_owner_rating` | `1500` | the rating to stand in for yours where the game carries none — an OTB PGN, an unrated game |
 
 Everything else out of range is clamped rather than refused, so what a save answers with is
 what is in force. Budgets and thresholds apply to runs from then on; a game already

@@ -17,7 +17,7 @@ import { MaiaLevels } from './MaiaLevels'
  * Analysis: what the library has been analysed with, and what finishing it would cost.
  *
  * The screen the app was missing. Every whole-library operation used to live wherever it
- * had first been needed — "Analyse all" on the library, the Maia fill inside a Settings
+ * had first been needed — an "Analyse all" on the library, the Maia fill inside a configuration
  * card, "Clear the queue" inside a titlebar widget that only appears while something is
  * queued — and none of them said what they would cost. So a pass over eight thousand games
  * was one click from an owner who had no way to learn it was forty hours until it was

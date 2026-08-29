@@ -79,9 +79,9 @@ describe('the ⌘K palette', () => {
 
     expect(screen.getByRole('dialog', { name: 'Search everything' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Dashboard/ })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Blunder log/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Games/ })).toBeInTheDocument()
     // Nothing typed: the pages are the whole list, and no saved cut or report is on it.
-    expect(screen.queryByRole('option', { name: /Games with blunders/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Blunders/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /Blunder taxonomy/ })).not.toBeInTheDocument()
   })
 
@@ -103,9 +103,9 @@ describe('the ⌘K palette', () => {
     await user.keyboard('{Meta>}k{/Meta}')
     await user.keyboard('blunder')
 
-    expect(screen.getByRole('option', { name: /Blunder log/ })).toBeInTheDocument()
-    // The built-in saved cut and the stats report both answer to the same word.
-    expect(screen.getByRole('option', { name: /Games with blunders/ })).toBeInTheDocument()
+    // The built-in saved cut and the stats report both answer to the same word. There is
+    // no separate page entry for the cut: the saved filter *is* how the palette offers it.
+    expect(screen.getByRole('option', { name: /Blunders/ })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Blunder taxonomy/ })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /Dashboard/ })).not.toBeInTheDocument()
   })
@@ -153,7 +153,7 @@ describe('the ⌘K palette', () => {
     await user.keyboard('engines')
     await user.keyboard('{Enter}')
 
-    expect(screen.getByTestId('where')).toHaveTextContent('/settings/engines')
+    expect(screen.getByTestId('where')).toHaveTextContent('/engines')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

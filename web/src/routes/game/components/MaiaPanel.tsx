@@ -1,6 +1,7 @@
 import { ChevronDown, Columns3 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { LinePreviewSettingsButton } from '@/components/analysis/LinePreviewSettings'
 import { MiniBoard } from '@/components/board/MiniBoard'
 import type { GameRunSummary } from '@/lib/api/types'
 import {
@@ -356,6 +357,12 @@ export function MaiaPanel({
                   MPV {run.multipv}
                 </span>
               ) : null}
+              {/*
+                The same gear as the live panel's, because these rows preview the same way:
+                the preferences belong wherever a line can be hovered, not on the one panel
+                that happened to get them first.
+              */}
+              {onHoverLine ? <LinePreviewSettingsButton /> : null}
             </div>
 
             {engine.length === 0 ? (

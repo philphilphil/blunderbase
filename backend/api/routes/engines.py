@@ -1,4 +1,4 @@
-"""`/engines` — Settings → Engines: register a binary, probe it, test-run it.
+"""`/engines` — register a binary, probe it, and test-run it.
 
 Every write path probes the process, so a bad binary is rejected here rather than at
 analysis time. `/engines/roles` is the other half of that promise: it is where the owner

@@ -62,7 +62,7 @@ function RetryError({ error }: { error: Error }) {
         <>
           Nothing was queued: the tier these runs failed under still has no engine that can
           take them, so a retry would fail the same way.{' '}
-          <Link to="/settings/engines" className="text-accent-teal hover:text-accent-link">
+          <Link to="/engines" className="text-accent-teal hover:text-accent-link">
             Register or enable an engine
           </Link>{' '}
           for it first.

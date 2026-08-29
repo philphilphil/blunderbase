@@ -1,4 +1,4 @@
-import { Bot, CircleHelp, KeyRound, LogOut, Settings, User, Users } from 'lucide-react'
+import { Bot, CircleHelp, KeyRound, LogOut, User, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -117,22 +117,18 @@ export function AccountMenu() {
           </div>
           <div className="my-0.5 h-px bg-hairline" />
 
-          <Link to="/settings" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
-            <Settings className="size-3.5" aria-hidden />
-            Settings
-          </Link>
           <Link to="/import" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <Users className="size-3.5" aria-hidden />
             Connected accounts
           </Link>
           <Link
-            to="/settings/mcp"
+            to="/assistant"
             role="menuitem"
             className={ITEM}
             onClick={() => setOpen(false)}
           >
             <Bot className="size-3.5" aria-hidden />
-            Connect your assistant
+            Assistant
           </Link>
           <Link to="/help" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <CircleHelp className="size-3.5" aria-hidden />

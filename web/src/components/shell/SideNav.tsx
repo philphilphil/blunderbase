@@ -1,10 +1,14 @@
 /**
  * The 200px workspace rail from the design.
  *
- * Three parts, on every frame: the workspace list (with the Games count and the red
- * Blunder-log count), a second section that changes with the screen — Saved filters on the
- * library, Your lines in the explorer, Reports on stats, the engine roster everywhere else
- * — and a pinned footer.
+ * Three parts, on every frame: the workspace list (with the Games count), the data list,
+ * and a pinned footer with the engine roster above it.
+ *
+ * An entry with more inside it unfolds when you are in it, and only then — Saved filters
+ * under Games, Your lines under Openings, Reports under Stats, the configuration pages
+ * under Analysis. They used to be one section at the bottom of the rail that swapped
+ * contents with the screen, which meant the list of cuts of the library sat under a
+ * heading of its own three entries away from Games, and nothing said whose they were.
  *
  * The design's footer reads "Storage · local / 2.4 GB / 3.8 GB". Nothing in the API
  * reports disk usage, so the same three-line treatment carries numbers that are true: how
@@ -14,7 +18,6 @@ import {
   ChartNoAxesColumn,
   Cpu,
   Download,
-  Flame,
   Gauge,
   LayoutDashboard,
   Library,
@@ -22,7 +25,7 @@ import {
   Network,
   StickyNote,
 } from 'lucide-react'
-import type { ComponentType, ReactNode } from 'react'
+import { Fragment, type ComponentType, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { StatusDot } from '@/components/badges/StatusDot'
@@ -65,11 +68,27 @@ const WORKSPACE: NavItem[] = [
 const DATA: NavItem[] = [
   { to: '/import', label: 'Import', icon: Download },
   { to: '/analysis', label: 'Analysis', icon: Gauge },
-  { to: '/settings/engines', label: 'Engines', icon: Cpu },
+  { to: '/engines', label: 'Engines', icon: Cpu },
 ]
 
-/** The library filtered to the games a blunder was found in — the design's blunder log. */
-const BLUNDER_LOG = '/games?has_blunders=true'
+/**
+ * The pages that live under a rail entry, and only appear once that entry is open.
+ *
+ * A submenu pinned open is two more rows to read on every screen the owner is not
+ * configuring anything on; one that unfolds on entering the section says "these belong to
+ * Analysis" by where it sits, and costs nothing everywhere else.
+ */
+const SUBPAGES: Record<string, { to: string; label: string }[]> = {
+  '/analysis': [
+    { to: '/analysis/engine', label: 'Engine passes' },
+    { to: '/analysis/maia', label: 'Maia' },
+  ],
+}
+
+/** Whether a rail entry's own route, or one of its pages, is what is on screen. */
+function inSection(pathname: string, to: string): boolean {
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
 
 const ROWS = 4
 
@@ -85,16 +104,12 @@ function Item({
   item,
   trailing,
   trailingClass,
-  active,
 }: {
   item: NavItem
   trailing?: string
   trailingClass?: string
-  /** Overrides the route match — the blunder log is a query on a route of its own. */
-  active?: boolean
 }) {
   const Icon = item.icon
-  const state = (isActive: boolean) => active ?? isActive
   return (
     <NavLink
       to={item.to}
@@ -102,7 +117,7 @@ function Item({
       className={({ isActive }) =>
         cn(
           'flex items-center gap-2.5 rounded-md px-2 py-[0.4375rem] text-[0.8125rem] transition-colors',
-          state(isActive)
+          isActive
             ? 'bg-raised-2 font-medium text-ink shadow-[inset_0.125rem_0_0_var(--bb-accent)]'
             : 'text-soft hover:bg-raised hover:text-ink',
         )
@@ -111,7 +126,7 @@ function Item({
       {({ isActive }) => (
         <>
           <Icon
-            className={cn('size-3.5', state(isActive) ? 'text-accent-teal' : 'text-faint')}
+            className={cn('size-3.5', isActive ? 'text-accent-teal' : 'text-faint')}
           />
           {item.label}
           {trailing ? (
@@ -125,6 +140,36 @@ function Item({
         </>
       )}
     </NavLink>
+  )
+}
+
+/**
+ * The pages of the open entry.
+ *
+ * Smaller and dimmer than the entry above them, and without its accent bar, so the rail
+ * still reads as one list of destinations with one of them opened rather than as two
+ * levels competing for the eye.
+ */
+function SubPages({ pages }: { pages: { to: string; label: string }[] }) {
+  return (
+    <>
+      {pages.map((page) => (
+        <NavLink
+          key={page.to}
+          to={page.to}
+          className={({ isActive }) =>
+            cn(
+              'rounded-md px-1.5 py-[0.375rem] text-[0.75rem] transition-colors',
+              isActive
+                ? 'bg-raised-2 font-medium text-ink'
+                : 'text-dim hover:bg-raised hover:text-ink',
+            )
+          }
+        >
+          {page.label}
+        </NavLink>
+      ))}
+    </>
   )
 }
 
@@ -154,17 +199,17 @@ function DotRow({
       to={to}
       title={title}
       className={cn(
-        'flex items-center gap-2.5 rounded-md px-2 py-[0.4375rem] text-[0.78125rem] transition-colors',
+        'flex items-center gap-1.5 rounded-md px-1.5 py-[0.375rem] text-[0.75rem] transition-colors',
         active ? 'bg-raised text-ink' : 'text-soft hover:bg-raised hover:text-ink',
       )}
     >
-      {dotClass ? <span className={cn('mx-1 size-1.5 flex-none rounded-full', dotClass)} /> : null}
+      {dotClass ? <span className={cn('size-1.5 flex-none rounded-full', dotClass)} /> : null}
       {leading}
       <span className="truncate">{children}</span>
       {trailing !== undefined ? (
         <>
           <span className="flex-1" />
-          <span className={cn('font-mono text-[0.6875rem] tabular text-dim', trailingClass)}>
+          <span className={cn('font-mono text-[0.625rem] tabular text-dim', trailingClass)}>
             {trailing}
           </span>
         </>
@@ -232,7 +277,7 @@ function SavedFilterRow({
           aria-label={`Forget the saved filter “${label}”`}
           title="Forget this filter"
           onClick={() => removeSavedFilter(id)}
-          className="absolute inset-y-0 right-1 hidden items-center px-1 text-faint hover:text-blunder group-hover/saved:flex"
+          className="absolute inset-y-0 right-0 hidden items-center bg-raised px-1 text-faint hover:text-blunder group-hover/saved:flex"
         >
           ×
         </button>
@@ -245,7 +290,6 @@ function SavedFilters({ search }: { search: string }) {
   const filters = useSavedFilters()
   return (
     <>
-      <SectionLabel>Saved filters</SectionLabel>
       {filters.map((filter) => (
         <SavedFilterRow key={filter.id} {...filter} search={search} />
       ))}
@@ -261,7 +305,7 @@ function YourLines({ search }: { search: string }) {
 
   return (
     <>
-      <SectionLabel>{`Your lines · ${scope ?? 'both colours'}`}</SectionLabel>
+      <div className="px-1.5 py-1 text-[0.625rem] text-faint">{`Your lines · ${scope ?? 'both colours'}`}</div>
       {lines.map((line) => (
         <DotRow
           key={line.eco}
@@ -286,7 +330,6 @@ function Reports({ search }: { search: string }) {
   const current = reportFrom(search)
   return (
     <>
-      <SectionLabel>Reports</SectionLabel>
       {REPORTS.map((report) => (
         <DotRow
           key={report.key}
@@ -415,62 +458,68 @@ function NavFooter() {
   )
 }
 
-/** The second section, which is the screen's own: filters, lines, reports or engines. */
-function ContextSection({ pathname, search }: { pathname: string; search: string }) {
-  if (pathname === '/games') return <SavedFilters search={search} />
-  if (pathname.startsWith('/explorer')) return <YourLines search={search} />
-  if (pathname.startsWith('/stats')) return <Reports search={search} />
-  return <EngineRoster />
+/**
+ * What unfolds under the open entry: its pages, or the list that belongs to the screen it
+ * is showing — the same indent and hairline either way, so a fold is one shape.
+ *
+ * Games opens on the library itself and not on one game: a saved cut is a jump within the
+ * list, which is not a question anyone is asking while looking at a board.
+ */
+function Folded({ to, pathname, search }: { to: string; pathname: string; search: string }) {
+  const pages = SUBPAGES[to]
+  const body = pages ? (
+    <SubPages pages={pages} />
+  ) : to === '/games' ? (
+    pathname === '/games' ? <SavedFilters search={search} /> : null
+  ) : to === '/explorer' ? (
+    <YourLines search={search} />
+  ) : to === '/stats' ? (
+    <Reports search={search} />
+  ) : null
+
+  if (!body) return null
+  return (
+    <div className="ml-3 flex flex-col border-l border-hairline pl-1">{body}</div>
+  )
 }
 
 export function SideNav() {
   const { pathname, search } = useLocation()
   const games = useGames({ limit: 1 })
-  const blunders = useGames({ has_blunders: true, limit: 1 })
   const live = useLiveState()
 
   const total = games.data?.total
-  const flagged = blunders.data?.total
   const liveActive = live.data?.active === true
-  // The blunder log is the library under one filter, so the two rows share a route: the
-  // one the query string names is the one that lights up.
-  const onBlunderLog =
-    pathname === '/games' && new URLSearchParams(search).get('has_blunders') === 'true'
+
+  const entry = (item: NavItem, trailing?: string) => (
+    <Fragment key={item.to}>
+      <Item item={item} trailing={trailing} />
+      {inSection(pathname, item.to) ? (
+        <Folded to={item.to} pathname={pathname} search={search} />
+      ) : null}
+    </Fragment>
+  )
 
   return (
     <nav className="flex w-50 flex-none flex-col gap-0.5 border-r border-hairline bg-panel px-2.5 py-3.5">
       <SectionLabel>Workspace</SectionLabel>
-      {WORKSPACE.map((item) => (
-        <Item
-          key={item.to}
-          item={item}
-          active={item.to === '/games' && onBlunderLog ? false : undefined}
-          trailing={
-            item.to === '/games' && total !== undefined
-              ? total.toLocaleString()
-              : item.to === '/live' && liveActive
-                ? 'on air'
-                : undefined
-          }
-        />
-      ))}
-      <Item
-        item={{ to: BLUNDER_LOG, label: 'Blunder log', icon: Flame }}
-        active={onBlunderLog}
-        trailing={flagged ? flagged.toLocaleString() : undefined}
-        trailingClass="text-blunder"
-      />
+      {WORKSPACE.map((item) =>
+        entry(
+          item,
+          item.to === '/games' && total !== undefined
+            ? total.toLocaleString()
+            : item.to === '/live' && liveActive
+              ? 'on air'
+              : undefined,
+        ),
+      )}
 
       <div className="h-3.5" />
-      <SectionLabel>Data</SectionLabel>
-      {DATA.map((item) => (
-        <Item key={item.to} item={item} />
-      ))}
-
-      <div className="h-3.5" />
-      <ContextSection pathname={pathname} search={search} />
+      <SectionLabel>Data &amp; compute</SectionLabel>
+      {DATA.map((item) => entry(item))}
 
       <div className="flex-1" />
+      <EngineRoster />
       <NavFooter />
     </nav>
   )

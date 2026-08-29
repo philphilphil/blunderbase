@@ -14,7 +14,7 @@ import { RolesForm } from './RolesForm'
 import { engineRoles } from './roles'
 
 /**
- * Settings → Engines as one ranked screen: assignments, engine inventory, then capacity.
+ * Engines as one ranked screen: assignments, engine inventory, then capacity.
  * Policy comes first because a role that cannot run is the actionable failure; the flat
  * inventory makes kind, role and host comparable; host setup is last because it changes
  * where work can run rather than what the deployment has chosen to run.
@@ -36,7 +36,7 @@ export function EnginesPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: 'Settings', to: '/settings' }, { label: 'Engines' }]} />
+      <SetPageChrome breadcrumb={[{ label: 'Engines' }]} />
       <PageHeader
         className="max-w-5xl"
         title="Engines"

@@ -1,4 +1,3 @@
-import { Hand } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -7,8 +6,8 @@ import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { useGames, useImportJobs, useProfile } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 
-import { ConnectAccount } from './ConnectAccount'
-import { PgnUpload } from './PgnUpload'
+import { LibraryManagement } from './LibraryManagement'
+import { SourcesTable } from './SourcesTable'
 import { SyncHistory } from './SyncHistory'
 import { useImportProgress } from './useImportProgress'
 
@@ -22,15 +21,14 @@ function newestFirst(jobs: ImportJob[] | undefined): ImportJob[] | undefined {
   )
 }
 
-function latestOf(jobs: ImportJob[] | undefined, source: Source): ImportJob | undefined {
-  return jobs?.find((job) => job.source === source)
-}
-
 /**
  * Import: connect an account, sync it, drop a PGN in, and read what every previous sync
- * did. No dedicated design turn — the cards, table and badges are the ones the rest of the
- * app uses. Handing the coach the address of all this lives on its own page, under
- * Settings → MCP.
+ * did.
+ *
+ * Two tables and a strip, in the order the work happens: what games come from, what every
+ * run of it did, and emptying the lot. No dedicated design turn; the table, badges and
+ * chips are the ones the rest of the app uses. Assistant setup, which used to be filed
+ * under the same heading, has a page of its own.
  */
 export function ImportPage() {
   const jobs = useImportJobs({ limit: HISTORY_LIMIT })
@@ -41,6 +39,8 @@ export function ImportPage() {
   const history = useMemo(() => newestFirst(jobs.data), [jobs.data])
   const accounts = profile.data?.accounts ?? []
   const total = games.data?.total
+
+  const latestOf = (source: Source) => history?.find((job) => job.source === source)
 
   return (
     <PageBody>
@@ -61,37 +61,11 @@ export function ImportPage() {
         }
       />
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        <ConnectAccount
-          source="lichess"
-          account={accounts.find((account) => account.platform === 'lichess')}
-          lastJob={latestOf(history, 'lichess')}
-          progress={progress.lichess}
-        />
-        <ConnectAccount
-          source="chesscom"
-          account={accounts.find((account) => account.platform === 'chesscom')}
-          lastJob={latestOf(history, 'chesscom')}
-          progress={progress.chesscom}
-        />
-        <PgnUpload progress={progress.pgn} />
-      </div>
-
-      <div className="flex items-start gap-3 rounded-xl border border-dashed border-edge-strong bg-panel/60 px-3.5 py-3">
-        <Hand className="mt-px size-3.5 flex-none text-faint" aria-hidden />
-        <div className="flex flex-col gap-1">
-          <span className="text-[0.75rem] font-medium text-soft">
-            Over-the-board games, entered by hand
-          </span>
-          <p className="text-[0.71875rem] leading-[1.5] text-dim">
-            Not built yet. An OTB game exported from a scoresheet app is a PGN — drop it in
-            above and it arrives like any other import, under the{' '}
-            <span className="font-mono text-soft-2">pgn</span> source.
-          </p>
-        </div>
-      </div>
+      <SourcesTable accounts={accounts} latestOf={latestOf} progress={progress} />
 
       <SyncHistory jobs={history} isLoading={jobs.isPending} error={jobs.error} />
+
+      <LibraryManagement />
     </PageBody>
   )
 }

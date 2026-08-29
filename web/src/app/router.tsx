@@ -2,7 +2,7 @@ import { createBrowserRouter, Link } from 'react-router-dom'
 
 import { AppShell } from '@/components/shell/AppShell'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
-import { AnalysisPage } from '@/routes/analysis'
+import { AnalysisPage, EnginePassesPage, MaiaSettingsPage } from '@/routes/analysis'
 import { DashboardPage } from '@/routes/dashboard'
 import { EnginesPage } from '@/routes/engines'
 import { ExplorerPage } from '@/routes/explorer'
@@ -13,7 +13,6 @@ import { ImportPage } from '@/routes/import'
 import { LivePage } from '@/routes/live'
 import { McpPage } from '@/routes/mcp'
 import { NotesPage } from '@/routes/notes'
-import { SettingsPage } from '@/routes/settings'
 import { StatsPage } from '@/routes/stats'
 
 function NotFound() {
@@ -45,11 +44,11 @@ export const router = createBrowserRouter([
       { path: 'stats', element: <StatsPage /> },
       { path: 'import', element: <ImportPage /> },
       { path: 'analysis', element: <AnalysisPage /> },
-      { path: 'settings', element: <SettingsPage /> },
-      { path: 'settings/engines', element: <EnginesPage /> },
-      // Under settings rather than at `/mcp`: that path is the MCP server itself, and a
-      // client pointed at it must reach the backend, never this app.
-      { path: 'settings/mcp', element: <McpPage /> },
+      { path: 'analysis/engine', element: <EnginePassesPage /> },
+      { path: 'analysis/maia', element: <MaiaSettingsPage /> },
+      { path: 'engines', element: <EnginesPage /> },
+      // `/mcp` is the server itself, so the human-facing setup page uses `/assistant`.
+      { path: 'assistant', element: <McpPage /> },
       { path: 'live', element: <LivePage /> },
       { path: 'help', element: <HelpPage /> },
       { path: '*', element: <NotFound /> },

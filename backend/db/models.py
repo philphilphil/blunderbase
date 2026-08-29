@@ -102,7 +102,7 @@ class AuthSession(Base):
 
 
 class AppSetting(Base):
-    """One piece of deployment configuration the owner edits on the Settings page.
+    """One piece of deployment configuration the owner edits in the analysis UI.
 
     Key and value rather than a column apiece: these are single values a person changes
     from a form, not a schema anything joins against, and the set of them is expected to

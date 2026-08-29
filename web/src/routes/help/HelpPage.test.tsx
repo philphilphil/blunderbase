@@ -58,6 +58,9 @@ describe('HelpPage', () => {
     for (const question of ['Quick vs deep', 'Why Maia never shows a line', 'What a move cost']) {
       expect(screen.getByRole('heading', { name: question })).toBeInTheDocument()
     }
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('link', { name: 'Engine passes' })).toHaveAttribute(
+      'href',
+      '/analysis/engine',
+    )
   })
 })

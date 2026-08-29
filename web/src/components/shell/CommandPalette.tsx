@@ -16,13 +16,11 @@ import {
   ChartNoAxesColumn,
   Cpu,
   Download,
-  Flame,
   Gauge,
   LayoutDashboard,
   Library,
   Network,
   Radio,
-  Settings,
   Signpost,
   StickyNote,
   Swords,
@@ -97,15 +95,10 @@ const PAGES: PageRoute[] = [
     icon: Gauge,
     to: '/analysis',
   },
-  { label: 'Engines', hint: 'the roster and what runs what', icon: Cpu, to: '/settings/engines' },
-  { label: 'Settings', hint: 'the deployment', icon: Settings, to: '/settings' },
-  { label: 'MCP', hint: 'connect your assistant', icon: Bot, to: '/settings/mcp' },
-  {
-    label: 'Blunder log',
-    hint: 'games a blunder was found in',
-    icon: Flame,
-    to: '/games?has_blunders=true',
-  },
+  { label: 'Engines', hint: 'the roster and what runs what', icon: Cpu, to: '/engines' },
+  { label: 'Engine passes', hint: 'budgets and move labels', icon: Gauge, to: '/analysis/engine' },
+  { label: 'Maia', hint: 'human levels and when they run', icon: Gauge, to: '/analysis/maia' },
+  { label: 'Assistant', hint: 'MCP keys and client setup', icon: Bot, to: '/assistant' },
 ]
 
 function matches(query: string, ...fields: (string | undefined)[]): boolean {

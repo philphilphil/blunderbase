@@ -1,6 +1,6 @@
 """Engine management: register a binary, keep its options honest, tell a role what it has.
 
-Engines are rows, not configuration, so this module is what the Settings → Engines screen
+Engines are rows, not configuration, so this module is what the Engines screen
 and the MCP coach both talk to. Three rules shape it:
 
 - A bad binary is rejected when it is added, not when an analysis run reaches for it. Every

@@ -53,7 +53,7 @@ export interface ErrorBody {
  * What every `/auth` route answers with: is there a password, and do I have it.
  *
  * It doubles as the app's bootstrap payload — it is the one call made before anything
- * renders — so the deployment-wide Maia target elo rides along on it. The Settings page
+ * renders — so the deployment-wide Maia target elo rides along on it. The Maia page
  * owns that value (`AppSettings` below), but every other screen needs it to render and
  * none of them should wait on a second call for it.
  */
@@ -89,7 +89,7 @@ export const MAIA_ELO_STEP = 50
 export const MAX_MAIA_ELOS = 5
 
 /**
- * `GET`/`PUT /settings` — everything the Settings page shows: eleven numbers, ten of them
+ * `GET`/`PUT /settings` — analysis configuration: eleven numbers, ten of them
  * nullable.
  *
  * Null is not "unset yet" pending a load: it is the deployment's answer that nobody has
@@ -128,7 +128,6 @@ export interface AppSettings {
   inaccuracy_threshold: number | null
   mistake_threshold: number | null
   blunder_threshold: number | null
-  default_owner_rating: number | null
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * The chips Settings → Engines uses for itself, and nothing outside it does.
+ * The chips the Engines page uses for itself, and nothing outside it does.
  *
  * Deliberately not `TierBadge`. On a game row that badge means "this game got a deep pass,
  * at depth 18" — a fact about work that happened. Reused here it meant "this engine is the

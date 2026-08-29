@@ -11,6 +11,11 @@
  * the mock's names: the design lists "Losses as black / Time trouble / Unanalysed", and
  * `backend/api/deps.py:game_filters` has no clock filter and no plain `analyzed` flag — so
  * the two it cannot express are the nearest cuts it can, `has_blunders` and `deep_analyzed`.
+ *
+ * "Blunders" is one of them, and is all the design's separate Blunder-log rail entry ever
+ * was: the library under `has_blunders`. A second permanent row for one saved cut said the
+ * blunders were a place rather than a filter, and left the owner two ways to reach the
+ * same list with two different counts beside them.
  */
 import { useSyncExternalStore } from 'react'
 
@@ -45,7 +50,7 @@ export const BUILT_IN_FILTERS: readonly SavedFilter[] = [
   },
   {
     id: 'with-blunders',
-    label: 'Games with blunders',
+    label: 'Blunders',
     filters: { has_blunders: true },
     dotClass: 'bg-mistake',
     builtin: true,

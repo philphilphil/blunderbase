@@ -13,10 +13,10 @@ import { estimateLabel } from './estimate'
  * The four passes an owner can start over the whole library, each carrying what it would
  * cost before it is pressed.
  *
- * This is the reason the page exists. The only whole-library button the app had was
+ * This is the reason the page exists. The only whole-library button the app had was an
  * "Analyse all" on the library screen, which said how many games and nothing about how
  * long — so a pass that turned out to be forty hours was one click away from an owner who
- * thought it was twenty minutes. Every card here shows the same two numbers: how many
+ * thought it was twenty minutes. That button is gone; this is where it went. Every card here shows the same two numbers: how many
  * games the press would queue, and what this deployment's own finished runs say that
  * costs. The estimate sits *on* the button rather than in a footnote because the moment it
  * is worth reading is the moment before the click.
@@ -120,7 +120,7 @@ function BackfillCard({
 }
 
 /**
- * The Maia fill, moved here off the Settings page: queueing thousands of runs over the
+ * The Maia fill belongs here rather than on the Maia configuration page: queueing thousands of runs over the
  * library is not a setting, whatever changing the levels is.
  */
 function MaiaFillCard({

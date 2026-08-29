@@ -253,10 +253,11 @@ class RunPlan:
     depth: int | None
     multipv: int
     thresholds: Thresholds
-    # Who the owner was in this game and what they were rated — the game's own rating, or
-    # `default_owner_rating` where it carries none. The colour is what an owner's-moves-only
-    # Maia pass filters on; the rating no pass reads at all, and is here because it is part
-    # of what a plan says about the player and crosses the wire to a runner with the rest.
+    # Who the owner was in this game and what they were rated. The colour is what an
+    # owner's-moves-only Maia pass filters on; the rating no pass reads at all, and is here
+    # because it is part of what a plan says about the player and crosses the wire to a
+    # runner with the rest. None where the game names no rating — a bare PGN, an unrated
+    # game — since nothing downstream is better off being told a number nobody measured.
     owner_color: Color | None = None
     owner_rating: int | None = None
     # The first level every Maia question in this run is asked at.
@@ -1869,7 +1870,6 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
             depth=run.depth,
             multipv=max(1, run.multipv),
             thresholds=thresholds,
-            owner_rating=app_settings_service.get_default_owner_rating(session),
             maia_target_elo=target_elo,
             maia_elos=tuple(elos),
             maia_only=bool(run.maia_only),
@@ -1921,7 +1921,7 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
         multipv=max(1, run.multipv),
         thresholds=thresholds,
         owner_color=game.owner_color,
-        owner_rating=owner_rating(session, game),
+        owner_rating=owner_rating(game),
         maia_target_elo=target_elo,
         maia_elos=tuple(elos),
         maia_only=bool(run.maia_only),
@@ -1930,13 +1930,13 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
     )
 
 
-def owner_rating(session: Session, game: Game) -> int:
-    """The owner's rating in this game, else the configured default."""
+def owner_rating(game: Game) -> int | None:
+    """What the owner was rated in this game, where the game says so at all."""
     if game.owner_color is Color.WHITE and game.white_rating:
         return int(game.white_rating)
     if game.owner_color is Color.BLACK and game.black_rating:
         return int(game.black_rating)
-    return app_settings_service.get_default_owner_rating(session)
+    return None
 
 
 # --- computing a run ------------------------------------------------------

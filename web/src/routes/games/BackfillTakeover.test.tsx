@@ -19,9 +19,12 @@ import type {
 import { GamesPage } from './GamesPage'
 
 /**
- * The whole path the owner takes: a count on a button, a confirmation, and then an app
- * that is nothing but the pass until it drains. The shell is rendered for real because
- * the takeover's contract is with the shell — it replaces it, rather than covering it.
+ * What a running whole-library pass does to the app: takes it over until the queue drains.
+ *
+ * Started from the Analysis page (`routes/analysis/LibraryActions.test.tsx` covers the
+ * confirm-and-post half), but what it takes over is any screen, so the library is the one
+ * rendered here. The shell is rendered for real because the takeover's contract is with
+ * the shell — it replaces it, rather than covering it.
  */
 
 class FakeSocket {
@@ -165,38 +168,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('Analyse all — the trigger', () => {
-  it('labels itself with what a pass would actually take on', async () => {
-    draw()
-    expect(await screen.findByRole('button', { name: 'Analyse all 8,412' })).toBeEnabled()
-  })
-
-  it('has nothing to offer when every game has been through a pass', async () => {
-    preview = { tier: 'quick', pending: 0 }
-    draw()
-    expect(await screen.findByRole('button', { name: 'All analysed' })).toBeDisabled()
-  })
-
-  it('asks first, then posts one call and takes the app over', async () => {
-    queue = { ...idle(), queued: 8_412, running: 4 }
-    const user = userEvent.setup()
-    draw()
-
-    await user.click(await screen.findByRole('button', { name: 'Analyse all 8,412' }))
-    expect(await screen.findByRole('dialog')).toHaveTextContent('8,412 games get a quick pass')
-    expect(postedTo('/analysis/backfill')).toHaveLength(0)
-
-    await user.click(screen.getByRole('button', { name: /start the pass/i }))
-
-    await waitFor(() => expect(postedTo('/analysis/backfill')).toEqual([{ tier: 'quick' }]))
-    expect(await screen.findByText('Analysing your library')).toBeInTheDocument()
-    // The shell is gone, not covered: no nav, no table, no way back to a board.
-    expect(screen.queryByLabelText('Select game 11')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /analyse all/i })).not.toBeInTheDocument()
-  })
-})
-
-describe('Analyse all — the takeover', () => {
+describe('the backfill takeover', () => {
   it('comes back after a reload and counts the pass down off the queue', async () => {
     stored({ total: 10_000, startedAt: Date.now() - 600_000 })
     queue = { ...idle(), queued: 6_000, running: 4 }

@@ -22,14 +22,22 @@ vi.mock('@/lib/events/EventsProvider', () => ({ useEvents }))
 
 const pending = { data: undefined, isPending: true }
 
-function draw({ status = 'open' as ConnectionStatus, reconnects = 0 } = {}) {
+function draw({
+  status = 'open' as ConnectionStatus,
+  reconnects = 0,
+  path = '/',
+}: {
+  status?: ConnectionStatus
+  reconnects?: number
+  path?: string
+} = {}) {
   useEngines.mockReturnValue(pending)
   useGames.mockReturnValue(pending)
   useLiveState.mockReturnValue(pending)
   useEvents.mockReturnValue({ status, reconnects })
   return render(
     <ThemeProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <SideNav />
       </MemoryRouter>
     </ThemeProvider>,
@@ -66,5 +74,31 @@ describe('the rail footer', () => {
     )
     expect(screen.getByRole('link', { name: /github/i })).toHaveAttribute('target', '_blank')
     expect(screen.getByLabelText('connecting to /events')).toBeInTheDocument()
+  })
+})
+
+describe('the analysis navigation', () => {
+  it('folds its pages away everywhere else', () => {
+    draw({ path: '/games' })
+
+    expect(screen.queryByRole('link', { name: 'Engine passes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Maia' })).not.toBeInTheDocument()
+  })
+
+  it('unfolds them on the analysis overview', () => {
+    draw({ path: '/analysis' })
+
+    expect(screen.getByRole('link', { name: 'Engine passes' })).toHaveAttribute(
+      'href',
+      '/analysis/engine',
+    )
+    expect(screen.getByRole('link', { name: 'Maia' })).toHaveAttribute('href', '/analysis/maia')
+  })
+
+  it('keeps them open on one of its own pages', () => {
+    draw({ path: '/analysis/maia' })
+
+    expect(screen.getByRole('link', { name: 'Engine passes' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Maia' })).toBeInTheDocument()
   })
 })

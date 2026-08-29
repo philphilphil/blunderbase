@@ -1,11 +1,11 @@
-"""The handful of settings the owner changes from the Settings page.
+"""The analysis settings the owner changes from the Engine passes and Maia pages.
 
 Everything else Blunderbase is configured with is an environment variable read once at
 boot (`backend/config.py`). These are not: they are the ones a person changes while the
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are fifteen of them, in six groups.
+There are fourteen of them, in five groups.
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
 is playing towards and the ones they want to contrast with, not the one they have. Batch
@@ -13,7 +13,7 @@ analysis bakes *every* configured level into every ply it asks about, and the an
 board's live queries ask the same set, so no two surfaces ever speak for two different
 humans. It is a list rather than a number because the interesting reading is a comparison:
 what a 1500 plays here and what a 1900 plays here, side by side. One to five of them, each
-clamped to what Maia can answer; an install that never opened the Settings page is pinned
+clamped to what Maia can answer; an install that never changed the Maia page is pinned
 to the top of that range alone, [2000]. `maia_target_elo` survives as the first of them,
 which is what every caller that only ever wanted one level still reads.
 
@@ -34,9 +34,6 @@ they are the budget of the *next* run rather than of every run ever queued.
 **The classification thresholds** — `inaccuracy`, `mistake`, `blunder`, in win-percentage
 points lost by the mover. Read per plan, which means a game re-analysed after they moved
 is judged by the new ones and one analysed before it keeps what it was judged by.
-
-**The default owner rating.** The rating to stand in for the owner's when the game itself
-carries none — an OTB PGN, an unrated game.
 
 **The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
 engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
@@ -87,7 +84,6 @@ DEEP_MULTIPV = "deep_multipv"
 INACCURACY_THRESHOLD = "inaccuracy_threshold"
 MISTAKE_THRESHOLD = "mistake_threshold"
 BLUNDER_THRESHOLD = "blunder_threshold"
-DEFAULT_OWNER_RATING = "default_owner_rating"
 # The three role assignments, each a nullable engine id. Not in `SETTINGS` for the same
 # reason `MAIA_ELOS` is not: those are single numbers with a range and a clamp, and an
 # engine id has neither — the nearest sensible engine to one that is gone is no engine.
@@ -120,7 +116,6 @@ DEEP_MULTIPV_DEFAULT = 4
 INACCURACY_DEFAULT = 5.0
 MISTAKE_DEFAULT = 10.0
 BLUNDER_DEFAULT = 15.0
-OWNER_RATING_DEFAULT = 1500
 # The levels an install that configured nothing asks Maia at: the top of what the model can
 # answer, and only that one. The same default the single target elo had, as a list of one.
 MAIA_ELOS_DEFAULT: tuple[int, ...] = (MAIA_MAX_RATING,)
@@ -133,7 +128,6 @@ MAX_MULTIPV = 10
 # The thresholds are win percentage, which is the whole of the scale.
 MIN_THRESHOLD = 0.0
 MAX_THRESHOLD = 100.0
-MIN_OWNER_RATING = 1
 # A flag's range: off, on, and nothing in between for a clamp to land on.
 FLAG_OFF = 0
 FLAG_ON = 1
@@ -223,13 +217,6 @@ SETTINGS: tuple[Setting, ...] = (
         low=MIN_THRESHOLD,
         high=MAX_THRESHOLD,
         whole=False,
-    ),
-    Setting(
-        key=DEFAULT_OWNER_RATING,
-        default=OWNER_RATING_DEFAULT,
-        low=MIN_OWNER_RATING,
-        high=None,
-        whole=True,
     ),
 )
 
@@ -419,12 +406,6 @@ def get_thresholds(session: Session) -> tuple[float, float, float]:
     values = read(session)
     inaccuracy, mistake, blunder = (_or_default(values, key) for key in THRESHOLD_KEYS)
     return inaccuracy, mistake, blunder
-
-
-def get_default_owner_rating(session: Session) -> int:
-    """The rating to stand in for the owner's when the game itself carries none."""
-    value = stored(session, DEFAULT_OWNER_RATING)
-    return OWNER_RATING_DEFAULT if value is None else int(value)
 
 
 def _or_default(values: Mapping[str, int | float | None], key: str) -> float:

@@ -47,7 +47,6 @@ def test_nothing_is_configured_until_somebody_configures_it(session: Session) ->
     assert app_settings.get_quick_nodes(session) == app_settings.QUICK_NODES_DEFAULT
     assert app_settings.get_deep_nodes(session) == app_settings.DEEP_NODES_DEFAULT
     assert app_settings.get_deep_multipv(session) == app_settings.DEEP_MULTIPV_DEFAULT
-    assert app_settings.get_default_owner_rating(session) == app_settings.OWNER_RATING_DEFAULT
     assert app_settings.get_thresholds(session) == (5.0, 10.0, 15.0)
     # The quick pass pays for Maia and the deep pass does not, over both sides of the board.
     assert app_settings.get_maia_on_quick(session) is True
@@ -76,7 +75,6 @@ def test_which_tier_a_maia_pass_belongs_to_is_the_tiers_own_setting(session: Ses
         (app_settings.INACCURACY_THRESHOLD, 7.5, 7.5),
         (app_settings.MISTAKE_THRESHOLD, 21, 21.0),
         (app_settings.BLUNDER_THRESHOLD, 44, 44.0),
-        (app_settings.DEFAULT_OWNER_RATING, 1200, 1200),
         (app_settings.MAIA_ON_QUICK, 0, 0),
         (app_settings.MAIA_ON_DEEP, 1, 1),
         (app_settings.MAIA_BOTH_SIDES, 0, 0),
@@ -103,7 +101,6 @@ def test_a_stored_value_is_what_comes_back(
         # Win percentage is the whole of the scale, either way.
         (app_settings.INACCURACY_THRESHOLD, -3, app_settings.MIN_THRESHOLD),
         (app_settings.BLUNDER_THRESHOLD, 250, app_settings.MAX_THRESHOLD),
-        (app_settings.DEFAULT_OWNER_RATING, 0, app_settings.MIN_OWNER_RATING),
         # A flag is off, on, and nothing in between for a stray number to land on.
         (app_settings.MAIA_ON_QUICK, 7, app_settings.FLAG_ON),
         (app_settings.MAIA_ON_DEEP, -1, app_settings.FLAG_OFF),
@@ -342,7 +339,6 @@ def test_a_put_stores_the_values_and_answers_with_them(api: TestClient) -> None:
         "inaccuracy_threshold": 5,
         "mistake_threshold": 15,
         "blunder_threshold": 25,
-        "default_owner_rating": 1200,
     }
     response = api.put("/api/settings", json=body)
 
@@ -557,18 +553,20 @@ def test_a_plan_built_after_a_put_carries_the_new_thresholds(
         assert plan.thresholds == analysis.Thresholds(inaccuracy=4.0, mistake=12.0, blunder=25.0)
 
 
-def test_a_game_with_no_rating_falls_back_to_the_configured_default(
+def test_a_game_with_no_rating_says_so_rather_than_inventing_one(
     api: TestClient, settings: Settings
 ) -> None:
-    """What the plan says the owner was rated where the game itself does not say."""
-    api.put("/api/settings", json={"default_owner_rating": 1234})
+    """What the plan says the owner was rated where the game itself does not say.
 
+    Nothing: an OTB PGN carries no rating, and a number nobody measured standing in for it
+    would be a fact about the player invented by the importer.
+    """
     with get_sessionmaker(settings)() as session:
         game = _seed(session)
         game.white_rating = None
         session.commit()
         plan = analysis.build_plan(session, analysis.request_analysis(session, game_id=game.id))
 
-        assert plan.owner_rating == 1234
+        assert plan.owner_rating is None
         # Which is not the level Maia is asked at: that is the deployment's, not the game's.
         assert plan.maia_target_elo == MAIA_MAX_RATING

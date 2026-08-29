@@ -326,7 +326,7 @@ class LiveMaia:
         `_reported_level`, not these.
 
         Read out of the database on every query, the same way the engine to start is:
-        changing them on the Settings page takes effect on the next thing the board asks,
+        changing them on the Maia page takes effect on the next thing the board asks,
         without restarting anything or dropping the warm process.
         """
         from backend.services.analysis import maia_bounds

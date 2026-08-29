@@ -17,6 +17,7 @@ import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { AnalysisControls } from './AnalysisControls'
+import { LinePreviewSettingsButton } from './LinePreviewSettings'
 
 // What a hovered line *is* belongs to the preview, not to the panel that reports one, so
 // the type lives beside the hook that consumes it — and is re-exported here because this
@@ -366,7 +367,7 @@ export function InfiniteAnalysisPanel({
         ) : null}
         {/*
           The row mode, at the weight of the readouts beside it: it says what hovering a line
-          will do, which is worth a glance and not worth a trip to Settings to change.
+          will do, which is worth a glance and can be configured beside the chip.
         */}
         {onHoverLine ? (
           <button
@@ -376,12 +377,13 @@ export function InfiniteAnalysisPanel({
                 row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
               })
             }
-            title={`Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle; the rest is in Settings.`}
+            title={`Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`}
             className="bb-chip px-1.5 py-px font-mono text-[0.625rem] text-dim transition-colors hover:text-ink"
           >
             {prefs.row}
           </button>
         ) : null}
+        {onHoverLine ? <LinePreviewSettingsButton /> : null}
       </div>
 
       {offer ? (

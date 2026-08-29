@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -172,13 +172,41 @@ describe('ImportPage', () => {
     await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
     expect(postedTo('/api/import/lichess')[0]).not.toHaveProperty('analyze')
 
-    const skip = screen.getAllByRole('checkbox', { name: 'Skip evaluation' })[0]!
+    // One switch for the whole table: the answer is never different per source.
+    const skip = screen.getByRole('checkbox', { name: 'Skip evaluation' })
     await userEvent.click(skip)
     expect(skip).toHaveAttribute('aria-checked', 'true')
     await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
 
     await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(2))
     expect(postedTo('/api/import/lichess')[1]).toMatchObject({ username: 'phib', analyze: false })
+  })
+
+  it('tells a sync what the strip above the table says, not what a row does', async () => {
+    stubFetch({
+      '/api/import/jobs': [],
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+      '/api/import/lichess': { source: 'lichess', status: 'running', job_id: 11 },
+    })
+    renderPage(<ImportPage />)
+
+    const username = await screen.findByLabelText<HTMLInputElement>('Username', {
+      selector: '#lichess-username',
+    })
+    await waitFor(() => expect(username.value).toBe('phib'))
+
+    // A native date input takes a value, not keystrokes.
+    fireEvent.change(screen.getByLabelText('Since'), { target: { value: '2024-01-01' } })
+    await userEvent.type(screen.getByLabelText('Max games'), '50')
+    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+
+    await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
+    expect(postedTo('/api/import/lichess')[0]).toMatchObject({
+      username: 'phib',
+      since: '2024-01-01',
+      max_games: 50,
+    })
   })
 
   it('carries the same skip into the PGN upload, where it is a query flag', async () => {
@@ -200,8 +228,8 @@ describe('ImportPage', () => {
     await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(1))
     expect(urlsFor('/api/import/pgn/upload')[0]).not.toContain('analyze')
 
-    // The PGN card has its own box, and it is the last of the three on the page.
-    const skip = screen.getAllByRole('checkbox', { name: 'Skip evaluation' }).at(-1)!
+    // The same one switch the accounts above use.
+    const skip = screen.getByRole('checkbox', { name: 'Skip evaluation' })
     await userEvent.click(skip)
     await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
 
