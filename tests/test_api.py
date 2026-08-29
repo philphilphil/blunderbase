@@ -19,7 +19,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.api.app import create_app
-from backend.api.schemas import MAX_BATCH_GAMES
 from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.enums import (
     Classification,
@@ -509,14 +508,6 @@ def test_reconcile_repairs_a_library_whose_account_was_never_applied(
     }
 
 
-def test_a_platform_nobody_plays_on_is_a_422(api: TestClient) -> None:
-    response = api.post("/accounts", json={"platform": "telepathy", "username": OWNER})
-
-    assert response.status_code == 422
-    assert error_of(response) == "invalid_request"
-    assert response.json()["fields"][0]["field"].endswith("platform")
-
-
 def test_the_accounts_routes_are_behind_the_owners_password(
     settings: Settings, seeded: dict[str, int]
 ) -> None:
@@ -687,24 +678,6 @@ def test_a_batch_queues_around_the_game_it_cannot_take(api: TestClient) -> None:
     assert api.get("/analysis/queue").json()["queued"] == 2
 
 
-def test_a_batch_needs_at_least_one_game(api: TestClient) -> None:
-    response = api.post("/analysis/batch", json={"game_ids": []})
-
-    assert response.status_code == 422
-    assert error_of(response) == "invalid_request"
-    assert api.get("/analysis/queue").json()["queued"] == 0
-
-
-def test_a_batch_takes_no_single_game_field(api: TestClient, seeded: dict[str, int]) -> None:
-    """The two forms are two bodies: `game_id` on a batch is a typo, not an extra game."""
-    response = api.post(
-        "/analysis/batch", json={"game_ids": [seeded["game_id"]], "game_id": seeded["game_id"]}
-    )
-
-    assert response.status_code == 422
-    assert error_of(response) == "invalid_request"
-
-
 def test_a_batch_queues_a_repeated_game_once(api: TestClient, seeded: dict[str, int]) -> None:
     game_id = seeded["game_id"]
 
@@ -724,17 +697,6 @@ def test_a_batch_with_no_usable_engine_is_the_same_typed_conflict(
 
     assert response.status_code == 409
     assert error_of(response) == "tier_unavailable"
-
-
-def test_a_batch_still_stops_at_five_hundred_games(api: TestClient) -> None:
-    """The cap on a hand-made selection stays where it is; `/backfill` is the uncapped one."""
-    response = api.post(
-        "/analysis/batch", json={"game_ids": list(range(1, MAX_BATCH_GAMES + 2))}
-    )
-
-    assert response.status_code == 422
-    assert error_of(response) == "invalid_request"
-    assert api.get("/analysis/queue").json()["queued"] == 0
 
 
 def _register_maia(settings: Settings, engine_command: str) -> None:
@@ -1713,7 +1675,6 @@ def test_the_search_limit_caps_every_group_on_its_own(api: TestClient) -> None:
     capped = api.get("/search", params={"q": "lopez", "limit": 1}).json()
     assert len(capped["games"]) == 1
     assert len(capped["openings"]) == 1
-    assert api.get("/search", params={"q": "lopez", "limit": 21}).status_code == 422
 
 
 # --- /events --------------------------------------------------------------

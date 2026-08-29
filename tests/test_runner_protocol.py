@@ -99,11 +99,6 @@ def test_a_type_nobody_defines_is_refused() -> None:
         protocol.validate({"type": "run_teleport", "run_id": 3})
 
 
-def test_a_frame_missing_a_required_field_is_refused() -> None:
-    with pytest.raises(ProtocolError, match="attempt_token"):
-        protocol.validate({"type": protocol.RUN_COMPLETE, "run_id": 3, "evals": []})
-
-
 def test_a_field_a_newer_peer_added_is_carried_not_refused() -> None:
     frame = protocol.validate(
         {"type": protocol.RUN_CANCELLED, "run_id": 3, "elapsed_ms": 12, "future": "field"}

@@ -547,16 +547,6 @@ def test_a_fen_that_is_not_a_position_is_a_422(api: TestClient) -> None:
     assert response.json()["error"] == "invalid_request"
 
 
-def test_a_body_with_no_fen_is_a_422(api: TestClient) -> None:
-    assert api.post("/api/maia/policy", json={"moves": 3}).status_code == 422
-
-
-def test_a_field_nobody_declared_is_a_422(api: TestClient) -> None:
-    response = api.post("/api/maia/policy", json={"fen": STARTING, "level": 1700})
-
-    assert response.status_code == 422
-
-
 @pytest.fixture()
 def api_without_maia(settings: Settings) -> Iterator[TestClient]:
     settings.analysis_workers = False

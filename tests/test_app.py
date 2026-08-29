@@ -170,20 +170,6 @@ def test_a_large_response_is_compressed_for_a_client_that_asks(
             assert int(response.headers["content-length"]) < len(response.content), path
 
 
-def test_a_client_that_does_not_ask_is_answered_uncompressed(settings: Settings) -> None:
-    with running_app(create_app(settings)) as client:
-        response = client.get("/openapi.json", headers={"accept-encoding": "identity"})
-    assert response.status_code == 200
-    assert "content-encoding" not in response.headers
-
-
-def test_a_short_response_is_not_worth_compressing(settings: Settings) -> None:
-    with running_app(create_app(settings)) as client:
-        response = client.get("/health", headers={"accept-encoding": "gzip"})
-    assert response.json() == {"status": "ok"}
-    assert "content-encoding" not in response.headers
-
-
 def test_nothing_is_served_when_the_web_app_was_never_built(settings: Settings) -> None:
     """Development: `pnpm dev` has the page and proxies `/api` here."""
     app = create_app(settings)

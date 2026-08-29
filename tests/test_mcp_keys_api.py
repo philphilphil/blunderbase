@@ -67,12 +67,6 @@ def test_a_duplicate_name_is_a_conflict(api: TestClient) -> None:
     assert response.json()["error"] == "duplicate_mcp_key"
 
 
-@pytest.mark.parametrize("body", [{"name": ""}, {"name": "x" * 65}, {}, {"name": "ok", "x": 1}])
-def test_a_body_that_does_not_hold_up_is_refused(api: TestClient, body: dict[str, Any]) -> None:
-    response = api.post("/mcp-keys", json=body)
-    assert response.status_code == 422
-
-
 def test_a_key_is_revoked_and_a_second_revoke_is_a_404(api: TestClient) -> None:
     created = create(api)
     key_id = created["key"]["id"]

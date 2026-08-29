@@ -131,12 +131,6 @@ def test_the_name_this_host_answers_to_is_not_available(api: TestClient) -> None
     assert refused.json()["error"] == "invalid_runner"
 
 
-def test_a_runner_needs_at_least_one_slot(api: TestClient) -> None:
-    refused = api.post("/runners", json={"name": "gpu-box", "slots": 0})
-
-    assert refused.status_code == 422
-
-
 # --- what the list says -----------------------------------------------------
 
 

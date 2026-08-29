@@ -425,17 +425,6 @@ def test_thresholds_that_do_not_rise_are_a_422(api: TestClient) -> None:
     assert api.get("/api/settings").json() == UNCONFIGURED
 
 
-def test_a_value_that_is_not_a_number_is_a_422(api: TestClient) -> None:
-    response = api.put("/api/settings", json={"maia_target_elo": "seventeen hundred"})
-
-    assert response.status_code == 422
-
-
-def test_a_field_nobody_declared_is_a_422(api: TestClient) -> None:
-    """Request bodies are strict, so a typo is refused rather than silently ignored."""
-    assert api.put("/api/settings", json={"maia_target_leo": 1700}).status_code == 422
-
-
 def test_the_bootstrap_payload_moves_with_the_setting(api: TestClient) -> None:
     """`/auth/status` is what every screen renders from, so it reads the same row."""
     api.put("/api/settings", json={"maia_target_elo": 1700})

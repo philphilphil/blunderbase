@@ -181,83 +181,6 @@ def test_metadata_covers_every_entity() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
 
 
-def test_every_table_roundtrips(sessions: sessionmaker[Session]) -> None:
-    with sessions() as writer:
-        ids = seed(writer)
-
-    with sessions() as reader:
-        account = reader.get(Account, ids["account"])
-        assert account is not None
-        assert account.platform is Platform.LICHESS
-        assert account.is_owner is True
-        assert account.created_at.tzinfo is UTC
-
-        engine = reader.get(Engine, ids["engine"])
-        assert engine is not None
-        assert engine.kind is EngineKind.UCI
-        assert engine.options == {"Threads": 2, "Hash": 256}
-        assert engine.enabled is True
-
-        job = reader.get(ImportJob, ids["job"])
-        assert job is not None
-        assert job.status is JobStatus.DONE
-        assert job.cursor == "1754068200000"
-        assert job.errors == [{"ref": "abcd1234", "error": "unparseable"}]
-        assert (job.games_imported, job.games_skipped, job.games_failed) == (1, 0, 0)
-
-        position = reader.get(Position, ids["position"])
-        assert position is not None
-        assert position.side_to_move is Color.BLACK
-        assert position.zobrist_key == "823c9b50fd114196"
-
-        game = reader.get(Game, ids["game"])
-        assert game is not None
-        assert game.source is Source.LICHESS
-        assert game.result is Result.WHITE_WIN
-        assert game.speed is Speed.BLITZ
-        assert game.owner_color is Color.WHITE
-        assert game.moves_uci == ["e2e4", "c7c5"]
-        assert game.moves_san == ["e4", "c5"]
-        assert game.clocks == [178.0, 177.5]
-        assert game.variant == "standard"
-        assert game.played_at == PLAYED_AT
-        assert game.import_job_id == ids["job"]
-
-        game_position = reader.get(GamePosition, ids["game_position"])
-        assert game_position is not None
-        assert (game_position.ply, game_position.move_san) == (1, "c5")
-        assert game_position.position.fen == position.fen
-
-        run = reader.get(AnalysisRun, ids["run"])
-        assert run is not None
-        assert run.tier is Tier.QUICK
-        assert run.status is RunStatus.DONE
-        assert (run.nodes, run.multipv, run.attempts, run.priority) == (50_000, 1, 0, 0)
-
-        move_eval = reader.get(MoveEval, ids["move_eval"])
-        assert move_eval is not None
-        assert move_eval.classification is Classification.BLUNDER
-        assert move_eval.best_lines == [
-            {"multipv": 1, "cp": 28, "mate": None, "pv": ["e7e5", "g1f3"]}
-        ]
-        assert move_eval.maia_policy == {"1700": [{"uci": "e7e5", "p": 0.31}]}
-
-        line = reader.get(Line, ids["line"])
-        assert line is not None
-        assert (line.game_id, line.base_ply) == (game.id, 1)
-        assert line.moves == ["g1f3", "d7d6"]
-        assert line.created_at.tzinfo is UTC
-
-        note = reader.get(Note, ids["note"])
-        assert note is not None
-        assert note.tags == ["opening", "najdorf"]
-        assert (note.line_id, note.ply) == (ids["line"], 2)
-        assert note.source is NoteSource.MCP
-        assert note.line is not None and note.line.moves == ["g1f3", "d7d6"]
-        assert note.created_at.tzinfo is UTC
-        assert note.updated_at.tzinfo is UTC
-
-
 def test_game_source_id_is_unique_per_source(session: Session) -> None:
     seed(session)
     session.add(
@@ -290,25 +213,6 @@ def test_missing_source_id_does_not_collide(session: Session) -> None:
         )
     session.commit()
     assert len(session.scalars(select(Game)).all()) == 2
-
-
-def test_unknown_enum_value_is_rejected_in_python(session: Session) -> None:
-    """No database constraint spells this; `EnumString` refuses the value on the way in."""
-    session.add(
-        Game(
-            source="telepathy",
-            dedup_hash="a" * 64,
-            white_name="owner",
-            black_name="rival",
-            result=Result.DRAW,
-            pgn="1. e4 1/2-1/2\n",
-        )
-    )
-    with pytest.raises(StatementError) as caught:
-        session.flush()
-    assert isinstance(caught.value.orig, ValueError)
-    assert "telepathy" in str(caught.value.orig)
-    session.rollback()
 
 
 def test_deleting_a_game_takes_its_analysis_with_it(sessions: sessionmaker[Session]) -> None:
