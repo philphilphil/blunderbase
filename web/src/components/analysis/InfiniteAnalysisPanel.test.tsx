@@ -247,15 +247,52 @@ describe('InfiniteAnalysisPanel', () => {
     expect(token(rows[0]!, 1)).toHaveTextContent('d6')
     expect(token(rows[0]!, 3)).toHaveTextContent('cxd4')
 
-    // The lines reach the panel already in White's frame (`streamModel`); the header still
-    // names whose move it is, which the numbers alone do not say.
-    expect(screen.getByText('black to move')).toBeInTheDocument()
+    // The lines reach the panel already in White's frame (`streamModel`); the header keeps
+    // identity/actions and runtime stats on two deliberate rows, without repeating turn.
+    expect(screen.queryByText('black to move')).not.toBeInTheDocument()
     expect(screen.getByTestId('infinite-analysis-engine')).toHaveTextContent('stockfish')
     expect(screen.getByText('local')).toBeInTheDocument()
-    expect(screen.getByText('d24')).toBeInTheDocument()
-    expect(screen.getByText('18.4M nodes')).toBeInTheDocument()
-    expect(screen.getByText('1.8M/s')).toBeInTheDocument()
+    const meta = screen.getByTestId('infinite-analysis-meta')
+    expect(within(meta).getByText('d24')).toBeInTheDocument()
+    expect(within(meta).getByText('18.4M nodes')).toBeInTheDocument()
+    expect(within(meta).getByText('1.8M/s')).toBeInTheDocument()
     expect(screen.queryByTestId('infinite-analysis-pending')).not.toBeInTheDocument()
+  })
+
+  it('separates a browser engine from its repeated runner name', () => {
+    render(
+      <InfiniteAnalysisPanel
+        stream={streamApi({
+          enabled: true,
+          phase: 'running',
+          session: {
+            ...SESSION,
+            engine: 'Stockfish (Firefox on macOS)',
+            runner_id: 3,
+            runner: 'Firefox on macOS',
+          },
+          snapshot: SNAPSHOT,
+        })}
+        fen={SICILIAN}
+        onHoverLine={vi.fn()}
+      />,
+    )
+
+    const engine = screen.getByTestId('infinite-analysis-engine')
+    const host = screen.getByTestId('infinite-analysis-host')
+    expect(engine).toHaveTextContent(/^Stockfish$/)
+    expect(engine.nextElementSibling).toBe(host)
+    expect(
+      within(screen.getByTestId('infinite-analysis-header')).getByText('Firefox on macOS'),
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('infinite-analysis-meta')).queryByText('Firefox on macOS'),
+    ).not.toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('infinite-analysis-header')).getByRole('button', {
+        name: 'arrows',
+      }),
+    ).toBeInTheDocument()
   })
 
   it('offers the hovered line’s first move, and takes it back on leaving', async () => {

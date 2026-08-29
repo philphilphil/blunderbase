@@ -354,6 +354,7 @@ export interface GameFilters {
   opponent?: string
   variant?: string
   has_blunders?: boolean
+  analyzed?: boolean
   deep_analyzed?: boolean
   text?: string
 }
@@ -645,10 +646,19 @@ export interface QueueDestination extends Extra {
 export interface QueueStatus {
   queued: number
   running: number
+  /** The owner has stopped the workers claiming; what one already claimed still finishes. */
+  paused: boolean
   workers: boolean
   busy: number
   /** Always sent by the backend (`default_factory`); consumers still read `?? []`. */
   destinations: QueueDestination[]
+}
+
+/** What pausing or resuming answers: the switch, and the depth it was thrown over. */
+export interface QueuePaused {
+  paused: boolean
+  queued: number
+  running: number
 }
 
 export interface PositionAnalysis extends Extra {

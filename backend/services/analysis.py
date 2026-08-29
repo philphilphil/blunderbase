@@ -102,6 +102,9 @@ EVENT_RUN_DONE = "analysis.done"
 EVENT_RUN_FAILED = "analysis.failed"
 # One frame for a whole library-sized write, in place of one per run; see `backfill_event`.
 EVENT_BACKFILL = "analysis.backfill"
+# The queue stopping or starting again. Its own event rather than a `backfill` one: nothing
+# was queued and nothing was dropped, so that frame's counts would all be untrue.
+EVENT_QUEUE_PAUSED = "analysis.paused"
 
 # One progress event every this many analysed positions, plus one at the end. A run of a
 # hundred positions should tell a UI it is moving without flooding a socket.
@@ -1499,6 +1502,30 @@ def queue_depth(session: Session) -> dict[str, int]:
     }
 
 
+def get_queue_paused(session: Session) -> bool:
+    """Whether the workers are currently stopped from claiming. See `claim_next_run`.
+
+    Here as well as in `app_settings` so that the route, the MCP tools and the queue widget
+    read the queue's own service for a fact about the queue, and `api/` keeps its one import.
+    """
+    return app_settings_service.get_queue_paused(session)
+
+
+def set_queue_paused(session: Session, paused: bool) -> bool:
+    """Stop the workers claiming, or let them start again. Returns the state in force.
+
+    Announced once, to everybody: the frame carries the depth as well as the flag, because
+    "paused" and "seven runs waiting" are one sentence to a client and reading them from
+    two calls would let a widget show a queue that is moving and stopped at once.
+    """
+    depth = queue_depth(session)
+    emit_on_commit(
+        session,
+        queue_paused_event(paused=paused, queued=depth["queued"], running=depth["running"]),
+    )
+    return app_settings_service.set_queue_paused(session, paused)
+
+
 def claim_next_run(
     session: Session,
     *,
@@ -1517,8 +1544,22 @@ def claim_next_run(
     all is nobody's in particular, so it stays claimable under an exclusion and is not
     claimable under an inclusion — the local fallback at `_prepare` time is what will end
     up serving it.
+
+    A paused queue answers None here and nowhere else. This is the choke point both kinds
+    of worker go through — the local set and the runner gateway — so one check stops the
+    whole deployment claiming, where the same check in `workers/analysis_queue.py` would
+    pause the local half and leave every remote runner drawing work. What a worker has
+    already claimed is not touched: there is no cancelled status to move a run to, and a
+    pass mid-search is cheaper finished than thrown away.
+
+    The read is a single-row primary-key lookup on a local database, which is what every
+    other `app_settings` call site pays per request; it is deliberately not cached in the
+    process, because a runner or a second process would go on claiming against a copy of
+    the flag from before the owner pressed the button.
     """
     if engine_ids is not None and not list(engine_ids):
+        return None
+    if app_settings_service.get_queue_paused(session):
         return None
     while True:
         statement = (
@@ -1859,6 +1900,30 @@ def backfill_event(
         "queued": queued,
         "outstanding": outstanding,
         "maia_only": maia_only,
+    }
+
+
+def queue_paused_event(*, paused: bool, queued: int, running: int) -> dict[str, Any]:
+    """The one event pausing or resuming the queue announces.
+
+    The shape is the contract, because the web client mirrors it by hand and nothing
+    generates it from here:
+
+        {"event": "analysis.paused", "paused": true, "queued": 0, "running": 0}
+
+    Not an `analysis.backfill`: no run was queued and none was dropped, so that frame's
+    `tier`, `queued` and `outstanding` would each be a statement about work that did not
+    happen. `queued` and `running` are the depth as it stands, unchanged by the switch —
+    they are here so a client hears the whole of the queue's state in one frame.
+
+    It names no run, deliberately: pausing changes nothing about any row, only whether the
+    rows that are there are being picked up.
+    """
+    return {
+        "event": EVENT_QUEUE_PAUSED,
+        "paused": paused,
+        "queued": queued,
+        "running": running,
     }
 
 

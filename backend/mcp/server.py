@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 from mcp.server import MCPServer
 from mcp.types import TextContent
@@ -249,6 +250,7 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
         opponent: str | None = None,
         variant: str | None = None,
         has_blunders: bool | None = None,
+        analyzed: bool | None = None,
         deep_analyzed: bool | None = None,
         text: str | None = None,
         limit: int = DEFAULT_SEARCH,
@@ -273,6 +275,7 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
             opponent=opponent,
             variant=variant,
             has_blunders=has_blunders,
+            analyzed=analyzed,
             deep_analyzed=deep_analyzed,
             text=text,
         )
@@ -480,12 +483,17 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
         human = args.flag(maia, "maia")
         position = args.fen(fen, required=False)
         with coach.session() as session:
-            depth = analysis_service.queue_depth(session)
+            depth = _queue_state(session)
             if depth["queued"] >= MAX_QUEUED_RUNS:
                 raise CoachError(
                     QUEUE_FULL,
-                    f"{depth['queued']} runs are already waiting; try again once the "
-                    "queue has drained",
+                    f"{depth['queued']} runs are already waiting; "
+                    + (
+                        "the queue is paused, so it will not drain until the owner "
+                        "resumes it"
+                        if depth["paused"]
+                        else "try again once the queue has drained"
+                    ),
                     **depth,
                 )
             if game_id is not None and games_service.get_game(session, int(game_id)) is None:
@@ -515,7 +523,7 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
                 "ply_end": run.ply_end,
                 "maia": run.maia,
                 "maia_elos": run.maia_elos,
-                "queue": analysis_service.queue_depth(session),
+                "queue": _queue_state(session),
             }
         return payloads.result(payload)
 
@@ -529,7 +537,7 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
         queue still is."""
         with coach.session() as session:
             dropped = analysis_service.clear_queue(session)
-            payload = {"dropped": dropped, "queue": analysis_service.queue_depth(session)}
+            payload = {"dropped": dropped, "queue": _queue_state(session)}
         return payloads.result(payload)
 
     @server.tool()
@@ -537,7 +545,9 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
     def get_analysis_status(run_id: int) -> TextContent:
         """Where a queued analysis pass has got to: queued, running, done or failed,
         with how many plies it has written and what is still ahead of it. A failed run
-        carries the engine's own last words."""
+        carries the engine's own last words. The `queue` it reports says whether the owner
+        has paused it: a paused queue is not draining, however short it is, so a queued run
+        is not about to start."""
         with coach.session() as session:
             run = analysis_service.require_run(session, int(run_id))
             evals = len(analysis_service.get_move_evals(session, run.id))
@@ -559,7 +569,7 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
                 "finished_at": payloads.stamp(run.finished_at),
                 "evals": evals,
                 "error": _tail(run.error),
-                "queue": analysis_service.queue_depth(session),
+                "queue": _queue_state(session),
             }
         return payloads.result(payload)
 
@@ -889,6 +899,18 @@ def _register_live(server: MCPServer, coach: Coach) -> None:
         `viewer_count` is how many browsers are subscribed. Read this before driving the
         board in a new session, or after being told the page was reloaded."""
         return payloads.result(live_service.get_state())
+
+
+def _queue_state(session: Session) -> dict[str, Any]:
+    """The depth, plus whether anything is being taken out of it.
+
+    Every payload that reports the queue reports both: "7 runs queued" about a queue the
+    owner has paused is a wait the coach would otherwise tell them to sit through.
+    """
+    return {
+        **analysis_service.queue_depth(session),
+        "paused": analysis_service.get_queue_paused(session),
+    }
 
 
 def _tail(text: str | None) -> str | None:

@@ -1564,6 +1564,52 @@ def test_the_queue_reports_its_depth(session: Session) -> None:
     assert analysis.queue_depth(session) == {"queued": 1, "running": 1}
 
 
+def test_a_paused_queue_is_not_claimed_from_and_a_resumed_one_is(session: Session) -> None:
+    """The whole of the pause: the rows stay queued and nothing picks them up."""
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+    assert analysis.set_queue_paused(session, True) is True
+    assert analysis.claim_next_run(session) is None
+    assert analysis.queue_depth(session) == {"queued": 2, "running": 0}
+
+    assert analysis.set_queue_paused(session, False) is False
+    assert analysis.claim_next_run(session) is not None
+    assert analysis.queue_depth(session) == {"queued": 1, "running": 1}
+
+
+def test_pausing_the_queue_announces_it_once_with_the_depth(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        analysis.set_queue_paused(session, True)
+    finally:
+        cancel()
+
+    assert seen == [
+        {"event": analysis.EVENT_QUEUE_PAUSED, "paused": True, "queued": 1, "running": 0}
+    ]
+
+
+def test_pausing_the_queue_survives_a_save_of_the_analysis_settings(session: Session) -> None:
+    """`replace` rewrites every key it knows; `queue_paused` is deliberately not one."""
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    analysis.set_queue_paused(session, True)
+
+    app_settings.replace(session, {app_settings.QUICK_NODES: 100_000})
+
+    assert analysis.get_queue_paused(session) is True
+    assert analysis.claim_next_run(session) is None
+
+
 def test_a_whole_run_lands_in_one_transaction(session: Session) -> None:
     _engine(session)
     game = _game(session)

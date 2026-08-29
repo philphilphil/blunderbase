@@ -5,7 +5,8 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are fourteen of them, in five groups.
+There are fourteen of them, in five groups, plus one switch that is not a setting at all
+(`queue_paused`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
 is playing towards and the ones they want to contrast with, not the one they have. Batch
@@ -41,6 +42,14 @@ They are identities, not numbers with a range, so they are outside `SETTINGS` an
 `replace` entirely — there is no clamp that could rescue an engine id, and a save of the
 analysis form must not wipe the deployment's wiring. `services.engines` is where they mean
 something; here they are three rows and their accessors, the way `maia_elos` is.
+
+**Whether the queue is draining at all** — `queue_paused`, the top bar's pause button.
+Not one of the fourteen and deliberately not a member of `SETTINGS`: it is a switch over
+the *queue* rather than a number with a clamp, nobody sets it from the analysis form, and
+`replace` rewrites the whole set of keys it knows — so a member would be un-paused by the
+next save of the Engine passes page, which is exactly the bug a pause button must not have.
+Its own read/write pair goes at the row directly, the way the engine roles and `maia_elos`
+do. `services.analysis.claim_next_run` is the only thing that reads it in anger.
 
 A value outside what a setting can mean is clamped, never refused: an owner aiming at 2200
 gets Maia's top level rather than a form that will not save. The one exception is the
@@ -90,6 +99,11 @@ BLUNDER_THRESHOLD = "blunder_threshold"
 QUICK_ENGINE_ID = "quick_engine_id"
 DEEP_ENGINE_ID = "deep_engine_id"
 HUMAN_ENGINE_ID = "human_engine_id"
+
+# Whether the workers are allowed to claim. Outside `SETTINGS` and outside `replace`'s
+# whole-set rewrite on purpose: it is not a number the analysis form posts, and a key that
+# form rewrote would resume a queue the owner had paused.
+QUEUE_PAUSED = "queue_paused"
 
 ROLE_KEYS: dict[EngineRole, str] = {
     EngineRole.QUICK: QUICK_ENGINE_ID,
@@ -353,6 +367,35 @@ def set_role_engine_id(session: Session, role: EngineRole, engine_id: int | None
         row.value = int(engine_id)
     session.commit()
     return int(engine_id)
+
+
+def get_queue_paused(session: Session) -> bool:
+    """Whether the owner has stopped the workers claiming new runs.
+
+    No row means not paused: a deployment that has never touched the button drains its
+    queue, which is the only state an install can be in before there is a button to press.
+    """
+    row = session.get(AppSetting, QUEUE_PAUSED)
+    return False if row is None else bool(row.value)
+
+
+def set_queue_paused(session: Session, paused: bool) -> bool:
+    """Pause or resume the queue. Returns the state in force afterwards.
+
+    Resuming deletes the row rather than writing a 0, the way every other write here treats
+    "the owner has not chosen": there is one fallback and it is the absence of a row.
+    """
+    if not paused:
+        session.execute(delete(AppSetting).where(AppSetting.key == QUEUE_PAUSED))
+        session.commit()
+        return False
+    row = session.get(AppSetting, QUEUE_PAUSED)
+    if row is None:
+        session.add(AppSetting(key=QUEUE_PAUSED, value=FLAG_ON))
+    else:
+        row.value = FLAG_ON
+    session.commit()
+    return True
 
 
 def _flag(session: Session, key: str) -> bool:

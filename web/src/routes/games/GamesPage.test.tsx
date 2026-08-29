@@ -104,6 +104,23 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals())
 
+describe('GamesPage — filtering analysis coverage', () => {
+  it('requests only games with no finished analysis', async () => {
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    await user.click(screen.getByRole('button', { name: /^Analysis/ }))
+    await user.click(screen.getByRole('button', { name: 'Unanalysed' }))
+
+    await waitFor(() => {
+      const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input))
+      expect(requests.some((request) => request.includes('analyzed=false'))).toBe(true)
+    })
+    expect(screen.getByRole('button', { name: /Analysis:unanalysed/ })).toBeInTheDocument()
+  })
+})
+
 describe('GamesPage — queueing analysis over a selection', () => {
   it('sends one request for the whole selection, not one per game', async () => {
     const user = userEvent.setup()

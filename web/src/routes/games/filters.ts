@@ -25,6 +25,7 @@ export interface LibraryFilters {
   time_control?: string
   opponent?: string
   has_blunders?: boolean
+  analyzed?: boolean
   deep_analyzed?: boolean
   text?: string
 }
@@ -78,6 +79,7 @@ export function filtersFromParams(params: URLSearchParams): LibraryFilters {
     time_control: text(params.get('time_control')),
     opponent: text(params.get('opponent')),
     has_blunders: bool(params.get('has_blunders')),
+    analyzed: bool(params.get('analyzed')),
     deep_analyzed: bool(params.get('deep_analyzed')),
     text: text(params.get('q')),
   })
@@ -146,7 +148,7 @@ export const GROUP_KEYS: Record<FilterGroup, (keyof LibraryFilters)[]> = {
   opening: ['eco'],
   time: ['speed', 'time_control'],
   opponent: ['opponent'],
-  analysis: ['has_blunders', 'deep_analyzed'],
+  analysis: ['has_blunders', 'analyzed', 'deep_analyzed'],
 }
 
 export const FILTER_GROUPS: FilterGroup[] = [
@@ -192,6 +194,9 @@ export function groupSummary(group: FilterGroup, filters: LibraryFilters): strin
       const parts: string[] = []
       if (filters.has_blunders !== undefined) {
         parts.push(filters.has_blunders ? 'has blunders' : 'no blunders')
+      }
+      if (filters.analyzed !== undefined) {
+        parts.push(filters.analyzed ? 'analysed' : 'unanalysed')
       }
       if (filters.deep_analyzed !== undefined) {
         parts.push(filters.deep_analyzed ? 'deep' : 'not deep')

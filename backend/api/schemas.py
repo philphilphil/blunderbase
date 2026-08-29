@@ -715,9 +715,25 @@ class QueueDestination(Payload):
     streams: int = 0
 
 
+class QueuePaused(BaseModel):
+    """What `/queue/pause` and `/queue/resume` answer: the switch, and the depth it acts on.
+
+    The depth comes back with the flag because the two are one sentence — "paused, with
+    seven waiting" — and a client that had to read them from two calls could show a queue
+    that is stopped and moving at once.
+    """
+
+    paused: bool
+    queued: int
+    running: int
+
+
 class QueueStatus(BaseModel):
     queued: int
     running: int
+    paused: bool = Field(
+        default=False, description="whether the workers are stopped from claiming new runs"
+    )
     workers: bool = Field(description="whether this process is draining the queue")
     busy: int = Field(default=0, description="runs executing in this process right now")
     destinations: list[QueueDestination] = Field(

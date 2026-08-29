@@ -365,6 +365,39 @@ describe('GamePage', () => {
     ).toBe(true)
   })
 
+  it('puts both players’ Lichess-style totals to the left of the evaluation chart', async () => {
+    const counted: GameDetail = {
+      ...DETAIL,
+      moves: DETAIL.moves.map((row, index) => ({
+        ...row,
+        by_owner: index % 2 === 0,
+        classification:
+          index === 0
+            ? 'mistake'
+            : index === 1 || index === 3
+              ? 'blunder'
+              : 'inaccuracy',
+      })),
+    }
+    vi.stubGlobal('fetch', stubFetch({ '/games/14': counted }))
+
+    renderPage()
+    await screen.findByText('Evaluation')
+
+    const summary = screen.getByTestId('player-summaries')
+    const plot = screen.getByTestId('evaluation-plot')
+    expect(screen.getByRole('checkbox', { name: 'only mine' })).toBeChecked()
+    expect(summary).toHaveAccessibleName(/You:.*Opponent:/)
+    expect(within(summary).getByText('You')).toBeInTheDocument()
+    expect(within(summary).getByText('Opp.')).toBeInTheDocument()
+    expect(within(summary).getByText('Inaccuracies')).toBeInTheDocument()
+    expect(within(summary).getByText('Mistakes')).toBeInTheDocument()
+    expect(within(summary).getByText('Blunders')).toBeInTheDocument()
+    expect(within(summary).getByTitle('Average centipawn loss')).toHaveTextContent('ACPL')
+    expect(summary).toHaveTextContent('ACPL5260')
+    expect(summary.compareDocumentPosition(plot)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('puts the multi-PV box over the move table once a deep pass has run', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')

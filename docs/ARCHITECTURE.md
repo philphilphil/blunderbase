@@ -362,6 +362,16 @@ re-analyse, coverage counts that treated one as a pass would leave the game perm
 out of a backfill, and `/analysis/backfill/cancel` leaves fills alone — `POST
 /analysis/queue/clear` is what takes those back.
 
+**Pausing.** `POST /analysis/queue/pause` and `/queue/resume` throw one stored flag
+(`app_settings.queue_paused`), and `claim_next_run` is the only thing that reads it: both
+the local worker set and the runner gateway take their work through that one claim, so a
+check there stops every machine rather than only this one, and it holds across a restart.
+It is deliberately outside `SETTINGS` and outside `app_settings.replace`, which rewrites the
+whole set of keys it knows — a member would be un-paused by the next save of the analysis
+form. A run already claimed finishes, for the reason a cancel leaves one alone. The switch
+announces itself as `analysis.paused` with `paused`, `queued` and `running`, not as an
+`analysis.backfill`: nothing was queued and nothing was dropped.
+
 **Where the workers run.** The FastAPI lifespan starts and stops a set
 (`analysis_workers = false` turns that off), and `blunderbase analyze` starts the same set
 headless, drains the queue and exits. Each set owns its own engine pool, so stopping one

@@ -114,7 +114,7 @@ export function GamesTable({
                   onClick={onToggleAll}
                   disabled={games.length === 0}
                   className={cn(
-                    'size-[0.6875rem] rounded-[0.1875rem] border transition-colors max-md:size-[1.125rem]',
+                    'size-[1.125rem] rounded-[0.1875rem] border transition-colors',
                     allSelected
                       ? 'border-accent-teal bg-accent-teal'
                       : 'border-edge-strong hover:border-edge-hover',

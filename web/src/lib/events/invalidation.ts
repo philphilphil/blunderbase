@@ -45,6 +45,12 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'analysis.backfill':
       return [queryKeys.analysis()]
 
+    // The button in the top bar, pressed here or in another tab. Narrower than the rest of
+    // the analysis events on purpose: pausing changes nothing about any run row, only
+    // whether the queue is moving, and `/analysis/queue` is the one answer that says so.
+    case 'analysis.paused':
+      return [queryKeys.queue()]
+
     // New evals: classifications, eval curves, worst moments, explorer eval drops.
     case 'analysis.done':
     case 'analysis.failed':

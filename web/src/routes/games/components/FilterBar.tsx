@@ -298,6 +298,13 @@ function GroupPanel({
             value={filters.has_blunders}
             onChange={(has_blunders) => patch({ has_blunders })}
           />
+          <PopoverLabel>Any analysis done</PopoverLabel>
+          <TriState
+            value={filters.analyzed}
+            onChange={(analyzed) => patch({ analyzed })}
+            yes="Analysed"
+            no="Unanalysed"
+          />
           <PopoverLabel>Deep pass done</PopoverLabel>
           <TriState
             value={filters.deep_analyzed}

@@ -44,9 +44,9 @@ from backend.db.models import (
 )
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
+from backend.services import analysis, import_service
 from backend.services import engines as engines_service
 from backend.services import games as games_service
-from backend.services import import_service
 from backend.services import live as live_service
 from tests.conftest import OWNER_PASSWORD, running_app, socket_headers
 from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
@@ -278,10 +278,12 @@ def test_the_games_list_pages_and_counts(api: TestClient) -> None:
 def test_the_games_list_takes_the_same_filters_the_stats_do(api: TestClient) -> None:
     wins = api.get("/games", params={"outcome": "win"}).json()
     blunders = api.get("/games", params={"has_blunders": True}).json()
+    unanalysed = api.get("/games", params={"analyzed": False}).json()
 
     assert wins["total"] < 6
     assert all(game["outcome"] == "win" for game in wins["games"])
     assert blunders["total"] == 1
+    assert unanalysed["total"] == 5
 
 
 def test_a_game_card_carries_the_eval_curve_and_the_worst_moments(
@@ -921,6 +923,38 @@ def test_clearing_an_empty_queue_drops_nothing(api: TestClient) -> None:
     body = api.post("/analysis/queue/clear").json()
 
     assert body == {"dropped": 0, "outstanding": 0}
+
+
+def test_the_queue_can_be_paused_and_resumed(api: TestClient, seeded: dict[str, int]) -> None:
+    """Both verbs answer the state in force, and `/queue` reports it in between."""
+    api.post("/analysis", json={"game_id": seeded["game_id"]})
+    assert api.get("/analysis/queue").json()["paused"] is False
+
+    paused = api.post("/analysis/queue/pause").json()
+
+    assert paused == {"paused": True, "queued": 1, "running": 0}
+    queue = api.get("/analysis/queue").json()
+    assert (queue["paused"], queue["queued"]) == (True, 1)
+
+    resumed = api.post("/analysis/queue/resume").json()
+
+    assert resumed == {"paused": False, "queued": 1, "running": 0}
+    assert api.get("/analysis/queue").json()["paused"] is False
+
+
+def test_pausing_the_queue_stops_a_worker_claiming(
+    api: TestClient, settings: Settings, seeded: dict[str, int]
+) -> None:
+    """The flag is the gate `claim_next_run` reads, whichever process is doing the claiming."""
+    api.post("/analysis", json={"game_id": seeded["game_id"]})
+    api.post("/analysis/queue/pause")
+
+    with get_sessionmaker(settings)() as session:
+        assert analysis.claim_next_run(session) is None
+
+    api.post("/analysis/queue/resume")
+    with get_sessionmaker(settings)() as session:
+        assert analysis.claim_next_run(session) is not None
 
 
 def test_a_run_over_a_position_takes_no_ply_range(api: TestClient) -> None:

@@ -8,6 +8,7 @@
 import type { Classification, GameCard, GameSummary, Outcome, Source, Tier } from '@/lib/api/types'
 import { glyphFor, type Glyph } from '@/lib/chess/classification'
 import { MINUS } from '@/lib/chess/evaluation'
+import { formatClock } from '@/lib/chess/timeControl'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -59,7 +60,7 @@ export function outcomeTone(outcome: string | null | undefined): string {
 }
 
 /**
- * `600+0` -> `10+0`, `90+30` OTB -> `OTB 90+30`. A clock the backend stored in seconds is
+ * `300` -> `5`, `600+0` -> `10+0`, `5400+30` OTB -> `OTB 90+30`. A clock the backend stored in seconds is
  * shown in minutes the way every chess site writes it; anything unparseable is passed
  * through rather than mangled.
  */
@@ -67,12 +68,7 @@ export function formatTimeControl(game: Pick<GameSummary, 'time_control' | 'spee
   const prefix = game.source === 'manual' ? 'OTB ' : ''
   const raw = game.time_control
   if (!raw) return game.speed ? `${prefix}${SPEED_LABELS[game.speed] ?? game.speed}` : '—'
-  const match = /^(\d+)\+(\d+)$/.exec(raw)
-  if (!match) return `${prefix}${raw}`
-  const seconds = Number(match[1])
-  const increment = match[2]
-  const base = seconds % 60 === 0 ? String(seconds / 60) : `${(seconds / 60).toFixed(1)}`
-  return `${prefix}${base}+${increment}`
+  return `${prefix}${formatClock(raw)}`
 }
 
 const SPEED_LABELS: Record<string, string> = {

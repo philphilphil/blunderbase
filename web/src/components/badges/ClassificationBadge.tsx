@@ -36,7 +36,9 @@ export function ClassificationBadge({
   if (!kind) return null
   const style = GLYPHS[kind]
   const label =
-    count === undefined ? style.label : `${count} ${style.label}${count === 1 ? '' : 's'}`
+    count === undefined
+      ? style.label
+      : `${count} ${count === 1 ? style.label : style.label === 'inaccuracy' ? 'inaccuracies' : `${style.label}s`}`
 
   const badge = (
     <span

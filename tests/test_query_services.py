@@ -278,6 +278,25 @@ def test_deep_analyzed_filter(analysed: Library, engine_row: Engine) -> None:
     assert [game.source_id for game in found] == ["qg000001"]
 
 
+def test_analyzed_filter_means_a_finished_pass(analysed: Library, engine_row: Engine) -> None:
+    session = analysed.session
+    done = games_service.search_games(session, GameFilters(analyzed=True))
+    assert {game.source_id for game in done} == {"qg000001", "qg000003", "qg000006"}
+
+    missing = games_service.search_games(session, GameFilters(analyzed=False))
+    assert {game.source_id for game in missing} == {"qg000002", "qg000004", "qg000005"}
+
+    analyse(
+        session,
+        analysed["qg000002"],
+        [],
+        engine=engine_row,
+        status=RunStatus.QUEUED,
+    )
+    still_missing = games_service.search_games(session, GameFilters(analyzed=False))
+    assert "qg000002" in {game.source_id for game in still_missing}
+
+
 def test_a_queued_run_is_not_an_analysis(library: Library, engine_row: Engine) -> None:
     analyse(
         library.session,

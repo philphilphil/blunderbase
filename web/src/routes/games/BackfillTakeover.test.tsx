@@ -88,7 +88,7 @@ let started: BackfillStarted
 let cancelled: BackfillCancelled
 
 function idle(): QueueStatus {
-  return { queued: 0, running: 0, workers: true, busy: 0, destinations: [] }
+  return { queued: 0, running: 0, paused: false, workers: true, busy: 0, destinations: [] }
 }
 
 function stubFetch() {

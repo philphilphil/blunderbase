@@ -1,9 +1,10 @@
 /**
  * Design 2d, "Performance by time control" — the table over `/stats/performance_by_speed`.
  *
- * The design's last two columns are ACPL and accuracy. Neither exists in this backend:
- * loss is measured in win percentage, not centipawns, and no service computes an accuracy
- * figure. So the columns are the two the data does support — blunders per game and the
+ * The design's last two columns are aggregate ACPL and accuracy. Neither exists in this
+ * stats endpoint: the game page can derive one game's ACPL from its move evaluations, but
+ * no service aggregates it across a bucket or computes accuracy. So the columns are the
+ * two the data does support — blunders per game and the
  * average rating the bucket was played at — rather than an invented number.
  */
 import { useStats } from '@/lib/api/queries'

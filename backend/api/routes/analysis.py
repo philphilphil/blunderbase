@@ -27,6 +27,7 @@ from backend.api.schemas import (
     QueueCleared,
     QueueDestination,
     QueuedRun,
+    QueuePaused,
     QueueStatus,
     RefusedGame,
     RetryFailedReceipt,
@@ -228,6 +229,47 @@ def clear_queue(session: SessionDep) -> QueueCleared:
     return QueueCleared(dropped=dropped, outstanding=depth["queued"] + depth["running"])
 
 
+@router.post(
+    "/queue/pause",
+    response_model=QueuePaused,
+    summary="Stop the workers taking anything else out of the queue",
+)
+def pause_queue(session: SessionDep) -> QueuePaused:
+    """Hold the queue where it is: nothing queued is claimed until it is resumed.
+
+    A verb path beside `/queue/clear` and `/backfill/cancel`, and the same promise about
+    what it does not touch: a run a worker has already claimed finishes, for the reason
+    `clear_queue` leaves one alone — there is no cancelled status to move it to. The pause
+    is a stored flag rather than a signal to this process, so it holds every runner as well
+    as this machine, and survives a restart.
+    """
+    paused = analysis_service.set_queue_paused(session, True)
+    depth = analysis_service.queue_depth(session)
+    return QueuePaused(paused=paused, queued=depth["queued"], running=depth["running"])
+
+
+@router.post(
+    "/queue/resume",
+    response_model=QueuePaused,
+    summary="Let the workers start claiming again",
+)
+def resume_queue(request: Request, session: SessionDep) -> QueuePaused:
+    """Start the queue draining again, and nudge both halves so it starts now.
+
+    Without the nudge a resumed queue would sit still until the next poll — correct, but it
+    looks like a button that did nothing. The gateway needs its own: it wakes on
+    `analysis.queued`, and resuming queues nothing, so a runner would otherwise wait out a
+    stale sweep before being offered work that was already there.
+    """
+    paused = analysis_service.set_queue_paused(session, False)
+    wake_workers(request)
+    gateway = getattr(request.app.state, "gateway", None)
+    if gateway is not None:
+        gateway.notify()
+    depth = analysis_service.queue_depth(session)
+    return QueuePaused(paused=paused, queued=depth["queued"], running=depth["running"])
+
+
 @router.get("/queue", response_model=QueueStatus, summary="How much work is outstanding")
 async def queue_status(request: Request, settings: SettingsDep) -> QueueStatus:
     """The backlog, and where it will actually be worked.
@@ -244,10 +286,11 @@ async def queue_status(request: Request, settings: SettingsDep) -> QueueStatus:
     workers = getattr(request.app.state, "workers", None)
     live = live_picture(request)
     local = local_picture(request, settings)
-    depth, destinations = await asyncio.to_thread(_queue, settings, live, local)
+    depth, paused, destinations = await asyncio.to_thread(_queue, settings, live, local)
     return QueueStatus(
         queued=depth["queued"],
         running=depth["running"],
+        paused=paused,
         workers=bool(workers is not None and workers.running),
         busy=int(workers.busy) if workers is not None else 0,
         destinations=[QueueDestination.model_validate(row) for row in destinations],
@@ -339,10 +382,15 @@ def analyze_position(session: SessionDep, body: PositionAnalysisRequest) -> Any:
 
 def _queue(
     settings: Settings, live: dict[int, dict[str, Any]], local: dict[str, Any]
-) -> tuple[dict[str, int], list[dict[str, Any]]]:
-    """The database half of a queue answer. Runs in a thread; the live half is the loop's."""
+) -> tuple[dict[str, int], bool, list[dict[str, Any]]]:
+    """The database half of a queue answer. Runs in a thread; the live half is the loop's.
+
+    The paused flag is read here rather than on the loop for the reason the depth is: it is
+    a row, and rows are read off the thread.
+    """
     with session_scope(settings) as session:
         return (
             analysis_service.queue_depth(session),
+            analysis_service.get_queue_paused(session),
             runners_service.queue_destinations(session, live=live, local=local),
         )

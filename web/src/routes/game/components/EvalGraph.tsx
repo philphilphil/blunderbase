@@ -8,7 +8,12 @@ import { GLYPHS, glyphFor, type Glyph } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
 import { scaleMargin, scalePx } from '@/lib/ui/scale'
 
-import { plyLabel, type CurvePoint } from '../gameModel'
+import {
+  plyLabel,
+  type CurvePoint,
+  type GameAnalysisSummary,
+  type PlayerAnalysisSummary,
+} from '../gameModel'
 
 const AXIS = 50
 const CURVE = 'var(--bb-text-2)'
@@ -84,6 +89,7 @@ export function EvalGraph({
   plyCount,
   cursor,
   ownerSide,
+  analysisSummary,
   onSelectPly,
   scrub = false,
   className,
@@ -94,6 +100,8 @@ export function EvalGraph({
   cursor: number
   /** The side the owner played; `null` for a game no account claims a side of. */
   ownerSide: Color | null
+  /** Lichess-style totals and ACPL for both players, drawn to the left of the curve. */
+  analysisSummary?: GameAnalysisSummary | null
   onSelectPly: (ply: number) => void
   /**
    * Follow a finger dragged across the plot, not just a tap. Off by default, and only the
@@ -109,9 +117,9 @@ export function EvalGraph({
     [points, plyCount],
   )
   const series = useMemo(() => splitSeries(points), [points])
-  // "Only mine" hides the opponent's marks. Off by default: the whole game is the usual
-  // view, the filter is for going over one's own mistakes.
-  const [onlyMine, setOnlyMine] = useState(false)
+  // Start focused on the owner's mistakes; the checkbox can still reveal both players'
+  // markers without changing the two-player summary beside the graph.
+  const [onlyMine, setOnlyMine] = useState(true)
   const markedSide = onlyMine && ownerSide ? ownerSide : null
 
   return (
@@ -148,79 +156,151 @@ export function EvalGraph({
         ) : null}
       </div>
 
-      {points.length === 0 ? (
-        <div className="flex min-h-[2.875rem] flex-1 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-center text-[0.6875rem] text-dim">
-          No evaluations yet — run an analysis pass to draw the curve.
-        </div>
-      ) : (
-        <div className="relative min-h-[2.875rem] min-w-0 flex-1">
-          {/* The key to the fills: white's half is the top, black's the bottom. Pinned outside
-              the chart so recharts never re-layouts around them. */}
-          <SideDot side="white" size="sm" className="pointer-events-none absolute left-1 top-1 z-10" />
-          <SideDot side="black" size="sm" className="pointer-events-none absolute bottom-1 left-1 z-10" />
-          <ChartContainer
-            config={CONFIG}
-            className="h-full w-full aspect-auto rounded-md bg-graph-bg [&_.recharts-surface]:cursor-crosshair"
-          >
-          <AreaChart
-            data={series}
-            margin={scaleMargin({ top: 4, right: 0, bottom: 2, left: 0 })}
-            onClick={(state: { activeLabel?: string | number }) => {
-              const label = Number(state?.activeLabel)
-              // A synthesised axis crossing has a fractional ply; land on the nearest move.
-              if (Number.isFinite(label)) onSelectPly(Math.round(label))
-            }}
-            // Dragging along the curve walks the game under the finger. recharts hands the
-            // same state to both, so a tap (which ends in a click) and a drag land on the
-            // ply the same way.
-            onTouchMove={
-              scrub
-                ? (state: { activeLabel?: string | number }) => {
-                    const label = Number(state?.activeLabel)
-                    if (Number.isFinite(label)) onSelectPly(Math.round(label))
-                  }
-                : undefined
-            }
-          >
-            {/* Hidden, not gone: the numeric ply scale is what click-to-seek and the
-                cursor line position against. The move numbers it used to print said
-                nothing the move table doesn't, and their row goes to the plot. */}
-            <XAxis dataKey="ply" type="number" domain={domain} hide />
-            <YAxis type="number" domain={[0, 100]} hide />
+      <div className="flex min-h-[2.875rem] min-w-0 flex-1 gap-2">
+        {analysisSummary ? (
+          <PlayerSummaries summary={analysisSummary} ownerSide={ownerSide} />
+        ) : null}
+        {points.length === 0 ? (
+          <div className="flex min-w-0 flex-1 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-center text-[0.6875rem] text-dim">
+            No evaluations yet — run an analysis pass to draw the curve.
+          </div>
+        ) : (
+          <div data-testid="evaluation-plot" className="relative min-w-0 flex-1">
+            {/* The key to the fills: white's half is the top, black's the bottom. Pinned outside
+                the chart so recharts never re-layouts around them. */}
+            <SideDot side="white" size="sm" className="pointer-events-none absolute left-1 top-1 z-10" />
+            <SideDot side="black" size="sm" className="pointer-events-none absolute bottom-1 left-1 z-10" />
+            <ChartContainer
+              config={CONFIG}
+              className="h-full w-full aspect-auto rounded-md bg-graph-bg [&_.recharts-surface]:cursor-crosshair"
+            >
+              <AreaChart
+                data={series}
+                margin={scaleMargin({ top: 4, right: 0, bottom: 2, left: 0 })}
+                onClick={(state: { activeLabel?: string | number }) => {
+                  const label = Number(state?.activeLabel)
+                  // A synthesised axis crossing has a fractional ply; land on the nearest move.
+                  if (Number.isFinite(label)) onSelectPly(Math.round(label))
+                }}
+                // Dragging along the curve walks the game under the finger. recharts hands the
+                // same state to both, so a tap (which ends in a click) and a drag land on the
+                // ply the same way.
+                onTouchMove={
+                  scrub
+                    ? (state: { activeLabel?: string | number }) => {
+                        const label = Number(state?.activeLabel)
+                        if (Number.isFinite(label)) onSelectPly(Math.round(label))
+                      }
+                    : undefined
+                }
+              >
+                {/* Hidden, not gone: the numeric ply scale is what click-to-seek and the
+                    cursor line position against. The move numbers it used to print said
+                    nothing the move table doesn't, and their row goes to the plot. */}
+                <XAxis dataKey="ply" type="number" domain={domain} hide />
+                <YAxis type="number" domain={[0, 100]} hide />
 
-            <ReferenceLine y={75} stroke="var(--bb-graph-grid)" strokeWidth={1} />
-            <ReferenceLine y={25} stroke="var(--bb-graph-grid)" strokeWidth={1} />
-            <ReferenceLine y={AXIS} stroke="var(--bb-graph-axis)" strokeWidth={1} />
-            {cursor >= -1 ? (
-              <ReferenceLine
-                x={cursor}
-                stroke="var(--bb-accent)"
-                strokeWidth={1}
-                strokeDasharray="2 3"
-                ifOverflow="extendDomain"
-              />
-            ) : null}
+                <ReferenceLine y={75} stroke="var(--bb-graph-grid)" strokeWidth={1} />
+                <ReferenceLine y={25} stroke="var(--bb-graph-grid)" strokeWidth={1} />
+                <ReferenceLine y={AXIS} stroke="var(--bb-graph-axis)" strokeWidth={1} />
+                {cursor >= -1 ? (
+                  <ReferenceLine
+                    x={cursor}
+                    stroke="var(--bb-accent)"
+                    strokeWidth={1}
+                    strokeDasharray="2 3"
+                    ifOverflow="extendDomain"
+                  />
+                ) : null}
 
-            {/* The two half-fills carry no stroke of their own: clamped to the axis, their
-                outline would run flat along it. The third series draws the curve and marks. */}
-            <Area type="linear" dataKey="above" baseValue={AXIS} stroke="none" fill={FILL_WHITE} isAnimationActive={false} dot={false} activeDot={false} />
-            <Area type="linear" dataKey="below" baseValue={AXIS} stroke="none" fill={FILL_BLACK} isAnimationActive={false} dot={false} activeDot={false} />
-            <Area
-              type="linear"
-              dataKey="win"
-              baseValue={AXIS}
-              stroke={CURVE}
-              strokeWidth={scalePx(1.6)}
-              strokeLinejoin="round"
-              fill="none"
-              isAnimationActive={false}
-              activeDot={false}
-              dot={(props: DotProps) => <ClassificationDot {...props} side={markedSide} />}
-            />
-          </AreaChart>
-          </ChartContainer>
-        </div>
-      )}
+                {/* The two half-fills carry no stroke of their own: clamped to the axis, their
+                    outline would run flat along it. The third series draws the curve and marks. */}
+                <Area type="linear" dataKey="above" baseValue={AXIS} stroke="none" fill={FILL_WHITE} isAnimationActive={false} dot={false} activeDot={false} />
+                <Area type="linear" dataKey="below" baseValue={AXIS} stroke="none" fill={FILL_BLACK} isAnimationActive={false} dot={false} activeDot={false} />
+                <Area
+                  type="linear"
+                  dataKey="win"
+                  baseValue={AXIS}
+                  stroke={CURVE}
+                  strokeWidth={scalePx(1.6)}
+                  strokeLinejoin="round"
+                  fill="none"
+                  isAnimationActive={false}
+                  activeDot={false}
+                  dot={(props: DotProps) => <ClassificationDot {...props} side={markedSide} />}
+                />
+              </AreaChart>
+            </ChartContainer>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const SUMMARY_ROWS: readonly {
+  field: keyof PlayerAnalysisSummary
+  label: string
+  glyph?: Glyph
+  title?: string
+}[] = [
+  { field: 'inaccuracy', label: 'Inaccuracies', glyph: 'inaccuracy' },
+  { field: 'mistake', label: 'Mistakes', glyph: 'mistake' },
+  { field: 'blunder', label: 'Blunders', glyph: 'blunder' },
+  { field: 'acpl', label: 'ACPL', title: 'Average centipawn loss' },
+]
+
+function PlayerSummaries({
+  summary,
+  ownerSide,
+}: {
+  summary: GameAnalysisSummary
+  ownerSide: Color | null
+}) {
+  const sides: Color[] = ownerSide === 'black' ? ['black', 'white'] : ['white', 'black']
+  const name = (side: Color) =>
+    ownerSide ? (side === ownerSide ? 'You' : 'Opponent') : side === 'white' ? 'White' : 'Black'
+  const quantity = (count: number, singular: string, plural = `${singular}s`) =>
+    `${count} ${count === 1 ? singular : plural}`
+  const prose = (side: Color) => {
+    const row = summary[side]
+    const acpl = row.acpl === null ? 'average centipawn loss unavailable' : `${row.acpl} average centipawn loss`
+    return `${name(side)}: ${quantity(row.inaccuracy, 'inaccuracy', 'inaccuracies')}, ${quantity(row.mistake, 'mistake')}, ${quantity(row.blunder, 'blunder')}, ${acpl}`
+  }
+
+  return (
+    <div
+      data-testid="player-summaries"
+      aria-label={`${prose(sides[0])}. ${prose(sides[1])}.`}
+      className="grid w-[9.5rem] flex-none grid-cols-[minmax(0,1fr)_2rem_2rem] content-center gap-x-1 border-r border-hairline pr-2 text-[0.59375rem] leading-[1.35]"
+    >
+      <span />
+      {sides.map((side) => (
+        <span key={side} className="flex items-center justify-end gap-1 text-dim">
+          <SideDot side={side} size="sm" />
+          {name(side) === 'Opponent' ? 'Opp.' : name(side)}
+        </span>
+      ))}
+      {SUMMARY_ROWS.flatMap(({ field, label, glyph, title }) => [
+        <span
+          key={`${field}-label`}
+          title={title}
+          className={cn('truncate', glyph ? GLYPHS[glyph].textClass : 'text-dim')}
+        >
+          {label}
+        </span>,
+        ...sides.map((side) => (
+          <span
+            key={`${field}-${side}`}
+            className={cn(
+              'text-right font-mono font-semibold tabular',
+              glyph ? GLYPHS[glyph].textClass : 'text-soft',
+            )}
+          >
+            {summary[side][field] ?? '—'}
+          </span>
+        )),
+      ])}
     </div>
   )
 }

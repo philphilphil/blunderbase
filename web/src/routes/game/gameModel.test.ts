@@ -11,6 +11,7 @@ import {
   evalCurve,
   formatResult,
   formatVariation,
+  gameAnalysisSummary,
   humanMoves,
   maiaLevels,
   maiaLive,
@@ -146,6 +147,35 @@ describe('evalCurve', () => {
     expect(evalCurve(OPENING)).toEqual([])
   })
 
+})
+
+describe('gameAnalysisSummary', () => {
+  it('counts both players and derives bounded average centipawn loss', () => {
+    const summary = gameAnalysisSummary([
+      move(0, 'e4', 'e2e4', {
+        classification: 'mistake',
+        eval_before_cp: 100,
+        eval_after_cp: 50,
+      }),
+      move(1, 'd5', 'd7d5', {
+        classification: 'blunder',
+        eval_before_cp: 300,
+        eval_after_cp: -50,
+      }),
+      move(2, 'Qh5', 'd1h5', {
+        classification: 'inaccuracy',
+        eval_before_cp: 10_000,
+        eval_after_cp: -10_000,
+      }),
+      move(3, 'Nc6', 'b8c6', { eval_before_cp: 20, eval_after_cp: 40 }),
+      move(4, 'Bb5', 'f1b5', { classification: 'blunder' }),
+    ])
+
+    expect(summary).toEqual({
+      white: { inaccuracy: 1, mistake: 1, blunder: 1, acpl: 1025 },
+      black: { inaccuracy: 0, mistake: 0, blunder: 1, acpl: 175 },
+    })
+  })
 })
 
 describe('pairMoves', () => {

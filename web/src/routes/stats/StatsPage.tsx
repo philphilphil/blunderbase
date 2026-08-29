@@ -7,8 +7,9 @@
  * `/stats/compare`.
  *
  * The tile row is the design's five, at its anatomy, but two of its metrics do not exist:
- * `/stats` has no accuracy and no ACPL — `services.stats` aggregates win percentage given
- * away, not centipawn loss, and nothing in the pipeline computes an accuracy score. Their
+ * `/stats` has no accuracy and no aggregate ACPL — `services.stats` aggregates win percentage
+ * given away, while the game page derives ACPL from its move evaluations only, and nothing
+ * computes an accuracy score. Their
  * slots carry the two numbers the same aggregation does answer, on the same axis: `Win %
  * given away` (`avg_win_loss`, the average a move costs) and `Blunder rate` (the share of
  * moves that were one). Same question — how expensive are your moves — in real units.

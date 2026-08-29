@@ -70,7 +70,7 @@ const CARD = {
 } as const
 
 export const COLUMNS: Column[] = [
-  { id: 'select', label: '', width: 14, phone: CARD.select },
+  { id: 'select', label: '', width: 20, phone: CARD.select },
   { id: 'date', label: 'Date', width: 78, sort: 'played_at', mono: true, phone: CARD.date },
   { id: 'opponent', label: 'Opponent', width: 136, sort: 'opponent', phone: CARD.opponent },
   { id: 'rating', label: 'Elo', width: 46, align: 'right', sort: 'opponent_rating', mono: true, phone: CARD.rating },

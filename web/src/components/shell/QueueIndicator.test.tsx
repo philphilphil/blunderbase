@@ -28,9 +28,10 @@ function draw() {
   )
 }
 
-const queue = (queued: number, running = 0) => ({
+const queue = (queued: number, running = 0, paused = false) => ({
   queued,
   running,
+  paused,
   workers: true,
   busy: running,
   destinations: [],
@@ -41,6 +42,10 @@ beforeEach(() => {
   routes = {
     'GET /api/analysis/queue': () => json(200, queue(825, 4)),
     'POST /api/analysis/queue/clear': () => json(200, { dropped: 825, outstanding: 4 }),
+    'POST /api/analysis/queue/pause': () =>
+      json(200, { paused: true, queued: 825, running: 4 }),
+    'POST /api/analysis/queue/resume': () =>
+      json(200, { paused: false, queued: 825, running: 4 }),
   }
   vi.stubGlobal(
     'fetch',
@@ -60,6 +65,47 @@ describe('QueueIndicator', () => {
     draw()
     await screen.findByText('Idle')
     expect(screen.queryByTestId('clear-queue')).not.toBeInTheDocument()
+  })
+
+  it('offers no Pause while the queue is empty and running', async () => {
+    routes['GET /api/analysis/queue'] = () => json(200, queue(0, 0))
+    draw()
+    await screen.findByText('Idle')
+    expect(screen.queryByTestId('pause-queue')).not.toBeInTheDocument()
+  })
+
+  it('keeps the button on an empty queue that is paused, so it can be resumed', async () => {
+    routes['GET /api/analysis/queue'] = () => json(200, queue(0, 0, true))
+    draw()
+
+    await screen.findByText('Paused')
+    const button = screen.getByTestId('pause-queue')
+    expect(button).toHaveAccessibleName('Resume the analysis queue')
+    expect(button.querySelector('.lucide-play')).not.toBeNull()
+  })
+
+  it('pauses on a single click', async () => {
+    draw()
+    const button = await screen.findByTestId('pause-queue')
+    expect(button).toHaveAccessibleName('Pause the analysis queue')
+
+    await userEvent.click(button)
+
+    await waitFor(() =>
+      expect(calls.filter((call) => call === 'POST /api/analysis/queue/pause')).toHaveLength(1),
+    )
+  })
+
+  it('resumes a paused queue on a single click', async () => {
+    routes['GET /api/analysis/queue'] = () => json(200, queue(825, 4, true))
+    draw()
+    const button = await screen.findByTestId('pause-queue')
+
+    await userEvent.click(button)
+
+    await waitFor(() =>
+      expect(calls.filter((call) => call === 'POST /api/analysis/queue/resume')).toHaveLength(1),
+    )
   })
 
   it('asks once, with the count, and clears on the second click only', async () => {

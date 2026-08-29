@@ -81,6 +81,7 @@ class GameFilters:
     opponent: str | None = None
     variant: str | None = None
     has_blunders: bool | None = None
+    analyzed: bool | None = None
     deep_analyzed: bool | None = None
     text: str | None = None
 
@@ -182,6 +183,9 @@ def game_conditions(filters: GameFilters) -> list[ColumnElement[bool]]:
     if filters.has_blunders is not None:
         blunders = _has_classification(Classification.BLUNDER)
         conditions.append(blunders if filters.has_blunders else ~blunders)
+    if filters.analyzed is not None:
+        done = _has_done_run()
+        conditions.append(done if filters.analyzed else ~done)
     if filters.deep_analyzed is not None:
         deep = _has_deep_run()
         conditions.append(deep if filters.deep_analyzed else ~deep)

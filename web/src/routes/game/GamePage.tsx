@@ -46,6 +46,7 @@ import {
   evalAtCursor,
   evalCurve,
   formatGameDate,
+  gameAnalysisSummary,
   humanMoves,
   maiaComparison,
   maiaLevelFor,
@@ -378,6 +379,7 @@ function GameStudio({ gameId }: { gameId: number }) {
     () => moves.filter((move) => isFlagged(move.classification)).length,
     [moves],
   )
+  const analysisSummary = useMemo(() => gameAnalysisSummary(moves), [moves])
 
   // Where `j` and `shift+J` land, as cursors rather than as plies: one ply short of the
   // flagged move, which puts the board in the position the mistake was made *from* — where
@@ -1108,6 +1110,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       plyCount={plyCount}
       cursor={cursor}
       ownerSide={detail?.game.color ?? null}
+      analysisSummary={best ? analysisSummary : null}
       onSelectPly={selectPly}
       // A little taller than the desktop's 6.5rem cap, since it has the width to itself —
       // and no taller. The rest of the Eval tab goes to `FlaggedMoments`, which is the part

@@ -442,6 +442,24 @@ export function useClearQueue(
   })
 }
 
+/**
+ * The queue's stop and start. One mutation for both directions, because the button is one
+ * switch: what it posts is decided by the state it is in, not by which hook was called.
+ */
+export function useSetQueuePaused(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.pauseQueue>>, Error, boolean>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (paused: boolean) => (paused ? api.pauseQueue() : api.resumeQueue()),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
 // --- import ---------------------------------------------------------------
 
 export function useImportJobs(

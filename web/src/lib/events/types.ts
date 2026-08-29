@@ -27,6 +27,7 @@ export const EVENT_NAMES = [
   'analysis.done',
   'analysis.failed',
   'analysis.backfill',
+  'analysis.paused',
   'note.created',
   'note.updated',
   'note.deleted',
@@ -128,7 +129,23 @@ export interface AnalysisBackfillEvent {
   maia_only?: boolean
 }
 
-export type AnalysisEvent = AnalysisRunEvent | AnalysisProgressEvent | AnalysisBackfillEvent
+/**
+ * The queue stopped or started again. Not a backfill frame: nothing was queued and nothing
+ * was dropped, so `queued` and `running` are the depth as it already stood — they ride
+ * along so a widget hears the whole of the queue's state at once.
+ */
+export interface AnalysisPausedEvent {
+  event: 'analysis.paused'
+  paused: boolean
+  queued: number
+  running: number
+}
+
+export type AnalysisEvent =
+  | AnalysisRunEvent
+  | AnalysisProgressEvent
+  | AnalysisBackfillEvent
+  | AnalysisPausedEvent
 
 /**
  * A note written or rewritten — the whole note payload, flat, with `note_id` for its id.

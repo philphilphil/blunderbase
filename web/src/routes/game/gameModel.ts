@@ -32,6 +32,7 @@ import type {
 } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
 import { winPercent, type Score } from '@/lib/chess/evaluation'
+import { formatClock } from '@/lib/chess/timeControl'
 
 export type Side = 'white' | 'black'
 
@@ -148,8 +149,9 @@ export function formatResult(result: string | null | undefined): string {
 /** `Rapid 10+0`, or whatever the source gave us of it. */
 export function formatTimeControl(game: GameSummary): string | null {
   const speed = game.speed ? game.speed[0].toUpperCase() + game.speed.slice(1) : null
-  if (speed && game.time_control) return `${speed} ${game.time_control}`
-  return speed ?? game.time_control ?? null
+  const clock = game.time_control ? formatClock(game.time_control) : null
+  if (speed && clock) return `${speed} ${clock}`
+  return speed ?? clock
 }
 
 /** `22 Aug 2026` — the breadcrumb and header date format. */
@@ -211,6 +213,66 @@ export function evalAtCursor(
   return {
     score: scoreAfter(played) ?? scoreBefore(upcoming),
     win: whiteWinAfter(played) ?? whiteWinBefore(upcoming),
+  }
+}
+
+// --- per-player analysis summary -----------------------------------------
+
+export interface PlayerAnalysisSummary {
+  inaccuracy: number
+  mistake: number
+  blunder: number
+  /** Average centipawns lost per evaluated move, or null when no move has both scores. */
+  acpl: number | null
+}
+
+export type GameAnalysisSummary = Record<Side, PlayerAnalysisSummary>
+
+/**
+ * The Lichess-style summary for both players.
+ *
+ * Move evaluations are already in the mover's frame, so loss is simply before minus
+ * after, floored at zero. Each score is capped at ±1000cp first, matching the ceiling the
+ * win-percentage/classification model uses and keeping forced-mate scores from turning one
+ * move into a five-digit average.
+ */
+export function gameAnalysisSummary(moves: readonly MoveRow[]): GameAnalysisSummary {
+  const totals = {
+    white: { inaccuracy: 0, mistake: 0, blunder: 0, cpLoss: 0, evaluated: 0 },
+    black: { inaccuracy: 0, mistake: 0, blunder: 0, cpLoss: 0, evaluated: 0 },
+  }
+
+  for (const move of moves) {
+    const row = totals[sideOf(move.ply)]
+    if (
+      move.classification === 'inaccuracy' ||
+      move.classification === 'mistake' ||
+      move.classification === 'blunder'
+    ) {
+      row[move.classification] += 1
+    }
+
+    if (typeof move.eval_before_cp !== 'number' || typeof move.eval_after_cp !== 'number') continue
+    const before = Math.max(-1000, Math.min(1000, move.eval_before_cp))
+    const after = Math.max(-1000, Math.min(1000, move.eval_after_cp))
+    row.cpLoss += Math.max(0, before - after)
+    row.evaluated += 1
+  }
+
+  return {
+    white: finishSummary(totals.white),
+    black: finishSummary(totals.black),
+  }
+}
+
+function finishSummary(
+  row: Omit<PlayerAnalysisSummary, 'acpl'> & { cpLoss: number; evaluated: number },
+): PlayerAnalysisSummary {
+  return {
+    inaccuracy: row.inaccuracy,
+    mistake: row.mistake,
+    blunder: row.blunder,
+    acpl: row.evaluated > 0 ? Math.round(row.cpLoss / row.evaluated) : null,
   }
 }
 

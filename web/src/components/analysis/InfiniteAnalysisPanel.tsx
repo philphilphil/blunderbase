@@ -28,8 +28,7 @@ export interface InfiniteAnalysisPanelProps {
   /** The hook's whole surface; the panel renders, it never fetches. */
   stream: StreamSessionApi
   /**
-   * The position the lines are read from — SAN needs it, and its turn labels the eval's
-   * point of view.
+   * The position the lines are read from — SAN needs it.
    */
   fen: string | null
   /** For numbering the variation; omitted numbers from move 1. */
@@ -52,12 +51,6 @@ export interface InfiniteAnalysisPanelProps {
   /** Which way up the peek board is drawn — the surface's own board, not the engine's. */
   orientation?: 'white' | 'black'
   className?: string
-}
-
-/** Whose move it is, straight off the FEN's second field. */
-function turnOf(fen: string | null): 'white' | 'black' | null {
-  if (!fen) return null
-  return fen.split(/\s+/)[1] === 'b' ? 'black' : 'white'
 }
 
 /**
@@ -191,15 +184,27 @@ function reasonSentence(reason: StreamEndReason, where: string): string {
 
 function HostChip({ runner }: { runner: string | null }) {
   return runner === null ? (
-    <span className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-[0.59375rem] text-dim">
+    <span
+      data-testid="infinite-analysis-host"
+      className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-[0.59375rem] text-dim"
+    >
       local
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.59375rem] text-soft">
+    <span
+      data-testid="infinite-analysis-host"
+      className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.59375rem] text-soft"
+    >
       <span className="size-1 flex-none rounded-full bg-accent-teal" />
-      {runner}
+      <span className="truncate" title={runner}>{runner}</span>
     </span>
   )
+}
+
+/** Browser engines include the runner in their unique wire name; the adjacent chip owns it here. */
+function displayEngine(engine: string, runner: string | null): string {
+  const suffix = runner ? ` (${runner})` : ''
+  return suffix && engine.endsWith(suffix) ? engine.slice(0, -suffix.length) : engine
 }
 
 /**
@@ -231,8 +236,6 @@ function ControlsFooter({
  *
  * The scores are White-relative, like every other evaluation the app draws — the panel above
  * this one included, which is the whole reason `streamModel` flips what the engine reports.
- * The header still names whose move it is, which is the one thing about the position the
- * lines alone do not say.
  *
  * Three gestures point at a line, and they stay separate because they ask different
  * questions. The **row** asks where the line goes, and answers for the whole line at once;
@@ -257,7 +260,6 @@ export function InfiniteAnalysisPanel({
   className,
 }: InfiniteAnalysisPanelProps) {
   const { phase, snapshot, session, offer, error, note } = stream
-  const turn = turnOf(fen)
   const lines: StreamLine[] = [...(snapshot?.lines ?? [])].sort((a, b) => a.multipv - b.multipv)
   const prefs = useLinePreviewPrefs()
 
@@ -328,62 +330,62 @@ export function InfiniteAnalysisPanel({
 
   return (
     <section className={shell} data-testid="infinite-analysis">
-      <div className="flex items-center gap-2 px-3 pb-2 pt-2.5">
-        <span
-          className={cn(
-            'size-1.5 flex-none rounded-full',
-            phase === 'running'
-              ? 'animate-pulse bg-accent-teal'
-              : phase === 'opening'
-                ? 'bg-mistake'
-                : phase === 'error'
-                  ? 'bg-blunder'
-                  : 'bg-edge-strong',
-          )}
-        />
-        <span
-          data-testid="infinite-analysis-engine"
-          className="text-xs font-semibold text-ink"
-        >
-          {session?.engine ?? 'Live analysis'}
-        </span>
-        {session ? <HostChip runner={session.runner ?? null} /> : null}
-        {turn ? (
-          <span className="text-[0.625rem] text-dim">{turn} to move</span>
-        ) : null}
-        <div className="flex-1" />
-        {snapshot?.depth ? (
-          <span className="font-mono text-[0.625rem] tabular text-dim">d{snapshot.depth}</span>
-        ) : null}
-        {snapshot?.nodes ? (
-          <span className="font-mono text-[0.625rem] tabular text-dim">
-            {formatNodes(snapshot.nodes)} nodes
-          </span>
-        ) : null}
-        {snapshot?.nps ? (
-          <span className="font-mono text-[0.625rem] tabular text-dim">
-            {formatNps(snapshot.nps)}
-          </span>
-        ) : null}
-        {/*
-          The row mode, at the weight of the readouts beside it: it says what hovering a line
-          will do, which is worth a glance and can be configured beside the chip.
-        */}
-        {onHoverLine ? (
-          <button
-            type="button"
-            onClick={() =>
-              setLinePreviewPrefs({
-                row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
-              })
-            }
-            title={`Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`}
-            className="bb-chip px-1.5 py-px font-mono text-[0.625rem] text-dim transition-colors hover:text-ink"
+      <div className="px-3 pb-2 pt-2.5" data-testid="infinite-analysis-header">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              'size-1.5 flex-none rounded-full',
+              phase === 'running'
+                ? 'animate-pulse bg-accent-teal'
+                : phase === 'opening'
+                  ? 'bg-mistake'
+                  : phase === 'error'
+                    ? 'bg-blunder'
+                    : 'bg-edge-strong',
+            )}
+          />
+          <span
+            data-testid="infinite-analysis-engine"
+            title={session?.engine}
+            className="max-w-[45%] flex-none truncate text-xs font-semibold text-ink"
           >
-            {prefs.row}
-          </button>
-        ) : null}
-        {onHoverLine ? <LinePreviewSettingsButton /> : null}
+            {session ? displayEngine(session.engine, session.runner ?? null) : 'Live analysis'}
+          </span>
+          {session ? <HostChip runner={session.runner ?? null} /> : null}
+          <div className="flex-1" />
+          {onHoverLine ? (
+            <button
+              type="button"
+              onClick={() =>
+                setLinePreviewPrefs({
+                  row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
+                })
+              }
+              title={`Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`}
+              className="bb-chip flex-none px-1.5 py-px font-mono text-[0.625rem] text-dim transition-colors hover:text-ink"
+            >
+              {prefs.row}
+            </button>
+          ) : null}
+          {onHoverLine ? <LinePreviewSettingsButton /> : null}
+        </div>
+
+        <div className="mt-1 flex min-w-0 items-center gap-2 pl-3.5" data-testid="infinite-analysis-meta">
+          <div className="flex-1" />
+          {snapshot?.depth ? (
+            <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">d{snapshot.depth}</span>
+          ) : null}
+          {snapshot?.nodes ? (
+            <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+              {formatNodes(snapshot.nodes)} nodes
+            </span>
+          ) : null}
+          {snapshot?.nps ? (
+            <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+              {formatNps(snapshot.nps)}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {offer ? (

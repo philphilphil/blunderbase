@@ -65,6 +65,7 @@ def game_filters(
     opponent: str | None = None,
     variant: str | None = None,
     has_blunders: bool | None = None,
+    analyzed: Annotated[bool | None, Query(description="whether any analysis pass is done")] = None,
     deep_analyzed: bool | None = None,
     text: Annotated[str | None, Query(description="free text over names and openings")] = None,
 ) -> GameFilters:
@@ -82,6 +83,7 @@ def game_filters(
         opponent=opponent,
         variant=variant,
         has_blunders=has_blunders,
+        analyzed=analyzed,
         deep_analyzed=deep_analyzed,
         text=text,
     )

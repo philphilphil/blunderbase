@@ -56,6 +56,7 @@ import type {
   ProbeResponse,
   ProfileResponse,
   QueueCleared,
+  QueuePaused,
   QueueStatus,
   ResurfaceResponse,
   RetryFailedReceipt,
@@ -200,6 +201,15 @@ export const cancelBackfill = (tier: Tier = 'quick') =>
  * queue built up by mistake. Runs already on an engine are left to finish.
  */
 export const clearQueue = () => http.post<QueueCleared>('/analysis/queue/clear')
+
+/**
+ * Stops the workers claiming anything else — every machine's, not only this one's, since
+ * the pause is a stored flag both halves of the queue read. A run already claimed finishes.
+ */
+export const pauseQueue = () => http.post<QueuePaused>('/analysis/queue/pause')
+
+/** Lets the queue drain again, and nudges the workers so it starts without a poll's wait. */
+export const resumeQueue = () => http.post<QueuePaused>('/analysis/queue/resume')
 
 /**
  * The whole library's analysis state in one call — what has been analysed with what, what

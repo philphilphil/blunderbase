@@ -16,7 +16,7 @@ describe('filtersFromParams', () => {
     const params = new URLSearchParams(
       'since=2016-12-01&until=2016-12-07&source=lichess&color=black&eco=b2&result=1-0' +
         '&outcome=loss&speed=rapid&time_control=600%2B0&opponent=chillzone' +
-        '&has_blunders=true&deep_analyzed=false&q=alapin',
+        '&has_blunders=true&analyzed=false&deep_analyzed=false&q=alapin',
     )
     expect(filtersFromParams(params)).toEqual({
       since: '2016-12-01',
@@ -30,6 +30,7 @@ describe('filtersFromParams', () => {
       time_control: '600+0',
       opponent: 'chillzone',
       has_blunders: true,
+      analyzed: false,
       deep_analyzed: false,
       text: 'alapin',
     })
@@ -86,6 +87,7 @@ describe('groups', () => {
     expect(groupSummary('color', { color: 'black' })).toBe('black')
     expect(groupSummary('result', { outcome: 'loss', result: '1-0' })).toBe('loss · 1-0')
     expect(groupSummary('analysis', { has_blunders: false })).toBe('no blunders')
+    expect(groupSummary('analysis', { analyzed: false })).toBe('unanalysed')
     expect(groupSummary('date', { until: '2016-12-07' })).toBe('until 2016-12-07')
     expect(groupSummary('opponent', {})).toBeNull()
   })

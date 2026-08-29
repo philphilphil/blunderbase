@@ -92,9 +92,9 @@ export const GameRow = memo(function GameRow({
             onToggle(game.id, event)
           }}
           className={cn(
-            // An 11px box is a mouse target, not a thumb one, so the phone gets a bigger
-            // square rather than an invisible pad around the same one.
-            'size-[0.6875rem] rounded-[0.1875rem] border transition-colors max-md:size-[1.125rem]',
+            // Large enough to distinguish from the row around it as a click target. The
+            // whole visible square is the button, so a near-hit selects instead of opening.
+            'size-[1.125rem] rounded-[0.1875rem] border transition-colors',
             selected
               ? 'border-accent-teal bg-accent-teal'
               : 'border-edge-strong hover:border-edge-hover',

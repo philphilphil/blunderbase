@@ -831,7 +831,7 @@ async def test_clear_queue_drops_every_tier_and_says_how_many(
     payload = await call(coach, "clear_queue")
 
     assert payload["dropped"] == 2
-    assert payload["queue"] == {"queued": 0, "running": 0}
+    assert payload["queue"] == {"queued": 0, "running": 0, "paused": False}
 
 
 async def test_get_analysis_status_reports_a_run(
@@ -843,6 +843,8 @@ async def test_get_analysis_status_reports_a_run(
     assert payload["engine"] == "stockfish-test"
     assert payload["evals"] == 0
     assert payload["queue"]["queued"] == 1
+    # A queue that is not draining is not a queue the coach should tell the owner to wait on.
+    assert payload["queue"]["paused"] is False
     assert payload["created_at"].endswith("Z")
 
 

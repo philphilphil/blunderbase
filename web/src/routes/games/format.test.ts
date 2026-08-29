@@ -42,6 +42,9 @@ describe('formatResult', () => {
 
 describe('formatTimeControl', () => {
   it('turns the stored seconds into the minutes every chess site shows', () => {
+    expect(formatTimeControl({ time_control: '300', speed: 'blitz', source: 'chesscom' })).toBe(
+      '5',
+    )
     expect(formatTimeControl({ time_control: '600+0', speed: 'rapid', source: 'lichess' })).toBe(
       '10+0',
     )
