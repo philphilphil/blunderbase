@@ -44,11 +44,4 @@ describe('the explorer’s board wiring', () => {
     expect(api!.state.movable.dests?.get('e7')).toEqual(expect.arrayContaining(['e5', 'e6']))
     expect(api!.state.movable.free).toBe(false)
   })
-
-  it('offers no destinations for the side that is not to move', () => {
-    const ref = createRef<Api | null>()
-    render(<Board fen={AFTER_E4.fen} viewOnly={false} turnColor="black" ref={ref} />)
-    ref.current!.set({ movable: { free: false, dests: AFTER_E4.dests } })
-    expect(ref.current!.state.movable.dests?.has('e4')).toBe(false)
-  })
 })

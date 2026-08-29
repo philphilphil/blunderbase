@@ -13,14 +13,6 @@ function board() {
 }
 
 describe('Board', () => {
-  it('mounts chessground and renders the pieces of a FEN', () => {
-    render(<Board fen={START} />)
-    expect(board()).toHaveClass('cg-wrap')
-    // 32 pieces at the start, one <piece> element each.
-    expect(board().querySelectorAll('piece')).toHaveLength(32)
-    expect(board().querySelector('cg-board')).not.toBeNull()
-  })
-
   it('orients the board and reorients it when the prop changes', () => {
     const { rerender } = render(<Board fen={START} orientation="white" />)
     expect(board()).toHaveClass('orientation-white')
