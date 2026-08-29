@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.8.0 — 2026-08-29
+
+- Added a command that builds an anonymous demo database
+- Added screenshots to the README
+- Changed backfills to queue like any other analysis
+
 ## v0.7.0 — 2026-08-29
 
 - Added pausing and resuming the analysis queue
