@@ -16,8 +16,7 @@
 - Support for maia3 at multiple ELO's to see what humans would have played
 - Take notes on positions
 - Awesome Engine-Line visualizer 
-- Full MCP support to discuss games with an AI-Agent
-- Live-Chessbaord to be used with your AI-Agent over MCP
+- Full MCP support to discuss games with an AI-Agent and a shared live board
 - Remote-Engine-Runner to use your copmanies idling inference server CPUs for your hobbies 
 - Opening explorer with win-stats over your own games
 - Fully self-hostable, easiest via docker
