@@ -18,7 +18,8 @@ kept — but the shape had to change on re-review:
 - "One warm process per engine" is one process per *caller* of an engine, up to the cap.
   Every worker of an archive sync asks for the same quick-tier engine, so a single process
   per spec would put the whole pool in a queue behind one search and make
-  `analysis_concurrency` mean nothing.
+  `analysis_concurrency` mean nothing. An engine that cannot be run twice — a Maia holding
+  one GPU — says so with `EngineSpec.instances`, and then its callers do queue.
 """
 
 from __future__ import annotations
@@ -58,6 +59,10 @@ class EngineSpec:
     options: tuple[tuple[str, Any], ...] = ()
     name: str = ""
     engine_id: int | None = None
+    # How many processes of this engine may run at once, at most. None means "as many as
+    # the pool's cap allows", which is what everything but a GPU engine wants: a Maia on
+    # one card is one process every caller queues on, not one per slot.
+    instances: int | None = None
 
     @classmethod
     def build(
@@ -68,6 +73,7 @@ class EngineSpec:
         options: Mapping[str, Any] | None = None,
         name: str = "",
         engine_id: int | None = None,
+        instances: int | None = None,
     ) -> EngineSpec:
         return cls(
             path=path,
@@ -75,6 +81,7 @@ class EngineSpec:
             options=tuple(sorted((str(key), value) for key, value in (options or {}).items())),
             name=name,
             engine_id=engine_id,
+            instances=instances,
         )
 
     @property
@@ -83,7 +90,12 @@ class EngineSpec:
 
     @property
     def key(self) -> str:
-        """Same key, same process. Changing an option is a different engine."""
+        """Same key, same process. Changing an option is a different engine.
+
+        `instances` is deliberately not part of it: it is how many of this process may run,
+        not which process it is. Folding it in would make raising the cap orphan the warm
+        processes under the old key instead of letting the same group grow.
+        """
         options = ",".join(f"{name}={value}" for name, value in self.options)
         return f"{self.kind}|{self.path}|{options}"
 
@@ -192,8 +204,16 @@ class _SlotGroup:
     """The warm processes for one engine spec, and which of them are free.
 
     Callers reach a group having already passed the pool's semaphore, so there are never
-    more of them here at once than the cap — which is why taking a process is a plain list
-    pop with no waiting: a free one always exists, or one more may be started.
+    more of them here at once than the pool's cap — which is why taking a process is a plain
+    list pop with no waiting: a free one exists, or one more may be started. When the group
+    is capped below that (an engine with its own `instances`) the extra callers are handed a
+    process that is already in use and queue on its lock, which is the whole point of the
+    cap: one GPU process, several callers, one search at a time.
+
+    `_free` therefore holds a process at most once even when several callers share it —
+    `acquire` only hands one back if it is not already there. Counting a release per caller
+    would let `idle` report one process as several, make the reaper walk it repeatedly, and
+    hand a later `_take` a process somebody is still inside.
     """
 
     def __init__(
@@ -229,19 +249,26 @@ class _SlotGroup:
             async with slot.acquire() as engine:
                 yield engine
         finally:
-            self._free.append(slot)
+            if slot not in self._free:
+                self._free.append(slot)
 
     def drop_cold(self) -> None:
         """Forget the processes that have been shut down. A new one is started on demand."""
-        self.slots = [slot for slot in self.slots if slot.warm or slot not in self._free]
-        self._free = [slot for slot in self._free if slot.warm]
+        # A busy slot is kept whether or not it is warm: a caller sharing a capped process
+        # may be starting it right now, and forgetting it here would leave that process
+        # running with neither `warm()` nor the pool's own `close()` knowing about it.
+        self.slots = [
+            slot for slot in self.slots if slot.warm or slot.busy or slot not in self._free
+        ]
+        self._free = [slot for slot in self._free if slot.warm or slot.busy]
 
     def _take(self) -> _Slot:
         if self._free:
             return self._free.pop()
         if len(self.slots) >= self._limit:
-            # Only reachable if a slot was taken out of circulation while every other one
-            # was in use; waiting on an existing process is right and costs nothing.
+            # Either a slot was taken out of circulation while every other one was in use, or
+            # this engine caps itself below the pool. Waiting on an existing process is right
+            # in both cases, and costs nothing.
             return self.slots[0]
         slot = _Slot(
             self.spec, self._factory, idle_seconds=self._idle_seconds, clock=self._clock
@@ -336,10 +363,17 @@ class EnginePool:
             group = self._groups[spec.key] = _SlotGroup(
                 spec,
                 self._factory,
-                limit=self.concurrency,
+                # An engine may pin itself below the pool's cap; it can never raise itself
+                # above it, since a caller holds one of the pool's slots either way.
+                limit=min(self.concurrency, spec.instances or self.concurrency),
                 idle_seconds=self._idle_seconds,
                 clock=self._clock,
             )
+        # A group is cached by key and `instances` is not part of the key, so a later spec
+        # for the same engine with a different count does not resize the group it finds: the
+        # limit it was built with stands until every process idles out and the group is
+        # reaped. Editing a runner's yaml already means restarting the runner, so this only
+        # shows up in the window between the two.
         return group
 
     def _ensure_reaper(self) -> None:

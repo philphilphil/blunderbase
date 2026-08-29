@@ -30,6 +30,8 @@ services:
       - ./runner.yaml:/etc/blunderbase/runner.yaml:ro
       # A Maia build and its weights, if this machine has them. Register the path in the
       # yaml as `kind: maia`. The image ships Stockfish at /usr/games/stockfish already.
+      # If it runs on a GPU, give that engine `instances: 1` in the yaml as well: without
+      # it every slot starts its own copy and they fight over the card.
       # - ./engines:/opt/engines:ro
     environment:
       # The token beats whatever the mounted yaml says, so the secret can stay out of a

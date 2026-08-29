@@ -17,6 +17,7 @@ from backend.adapters.pool import (
     MAIA_KIND,
     EnginePool,
     EngineSpec,
+    _SlotGroup,
     build_adapter,
     get_pool,
     shutdown_pool,
@@ -25,6 +26,10 @@ from backend.adapters.stockfish import EngineError, EngineStartError, StockfishA
 
 STOCKFISH = EngineSpec.build("stockfish", name="Stockfish")
 MAIA = EngineSpec.build("lc0 --weights=maia-1500", kind=MAIA_KIND, name="Maia 1500")
+# The same Maia, on a machine whose yaml says its one GPU holds one process.
+PINNED = EngineSpec.build(
+    "lc0 --weights=maia-1500", kind=MAIA_KIND, name="Maia 1500", instances=1
+)
 
 
 class FakeAdapter:
@@ -132,6 +137,13 @@ def test_a_spec_key_does_not_depend_on_how_the_options_were_ordered() -> None:
     assert one.option_dict == {"Hash": 64, "Threads": 2}
 
 
+def test_capping_the_instances_is_not_a_different_engine() -> None:
+    """How many of a process may run is not which process it is. If the cap were part of the
+    key, changing it would leave the warm processes stranded under the old one."""
+    assert PINNED.key == MAIA.key
+    assert (PINNED.instances, MAIA.instances) == (1, None)
+
+
 # --- concurrency ----------------------------------------------------------
 
 
@@ -158,6 +170,65 @@ async def test_two_callers_of_one_engine_get_a_process_each() -> None:
     assert log == ["start:Stockfish", "start:Stockfish"]
     assert pool.warm() == [STOCKFISH.key, STOCKFISH.key]
     await pool.close()
+
+
+async def test_an_engine_pinned_to_one_instance_is_one_process_its_callers_queue_on() -> None:
+    """A Maia holding one GPU cannot be started four times, however many slots the runner
+    has. Its callers wait for the process rather than being handed one each."""
+    log: list[str] = []
+    clock = Clock()
+    pool = build(log, concurrency=4, clock=clock)
+    inside = 0
+    peak = 0
+    served = 0
+
+    async def work() -> None:
+        nonlocal inside, peak, served
+        async with pool.acquire(PINNED):
+            inside += 1
+            peak = max(peak, inside)
+            for _ in range(3):
+                await asyncio.sleep(0)  # every other caller gets its turn to run
+            served += 1
+            inside -= 1
+
+    await asyncio.gather(*(work() for _ in range(4)))
+
+    assert log == ["start:Maia 1500"]
+    assert (served, peak) == (4, 1)  # all four ran, one at a time
+    assert pool.warm() == [PINNED.key]
+
+    clock.advance(IDLE_SECONDS + 1)
+    assert await pool.reap_idle() == [PINNED.key]
+    assert pool.warm() == []
+    await pool.close()
+
+
+async def test_a_capped_group_hands_its_shared_process_back_only_once() -> None:
+    """The pool cannot show this one: `warm()` counts processes and `reap_idle()` shuts each
+    down once, so a free list holding the same process four times looks right from outside —
+    until a caller is handed a process somebody else is already inside. Assert the invariant
+    where it lives instead."""
+    log: list[str] = []
+    group = _SlotGroup(
+        PINNED,
+        lambda spec: FakeAdapter(spec, log),  # type: ignore[arg-type,return-value]
+        limit=1,
+        idle_seconds=IDLE_SECONDS,
+        clock=Clock(),
+    )
+
+    async def work() -> None:
+        async with group.acquire():
+            await asyncio.sleep(0)
+
+    await asyncio.gather(*(work() for _ in range(4)))
+
+    assert log == ["start:Maia 1500"]
+    assert len(group.slots) == 1
+    assert group.idle == group.slots  # one process, listed once
+    for slot in group.slots:
+        await slot.close()
 
 
 async def test_one_engine_starts_no_more_processes_than_the_cap() -> None:

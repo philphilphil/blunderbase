@@ -80,7 +80,7 @@ TOP_LEVEL = frozenset(
 RECONNECT_KEYS = frozenset(
     {"initial_seconds", "max_seconds", "websocket_failures", "retry_websocket_seconds"}
 )
-ENGINE_KEYS = frozenset({"name", "path", "kind", "tier", "options", "streams"})
+ENGINE_KEYS = frozenset({"name", "path", "kind", "tier", "options", "streams", "instances"})
 
 
 class RunnerConfigError(ValueError):
@@ -101,6 +101,11 @@ class EngineConfig:
     options: dict[str, Any] = field(default_factory=dict)
     # None means "whatever this kind of engine can do"; a yaml may say otherwise.
     streams: bool | None = None
+    # How many of this binary may run at once on this machine. None is the default and means
+    # one per slot, which is right for a CPU engine. A Maia holding one GPU is `instances: 1`:
+    # a single process, with the slots that want it queueing on it rather than starting a
+    # second copy and running the card out of memory.
+    instances: int | None = None
 
     @property
     def streams_enabled(self) -> bool:
@@ -374,6 +379,9 @@ def _engine(source: str, index: int, entry: Any) -> EngineConfig:
     if not isinstance(options, Mapping):
         _refuse(source, f"{name}: options is a mapping of UCI option names to values")
     streams = entry.get("streams")
+    # `_positive_int` needs a default and there is none: an absent `instances` stays None,
+    # which is not the same as any number the yaml could have written.
+    instances = entry.get("instances")
     return EngineConfig(
         name=name,
         path=path,
@@ -382,6 +390,8 @@ def _engine(source: str, index: int, entry: Any) -> EngineConfig:
         options=dict(options),
         streams=None if streams is None else _boolean(source, f"{name}.streams", streams,
                                                       default=True),
+        instances=None if instances is None else _positive_int(source, f"{name}.instances",
+                                                               instances, default=1),
     )
 
 

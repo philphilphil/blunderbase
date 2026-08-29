@@ -1256,7 +1256,11 @@ class RunnerClient:
 def _spec(engine: EngineConfig) -> EngineSpec:
     """The pool key for one configured engine. Changing an option is a new process."""
     return EngineSpec.build(
-        engine.path, kind=engine.kind, options=dict(engine.options), name=engine.name
+        engine.path,
+        kind=engine.kind,
+        options=dict(engine.options),
+        name=engine.name,
+        instances=engine.instances,
     )
 
 

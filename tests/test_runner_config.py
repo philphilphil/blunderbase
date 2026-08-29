@@ -108,6 +108,31 @@ def test_everything_optional_has_a_default(tmp_path: Path) -> None:
     assert config.reconnect == Reconnect()
 
 
+def test_an_engine_pins_its_process_count_only_when_the_yaml_says_so(tmp_path: Path) -> None:
+    """A Maia on one GPU is one process every slot queues on; a CPU engine wants one per
+    slot, which is what an absent `instances` leaves it with."""
+    data = {
+        **MINIMAL,
+        "engines": [
+            {"name": "sf", "path": "/sf"},
+            {"name": "maia3", "path": "/lc0", "kind": "maia", "instances": 1},
+        ],
+    }
+    config = RunnerConfig.load(write(tmp_path, data))
+
+    assert [engine.instances for engine in config.engines] == [None, 1]
+
+
+def test_an_instance_count_below_one_is_a_refusal(tmp_path: Path) -> None:
+    def instances(value: object) -> str:
+        engines = [{"name": "sf", "path": "/sf", "instances": value}]
+        return refusal({**MINIMAL, "engines": engines}, tmp_path)
+
+    assert "sf.instances is at least 1" in instances(0)
+    assert "sf.instances is at least 1" in instances(-2)
+    assert "sf.instances is a whole number" in instances("many")
+
+
 def test_a_maia_never_streams_and_a_uci_engine_does_unless_it_says_otherwise() -> None:
     uci = EngineConfig(name="sf", path="/sf")
     quiet = EngineConfig(name="sf2", path="/sf", streams=False)

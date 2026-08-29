@@ -68,7 +68,19 @@ engines:
       Threads: 8
       Hash: 4096
     streams: true                 # default true for uci; a Maia never streams
+    instances: 2                  # default: one process per slot
+
+  - name: maia3
+    path: /engines/maia3/bin/maia3
+    kind: maia
+    instances: 1   # one GPU process shared by all slots
 ```
+
+`instances:` is the one thing an engine can say about how it is *run*: without it each slot
+that wants this engine gets its own process, which is right for a CPU binary and wrong for
+anything holding a single accelerator — a Maia on one GPU wants `instances: 1`, so the slots
+queue on one process instead of starting a second and running the card out of memory. It can
+only lower the number of processes, never raise it above `slots`.
 
 An unrecognised key is refused by name rather than ignored — a typo in a slot count is a
 mistake, not a preference. `tier:` on an engine is the one exception: it is accepted and
