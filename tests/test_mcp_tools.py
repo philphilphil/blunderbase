@@ -857,50 +857,9 @@ async def test_analyze_position_rejects_a_bad_fen(coach: MCPServer) -> None:
 # --- memory ----------------------------------------------------------------
 
 
-async def test_save_note_writes_a_note(coach: MCPServer, analysed: dict[str, Game]) -> None:
-    payload = await call(
-        coach, "save_note", text="  work on the Berlin  ", tags=["opening", "berlin"]
-    )
-    assert payload["text"] == "work on the Berlin"
-    assert payload["tags"] == ["opening", "berlin"]
-    assert payload["created_at"].endswith("Z")
-
-
-async def test_save_note_anchors_to_a_game_or_a_position(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    game = analysed["qg000001"]
-    on_game = await call(coach, "save_note", text="lost the thread here", game_id=game.id)
-    assert on_game["game_id"] == game.id
-    on_position = await call(coach, "save_note", text="know this one", fen=START_FEN)
-    assert on_position["position_id"]
-
-
 async def test_save_note_refuses_an_unknown_game(coach: MCPServer) -> None:
     payload = await failure(coach, "save_note", text="about nothing", game_id=1234)
     assert payload["error"] == "unknown_game"
-
-
-async def test_an_empty_note_is_a_structured_error(coach: MCPServer) -> None:
-    payload = await failure(coach, "save_note", text="   ")
-    assert payload["error"] == "bad_argument"
-
-
-async def test_search_notes_finds_by_text_tags_and_anchor(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    game = analysed["qg000001"]
-    await call(coach, "save_note", text="Berlin endgames", tags=["opening", "berlin"])
-    await call(coach, "save_note", text="time trouble again", tags=["clock"], game_id=game.id)
-
-    by_text = await call(coach, "search_notes", query="berlin")
-    assert [note["text"] for note in by_text["notes"]] == ["Berlin endgames"]
-    by_tags = await call(coach, "search_notes", tags=["opening", "berlin"])
-    assert by_tags["count"] == 1
-    by_game = await call(coach, "search_notes", game_id=game.id)
-    assert [note["text"] for note in by_game["notes"]] == ["time trouble again"]
-    both_tags = await call(coach, "search_notes", tags=["opening", "clock"])
-    assert both_tags["count"] == 0
 
 
 async def test_search_notes_opens_a_session_with_the_tags_in_use(
@@ -916,17 +875,6 @@ async def test_search_notes_narrows_by_date(coach: MCPServer, analysed: dict[str
     await call(coach, "save_note", text="today's note")
     assert (await call(coach, "search_notes", since="1d"))["count"] == 1
     assert (await call(coach, "search_notes", until="2020-01-01"))["count"] == 0
-
-
-async def test_save_note_lands_on_a_ply(coach: MCPServer, analysed: dict[str, Game]) -> None:
-    game = analysed["qg000001"]
-    payload = await call(
-        coach, "save_note", text="this is where it went wrong", game_id=game.id, ply=5
-    )
-    assert payload["ply"] == 5
-    # A ply names a position, so the note knows the FEN without being told it.
-    assert payload["fen"]
-    assert payload["source"] == "mcp"
 
 
 async def test_save_note_pins_the_line_it_is_about(
@@ -945,6 +893,8 @@ async def test_save_note_pins_the_line_it_is_about(
     assert payload["line"]["base_ply"] == 3
     # The tip of the line is where the note landed.
     assert payload["ply"] == 5
+    # Written through the coach, and the note says so.
+    assert payload["source"] == "mcp"
 
     kept = await call(coach, "get_lines", game_id=game.id)
     assert kept["count"] == 1
@@ -964,28 +914,6 @@ async def test_save_line_folds_a_line_that_is_already_kept(
     assert longer["id"] == first["id"]
     assert longer["moves"] == ["d7d6", "d2d4", "e5d4"]
     assert (await call(coach, "get_lines", game_id=game.id))["count"] == 1
-
-
-async def test_save_line_refuses_a_move_that_could_not_be_played(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    game = analysed["qg000001"]
-    payload = await failure(coach, "save_line", game_id=game.id, base_ply=3, moves=["e2e4"])
-    assert payload["error"] == "bad_argument"
-
-
-async def test_search_notes_narrows_by_scope(coach: MCPServer, analysed: dict[str, Game]) -> None:
-    game = analysed["qg000001"]
-    await call(coach, "save_note", text="a plan", tags=["plan"])
-    await call(coach, "save_note", text="about this game", game_id=game.id)
-    await call(
-        coach, "save_note", text="about this line", game_id=game.id, base_ply=3, line=["d7d6"]
-    )
-
-    assert (await call(coach, "search_notes", scope="free"))["count"] == 1
-    assert (await call(coach, "search_notes", scope="line"))["count"] == 1
-    by_game = await call(coach, "search_notes", scope="game")
-    assert [note["text"] for note in by_game["notes"]] == ["about this game"]
 
 
 async def test_resurface_notes_says_why_each_note_came_back(

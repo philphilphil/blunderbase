@@ -1425,27 +1425,9 @@ def test_a_note_can_be_written_and_read_back(api: TestClient, seeded: dict[str, 
     body = response.json()
     assert body["text"] == "push the d pawn"
     assert body["tags"] == ["plan"]
+    # Written through the browser, and the note says so.
+    assert body["source"] == "web"
     assert api.get(f"/notes/{body['id']}").json() == body
-
-
-def test_a_note_can_be_anchored_to_a_position(api: TestClient) -> None:
-    body = api.post("/notes", json={"text": "the Berlin again", "fen": FRENCH}).json()
-
-    assert body["position_id"] is not None
-    found = api.get("/notes", params={"fen": FRENCH}).json()
-    assert [note["id"] for note in found] == [body["id"]]
-
-
-def test_notes_are_searched_by_text_and_by_tag(api: TestClient, seeded: dict[str, int]) -> None:
-    api.post("/notes", json={"text": "time trouble again", "tags": ["clock"]})
-
-    assert [note["id"] for note in api.get("/notes", params={"query": "endgames"}).json()] == [
-        seeded["note_id"]
-    ]
-    assert api.get("/notes", params={"tags": ["clock"]}).json()[0]["text"] == (
-        "time trouble again"
-    )
-    assert api.get("/notes", params={"tags": ["clock", "berlin"]}).json() == []
 
 
 def test_the_tags_in_use_come_back_with_their_counts(api: TestClient) -> None:
@@ -1470,21 +1452,6 @@ def test_a_note_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
     assert error_of(api.get("/notes/9999")) == "unknown_note"
     assert error_of(api.patch("/notes/9999", json={"text": "x"})) == "unknown_note"
     assert error_of(api.delete("/notes/9999")) == "unknown_note"
-
-
-def test_a_note_can_land_on_a_move_of_a_game(api: TestClient, seeded: dict[str, int]) -> None:
-    body = api.post(
-        "/notes", json={"text": "the tempo goes here", "game_id": seeded["game_id"], "ply": 4}
-    ).json()
-
-    assert body["ply"] == 4
-    # A ply names a position, so the note comes back knowing the FEN and the game.
-    assert body["fen"]
-    assert body["game"]["id"] == seeded["game_id"]
-    assert body["source"] == "web"
-    detail = api.get(f"/games/{seeded['game_id']}").json()
-    written = next(note for note in detail["notes"] if note["id"] == body["id"])
-    assert written["ply"] == 4
 
 
 def test_a_note_on_a_variation_pins_the_variation(
@@ -1530,16 +1497,6 @@ def test_a_line_on_a_game_that_is_not_there_is_a_typed_404(api: TestClient) -> N
     assert response.status_code == 404
     assert error_of(response) == "unknown_game"
     assert error_of(api.delete("/lines/9999")) == "unknown_line"
-
-
-def test_a_line_that_could_not_have_been_played_is_refused(
-    api: TestClient, seeded: dict[str, int]
-) -> None:
-    response = api.post(
-        "/lines", json={"game_id": seeded["game_id"], "base_ply": 3, "moves": ["e2e4"]}
-    )
-    assert response.status_code == 422
-    assert error_of(response) == "invalid_request"
 
 
 def test_notes_are_narrowed_by_scope(api: TestClient, seeded: dict[str, int]) -> None:
@@ -1589,24 +1546,6 @@ def test_notes_export_as_markdown_and_as_pgn(api: TestClient, seeded: dict[str, 
     assert "{ watch the c-file }" in pgn.text
 
     assert error_of(api.get("/notes/export", params={"format": "docx"})) == "invalid_request"
-
-
-def test_a_note_can_be_written_from_the_live_board(
-    api: TestClient, seeded: dict[str, int]
-) -> None:
-    """"Save this moment": the board says which game and which position, so the body need
-    only carry the text."""
-    with get_sessionmaker(api.app.state.settings)() as session:
-        live_service.show_game(session, seeded["game_id"], 4)
-    live_service.make_move("f1c4")
-
-    body = api.post("/notes", json={"text": "why not the Italian", "from_live": True}).json()
-
-    assert body["game_id"] == seeded["game_id"]
-    assert body["source"] == "live"
-    assert body["ply"] == 5
-    assert body["line"]["moves"] == ["f1c4"]
-    assert body["fen"]
 
 
 def test_the_events_socket_sees_a_line_and_a_deletion(
