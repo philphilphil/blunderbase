@@ -139,8 +139,21 @@ That tag push builds the image again and publishes
 
 ```bash
 make test                                       # uv run pytest + pnpm test
+uv run pytest -m slow                           # the seven that wait on a real clock
 uv run pytest -m engine                         # the suite that wants a real binary
+uv run pytest -n0                               # back on one process, for a breakpoint
 ```
 
-Engine adapters are covered by scripted fake UCI processes, so the default run needs no
-binary. CI lints, runs the whole suite, then builds and pushes the image from `main`.
+Two markers are deselected from the default run, so that the run you type between edits
+answers in seconds. **`engine`** wants a real Stockfish or Maia; the adapters are otherwise
+covered by scripted fake UCI processes, so the default run needs no binary at all.
+**`slow`** is seven tests that wait on a wall clock rather than on an event — a reconnect
+window running out, a shutdown grace period — and were forty of the suite's hundred-odd
+seconds. Worth running by hand after touching `backend/runners/`.
+
+The default run also goes across your cores (`-n auto`, in `pyproject.toml`): the tests
+share nothing but a temporary SQLite file apiece. Together with the markers that takes the
+backend suite from about 140 seconds to under 20. Use `-n0` when you want a breakpoint.
+
+CI runs both: the default suite and `-m slow`, and `release.yml` runs CI before it deploys,
+so the tag that ships is a tag both passed on. `engine` runs nowhere but your machine.

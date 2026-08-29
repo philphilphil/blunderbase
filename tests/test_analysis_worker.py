@@ -521,6 +521,7 @@ async def test_a_worker_survives_an_error_no_run_path_expects(
     assert len(rows) == 6
 
 
+@pytest.mark.slow
 async def test_a_shutdown_hands_a_run_back_without_spending_its_retry(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
@@ -544,6 +545,7 @@ async def test_a_shutdown_hands_a_run_back_without_spending_its_retry(
     assert run.error == analysis.STALE_RUN_MESSAGE
 
 
+@pytest.mark.slow
 async def test_a_run_being_worked_on_keeps_saying_it_is_alive(
     db: sessionmaker[Session],
     settings: Settings,

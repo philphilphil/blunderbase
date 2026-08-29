@@ -29,6 +29,7 @@ blunderbase-runner = "backend.runners.entrypoint:main"
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "pytest-xdist>=3.6",
     "respx>=0.21",
     "ruff>=0.6",
 ]
@@ -42,11 +43,16 @@ packages = ["backend"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# Across the cores by default: the suite is 1,363 tests that each want their own SQLite
+# file and share nothing, which is the shape xdist is for — a hundred seconds becomes
+# under twenty, and a single file costs no more than it did. `-n0` puts it back on one
+# process, which is what a `pdb` breakpoint or a `-s` print wants.
+addopts = "-q -n auto"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "engine: needs a real Stockfish or Maia binary; excluded from the default run",
+    "slow: waits on a real clock — reconnect windows, shutdown grace; CI runs these",
 ]
 
 [tool.ruff]

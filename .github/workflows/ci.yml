@@ -22,8 +22,12 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check backend tests
       # `engine`-marked tests want a real Stockfish or Maia binary and are not part of
-      # the default run.
+      # any run here.
       - run: uv run pytest
+      # `slow` is deselected locally — seven tests that wait out reconnect windows and
+      # shutdown grace periods, forty seconds between them. This is the run that means
+      # nobody has to.
+      - run: uv run pytest -m slow
 
   web:
     runs-on: ubuntu-latest

@@ -27,6 +27,7 @@ make test             # uv run pytest + pnpm test
 uv run ruff check backend tests           # what CI lints
 cd web && pnpm lint && pnpm typecheck     # what CI checks on the frontend
 uv run pytest -m engine                   # tests that want a real Stockfish/Maia binary (not in CI)
+uv run pytest -m slow                     # the seven clock-waiting runner tests (CI runs these)
 uv run alembic revision --autogenerate -m "..."   # new migration; alembic.ini at the root is for this
 ```
 

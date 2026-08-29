@@ -234,6 +234,7 @@ async def test_an_engine_that_dies_comes_back_as_a_failure_with_its_last_words(
     assert "Segmentation fault" in stderr
 
 
+@pytest.mark.slow
 async def test_the_poll_fallback_drains_the_queue_when_the_socket_will_not_open(
     server: str, settings: Settings, tmp_path: Path
 ) -> None:
@@ -520,6 +521,7 @@ async def test_a_run_for_an_engine_this_machine_does_not_have_is_failed_by_name(
     assert failure["retry"] is True
 
 
+@pytest.mark.slow
 async def test_a_cancel_stops_the_search_and_is_confirmed(tmp_path: Path) -> None:
     sockets = Sockets()
     # Long enough that the cancel lands while the engine is still thinking.
@@ -539,6 +541,7 @@ async def test_a_cancel_stops_the_search_and_is_confirmed(tmp_path: Path) -> Non
     assert protocol.RUN_COMPLETE not in socket.kinds(), "an abandoned run reports nothing"
 
 
+@pytest.mark.slow
 async def test_a_reconnect_says_what_it_is_still_executing(tmp_path: Path) -> None:
     """The server reconciles against this list; a run left out of it goes back to the queue."""
     sockets = Sockets()
@@ -558,6 +561,7 @@ async def test_a_reconnect_says_what_it_is_still_executing(tmp_path: Path) -> No
     assert hello["active_runs"] == [{"run_id": 12, "attempt_token": "9f3c1a"}]
 
 
+@pytest.mark.slow
 async def test_a_run_the_server_takes_back_at_the_welcome_is_dropped(tmp_path: Path) -> None:
     sockets = Sockets()
     client = scripted_client(tmp_path, sockets, go_default={"delay": 5.0, "bestmove": "e2e4"})
@@ -739,6 +743,7 @@ async def test_a_session_that_was_welcomed_and_then_dropped_is_not_a_socket_fail
         assert client.polling is False
 
 
+@pytest.mark.slow
 async def test_polling_goes_back_to_the_socket_when_the_retry_window_runs_out(
     tmp_path: Path,
 ) -> None:

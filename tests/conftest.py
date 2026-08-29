@@ -116,14 +116,28 @@ def fixtures_dir() -> Path:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Keep the default run free of real engine binaries.
+    """Keep the default run free of real engine binaries and of real waiting.
 
-    Engine adapters are covered by scripted fake UCI processes; the `engine` marker is for
-    the suite that wants a real Stockfish or Maia, and `-m engine` is how it is asked for.
+    Two markers, deselected the same way and for the same reason — the default run is the
+    one someone types between edits, and it should answer in seconds.
+
+    `engine` wants a real Stockfish or Maia; engine adapters are otherwise covered by
+    scripted fake UCI processes. `slow` is the handful that wait on a wall clock rather
+    than on an event — a reconnect window running out, a shutdown grace period — which is
+    forty of the suite's hundred-odd seconds in seven tests. Neither is optional: CI runs
+    `-m slow` beside the default run, and `release.yml` runs CI before it deploys, so a tag
+    that ships is a tag both passed on. What you lose locally is the runner client's
+    reconnect and shutdown behaviour, so `-m slow` is worth typing before a release or
+    after touching `backend/runners/`.
     """
-    if "engine" in (config.getoption("-m") or ""):
-        return
-    skip = pytest.mark.skip(reason="needs a real engine binary; run with -m engine")
-    for item in items:
-        if "engine" in item.keywords:
-            item.add_marker(skip)
+    asked = config.getoption("-m") or ""
+    for marker, why in (
+        ("engine", "needs a real engine binary; run with -m engine"),
+        ("slow", "waits on a real clock; run with -m slow"),
+    ):
+        if marker in asked:
+            continue
+        skip = pytest.mark.skip(reason=why)
+        for item in items:
+            if marker in item.keywords:
+                item.add_marker(skip)
