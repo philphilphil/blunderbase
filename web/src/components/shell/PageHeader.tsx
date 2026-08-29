@@ -5,6 +5,10 @@ import { cn } from '@/lib/utils'
 /**
  * The page heading from the design: a 19px title with a 12.5px line under it and the
  * page's own actions pushed to the right.
+ *
+ * Below `md` the row is allowed to wrap: a title and a pair of buttons do not share 375px,
+ * and a second line is better than either half being squeezed out of legibility. The
+ * spacer keeps the actions on the right whenever they still fit on the first.
  */
 export function PageHeader({
   title,
@@ -18,7 +22,7 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('flex items-end gap-3', className)}>
+    <div className={cn('flex items-end gap-3 max-md:flex-wrap', className)}>
       <div className="flex flex-col gap-[0.1875rem]">
         <h1 className="text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">{title}</h1>
         {description ? (
@@ -39,13 +43,20 @@ export function PageHeader({
  * when that chrome changes what it is showing — see `EnginesPage`, which is the reason this
  * exists. Every other caller ignores it; a page that never asks for the ref behaves exactly
  * as before.
+ *
+ * The bottom padding is `max(1.125rem, …)` of the safe-area inset rather than half of
+ * `py-4.5`, so the last row of a page installed to an iPhone's home screen clears the home
+ * indicator. Off a notched device the inset is 0 and the padding is the 18px it was.
  */
 export const PageBody = forwardRef<HTMLDivElement, { children: ReactNode; className?: string }>(
   function PageBody({ children, className }, ref) {
     return (
       <div
         ref={ref}
-        className={cn('flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4.5', className)}
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pt-4.5 pb-[max(1.125rem,env(safe-area-inset-bottom,0rem))]',
+          className,
+        )}
       >
         {children}
       </div>

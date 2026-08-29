@@ -85,6 +85,7 @@ export function EvalGraph({
   cursor,
   ownerSide,
   onSelectPly,
+  scrub = false,
   className,
 }: {
   points: CurvePoint[]
@@ -94,6 +95,13 @@ export function EvalGraph({
   /** The side the owner played; `null` for a game no account claims a side of. */
   ownerSide: Color | null
   onSelectPly: (ply: number) => void
+  /**
+   * Follow a finger dragged across the plot, not just a tap. Off by default, and only the
+   * phone layout turns it on: a mouse already gets this for free — the click handler below
+   * reads the position recharts tracked on hover — and a touchscreen laptop that started
+   * scrubbing the desktop curve would be a behaviour change nobody asked for.
+   */
+  scrub?: boolean
   className?: string
 }) {
   const domain = useMemo<[number, number]>(
@@ -116,8 +124,17 @@ export function EvalGraph({
       <div className="flex items-center gap-2">
         <span className="text-[0.6875rem] font-medium text-soft">Evaluation</span>
         <div className="flex-1" />
-        <Marker color={GLYPHS.blunder.color} label="blunder" />
-        <Marker color={GLYPHS.mistake.color} label="mistake" />
+        {/*
+          The key to the dots, dropped below `md`. It buys no height — this box is a fixed
+          height and the header eats into the *plot*, not out of the pane — but that is
+          exactly why it is worth dropping on a phone, where the plot is 8.5rem and every
+          row of it counts. It is redundant there anyway: the flagged-moments list directly
+          under the curve names each of these marks with its own badge.
+        */}
+        <span className="flex items-center gap-2 max-md:hidden">
+          <Marker color={GLYPHS.blunder.color} label="blunder" />
+          <Marker color={GLYPHS.mistake.color} label="mistake" />
+        </span>
         {ownerSide ? (
           <label className="ml-1 inline-flex cursor-pointer select-none items-center gap-1 text-[0.625rem] text-dim">
             <input
@@ -153,6 +170,17 @@ export function EvalGraph({
               // A synthesised axis crossing has a fractional ply; land on the nearest move.
               if (Number.isFinite(label)) onSelectPly(Math.round(label))
             }}
+            // Dragging along the curve walks the game under the finger. recharts hands the
+            // same state to both, so a tap (which ends in a click) and a drag land on the
+            // ply the same way.
+            onTouchMove={
+              scrub
+                ? (state: { activeLabel?: string | number }) => {
+                    const label = Number(state?.activeLabel)
+                    if (Number.isFinite(label)) onSelectPly(Math.round(label))
+                  }
+                : undefined
+            }
           >
             {/* Hidden, not gone: the numeric ply scale is what click-to-seek and the
                 cursor line position against. The move numbers it used to print said

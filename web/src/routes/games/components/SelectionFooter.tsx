@@ -5,6 +5,10 @@
  * The design's "Add to study", "Export PGN" and "Delete" have no route behind them
  * (`backend/api/routes/*.py` exposes no export and no delete), so the two actions here are
  * the two that are real: enqueue a quick or a deep pass over the selection.
+ *
+ * Below `md` the 46px line becomes as many lines as it needs. Nothing here shortens on a
+ * phone: "Queue deep analysis" is what the button does, and a second line costs less than
+ * guessing which word the owner would still recognise it by.
  */
 import type * as React from 'react'
 
@@ -35,7 +39,7 @@ export function SelectionFooter({
   message,
 }: SelectionFooterProps) {
   return (
-    <div className="flex h-[2.875rem] flex-none items-center gap-3 border-t border-hairline bg-panel px-5">
+    <div className="flex h-[2.875rem] flex-none items-center gap-3 border-t border-hairline bg-panel px-5 max-md:h-auto max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1.5 max-md:px-3 max-md:py-2.5">
       {selectedCount > 0 ? (
         <>
           <span className="font-mono text-[0.71875rem] tabular text-accent-teal">
@@ -60,7 +64,9 @@ export function SelectionFooter({
         <span className="font-mono text-[0.6875rem] text-good">{message}</span>
       ) : null}
 
-      <div className="flex-1" />
+      {/* The spacer pushes the counts right on one line; on a wrapped one it would only
+          strand them on a line of their own. */}
+      <div className="flex-1 max-md:hidden" />
 
       {sortedClientSide ? (
         <span className="text-[0.6875rem] text-dim-2">
@@ -84,6 +90,8 @@ function FooterAction({
       type="button"
       className={cn(
         'text-[0.71875rem] text-soft transition-colors hover:text-ink disabled:text-dim-2',
+        // A bare word is a fine mouse target and a poor thumb one; the phone gets a box.
+        'max-md:rounded-md max-md:border max-md:border-edge max-md:px-2 max-md:py-1',
         className,
       )}
       {...props}

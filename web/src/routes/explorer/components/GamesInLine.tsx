@@ -25,7 +25,7 @@ export function GamesInLine({
   const navigate = useNavigate()
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+    <div className="flex min-h-0 flex-1 flex-col gap-2.5 max-md:flex-none">
       <div className="flex items-baseline gap-2">
         <span className="text-[0.75rem] font-semibold text-ink">Games in this line</span>
         <div className="flex-1" />
@@ -51,7 +51,9 @@ export function GamesInLine({
           Nothing has reached this position yet.
         </p>
       ) : (
-        <div className="flex min-h-0 flex-col overflow-y-auto font-mono text-[0.71875rem] tabular">
+        // The list scrolls inside the right-hand pane on desktop; below `md` the page is
+        // the only scroller, so it runs on in normal flow instead.
+        <div className="flex min-h-0 flex-col overflow-y-auto font-mono text-[0.71875rem] tabular max-md:overflow-visible">
           {games.map((occurrence) => (
             <button
               key={`${occurrence.game.id}-${occurrence.ply}`}

@@ -101,6 +101,21 @@ export interface MoveListProps {
   onSelectNote?: (note: NoteRow) => void
   /** Open the composer on the position the board is showing. */
   onAddNote?: () => void
+  /**
+   * The open tab, where the caller owns it. Undefined leaves the table in charge of its
+   * own, which is what the desktop column does and has always done. The phone layout
+   * promotes these three tabs into a strip of its own that also holds Eval and Engine, so
+   * there the tab is page state and this table is told which one to draw.
+   */
+  tab?: MoveTab
+  /** Fires on a click in the tab row — meaningless while `showTabRow` is false. */
+  onTabChange?: (tab: MoveTab) => void
+  /**
+   * Draw the tab row. False where the caller draws the tabs itself; the PGN affordance
+   * lives in that row, so a caller that switches it off has to place `PgnButton` somewhere
+   * of its own.
+   */
+  showTabRow?: boolean
   className?: string
 }
 
@@ -146,9 +161,20 @@ export function MoveList({
   notedMoves,
   onSelectNote,
   onAddNote,
+  tab: openTab,
+  onTabChange,
+  showTabRow = true,
   className,
 }: MoveListProps) {
-  const [tab, setTab] = useState<MoveTab>('moves')
+  // Uncontrolled by default — the desktop column has never had anywhere else to put these
+  // tabs. `openTab` takes over where a caller draws the strip itself; the internal state is
+  // still kept in step, so handing control back would not jump the table to another tab.
+  const [ownTab, setOwnTab] = useState<MoveTab>('moves')
+  const tab = openTab ?? ownTab
+  const setTab = (next: MoveTab) => {
+    setOwnTab(next)
+    onTabChange?.(next)
+  }
   const [expanded, setExpanded] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const activeRow = useRef<HTMLDivElement>(null)
@@ -232,7 +258,8 @@ export function MoveList({
   }, [cursor, tab, walked?.cursor, walked?.sans.length])
 
   return (
-    <div className={cn('flex min-h-0 flex-col', className)}>
+    <div data-testid="move-list" className={cn('flex min-h-0 flex-col', className)}>
+      {showTabRow ? (
       <div className="flex h-[2.375rem] flex-none items-stretch gap-0.5 border-b border-hairline px-3">
         <Tab active={tab === 'moves'} onClick={() => setTab('moves')}>
           Moves
@@ -252,11 +279,23 @@ export function MoveList({
           ) : null}
         </Tab>
         <div className="flex-1" />
-        <div className="flex items-center gap-2.5 font-mono text-[0.625rem] tabular text-faint">
-          <span>{plyCount} plies</span>
+        {/*
+          `flex-none`, so whatever else this row has to give up, the PGN affordance is never
+          the thing that gets clipped off the right edge.
+
+          The ply total goes below `md`: three tabs, a count and this pair do not fit across
+          a 375px screen, and of everything here it is the one thing said elsewhere — the
+          phone's own header carries `ply 34/91`. The phone layout switches this whole row
+          off (`showTabRow`) and draws its own strip, so this only bites a narrow desktop
+          window; it is kept because that window is real and a clipped PGN button is not
+          worth the two words.
+        */}
+        <div className="flex flex-none items-center gap-2.5 whitespace-nowrap font-mono text-[0.625rem] tabular text-faint">
+          <span className="max-md:hidden">{plyCount} plies</span>
           <PgnButton pgn={pgn} />
         </div>
       </div>
+      ) : null}
 
       <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto py-0.5">
         {tab === 'notes' ? (
@@ -424,7 +463,11 @@ function NotesPane({
  * the thing anyone wants a game's PGN for — pasting it into an analysis board, handing it
  * to the coach over MCP — starts with it on the clipboard.
  */
-function PgnButton({ pgn }: { pgn?: string }) {
+/**
+ * Copy the whole game as PGN. Exported because the tab row it normally sits in is switched
+ * off below `md` (`showTabRow`), and the phone layout has to put it somewhere of its own.
+ */
+export function PgnButton({ pgn }: { pgn?: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 

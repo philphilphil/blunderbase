@@ -3,11 +3,20 @@ import { Link } from 'react-router-dom'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api/client'
 
-/** The two-column geometry, held while the payload is in flight (design 1c). */
+/**
+ * The two-column geometry, held while the payload is in flight (design 1c) — and below
+ * `md` the one-column geometry the page settles into instead. The column floors are the
+ * point of this skeleton, so they have to come *off* on a phone: `26.25rem` and `20rem`
+ * side by side are 883 physical pixels, and holding them on a 375px screen would open the
+ * game with a sideways scrollbar and then take it away again when the payload landed.
+ */
 export function GameViewSkeleton() {
   return (
-    <div className="flex min-h-0 flex-1" data-testid="game-skeleton">
-      <div className="flex shrink-[2] grow-0 basis-[35rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem] min-w-[26.25rem]">
+    <div
+      className="flex min-h-0 flex-1 max-md:flex-col max-md:overflow-y-auto"
+      data-testid="game-skeleton"
+    >
+      <div className="flex shrink-[2] grow-0 basis-[35rem] flex-col gap-3.5 border-r border-hairline px-5 py-[1.125rem] min-w-[26.25rem] max-md:min-w-0 max-md:shrink-0 max-md:basis-auto max-md:border-r-0 max-md:px-3 max-md:py-3">
         <div className="flex items-start gap-2.5">
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-4 w-56" />
@@ -24,7 +33,7 @@ export function GameViewSkeleton() {
         <Skeleton className="min-h-[6.875rem] flex-1 rounded-lg" />
       </div>
 
-      <div className="flex min-w-[20rem] flex-1 flex-col">
+      <div className="flex min-w-[20rem] flex-1 flex-col max-md:min-w-0 max-md:flex-none">
         <div className="h-[2.375rem] flex-none border-b border-hairline" />
         <div className="flex flex-1 flex-col gap-1.5 p-3">
           {Array.from({ length: 12 }, (_, index) => (

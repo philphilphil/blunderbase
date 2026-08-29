@@ -490,7 +490,8 @@ export function EngineDetail({
         </>
       ) : null}
 
-      <div className="mt-auto flex items-center gap-2 border-t border-hairline px-3.5 py-2.5">
+      {/* The footer carries a sentence and up to two buttons; below `md` it wraps. */}
+      <div className="mt-auto flex items-center gap-2 border-t border-hairline px-3.5 py-2.5 max-md:flex-wrap max-md:justify-end">
         {remote ? (
           // Removing the row would delete an advertisement the runner recreates on its next
           // connection. Revoking the runner in the section below is the honest way out.

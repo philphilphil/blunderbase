@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
@@ -7,7 +7,7 @@ import { browserRunner } from '@/lib/runner'
 
 import { BackfillTakeover } from './BackfillTakeover'
 import { CommandPaletteProvider } from './CommandPalette'
-import { SideNav } from './SideNav'
+import { NavDrawer, SideNav } from './SideNav'
 import { TopBar } from './TopBar'
 
 /**
@@ -37,6 +37,11 @@ const TOAST_CLASSES = {
  * The ⌘K palette wraps the lot rather than sitting in the titlebar: the shortcut is
  * global, and the dialog has to outlive whichever route is under it.
  *
+ * Below `md` the rail has nowhere to stand, so it becomes a drawer over the page. Whether
+ * it is up is the shell's state and not the titlebar's: the button that opens it is in the
+ * titlebar but the drawer itself covers everything, and the two would otherwise have to
+ * reach across the layout for each other.
+ *
  * A whole-library analysis pass replaces all of it — see `BackfillTakeover`. The route
  * stays in the URL underneath, so releasing puts the owner back on the page they left.
  */
@@ -49,13 +54,17 @@ export function AppShell() {
     browserRunner.resume()
   }, [])
 
+  const [navOpen, setNavOpen] = useState(false)
+  const closeNav = useCallback(() => setNavOpen(false), [])
+  const openNav = useCallback(() => setNavOpen(true), [])
+
   const backfill = useBackfillRun()
   if (backfill) return <BackfillTakeover run={backfill} />
 
   return (
     <CommandPaletteProvider>
       <div className="flex h-full min-h-0 flex-col bg-surface">
-        <TopBar />
+        <TopBar onOpenNav={openNav} />
         <div className="flex min-h-0 flex-1">
           <SideNav />
           <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -63,6 +72,7 @@ export function AppShell() {
           </main>
         </div>
       </div>
+      <NavDrawer open={navOpen} onClose={closeNav} />
       <Toaster
         position="bottom-right"
         gap={8}

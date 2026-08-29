@@ -351,7 +351,10 @@ export function RatingCard() {
 
   return (
     <section className="flex flex-none flex-col gap-3 rounded-xl border border-line bg-panel p-3.5">
-      <header className="flex items-baseline gap-2">
+      {/* The window buttons and the speeds menu are 240px of control between them, which is
+          most of a phone's width — below `md` they wrap under the title rather than
+          squeezing it. */}
+      <header className="flex items-baseline gap-2 max-md:flex-wrap max-md:gap-y-2">
         <h2 className="text-[0.78125rem] font-semibold text-ink">Rating</h2>
         <span className="text-[0.6875rem] text-dim-2">{windowProse(windowKey, anchor)}</span>
         <div className="flex-1" />

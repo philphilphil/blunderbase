@@ -47,7 +47,7 @@ export function CapacityGrid({
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 max-md:flex-wrap">
         <div className="min-w-0">
           <h2 className="text-xs font-semibold text-ink">Compute capacity</h2>
           <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
@@ -86,13 +86,15 @@ export function CapacityGrid({
           </Button>
         </div>
       ) : isLoading || !status ? (
-        <div className="grid grid-cols-3 gap-2.5" data-testid="machines-loading">
+        <div className="grid grid-cols-3 gap-2.5 max-md:grid-cols-1" data-testid="machines-loading">
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2.5">
+        // One machine card per row below `md`. `col-span-full` details keep working:
+        // a full span of one column is still the whole width.
+        <div className="grid grid-cols-3 gap-2.5 max-md:grid-cols-1">
           <ServerCard
             local={status.local}
             expanded={openDetail === 'server'}

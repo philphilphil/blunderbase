@@ -138,11 +138,12 @@ export function AccountRow({
           ) : null}
         </TableCell>
 
-        <TableCell className="text-right font-mono text-[0.71875rem] text-body tabular">
+        {/* Hidden below `md` with their headers — see `SourcesTable`. */}
+        <TableCell className="text-right font-mono text-[0.71875rem] text-body tabular max-md:hidden">
           {account?.games?.toLocaleString() ?? <span className="text-faint">—</span>}
         </TableCell>
 
-        <TableCell className="font-mono text-[0.71875rem] text-dim tabular">
+        <TableCell className="font-mono text-[0.71875rem] text-dim tabular max-md:hidden">
           {lastJob ? relative(lastJob.finished_at ?? lastJob.created_at) : '—'}
         </TableCell>
 

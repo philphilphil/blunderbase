@@ -171,7 +171,9 @@ function GroupHeading({
   count?: number
 }) {
   return (
-    <div className="flex items-baseline gap-2 pt-1">
+    // Two long usernames and a result do not share a phone's line; the result and date go
+    // under them rather than squeezing the names into one word each.
+    <div className="flex items-baseline gap-2 pt-1 max-md:flex-wrap max-md:gap-y-0.5">
       {href ? (
         <Link
           to={href}
@@ -195,7 +197,7 @@ function GroupHeading({
 
 function Empty({ filtered }: { filtered: boolean }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-edge-strong bg-panel/60 p-10 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-edge-strong bg-panel/60 p-10 text-center max-md:p-6">
       <StickyNote className="size-5 text-faint" aria-hidden />
       <p className="max-w-md text-[0.78125rem] leading-relaxed text-dim">
         {filtered
@@ -219,9 +221,9 @@ function ExportButtons({ filters, disabled }: { filters: NoteFilters; disabled: 
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 max-md:flex-wrap max-md:gap-y-1">
       {exporting.isError ? (
-        <span className="max-w-[16rem] truncate text-[0.6875rem] text-blunder">
+        <span className="max-w-[16rem] truncate text-[0.6875rem] text-blunder max-md:max-w-full max-md:basis-full">
           {exporting.error.message}
         </span>
       ) : null}

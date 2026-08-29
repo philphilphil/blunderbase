@@ -67,7 +67,9 @@ export function LineSummary({
             <span className="flex-1 text-right">{split.losses} L</span>
           </div>
 
-          <div className="flex gap-5 border-t border-hairline pt-2.5">
+          {/* Three stats and the worst move are wider than a phone; they wrap rather
+              than push the card sideways. */}
+          <div className="flex gap-5 border-t border-hairline pt-2.5 max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-2.5">
             <Stat
               label="Score"
               value={percent === null ? '—' : `${percent.toFixed(1)}%`}

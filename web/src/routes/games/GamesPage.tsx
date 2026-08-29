@@ -146,8 +146,11 @@ export function GamesPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }]} />
 
-      <div className="flex flex-none flex-col gap-3 border-b border-hairline px-5 pt-4 pb-3">
-        <div className="flex items-end gap-3">
+      <div className="flex flex-none flex-col gap-3 border-b border-hairline px-5 pt-4 pb-3 max-md:px-3 max-md:pt-3">
+        {/* Below `md` the search box takes a line of its own: at 375px it and the title
+            cannot share one, and shrinking a box you type an opponent's name into is the
+            wrong half to give up. The two buttons wrap under it. */}
+        <div className="flex items-end gap-3 max-md:flex-wrap max-md:gap-y-2.5">
           <div className="flex flex-col gap-[0.1875rem]">
             <h1 className="text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">Games</h1>
             <p className="text-[0.78125rem] text-dim">
@@ -174,7 +177,7 @@ export function GamesPage() {
             placeholder="Opponent, ECO, PGN text…"
             value={filters.text ?? ''}
             onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
-            className="h-8 w-[13.75rem] text-xs"
+            className="h-8 w-[13.75rem] text-xs max-md:w-full"
           />
 
           {active > 0 ? (
@@ -242,7 +245,7 @@ function EmptyState({ active, onClear }: { active: number; onClear: () => void }
   return (
     <div
       className={cn(
-        'flex max-w-md flex-col items-center gap-2.5 rounded-xl border border-dashed border-edge-strong bg-panel/60 p-10 text-center',
+        'flex max-w-md flex-col items-center gap-2.5 rounded-xl border border-dashed border-edge-strong bg-panel/60 p-10 text-center max-md:p-6',
       )}
     >
       <span className="text-[0.8125rem] font-semibold text-ink">

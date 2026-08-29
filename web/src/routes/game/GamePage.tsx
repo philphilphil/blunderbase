@@ -20,16 +20,24 @@ import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
 import { whiteWinPercent } from '@/lib/chess/evaluation'
+import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
 
 import { buildAnalysisLine, withBoardMove } from './analysisLine'
 import { BoardPanel } from './components/BoardPanel'
 import { ColumnSplitter } from './components/ColumnSplitter'
 import { EvalGraph } from './components/EvalGraph'
+import { FlaggedMoments } from './components/FlaggedMoments'
 import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
 import { MaiaPanel } from './components/MaiaPanel'
-import { MoveList, type MoveAnnotation, type MoveListVariation } from './components/MoveList'
+import { MobileGameView, type MobileTab } from './components/MobileGameView'
+import {
+  MoveList,
+  type MoveAnnotation,
+  type MoveListVariation,
+  type MoveTab,
+} from './components/MoveList'
 import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
 import {
   bestRun,
@@ -172,6 +180,23 @@ function GameStudio({ gameId }: { gameId: number }) {
   const game = useGame(gameId, { notes: true })
   const deepAnalysis = useDeepAnalysis(gameId)
 
+  /**
+   * Below `md` the screen is `MobileGameView` instead of the two-column studio — a pinned
+   * board over one tabbed pane. Asked as a media query rather than left to `max-md:`
+   * classes because the two layouts are different *trees*, not one tree in two shapes: the
+   * `ColumnSplitter` has to be unmounted rather than hidden (it binds pointer capture and
+   * takes the body's selection on a drag a phone cannot make), and the panels are in a
+   * different order under a different set of parents.
+   */
+  const mobile = useIsMobile()
+  /**
+   * Which panel the phone is showing. Page state, not persisted: a game is opened to look
+   * at the game, and landing on the moves every time is the predictable thing. Held here
+   * rather than inside `MobileGameView` because it is not only the strip that moves it —
+   * writing a note switches to the Notes tab, which is where the composer lives.
+   */
+  const [mobileTab, setMobileTab] = useState<MobileTab>('moves')
+
   const [cursor, setCursor] = useState(-1)
   const [flipped, setFlipped] = useState(false)
   const [hints, setHints] = useState(true)
@@ -220,9 +245,26 @@ function GameStudio({ gameId }: { gameId: number }) {
    * as the position it is about, with no click in between. The Note button, the move
    * list's "add" and a Notes-tab row all just put the keyboard in it.
    */
+  /**
+   * On the phone the composer is only mounted while the Notes tab is open, so focusing it
+   * means going there first — and the focus has to wait for the tab to render, which is
+   * what the counter and its effect below are for. The desktop path is unchanged and stays
+   * synchronous: the composer is always on screen there, and a click straight into it
+   * should not have to wait a render.
+   */
+  const [composerFocus, setComposerFocus] = useState(0)
   const focusComposer = useCallback(() => {
+    if (mobile) {
+      setMobileTab('notes')
+      setComposerFocus((request) => request + 1)
+      return
+    }
     document.getElementById(COMPOSER_TEXT_ID)?.focus()
-  }, [])
+  }, [mobile])
+  useEffect(() => {
+    if (composerFocus === 0) return
+    document.getElementById(COMPOSER_TEXT_ID)?.focus()
+  }, [composerFocus])
   const blurComposer = useCallback(() => {
     const box = document.getElementById(COMPOSER_TEXT_ID)
     if (box && box === document.activeElement) box.blur()
@@ -336,6 +378,21 @@ function GameStudio({ gameId }: { gameId: number }) {
     () => moves.filter((move) => isFlagged(move.classification)).length,
     [moves],
   )
+
+  // Where `j` and `shift+J` land, as cursors rather than as plies: one ply short of the
+  // flagged move, which puts the board in the position the mistake was made *from* — where
+  // the engine lines and Maia's prediction are worth reading. Held here rather than
+  // computed twice because the phone layout draws the same two jumps as buttons, and the
+  // key and the button must be the same jump. Null is "none that way", which is what
+  // disables the button.
+  const nextFlagged = useMemo(() => {
+    const ply = nextFlaggedPly(moves, cursor + 1)
+    return ply === null ? null : ply - 1
+  }, [moves, cursor])
+  const previousFlagged = useMemo(() => {
+    const ply = previousFlaggedPly(moves, cursor + 1)
+    return ply === null ? null : ply - 1
+  }, [moves, cursor])
 
   const boardIndex = Math.min(cursor + 1, line.positions.length - 1)
   const position = line.positions[Math.max(0, boardIndex)]
@@ -923,15 +980,12 @@ function GameStudio({ gameId }: { gameId: number }) {
       step,
       seekStart: () => seek(-1),
       seekEnd: () => seek(plyCount - 1),
-      // Landing one ply short puts the board in the position the mistake was made from,
-      // which is where the engine lines and Maia's prediction are worth reading.
+      // Both land one ply short of the flagged move — see the memos the buttons share.
       nextFlagged: () => {
-        const ply = nextFlaggedPly(moves, cursor + 1)
-        if (ply !== null) seek(ply - 1)
+        if (nextFlagged !== null) seek(nextFlagged)
       },
       previousFlagged: () => {
-        const ply = previousFlaggedPly(moves, cursor + 1)
-        if (ply !== null) seek(ply - 1)
+        if (previousFlagged !== null) seek(previousFlagged)
       },
       flip: () => setFlipped((value) => !value),
     },
@@ -986,19 +1040,191 @@ function GameStudio({ gameId }: { gameId: number }) {
       previewLine={previewView.line}
       previewPly={previewView.ply}
       onPlayLine={playLine}
-      className="border-b border-t-0 border-hairline"
+      // In the moves column the box is a band welded to the top of the move table, so it
+      // is bordered on the sides the column already draws. Standing on its own in the
+      // phone's single column it is a card like the others, and carries its own outline.
+      className={mobile ? 'rounded-lg border border-hairline' : 'border-b border-t-0 border-hairline'}
     />
   )
 
+  const header = <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
+
+  const board = (
+    <BoardPanel
+      position={position}
+      analysis={analysis}
+      onPlayMove={playMove}
+      onExitAnalysis={() => {
+        keepBranch()
+        setBranch(null)
+      }}
+      orientation={orientation}
+      lastMove={played}
+      // The marks and the engine arrow are claims about a position a run has looked
+      // at; on an analysis position there is no such claim, and only Maia's own
+      // (live) arrow is left — and the live search's, which is looking at exactly the
+      // position on the board (`boardEngineBest` carries that rule).
+      upcoming={exploring ? undefined : upcoming}
+      engineBest={boardEngineBest}
+      hoverMove={hoverMove}
+      previewFen={previewView.fen}
+      previewShapes={previewView.shapes}
+      previewLastMove={previewView.lastMove}
+      previewCaption={previewView.caption}
+      previewDim={previewView.dim}
+      maia={maia}
+      win={boardWin}
+      score={boardScore}
+      cursor={cursor}
+      plyCount={plyCount}
+      hints={hints}
+      onHintsChange={setHints}
+      onFlip={() => setFlipped((value) => !value)}
+      onSeek={seek}
+      nextFlagged={nextFlagged}
+      previousFlagged={previousFlagged}
+      onStep={stepFromBoard}
+      deepRun={deepRun}
+      deepActiveRun={deepAnalysis.activeRun}
+      deepProgress={deepAnalysis.progress}
+      deepPending={deepAnalysis.pending}
+      deepError={deepAnalysis.error}
+      onRequestDeep={deepAnalysis.request}
+      onNote={focusComposer}
+    />
+  )
+
+  const evalGraph = (
+    <EvalGraph
+      points={curve}
+      plyCount={plyCount}
+      cursor={cursor}
+      ownerSide={detail?.game.color ?? null}
+      onSelectPly={selectPly}
+      // A little taller than the desktop's 6.5rem cap, since it has the width to itself —
+      // and no taller. The rest of the Eval tab goes to `FlaggedMoments`, which is the part
+      // of "the story of the game" a finger can actually hit. 8.5rem rather than 9.5 so
+      // that at 812 a row or two of that list is on screen before anybody scrolls.
+      className={mobile ? 'h-[8.5rem] max-h-none' : 'min-w-0 flex-1 basis-1/2'}
+      // A drag along the curve walks the game. Only here: see `EvalGraph`'s own note.
+      scrub={mobile}
+    />
+  )
+
+  // The curve's own marks, as rows. Only the phone builds it: the desktop reads them off
+  // the plot with a mouse, and off the move table's Flagged tab beside it.
+  const flaggedMoments = <FlaggedMoments moves={moves} cursor={cursor} onSelect={seek} />
+
+  const composer = (
+    <NoteComposer
+      target={target}
+      note={editedNote}
+      knownTags={tagNames}
+      pending={saveNote.isPending || updateNote.isPending}
+      error={saveNote.error ?? updateNote.error ?? removeNote.error}
+      onSave={writeNote}
+      onDelete={forgetNote}
+      onClose={blurComposer}
+      // Pinned under the notes list in the Notes tab, at about the height of the desktop
+      // slot: tall enough for the text box and its button row, short enough to leave the
+      // list something to be a list in on a 667-tall phone.
+      className={mobile ? 'h-[6.5rem]' : 'max-h-[6.5rem] min-w-0 flex-1 basis-1/2'}
+    />
+  )
+
+  // The phone's strip carries the move table's three tabs plus two of its own; the other
+  // two do not mount the table at all, so anything that is not Flagged or Notes is Moves.
+  const movesTab: MoveTab = mobileTab === 'flagged' || mobileTab === 'notes' ? mobileTab : 'moves'
+
+  const moveList = (
+    <MoveList
+      pairs={pairs}
+      cursor={cursor}
+      collapsedThrough={collapsedThrough}
+      annotation={annotation}
+      flaggedCount={flaggedCount}
+      plyCount={plyCount}
+      pgn={pgn}
+      // Every line this session has walked, each under the move it hangs off and in
+      // the order they were walked — the one the board is standing in among them.
+      variations={variations}
+      onSelectVariationMove={seekVariation}
+      onSelectKeptMove={enterKeptVariation}
+      onSelectLineMove={(lineId, index) => enterLine(lineId, index + 1)}
+      onPinVariation={pinVariation}
+      onUnpinVariation={unpinVariation}
+      onSelectPly={selectPly}
+      notes={noteList}
+      notedMoves={notedMoves}
+      onSelectNote={selectNote}
+      onAddNote={focusComposer}
+      // The phone promotes these three tabs into `MobileGameView`'s strip, so the table is
+      // told which one to draw and its own row is switched off — that row is also where the
+      // PGN affordance lives, which is why the phone header carries one.
+      tab={mobile ? movesTab : undefined}
+      showTabRow={!mobile}
+      className="min-h-0 flex-1"
+    />
+  )
+
+  const infinite = (
+    <InfiniteAnalysisPanel
+      stream={stream}
+      fen={boardPosition.fen}
+      ply={analysisPly}
+      orientation={orientation}
+      onHoverLine={setPreview}
+      onStepPreview={previewView.step}
+      onPlayLine={playLine}
+      previewLine={previewView.line}
+      previewPly={previewView.ply}
+      className={mobile ? 'rounded-lg border border-hairline' : undefined}
+    />
+  )
+
+  const chrome = (
+    <SetPageChrome
+      breadcrumb={[
+        { label: 'Library', to: '/games' },
+        { label: formatGameDate(detail.game.played_at), mono: true },
+        { label: players },
+      ]}
+    />
+  )
+
+  if (mobile) {
+    return (
+      <>
+        {chrome}
+        <MobileGameView
+          game={detail.game}
+          best={best}
+          active={deepAnalysis.activeRun}
+          pgn={pgn}
+          cursor={cursor}
+          plyCount={plyCount}
+          // The same evaluation the transport row's chip carries on a desktop, which is the
+          // live search's where there is one — not the stored eval for the ply.
+          score={boardScore}
+          flaggedCount={flaggedCount}
+          noteCount={noteList.length}
+          tab={mobileTab}
+          onTabChange={setMobileTab}
+          board={board}
+          moveList={moveList}
+          evalGraph={evalGraph}
+          flaggedMoments={flaggedMoments}
+          maiaPanel={maiaPanel}
+          infinite={infinite}
+          composer={composer}
+        />
+      </>
+    )
+  }
+
   return (
     <>
-      <SetPageChrome
-        breadcrumb={[
-          { label: 'Library', to: '/games' },
-          { label: formatGameDate(detail.game.played_at), mono: true },
-          { label: players },
-        ]}
-      />
+      {chrome}
 
       <div ref={columnsRef} className="flex min-h-0 flex-1">
         {/*
@@ -1034,72 +1260,16 @@ function GameStudio({ gameId }: { gameId: number }) {
           // composer's own save button used to end up. Clipped, an overrun is visible.
           className="flex min-h-0 min-w-[26.25rem] flex-1 flex-col gap-3.5 overflow-hidden px-5 py-[1.125rem]"
         >
-          <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
-          <BoardPanel
-            position={position}
-            analysis={analysis}
-            onPlayMove={playMove}
-            onExitAnalysis={() => {
-              keepBranch()
-              setBranch(null)
-            }}
-            orientation={orientation}
-            lastMove={played}
-            // The marks and the engine arrow are claims about a position a run has looked
-            // at; on an analysis position there is no such claim, and only Maia's own
-            // (live) arrow is left — and the live search's, which is looking at exactly the
-            // position on the board (`boardEngineBest` carries that rule).
-            upcoming={exploring ? undefined : upcoming}
-            engineBest={boardEngineBest}
-            hoverMove={hoverMove}
-            previewFen={previewView.fen}
-            previewShapes={previewView.shapes}
-            previewLastMove={previewView.lastMove}
-            previewCaption={previewView.caption}
-            previewDim={previewView.dim}
-            maia={maia}
-            win={boardWin}
-            score={boardScore}
-            cursor={cursor}
-            plyCount={plyCount}
-            hints={hints}
-            onHintsChange={setHints}
-            onFlip={() => setFlipped((value) => !value)}
-            onSeek={seek}
-            onStep={stepFromBoard}
-            deepRun={deepRun}
-            deepActiveRun={deepAnalysis.activeRun}
-            deepProgress={deepAnalysis.progress}
-            deepPending={deepAnalysis.pending}
-            deepError={deepAnalysis.error}
-            onRequestDeep={deepAnalysis.request}
-            onNote={focusComposer}
-          />
+          {header}
+          {board}
           {/*
             The composer sits to the right of the eval curve under the transport row, always: the
             note on a position is read in the same glance as the position, and side by side
             the pair costs no more height than the curve did alone.
           */}
           <div className="flex min-h-0 flex-1 gap-3.5">
-            <EvalGraph
-              points={curve}
-              plyCount={plyCount}
-              cursor={cursor}
-              ownerSide={detail?.game.color ?? null}
-              onSelectPly={selectPly}
-              className="min-w-0 flex-1 basis-1/2"
-            />
-            <NoteComposer
-              target={target}
-              note={editedNote}
-              knownTags={tagNames}
-              pending={saveNote.isPending || updateNote.isPending}
-              error={saveNote.error ?? updateNote.error ?? removeNote.error}
-              onSave={writeNote}
-              onDelete={forgetNote}
-              onClose={blurComposer}
-              className="max-h-[6.5rem] min-w-0 flex-1 basis-1/2"
-            />
+            {evalGraph}
+            {composer}
           </div>
         </div>
 
@@ -1120,46 +1290,14 @@ function GameStudio({ gameId }: { gameId: number }) {
           style={movesWidth === null ? undefined : { flexBasis: `${movesWidth}rem` }}
         >
           {maiaPanel}
-          <MoveList
-            pairs={pairs}
-            cursor={cursor}
-            collapsedThrough={collapsedThrough}
-            annotation={annotation}
-            flaggedCount={flaggedCount}
-            plyCount={plyCount}
-            pgn={pgn}
-            // Every line this session has walked, each under the move it hangs off and in
-            // the order they were walked — the one the board is standing in among them.
-            variations={variations}
-            onSelectVariationMove={seekVariation}
-            onSelectKeptMove={enterKeptVariation}
-            onSelectLineMove={(lineId, index) => enterLine(lineId, index + 1)}
-            onPinVariation={pinVariation}
-            onUnpinVariation={unpinVariation}
-            onSelectPly={selectPly}
-            notes={noteList}
-            notedMoves={notedMoves}
-            onSelectNote={selectNote}
-            onAddNote={focusComposer}
-            className="min-h-0 flex-1"
-          />
+          {moveList}
           {/*
             The whole line, not its first move: `onHoverLine` replaces the single arrow
             `onHoverMove` drew here, and the preview it feeds is what the board shows. The
             box above reports the same three gestures from its engine rows, into the same
             state — the ids are what keeps the two apart.
           */}
-          <InfiniteAnalysisPanel
-            stream={stream}
-            fen={boardPosition.fen}
-            ply={analysisPly}
-            orientation={orientation}
-            onHoverLine={setPreview}
-            onStepPreview={previewView.step}
-            onPlayLine={playLine}
-            previewLine={previewView.line}
-            previewPly={previewView.ply}
-          />
+          {infinite}
           {/*
             Two panels, two different claims about the same position: the live search says
             what an engine is finding right now, and the box at the top of the column says

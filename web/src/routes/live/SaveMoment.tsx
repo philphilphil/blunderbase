@@ -92,7 +92,10 @@ export function SaveMoment({ active }: SaveMomentProps) {
       </button>
 
       {open ? (
-        <div className="absolute top-[calc(100%+0.375rem)] right-0 z-30 flex w-[19rem] flex-col gap-2 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)]">
+        // The panel hangs off the button's right edge, which is not the screen's — the
+        // flip control sits to its right — so below `md` it is narrow enough that 19rem
+        // of it cannot reach past the left edge of a phone.
+        <div className="absolute top-[calc(100%+0.375rem)] right-0 z-30 flex w-[19rem] flex-col gap-2 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] max-md:w-[15rem]">
           <span className="text-[0.625rem] tracking-[.1em] text-faint uppercase">
             About this position
           </span>

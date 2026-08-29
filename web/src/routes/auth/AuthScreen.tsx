@@ -8,6 +8,10 @@ import { cn } from '@/lib/utils'
  * centred and no wider than a password field needs to be. The theme control is here too —
  * a fresh deployment is set up on this screen, and the owner may want it in the theme they
  * are going to live in.
+ *
+ * Below `md` the card is aligned to the top rather than centred. A centred flex child that
+ * outgrows its scroll container has its overflow above the top edge, where no scrolling
+ * reaches it — which is the setup form with the keyboard up on a short phone.
  */
 export function AuthScreen({
   title,
@@ -19,7 +23,7 @@ export function AuthScreen({
   children: ReactNode
 }) {
   return (
-    <div className="relative flex h-full min-h-0 items-center justify-center overflow-y-auto bg-void px-6 py-10">
+    <div className="relative flex h-full min-h-0 items-center justify-center overflow-y-auto bg-void px-6 py-10 max-md:items-start max-md:px-4 max-md:pt-12">
       <ThemeToggle className="absolute right-4 top-4" />
       <div className="flex w-full max-w-[22rem] flex-col gap-4">
         <div className="flex items-center justify-center gap-2">

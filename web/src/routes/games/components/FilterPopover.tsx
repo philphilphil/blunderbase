@@ -66,6 +66,14 @@ export function FilterChipButton({
 /**
  * A chip with a panel under it. Closes on Escape, on a click outside, and whenever the
  * caller says the interaction is finished (`closeOnApply`).
+ *
+ * Below `md` the chip stops being the panel's containing block (`max-md:static`) and the
+ * filter bar becomes it instead, so the panel spans the bar and drops under the whole of
+ * it. A 250px panel anchored to the left edge of a chip that is itself 250px along a
+ * 375px screen hangs off the side, where the nearest ancestor with an overflow rule either
+ * clips it or grows the page sideways; a bar-wide panel cannot. Every bar that hosts one
+ * of these has to say `max-md:relative` for that to work — `FilterBar` and
+ * `NoteFilterBar` both do.
  */
 export function FilterPopover({
   label,
@@ -101,7 +109,7 @@ export function FilterPopover({
   }, [open])
 
   return (
-    <div ref={host} className="relative">
+    <div ref={host} className="relative max-md:static">
       <FilterChipButton
         label={label}
         summary={value}
@@ -113,8 +121,10 @@ export function FilterPopover({
       {open ? (
         <div
           id={panelId}
-          style={{ width }}
-          className="absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)]"
+          // Handed over rather than set, so `max-md:right-0` can win below the breakpoint:
+          // an inline width outranks every class.
+          style={{ '--panel-width': width } as React.CSSProperties}
+          className="absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[var(--panel-width)] max-md:right-0"
         >
           {children(() => setOpen(false))}
         </div>

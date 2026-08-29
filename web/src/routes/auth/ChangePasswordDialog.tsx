@@ -42,7 +42,10 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh]"
+      // Three password fields do not fit under a 12vh inset on a phone, least of all with
+      // the keyboard up, so below `md` the sheet starts near the top and the backdrop
+      // itself scrolls.
+      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh] max-md:overflow-y-auto max-md:px-4 max-md:pt-6 max-md:pb-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}

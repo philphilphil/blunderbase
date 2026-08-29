@@ -261,7 +261,11 @@ export function MaiaPanel({
         // height that tracked how many rows the columns happen to have would bounce the
         // table on every step through the game. A column with more to say scrolls.
         // `relative` for the peek board, which hangs off the bottom edge.
-        'relative flex h-[12rem] flex-none flex-col border-t border-hairline bg-panel',
+        //
+        // Below `md` the height comes off. The two halves are stacked there rather than
+        // side by side (see the grid), so a fixed 12rem would be showing half of each; the
+        // box is a card in a scrolling pane instead, and the pane does the scrolling.
+        'relative flex h-[12rem] flex-none flex-col border-t border-hairline bg-panel max-md:h-auto',
         className,
       )}
       data-testid="maia-panel"
@@ -273,11 +277,19 @@ export function MaiaPanel({
         a SAN and a percentage side by side are about 9rem, and below that the column
         truncates its own header — so in a narrow moves column the engine's rows wrap a
         line sooner rather than the human rows becoming ellipses.
+
+        None of that survives 375px. A quarter of a phone is 90 pixels and three quarters is
+        270, and the engine's variations were wrapping every second ply — so below `md` the
+        split is dropped entirely and the two stack, each with the width to itself. Maia
+        first, which is the order they are read in on a desktop. The rule stays vertical up
+        there and becomes the line between the two rows down here.
       */}
       <div
         className={cn(
-          'grid min-h-0 flex-1 divide-x divide-line',
-          comparing ? 'grid-cols-1' : 'grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)]',
+          'grid min-h-0 flex-1 divide-x divide-line max-md:divide-x-0 max-md:divide-y',
+          comparing
+            ? 'grid-cols-1'
+            : 'grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)] max-md:grid-cols-1',
         )}
       >
         <section className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5">

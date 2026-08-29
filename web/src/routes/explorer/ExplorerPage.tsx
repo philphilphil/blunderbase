@@ -151,8 +151,15 @@ export function ExplorerPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome breadcrumb={[{ label: 'Openings', to: '/explorer' }]} />
 
-      <div className="flex min-h-0 flex-1 gap-[1.125rem] overflow-hidden px-5 py-[1.125rem]">
-        <div className="flex w-[31.25rem] flex-none flex-col gap-3.5">
+      {/*
+        Below `md` the two panels become one column that scrolls as a whole: the board and
+        its controls first, the tree under them. The desktop layout is two panes that never
+        scroll together — the tree scrolls inside itself against a fixed board — and on a
+        phone that would be a 460px board over a 200px scroller, so the outer row takes the
+        scrolling and both panes go back to normal flow.
+      */}
+      <div className="flex min-h-0 flex-1 gap-[1.125rem] overflow-hidden px-5 py-[1.125rem] max-md:flex-col max-md:gap-3 max-md:overflow-y-auto max-md:px-3 max-md:py-3">
+        <div className="flex w-[31.25rem] flex-none flex-col gap-3.5 max-md:w-full">
           <div className="flex flex-col gap-[0.4375rem]">
             <div className="flex items-baseline gap-2">
               <h1 className="text-[0.9375rem] font-semibold text-ink">
@@ -180,11 +187,11 @@ export function ExplorerPage() {
               // Nothing was played, so put the piece back where the FEN says it is.
               else boardApi.current?.set({ fen: line.fen })
             }}
-            className="w-[28.75rem]"
+            className="w-[28.75rem] max-md:w-full"
             ref={boardApi}
           />
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 max-md:flex-wrap">
             <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
               <button
                 type="button"
@@ -229,8 +236,8 @@ export function ExplorerPage() {
           <LineSummary tree={tree.data} ply={line.ply} loading={tree.isPending} />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto">
-          <div className="flex flex-none items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto max-md:flex-none max-md:overflow-visible">
+          <div className="flex flex-none items-center gap-2.5 max-md:flex-wrap">
             <span className="text-[0.75rem] font-semibold text-ink">Your move tree from here</span>
             <div className="flex-1" />
             <ScopeToggle scope={scope} onChange={setScope} />

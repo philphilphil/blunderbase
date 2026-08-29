@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      `viewport-fit=cover` lets the app paint under an iPhone's notch and home indicator
+      when it is installed to the home screen; the chrome puts the space back with
+      `env(safe-area-inset-*)` padding, so nothing lands under either.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#08090b" />
     <title>Blunderbase</title>
     <!--

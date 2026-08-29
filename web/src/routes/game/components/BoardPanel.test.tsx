@@ -312,6 +312,39 @@ describe('BoardPanel line preview', () => {
   })
 })
 
+/**
+ * The two jumps `j`/`shift+J` make, drawn as buttons for the phone. The suite runs with
+ * `css: false`, so `md:hidden` hides nothing here and both are always queryable — that they
+ * are *only* shown below `md` is asserted as the class it is.
+ */
+describe('BoardPanel flagged jumps', () => {
+  it('seeks the position the flagged move was made from, either way', () => {
+    const { onSeek } = renderPanel({ cursor: 4, nextFlagged: 8, previousFlagged: 0 })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next flagged move' }))
+    expect(onSeek).toHaveBeenLastCalledWith(8)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous flagged move' }))
+    expect(onSeek).toHaveBeenLastCalledWith(0)
+  })
+
+  it('is disabled where there is no flagged move that way', () => {
+    const { onSeek } = renderPanel({ nextFlagged: null, previousFlagged: null })
+    const next = screen.getByRole('button', { name: 'Next flagged move' })
+
+    expect(next).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Previous flagged move' })).toBeDisabled()
+    fireEvent.click(next)
+    expect(onSeek).not.toHaveBeenCalled()
+  })
+
+  it('stays off the desktop row, where the same jump is a keypress', () => {
+    renderPanel({ nextFlagged: 8 })
+    expect(screen.getByRole('button', { name: 'Next flagged move' }).parentElement).toHaveClass(
+      'md:hidden',
+    )
+  })
+})
+
 describe('BoardPanel deep-analysis button', () => {
   it('is idle when there is no run and none has ever finished', () => {
     const { onRequestDeep } = renderPanel()

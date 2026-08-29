@@ -20,6 +20,7 @@ import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { useProfile, useStats } from '@/lib/api/queries'
 import type { Color, GameFilters, StatsBucket } from '@/lib/api/types'
+import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
 
 import { BlundersByPhaseCard } from './cards/BlundersByPhaseCard'
@@ -136,39 +137,51 @@ export function StatsPage() {
     )
   }
 
+  /**
+   * Design 2d puts the window and colour controls in the 46px titlebar, not in the page
+   * header — they scope every card on the screen, not just the one below them. Below `md`
+   * they come back down into the page: seven buttons will not share that bar with a
+   * breadcrumb and the queue widget, and clipped into fragments they are worse than absent.
+   * They still scope everything, so moving them is the only option — dropping them is not.
+   *
+   * Rendered at one place or the other rather than both-with-one-hidden: they are a live
+   * control over the page's filters, and two of them would be two things claiming to say
+   * what the screen is showing.
+   */
+  const mobile = useIsMobile()
+  const scope = (
+    <>
+      <Segmented
+        label="Window"
+        value={windowKey}
+        onChange={setWindowKey}
+        options={DEFAULT_WINDOWS.map((key) => ({
+          value: key,
+          label: WINDOW_LABELS[key],
+        }))}
+      />
+      <Segmented
+        label="Colour"
+        value={color}
+        onChange={setColor}
+        options={[
+          { value: 'both', label: 'both' },
+          { value: 'white', label: 'white' },
+          { value: 'black', label: 'black' },
+        ]}
+      />
+    </>
+  )
+
   return (
     <PageBody className="gap-3.5">
-      {/* Design 2d puts the window and colour controls in the 46px titlebar, not in the
-          page header — they scope every card on the screen, not just the one below them. */}
       <SetPageChrome
         breadcrumb={
           report === 'overview'
             ? [{ label: 'Stats' }]
             : [{ label: 'Stats', to: '/stats' }, { label: reportLabel }]
         }
-        actions={
-          <>
-            <Segmented
-              label="Window"
-              value={windowKey}
-              onChange={setWindowKey}
-              options={DEFAULT_WINDOWS.map((key) => ({
-                value: key,
-                label: WINDOW_LABELS[key],
-              }))}
-            />
-            <Segmented
-              label="Colour"
-              value={color}
-              onChange={setColor}
-              options={[
-                { value: 'both', label: 'both' },
-                { value: 'white', label: 'white' },
-                { value: 'black', label: 'black' },
-              ]}
-            />
-          </>
-        }
+        actions={mobile ? null : scope}
       />
       <PageHeader
         title="Stats"
@@ -213,7 +226,14 @@ export function StatsPage() {
         }
       />
 
-      <div className="flex flex-none gap-3">
+      {/* Each `Segmented` names itself, so the row wrapping them needs no label of its
+          own — the two together are ~340px and take a line each on a 375px screen. */}
+      {mobile ? <div className="flex flex-wrap items-center gap-2">{scope}</div> : null}
+
+      {/* Five tiles across is 70px each on a phone, which fits neither a label nor a
+          22px number. Below `md` they go two to a line, and the fifth — the one that
+          would otherwise sit alone in half a row — takes the whole last one. */}
+      <div className="grid flex-none grid-cols-2 gap-2.5 md:flex md:gap-3">
         <StatTile
           label="Games"
           value={speed.isPending ? '—' : formatCount(games)}
@@ -239,6 +259,7 @@ export function StatsPage() {
           label="Blunder rate"
           value={blunderRate === null ? '—' : `${blunderRate.toFixed(1)}%`}
           suffix={suffix(asPercent(num(phaseDelta?.total, 'blunder_rate')), 'of your moves', true)}
+          className="max-md:col-span-2"
         />
       </div>
 

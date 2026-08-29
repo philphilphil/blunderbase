@@ -1,7 +1,7 @@
 import type { Api } from '@lichess-org/chessground/api'
 import type { DrawShape } from '@lichess-org/chessground/draw'
-import { Check, Loader2, StickyNote, Undo2 } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import { Check, ChevronLeft, ChevronRight, Flag, Loader2, StickyNote, Undo2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -66,6 +66,14 @@ export interface BoardPanelProps {
   onHintsChange: (hints: boolean) => void
   onFlip: () => void
   onSeek: (cursor: number) => void
+  /**
+   * The cursor the next (and previous) flagged move is made *from* — one ply before the
+   * mistake, which is the position worth reading — or null where there is none that way.
+   * The same jump `j`/`shift+J` make; they are only drawn as buttons below `md`, where
+   * there is no keyboard to press and the flagged moves are the reason the page is open.
+   */
+  nextFlagged?: number | null
+  previousFlagged?: number | null
   /**
    * One move forwards or back from wherever the board stands. Inside an analysis line that
    * is a step along the line rather than along the game, which the page decides — the wheel
@@ -137,6 +145,8 @@ export function BoardPanel({
   onHintsChange,
   onFlip,
   onSeek,
+  nextFlagged,
+  previousFlagged,
   onStep,
   deepRun,
   deepActiveRun,
@@ -243,7 +253,7 @@ export function BoardPanel({
   }, [analysis])
 
   return (
-    <div ref={column} className={cn('flex flex-col gap-3.5', className)}>
+    <div ref={column} className={cn('flex flex-col gap-3.5 max-md:gap-2', className)}>
       {/*
         The board column takes the page's spare width now (`GamePage`), and the board is
         square: every rem of width is a rem of height, and unchecked it would push the
@@ -318,8 +328,32 @@ export function BoardPanel({
           // anyway on the preview boards, which are view-only.
           drawable
           onMove={previewing ? undefined : onPlayMove}
+          // Below `md` the board sits in `MobileGameView`'s pinned head, over a tab pane
+          // that has to keep a usable height of its own, so it is capped again — against a
+          // different sum. What stands above and below it there, at the app's 120 % scale:
+          //
+          //   2.875  the titlebar (`AppShell`/`TopBar`)
+          //   2.75   the phone header: players over result/ply/opening
+          //   1      this panel's `max-md:py-2`, both ends
+          //   0.5    its `max-md:gap-2`, board row → transport
+          //   4.2    the transport row, which wraps to two lines at 375px: the transport
+          //          and flagged groups on the first, the four toggles and the score chip
+          //          on the second, over a `max-md:gap-1.5` row gap
+          //   2.5    the tab strip
+          //   9      the floor left for the tab pane itself — about five move rows
+          //   -----
+          //   23     which is `calc(100dvh-23rem)`
+          //
+          // `dvh`, not `vh`: on iOS `vh` is the height with the address bar *hidden*, so a
+          // `vh` cap over-feeds the board and eats the pane the moment the bar is showing.
+          //
+          // No `env(safe-area-inset-*)` in that sum, deliberately. It would have to go
+          // inside the `calc`, where Tailwind's operator normalisation is not something to
+          // bet an identifier full of hyphens on — and it would buy nothing: the cap only
+          // binds on a short phone (at 812 the board is already full width and the `100%`
+          // wins), and short phones are the un-notched ones whose insets are zero.
           className={cn(
-            'min-w-0 max-w-[min(100%,calc(100vh-20rem))] flex-1',
+            'min-w-0 max-w-[min(100%,calc(100vh-20rem))] flex-1 max-md:max-w-[min(100%,calc(100dvh-23rem))]',
             previewDim && 'bb-preview-dim',
           )}
         >
@@ -333,7 +367,19 @@ export function BoardPanel({
         </Board>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/*
+        Below `md` this row wraps onto exactly two lines, and the split is designed rather
+        than left to chance. At 375px the transport and flagged groups come to about 296 of
+        the 356 available, so they take the first line together — the thumb line, directly
+        under the board — and Flip is the first thing that cannot follow them. The four
+        toggles and the score chip come to about 341 and make the second. The `flex-1`
+        spacer is dropped there: in a wrapping row it is a forced line break.
+
+        Two lines is what `BoardPanel`'s `100dvh` cap budgets for. "Back to game" appears
+        only while a line is being walked and can push it to three; the pane below is
+        `flex-1 min-h-0` and gives up the height, which is the right way round.
+      */}
+      <div className="flex items-center gap-2 max-md:flex-wrap max-md:gap-1.5">
         <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
           <TransportButton label="First" disabled={cursor < 0} onClick={() => onSeek(-1)}>
             ⏮
@@ -358,10 +404,44 @@ export function BoardPanel({
           </TransportButton>
         </div>
 
+        {/*
+          The flagged-move jumps, as their own group beside the transport: on a desktop they
+          are `j` and `shift+J` and this row stays exactly as it was, but a phone has no keys
+          to press, and getting to the blunder is what the page is opened for — tapping ⏭
+          twenty times to reach it is not a review.
+
+          A group of its own rather than two more cells in the transport group: that group's
+          dividers are drawn by the cell *before* each boundary, so a cell that exists only
+          under `md` would leave the desktop row's last divider hanging.
+        */}
+        <div className="flex overflow-hidden rounded-md border border-edge bg-elevated md:hidden">
+          <TransportButton
+            label="Previous flagged move"
+            disabled={previousFlagged == null}
+            onClick={() => previousFlagged != null && onSeek(previousFlagged)}
+          >
+            <span className="flex items-center">
+              <ChevronLeft className="size-3.5" aria-hidden />
+              <Flag className="size-3" aria-hidden />
+            </span>
+          </TransportButton>
+          <TransportButton
+            label="Next flagged move"
+            last
+            disabled={nextFlagged == null}
+            onClick={() => nextFlagged != null && onSeek(nextFlagged)}
+          >
+            <span className="flex items-center">
+              <Flag className="size-3" aria-hidden />
+              <ChevronRight className="size-3.5" aria-hidden />
+            </span>
+          </TransportButton>
+        </div>
+
         <button
           type="button"
           onClick={onFlip}
-          className="rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink"
+          className="rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
         >
           ⇅ Flip
         </button>
@@ -372,7 +452,7 @@ export function BoardPanel({
           aria-pressed={hints}
           title="Engine and Maia marks on the board"
           className={cn(
-            'rounded-md border px-2.5 py-[0.3125rem] text-xs',
+            'rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
             hints
               ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
               : 'border-edge bg-elevated text-dim hover:text-ink',
@@ -397,7 +477,7 @@ export function BoardPanel({
             aria-pressed={noting}
             title="Write a note about this position"
             className={cn(
-              'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs',
+              'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
               noting
                 ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
                 : 'border-edge bg-elevated text-soft hover:text-ink',
@@ -413,20 +493,26 @@ export function BoardPanel({
             type="button"
             onClick={onExitAnalysis}
             title="Leave the analysis line and go back to the game"
-            className="flex items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant"
+            className="flex items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant max-md:py-1.5"
           >
             <Undo2 className="size-3" aria-hidden />
             Back to game
           </button>
         ) : null}
 
-        <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] tabular text-dim">
+        <div className="flex-1 max-md:hidden" />
+        {/*
+          Both readouts go below `md`, and `MobileGameView`'s header carries both instead —
+          `+0.32 · 1-0 · ply 34/91` on a line it was drawing anyway. Kept here they wrapped
+          onto a third line of their own, which spent a third of a `rem` of pinned height on
+          two small pieces of text and took it straight out of the tab pane underneath.
+        */}
+        <span className="font-mono text-[0.6875rem] tabular text-dim max-md:hidden">
           {inLine && analysis
             ? `analysis +${analysis.cursor}`
             : `ply ${cursor + 1} / ${plyCount}`}
         </span>
-        <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink">
+        <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink max-md:hidden">
           {formatScore(score)}
         </span>
       </div>
@@ -489,7 +575,7 @@ function DeepButton({
           disabled={busy}
           onClick={onRequest}
           className={cn(
-            'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs disabled:cursor-default',
+            'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs disabled:cursor-default max-md:py-1.5',
             error && !busy
               ? 'border-blunder/30 bg-blunder/5 text-blunder'
               : deepRun
@@ -505,6 +591,12 @@ function DeepButton({
   )
 }
 
+/**
+ * One cell of a transport group. The divider between two cells is drawn by the cell before
+ * it, which is what `last` turns off — so a group's cells all have to exist at the same
+ * breakpoints as each other (see the flagged pair, which is a group of its own for exactly
+ * that reason). Below `md` the cell grows into a thumb-sized target; it is the same button.
+ */
 function TransportButton({
   children,
   label,
@@ -512,7 +604,7 @@ function TransportButton({
   last,
   onClick,
 }: {
-  children: string
+  children: ReactNode
   label: string
   disabled?: boolean
   last?: boolean
@@ -526,7 +618,7 @@ function TransportButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'px-2.5 py-[0.3125rem] text-xs text-soft hover:bg-selected hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent',
+        'px-2.5 py-[0.3125rem] text-xs text-soft hover:bg-selected hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent max-md:px-3 max-md:py-1.5 max-md:text-sm',
         !last && 'border-r border-edge',
       )}
     >

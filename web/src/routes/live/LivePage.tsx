@@ -103,8 +103,13 @@ export function LivePage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome breadcrumb={[{ label: 'Live' }]} actions={<ConnectionPill />} />
 
-      <header className="flex flex-none items-end gap-3 px-5 pt-4.5 pb-3">
-        <div className="flex flex-col gap-[0.1875rem]">
+      {/*
+        The heading wraps below `md`: "Save this moment" and the flip control are the two
+        things a phone still needs from this row, and squeezing them onto the same line as
+        the session description leaves none of the three legible.
+      */}
+      <header className="flex flex-none items-end gap-3 px-5 pt-4.5 pb-3 max-md:flex-wrap max-md:px-3">
+        <div className="flex flex-col gap-[0.1875rem] max-md:min-w-0">
           <h1 className="flex items-center gap-2.5 text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">
             Live
             {active ? (
@@ -129,11 +134,17 @@ export function LivePage() {
         </button>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-4 px-5 pb-4.5">
-        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+      {/*
+        Board over rail below `md`, in one scroller. The desktop shape is a board sized to
+        the viewport height beside a rail that scrolls on its own; on a phone the height
+        cap makes the board a stamp and two independent scrollers make the analysis
+        unreachable, so the row becomes a column and the page takes the scrolling.
+      */}
+      <div className="flex min-h-0 flex-1 gap-4 px-5 pb-4.5 max-md:flex-col max-md:gap-3 max-md:overflow-y-auto max-md:px-3">
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center max-md:flex-none">
           {live.isPending ? (
             <Skeleton
-              className="aspect-square w-full max-w-[min(100%,calc(100vh-11.875rem))]"
+              className="aspect-square w-full max-w-[min(100%,calc(100vh-11.875rem))] max-md:max-w-full"
               data-testid="live-loading"
             />
           ) : live.isError ? (
@@ -144,7 +155,9 @@ export function LivePage() {
           ) : (
             <div
               className={cn(
-                'relative w-full max-w-[min(100%,calc(100vh-11.875rem))] rounded-md transition-shadow duration-300',
+                // The height cap keeps the board inside a desktop viewport that never
+                // scrolls; below `md` the page scrolls, so the board takes the full width.
+                'relative w-full max-w-[min(100%,calc(100vh-11.875rem))] rounded-md transition-shadow duration-300 max-md:max-w-full',
                 flash && 'shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--bb-accent)_55%,transparent)]',
               )}
             >
@@ -176,7 +189,7 @@ export function LivePage() {
           )}
         </div>
 
-        <aside className="flex w-[21.25rem] flex-none flex-col gap-4 overflow-y-auto">
+        <aside className="flex w-[21.25rem] flex-none flex-col gap-4 overflow-y-auto max-md:w-full max-md:overflow-visible">
           <InfiniteAnalysisPanel
             stream={stream}
             fen={boardFen}

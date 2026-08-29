@@ -39,6 +39,15 @@ function style(width: number | 'flex') {
   return width === 'flex' ? { flex: 1, minWidth: 0 } : { width, flex: 'none' as const }
 }
 
+/**
+ * The seven columns are fixed pixel widths — 436px of them before gaps and padding — so
+ * below `md` the table scrolls sideways inside itself rather than shrinking. Dropping
+ * columns instead would take away the numbers the screen exists to compare, and the
+ * header has to travel with the rows, so the minimum is set on both and the scroll on
+ * the element wrapping them.
+ */
+const MIN_TABLE = 'max-md:min-w-[34rem]'
+
 export function MoveTreeTable({
   tree,
   ply,
@@ -55,10 +64,17 @@ export function MoveTreeTable({
   const mainLine = tree?.main_line?.[0]?.uci
 
   return (
-    <div className="flex flex-col gap-3.5" role="table" aria-label="Continuations">
+    <div
+      className="flex flex-col gap-3.5 max-md:overflow-x-auto"
+      role="table"
+      aria-label="Continuations"
+    >
       <div
         role="row"
-        className="flex h-[1.875rem] flex-none items-center gap-3 rounded-[0.4375rem] border border-line bg-panel px-3 text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase"
+        className={cn(
+          'flex h-[1.875rem] flex-none items-center gap-3 rounded-[0.4375rem] border border-line bg-panel px-3 text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase',
+          MIN_TABLE,
+        )}
       >
         {COLUMNS.map((column) => (
           <span
@@ -72,7 +88,7 @@ export function MoveTreeTable({
       </div>
 
       {loading ? (
-        <div className="flex flex-col gap-0.5" data-testid="tree-loading">
+        <div className={cn('flex flex-col gap-0.5', MIN_TABLE)} data-testid="tree-loading">
           {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
@@ -94,7 +110,7 @@ export function MoveTreeTable({
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-0.5 font-mono text-[0.78125rem] tabular">
+        <div className={cn('flex flex-col gap-0.5 font-mono text-[0.78125rem] tabular', MIN_TABLE)}>
           {moves.map((move) => {
             const split = splitOf(move)
             const percent = scorePercent(move.score)

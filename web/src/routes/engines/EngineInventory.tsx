@@ -10,6 +10,17 @@ import { KindBadge, RoleBadge } from './EngineBadges'
 import { NO_ROLES, type EngineRoles } from './roles'
 
 /**
+ * The header and every row share one track list, so the columns can never be drawn two
+ * widths. The five tracks are 25rem of fixed width before the name gets any, so below `md`
+ * the two describing *policy and place* are dropped and the row keeps name, kind and state
+ * — what it is scanned for. Neither dropped fact is only here: the assignment is the role
+ * strip at the top of the same page, and the host is named again inside the detail the row
+ * expands into.
+ */
+const COLUMNS =
+  'grid-cols-[minmax(0,1fr)_5rem_7rem_8rem_5rem] max-md:grid-cols-[minmax(0,1fr)_5rem_4rem]'
+
+/**
  * Every configured engine as one operational table, with its editor expanding directly
  * beneath the row. This is the winning prototype's central decision: kind, assignment,
  * location and state can be compared at a glance, while the large editor costs no space
@@ -36,11 +47,16 @@ export function EngineInventory({
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-panel">
-      <div className="grid grid-cols-[minmax(0,1fr)_5rem_7rem_8rem_5rem] gap-3 px-3 py-2 text-[0.625rem] tracking-[0.06em] text-faint uppercase">
+      <div
+        className={cn(
+          'grid gap-3 px-3 py-2 text-[0.625rem] tracking-[0.06em] text-faint uppercase',
+          COLUMNS,
+        )}
+      >
         <span>Engine</span>
         <span>Kind</span>
-        <span>Assignment</span>
-        <span>Where</span>
+        <span className="max-md:hidden">Assignment</span>
+        <span className="max-md:hidden">Where</span>
         <span className="text-right">State</span>
       </div>
       {engines.map((engine) => {
@@ -55,7 +71,8 @@ export function EngineInventory({
               aria-label={`${expanded ? 'Collapse' : 'Edit'} ${engine.name}`}
               onClick={() => onOpenDetail(expanded ? null : `engine:${engine.id}`)}
               className={cn(
-                'grid w-full grid-cols-[minmax(0,1fr)_5rem_7rem_8rem_5rem] items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raised',
+                'grid w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raised',
+                COLUMNS,
                 expanded && 'bg-raised-2',
               )}
             >
@@ -80,8 +97,11 @@ export function EngineInventory({
                 ) : null}
               </span>
               <KindBadge kind={engine.kind} />
-              <RoleBadge roles={roles.get(engine.id) ?? NO_ROLES} />
-              <span className="truncate text-[0.6875rem] text-dim">
+              <RoleBadge
+                roles={roles.get(engine.id) ?? NO_ROLES}
+                className="max-md:hidden"
+              />
+              <span className="truncate text-[0.6875rem] text-dim max-md:hidden">
                 {hostLabel(host, hostKnown)}
               </span>
               <span

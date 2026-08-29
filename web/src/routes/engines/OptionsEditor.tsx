@@ -6,8 +6,10 @@ import { cn } from '@/lib/utils'
 
 import { isEditable, type DeclaredOption, type OptionDraft } from './options'
 
-const SELECT_CLASS =
-  'h-8 w-44 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50'
+/** The value column narrows below `md` so the option's own name keeps room to be read. */
+const VALUE_WIDTH = 'w-44 max-md:w-28'
+
+const SELECT_CLASS = `h-8 ${VALUE_WIDTH} rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50`
 
 function range(option: DeclaredOption): string | null {
   if (option.type !== 'spin') return null
@@ -28,7 +30,7 @@ function Field({
 }) {
   if (!isEditable(option)) {
     return (
-      <span className="w-44 text-right font-mono text-[0.6875rem] text-faint">
+      <span className={cn(VALUE_WIDTH, 'text-right font-mono text-[0.6875rem] text-faint')}>
         {option.managed ? 'set per analysis' : 'action'}
       </span>
     )
@@ -73,7 +75,7 @@ function Field({
     <Input
       aria-label={option.name}
       aria-invalid={invalid}
-      className="w-44 font-mono"
+      className={cn(VALUE_WIDTH, 'font-mono')}
       inputMode={option.type === 'spin' ? 'numeric' : undefined}
       placeholder={option.default || 'default'}
       value={value}
@@ -131,11 +133,11 @@ export function OptionsEditor({
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 max-md:flex-wrap">
         <Input
           value={filter}
           placeholder="Filter options"
-          className="h-7 w-48"
+          className="h-7 w-48 max-md:w-36"
           onChange={(event) => setFilter(event.target.value)}
         />
         <button

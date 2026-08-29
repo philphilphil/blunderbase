@@ -454,4 +454,49 @@ describe('MoveList', () => {
     renderList([move(0, 'e4')])
     expect(screen.queryByRole('button', { name: 'PGN' })).not.toBeInTheDocument()
   })
+
+  it('draws the tab a caller names, and hides the row when the caller owns the tabs', () => {
+    // What the phone layout does: the three tabs are promoted into a strip of its own
+    // (`MobileGameView`), so the table is told which one to draw and its row goes.
+    // The filter keeps whole move *pairs*, so the blunder goes in the second pair — with
+    // it in the first, "e4" would still be on screen as the white half of a kept row.
+    const moves = [
+      move(0, 'e4'),
+      move(1, 'e5'),
+      move(2, 'Nf3'),
+      move(3, 'Qh4', { classification: 'blunder' }),
+    ]
+    const list = (props: Partial<Parameters<typeof MoveList>[0]>) => (
+      <MoveList
+        pairs={pairMoves(moves)}
+        cursor={-1}
+        collapsedThrough={null}
+        annotation={null}
+        flaggedCount={1}
+        plyCount={moves.length}
+        onSelectPly={vi.fn()}
+        {...props}
+      />
+    )
+    const { rerender } = render(list({ tab: 'flagged', showTabRow: false }))
+    expect(screen.queryByRole('button', { name: /^Moves/ })).not.toBeInTheDocument()
+    // Filtered to the flagged move without anyone having clicked a tab in here.
+    expect(screen.getByText('Qh4')).toBeInTheDocument()
+    expect(screen.queryByText('e4')).not.toBeInTheDocument()
+
+    rerender(list({ tab: 'moves', showTabRow: false }))
+    expect(screen.getByText('e4')).toBeInTheDocument()
+  })
+
+  it('drops the ply total below md, and never the PGN affordance', () => {
+    // The suite runs with `css: false`, so `max-md:hidden` hides nothing here — what is
+    // asserted is which of the two the row is willing to give up when it runs out of width.
+    // The total is on screen twice on a phone; `BoardPanel`'s transport row carries it.
+    renderList([move(0, 'e4'), move(1, 'd5')], { pgn: '[Event "?"]\n\n1. e4 *\n' })
+    const total = screen.getByText('2 plies')
+
+    expect(total).toHaveClass('max-md:hidden')
+    expect(total.parentElement).toHaveClass('flex-none')
+    expect(screen.getByRole('button', { name: 'PGN' })).not.toHaveClass('max-md:hidden')
+  })
 })

@@ -45,7 +45,9 @@ export function DeleteAllGamesDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh]"
+      // Below `md` the sheet starts near the top and the backdrop scrolls: the password
+      // field brings the keyboard up, and a 12vh inset would push the buttons off-screen.
+      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh] max-md:overflow-y-auto max-md:px-4 max-md:pt-6 max-md:pb-6"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div

@@ -39,10 +39,17 @@ export function QueueIndicator({ className }: { className?: string }) {
               className,
             )}
           >
-            <span className={cn('text-[0.6875rem]', idle ? 'text-dim-2' : 'text-soft')}>
+            {/*
+              The word and the full-width bar are the first things to go on a phone: the
+              `3/7` beside them already says whether anything is running, and the titlebar
+              has four other things to fit into 375px.
+            */}
+            <span
+              className={cn('text-[0.6875rem] max-md:hidden', idle ? 'text-dim-2' : 'text-soft')}
+            >
               {idle ? 'Idle' : 'Analysing'}
             </span>
-            <div className="h-[0.1875rem] w-16 overflow-hidden rounded-sm bg-edge">
+            <div className="h-[0.1875rem] w-16 overflow-hidden rounded-sm bg-edge max-md:w-8">
               <div
                 className={cn(
                   'h-full transition-[width] duration-500',

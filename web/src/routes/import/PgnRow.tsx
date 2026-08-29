@@ -96,7 +96,8 @@ export function PgnRow({
           </span>
         </TableCell>
 
-        <TableCell>
+        {/* Table cells never wrap; this one holds a sentence, and on a phone it has to. */}
+        <TableCell className="max-md:whitespace-normal">
           <div className="flex items-center gap-2">
             {files.length > 0 ? (
               <>
@@ -141,9 +142,12 @@ export function PgnRow({
           ) : null}
         </TableCell>
 
-        <TableCell className="text-right font-mono text-[0.71875rem] text-faint tabular">—</TableCell>
+        {/* Hidden below `md` with their headers — see `SourcesTable`. */}
+        <TableCell className="text-right font-mono text-[0.71875rem] text-faint tabular max-md:hidden">
+          —
+        </TableCell>
 
-        <TableCell className="font-mono text-[0.71875rem] text-dim tabular">
+        <TableCell className="font-mono text-[0.71875rem] text-dim tabular max-md:hidden">
           {lastJob ? relative(lastJob.finished_at ?? lastJob.created_at) : '—'}
         </TableCell>
 

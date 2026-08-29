@@ -74,7 +74,9 @@ function Row({
   return (
     <li
       className={cn(
-        'flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors',
+        // Five things on one line is a desktop row; below `md` the meta wraps under the
+        // note, and the note keeps most of the first line so it is still worth reading.
+        'flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors max-md:flex-wrap max-md:gap-y-1 max-md:py-1.5',
         current ? 'bg-raised' : 'hover:bg-raised/60',
       )}
     >
@@ -86,7 +88,7 @@ function Row({
         type="button"
         onClick={() => onHighlight(note.id)}
         title={recurred ? 'This position came back in a recent game' : 'Untouched for weeks'}
-        className="min-w-0 flex-1 truncate text-left text-[0.75rem] text-body-2 transition-colors hover:text-ink"
+        className="min-w-0 flex-1 truncate text-left text-[0.75rem] text-body-2 transition-colors hover:text-ink max-md:min-w-[60%]"
       >
         {oneLine(note)}
       </button>

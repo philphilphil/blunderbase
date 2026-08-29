@@ -42,7 +42,9 @@ export function StatCard({
         className,
       )}
     >
-      <header className="flex items-baseline gap-2">
+      {/* The `aside` is a legend or a control, and on a phone it rarely shares a line with
+          the title — it wraps under it rather than pushing either off the card. */}
+      <header className="flex items-baseline gap-2 max-md:flex-wrap max-md:gap-y-1">
         <h2
           className={cn(
             'font-semibold text-ink',
@@ -308,7 +310,10 @@ export function StatTile({
       )}
     >
       <span className="text-[0.6875rem] text-dim-2">{label}</span>
-      <div className="flex items-baseline gap-[0.4375rem]">
+      {/* On a half-width phone tile the number and its unit are a few pixels too wide to
+          share a line, and the unit broke mid-phrase — "60.5% of the / point". Stacked,
+          the caption gets a line of its own and stays one readable clause. */}
+      <div className="flex items-baseline gap-[0.4375rem] max-md:flex-col max-md:items-start max-md:gap-0.5">
         <span
           className={cn(
             'font-mono text-[1.375rem] font-semibold tracking-[-0.02em] tabular',

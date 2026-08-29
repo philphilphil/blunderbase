@@ -91,13 +91,19 @@ export function SourcesTable({
         />
       </div>
 
+      {/*
+        Below `md` the two read-only columns go. What the row is *for* on a phone is the
+        username and the button beside it; the game count and the last sync are both said
+        again in the history table under this one, and keeping all five columns would put
+        the Sync button behind a sideways scroll.
+      */}
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-28">Source</TableHead>
             <TableHead>Account</TableHead>
-            <TableHead className="w-24 text-right">Games</TableHead>
-            <TableHead className="w-28">Last sync</TableHead>
+            <TableHead className="w-24 text-right max-md:hidden">Games</TableHead>
+            <TableHead className="w-28 max-md:hidden">Last sync</TableHead>
             <TableHead className="w-28" />
           </TableRow>
         </TableHeader>

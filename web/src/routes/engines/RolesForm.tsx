@@ -161,7 +161,7 @@ export function RolesForm({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-3 gap-2.5" data-testid="roles-loading">
+      <div className="grid grid-cols-3 gap-2.5 max-md:grid-cols-1" data-testid="roles-loading">
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-12 w-full" />
@@ -188,7 +188,8 @@ export function RolesForm({
         Each job runs on the engine chosen for it and on no other — nothing falls back, so a
         role left empty simply does not run.
       </p>
-      <div className="mt-1 grid grid-cols-3 gap-2.5">
+      {/* One picker per row below `md`: a third of 375px cannot hold "Stockfish · nuc". */}
+      <div className="mt-1 grid grid-cols-3 gap-2.5 max-md:grid-cols-1">
         {ENGINE_ROLES.map((role) => {
           const status = byRole.get(role)
           if (!status) return null

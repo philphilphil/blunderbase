@@ -100,8 +100,12 @@ export function TimeControlCard({ filters }: { filters: GameFilters }) {
         empty={rows.length === 0}
         emptyMessage="No games in this window. Import a few, or widen the window."
       >
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex h-[1.125rem] flex-none items-center gap-2.5 border-b border-hairline text-[0.5625rem] tracking-[0.06em] text-dim-2 uppercase">
+        {/* Six numeric columns are ~22rem at their narrowest, so below `md` this one table
+            scrolls sideways inside itself rather than reflowing. Stacking a row would put
+            "Blitz" over "1,284" over "48.2" over "1.4" over "1612" and lose the only thing
+            the table is for — reading one speed against another down a column. */}
+        <div className="flex min-h-0 flex-1 flex-col max-md:overflow-x-auto">
+          <div className="flex h-[1.125rem] flex-none items-center gap-2.5 border-b border-hairline text-[0.5625rem] tracking-[0.06em] text-dim-2 uppercase max-md:min-w-[22rem]">
             <span className="w-[4.75rem] flex-none">Control</span>
             <span className="w-11 flex-none text-right">Games</span>
             <span className="flex-1">Score</span>
@@ -109,7 +113,7 @@ export function TimeControlCard({ filters }: { filters: GameFilters }) {
             <span className="w-12 flex-none text-right">Bl/g</span>
             <span className="w-11 flex-none text-right">Rating</span>
           </div>
-          <div className="flex flex-1 flex-col justify-start pt-0.5 font-mono text-[0.6875rem] tabular">
+          <div className="flex flex-1 flex-col justify-start pt-0.5 font-mono text-[0.6875rem] tabular max-md:min-w-[22rem]">
             {rows.map((row) => {
               const played = Math.max(1, row.wins + row.draws + row.losses)
               const highlight = busiest?.key === row.key && rows.length > 1

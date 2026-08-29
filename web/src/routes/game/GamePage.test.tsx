@@ -15,7 +15,9 @@ import type {
 } from '@/lib/api/types'
 
 import { toast } from '@/lib/toast'
+import { MOBILE_QUERY } from '@/lib/ui/media'
 
+import { COMPOSER_TEXT_ID } from './components/NoteComposer'
 import { GamePage, MOVES_WIDTH_KEY } from './GamePage'
 import { resetSessionVariations } from './sessionVariations'
 
@@ -1255,6 +1257,225 @@ describe('the board/moves splitter', () => {
 
     expect(movesColumn()).toHaveClass('basis-[26rem]')
     expect(movesColumn().style.flexBasis).toBe('')
+  })
+})
+
+/**
+ * The phone layout (`MobileGameView`): a pinned board over one tabbed pane. jsdom lays
+ * nothing out and the suite runs with `css: false`, so none of the sizing can be asserted
+ * here — what is checked is the structure the media query chooses and the behaviour of the
+ * strip: which panel is mounted, that the board never leaves, and that nothing that only
+ * makes sense on a desktop is mounted at all.
+ */
+describe('the game view below md', () => {
+  beforeEach(() => {
+    // The shared setup answers every query "no". This one answers the phone query "yes";
+    // `vi.unstubAllGlobals()` in the file's own `afterEach` puts it back.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === MOBILE_QUERY,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  })
+
+  /** The tab, by the name a screen reader reads — the counts are part of it. */
+  const tab = (name: RegExp | string) => screen.getByRole('tab', { name })
+
+  it('replaces the two sized panes with a tabbed pane', async () => {
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    expect(screen.getByTestId('mobile-tab-pane')).toBeInTheDocument()
+    // Neither sized pane exists, so neither pane's floor can force a sideways scrollbar.
+    expect(screen.queryByTestId('board-column')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('moves-column')).not.toBeInTheDocument()
+  })
+
+  it('leaves the splitter unmounted rather than merely hidden', async () => {
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    // Hiding it with a class would still install its pointer capture and take the body's
+    // selection on a drag the phone cannot make.
+    expect(screen.queryByRole('separator', { name: 'Moves column width' })).not.toBeInTheDocument()
+  })
+
+  it('opens on the moves, with the counts on the tabs that have them', async () => {
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    expect(tab('Moves')).toHaveAttribute('aria-selected', 'true')
+    // The position first, the game after: the two that can scroll off the right edge are
+    // the two nobody reaches for mid-move.
+    expect(screen.getAllByRole('tab').map((each) => each.textContent)).toEqual([
+      'Moves',
+      'Eval',
+      'Engine',
+      'Flagged1',
+      'Notes1',
+    ])
+    // One blunder and one note in the payload, reported on the strip rather than inside a
+    // panel nobody has opened yet.
+    expect(tab(/^Flagged/)).toHaveTextContent('1')
+    expect(tab(/^Notes/)).toHaveTextContent('1')
+    expect(screen.getByText('e4')).toBeInTheDocument()
+  })
+
+  it('shows one panel at a time, and never takes the board away', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    // The engine box and the live search are in the moves column on a desktop; here they
+    // are a tab, and they are not mounted until it is opened.
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+    await user.click(tab('Engine'))
+    expect(tab('Engine')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('infinite-analysis')).toBeInTheDocument()
+    // Asserted on the table itself rather than on a move: the engine box prints SAN too,
+    // so "e4" being on screen says nothing about which panel is open.
+    expect(screen.queryByTestId('move-list')).not.toBeInTheDocument()
+
+    await user.click(tab('Eval'))
+    expect(screen.getByText('Evaluation')).toBeInTheDocument()
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+    expect(screen.getByTestId('flagged-moments')).toBeInTheDocument()
+
+    // The whole point of the layout: the board is in the pinned head, so it survives every
+    // one of those switches.
+    expect(screen.getByTestId('board')).toBeInTheDocument()
+  })
+
+  it('filters the table to the flagged moves from the strip', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    await user.click(tab(/^Flagged/))
+    // 1…d5 is the only flagged move; 1.e4 is `best` and drops out of the table.
+    expect(screen.getByText('d5')).toBeInTheDocument()
+    expect(screen.queryByText('exd5')).not.toBeInTheDocument()
+  })
+
+  it('keeps PGN reachable now that the table’s own tab row is gone', async () => {
+    const writeText = vi.fn(async () => {})
+    const user = userEvent.setup()
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    // It moved to the phone header, which is pinned — so it is reachable from every tab.
+    await user.click(tab('Engine'))
+    await user.click(screen.getByRole('button', { name: 'PGN' }))
+    expect(writeText).toHaveBeenCalled()
+  })
+
+  it('pairs the curve with a tappable list of what made it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+    await user.click(tab('Eval'))
+
+    // Curve and list scroll as one column. Split into a fixed curve over a scrolling list,
+    // the curve was a `flex-none` box that could not yield and the list was left with 13
+    // visible pixels of 426 — so what is asserted is that both sit inside the *same*
+    // scroller, and that nothing between it and the list scrolls on its own.
+    const scroller = screen.getByTestId('eval-scroll')
+    expect(scroller).toHaveClass('overflow-y-auto')
+    expect(scroller).toContainElement(screen.getByText('Evaluation'))
+    expect(scroller).toContainElement(screen.getByTestId('flagged-moments'))
+    for (
+      let box = screen.getByTestId('flagged-moments'); box !== scroller; box = box.parentElement!
+    ) {
+      expect(box.className).not.toContain('overflow-y-auto')
+    }
+
+    const moments = screen.getByTestId('flagged-moments')
+    const row = within(moments).getByRole('button', { name: /d5/ })
+    expect(row).toHaveTextContent('26.3%')
+
+    await user.click(row)
+    // 1…d5 is ply 1, so the board stands on the position it was played from.
+    expect(within(screen.getByTestId('mobile-header')).getByText('ply 1/4')).toBeInTheDocument()
+  })
+
+  it('stacks Maia over the engine, each with the width to itself', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+    await user.click(tab('Engine'))
+
+    // A quarter of a phone is ~90px and three quarters ~270; side by side, the engine's
+    // variations wrapped every second ply. jsdom lays nothing out, so what is asserted is
+    // the rule: one column below `md`, and the rule between them turned on its side.
+    const split = screen.getByTestId('maia-engine-lines').parentElement
+    expect(split).toHaveClass('max-md:grid-cols-1')
+    expect(split).toHaveClass('max-md:divide-y')
+    expect(split).toHaveClass('max-md:divide-x-0')
+    // Maia first, the order the desktop reads them left to right.
+    expect(split!.firstElementChild).not.toBe(screen.getByTestId('maia-engine-lines'))
+  })
+
+  it('caps each player name at its own share, so a short one is never shortened', async () => {
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    // jsdom lays nothing out, so the ellipsis itself is unobservable — what is asserted is
+    // the rule that produces it. Without the cap, flex shares the overflow in proportion to
+    // what each name asked for and *both* give ground: "phib" came back as "p…" beside an
+    // opponent that kept a dozen characters.
+    const header = screen.getByTestId('mobile-header')
+    for (const name of ['phib', 'lichess AI level 2']) {
+      expect(within(header).getByText(name).parentElement).toHaveClass('max-w-[48%]')
+    }
+  })
+
+  it('reads the evaluation in the header, not on a line of its own under the board', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    // A third wrapped line under the transport spent pinned height — the pane's height — on
+    // one chip. The header's second line was already being drawn for the result.
+    const header = screen.getByTestId('mobile-header')
+    expect(within(header).getByText('+0.45')).toBeInTheDocument()
+    expect(within(header).getByText('ply 0/4')).toBeInTheDocument()
+
+    // And it follows the board, which is the whole point of it being on screen.
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(within(header).getByText('ply 1/4')).toBeInTheDocument()
+  })
+
+  it('goes to the Notes tab and puts the keyboard in the composer', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('tab', { name: 'Moves' })
+
+    // The composer only exists in the Notes tab, so the Note button in the transport row
+    // has to switch tabs before it can focus anything — and the focus has to wait for the
+    // tab to render.
+    expect(screen.queryByTestId('note-composer')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Note' }))
+    expect(tab(/^Notes/)).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('note-composer')).toBeInTheDocument()
+    expect(document.getElementById(COMPOSER_TEXT_ID)).toHaveFocus()
+  })
+
+  it('jumps to a flagged move from the row under the board, with no keyboard to press', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.click(screen.getByRole('button', { name: 'Next flagged move' }))
+    // The blunder is ply 1, so the board lands on the position it was played from — the
+    // same place `j` goes.
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
   })
 })
 

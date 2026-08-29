@@ -60,8 +60,10 @@ function Compare({ of, stockfish, maia }: { of: string; stockfish: ReactNode; ma
       <TableHead scope="row" className="w-20">
         {of}
       </TableHead>
-      <TableCell>{stockfish}</TableCell>
-      <TableCell>{maia}</TableCell>
+      {/* Cells never wrap by default; these hold phrases, so on a phone they must, or the
+          three columns push the card into a sideways scroll. */}
+      <TableCell className="max-md:whitespace-normal">{stockfish}</TableCell>
+      <TableCell className="max-md:whitespace-normal">{maia}</TableCell>
     </TableRow>
   )
 }

@@ -45,7 +45,9 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
   const patch = (next: Partial<LibraryFilters>) => onChange(prune({ ...filters, ...next }))
 
   return (
-    <div className="flex flex-wrap items-center gap-[0.4375rem]">
+    // `max-md:relative` is what a `FilterPopover` anchors its panel to on a phone; see the
+    // comment there. The chips already wrap, which is all a narrow bar needs of them.
+    <div className="flex flex-wrap items-center gap-[0.4375rem] max-md:relative">
       {FILTER_GROUPS.map((group) => (
         <FilterPopover
           key={group}
@@ -96,7 +98,7 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
   }
 
   return (
-    <div ref={host} className="relative">
+    <div ref={host} className="relative max-md:static">
       <button
         type="button"
         disabled={!active}
@@ -115,7 +117,10 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
         Save filter
       </button>
       {open ? (
-        <div className="absolute top-[calc(100%+0.375rem)] left-0 z-30 flex w-[15.625rem] flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)]">
+        // Anchored to the bar rather than to the chip below `md`, like every other panel
+        // on this bar — this one sits at its right-hand end, where a 250px panel has the
+        // least room of all.
+        <div className="absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:right-0">
           <PopoverLabel>Save this cut as</PopoverLabel>
           <Input
             autoFocus

@@ -1,5 +1,5 @@
 /**
- * The 200px workspace rail from the design.
+ * The 200px workspace rail from the design, and the drawer it becomes on a phone.
  *
  * Three parts, on every frame: the workspace list (with the Games count), the data list,
  * and a pinned footer with the engine roster above it.
@@ -13,6 +13,11 @@
  * The design's footer reads "Storage · local / 2.4 GB / 3.8 GB". Nothing in the API
  * reports disk usage, so the same three-line treatment carries numbers that are true: how
  * much of the library has had a deep pass over it.
+ *
+ * Below `md` there is no room for a rail beside the page, so the same list slides in over
+ * it from the titlebar's hamburger — see `NavDrawer`. The two share `NavSections` rather
+ * than each keeping their own copy of the nav model: a second copy is a second place to
+ * forget a route.
  */
 import {
   ChartNoAxesColumn,
@@ -24,8 +29,9 @@ import {
   Radio,
   Network,
   StickyNote,
+  X,
 } from 'lucide-react'
-import { Fragment, type ComponentType, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, type ComponentType, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { StatusDot } from '@/components/badges/StatusDot'
@@ -483,7 +489,13 @@ function Folded({ to, pathname, search }: { to: string; pathname: string; search
   )
 }
 
-export function SideNav() {
+/**
+ * Everything the rail holds, without the frame around it: the same fragment fills the
+ * desktop rail and the phone drawer, so a route added here appears in both. Both wrappers
+ * are flex columns, which is what the `flex-1` spacer above the roster needs to push the
+ * footer to the bottom.
+ */
+function NavSections() {
   const { pathname, search } = useLocation()
   const games = useGames({ limit: 1 })
   const live = useLiveState()
@@ -501,7 +513,7 @@ export function SideNav() {
   )
 
   return (
-    <nav className="flex w-50 flex-none flex-col gap-0.5 border-r border-hairline bg-panel px-2.5 py-3.5">
+    <>
       <SectionLabel>Workspace</SectionLabel>
       {WORKSPACE.map((item) =>
         entry(
@@ -521,6 +533,88 @@ export function SideNav() {
       <div className="flex-1" />
       <EngineRoster />
       <NavFooter />
+    </>
+  )
+}
+
+export function SideNav() {
+  return (
+    <nav className="flex w-50 flex-none flex-col gap-0.5 border-r border-hairline bg-panel px-2.5 py-3.5 max-md:hidden">
+      <NavSections />
     </nav>
+  )
+}
+
+/**
+ * The rail on a phone: the same list, over the page instead of beside it.
+ *
+ * Only in the tree while it is open, so nothing below `md` pays for a second copy of the
+ * nav's queries and no test finds two of every link. `md:hidden` is the belt to that
+ * brace — a window widened while the drawer is up gets the rail back and nothing on top of
+ * it, without a resize listener.
+ *
+ * Three ways out, because a drawer that traps you is worse than no drawer: the backdrop,
+ * Escape, and following any link in it. The last watches the location rather than the
+ * anchors, so the folded lists (saved filters, reports, your lines) close it too.
+ */
+export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { pathname, search } = useLocation()
+  const here = `${pathname}${search}`
+  const wasHere = useRef(here)
+  const panel = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (wasHere.current === here) return
+    wasHere.current = here
+    if (open) onClose()
+  }, [here, open, onClose])
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
+
+  // Moving focus into the panel is what makes Escape and tabbing land here rather than
+  // back in the titlebar behind the backdrop.
+  useEffect(() => {
+    if (open) panel.current?.focus()
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-40 md:hidden">
+      <div
+        aria-hidden
+        data-testid="nav-backdrop"
+        onClick={onClose}
+        className="absolute inset-0 animate-in bg-void/70 duration-200 fade-in-0"
+      />
+      <nav
+        ref={panel}
+        tabIndex={-1}
+        aria-label="Sections"
+        className="relative flex h-full w-[17rem] max-w-[85vw] flex-col gap-0.5 overflow-y-auto border-r border-hairline bg-panel shadow-[0_0_2rem_var(--bb-shadow)] outline-none duration-200 animate-in slide-in-from-left pt-[max(0.875rem,env(safe-area-inset-top,0rem))] pr-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0rem))] pl-[max(0.625rem,env(safe-area-inset-left,0rem))]"
+      >
+        <div className="flex flex-none items-center justify-between pb-1">
+          <span className="pl-2 text-[0.8125rem] font-semibold tracking-[-0.01em] text-ink">
+            Blunderbase
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close the navigation"
+            className="rounded-md p-1 text-dim transition-colors hover:bg-raised hover:text-ink"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <NavSections />
+      </nav>
+    </div>
   )
 }

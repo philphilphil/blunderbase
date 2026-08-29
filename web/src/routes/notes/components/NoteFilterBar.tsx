@@ -53,13 +53,17 @@ export function NoteFilterBar({ filters, onChange }: NoteFilterBarProps) {
   const patch = (next: Partial<NoteFilters>) => onChange(prune({ ...filters, ...next }))
 
   return (
-    <div className="flex flex-wrap items-center gap-[0.4375rem]">
+    // `max-md:relative` anchors the chips' panels to the bar instead of to the chip they
+    // hang off, which is the only way a 250px panel stays on a 375px screen; see
+    // `FilterPopover`. The box takes the whole first line there — prose is what this
+    // screen is searched by, so it is the last thing to give up width.
+    <div className="flex flex-wrap items-center gap-[0.4375rem] max-md:relative">
       <DebouncedInput
         aria-label="Search the notes"
         placeholder="Search what you wrote…"
         value={filters.text ?? ''}
         onCommit={(value) => patch({ text: value || undefined })}
-        className="h-7 w-[16rem] text-[0.71875rem]"
+        className="h-7 w-[16rem] text-[0.71875rem] max-md:w-full"
       />
 
       {NOTE_FILTER_GROUPS.map((group) => (

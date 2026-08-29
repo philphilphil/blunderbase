@@ -93,7 +93,11 @@ export function NoteCard({
         <MiniBoard
           fen={note.fen}
           label={ply ? `The position at ${ply}` : 'The position this note is about'}
-          size="6.25rem"
+          // `MiniBoard` sets its width inline, so the narrow case has to be part of the
+          // value rather than a class over it. A note about a position should still show
+          // the position on a phone — 100px of board would leave the prose beside it about
+          // twenty characters wide, and a quarter of the screen leaves it readable.
+          size="min(6.25rem, 24vw)"
         />
       ) : null}
 
@@ -180,7 +184,7 @@ export function NoteCard({
               label="This note's tags"
               className="rounded-md border border-input bg-elevated px-1.5 py-1"
             />
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 max-md:flex-wrap max-md:gap-y-1.5">
               <Button size="sm" onClick={save} disabled={update.isPending || !text.trim()}>
                 {update.isPending ? (
                   <Loader2 className="size-3 animate-spin" aria-hidden />
@@ -222,7 +226,7 @@ export function NoteCard({
         ) : null}
 
         {confirming ? (
-          <div className="flex items-center gap-2 rounded-md border border-blunder/28 bg-blunder/5 px-2 py-1.5">
+          <div className="flex items-center gap-2 rounded-md border border-blunder/28 bg-blunder/5 px-2 py-1.5 max-md:flex-wrap max-md:gap-y-1.5">
             <span className="text-[0.6875rem] text-blunder">Forget this note for good?</span>
             <span className="flex-1" />
             <Button

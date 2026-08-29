@@ -53,7 +53,7 @@ function draw(data: Answer = EMPTY) {
         <PageChromeProvider>
           <CommandPaletteProvider>
             <Where />
-            <TopBar />
+            <TopBar onOpenNav={vi.fn()} />
           </CommandPaletteProvider>
         </PageChromeProvider>
       </MemoryRouter>

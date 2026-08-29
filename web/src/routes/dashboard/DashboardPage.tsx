@@ -5,6 +5,10 @@
  * 326px rail carries the recent-games list, the analysis queue and the trend card.
  * Every panel fetches its own data and owns its own loading, empty and error state, so one
  * endpoint being down does not take the page with it.
+ *
+ * Below `md` the rail stops being a rail: the two columns become one, and the panels stack
+ * in the order they are written — ratings and worst moments first, because they are what
+ * the page is for, then the recent games, the queue and the trends under them.
  */
 import { Link } from 'react-router-dom'
 
@@ -42,7 +46,7 @@ export function DashboardPage() {
   return (
     <PageBody className="gap-4">
       <SetPageChrome breadcrumb={[{ label: 'Overview' }]} />
-      <div className="flex min-h-0 flex-1 gap-4">
+      <div className="flex min-h-0 flex-1 gap-4 max-md:flex-col">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <PageHeader
             title="Overview"
@@ -63,7 +67,7 @@ export function DashboardPage() {
           <WorstMomentsRow />
         </div>
 
-        <aside className="flex w-[20.375rem] flex-none flex-col gap-3.5">
+        <aside className="flex w-[20.375rem] flex-none flex-col gap-3.5 max-md:w-full">
           <RecentGamesList />
           <QueueCard />
           <TrendsCard />

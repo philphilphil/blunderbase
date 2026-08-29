@@ -87,7 +87,7 @@ export function RunnerCard({
       layout={layout}
       detail={
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-md:flex-wrap">
             {editing ? (
               <>
                 <Input
@@ -178,7 +178,8 @@ export function RunnerCard({
           </div>
 
           <div className="flex flex-col gap-1.5 border-t border-hairline pt-2.5">
-            <div className="flex items-center gap-2">
+            {/* The confirm sentence and its two buttons need a second line on a phone. */}
+            <div className="flex items-center gap-2 max-md:flex-wrap max-md:justify-end">
               {confirmRevoke ? (
                 <>
                   <span className="flex-1 text-[0.6875rem] leading-[1.6] text-blunder">

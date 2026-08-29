@@ -81,7 +81,7 @@ export function ProgressCard({ filters }: { filters: GameFilters }) {
       }
       footer={
         span ? (
-          <span className="flex gap-5">
+          <span className="flex gap-5 max-md:flex-wrap max-md:gap-x-5 max-md:gap-y-1.5">
             <ThenNow
               label="Blunders / 100 moves"
               value={`${first.blunderRate.toFixed(1)} → ${last.blunderRate.toFixed(1)}`}

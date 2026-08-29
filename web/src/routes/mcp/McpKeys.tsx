@@ -21,7 +21,8 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
 
   return (
     <li className="flex flex-col gap-1.5 px-3.5 py-2.5">
-      <div className="flex items-center gap-2">
+      {/* Wraps below `md`: the revoke sentence and its two buttons do not share 375px. */}
+      <div className="flex items-center gap-2 max-md:flex-wrap max-md:justify-end">
         {confirmRevoke ? (
           <>
             <span className="flex-1 text-[0.6875rem] leading-[1.6] text-blunder">
@@ -145,7 +146,7 @@ export function McpKeys({
           aria-live="polite"
           className="mx-3.5 mb-3 flex flex-col gap-2.5 rounded-lg border border-accent-teal/40 bg-accent-teal/5 px-3 py-3"
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 max-md:flex-wrap">
             <span className="text-xs font-semibold text-ink">
               {minted.key.name} is ready — this key is shown once
             </span>

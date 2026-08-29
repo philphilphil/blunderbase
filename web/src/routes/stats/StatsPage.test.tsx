@@ -1,14 +1,21 @@
-import { render, screen } from '@testing-library/react'
+import { QueryClient } from '@tanstack/react-query'
+import { cleanup, render, screen } from '@testing-library/react'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Providers } from '@/app/Providers'
+import { usePageChrome } from '@/components/shell/PageChrome'
+import { MOBILE_QUERY } from '@/lib/ui/media'
 import type { StatsResponse } from '@/lib/api/types'
 
 import { BlundersByPhaseCard } from './cards/BlundersByPhaseCard'
+import { StatsPage } from './StatsPage'
 import { exportRows, toCsv } from './kit/csv'
 
 const useStats = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api/queries', () => ({ useStats }))
+const useProfile = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/queries', () => ({ useStats, useProfile }))
 
 /** Just the fields the cards read off a query result. */
 function result(state: Partial<UseQueryResult<StatsResponse, Error>>) {
@@ -134,5 +141,91 @@ describe('CSV export', () => {
 
   it('skips a dimension that has not loaded', () => {
     expect(exportRows([{ dimension: 'rating_trend', data: undefined }])).toHaveLength(1)
+  })
+})
+
+/**
+ * The window and colour controls scope every card on the page, so they have to stay
+ * reachable on a phone — where the titlebar they normally live in has no room and clipped
+ * them into fragments. They move into the page body instead, and the point of the branch
+ * is that they *move*: two of them, one hidden, would be two controls each claiming to say
+ * what the screen is showing.
+ */
+describe('StatsPage — where the scope controls live', () => {
+  /** Renders whatever the page put in the titlebar, which the shell would otherwise draw. */
+  function Titlebar() {
+    const { actions } = usePageChrome()
+    return <div data-testid="titlebar">{actions}</div>
+  }
+
+  /** `EventsProvider` dials one of these; nothing here cares what it says. */
+  class FakeSocket {
+    onopen: (() => void) | null = null
+    onmessage: ((event: MessageEvent<string>) => void) | null = null
+    onerror: (() => void) | null = null
+    onclose: (() => void) | null = null
+    close() {}
+  }
+
+  /** A `matchMedia` that answers only the mobile query, so the theme is left alone. */
+  function stubViewport(mobile: boolean) {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: mobile && query === MOBILE_QUERY,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    )
+  }
+
+  function draw() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <Providers client={client}>
+        <MemoryRouter>
+          <Titlebar />
+          <StatsPage />
+        </MemoryRouter>
+      </Providers>,
+    )
+  }
+
+  beforeEach(() => {
+    // Every card stays a skeleton: this is about where two controls are rendered, not
+    // about what the aggregations say.
+    useStats.mockReturnValue(result({ isPending: true }))
+    useProfile.mockReturnValue(result({ isPending: true }))
+    vi.stubGlobal('WebSocket', FakeSocket)
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('puts them in the titlebar on a desktop', () => {
+    stubViewport(false)
+    draw()
+    const titlebar = screen.getByTestId('titlebar')
+    expect(titlebar).toContainElement(screen.getByRole('group', { name: 'Window' }))
+    expect(titlebar).toContainElement(screen.getByRole('group', { name: 'Colour' }))
+  })
+
+  it('brings them down into the page on a phone', () => {
+    stubViewport(true)
+    draw()
+    const titlebar = screen.getByTestId('titlebar')
+    expect(titlebar).toBeEmptyDOMElement()
+    expect(screen.getByRole('group', { name: 'Window' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Colour' })).toBeInTheDocument()
+  })
+
+  it('never renders them twice', () => {
+    for (const mobile of [false, true]) {
+      stubViewport(mobile)
+      draw()
+      expect(screen.getAllByRole('group', { name: 'Window' })).toHaveLength(1)
+      expect(screen.getAllByRole('group', { name: 'Colour' })).toHaveLength(1)
+      cleanup()
+    }
   })
 })

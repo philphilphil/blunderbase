@@ -78,9 +78,14 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
   return (
     <Link
       to={`/games/${moment.game.id}`}
-      className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.6875rem] transition-colors hover:border-edge-strong"
+      // `flex-1` is what splits the row into equal thirds; stacked, it would be asking the
+      // card to share out a height nobody has decided yet, so the phone drops it and the
+      // card is just its own 134px tall.
+      className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.6875rem] transition-colors hover:border-edge-strong max-md:flex-none"
     >
-      <div className="w-28 flex-none overflow-hidden rounded-sm">
+      {/* A little smaller on a phone, where the card is full width but the prose beside the
+          board is the half that has nowhere else to go. */}
+      <div className="w-28 flex-none overflow-hidden rounded-sm max-md:w-24">
         {moment.fen ? (
           <Board
             fen={moment.fen}
@@ -132,8 +137,8 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
 
 function MomentSkeleton() {
   return (
-    <div className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.6875rem]">
-      <Bar className="size-28 flex-none" />
+    <div className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.6875rem] max-md:flex-none">
+      <Bar className="size-28 flex-none max-md:size-24" />
       <div className="flex flex-1 flex-col gap-2">
         <Bar className="h-3.5 w-2/3" />
         <Bar className="h-2.5 w-1/2" />
@@ -149,7 +154,7 @@ export function WorstMomentsRow({ className }: { className?: string }) {
 
   return (
     <section className={cn('flex min-h-0 flex-col gap-[0.5625rem]', className)}>
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-baseline gap-2 max-md:flex-wrap max-md:gap-y-0.5">
         <h2 className="text-xs font-semibold text-ink">Your worst recent moments</h2>
         <span className="text-[0.6875rem] text-dim-2">by the win percentage they gave away</span>
         <div className="flex-1" />
@@ -161,7 +166,7 @@ export function WorstMomentsRow({ className }: { className?: string }) {
         </Link>
       </div>
       {query.isPending ? (
-        <div className="flex gap-2.5" data-testid="loading">
+        <div className="flex gap-2.5 max-md:flex-col" data-testid="loading">
           {Array.from({ length: COUNT }, (_, index) => (
             <MomentSkeleton key={index} />
           ))}
@@ -178,7 +183,10 @@ export function WorstMomentsRow({ className }: { className?: string }) {
           or — less likely — you have not blundered.
         </EmptyBlock>
       ) : (
-        <div className="flex gap-2.5">
+        // Three across is the design; on a phone three across is three 100px cards, so
+        // they stack — a moment is a board and four lines of prose, and neither survives
+        // a third of 375px.
+        <div className="flex gap-2.5 max-md:flex-col">
           {moments.map((moment) => (
             <MomentCard key={`${moment.game.id}-${moment.ply}`} moment={moment} />
           ))}

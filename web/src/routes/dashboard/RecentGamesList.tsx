@@ -50,7 +50,9 @@ function GameRow({ game }: { game: GameCardRow }) {
     <Link
       to={`/games/${game.id}`}
       title={titleOf(game)}
-      className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-raised"
+      // A 28px line is a comfortable list row under a mouse and a cramped one under a
+      // thumb, so the phone gets a taller one.
+      className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-raised max-md:py-2.5"
     >
       <span className={cn('font-mono text-[0.6875rem] font-semibold', outcome.text)}>
         {outcome.letter}
