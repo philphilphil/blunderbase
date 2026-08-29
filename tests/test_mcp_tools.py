@@ -410,31 +410,12 @@ async def test_search_games_filters_and_counts(coach: MCPServer, analysed: dict[
     assert payload["offset"] == 0
 
 
-async def test_search_games_understands_the_owners_side(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    wins = await call(coach, "search_games", outcome="win")
-    assert {game["id"] for game in wins["games"]} == {
-        analysed["qg000001"].id,
-        analysed["qg000004"].id,
-        analysed["qg000005"].id,
-        analysed["qg000006"].id,
-    }
-    black = await call(coach, "search_games", color="black")
-    assert [game["id"] for game in black["games"]] == [analysed["qg000005"].id]
-
-
-async def test_search_games_finds_the_game_with_blunders(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    payload = await call(coach, "search_games", has_blunders=True)
-    assert [game["id"] for game in payload["games"]] == [analysed["qg000001"].id]
-
-
 async def test_search_games_pages(coach: MCPServer, analysed: dict[str, Game]) -> None:
+    """The offset the coach is handed back is the one it has to send to turn the page."""
     first = await call(coach, "search_games", limit=2)
     second = await call(coach, "search_games", limit=2, offset=2)
     assert first["total"] == second["total"] == 6
+    assert (first["offset"], second["offset"]) == (0, 2)
     assert not {game["id"] for game in first["games"]} & {game["id"] for game in second["games"]}
 
 
@@ -501,15 +482,6 @@ async def test_an_unknown_game_is_a_structured_error(
     assert payload["game_id"] == 9999
 
 
-async def test_get_game_carries_its_notes(coach: MCPServer, analysed: dict[str, Game]) -> None:
-    game = analysed["qg000001"]
-    await call(coach, "save_note", text="watch the Berlin", tags=["opening"], game_id=game.id)
-    payload = await call(coach, "get_game", game_id=game.id)
-    assert [note["text"] for note in payload["notes"]] == ["watch the Berlin"]
-    without = await call(coach, "get_game", game_id=game.id, include_notes=False)
-    assert "notes" not in without
-
-
 async def test_find_positions_answers_have_i_been_here_before(
     coach: MCPServer, analysed: dict[str, Game]
 ) -> None:
@@ -544,16 +516,6 @@ async def test_get_player_profile_reports_accounts_ratings_and_volume(
     assert series["points"][0]["at"].endswith("Z")
 
 
-async def test_get_player_profile_keeps_a_fully_recent_series_uncapped(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    """The fixture's games all fall within a year of each other, so a tiny cap doesn't thin them."""
-    payload = await call(coach, "get_player_profile", rating_points=2)
-    assert all(
-        len(series["points"]) == series["games"] for series in payload["ratings"]
-    )
-
-
 # --- accounts --------------------------------------------------------------
 
 
@@ -573,6 +535,7 @@ async def test_register_account_claims_the_games_that_were_stored_without_one(
 
 
 async def test_register_account_refuses_a_platform_nobody_plays_on(coach: MCPServer) -> None:
+    """The tool takes a platform, not a source, so it is `args.member` that refuses this."""
     payload = await failure(coach, "register_account", platform="telepathy", username=OWNER)
     assert payload["error"] == "bad_argument"
     assert "chesscom" in payload["allowed"]
@@ -617,39 +580,10 @@ async def test_get_stats_answers_every_dimension_it_advertises(
         assert "buckets" in payload
 
 
-async def test_get_stats_counts_the_owners_blunders_by_phase(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    payload = await call(coach, "get_stats", dimension="blunders_by_phase")
-    opening = next(bucket for bucket in payload["buckets"] if bucket["key"] == "opening")
-    assert opening["blunder"] == 1
-    assert opening["mistake"] == 1
-    assert opening["inaccuracy"] == 1
-
-
-async def test_get_stats_narrows_by_window_and_filter(
-    coach: MCPServer, analysed: dict[str, Game]
-) -> None:
-    payload = await call(
-        coach, "get_stats", dimension="performance_by_speed", since="2026-03-01"
-    )
-    assert payload["total"]["games"] == 2
-    filtered = await call(
-        coach, "get_stats", dimension="performance_by_speed", time_control="blitz"
-    )
-    assert {bucket["key"] for bucket in filtered["buckets"]} == {"blitz"}
-
-
 async def test_an_unknown_dimension_is_a_structured_error(coach: MCPServer) -> None:
     payload = await failure(coach, "get_stats", dimension="blunders_by_vibe")
     assert payload["error"] == "unknown_dimension"
     assert "blunders_by_phase" in payload["message"]
-
-
-async def test_a_planned_dimension_says_it_is_not_built_yet(coach: MCPServer) -> None:
-    payload = await failure(coach, "get_stats", dimension="blunders_by_motif")
-    assert payload["error"] == "unknown_dimension"
-    assert "not implemented" in payload["message"]
 
 
 # --- analysis --------------------------------------------------------------

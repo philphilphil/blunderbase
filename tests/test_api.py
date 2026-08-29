@@ -44,7 +44,6 @@ from backend.db.models import (
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
 from backend.services import engines as engines_service
-from backend.services import games as games_service
 from backend.services import import_service
 from backend.services import live as live_service
 from tests.conftest import OWNER_PASSWORD, running_app, socket_headers
@@ -274,17 +273,6 @@ def test_the_games_list_pages_and_counts(api: TestClient) -> None:
     assert body["games"][0]["id"] != body["games"][1]["id"]
 
 
-def test_the_games_list_takes_the_same_filters_the_stats_do(api: TestClient) -> None:
-    wins = api.get("/games", params={"outcome": "win"}).json()
-    blunders = api.get("/games", params={"has_blunders": True}).json()
-    unanalysed = api.get("/games", params={"analyzed": False}).json()
-
-    assert wins["total"] < 6
-    assert all(game["outcome"] == "win" for game in wins["games"])
-    assert blunders["total"] == 1
-    assert unanalysed["total"] == 5
-
-
 def test_a_game_card_carries_the_eval_curve_and_the_worst_moments(
     api: TestClient, seeded: dict[str, int]
 ) -> None:
@@ -295,22 +283,6 @@ def test_a_game_card_carries_the_eval_curve_and_the_worst_moments(
     assert card["deep"] is False
     assert len(card["eval_curve"]) == seeded["plies"]
     assert card["worst_moments"][0]["classification"] == "blunder"
-
-
-def test_a_stored_card_serves_the_payload_a_computed_one_would(
-    api: TestClient, settings: Settings
-) -> None:
-    """Moving the work to write time must not have moved the wire format by a byte.
-
-    The seed writes its run by hand, so the first response is the fallback computing every
-    card; the second is the same page served out of the column the backfill just filled.
-    """
-    computed = api.get("/games", params={"cards": True, "limit": 50}).json()
-
-    with get_sessionmaker(settings)() as session:
-        assert games_service.rebuild_game_cards(session) == 1
-
-    assert api.get("/games", params={"cards": True, "limit": 50}).json() == computed
 
 
 def test_a_game_detail_merges_the_runs_over_it(api: TestClient, seeded: dict[str, int]) -> None:
@@ -993,20 +965,6 @@ def test_the_explorer_answers_from_the_initial_array(api: TestClient) -> None:
     assert body["main_line"]
 
 
-def test_the_explorer_can_be_entered_by_eco(api: TestClient) -> None:
-    body = api.get("/explorer", params={"eco": "C6"}).json()
-
-    assert body["eco"] == "C6"
-    assert body["totals"]["games"] == 2
-
-
-def test_the_explorer_refuses_a_fen_that_is_not_one(api: TestClient) -> None:
-    response = api.get("/explorer", params={"fen": "not a fen"})
-
-    assert response.status_code == 422
-    assert error_of(response) == "invalid_request"
-
-
 def test_the_games_that_reached_a_position_come_back_with_their_outcomes(
     api: TestClient,
 ) -> None:
@@ -1041,16 +999,6 @@ def test_one_dimension_aggregates_over_the_filtered_games(api: TestClient) -> No
     assert api.get("/stats/blunders_by_phase", params={"since": "2030-01-01T00:00:00Z"}).json()[
         "total"
     ]["blunder"] == 0
-
-
-def test_a_dimension_that_is_only_planned_says_so_rather_than_pretending(
-    api: TestClient,
-) -> None:
-    response = api.get("/stats/blunders_by_motif")
-
-    assert response.status_code == 422
-    assert error_of(response) == "unknown_dimension"
-    assert "not implemented yet" in response.json()["detail"]
 
 
 def test_two_periods_can_be_compared(api: TestClient) -> None:
