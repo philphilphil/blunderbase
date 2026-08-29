@@ -4,6 +4,14 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.6.0 — 2026-08-29
+
+- Added a phone layout with a tabbed game view
+- Added a Quick analysis button on the game page
+- Added an instances cap for runner engines
+- Added the MIT license
+- Changed analysis to skip Maia levels a game already has
+
 ## v0.5.0 — 2026-08-29
 
 - Added an Analysis page with coverage, failed runs and a costed backfill
