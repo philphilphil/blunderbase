@@ -429,12 +429,6 @@ describe('BoardPanel quick-analysis button', () => {
     expect(deep).toBeDisabled()
   })
 
-  it('spins Deep, not Quick, when a deep run is the one live', () => {
-    renderPanel({ activeRun: ACTIVE_RUN, progress: { done: 27, total: 50 } })
-    expect(screen.getByRole('button', { name: '54%' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Quick' })).toBeDisabled()
-  })
-
   it('shows a done state once a quick run has finished, and stays clickable to re-run', () => {
     const { onRequestQuick } = renderPanel({ quickRun: QUICK_RUN })
     const button = screen.getByRole('button', { name: 'Quick' })

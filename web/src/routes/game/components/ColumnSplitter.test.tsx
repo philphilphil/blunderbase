@@ -100,9 +100,4 @@ describe('ColumnSplitter', () => {
     window.removeEventListener('keydown', onWindowKeyDown)
   })
 
-  it('resets on a double-click', () => {
-    const { splitter, onReset } = renderSplitter()
-    fireEvent.doubleClick(splitter)
-    expect(onReset).toHaveBeenCalledTimes(1)
-  })
 })

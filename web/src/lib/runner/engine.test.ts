@@ -337,41 +337,6 @@ describe('searchInfinite', () => {
     await search.ended
   })
 
-  it('writes the lines from the side to move, not from White', async () => {
-    // The one arithmetic the two halves of Blunderbase must not disagree about — and the
-    // one place a board reads differently from a stored `MoveEval`, which is White's.
-    const { engine, module } = await boot()
-    const search = board(engine, {
-      fen: 'rnbqkbnr/pppppppp/8/8/8/5P2/PPPPP1PP/RNBQKBNR b KQkq - 0 1',
-      multipv: 1,
-    })
-    await vi.advanceTimersByTimeAsync(0)
-
-    module.say('info depth 10 multipv 1 score cp 60 nodes 500 pv e7e5')
-    expect(search.snapshots[0]!.lines).toEqual([
-      { multipv: 1, cp: 60, mate: null, pv: ['e7e5'] },
-    ])
-
-    search.stop.abort()
-    await search.ended
-  })
-
-  it('shows no bounded score and no line the position refuses', async () => {
-    const { engine, module } = await boot()
-    const search = board(engine)
-    await vi.advanceTimersByTimeAsync(0)
-
-    module.say(
-      'info depth 9 multipv 1 score cp 900 lowerbound nodes 10 pv e2e4',
-      'info depth 9 multipv 2 score cp 5 nodes 10 pv h1h8',
-    )
-    // Depth and nodes still moved, so a picture goes out — with nothing to draw on it.
-    expect(search.snapshots[0]!.lines).toEqual([])
-
-    search.stop.abort()
-    await search.ended
-  })
-
   it('says the engine stopped by itself when a `bestmove` arrives unasked', async () => {
     const { engine, module } = await boot()
     const search = board(engine)

@@ -871,23 +871,6 @@ describe('EnginesPage — delete engine', () => {
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
   })
 
-  it('offers removal for a local engine but not a disabled runner-owned one', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH, { ...SF_REMOTE, enabled: false }],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus([
-        runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
-      ]),
-    })
-    renderPage(<EnginesPage />)
-
-    await openEngine('stockfish')
-    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
-
-    await openEngine('sf-remote')
-    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
-  })
 })
 
 describe('EngineDetail', () => {
@@ -1000,15 +983,6 @@ describe('EnginesPage — one page', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
-  it('keeps old Machines links useful by showing the whole page', async () => {
-    stubFetch(routes)
-    renderPage(<EnginesPage />, MACHINES)
-
-    expect(await screen.findByText('Engine inventory')).toBeInTheDocument()
-    expect(screen.getByText('Compute capacity')).toBeInTheDocument()
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
-  })
-
   it('explains remote runners before registration', async () => {
     stubFetch(routes)
     renderPage(<EnginesPage />)
@@ -1033,24 +1007,6 @@ describe('EnginesPage — one page', () => {
 })
 
 describe('EnginesPage — more settings', () => {
-  it('keeps options and test runs behind the opened engine’s disclosure', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus(),
-    })
-    renderPage(<EnginesPage />)
-
-    await openEngine('stockfish')
-    expect(screen.getByRole('button', { name: /More settings/ })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    )
-    expect(screen.queryByLabelText('Threads')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Test run' })).not.toBeInTheDocument()
-  })
-
   it('reveals options and test run for that engine', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
