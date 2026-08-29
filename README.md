@@ -10,9 +10,17 @@
 
 ---
 
-Blunderbase imports your games, runs Stockfish over every one as it arrives, and stores
-the results. Browse them in the web app — or connect your AI agent over MCP and it
-becomes a coach with your whole chess history in reach.
+## Features
+- Import games from lichess, chess.com and PGNs
+- Analyze your games with or without an engine
+- Support for maia3 at multiple ELO's to see what humans would have played
+- Take notes on positions
+- Awesome Engine-Line visualizer 
+- Full MCP support to discuss games with an AI-Agent
+- Live-Chessbaord to be used with your AI-Agent over MCP
+- Remote-Engine-Runner to use your copmanies idling inference server CPUs for your hobbies 
+- Opening explorer with win-stats over your own games
+- Fully self-hostable, easiest via docker
 
 <!-- screenshots
 <p align="center">
@@ -20,23 +28,6 @@ becomes a coach with your whole chess history in reach.
   <img src="docs/media/game_view.png" alt="Game view" width="400" />
 </p>
 -->
-
-## How It Works
-
-1. **Import your games**: sync Lichess and chess.com accounts, upload PGNs, or enter OTB games by hand
-2. **Analysis happens up front**: every game gets a Stockfish pass on arrival, deep re-analysis on demand — the engine truth is in the database before you ask
-3. **Browse or ask**: the web app and the MCP coach read the same store — "my Najdorfs where the eval dropped 1.5 in the middlegame" is one question away
-
-## Features
-
-- Automatic Stockfish analysis of every imported game, with blunder/mistake/inaccuracy classification
-- MCP server that turns Claude (or any MCP agent) into a coach over your games
-- Maia human-move predictions: what a player at the rating you are aiming for would have played
-- Personal opening explorer — your tree, your scores, where you leave your own book
-- Stats: blunders by phase, piece and time control, time-trouble losses, trends
-- Live mode: the coach drives a board in your browser, move by move
-- Bring your own engines, including on other machines via [remote runners](docs/runners.md)
-- Single-user, self-hostable via Docker — one container, one port
 
 ## MCP
 
@@ -114,7 +105,7 @@ releases and testing are in [docs/reference.md](docs/reference.md).
 
 ## License
 
-No `LICENSE` file yet, so all rights are reserved by default until one is added. The image
+[MIT](LICENSE). The image
 ships Debian's Stockfish package (GPL-3.0), unmodified and separately licensed. It also
 ships `@lichess-org/stockfish-web` — Stockfish compiled to WebAssembly, declared
 `AGPL-3.0-or-later` by its npm package and distributed with the GNU GPL v3 as its LICENSE
