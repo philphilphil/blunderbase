@@ -29,6 +29,7 @@ blunderbase-runner = "backend.runners.entrypoint:main"
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "pytest-timeout>=2.3",
     "pytest-xdist>=3.6",
     "respx>=0.21",
     "ruff>=0.6",
@@ -47,7 +48,13 @@ testpaths = ["tests"]
 # file and share nothing, which is the shape xdist is for — a hundred seconds becomes
 # under twenty, and a single file costs no more than it did. `-n0` puts it back on one
 # process, which is what a `pdb` breakpoint or a `-s` print wants.
-addopts = "-q -n auto"
+#
+# The timeout is about hangs, not speed: a websocket test that waits for a frame nobody
+# sends blocks for as long as the runner lets it, and a CI job that sits there for hours
+# says nothing about which test it was. Sixty seconds is far outside anything here — the
+# whole default run is two minutes on CI and the seven `slow` tests together are thirty —
+# so a test that hits it is stuck, and the traceback names it.
+addopts = "-q -n auto --timeout=60"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
