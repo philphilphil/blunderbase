@@ -74,8 +74,8 @@ import {
 import { buildPgn } from './pgn'
 import { useSessionVariations } from './sessionVariations'
 import { variationRows } from './variationRows'
+import { useAnalysisRequest } from './useAnalysisRequest'
 import { useBoardKeys } from './useBoardKeys'
-import { useDeepAnalysis } from './useDeepAnalysis'
 import { useLiveMaia } from './useLiveMaia'
 
 // --- the moves column's width ---------------------------------------------
@@ -178,7 +178,7 @@ function intParam(raw: string | null): number | null {
 
 function GameStudio({ gameId }: { gameId: number }) {
   const game = useGame(gameId, { notes: true })
-  const deepAnalysis = useDeepAnalysis(gameId)
+  const analysisRequest = useAnalysisRequest(gameId)
 
   /**
    * Below `md` the screen is `MobileGameView` instead of the two-column studio — a pinned
@@ -919,6 +919,12 @@ function GameStudio({ gameId }: { gameId: number }) {
     () => bestRun(finishedRuns.filter((run) => run.tier === 'deep')),
     [finishedRuns],
   )
+  // `bestRun` drops `maia_only` rows on its own, so a Maia fill (filed under the quick
+  // tier) never lights this — only an actual quick search does.
+  const quickRun = useMemo(
+    () => bestRun(finishedRuns.filter((run) => run.tier === 'quick')),
+    [finishedRuns],
+  )
   const engineRun = useMemo(() => runFor(finishedRuns, upcoming), [finishedRuns, upcoming])
 
   // Design 1a's `PGN` affordance in the move-list tab row. No endpoint exports one, so it
@@ -1047,7 +1053,7 @@ function GameStudio({ gameId }: { gameId: number }) {
     />
   )
 
-  const header = <GameHeaderBar game={detail.game} best={best} active={deepAnalysis.activeRun} />
+  const header = <GameHeaderBar game={detail.game} best={best} active={analysisRequest.activeRun} />
 
   const board = (
     <BoardPanel
@@ -1084,12 +1090,14 @@ function GameStudio({ gameId }: { gameId: number }) {
       nextFlagged={nextFlagged}
       previousFlagged={previousFlagged}
       onStep={stepFromBoard}
+      quickRun={quickRun}
       deepRun={deepRun}
-      deepActiveRun={deepAnalysis.activeRun}
-      deepProgress={deepAnalysis.progress}
-      deepPending={deepAnalysis.pending}
-      deepError={deepAnalysis.error}
-      onRequestDeep={deepAnalysis.request}
+      activeRun={analysisRequest.activeRun}
+      progress={analysisRequest.progress}
+      pending={analysisRequest.pending}
+      error={analysisRequest.error}
+      onRequestQuick={() => analysisRequest.request('quick')}
+      onRequestDeep={() => analysisRequest.request('deep')}
       onNote={focusComposer}
     />
   )
@@ -1199,7 +1207,7 @@ function GameStudio({ gameId }: { gameId: number }) {
         <MobileGameView
           game={detail.game}
           best={best}
-          active={deepAnalysis.activeRun}
+          active={analysisRequest.activeRun}
           pgn={pgn}
           cursor={cursor}
           plyCount={plyCount}

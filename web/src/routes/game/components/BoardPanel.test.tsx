@@ -75,6 +75,7 @@ function arrows(): string[] {
 
 function renderPanel(props: Partial<Parameters<typeof BoardPanel>[0]> = {}) {
   const onSeek = vi.fn()
+  const onRequestQuick = vi.fn()
   const onRequestDeep = vi.fn()
   const view = render(
     <TooltipProvider delayDuration={0}>
@@ -93,17 +94,19 @@ function renderPanel(props: Partial<Parameters<typeof BoardPanel>[0]> = {}) {
         onHintsChange={vi.fn()}
         onFlip={vi.fn()}
         onSeek={onSeek}
+        quickRun={null}
         deepRun={null}
-        deepActiveRun={null}
-        deepProgress={null}
-        deepPending={false}
-        deepError={null}
+        activeRun={null}
+        progress={null}
+        pending={false}
+        error={null}
+        onRequestQuick={onRequestQuick}
         onRequestDeep={onRequestDeep}
         {...props}
       />
     </TooltipProvider>,
   )
-  return { onSeek, onRequestDeep, ...view }
+  return { onSeek, onRequestQuick, onRequestDeep, ...view }
 }
 
 const DEEP_RUN: GameRunSummary = {
@@ -164,11 +167,13 @@ describe('BoardPanel arrows', () => {
           onHintsChange={vi.fn()}
           onFlip={vi.fn()}
           onSeek={vi.fn()}
+          quickRun={null}
           deepRun={null}
-          deepActiveRun={null}
-          deepProgress={null}
-          deepPending={false}
-          deepError={null}
+          activeRun={null}
+          progress={null}
+          pending={false}
+          error={null}
+          onRequestQuick={vi.fn()}
           onRequestDeep={vi.fn()}
         />
       </TooltipProvider>,
@@ -345,6 +350,24 @@ describe('BoardPanel flagged jumps', () => {
   })
 })
 
+const QUICK_RUN: GameRunSummary = {
+  id: 5,
+  tier: 'quick',
+  status: 'done',
+  multipv: 1,
+  finished_at: '2026-08-19T12:00:00Z',
+}
+
+const ACTIVE_QUICK_RUN: RunResponse = {
+  id: 12,
+  tier: 'quick',
+  status: 'running',
+  multipv: 1,
+  priority: 0,
+  attempts: 0,
+  created_at: '2026-08-20T12:00:00Z',
+}
+
 describe('BoardPanel deep-analysis button', () => {
   it('is idle when there is no run and none has ever finished', () => {
     const { onRequestDeep } = renderPanel()
@@ -357,8 +380,8 @@ describe('BoardPanel deep-analysis button', () => {
 
   it('is disabled and shows progress while a run is queued or running', () => {
     renderPanel({
-      deepActiveRun: ACTIVE_RUN,
-      deepProgress: { done: 27, total: 50 },
+      activeRun: ACTIVE_RUN,
+      progress: { done: 27, total: 50 },
     })
     // `54%` replaces the idle label while the run is live.
     const button = screen.getByRole('button', { name: '54%' })
@@ -366,7 +389,7 @@ describe('BoardPanel deep-analysis button', () => {
   })
 
   it('stays disabled without a percent when no progress frame has arrived yet', () => {
-    renderPanel({ deepActiveRun: ACTIVE_RUN })
+    renderPanel({ activeRun: ACTIVE_RUN })
     const button = screen.getByRole('button', { name: 'Deep' })
     expect(button).toBeDisabled()
   })
@@ -379,5 +402,46 @@ describe('BoardPanel deep-analysis button', () => {
 
     fireEvent.click(button)
     expect(onRequestDeep).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('BoardPanel quick-analysis button', () => {
+  it('is idle beside Deep when neither has ever finished', () => {
+    const { onRequestQuick } = renderPanel()
+    const button = screen.getByRole('button', { name: 'Quick' })
+    expect(button).toBeEnabled()
+
+    fireEvent.click(button)
+    expect(onRequestQuick).toHaveBeenCalledTimes(1)
+  })
+
+  it('disappears once the game has a completed deep run', () => {
+    renderPanel({ deepRun: DEEP_RUN, quickRun: QUICK_RUN })
+    expect(screen.queryByRole('button', { name: /Quick/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deep' })).toBeInTheDocument()
+  })
+
+  it('disables both buttons while either tier is running, spinning only the matching one', () => {
+    renderPanel({ activeRun: ACTIVE_QUICK_RUN, progress: { done: 10, total: 40 } })
+    const quick = screen.getByRole('button', { name: '25%' })
+    const deep = screen.getByRole('button', { name: 'Deep' })
+    expect(quick).toBeDisabled()
+    expect(deep).toBeDisabled()
+  })
+
+  it('spins Deep, not Quick, when a deep run is the one live', () => {
+    renderPanel({ activeRun: ACTIVE_RUN, progress: { done: 27, total: 50 } })
+    expect(screen.getByRole('button', { name: '54%' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Quick' })).toBeDisabled()
+  })
+
+  it('shows a done state once a quick run has finished, and stays clickable to re-run', () => {
+    const { onRequestQuick } = renderPanel({ quickRun: QUICK_RUN })
+    const button = screen.getByRole('button', { name: 'Quick' })
+    expect(button).toBeEnabled()
+    expect(button.className).toContain('accent-teal')
+
+    fireEvent.click(button)
+    expect(onRequestQuick).toHaveBeenCalledTimes(1)
   })
 })

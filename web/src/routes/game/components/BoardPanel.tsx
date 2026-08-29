@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 
 import type { AnalysisLine } from '../analysisLine'
 import { sameMove, type MaiaLevel, type PlyPosition, type Side } from '../gameModel'
-import type { RunProgress } from '../useDeepAnalysis'
+import type { RunProgress } from '../useAnalysisRequest'
 import { EvalBar } from './EvalBar'
 
 export interface BoardPanelProps {
@@ -80,14 +80,18 @@ export interface BoardPanelProps {
    * only says which way. Without it, a step is a plain seek.
    */
   onStep?: (delta: number) => void
+  /** The newest finished quick run over this game, if there is one — hidden once `deepRun`
+   * is set, since a quick pass adds nothing once the game has a completed deep one. */
+  quickRun: GameRunSummary | null
   /** The newest finished deep run over this game, if there is one. */
   deepRun: GameRunSummary | null
-  /** A run over this game that is queued or running right now. */
-  deepActiveRun: RunResponse | null
+  /** A run over this game that is queued or running right now, either tier. */
+  activeRun: RunResponse | null
   /** Live ply counts from `analysis.progress`, while a run is working. */
-  deepProgress: RunProgress | null
-  deepPending: boolean
-  deepError: Error | null
+  progress: RunProgress | null
+  pending: boolean
+  error: Error | null
+  onRequestQuick: () => void
   onRequestDeep: () => void
   /**
    * Write a note about the position on the board. The transport row is where it belongs: a
@@ -148,16 +152,28 @@ export function BoardPanel({
   nextFlagged,
   previousFlagged,
   onStep,
+  quickRun,
   deepRun,
-  deepActiveRun,
-  deepProgress,
-  deepPending,
-  deepError,
+  activeRun,
+  progress,
+  pending,
+  error,
+  onRequestQuick,
   onRequestDeep,
   onNote,
   noting,
   className,
 }: BoardPanelProps) {
+  // Both analysis buttons disable together — only one run is ever live over a game — but
+  // the spinner belongs to whichever button matches it. An unknown tier (a request just
+  // sent, before the run list catches up; a fill run that is neither) falls back to Deep
+  // rather than lighting neither button — and so does a quick-tier run while the Quick
+  // button is hidden behind a finished deep pass (a Maia fill, mostly), for the same
+  // reason: a spinner on a button that is not there spins for nobody.
+  const analysisBusy = activeRun !== null || pending
+  const spinningTier: 'quick' | 'deep' =
+    activeRun?.tier === 'quick' && deepRun == null ? 'quick' : 'deep'
+
   const squares = useMemo<BoardSquare[]>(() => {
     const marks = new Map<string, string>()
     if (hints) {
@@ -461,12 +477,26 @@ export function BoardPanel({
           Hints
         </button>
 
-        <DeepButton
-          deepRun={deepRun}
-          activeRun={deepActiveRun}
-          progress={deepProgress}
-          pending={deepPending}
-          error={deepError}
+        {deepRun == null ? (
+          <AnalysisTierButton
+            label="Quick"
+            finishedRun={quickRun}
+            busy={analysisBusy}
+            spinning={analysisBusy && spinningTier === 'quick'}
+            activeRun={activeRun}
+            progress={progress}
+            error={error}
+            onRequest={onRequestQuick}
+          />
+        ) : null}
+        <AnalysisTierButton
+          label="Deep"
+          finishedRun={deepRun}
+          busy={analysisBusy}
+          spinning={analysisBusy && spinningTier === 'deep'}
+          activeRun={activeRun}
+          progress={progress}
+          error={error}
           onRequest={onRequestDeep}
         />
 
@@ -521,51 +551,62 @@ export function BoardPanel({
 }
 
 /**
- * The deep-analysis trigger: the only place in the game view that writes
- * `POST /analysis { game_id, tier: "deep" }`. Idle by default, tinted once a deep run has
- * finished (still clickable — "re-analysis is always a new run"), and disabled with a
- * progress readout while one is queued or running, whichever tier it is.
+ * One of the two analysis triggers in the transport row — labelled "Quick" or "Deep",
+ * writing `POST /analysis { game_id, tier }` for its own tier (the label lowercased is the
+ * tier). Idle by default, tinted once a run of its own tier has finished (still clickable —
+ * "re-analysis is always a new run"). Both buttons disable together while any run over the
+ * game is queued or running (`BoardPanel` computes that), but only the one `spinning` shows
+ * the spinner and progress readout — the other stays a plain disabled label, so the reader
+ * is never told two runs are in flight when there is only one.
+ *
+ * The mutation error is shared across tiers (there is one request state, not two), so a
+ * refusal tints both buttons red rather than trying to guess which one it was about.
  */
-function DeepButton({
-  deepRun,
+function AnalysisTierButton({
+  label,
+  finishedRun,
+  busy,
+  spinning,
   activeRun,
   progress,
-  pending,
   error,
   onRequest,
 }: {
-  deepRun: GameRunSummary | null
+  label: 'Quick' | 'Deep'
+  finishedRun: GameRunSummary | null
+  busy: boolean
+  spinning: boolean
   activeRun: RunResponse | null
   progress: RunProgress | null
-  pending: boolean
   error: Error | null
   onRequest: () => void
 }) {
-  const busy = activeRun !== null || pending
   const percent =
-    progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null
+    spinning && progress && progress.total > 0
+      ? Math.round((progress.done / progress.total) * 100)
+      : null
 
-  const label = busy ? (
+  const buttonLabel = spinning ? (
     <>
       <Loader2 className="size-3 animate-spin" aria-hidden />
-      {percent !== null ? `${percent}%` : 'Deep'}
+      {percent !== null ? `${percent}%` : label}
     </>
-  ) : deepRun ? (
+  ) : finishedRun ? (
     <>
       <Check className="size-3" aria-hidden />
-      Deep
+      {label}
     </>
   ) : (
-    'Deep'
+    label
   )
 
-  const tooltip = busy
+  const tooltip = spinning
     ? `${activeRun?.status === 'running' ? 'Analysing' : 'Queued'}${activeRun ? ` · ${activeRun.tier}` : ''}`
     : error
       ? error.message
-      : deepRun
-        ? 'Deep analysis complete — click to re-run'
-        : 'Queue a deep analysis pass over this game'
+      : finishedRun
+        ? `${label} analysis complete — click to re-run`
+        : `Queue a ${label.toLowerCase()} analysis pass over this game`
 
   return (
     <Tooltip>
@@ -578,12 +619,12 @@ function DeepButton({
             'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs disabled:cursor-default max-md:py-1.5',
             error && !busy
               ? 'border-blunder/30 bg-blunder/5 text-blunder'
-              : deepRun
+              : finishedRun
                 ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
                 : 'border-edge bg-elevated text-soft hover:text-ink',
           )}
         >
-          {label}
+          {buttonLabel}
         </button>
       </TooltipTrigger>
       <TooltipContent>{tooltip}</TooltipContent>

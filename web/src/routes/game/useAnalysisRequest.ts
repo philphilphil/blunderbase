@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useRequestAnalysis, useRuns } from '@/lib/api/queries'
-import type { RunResponse } from '@/lib/api/types'
+import type { RunResponse, Tier } from '@/lib/api/types'
 import { useEventListener } from '@/lib/events/EventsProvider'
 import type { AnalysisProgressEvent, AnalysisRunEvent } from '@/lib/events/types'
 import { toast } from '@/lib/toast'
@@ -12,21 +12,25 @@ export interface RunProgress {
 }
 
 /**
- * Drives the game view's deep-analysis trigger: `POST /analysis { game_id, tier: "deep" }`,
- * followed through the `/events` socket rather than polling. Guarded on the run, not only
- * the game — two runs over one game are ordinary (an import auto-queues a quick pass, and
- * the deep button can be pressed while that is still going), and a listener that checked
+ * Drives the game view's Quick and Deep analysis triggers: `POST /analysis { game_id,
+ * tier }`, followed through the `/events` socket rather than polling. Guarded on the run,
+ * not only the game — two runs over one game are ordinary (an import auto-queues a quick
+ * pass, and a button can be pressed while that is still going), and a listener that checked
  * `game_id` alone would interleave two counters into one bar and let whichever run finished
  * first clear the other one's progress.
  *
- * A refusal is toasted. Nothing falls back any more: if the engine assigned to Deep is
+ * `activeRun`/`progress`/`pending`/`error` are per-game, not per-tier: only one run is ever
+ * live over a game at a time in practice, so both buttons watch the same state and disable
+ * together (`BoardPanel` decides which of the two shows the spinner, off `activeRun.tier`).
+ *
+ * A refusal is toasted. Nothing falls back any more: if the engine assigned to a tier is
  * switched off or on a machine that is not connected, the POST is refused with a sentence
  * naming it ("'sf-nuc' runs on 'nuc', which is not connected"), and the button's only trace
  * of that was a red tint and a tooltip nobody hovers. The sentence is passed through rather
  * than replaced — it is the same one the Engines page shows for that role, and it says
  * which engine and what to do about it.
  */
-export function useDeepAnalysis(gameId: number) {
+export function useAnalysisRequest(gameId: number) {
   const runs = useRuns(gameId)
   const analysis = useRequestAnalysis({ onError: (error) => toast.error(error.message) })
 
@@ -72,9 +76,12 @@ export function useDeepAnalysis(gameId: number) {
       ? { done: progress.done, total: progress.total }
       : null
 
-  const request = useCallback(() => {
-    analysis.mutate({ game_id: gameId, tier: 'deep' }, { onSuccess: (run) => setRequested(run) })
-  }, [analysis, gameId])
+  const request = useCallback(
+    (tier: Tier) => {
+      analysis.mutate({ game_id: gameId, tier }, { onSuccess: (run) => setRequested(run) })
+    },
+    [analysis, gameId],
+  )
 
   return {
     /** A run over this game that is queued or running right now. */

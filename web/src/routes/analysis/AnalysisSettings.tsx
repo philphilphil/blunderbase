@@ -72,7 +72,8 @@ const FLAGS: { key: MaiaFlagKey; label: string; caption: string }[] = [
   {
     key: 'maia_on_deep',
     label: 'Run Maia on deep passes',
-    caption: 'Usually unnecessary when the quick pass already stored the same human policy.',
+    caption:
+      'A game that already has every configured level is skipped, so this only pays for what a quick pass missed.',
   },
   {
     key: 'maia_both_sides',

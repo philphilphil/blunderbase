@@ -484,6 +484,29 @@ def _queued_row(
     )
 
 
+def _games_with_every_maia_level(
+    session: Session, game_ids: Sequence[int], levels: Sequence[int]
+) -> set[int]:
+    """Which of these games have nothing left to ask Maia about at `levels`.
+
+    Maia's answer to a position at a level is the same answer next week, so a run over a
+    game that already carries every level it would ask about pays for a pass that rewrites
+    what is there — the deep pass of a game the import pass already asked, most of all.
+    The levels a game has are the ones `_settled_maia_levels` reports, the same source the
+    fill button counts from, so the two can never disagree about what a game holds.
+
+    Levels of none is nothing to ask and every game qualifies; in practice neither
+    `get_maia_elos` nor `clean_maia_elos` ever hands back an empty list.
+    """
+    wanted = [str(level) for level in levels]
+    have = _settled_maia_levels(session, game_ids)
+    return {
+        int(game_id)
+        for game_id in game_ids
+        if all(key in have.get(int(game_id), frozenset()) for key in wanted)
+    }
+
+
 def request_analysis(
     session: Session,
     *,
@@ -511,7 +534,10 @@ def request_analysis(
 
     `maia` is settled here for the same reason and in the same breath. Given none, the
     tier's own setting decides — `maia_on_quick`, `maia_on_deep` — and what it said at
-    enqueue is what the run pays for, whoever moves it afterwards.
+    enqueue is what the run pays for, whoever moves it afterwards. A game that already
+    carries every level the run would ask about settles to no pass at all whatever the
+    setting says, because a second pass over it would only rewrite what is there; a caller
+    who asks for `maia=True` outright still gets one.
 
     The engine is resolved now so the row records which engine was meant, but its binary
     is not checked here: enqueueing must stay a cheap write, and a binary that has gone
@@ -544,6 +570,14 @@ def request_analysis(
         if ply_range is not None:
             raise AnalysisRequestError("a run over a FEN has no ply range")
 
+    run_elos = None if elos is None else app_settings_service.clean_maia_elos(list(elos))
+    # Before `_run_defaults`, not after: the one-host rule is asked only of a run that
+    # carries a Maia pass, and a run about to drop its own must not be refused by it.
+    if maia is None and game_id is not None and app_settings_service.maia_for_tier(session, tier):
+        wanted = run_elos if run_elos is not None else app_settings_service.get_maia_elos(session)
+        if _games_with_every_maia_level(session, [game_id], wanted):
+            maia = False
+
     defaults = _run_defaults(
         session,
         tier,
@@ -560,7 +594,7 @@ def request_analysis(
         window=window,
         depth=depth,
         maia=defaults.maia,
-        maia_elos=None if elos is None else app_settings_service.clean_maia_elos(list(elos)),
+        maia_elos=run_elos,
     )
     session.add(run)
     session.flush()
@@ -726,6 +760,10 @@ def enqueue_missing(
     over on before; a client that wants the detail refetches the queue.
 
     `limit` is what `blunderbase analyze --limit` takes a bite of the backlog with.
+
+    The Maia pass is the one thing that is *not* per call: a game that already carries
+    every configured level is queued without one, and that answer takes a single batch
+    query for the whole bite rather than one per game.
     """
     tier = Tier(tier)
     pending = list(session.scalars(_missing_games(tier, limit=limit)))
@@ -733,7 +771,15 @@ def enqueue_missing(
         return []
 
     defaults = _run_defaults(session, tier)
-    queued = [_queued_row(defaults, game_id=game_id, maia=defaults.maia) for game_id in pending]
+    settled: set[int] = set()
+    if defaults.maia:
+        settled = _games_with_every_maia_level(
+            session, pending, app_settings_service.get_maia_elos(session)
+        )
+    queued = [
+        _queued_row(defaults, game_id=game_id, maia=defaults.maia and game_id not in settled)
+        for game_id in pending
+    ]
     session.add_all(queued)
     session.flush()
     emit_on_commit(

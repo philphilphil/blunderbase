@@ -909,6 +909,85 @@ def test_stopping_a_backfill_leaves_the_queued_fills_alone(session: Session) -> 
     assert analysis.outstanding_runs(session, maia_only=True) == 1
 
 
+# --- skipping the pass a game already has ---------------------------------
+
+
+def _asks_maia(session: Session) -> None:
+    """A deployment with a Maia, two configured levels, and both tiers asking for them."""
+    _engine(session)
+    _maia(session)
+    app_settings.set_maia_elos(session, [1500, 1900])
+    app_settings.set_value(session, app_settings.MAIA_ON_DEEP, 1)
+
+
+def test_a_game_that_carries_every_level_is_queued_without_a_maia_pass(
+    session: Session,
+) -> None:
+    """The deep pass of an imported game: the quick one already asked, so this one does not."""
+    _asks_maia(session)
+    game = _game(session)
+    _analysed(session, game, ("1500", "1900"))
+
+    run = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+    assert run.maia is False
+    assert app_settings.get_maia_on_deep(session) is True
+
+
+def test_one_missing_level_is_still_worth_a_maia_pass(session: Session) -> None:
+    _asks_maia(session)
+    game = _game(session)
+    _analysed(session, game, ("1500",))
+
+    assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).maia is True
+
+
+def test_the_levels_a_run_names_are_the_ones_it_is_skipped_for(session: Session) -> None:
+    """`elos` moves the levels this run would ask about, so it moves what settles it."""
+    _asks_maia(session)
+    game = _game(session)
+    _analysed(session, game, ("1500",))
+
+    asked = analysis.request_analysis(session, game_id=game.id, elos=[1500])
+    both = analysis.request_analysis(session, game_id=game.id, elos=[1500, 1900])
+
+    assert (asked.maia, both.maia) == (False, True)
+
+
+def test_a_caller_who_asks_for_maia_outright_gets_it_anyway(session: Session) -> None:
+    """The skip is what the setting would have said, not an override of the caller."""
+    _asks_maia(session)
+    game = _game(session)
+    _analysed(session, game, ("1500", "1900"))
+
+    assert analysis.request_analysis(session, game_id=game.id, maia=True).maia is True
+
+
+def test_a_run_over_a_bare_position_has_no_game_to_be_settled_by(session: Session) -> None:
+    _asks_maia(session)
+    _analysed(session, _game(session), ("1500", "1900"))
+
+    run = analysis.request_analysis(
+        session,
+        fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        tier=Tier.DEEP,
+    )
+
+    assert run.maia is True
+
+
+def test_a_backfill_skips_the_maia_pass_game_by_game(session: Session) -> None:
+    """One batch query for the bite, and the flag still lands per row."""
+    _asks_maia(session)
+    settled, missing = _game(session, plies=4), _game(session, plies=6)
+    _analysed(session, settled, ("1500", "1900"))
+    _analysed(session, missing, ("1500",))
+
+    queued = analysis.enqueue_missing(session, Tier.DEEP)
+
+    assert {run.game_id: run.maia for run in queued} == {settled.id: False, missing.id: True}
+
+
 # --- enqueueing -----------------------------------------------------------
 
 
