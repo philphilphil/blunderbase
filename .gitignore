@@ -5,6 +5,9 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+coverage.json
 /data/
 # Downloaded engine binaries at the repo root. Anchored: unanchored it also swallowed
 # `web/src/routes/engines/`, which took that route out of git and out of Tailwind's
