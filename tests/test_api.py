@@ -44,6 +44,7 @@ from backend.db.models import (
 )
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
+from backend.services import engines as engines_service
 from backend.services import games as games_service
 from backend.services import import_service
 from backend.services import live as live_service
@@ -146,10 +147,10 @@ def _seed(settings: Settings, pgn: Path, engine_command: str) -> dict[str, int]:
             path=engine_command,
             options={},
             enabled=True,
-            default_tier=Tier.QUICK,
         )
         session.add(engine)
         session.commit()
+        engines_service.assign_default_roles(session, engine)
 
         game_id, run_id, plies = _seed_run(session, engine.id)
         note = Note(text="Berlin endgames need work", tags=["opening", "berlin"], game_id=game_id)
@@ -644,6 +645,19 @@ def test_a_run_can_be_enqueued_for_a_game(api: TestClient, seeded: dict[str, int
     assert queue["destinations"][0]["queued"] == 1
 
 
+def test_a_run_says_whether_it_asks_the_human_move_model(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    """Left out, the tier's setting decides; asked for, the run carries what was asked."""
+    deep = api.post("/analysis", json={"game_id": seeded["game_id"], "tier": "deep"}).json()
+    quick = api.post("/analysis", json={"game_id": seeded["game_id"]}).json()
+    asked = api.post(
+        "/analysis", json={"game_id": seeded["game_id"], "tier": "deep", "maia": True}
+    ).json()
+
+    assert (deep["maia"], quick["maia"], asked["maia"]) == (False, True, True)
+
+
 def test_a_batch_queues_one_run_per_game_in_one_call(api: TestClient) -> None:
     ids = [game["id"] for game in api.get("/games", params={"limit": 3}).json()["games"]]
 
@@ -724,16 +738,16 @@ def test_a_batch_still_stops_at_five_hundred_games(api: TestClient) -> None:
 def _register_maia(settings: Settings, engine_command: str) -> None:
     """A human-move model on this host, which a fill has to have something to ask."""
     with get_sessionmaker(settings)() as session:
-        session.add(
-            Engine(
-                name="Maia",
-                kind=EngineKind.MAIA,
-                path=engine_command,
-                options={},
-                enabled=True,
-            )
+        engine = Engine(
+            name="Maia",
+            kind=EngineKind.MAIA,
+            path=engine_command,
+            options={},
+            enabled=True,
         )
+        session.add(engine)
         session.commit()
+        engines_service.assign_default_roles(session, engine)
 
 
 def test_the_fill_status_counts_the_games_missing_a_level(api: TestClient) -> None:
@@ -946,6 +960,81 @@ def test_the_runs_of_one_game_are_listed_newest_first(
     ).json() == [runs[1]]
 
 
+def _failed_run(settings: Settings, game_id: int, engine_id: int) -> int:
+    """A run that failed for good — the shape of the 372 a first-day misconfiguration left."""
+    with get_sessionmaker(settings)() as session:
+        run = AnalysisRun(
+            game_id=game_id,
+            engine_id=engine_id,
+            tier=Tier.DEEP,
+            status=RunStatus.FAILED,
+            nodes=1000,
+            multipv=1,
+            attempts=2,
+            error="no engine is available for this tier",
+            started_at=utcnow(),
+            finished_at=utcnow(),
+        )
+        session.add(run)
+        session.commit()
+        return run.id
+
+
+def test_the_failed_runs_are_listable_and_can_be_picked_back_up(
+    api: TestClient, settings: Settings, seeded: dict[str, int]
+) -> None:
+    run_id = _failed_run(settings, seeded["game_id"], seeded["engine_id"])
+
+    listed = api.get("/analysis/runs", params={"status": "failed"}).json()
+
+    assert [run["id"] for run in listed] == [run_id]
+
+    response = api.post("/analysis/runs/retry-failed")
+
+    assert response.status_code == 202, response.text
+    assert response.json() == {"queued": 1, "skipped": 0}
+    assert api.get("/analysis/queue").json()["queued"] == 1
+    # A retry is a new run, so the failure is still there to read.
+    assert api.get(f"/analysis/runs/{run_id}").json()["status"] == "failed"
+
+
+def test_a_run_listing_that_narrows_by_nothing_is_a_422(api: TestClient) -> None:
+    response = api.get("/analysis/runs")
+
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+
+
+def test_the_coverage_answer_adds_up_to_the_library(
+    api: TestClient, settings: Settings, seeded: dict[str, int]
+) -> None:
+    """`seeded` finished one quick run over one of its games and nothing else."""
+    total = api.get("/games", params={"limit": 1}).json()["total"]
+    _failed_run(settings, seeded["game_id"], seeded["engine_id"])
+
+    body = api.get("/analysis/coverage").json()
+
+    assert body["total"] == total
+    assert body["no_pass"] + body["quick_only"] + body["deep"] == total
+    assert (body["quick_only"], body["deep"], body["no_pass"]) == (1, 0, total - 1)
+    assert body["missing"] == {"quick": total - 1, "deep": total}
+    assert body["failed"] == 1
+    assert body["maia"] == {
+        "configured": [MAIA_MAX_RATING],
+        "games_with_any": 0,
+        "per_level": [{"elo": MAIA_MAX_RATING, "games": 0}],
+        "missing_games": 1,
+        "orphan_levels": [],
+    }
+    # One run, at a budget nobody is enqueueing today: there is nothing honest to say yet.
+    assert body["estimates"] == {
+        "quick_seconds": None,
+        "deep_seconds": None,
+        "maia_seconds": None,
+        "concurrency": settings.analysis_concurrency,
+    }
+
+
 def test_one_run_reports_its_status_and_its_evals(
     api: TestClient, seeded: dict[str, int]
 ) -> None:
@@ -1151,7 +1240,6 @@ def test_an_engine_is_probed_before_it_is_registered(
             "name": "Second Fish",
             "path": engine_command,
             "options": {"Threads": 2},
-            "default_tier": "deep",
         },
     )
 
@@ -1217,6 +1305,55 @@ def test_the_tiers_say_which_engine_answers_for_them(api: TestClient) -> None:
     assert [tier["tier"] for tier in tiers] == ["quick", "deep"]
     assert all(tier["available"] for tier in tiers)
     assert tiers[0]["engine_name"] == "FakeFish"
+
+
+def test_the_roles_read_carries_the_two_tiers_and_human_moves_beside_them(
+    api: TestClient,
+) -> None:
+    """Human moves is a role, not a third `Tier`, so it is a row of the same list."""
+    body = api.get("/engines/roles").json()
+
+    assert [role["role"] for role in body["roles"]] == ["quick", "deep", "human"]
+    assert body["roles"][0]["engine_name"] == "FakeFish"
+    # This deployment registered no Maia: nothing assigned, and not a fault either.
+    assert body["roles"][2] == {
+        "role": "human",
+        "engine_id": None,
+        "engine_name": None,
+        "available": False,
+        "configured": False,
+        "reason": "no engine is assigned to human moves",
+    }
+
+
+def test_a_role_is_assigned_by_id_and_unassigned_with_null(
+    api: TestClient, seeded: dict[str, int], engine_command: str
+) -> None:
+    """Only the keys that were sent are applied, so one dropdown never clears another."""
+    second = api.post("/engines", json={"name": "Second Fish", "path": engine_command}).json()
+
+    body = api.put("/engines/roles", json={"deep": second["id"]}).json()
+
+    roles = {role["role"]: role for role in body["roles"]}
+    assert roles["deep"]["engine_id"] == second["id"]
+    assert roles["quick"]["engine_id"] == seeded["engine_id"]
+
+    emptied = api.put("/engines/roles", json={"deep": None}).json()
+    emptied_roles = {role["role"]: role for role in emptied["roles"]}
+    assert emptied_roles["deep"]["configured"] is False
+    assert emptied_roles["quick"]["engine_id"] == seeded["engine_id"]
+
+
+def test_a_role_refuses_an_engine_that_cannot_serve_it(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    unknown = api.put("/engines/roles", json={"quick": 4242})
+    assert unknown.status_code == 422
+    assert error_of(unknown) == "invalid_engine"
+
+    mismatched = api.put("/engines/roles", json={"human": seeded["engine_id"]})
+    assert mismatched.status_code == 422
+    assert "needs a human-move model" in mismatched.json()["detail"]
 
 
 def test_a_test_run_shows_what_the_engine_says_about_one_position(

@@ -5,6 +5,10 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "skipLibCheck": true,
+    /* `scripts/engine-assets.mjs` is plain node — it is run by `node` directly, in the
+       Dockerfile and from the package scripts, so it cannot be TypeScript. The build
+       plumbing imports the pin from it and infers its types. */
+    "allowJs": true,
 
     /* Bundler mode */
     "module": "nodenext",

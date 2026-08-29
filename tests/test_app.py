@@ -19,12 +19,14 @@ BIG_ASSET = "console.log('blunderbase');\n" * 200
 
 @pytest.fixture()
 def built(settings: Settings) -> Path:
-    """A stand-in for `pnpm build`: an index and one hashed asset under `web_dist`."""
+    """A stand-in for `pnpm build`: an index, one hashed asset, and the engine's glue."""
     assert settings.web_dist is not None
     dist = settings.web_dist
     (dist / "assets").mkdir(parents=True)
+    (dist / "engine").mkdir(parents=True)
     (dist / "index.html").write_text(INDEX)
     (dist / "assets" / "app-1234.js").write_text(ASSET)
+    (dist / "engine" / "sf_18_smallnet.js").write_text(ASSET)
     return dist
 
 
@@ -90,6 +92,62 @@ def test_the_api_keeps_the_paths_it_reserved(settings: Settings, built: Path) ->
         assert client.get("/openapi.json").json()["info"]["title"] == "Blunderbase"
         # Nothing the page could claim: a POST is never the static build's.
         assert client.post("/notes", json={"text": "written by hand"}).status_code == 201
+
+
+# --- cross-origin isolation -------------------------------------------------
+#
+# A multi-threaded WASM engine in a tab needs `SharedArrayBuffer`, and a browser gives the
+# page one only when the document arrived cross-origin isolated.
+
+
+def test_the_document_is_served_cross_origin_isolated(settings: Settings, built: Path) -> None:
+    with running_app(create_app(settings)) as client:
+        for path in ("/", "/games/7"):
+            page = client.get(path)
+            assert page.headers["cross-origin-opener-policy"] == "same-origin", path
+            assert page.headers["cross-origin-embedder-policy"] == "require-corp", path
+
+        # An ordinary asset needs nothing of its own, and the API, the socket and the
+        # transport have no window to isolate.
+        asset = client.get("/assets/app-1234.js")
+        api = client.get("/api/games")
+
+    assert "cross-origin-opener-policy" not in asset.headers
+    assert "cross-origin-embedder-policy" not in api.headers
+
+
+def test_the_engine_glue_carries_coep_so_its_workers_are_isolated(
+    settings: Settings, built: Path
+) -> None:
+    """The one asset that is not an ordinary asset: it is loaded as a *worker* script.
+
+    A dedicated worker is cross-origin isolated only if its own response asks to be — the
+    document's headers do not reach it — and a worker without isolation has no
+    `SharedArrayBuffer`. The browser engine is emscripten pthreads, so without this its
+    workers die at load, and the failure arrives as an `ErrorEvent` whose message, filename
+    and line number are all empty. This test exists because that happened.
+
+    COEP but not COOP: COOP is a property of a browsing context, and a worker has none.
+    """
+    with running_app(create_app(settings)) as client:
+        glue = client.get("/engine/sf_18_smallnet.js")
+
+    assert glue.headers["cross-origin-embedder-policy"] == "require-corp"
+    assert glue.headers["cross-origin-resource-policy"] == "same-origin"
+    assert "cross-origin-opener-policy" not in glue.headers
+
+
+def test_isolation_can_be_switched_off(settings: Settings, built: Path) -> None:
+    """For a proxy that rewrites the headers, or a page that has to load a cross-origin
+    asset: `require-corp` blocks every one that does not opt in with CORP."""
+    settings.cross_origin_isolation = False
+
+    with running_app(create_app(settings)) as client:
+        page = client.get("/")
+
+    assert page.text == INDEX
+    assert "cross-origin-opener-policy" not in page.headers
+    assert "cross-origin-embedder-policy" not in page.headers
 
 
 def test_a_large_response_is_compressed_for_a_client_that_asks(

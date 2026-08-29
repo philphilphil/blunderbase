@@ -16,8 +16,10 @@ import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings
-from backend.db.enums import EngineKind, Tier
+from backend.db.enums import EngineKind, EngineRole
 from backend.db.models import Engine, Runner
+from backend.services import app_settings
+from backend.services import engines as engines_service
 from backend.services import events as events_service
 from backend.services import streams as streams_service
 from backend.services.streams import (
@@ -100,9 +102,10 @@ def add_engine(
     name: str = "stockfish",
     *,
     kind: EngineKind = EngineKind.UCI,
-    tier: Tier | None = Tier.DEEP,
+    role: EngineRole | None = EngineRole.DEEP,
     enabled: bool = True,
     runner_id: int | None = None,
+    streams: bool = True,
 ) -> int:
     with sessions() as session:
         engine = Engine(
@@ -110,11 +113,16 @@ def add_engine(
             kind=kind,
             path="/usr/games/stockfish",
             enabled=enabled,
-            default_tier=tier,
             runner_id=runner_id,
+            streams=streams,
         )
         session.add(engine)
         session.commit()
+        # First registered keeps the role, as the old `default_tier` resolution did: a
+        # board with no engine named asks for the deep one, and these tests are about which
+        # engine that is.
+        if role is not None and app_settings.get_role_engine_id(session, role) is None:
+            engines_service.set_role_engine(session, role, engine.id)
         return engine.id
 
 
@@ -153,7 +161,7 @@ def of_kind(events: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
 async def test_a_board_with_no_engine_named_takes_the_deep_tier_s(
     settings: Settings, sessions: sessionmaker[Session], events: list[dict[str, Any]]
 ) -> None:
-    engine_id = add_engine(sessions, "deepfish", tier=Tier.DEEP)
+    engine_id = add_engine(sessions, "deepfish", role=EngineRole.DEEP)
     broker = broker_for(settings, sessions)
 
     session = await broker.open(fen=STARTING_FEN, surface="game")
@@ -167,7 +175,7 @@ async def test_a_board_with_no_engine_named_takes_the_deep_tier_s(
 async def test_a_maia_is_refused_because_it_answers_with_a_policy(
     settings: Settings, sessions: sessionmaker[Session]
 ) -> None:
-    engine_id = add_engine(sessions, "maia-1500", kind=EngineKind.MAIA, tier=None)
+    engine_id = add_engine(sessions, "maia-1500", kind=EngineKind.MAIA, role=None)
     broker = broker_for(settings, sessions)
 
     with pytest.raises(StreamRequestError, match="human-move model"):
@@ -181,6 +189,22 @@ async def test_an_engine_that_is_switched_off_is_refused(
     broker = broker_for(settings, sessions)
 
     with pytest.raises(StreamUnavailableError, match="switched off"):
+        await broker.open(fen=STARTING_FEN, engine_id=engine_id)
+
+
+async def test_an_engine_whose_host_answers_no_stream_open_is_refused(
+    settings: Settings, sessions: sessionmaker[Session]
+) -> None:
+    """The host's own word, and the reason it is a column rather than an inference.
+
+    The picker hides one of these, but a coach or a script asking by id has to get a
+    sentence back rather than a board that waits forever for a `stream_started`.
+    """
+    runner_id = add_runner(sessions, "this browser")
+    engine_id = add_engine(sessions, "queue-only", runner_id=runner_id, streams=False)
+    broker = broker_for(settings, sessions)
+
+    with pytest.raises(StreamUnavailableError, match="drives no analysis board"):
         await broker.open(fen=STARTING_FEN, engine_id=engine_id)
 
 
@@ -461,7 +485,7 @@ async def test_a_runner_that_drops_takes_its_boards_with_it(
     """`runner_gone` is what tells the page it may offer another engine, local included."""
     runner_id = add_runner(sessions)
     engine_id = add_engine(sessions, "sf-remote", runner_id=runner_id)
-    local_id = add_engine(sessions, "stockfish", tier=Tier.QUICK)
+    local_id = add_engine(sessions, "stockfish", role=EngineRole.QUICK)
     broker = broker_for(
         settings,
         sessions,

@@ -5,7 +5,7 @@
  * Both are the reader's, not the deployment's — the configured levels are a fact about what
  * has been computed (`useMaiaElos`), while these two are a way of looking at it, and a way
  * of looking at it should survive stepping to the next game. So they live in `localStorage`
- * beside the theme and the moves-column width, on `routes/engines/expertMode.ts`'s
+ * beside the theme and the moves-column width, on `lib/board/linePreviewPrefs.ts`'s
  * `useSyncExternalStore` idiom: two components read the same value and both re-render when
  * either writes it.
  *

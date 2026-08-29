@@ -1,6 +1,8 @@
-import { Loader2, Plus, RotateCcw, Save, Trash2, Wand2, X } from 'lucide-react'
+import { Loader2, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 
+import { Toggle } from '@/components/analysis/AnalysisControls'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -8,13 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  useAppSettings,
-  useGames,
-  useMaiaFill,
-  useMaiaFillStatus,
-  useSaveAppSettings,
-} from '@/lib/api/queries'
+import { useAppSettings, useGames, useSaveAppSettings } from '@/lib/api/queries'
 import {
   DEFAULT_MAIA_TARGET_ELO,
   MAIA_ELO_STEP,
@@ -39,6 +35,9 @@ export const MAX_TARGET_ELO = MAIA_MAX_ELO
  */
 export const DEFAULTS = {
   maia_target_elo: DEFAULT_MAIA_TARGET_ELO,
+  maia_on_quick: 1,
+  maia_on_deep: 0,
+  maia_both_sides: 1,
   quick_nodes: 250_000,
   deep_nodes: 2_000_000,
   deep_multipv: 4,
@@ -128,6 +127,45 @@ const DEFAULTS_FIELDS: Field[] = [
  * chips, and the one setting whose PUT value is not the text of a box.
  */
 const FIELDS: Field[] = [...ANALYSIS_FIELDS, ...CLASSIFICATION_FIELDS, ...DEFAULTS_FIELDS]
+
+/**
+ * The three switches over the Maia pass, which are 0/1 rows of the same settings table and
+ * so ride in the same draft as the boxes — the toggle writes `'1'` or `'0'` where a box
+ * writes its text.
+ *
+ * They are on this page rather than on a run because they are what a pass *costs*: the
+ * Maia pass is 40-70% of a quick run, and which tiers pay for it is a standing choice.
+ */
+interface Flag {
+  key: FlagKey
+  label: string
+  caption: string
+}
+
+type FlagKey = 'maia_on_quick' | 'maia_on_deep' | 'maia_both_sides'
+
+const FLAGS: Flag[] = [
+  {
+    key: 'maia_on_quick',
+    label: 'Run Maia on quick passes',
+    caption:
+      'The quick pass is the one every imported game gets, so it is where the human-move columns are worth their extra minutes.',
+  },
+  {
+    key: 'maia_on_deep',
+    label: 'Run Maia on deep passes',
+    caption:
+      'Off by default. Maia answers a position, not a search budget, so a deep pass would recompute the policy the quick pass already stored — the fill on the Analysis page is what adds a level to a game that only ever had a deep pass.',
+  },
+  {
+    key: 'maia_both_sides',
+    label: 'Ask about both sides',
+    caption:
+      'Off halves what the pass costs by asking only about your own moves. On is what answers “what will my opponent fall into” — that is a question about the plies they move in.',
+  },
+]
+
+const FLAG_KEYS: FlagKey[] = FLAGS.map((flag) => flag.key)
 
 /**
  * The stored value as the box shows it: empty is "nobody has set this one". The target elo
@@ -287,53 +325,28 @@ function MaiaLevels({
 }
 
 /**
- * Add the configured levels to games that already have a pass.
+ * One switch with its label and the sentence that says what turning it off buys.
  *
- * A separate action from Save on purpose: changing the levels changes what the *next* pass
- * stores, and a library of a few thousand games is not something a Save button should
- * silently start work over. What this queues is Maia-only — the search is not redone — so
- * it is minutes rather than the weekend a re-analysis would take, and the count says
- * whether there is anything to do at all.
+ * The caption is not decoration: each of these three trades money for an answer — engine
+ * minutes against a human-move column — and a bare label leaves the owner guessing which
+ * way the trade runs.
  */
-function MaiaFill() {
-  const status = useMaiaFillStatus()
-  const fill = useMaiaFill()
-  const missing = status.data?.missing_games ?? null
-  const receipt = fill.data ?? null
-
+function FlagRow({
+  flag,
+  checked,
+  onChange,
+}: {
+  flag: Flag
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
   return (
-    <div className="flex flex-col gap-2 border-t border-hairline pt-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={fill.isPending || missing === 0}
-          onClick={() => fill.mutate(undefined)}
-        >
-          {fill.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Wand2 aria-hidden />}
-          Fill in missing Maia levels
-        </Button>
-        {missing === null ? null : (
-          <span className="font-mono text-[0.625rem] tabular text-dim-2">
-            {missing === 0
-              ? 'every analysed game has every level'
-              : `${plural(missing, 'game')} missing a level`}
-          </span>
-        )}
+    <div className="flex items-start gap-2">
+      <Toggle checked={checked} onChange={onChange} label={flag.label} />
+      <div className="flex flex-col gap-0.5 pt-1.5">
+        <span className="text-[0.71875rem] leading-[1.4] text-body">{flag.label}</span>
+        <span className="text-[0.625rem] leading-[1.5] text-dim-2">{flag.caption}</span>
       </div>
-      {receipt ? (
-        <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
-          {receipt.queued === 0
-            ? 'Nothing to queue — every analysed game already has every level.'
-            : `Queued ${plural(receipt.queued, 'game')}; ${plural(receipt.already_complete, 'game')} already complete.`}
-        </p>
-      ) : null}
-      {fill.isError ? (
-        <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
-          {fill.error.message}
-        </p>
-      ) : null}
     </div>
   )
 }
@@ -402,7 +415,7 @@ function DangerZone() {
 }
 
 /**
- * Settings. Four cards over the eight numbers a deployment keeps in its database rather
+ * Settings. Four cards over the eleven numbers a deployment keeps in its database rather
  * than in its environment, and the danger zone under them.
  *
  * Each box is a draft over the stored value rather than a copy of it: a key missing from
@@ -431,8 +444,12 @@ export function SettingsPage() {
   const text = (key: Key) => draft[key] ?? storedText(settings.data, key)
   const stored = storedElos(settings.data)
   const levels = elos ?? stored
+  // A flag nobody has set comes back null, and what is in force is the default — which is
+  // the position the switch has to show, since a switch has no third state to mean "unset".
+  const flag = (key: FlagKey) => (parse(text(key)) ?? DEFAULTS[key]) === 1
   const dirty =
     FIELDS.some((field) => text(field.key) !== storedText(settings.data, field.key)) ||
+    FLAG_KEYS.some((key) => text(key) !== storedText(settings.data, key)) ||
     levels.join(',') !== stored.join(',')
 
   function submit(event: FormEvent) {
@@ -445,6 +462,12 @@ export function SettingsPage() {
       // backend reads as "the list said it" rather than as a level being cleared.
       maia_elos: levels,
       maia_target_elo: null,
+      // The switch's visible position rather than the row behind it: a PUT is the whole of
+      // the settings, and leaving these out is what silently put all three back to their
+      // defaults every time anything else on this page was saved.
+      maia_on_quick: flag('maia_on_quick') ? 1 : 0,
+      maia_on_deep: flag('maia_on_deep') ? 1 : 0,
+      maia_both_sides: flag('maia_both_sides') ? 1 : 0,
       quick_nodes: parse(text('quick_nodes')),
       deep_nodes: parse(text('deep_nodes')),
       deep_multipv: parse(text('deep_multipv')),
@@ -520,11 +543,12 @@ export function SettingsPage() {
               <CardHeader className="flex-col items-stretch gap-1">
                 <CardTitle>Maia</CardTitle>
                 <CardDescription>
-                  The ratings Maia is asked at everywhere — the batch pass over both sides of
-                  every game, and the analysis board&rsquo;s live column. One is the rating
-                  you are playing towards; a second and a third are what make a move&rsquo;s
+                  The ratings Maia is asked at everywhere — the batch pass over every game,
+                  and the analysis board&rsquo;s live column. One is the rating you are
+                  playing towards; a second and a third are what make a move&rsquo;s
                   popularity a curve rather than a number. Up to {MAX_MAIA_ELOS}, and never
-                  none: cleared, they go back to {DEFAULTS.maia_target_elo}.
+                  none: cleared, they go back to {DEFAULTS.maia_target_elo}. Under them,
+                  which passes pay for that column at all.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
@@ -535,7 +559,28 @@ export function SettingsPage() {
                   }
                   onChange={setElos}
                 />
-                <MaiaFill />
+
+                <div className="flex flex-col gap-3 border-t border-hairline pt-3">
+                  {FLAGS.map((each) => (
+                    <FlagRow
+                      key={each.key}
+                      flag={each}
+                      checked={flag(each.key)}
+                      onChange={(next) => setDraft({ ...draft, [each.key]: next ? '1' : '0' })}
+                    />
+                  ))}
+                </div>
+
+                {/* The fill used to be a button here. It is a library operation — thousands
+                    of runs over games that are already analysed — not a setting, so it
+                    lives with the other library-wide passes and this is the signpost. */}
+                <p className="border-t border-hairline pt-3 text-[0.625rem] leading-[1.5] text-dim-2">
+                  Adding a level to games that already have a pass is a{' '}
+                  <Link to="/analysis" className="text-accent-teal hover:text-accent-link">
+                    fill on the Analysis page
+                  </Link>
+                  , with the rest of the library-wide work.
+                </p>
               </CardContent>
             </Card>
 

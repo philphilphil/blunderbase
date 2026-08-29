@@ -6,6 +6,8 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { configDefaults, defineConfig } from 'vitest/config'
 
+import { engineAssets } from './vite-engine-assets.ts'
+
 /**
  * The version the sidebar footer prints. It is baked in at build time rather than fetched,
  * because web and backend ship from the same commit — `make release` bumps this file and
@@ -39,17 +41,35 @@ const DOM_LOGIC_TESTS = [
 ]
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), engineAssets()],
   define: { __APP_VERSION__: JSON.stringify(version) },
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
+  // 4.5 MB of prebuilt emscripten glue and wasm, imported by nobody: the package is here
+  // for its types and for the two files `engineAssets()` copies out of it. Pre-bundling it
+  // would be a dev-server stall for a module that is never evaluated, and worse, an
+  // invitation for it to end up in a JS chunk.
+  optimizeDeps: { exclude: ['@lichess-org/stockfish-web'] },
   server: {
     port: 5273,
+    // The same pair `api/web.py` puts on the document in production. Without them the dev
+    // page is not cross-origin isolated, gets no `SharedArrayBuffer`, and the browser
+    // runner's engine — a pthread build — cannot allocate its memory at all. Leaving this
+    // out would make the feature untestable under `make run` for a reason that looks like a
+    // bug in the runner rather than a missing header on the dev server.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
     proxy: {
       '/api': {
         target: BACKEND,
         changeOrigin: true,
+        // A browser tab that registers as a runner dials `/api/runner/ws`, and only the
+        // paths listed here are proxied at all — without this the socket would try to
+        // upgrade against Vite itself and be answered by the HMR endpoint.
+        ws: true,
       },
       '/events': {
         target: BACKEND,

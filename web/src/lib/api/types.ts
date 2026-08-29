@@ -89,7 +89,7 @@ export const MAIA_ELO_STEP = 50
 export const MAX_MAIA_ELOS = 5
 
 /**
- * `GET`/`PUT /settings` — everything the Settings page shows: eight numbers, seven of them
+ * `GET`/`PUT /settings` — everything the Settings page shows: eleven numbers, ten of them
  * nullable.
  *
  * Null is not "unset yet" pending a load: it is the deployment's answer that nobody has
@@ -111,6 +111,17 @@ export interface AppSettings {
    * it was not told (a test fixture, an optimistic write) does not have to invent a list.
    */
   maia_elos?: number[]
+  /**
+   * The three switches over the Maia pass itself, stored as 0 or 1 rather than as booleans
+   * — they are rows of the same numeric settings table as the budgets, and the PUT has to
+   * carry them as the numbers the backend clamps.
+   *
+   * `maia_on_quick` defaults on, `maia_on_deep` off (a deep pass would recompute the policy
+   * the quick pass already stored), `maia_both_sides` on.
+   */
+  maia_on_quick: number | null
+  maia_on_deep: number | null
+  maia_both_sides: number | null
   quick_nodes: number | null
   deep_nodes: number | null
   deep_multipv: number | null
@@ -123,7 +134,7 @@ export interface AppSettings {
 /**
  * A PUT carries the whole of the settings, not a patch of them: a field sent as null is
  * cleared back to its default — the target elo included, which is why every field is
- * nullable on the way in and only seven of them are on the way back. Out of range is
+ * nullable on the way in and only ten of them are on the way back. Out of range is
  * clamped by the backend rather than refused, so the response is what is in force — not
  * always what was sent. The one refusal is a set of classification thresholds that does
  * not rise, which comes back as a 422.
@@ -507,6 +518,8 @@ export interface RunResponse {
   attempts: number
   /** A Maia fill: this run asks the human-move model and searches nothing. */
   maia_only?: boolean
+  /** Whether this run's search is followed by a human-move pass, as settled when queued. */
+  maia?: boolean
   /** The levels this run was queued for; null means whatever is configured when it runs. */
   maia_elos?: number[] | null
   created_at: string
@@ -514,6 +527,88 @@ export interface RunResponse {
   finished_at?: string | null
   error?: string | null
   stderr?: string | null
+}
+
+// --- the library's analysis coverage --------------------------------------
+
+/** One Maia level and how many games carry it. */
+export interface CoverageLevel {
+  elo: number
+  games: number
+}
+
+/**
+ * What a backfill of each tier would queue if it were started now.
+ *
+ * Not the complement of the coverage buckets: a game with a deep pass and no quick one is
+ * missing a quick pass, and counts here under `quick` while counting as analysed in the
+ * split above.
+ */
+export interface CoverageMissing {
+  quick: number
+  deep: number
+}
+
+/**
+ * Which Maia levels the library carries, against the ones configured now.
+ *
+ * `games_with_any` and `per_level` are two different readings and the page needs both: a
+ * library analysed while Maia was centred on each game's own rating has Maia everywhere
+ * and none of it at the level configured today. Those are the `orphan_levels`, and
+ * `missing_games` is what the fill button would queue.
+ */
+export interface CoverageMaia {
+  configured: number[]
+  games_with_any: number
+  per_level: CoverageLevel[]
+  missing_games: number
+  orphan_levels: CoverageLevel[]
+}
+
+/**
+ * What finishing each piece of work would cost, in engine-seconds measured off this
+ * deployment's own finished runs.
+ *
+ * Seconds of *work*, not of waiting: `concurrency` is how many run at once, so the
+ * wall-clock answer is the one divided by the other. Null where too few finished runs
+ * carry the budget configured now to average — an empty space beats a made-up number on a
+ * page whose whole purpose is "what will this cost me".
+ */
+export interface CoverageEstimates {
+  quick_seconds: number | null
+  deep_seconds: number | null
+  /** The fill, priced off finished `maia_only` runs rather than off a tier that searches. */
+  maia_seconds: number | null
+  concurrency: number
+}
+
+/**
+ * `GET /analysis/coverage` — the whole library's analysis state in one answer.
+ *
+ * One call rather than six, so the page cannot show a breakdown that fails to add up to
+ * its own total: `no_pass`, `quick_only` and `deep` partition the library and sum to
+ * `total`.
+ */
+export interface AnalysisCoverage {
+  total: number
+  no_pass: number
+  quick_only: number
+  deep: number
+  missing: CoverageMissing
+  failed: number
+  maia: CoverageMaia
+  estimates: CoverageEstimates
+}
+
+/**
+ * What a retry queued, and how many failures it did not turn into a run.
+ *
+ * `skipped` counts a game whose pass has since succeeded, a second failure over a game
+ * already being retried, and a run over a bare FEN, which names no game to re-analyse.
+ */
+export interface RetryFailedReceipt {
+  queued: number
+  skipped: number
 }
 
 export interface MoveEvalResponse {
@@ -707,8 +802,14 @@ export interface EngineResponse {
   version?: string | null
   options: Record<string, unknown>
   enabled: boolean
-  default_tier?: Tier | null
   created_at: string
+  /**
+   * null ⇒ `path` is a path on some filesystem. A scheme — `wasm` — means it is not one at
+   * all, and the page has to say where the engine lives ("in this browser") rather than
+   * render `wasm:stockfish-18` as though it were a file. The backend derives it so no
+   * client parses the path for itself.
+   */
+  path_scheme?: string | null
 }
 
 export interface EngineCreate {
@@ -716,7 +817,6 @@ export interface EngineCreate {
   path: string
   kind?: EngineKind
   options?: Record<string, unknown>
-  default_tier?: Tier | null
   enabled?: boolean
 }
 
@@ -725,7 +825,6 @@ export interface EngineUpdate {
   path?: string
   kind?: EngineKind
   options?: Record<string, unknown>
-  default_tier?: Tier | null
   enabled?: boolean
 }
 
@@ -785,6 +884,53 @@ export interface TierStatusResponse {
   engine_name?: string | null
   available: boolean
   reason?: string | null
+}
+
+/**
+ * The three jobs an engine can be assigned to, in the order `/engines/roles` lists them.
+ *
+ * Human moves is a role beside the two tiers rather than a third `Tier`: `Tier` is a search
+ * budget stored on every analysis run, and Maia searches nothing. `db.enums.EngineRole` is
+ * the same list on the backend.
+ */
+export type EngineRoleName = 'quick' | 'deep' | 'human'
+
+export const ENGINE_ROLES: readonly EngineRoleName[] = ['quick', 'deep', 'human']
+
+/**
+ * One role and the engine assigned to it — `services.engines.role_status`.
+ *
+ * `configured` and `available` are two different questions and the form draws them
+ * differently. `configured` is "the owner has chosen an engine for this"; `available` is
+ * "that engine can run this second". Unconfigured is not a fault — a deployment that has
+ * not chosen a human-move model has one fewer column, not a broken role — while configured
+ * and unavailable is one, and `reason` then names the engine and what is wrong with it in
+ * the same words a failed run would use.
+ */
+export interface EngineRoleStatus {
+  role: EngineRoleName
+  engine_id?: number | null
+  engine_name?: string | null
+  available: boolean
+  configured: boolean
+  reason?: string | null
+}
+
+/** `GET /engines/roles` / `PUT /engines/roles` — one status per role, in `ENGINE_ROLES` order. */
+export interface EngineRolesResponse {
+  roles: EngineRoleStatus[]
+}
+
+/**
+ * The assignment to write. A key that is left out is left alone; `null` unassigns.
+ *
+ * That distinction is the whole shape: saving one dropdown must not clear the other two,
+ * so absence cannot mean "no engine" — only an explicit `null` does.
+ */
+export interface EngineRolesUpdate {
+  quick?: number | null
+  deep?: number | null
+  human?: number | null
 }
 
 // --- notes ----------------------------------------------------------------
@@ -962,11 +1108,14 @@ export interface RunnerEngine extends Extra {
   version?: string | null
   /** The path on THAT machine; read-only here. */
   path?: string | null
+  /** As on `EngineResponse`: `wasm` means `path` names a browser engine, not a file. */
+  path_scheme?: string | null
   enabled: boolean
-  default_tier?: Tier | null
   /**
-   * Whether the engine *kind* can drive a board at all — false for Maia. It does not know
-   * the transport: see `lib/engines/hosts.ts`, where "queue only" is decided.
+   * Whether this engine can drive a board at all: its kind (false for Maia) and what its
+   * host advertised (false for a runner that takes queue work only). It does not know the
+   * transport, which changes per connection: see `lib/engines/hosts.ts`, where "queue only"
+   * is decided.
    */
   streams: boolean
 }
@@ -977,6 +1126,12 @@ export interface RunnerResponse extends Extra {
   slots: number
   version?: string | null
   connected: boolean
+  /**
+   * What kind of host last dialled in. A browser tab is a runner that closes when someone
+   * shuts it, so it is listed differently and forgiven differently than a machine that is
+   * supposed to be there.
+   */
+  browser?: boolean
   transport?: RunnerTransport | null
   last_seen_at?: string | null
   created_at?: string | null

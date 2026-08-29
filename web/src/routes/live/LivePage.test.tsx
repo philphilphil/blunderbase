@@ -136,7 +136,6 @@ const RUNNERS_STATUS: RunnersStatus = {
         kind: 'uci',
         path: '/usr/games/stockfish',
         enabled: true,
-        default_tier: 'deep',
         streams: true,
       },
     ],

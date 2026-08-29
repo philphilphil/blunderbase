@@ -464,16 +464,20 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
         multipv: int | None = None,
         nodes: int | None = None,
         elos: list[int] | None = None,
+        maia: bool | None = None,
     ) -> TextContent:
         """Queue an engine pass over one game or one position and get a run id back.
         Deep analysis takes minutes, so this never blocks: poll get_analysis_status, and
         read the result with get_game once it is done. A ply range (half-moves, end
         exclusive) analyses one phase deeply. Re-analysis never overwrites an old run.
         `elos` asks Maia at those ratings for this run only; left out, the run uses the
-        deployment's configured levels, which is what keeps games comparable."""
+        deployment's configured levels, which is what keeps games comparable. `maia` says
+        whether this run asks the human-move model at all — it is most of what a pass
+        costs; left out, the tier's own setting decides."""
         window = args.ply_range(ply_start, ply_end)
         levels = args.ratings(elos)
         wanted = args.tier(tier)
+        human = args.flag(maia, "maia")
         position = args.fen(fen, required=False)
         with coach.session() as session:
             depth = analysis_service.queue_depth(session)
@@ -497,6 +501,7 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
                 multipv=multipv,
                 nodes=nodes,
                 elos=levels,
+                maia=human,
             )
             payload = {
                 "run_id": run.id,
@@ -508,6 +513,7 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
                 "multipv": run.multipv,
                 "ply_start": run.ply_start,
                 "ply_end": run.ply_end,
+                "maia": run.maia,
                 "maia_elos": run.maia_elos,
                 "queue": analysis_service.queue_depth(session),
             }

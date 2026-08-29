@@ -185,8 +185,15 @@ def hello(
     slots: int = 1,
     engines: Sequence[Mapping[str, Any]] = (),
     active_runs: Sequence[Mapping[str, Any]] = (),
+    browser: bool = False,
 ) -> dict[str, Any]:
-    """The runner's first frame. `active_runs` is what a reconnect is still executing."""
+    """The runner's first frame. `active_runs` is what a reconnect is still executing.
+
+    `browser` is the runner saying what kind of host it is, and it is here rather than
+    inferred from the transport because this frame is already where a runner describes
+    itself. It is taken at its word: only a holder of a minted token gets this far, so the
+    worst a lie buys is a different retry policy for the owner's own work.
+    """
     return {
         "type": HELLO,
         "proto": PROTO_VERSION,
@@ -195,6 +202,7 @@ def hello(
         "slots": int(slots),
         "engines": [dict(engine) for engine in engines],
         "active_runs": [dict(entry) for entry in active_runs],
+        "browser": bool(browser),
     }
 
 
@@ -431,6 +439,11 @@ def encode_plan(plan: RunPlan) -> dict[str, Any]:
         "maia_elos": list(plan.maia_elos),
         # A pass that asks Maia and nothing else, over a game that was searched already.
         "maia_only": plan.maia_only,
+        # Whether there is a human-move pass at all, and whether it covers both sides. The
+        # runner cannot read either out of settings it does not have, and the second one
+        # decides which plies it asks about — so both travel with the plan.
+        "maia": plan.maia,
+        "maia_both_sides": plan.maia_both_sides,
     }
 
 
@@ -478,6 +491,11 @@ def decode_plan(data: Mapping[str, Any]) -> RunPlan:
             # whole of the levels, which is exactly what that host meant by it.
             maia_elos=tuple(int(level) for level in (data.get("maia_elos") or ())),
             maia_only=bool(data.get("maia_only")),
+            # Absent from a frame an older host encoded, which meant a Maia pass over both
+            # sides by always doing one — the same backwards compatibility `maia_target_elo`
+            # is kept for.
+            maia=bool(data.get("maia", True)),
+            maia_both_sides=bool(data.get("maia_both_sides", True)),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ProtocolError(f"plan does not decode: {exc}") from exc
@@ -588,14 +606,24 @@ def decode_probe(
 class EngineAd:
     """One engine a runner says it can run, as it reaches the registry.
 
-    `path` is a path on the runner's filesystem and is read-only here: the truth about a
-    remote engine is the runner's yaml, and the server records rather than configures it.
+    `path` is read-only here: the truth about a remote engine is the runner's own
+    configuration, and the server records rather than configures it. Usually it is a path
+    on the runner's filesystem. It may instead be an opaque identifier behind a scheme —
+    `wasm:stockfish-18`, the build a browser tab loads inside itself — which crosses the
+    wire and round-trips exactly like any other string. Which of the two it is, is
+    `services.engines.is_binary_path`'s question and nothing here needs to ask it; what
+    matters at this end is only that the string is not empty, because a nameless engine is
+    one no dispatch could ever address.
     """
 
     name: str
     kind: str = EngineKind.UCI.value
     path: str = ""
     version: str | None = None
+    # Accepted and ignored. A runner cannot claim a job: the owner assigns one engine to
+    # each of Quick, Deep and Human moves on the server. The field survives so that a
+    # runner built before that — and every `runner.yaml` still carrying `tier:` — keeps
+    # connecting rather than being refused over a word nothing reads.
     tier: str | None = None
     options: dict[str, Any] = field(default_factory=dict)
     declared_options: tuple[dict[str, Any], ...] = ()

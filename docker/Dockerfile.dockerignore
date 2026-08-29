@@ -18,6 +18,10 @@
 web/dist/
 web/node_modules/
 web/.vite/
+# Same reasoning for `web/.engine/`: it is a 15 MB download cache. The web stage fetches the
+# net itself, from the checksum in `scripts/engine-assets.mjs`, so shipping the host's copy
+# into the context would only make the build depend on what happens to be lying around.
+web/.engine/
 **/__pycache__/
 **/*.py[cod]
 **/.DS_Store

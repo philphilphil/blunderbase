@@ -14,8 +14,15 @@ import type {
   RunnersStatus,
 } from '@/lib/api/types'
 
+import { toast } from '@/lib/toast'
+
 import { GamePage, MOVES_WIDTH_KEY } from './GamePage'
 import { resetSessionVariations } from './sessionVariations'
+
+// The Deep button has nowhere to put a red sentence, so a refused run is toasted. Mocked
+// rather than rendered: what these tests are about is that the backend's own words get
+// there, not how sonner draws them.
+vi.mock('@/lib/toast', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
 
 // jsdom builds PointerEvents but captures nothing, and the splitter asks for the capture
 // before it reads a single delta.
@@ -144,7 +151,6 @@ const RUNNERS_STATUS: RunnersStatus = {
         kind: 'uci',
         path: '/usr/games/stockfish',
         enabled: true,
-        default_tier: 'deep',
         streams: true,
       },
     ],
@@ -154,6 +160,12 @@ const RUNNERS_STATUS: RunnersStatus = {
 }
 
 let posted: { url: string; body: unknown }[] = []
+
+/**
+ * How the next POST is refused, when a test is about the refusal. `null` is the ordinary
+ * case, where every write is accepted.
+ */
+let refusePost: { status: number; body: unknown } | null = null
 /**
  * The pinned lines the stubbed backend is holding. Set by the tests that care; the fold of
  * pinned and session lines is exercised as a pure function in `variationRows.test.ts`, so
@@ -261,6 +273,7 @@ function stubFetch(
     }
     if (method === 'POST') {
       posted.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null })
+      if (refusePost) return json(refusePost.body, refusePost.status)
       return json(QUEUED_RUN, 202)
     }
     if (url.includes('/runners/status')) return json(RUNNERS_STATUS)
@@ -300,8 +313,10 @@ function renderPage(entry = '/games/14') {
 
 beforeEach(() => {
   posted = []
+  refusePost = null
   streamCalls = []
   lineRows = []
+  vi.mocked(toast.error).mockClear()
   SilentSocket.instances = []
   // Kept lines are session-scoped, and a test file is one session: each test starts on a
   // game nobody has read yet.
@@ -466,6 +481,29 @@ describe('GamePage', () => {
     renderPage()
     await waitFor(() =>
       expect(screen.getAllByText('Queued').length).toBeGreaterThan(0),
+    )
+  })
+
+  it('toasts the engine sentence when the deep run is refused', async () => {
+    // Nothing falls back: if the engine assigned to Deep is on a machine that is away, the
+    // press is refused with a sentence naming it, and the button's only trace of that is a
+    // tint and a tooltip nobody hovers.
+    const user = userEvent.setup()
+    refusePost = {
+      status: 409,
+      body: {
+        error: 'tier_unavailable',
+        detail: "'sf-nuc' runs on 'nuc', which is not connected",
+      },
+    }
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.click(screen.getByRole('button', { name: 'Deep' }))
+
+    // The backend's own words, passed through rather than replaced by a generic one.
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("'sf-nuc' runs on 'nuc', which is not connected"),
     )
   })
 

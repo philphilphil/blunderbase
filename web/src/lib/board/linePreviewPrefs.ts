@@ -1,10 +1,9 @@
 /**
  * The engine line preview's per-browser settings — row-hover mode, scrub, depth, colours,
- * playthrough tempo. A reading preference, not a fact about any game, so it lives beside
- * `routes/engines/expertMode.ts`'s localStorage + `useSyncExternalStore` idiom rather than
- * in `AppSettings`.
+ * playthrough tempo. A reading preference, not a fact about any game, so it uses a
+ * localStorage + `useSyncExternalStore` adapter rather than component-local state.
  *
- * Unlike `expertMode`'s single boolean, this is one JSON object with two nested groups
+ * This is one JSON object with two nested groups
  * (`play`, `overlay`). Reads are validated field by field: a value that fails its own
  * check falls back to that field's default rather than discarding the whole blob, so a
  * stale or hand-edited entry degrades gracefully instead of resetting everything.

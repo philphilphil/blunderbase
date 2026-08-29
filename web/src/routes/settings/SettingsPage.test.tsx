@@ -36,6 +36,9 @@ function json(status: number, body: unknown) {
 const NOTHING_SET: AppSettings = {
   maia_target_elo: 2000,
   maia_elos: [2000],
+  maia_on_quick: null,
+  maia_on_deep: null,
+  maia_both_sides: null,
   quick_nodes: null,
   deep_nodes: null,
   deep_multipv: null,
@@ -54,10 +57,6 @@ const WIPED: GamesDeleted = { games: 6, runs: 4, notes: 1, import_jobs: 2 }
 let stored: AppSettings
 /** How many games the library holds — the danger zone reads it, and the wipe empties it. */
 let games: number
-/** How many analysed games are missing one of the configured levels. */
-let missing: number
-/** What the fill queued, so a test can see the button actually asked for the work. */
-let filled: number[] | null | undefined
 
 function clamp(value: number | null, low: number, high: number) {
   return value === null ? null : Math.min(high, Math.max(low, value))
@@ -95,6 +94,12 @@ function stubFetch() {
           // Cleared is not a state the levels have: null is the default level.
           maia_target_elo: elos[0]!,
           maia_elos: elos,
+          // The three flags are 0/1 rows of the same table: clamped like any other number,
+          // and cleared to null by a PUT that leaves them out — which is the bug the page
+          // had, since a null read back is the default rather than what was in force.
+          maia_on_quick: clamp(sent.maia_on_quick ?? null, 0, 1),
+          maia_on_deep: clamp(sent.maia_on_deep ?? null, 0, 1),
+          maia_both_sides: clamp(sent.maia_both_sides ?? null, 0, 1),
           quick_nodes: clamp(sent.quick_nodes, 1, Number.MAX_SAFE_INTEGER),
           deep_nodes: clamp(sent.deep_nodes, 1, Number.MAX_SAFE_INTEGER),
           deep_multipv: clamp(sent.deep_multipv, 1, 10),
@@ -105,15 +110,6 @@ function stubFetch() {
         }
       }
       return json(200, stored)
-    }
-    if (path.endsWith('/api/analysis/maia-fill/status')) {
-      return json(200, { missing_games: missing, configured: stored.maia_elos ?? [] })
-    }
-    if (path.endsWith('/api/analysis/maia-fill')) {
-      filled = (JSON.parse(String(init?.body ?? '{}')) as { game_ids?: number[] }).game_ids
-      const queued = missing
-      missing = 0
-      return json(202, { queued, already_complete: games - queued })
     }
     if (path.endsWith('/api/games/delete-all')) {
       const sent = JSON.parse(String(init?.body)) as { password: string }
@@ -172,6 +168,11 @@ function save() {
   return screen.getByRole('button', { name: /save/i })
 }
 
+/** One of the Maia switches, by the label it announces itself with. */
+function toggle(label: string) {
+  return screen.getByRole('switch', { name: label })
+}
+
 /** The level chips, in the order the card shows them. */
 function chips() {
   return [...screen.getByTestId('maia-elos').querySelectorAll('span')]
@@ -182,8 +183,6 @@ function chips() {
 beforeEach(() => {
   stored = { ...NOTHING_SET }
   games = 6
-  missing = 3
-  filled = undefined
   vi.stubGlobal('WebSocket', FakeSocket)
   stubFetch()
 })
@@ -322,20 +321,75 @@ describe('SettingsPage', () => {
     expect(screen.getByText(/5 levels is the most/)).toBeInTheDocument()
   })
 
-  it('queues the missing levels over the library, and says what it queued', async () => {
+  it('points at the Analysis page for the fill rather than doing it here', async () => {
     draw()
-    const fill = await screen.findByRole('button', { name: /fill in missing maia levels/i })
-    expect(await screen.findByText('3 games missing a level')).toBeInTheDocument()
 
-    await userEvent.click(fill)
-
-    // The whole library, not a selection: the button is about the deployment's levels.
-    await waitFor(() => expect(filled).toBeUndefined())
-    expect(await screen.findByRole('status')).toHaveTextContent('Queued 3 games')
-    await waitFor(() =>
-      expect(screen.getByText('every analysed game has every level')).toBeInTheDocument(),
+    await loadedField('Add a level')
+    // The fill is a library operation — thousands of runs — not a setting.
+    expect(
+      screen.queryByRole('button', { name: /fill in missing maia levels/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /fill on the analysis page/i })).toHaveAttribute(
+      'href',
+      '/analysis',
     )
-    expect(screen.getByRole('button', { name: /fill in missing maia levels/i })).toBeDisabled()
+  })
+
+  it('shows the three Maia switches in the positions the backend defaults to', async () => {
+    draw()
+
+    await loadedField('Add a level')
+    expect(toggle('Run Maia on quick passes')).toHaveAttribute('aria-checked', 'true')
+    // Off, because a deep pass would recompute the policy the quick pass already stored.
+    expect(toggle('Run Maia on deep passes')).toHaveAttribute('aria-checked', 'false')
+    expect(toggle('Ask about both sides')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('renders the stored flags rather than their defaults', async () => {
+    stored = { ...NOTHING_SET, maia_on_quick: 0, maia_on_deep: 1, maia_both_sides: 0 }
+    draw()
+
+    await waitFor(() =>
+      expect(toggle('Run Maia on quick passes')).toHaveAttribute('aria-checked', 'false'),
+    )
+    expect(toggle('Run Maia on deep passes')).toHaveAttribute('aria-checked', 'true')
+    expect(toggle('Ask about both sides')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('round-trips a flipped switch through the PUT', async () => {
+    draw()
+    await loadedField('Add a level')
+
+    await userEvent.click(toggle('Run Maia on deep passes'))
+    await userEvent.click(toggle('Ask about both sides'))
+    await userEvent.click(save())
+
+    // Stored as the 0/1 numbers the settings table keeps, not as booleans.
+    await waitFor(() => expect(stored.maia_on_deep).toBe(1))
+    expect(stored.maia_both_sides).toBe(0)
+    expect(toggle('Run Maia on deep passes')).toHaveAttribute('aria-checked', 'true')
+    expect(toggle('Ask about both sides')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  /**
+   * The defect this card exists to close: the PUT is the whole of the settings, so a save
+   * that did not name these three put all of them back to their defaults — an owner who
+   * had turned Maia off for quick passes got it back on by editing a node budget.
+   */
+  it('carries the flags through a save that changed something else entirely', async () => {
+    stored = { ...NOTHING_SET, maia_on_quick: 0, maia_on_deep: 1, maia_both_sides: 0 }
+    draw()
+    await waitFor(() =>
+      expect(toggle('Run Maia on quick passes')).toHaveAttribute('aria-checked', 'false'),
+    )
+
+    await userEvent.type(field('Quick nodes'), '50000')
+    await userEvent.click(save())
+
+    await waitFor(() => expect(stored.quick_nodes).toBe(50000))
+    expect(stored.maia_on_quick).toBe(0)
+    expect(stored.maia_on_deep).toBe(1)
+    expect(stored.maia_both_sides).toBe(0)
   })
 
   it('saves every box in one request', async () => {

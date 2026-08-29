@@ -162,7 +162,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # guard — the UI has to load in order to show the login screen — and so the `/api`
     # prefix has already been stripped from the paths the guard matches.
     install_auth(app, settings)
-    app.state.web = install_web(app, settings.web_dist)
+    app.state.web = install_web(
+        app, settings.web_dist, isolate=settings.cross_origin_isolation
+    )
     # Added last so it runs first, outside the page and the guard both: everything this
     # process sends leaves compressed, the API's JSON and the build's assets alike.
     #

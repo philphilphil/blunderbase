@@ -26,6 +26,7 @@ from backend.db.models import Account, AnalysisRun, Engine, Game, GamePosition, 
 from backend.mcp import server as mcp_server
 from backend.mcp.server import build_server
 from backend.services import analysis as analysis_service
+from backend.services import engines as engines_service
 from backend.services import live as live_service
 from backend.services import runners as runners_service
 from backend.services.import_service import run_import
@@ -88,10 +89,10 @@ def engine_row(session: Session) -> Engine:
         name="stockfish-test",
         kind=EngineKind.UCI,
         path="/nonexistent/stockfish",
-        default_tier=Tier.QUICK,
     )
     session.add(engine)
     session.commit()
+    engines_service.assign_default_roles(session, engine)
     return engine
 
 
@@ -716,10 +717,25 @@ async def test_request_analysis_takes_the_levels_to_ask_maia_about(
     assert payload["maia_elos"] == [1100, 1300]
 
 
+async def test_request_analysis_says_whether_the_run_asks_the_human_move_model(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    """Left out, the tier decides — on for quick, off for deep — and asking for it wins."""
+    quick = await call(coach, "request_analysis", game_id=analysed["qg000001"].id, tier="quick")
+    # The tool's own default tier, which is the one a coach asks for without saying so.
+    deep = await call(coach, "request_analysis", game_id=analysed["qg000001"].id)
+    asked = await call(
+        coach, "request_analysis", game_id=analysed["qg000001"].id, tier="deep", maia=True
+    )
+
+    assert (quick["maia"], deep["maia"], asked["maia"]) == (True, False, True)
+
+
 def _maia_row(session: Session) -> Engine:
     engine = Engine(name="maia-test", kind=EngineKind.MAIA, path="/nonexistent/lc0")
     session.add(engine)
     session.commit()
+    engines_service.assign_default_roles(session, engine)
     return engine
 
 
@@ -1064,7 +1080,6 @@ async def test_runners_status_says_which_runner_the_backlog_is_waiting_on(
         name="sf-remote",
         kind=EngineKind.UCI,
         path="/usr/games/stockfish",
-        default_tier=Tier.DEEP,
         runner_id=runner.id,
     )
     session.add(remote)

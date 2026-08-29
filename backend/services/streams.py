@@ -564,6 +564,14 @@ class StreamBroker:
                 )
             if not engine.enabled:
                 raise StreamUnavailableError(f"{engine.name!r} is switched off")
+            if not engine.streams:
+                # Its host's own word, from the advertisement. The picker already hides one
+                # of these, but a coach or a script asking by id must get a sentence rather
+                # than a session that waits forever for a `stream_started`.
+                raise StreamUnavailableError(
+                    f"{engine.name!r} is on a host that takes queue work but drives no "
+                    f"analysis board"
+                )
             if engine.runner_id is None:
                 return Destination(
                     engine_id=engine.id,

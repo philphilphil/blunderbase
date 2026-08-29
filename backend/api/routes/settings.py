@@ -1,7 +1,8 @@
 """`/settings` — the deployment's own settings, as opposed to its engines.
 
-Nine settings live here: the Maia levels (a list of one to five), the two node budgets and
-the deep line count, the three classification thresholds, and the rating to fall back on
+Twelve settings live here: the Maia levels (a list of one to five), the three 0/1 flags
+over the Maia pass itself, the two node budgets and the deep line count, the three
+classification thresholds, and the rating to fall back on
 when a game carries none. They are stored settings rather than environment variables
 because they are the ones an owner changes as their play changes, and a restart is not a
 thing to ask of them for that. `services/app_settings.py` owns what they mean; this is the

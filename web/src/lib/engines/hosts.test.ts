@@ -9,8 +9,8 @@ function engine(over: Partial<RunnerEngine> & { id: number; name: string }): Run
     kind: 'uci',
     version: null,
     path: '/usr/games/stockfish',
+    path_scheme: null,
     enabled: true,
-    default_tier: null,
     streams: true,
     ...over,
   }
@@ -21,6 +21,7 @@ function runner(over: Partial<RunnerResponse> & { id: number; name: string }): R
     slots: 4,
     version: '0.1.0',
     connected: true,
+    browser: false,
     transport: 'websocket',
     last_seen_at: null,
     created_at: null,
@@ -57,7 +58,7 @@ describe('engineHosts', () => {
       status({
         local: {
           ...status().local,
-          engines: [engine({ id: 1, name: 'stockfish', default_tier: 'deep' })],
+          engines: [engine({ id: 1, name: 'stockfish' })],
         },
       }),
     )
@@ -69,6 +70,9 @@ describe('engineHosts', () => {
       transport: null,
       streams: true,
       streamsReason: null,
+      // A local engine is a file on this machine, and this machine is not a browser tab.
+      pathScheme: null,
+      browser: false,
     })
     expect(isRemote(host)).toBe(false)
   })
@@ -89,6 +93,35 @@ describe('engineHosts', () => {
       streams: true,
     })
     expect(isRemote(host)).toBe(true)
+  })
+
+  it('carries the browser flag and the wasm scheme through from a tab', () => {
+    const [host] = engineHosts(
+      status({
+        runners: [
+          runner({
+            id: 5,
+            name: 'this browser',
+            browser: true,
+            engines: [
+              engine({
+                id: 9,
+                name: 'stockfish-18',
+                path: 'wasm:stockfish-18',
+                path_scheme: 'wasm',
+              }),
+            ],
+          }),
+        ],
+      }),
+    )
+    expect(host).toMatchObject({
+      engineId: 9,
+      path: 'wasm:stockfish-18',
+      pathScheme: 'wasm',
+      browser: true,
+      streams: true,
+    })
   })
 
   it('is queue only on a poll-mode runner, in the words the 409 uses', () => {
@@ -139,6 +172,50 @@ describe('engineHosts', () => {
     expect(host!.streamsReason).toBe('answers with a policy rather than a search')
   })
 
+  it('names the host, not the kind, when a runner advertised no streams', () => {
+    // The bug this replaced: `streams` was inferred from `kind == "uci"`, so a runner that
+    // honestly said `streams: false` was listed in the picker and then answered nothing.
+    // A search engine that will not stream needs a different reason from a Maia, because
+    // the way out is a different engine rather than nothing at all.
+    const [host] = engineHosts(
+      status({
+        runners: [
+          runner({
+            id: 5,
+            name: 'this browser',
+            browser: true,
+            engines: [
+              engine({
+                id: 9,
+                name: 'Stockfish (this browser)',
+                path: 'wasm:stockfish-18',
+                path_scheme: 'wasm',
+                streams: false,
+              }),
+            ],
+          }),
+        ],
+      }),
+    )
+    expect(host!.streams).toBe(false)
+    expect(host!.streamsReason).toBe(
+      'this browser runs queued analysis on it but no analysis board — pick another engine',
+    )
+  })
+
+  it('says so plainly when a local engine will not drive a board', () => {
+    const [host] = engineHosts(
+      status({
+        local: {
+          ...status().local,
+          engines: [engine({ id: 1, name: 'stockfish', streams: false })],
+        },
+      }),
+    )
+    expect(host!.streams).toBe(false)
+    expect(host!.streamsReason).toBe('this host does not run analysis boards on it')
+  })
+
   it('will not drive a board with an engine that is switched off', () => {
     const [host] = engineHosts(
       status({
@@ -152,14 +229,16 @@ describe('engineHosts', () => {
     expect(host!.streamsReason).toBe('switched off')
   })
 
-  it('orders local first, then runners, deep before quick before untiered', () => {
+  it('orders local first, then runners, and by name within a host', () => {
+    // Not by role: which engine serves Quick or Deep is an assignment the owner makes, and
+    // a list that re-sorted itself when they changed it would move rows under the cursor.
     const hosts = engineHosts(
       status({
         local: {
           ...status().local,
           engines: [
-            engine({ id: 1, name: 'sf-quick', default_tier: 'quick' }),
-            engine({ id: 2, name: 'sf-deep', default_tier: 'deep' }),
+            engine({ id: 1, name: 'sf-quick' }),
+            engine({ id: 2, name: 'sf-deep' }),
             engine({ id: 3, name: 'maia', kind: 'maia', streams: false }),
           ],
         },
@@ -168,7 +247,7 @@ describe('engineHosts', () => {
         ],
       }),
     )
-    expect(hosts.map((host) => host.name)).toEqual(['sf-deep', 'sf-quick', 'maia', 'sf-remote'])
+    expect(hosts.map((host) => host.name)).toEqual(['maia', 'sf-deep', 'sf-quick', 'sf-remote'])
   })
 
   it('is empty before the status has been read', () => {

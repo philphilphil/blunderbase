@@ -244,8 +244,23 @@ def command_for(path: str | Sequence[str]) -> list[str]:
     A stored path is one of three things: a real file (used verbatim, spaces and all), a
     command line with arguments (`lc0 --weights=maia-1500.pb.gz`), or a bare name to be
     found on PATH. Splitting unconditionally, as the predecessor did, broke the first case.
+
+    A fourth kind of string is refused outright: an engine that is not a binary at all, such
+    as the `wasm:…` build a browser tab loads inside itself. Split and started, it would
+    fail with "no such file or directory" naming something that was never meant to be one.
     """
     if isinstance(path, str):
+        # Imported here rather than at module scope: this adapter is loaded by the runner
+        # process too, and it has no business pulling the database layer in to answer a
+        # question about a string. The predicate lives in the service layer because that is
+        # where every other caller asks it, and there must be one answer.
+        from backend.services.engines import is_binary_path
+
+        if not is_binary_path(path):
+            raise EngineStartError(
+                f"{path} does not name a binary: it is an engine that lives inside a "
+                f"runner, and only that runner can start it"
+            )
         candidate = Path(path).expanduser()
         command = [str(candidate)] if candidate.is_file() else shlex.split(path)
     else:

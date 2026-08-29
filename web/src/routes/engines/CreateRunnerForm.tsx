@@ -8,7 +8,7 @@ import { useCreateRunner } from '@/lib/api/queries'
 import type { RunnerCreated } from '@/lib/api/types'
 
 /**
- * Register a machine and hand over its token.
+ * Register a remote machine and hand over its token.
  *
  * The token is in the create response and nowhere else — only its SHA-256 is stored — so it
  * is held in this component's own state and dies with the panel. Nothing writes it to the
@@ -85,7 +85,7 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
     >
       <div className="flex items-center gap-2.5">
-        <span className="text-xs font-semibold text-ink">Add a runner</span>
+        <span className="text-xs font-semibold text-ink">Add a remote runner</span>
         <div className="flex-1" />
         <button
           type="button"
@@ -132,7 +132,7 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
         </p>
         <Button type="submit" size="sm" disabled={create.isPending}>
           {create.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
-          Register
+          Register remote runner
         </Button>
       </div>
     </form>

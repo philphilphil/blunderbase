@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# The browser engine's NNUE, downloaded by `scripts/engine-assets.mjs` and pinned by
+# checksum there. 15 MB of weights, reproducible from the pin, so not in the tree.
+.engine/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -23,6 +23,7 @@ from backend.db.migrate import alembic_config, upgrade_to_head
 from backend.db.models import AnalysisRun, AppSetting, Engine, Game
 from backend.db.session import get_sessionmaker
 from backend.services import analysis, app_settings
+from backend.services import engines as engines_service
 from tests.conftest import running_app
 
 # Every key cleared, which is what an install that never opened the page has stored.
@@ -48,6 +49,21 @@ def test_nothing_is_configured_until_somebody_configures_it(session: Session) ->
     assert app_settings.get_deep_multipv(session) == app_settings.DEEP_MULTIPV_DEFAULT
     assert app_settings.get_default_owner_rating(session) == app_settings.OWNER_RATING_DEFAULT
     assert app_settings.get_thresholds(session) == (5.0, 10.0, 15.0)
+    # The quick pass pays for Maia and the deep pass does not, over both sides of the board.
+    assert app_settings.get_maia_on_quick(session) is True
+    assert app_settings.get_maia_on_deep(session) is False
+    assert app_settings.get_maia_both_sides(session) is True
+
+
+def test_which_tier_a_maia_pass_belongs_to_is_the_tiers_own_setting(session: Session) -> None:
+    assert app_settings.maia_for_tier(session, Tier.QUICK) is True
+    assert app_settings.maia_for_tier(session, Tier.DEEP) is False
+
+    app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 0)
+    app_settings.set_value(session, app_settings.MAIA_ON_DEEP, 1)
+
+    assert app_settings.maia_for_tier(session, Tier.QUICK) is False
+    assert app_settings.maia_for_tier(session, Tier.DEEP) is True
 
 
 @pytest.mark.parametrize(
@@ -61,6 +77,9 @@ def test_nothing_is_configured_until_somebody_configures_it(session: Session) ->
         (app_settings.MISTAKE_THRESHOLD, 21, 21.0),
         (app_settings.BLUNDER_THRESHOLD, 44, 44.0),
         (app_settings.DEFAULT_OWNER_RATING, 1200, 1200),
+        (app_settings.MAIA_ON_QUICK, 0, 0),
+        (app_settings.MAIA_ON_DEEP, 1, 1),
+        (app_settings.MAIA_BOTH_SIDES, 0, 0),
     ],
 )
 def test_a_stored_value_is_what_comes_back(
@@ -85,6 +104,9 @@ def test_a_stored_value_is_what_comes_back(
         (app_settings.INACCURACY_THRESHOLD, -3, app_settings.MIN_THRESHOLD),
         (app_settings.BLUNDER_THRESHOLD, 250, app_settings.MAX_THRESHOLD),
         (app_settings.DEFAULT_OWNER_RATING, 0, app_settings.MIN_OWNER_RATING),
+        # A flag is off, on, and nothing in between for a stray number to land on.
+        (app_settings.MAIA_ON_QUICK, 7, app_settings.FLAG_ON),
+        (app_settings.MAIA_ON_DEEP, -1, app_settings.FLAG_OFF),
     ],
 )
 def test_a_value_outside_what_a_setting_can_mean_is_clamped(
@@ -325,8 +347,14 @@ def test_a_put_stores_the_values_and_answers_with_them(api: TestClient) -> None:
     response = api.put("/api/settings", json=body)
 
     assert response.status_code == 200, response.text
-    # The one level asked for is the whole of the levels in force.
-    assert response.json() == {**body, "inaccuracy_threshold": 5.0, "maia_elos": [1700]}
+    # The one level asked for is the whole of the levels in force. Every key the body left
+    # out is cleared, which is what a PUT means, so they answer null.
+    assert response.json() == {
+        **NOTHING_SET,
+        **body,
+        "inaccuracy_threshold": 5.0,
+        "maia_elos": [1700],
+    }
     assert api.get("/api/settings").json()["deep_multipv"] == 6
 
 
@@ -420,14 +448,10 @@ def test_the_bootstrap_payload_moves_with_the_setting(api: TestClient) -> None:
 
 
 def _seed(session: Session) -> Game:
-    session.add(
-        Engine(
-            name="Stockfish",
-            kind=EngineKind.UCI,
-            path="/usr/bin/stockfish",
-            default_tier=Tier.QUICK,
-        )
-    )
+    engine = Engine(name="Stockfish", kind=EngineKind.UCI, path="/usr/bin/stockfish")
+    session.add(engine)
+    session.commit()
+    engines_service.assign_default_roles(session, engine)
     game = Game(
         source=Source.PGN,
         dedup_hash="settings-plan",
@@ -486,6 +510,36 @@ def test_a_run_queued_after_a_put_carries_the_new_budget(
 
         assert (quick.nodes, quick.multipv) == (4321, 1)
         assert (deep.nodes, deep.multipv) == (8765, 7)
+
+
+def test_a_run_queued_after_a_put_carries_the_maia_pass_its_tier_was_given(
+    api: TestClient, settings: Settings
+) -> None:
+    """Whether Maia runs is settled at enqueue, alongside the budget, and lives on the row."""
+    api.put("/api/settings", json={"maia_on_quick": 0, "maia_on_deep": 1})
+
+    with get_sessionmaker(settings)() as session:
+        game = _seed(session)
+        quick = analysis.request_analysis(session, game_id=game.id)
+        deep = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+        assert (quick.maia, deep.maia) == (False, True)
+
+
+def test_a_plan_built_after_a_put_asks_maia_about_the_owners_moves_only(
+    api: TestClient, settings: Settings
+) -> None:
+    """Both sides is a live setting, not a column: the next plan built is the new answer."""
+    with get_sessionmaker(settings)() as session:
+        run_id = analysis.request_analysis(session, game_id=_seed(session).id).id
+
+    api.put("/api/settings", json={"maia_both_sides": 0})
+
+    with get_sessionmaker(settings)() as session:
+        plan = analysis.build_plan(session, session.get(AnalysisRun, run_id))
+
+        # The owner has White in `_seed`, so their own move is the one even ply.
+        assert plan.maia_plies() == [0]
 
 
 def test_a_plan_built_after_a_put_carries_the_new_thresholds(

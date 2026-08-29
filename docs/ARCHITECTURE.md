@@ -141,8 +141,8 @@ stream's place, so one broken game costs exactly that game. `ingest_games` then,
   is what repairs a library imported before any account named its owner. The repair only
   ever fills in an empty column, so it is idempotent and never revises a decided game.
 - **Enqueues the quick tier.** A `queued` `AnalysisRun` per imported game, against the
-  enabled engine whose `default_tier` is `quick`, else any enabled UCI engine. No engine
-  means no run — an import must never fail because the engine list is empty.
+  engine the owner assigned to the quick role. Nothing falls back, and no engine means no
+  run — an import must never fail because no engine is assigned.
 
 Each game is its own transaction, so a sync that dies half-way keeps what it got, and the
 job's counters and error list are rewritten after every game.
@@ -246,11 +246,18 @@ Engines are rows, and three modules divide the work:
   that raises drops its process (a corpse in the slot would be handed to the next caller)
   and always releases its slot.
 - `services/engines.py` owns the policy: probe on add, options validated against what the
-  binary declared, and tiers that degrade. `engine_for_tier` returns `None`,
-  `tier_status(tier)` explains why in words a UI can show, and only
-  `require_engine_for_tier` raises — as `TierUnavailableError`, never as whatever the
-  process layer threw. It imports the adapters inside its functions so that listing engines
-  does not pull python-chess into the server.
+  binary declared, and roles that degrade. The owner assigns one engine to each of Quick,
+  Deep and Human moves (`EngineRole`, three `app_settings` rows); nothing falls back, so a
+  role whose engine is missing, switched off, of the wrong kind or on a runner that is not
+  connected simply does not run. `engine_for_role` returns `None`, `role_status(role)`
+  explains why in words a UI can show — `configured` telling "you have not chosen one" from
+  "the one you chose is down" — and only `require_engine_for_tier` raises, as
+  `TierUnavailableError`, never as whatever the process layer threw. `assign_default_roles`
+  is the one write that happens without the owner asking: a role nobody has filled goes to
+  the first engine of a kind that fits it, at `add_engine` and for a runner's new engines,
+  which is what makes a fresh install run without a visit to the form. It imports the
+  adapters inside its functions so that listing engines does not pull python-chess into the
+  server.
 
 ## Analysis
 
@@ -277,14 +284,27 @@ non-issue: the write lock is held for milliseconds, never for the length of a se
 
 **Two passes, never nested.** Stockfish evaluates, then Maia predicts, each acquiring the
 pool separately. A worker that held one slot while waiting for a second would deadlock the
-moment `analysis_concurrency` is 1. Maia is asked at exactly one rating level, clamped to
-what the build declares it can answer: the deployment's `maia_target_elo`, the rating the
-owner is playing towards, defaulting to the top of what Maia knows. It never varies by
-game or by player, which is what makes two games comparable — a move Maia's answer changed
-between them is the play changing, not the question. Every ply of both sides is asked
-about, because "what will a human opposite me fall into" is a question about the positions
-the opponent moves in. No Maia engine, or a Maia that will not answer, degrades: the
+moment `analysis_concurrency` is 1. Maia is asked at the deployment's `maia_elos` — one to
+five rating levels, clamped to what the build declares it can answer — because the reading
+that teaches something is a comparison: what a 1500 plays here beside what a 1900 plays
+here. The levels are the deployment's and never vary by game or by player, which is what
+makes two games comparable: a move Maia's answer changed between them is the play
+changing, not the question. No Maia engine, or a Maia that will not answer, degrades: the
 evaluation is still worth having, and the reason is recorded on the run.
+
+**The second pass is not part of what a run is.** It costs 40-70% of a quick pass — 375 ms
+a ply against Stockfish's ~480 at 250k nodes — and a deep run spent it recomputing a policy
+identical to the quick run's, since Maia answers a position rather than a search budget. So
+a run carries a `maia` flag, written when it is queued from `maia_on_quick` /
+`maia_on_deep` the way its node budget is written from `quick_nodes` / `deep_nodes`: on for
+quick, off for deep, and a caller may say either explicitly. `maia_both_sides`, read per
+plan like the thresholds, is the other half of the cost — on, every ply is asked about,
+because "what will a human opposite me fall into" is a question about the positions the
+*opponent* moves in; off, only the plies the owner moved in are, which halves the pass. A
+run with no Maia pass never starts the process and never takes the pool slot. The two
+switched-off cases meet at `maia_only`, the fill pass that adds levels to a game already
+searched: it is always a Maia pass, whatever the tier's setting says, because a fill
+without one would be no pass at all.
 
 **Classification** is win-percentage based, à la Lichess:
 `win% = 100 / (1 + exp(-0.00368208 × cp))` with the centipawn score clamped to ±1000 and a
@@ -386,9 +406,11 @@ a single very deep position is otherwise a silence the stale sweep collects.
 **One run, one machine.** A run's evaluation and its human-move passes share a process, so
 both engines have to be on one host. There is no field in an analysis request that could
 say "this Stockfish and that Maia", so a search engine on a host with no Maia is refused at
-enqueue when the deployment's only Maia is somewhere else, naming both machines. A
-deployment with no Maia at all is unaffected — the pass simply does not happen, exactly as
-before runners existed.
+enqueue when the deployment's only Maia is somewhere else, naming both machines. The rule
+is about a run with *two* passes: `maia` is settled before the check, and a run queued
+without one has a single pass and a single host, so it is never refused for this. A
+deployment with no Maia at all is unaffected either way — the pass simply does not happen,
+exactly as before runners existed.
 
 **The socket is the transport, polling is the fallback.** After
 `reconnect.websocket_failures` consecutive failures the runner starts polling `/runner/poll`
@@ -399,12 +421,37 @@ unavailable while polling, and an engine advertised over a poll link reports
 `stream_unavailable` at the request, rather than opening a board that never draws and holds
 a slot until the idle reaper takes it.
 
+**Whether an engine drives a board is the host's own word, and a column.** `EngineAd.streams`
+is written onto `engines.streams` by `sync_runner_engines` rather than inferred from the
+engine's kind, because a host may honestly run queue work and answer no `stream_open` at
+all. `engine_payload` reports `engine.streams and kind == "uci"` — the kind still has the
+last word, since a Maia answers with a policy however it advertises — and `_resolve` refuses
+a session on one, so a coach asking by id gets a sentence instead of a board waiting forever
+for a `stream_started`. Every row that predates the column defaults to `true`: a binary on
+this host advertises nothing and has always driven a board.
+
 **A runner's engine row is an advertisement, not a binary here.** Its `path` is a path on
 that machine, so the two things that start a binary in this process refuse it by name: the
-synchronous `POST /analysis/position` resolves the tier `local_only` and falls back to an
-engine this host can really run, and the Engines page's test-run button says whose machine
-the engine is on. Tunnelling a single position to a runner is deliberately outside the
+synchronous `POST /analysis/position` resolves the tier `local_only` and says plainly that
+the tier's own engine is on another machine rather than handing the work to one nobody
+assigned, and the Engines page's test-run button says whose machine the engine is on. Tunnelling a single position to a runner is deliberately outside the
 protocol — a runner carries whole runs.
+
+**A browser tab is a runner too.** It speaks the same protocol over the same socket, and
+three things bend around it rather than for it. It cannot set an `Authorization` header, so
+`/runner/ws` also reads the bearer token out of `Sec-WebSocket-Protocol` behind a sentinel
+(`runners.config.WS_SUBPROTOCOL`), which the accept echoes back; never out of the query
+string, where a proxy would log it. Its engine is not a binary on any filesystem, so
+`engines.path` carries a scheme — `wasm:stockfish-18` — and `services.engines.is_binary_path`
+is the single answer to "may this host stat, split or start it", asked by `binary_present`,
+`spec_for`, `probe_engine`, `sample_eval` and `command_for` alike. And it is expected to
+vanish — a closed laptop, a locked phone, a background tab throttled past the detach window
+— so `Runner.browser` is written from its `hello`, and `requeue_stale_runs` gives a run
+orphaned by one its attempt back instead of spending it. A run that genuinely *fails* on a
+browser engine goes through `fail_run` and costs an attempt like any other: the refund is
+for the host going away, not for the work going wrong. The page itself is served
+cross-origin isolated so a multi-threaded WASM build can have a `SharedArrayBuffer` — see
+`api/web.py` for what `require-corp` costs.
 
 **Two prefixes, deliberately.** `/runner` (singular) is the transport: it carries a
 per-runner bearer token and is exempt from the session cookie. `/runners` (plural) is the
@@ -428,7 +475,7 @@ coach's `runners_status` share, so the three cannot drift into three accounts of
 deployment; `GET /analysis/queue` splits the same backlog by destination, which is what
 tells "the queue is long" from "the only machine with that engine is offline". A run with no
 engine, or one on a *local* engine that has been switched off, counts as local work — that
-is where the worker's fallback will send it. A run on a runner's engine stays that runner's
+is where the worker will look for its tier's engine. A run on a runner's engine stays that runner's
 even while the runner is away: the local set claims with every remote engine excluded,
 disabled ones included, so nothing here would ever drain it, and counting it as local would
 show a backlog against a host that cannot touch it.

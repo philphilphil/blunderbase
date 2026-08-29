@@ -25,7 +25,6 @@ engines:
   # One entry per engine on THIS machine. Edit the paths before starting.
   - name: sf-remote
     path: /usr/games/stockfish
-    tier: deep
     options:
       Threads: 8
 ```
@@ -65,7 +64,6 @@ engines:
   - name: sf-remote               # required, unique here; this becomes the Engine row's name
     path: /usr/games/stockfish    # required; the path on THIS machine
     kind: uci                     # uci | maia, default uci
-    tier: deep                    # quick | deep — the default-tier hint, as on the Engines page
     options:                      # validated against what the binary declares, at startup
       Threads: 8
       Hash: 4096
@@ -73,7 +71,10 @@ engines:
 ```
 
 An unrecognised key is refused by name rather than ignored — a typo in a slot count is a
-mistake, not a preference. Four values can come from the environment instead, and beat the
+mistake, not a preference. `tier:` on an engine is the one exception: it is accepted and
+ignored, so a yaml written before the roles existed still starts. Which engine serves
+Quick, Deep and Human moves is assigned by the owner on the Engines page; a runner
+advertises what it has, and claims nothing. Four values can come from the environment instead, and beat the
 file, so a token need not live in something that gets copied around:
 `BLUNDERBASE_RUNNER_CONFIG` (the path to this file), `_SERVER`, `_TOKEN`, `_NAME`, `_SLOTS`.
 
@@ -153,7 +154,9 @@ expendable.
 ## One run, one machine
 
 A run's evaluation and its human-move (Maia) passes execute in the same process, so both
-engines have to be on the same host. A search engine on a machine with no Maia, in a
-deployment whose only Maia is elsewhere, is refused when you queue the analysis, naming both
-machines. A deployment with no Maia at all is unaffected: the pass simply does not happen,
-exactly as before runners existed.
+engines have to be on the same host — *for a run that asks for both*. A search engine on a
+machine with no Maia, in a deployment whose only Maia is elsewhere, is refused when you
+queue the analysis, naming both machines. A run queued with no Maia pass at all (`maia`
+off for its tier, or `maia: false` on the request) has one pass and so one host, and is
+never refused for this. A deployment with no Maia at all is unaffected either way: the pass
+simply does not happen, exactly as before runners existed.

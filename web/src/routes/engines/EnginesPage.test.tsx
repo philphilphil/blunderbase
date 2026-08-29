@@ -8,17 +8,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Providers } from '@/app/Providers'
 import type {
   EngineResponse,
+  EngineRoleName,
+  EngineRolesResponse,
+  EngineRoleStatus,
   RunnerEngine,
   RunnerResponse,
   RunnersStatus,
-  TierStatusResponse,
 } from '@/lib/api/types'
 
 import { hostByEngineId } from '@/lib/engines/hosts'
 
 import { EngineDetail } from './EngineDetail'
 import { EnginesPage } from './EnginesPage'
-import { ENGINE_EXPERT_MODE_KEY, resetEngineExpertMode, setEngineExpertMode } from './expertMode'
 
 /** jsdom in this setup exposes no `localStorage`, so the tests bring their own (see
  *  `games/savedFilters.test.ts`). */
@@ -56,15 +57,21 @@ type Route = unknown | { status: number; body: unknown }
  */
 let release: () => void = () => {}
 
-/** Returns the mock so a case can assert on what was *not* asked for. */
+/**
+ * Returns the mock so a case can assert on what was *not* asked for.
+ *
+ * A route may be keyed by path, or by `"<METHOD> <path>"` when a case needs the write to
+ * answer differently from the read — `/engines/roles` is both a read and a write, and a
+ * refused assignment is only a refusal of the PUT.
+ */
 function stubFetch(routes: Record<string, Route>, defer: string[] = []) {
   const held = new Promise<void>((resolve) => {
     release = () => resolve()
   })
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input).split('?')[0]!
     if (defer.includes(path)) await held
-    const route = routes[path]
+    const route = routes[`${(init?.method ?? 'GET').toUpperCase()} ${path}`] ?? routes[path]
     if (route === undefined) {
       return new Response(JSON.stringify({ error: 'not_found', detail: path }), {
         status: 404,
@@ -88,14 +95,28 @@ function requestedPaths(fetchMock: ReturnType<typeof stubFetch>): string[] {
   return fetchMock.mock.calls.map(([input]) => String(input).split('?')[0]!)
 }
 
-function renderPage(ui: ReactNode) {
+/** `at` is the URL the page starts on — the tab lives in a search param. */
+function renderPage(ui: ReactNode, at = '/settings/engines') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[at]}>{ui}</MemoryRouter>
     </Providers>,
   )
 }
+
+/** Inventory details are closed at rest; tests open only the engine behavior they exercise. */
+async function openEngine(name: string) {
+  await userEvent.click(await screen.findByRole('button', { name: `Edit ${name}` }))
+}
+
+async function openMoreSettings(name: string) {
+  await openEngine(name)
+  await userEvent.click(screen.getByRole('button', { name: /More settings/ }))
+}
+
+/** The Machines half: runners, this browser, tokens. */
+const MACHINES = '/settings/engines?tab=machines'
 
 const STOCKFISH: EngineResponse = {
   id: 1,
@@ -105,20 +126,65 @@ const STOCKFISH: EngineResponse = {
   version: 'Stockfish 18',
   options: {},
   enabled: true,
-  default_tier: 'quick',
   created_at: '2026-08-26T00:50:11Z',
 }
 
-const TIERS: TierStatusResponse[] = [
-  { tier: 'quick', engine_id: 1, engine_name: 'stockfish', available: true, reason: null },
-  {
-    tier: 'deep',
+const MAIA: EngineResponse = {
+  id: 2,
+  name: 'maia3',
+  kind: 'maia',
+  path: '/models/maia-1500.pb.gz',
+  version: 'lc0 maia-1500',
+  options: {},
+  enabled: true,
+  created_at: '2026-08-26T00:51:00Z',
+}
+
+/** One role status, defaulted to the shape of a role nobody has assigned anything to. */
+function role(
+  over: Partial<EngineRoleStatus> & { role: EngineRoleName },
+): EngineRoleStatus {
+  return {
     engine_id: null,
     engine_name: null,
     available: false,
-    reason: 'every registered engine is disabled or is a Maia model',
-  },
-]
+    configured: false,
+    reason: `no engine is assigned to ${over.role === 'human' ? 'human moves' : `the ${over.role} tier`}`,
+    ...over,
+  }
+}
+
+/** Quick on `stockfish`, Deep on an engine that is away, and no human-move model at all. */
+function roles(...over: EngineRoleStatus[]): EngineRolesResponse {
+  const base = new Map<EngineRoleName, EngineRoleStatus>([
+    [
+      'quick',
+      role({
+        role: 'quick',
+        engine_id: 1,
+        engine_name: 'stockfish',
+        available: true,
+        configured: true,
+        reason: null,
+      }),
+    ],
+    [
+      'deep',
+      role({
+        role: 'deep',
+        engine_id: 7,
+        engine_name: 'sf-remote',
+        configured: true,
+        reason: "'sf-remote' runs on 'gpu-box', which is not connected",
+      }),
+    ],
+    ['human', role({ role: 'human' })],
+  ])
+  for (const status of over) base.set(status.role, status)
+  return { roles: [...base.values()] }
+}
+
+const ROLES = roles()
 
 function remoteEngine(over: Partial<RunnerEngine> & { id: number; name: string }): RunnerEngine {
   return {
@@ -126,7 +192,6 @@ function remoteEngine(over: Partial<RunnerEngine> & { id: number; name: string }
     version: 'Stockfish 17',
     path: '/usr/games/stockfish',
     enabled: true,
-    default_tier: 'deep',
     streams: true,
     ...over,
   }
@@ -160,9 +225,7 @@ function runnersStatus(runners: RunnerResponse[] = []): RunnersStatus {
       workers: true,
       queued: 0,
       running: 0,
-      engines: [
-        remoteEngine({ id: 1, name: 'stockfish', path: STOCKFISH.path, default_tier: 'quick' }),
-      ],
+      engines: [remoteEngine({ id: 1, name: 'stockfish', path: STOCKFISH.path })],
     },
     queue: { queued: 0, running: 0 },
   }
@@ -177,7 +240,6 @@ const SF_REMOTE: EngineResponse = {
   version: 'Stockfish 17',
   options: {},
   enabled: true,
-  default_tier: 'deep',
   created_at: '2026-08-26T09:30:00Z',
 }
 
@@ -194,19 +256,17 @@ beforeEach(() => {
   release = () => {}
   vi.stubGlobal('localStorage', memoryStorage())
   vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket)
-  resetEngineExpertMode()
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
-  resetEngineExpertMode()
 })
 
 describe('EnginesPage', () => {
   it('says nothing can be analysed when no engine is registered', async () => {
     stubFetch({
       '/api/engines': [],
-      '/api/engines/tiers': [],
+      '/api/engines/roles': roles(role({ role: 'quick' }), role({ role: 'deep' })),
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
@@ -214,30 +274,228 @@ describe('EnginesPage', () => {
     expect(await screen.findByText('No engines are registered.')).toBeInTheDocument()
   })
 
-  it('says in words why a tier cannot run', async () => {
+  it('says in the backend’s own words why an assigned role cannot run', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    // Verbatim: it is the sentence a deep run would fail with, and rewording it here would
+    // make the two look like two different problems.
+    expect(
+      await screen.findByText("'sf-remote' runs on 'gpu-box', which is not connected"),
+    ).toBeInTheDocument()
+  })
+
+  it('offers one picker per role, human moves beside the two tiers', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH, MAIA],
+      '/api/engines/roles': roles(
+        role({
+          role: 'human',
+          engine_id: 2,
+          engine_name: 'maia3',
+          available: true,
+          configured: true,
+          reason: null,
+        }),
+      ),
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    expect(await screen.findByText('What runs what')).toBeInTheDocument()
+    expect(screen.getByLabelText<HTMLSelectElement>('Quick')).toHaveValue('1')
+    expect(screen.getByLabelText<HTMLSelectElement>('Deep')).toHaveValue('7')
+    expect(screen.getByLabelText<HTMLSelectElement>('Human moves')).toHaveValue('2')
+  })
+
+  it('offers a role only the engines whose kind can serve it', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH, MAIA],
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    const quick = await screen.findByLabelText<HTMLSelectElement>('Quick')
+    // The engine, and where it lives — two engines of the same name on two machines is the
+    // case this form exists for.
+    expect([...quick.options].map((option) => option.text)).toEqual([
+      'Nothing assigned',
+      'stockfish · local',
+    ])
+    // A human-move model answers with a policy rather than a search, so it is not offered
+    // for a tier; the backend refuses it, and a dropdown offering it offers a refusal. This
+    // model is not in the status read, so there is no host to name beside it.
+    const human = screen.getByLabelText<HTMLSelectElement>('Human moves')
+    expect([...human.options].map((option) => option.text)).toEqual(['Nothing assigned', 'maia3'])
+  })
+
+  it('keeps an engine that cannot run the role as the selected option', async () => {
+    // `sf-remote` is on a machine that is away. It is still what is stored, and a select
+    // showing something else would be lying about the assignment.
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    const deep = await screen.findByLabelText<HTMLSelectElement>('Deep')
+    expect(deep).toHaveValue('7')
+    expect([...deep.options].map((option) => option.text)).toContain('sf-remote')
+  })
+
+  it('writes one role and leaves the other two out of the body', async () => {
+    const fetchMock = stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    await userEvent.selectOptions(await screen.findByLabelText('Deep'), '1')
+
+    await waitFor(() => expect(requestedPaths(fetchMock)).toContain('/api/engines/roles'))
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')!
+    // Absence means "leave alone": saving one dropdown must not clear the other two.
+    expect(JSON.parse(String(put[1]?.body))).toEqual({ deep: 1 })
+  })
+
+  it('says in the form why an assignment was refused', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/roles': ROLES,
+      'PUT /api/engines/roles': {
+        status: 422,
+        body: { error: 'invalid_engine', detail: 'no engine with id 1 to assign to the deep tier' },
+      },
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    await userEvent.selectOptions(await screen.findByLabelText('Deep'), '1')
+
+    // It is a form, so it owns its errors: the refusal is read beside the select that
+    // caused it, not in a toast that has gone by the time the owner looks up.
+    expect(
+      await screen.findByText('no engine with id 1 to assign to the deep tier'),
+    ).toBeInTheDocument()
+    // And the select is back to what is actually stored.
+    expect(screen.getByLabelText<HTMLSelectElement>('Deep')).toHaveValue('7')
+  })
+
+  it('says calmly, not in red, that a deployment simply has no human-move model', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    expect(await screen.findByText('no engine is assigned to human moves')).toBeInTheDocument()
+    // A role that was chosen and cannot run is a fault and gets the red dot; one nobody has
+    // chosen yet is a deployment with one fewer column, and gets neither.
+    expect(screen.getByLabelText('not set up')).toBeInTheDocument()
+  })
+
+  it('reports a model that is switched off as a fault, unlike one nobody chose', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH, { ...MAIA, enabled: false }],
+      '/api/engines/roles': roles(
+        role({
+          role: 'human',
+          engine_id: 2,
+          engine_name: 'maia3',
+          configured: true,
+          reason: "'maia3' is assigned to human moves and is switched off",
+        }),
+      ),
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
 
     expect(
-      await screen.findByText('every registered engine is disabled or is a Maia model'),
+      await screen.findByText("'maia3' is assigned to human moves and is switched off"),
     ).toBeInTheDocument()
+    expect(screen.queryByLabelText('not set up')).not.toBeInTheDocument()
+  })
+
+  it('labels every roster row with its kind, in the owner’s words', async () => {
+    // Not `UCI`/`Maia`: UCI is a protocol nobody chose and Maia is a model family they may
+    // not have heard of. The distinction they make is normal engine versus plays-like-a-person.
+    stubFetch({
+      '/api/engines': [STOCKFISH, MAIA],
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    expect(await screen.findAllByText('Engine')).not.toHaveLength(0)
+    expect(screen.getByText('Human')).toBeInTheDocument()
+    expect(screen.queryByText('UCI')).not.toBeInTheDocument()
+  })
+
+  it('labels a roster row with the roles it holds, and the rest with an em dash', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH, { ...SF_REMOTE, id: 4, name: 'sf-spare' }],
+      '/api/engines/roles': roles(
+        role({
+          role: 'deep',
+          engine_id: 1,
+          engine_name: 'stockfish',
+          available: true,
+          configured: true,
+          reason: null,
+        }),
+      ),
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    expect(await screen.findByText('Quick + Deep')).toBeInTheDocument()
+    expect(screen.getByTitle('Assigned to nothing right now')).toHaveTextContent('—')
+  })
+
+  it('keeps paths off the roster, where they cannot be edited anyway', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH, MAIA],
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(<EnginesPage />)
+
+    // Paths stay out of the comparable summary; opening one engine reveals only its field.
+    await openEngine('stockfish')
+    expect(await screen.findByLabelText<HTMLInputElement>('Path')).toHaveValue(STOCKFISH.path)
+    expect(screen.queryByText(STOCKFISH.path)).not.toBeInTheDocument()
+    expect(screen.queryByText(MAIA.path)).not.toBeInTheDocument()
   })
 
   it('edits the options the probe declares and refuses one the engine would reject', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
-    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
+    await openMoreSettings('stockfish')
     const threads = await screen.findByLabelText<HTMLInputElement>('Threads')
     // The driver sets MultiPV per analysis, so it is shown but not editable.
     expect(screen.queryByLabelText('MultiPV')).not.toBeInTheDocument()
@@ -259,7 +517,7 @@ describe('EnginesPage', () => {
   it('surfaces a probe that failed instead of an empty option list', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/runners/status': runnersStatus(),
       '/api/engines/probe': {
         status: 422,
@@ -269,9 +527,9 @@ describe('EnginesPage', () => {
         },
       },
     })
-    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
+    await openMoreSettings('stockfish')
     expect(await screen.findByText('The binary could not be probed.')).toBeInTheDocument()
     expect(
       screen.getByText('/opt/homebrew/bin/stockfish is not a usable uci engine: no handshake'),
@@ -281,7 +539,7 @@ describe('EnginesPage', () => {
   it('runs the engine on one position and shows what it said', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/runners/status': runnersStatus(),
       '/api/engines/probe': PROBE,
       '/api/engines/1/test-run': {
@@ -298,9 +556,9 @@ describe('EnginesPage', () => {
         lines: [{ multipv: 1, cp: 31, mate: null, pv: ['e2e4', 'e7e5'] }],
       },
     })
-    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
+    await openMoreSettings('stockfish')
     await userEvent.click(await screen.findByRole('button', { name: 'Test run' }))
 
     expect(await screen.findByText('412 ms')).toBeInTheDocument()
@@ -312,25 +570,42 @@ describe('EnginesPage', () => {
 })
 
 describe('EnginesPage — runners', () => {
-  it('says everything runs here when no runner is registered', async () => {
+  it('shows server and browser capacity when no remote runner is registered', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
+    renderPage(<EnginesPage />, MACHINES)
+
+    expect(await screen.findByText(/No remote runners are registered/)).toBeInTheDocument()
+    expect(screen.getAllByText('This server').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('This browser').length).toBeGreaterThan(0)
+    expect(screen.queryByText('queue only')).not.toBeInTheDocument()
+  })
+
+  it('labels every engine with where it runs on the same page as capacity', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH, SF_REMOTE],
+      '/api/engines/roles': ROLES,
+      '/api/engines/probe': PROBE,
+      '/api/runners/status': runnersStatus([
+        runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
+      ]),
+    })
     renderPage(<EnginesPage />)
 
-    expect(await screen.findByText('No runners are registered.')).toBeInTheDocument()
-    // A deployment with no runners still labels its engines as this host's.
-    expect(screen.getAllByText('local').length).toBeGreaterThan(0)
-    expect(screen.queryByText('queue only')).not.toBeInTheDocument()
+    expect((await screen.findAllByText('gpu-box')).length).toBeGreaterThan(1)
+    expect(screen.getAllByText('This server').length).toBeGreaterThan(0)
+    expect(screen.getByText('Compute capacity')).toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
   it('names the machine an engine is advertised by, and what its slots are doing', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH, SF_REMOTE],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus([
         runner({
@@ -343,23 +618,24 @@ describe('EnginesPage — runners', () => {
         }),
       ]),
     })
-    renderPage(<EnginesPage />)
+    renderPage(<EnginesPage />, MACHINES)
 
-    // Once on the roster row for sf-remote, once as the runner card's heading.
     expect((await screen.findAllByText('gpu-box')).length).toBeGreaterThan(1)
+    // The status caption and the slot count are on the row itself, unopened.
     expect(screen.getByText('connected · websocket')).toBeInTheDocument()
-    expect(screen.getByText('2/4 slots')).toBeInTheDocument()
-    // On the roster row and again in the runner's advertised list.
-    expect(screen.getAllByText('sf-remote')).toHaveLength(2)
+    expect(screen.getByText('2/4')).toBeInTheDocument()
+    // Its advertised engines are the detail — opening the row is what reveals them.
+    await userEvent.click(screen.getByRole('button', { name: /expand gpu-box/i }))
+    expect(screen.getAllByText('sf-remote').length).toBeGreaterThan(1)
     expect(screen.getByText('maia-remote')).toBeInTheDocument()
     // A Maia never drives a board, whatever its host's transport is.
     expect(screen.getAllByText('queue only')).toHaveLength(1)
   })
 
-  it('marks a polling runner queue only, on the engine row and on the card', async () => {
+  it('marks a polling runner queue only in both inventories', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH, SF_REMOTE],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus([
         runner({
@@ -370,26 +646,29 @@ describe('EnginesPage — runners', () => {
         }),
       ]),
     })
-    renderPage(<EnginesPage />)
+    renderPage(<EnginesPage />, MACHINES)
 
     expect(
       await screen.findByText('connected · polling — queue only'),
     ).toBeInTheDocument()
-    // The roster row and the advertised-engine row both say so.
-    expect(screen.getAllByText('queue only')).toHaveLength(2)
+    // The flat engine inventory says it before any detail is opened.
+    expect(screen.getAllByText(/queue only/i).length).toBeGreaterThanOrEqual(2)
+    // The advertised-engine detail repeats the transport limitation in its own context.
+    await userEvent.click(screen.getByRole('button', { name: /expand gpu-box/i }))
+    expect(screen.getAllByText(/queue only/i).length).toBeGreaterThanOrEqual(3)
   })
 
   it('shows a runner-bound engine as read-only, and never probes its remote path', async () => {
     const fetchMock = stubFetch({
       '/api/engines': [SF_REMOTE],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/runners/status': runnersStatus([
         runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
       ]),
     })
-    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
+    await openMoreSettings('sf-remote')
     expect(
       await screen.findByText(/rewritten every time it connects/),
     ).toBeInTheDocument()
@@ -409,7 +688,7 @@ describe('EnginesPage — runners', () => {
     const fetchMock = stubFetch(
       {
         '/api/engines': [SF_REMOTE],
-        '/api/engines/tiers': TIERS,
+        '/api/engines/roles': ROLES,
         '/api/engines/probe': PROBE,
         '/api/runners/status': runnersStatus([
           runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
@@ -417,10 +696,10 @@ describe('EnginesPage — runners', () => {
       },
       ['/api/runners/status'],
     )
-    setEngineExpertMode(true)
     renderPage(<EnginesPage />)
 
-    // The detail card is up, on a row whose host is not known yet.
+    await openMoreSettings('sf-remote')
+    // The requested detail is up, on a row whose host is not known yet.
     expect(await screen.findByText(/not known yet/)).toBeInTheDocument()
     expect(screen.getByLabelText<HTMLInputElement>('Path')).toHaveAttribute('readonly')
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
@@ -435,7 +714,7 @@ describe('EnginesPage — runners', () => {
   it('does not claim a runner that is away is taking queue work', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH, SF_REMOTE],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus([
         runner({
@@ -447,7 +726,7 @@ describe('EnginesPage — runners', () => {
         }),
       ]),
     })
-    renderPage(<EnginesPage />)
+    renderPage(<EnginesPage />, MACHINES)
 
     expect(await screen.findByText('not connected')).toBeInTheDocument()
     // A machine that is away drains nothing; the grey dot beside its name is the whole
@@ -458,7 +737,7 @@ describe('EnginesPage — runners', () => {
   it('says why a revoke was refused instead of leaving the click unanswered', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus([runner({ id: 3, name: 'gpu-box' })]),
       '/api/runners/3': {
@@ -466,11 +745,12 @@ describe('EnginesPage — runners', () => {
         body: { error: 'runner_busy', detail: 'gpu-box is running two analysis boards' },
       },
     })
-    renderPage(<EnginesPage />)
+    renderPage(<EnginesPage />, MACHINES)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Revoke' }))
+    await userEvent.click(await screen.findByRole('button', { name: /expand gpu-box/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
     // The confirmation row is where the second click lands, so it is where the refusal has
-    // to be readable — the card otherwise looks exactly as it did before the click.
+    // to be readable — the row otherwise looks exactly as it did before the click.
     await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
     expect(
       await screen.findByText('gpu-box is running two analysis boards'),
@@ -480,14 +760,15 @@ describe('EnginesPage — runners', () => {
   it('sends only what a rename actually changed', async () => {
     const fetchMock = stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus([runner({ id: 3, name: 'gpu-box' })]),
       '/api/runners/3': runner({ id: 3, name: 'gpu-two' }),
     })
-    renderPage(<EnginesPage />)
+    renderPage(<EnginesPage />, MACHINES)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit gpu-box' }))
+    await userEvent.click(await screen.findByRole('button', { name: /expand gpu-box/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit gpu-box' }))
     const field = screen.getByLabelText<HTMLInputElement>('Name of gpu-box')
     await userEvent.clear(field)
     await userEvent.type(field, 'gpu-two')
@@ -503,7 +784,7 @@ describe('EnginesPage — runners', () => {
   it('shows the token and the yaml once, then lets them go', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
       '/api/runners': {
@@ -515,13 +796,11 @@ describe('EnginesPage — runners', () => {
         },
       },
     })
-    renderPage(<EnginesPage />)
+    renderPage(<EnginesPage />, MACHINES)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Add runner' }))
-    // `Name` also labels the engine detail's field, so the new form's own input is
-    // reached by its placeholder.
+    await userEvent.click(await screen.findByRole('button', { name: 'Remote runner' }))
     await userEvent.type(screen.getByPlaceholderText('gpu-box'), 'gpu-box')
-    await userEvent.click(screen.getByRole('button', { name: 'Register' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Register remote runner' }))
 
     expect(await screen.findByText('gpu-box is registered')).toBeInTheDocument()
     expect(screen.getByText('bb_rnr_kY3secret')).toBeInTheDocument()
@@ -538,63 +817,64 @@ describe('EnginesPage — delete engine', () => {
   it('confirms before deleting, and cancels without sending anything', async () => {
     const fetchMock = stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete stockfish' }))
+    await openEngine('stockfish')
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
     expect(
-      await screen.findByText(/Delete stockfish\? This removes the engine and unqueues its pending analyses\./),
+      await screen.findByText(/Remove stockfish\? Analysis already stored keeps its runs\./),
     ).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(
-      screen.queryByText(/This removes the engine and unqueues its pending analyses\./),
+      screen.queryByText(/Analysis already stored keeps its runs\./),
     ).not.toBeInTheDocument()
     expect(requestedPaths(fetchMock)).not.toContain('/api/engines/1')
   })
 
-  it('deletes the engine on confirm and reports how many queued runs it unqueued', async () => {
+  it('deletes the engine on confirm and closes its detail', async () => {
     const fetchMock = stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
       '/api/engines/1': { status: 200, body: { unqueued: 2 } },
     })
     renderPage(<EnginesPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete stockfish' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await openEngine('stockfish')
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
 
     await waitFor(() => expect(requestedPaths(fetchMock)).toContain('/api/engines/1'))
     const call = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/api/engines/1'))!
     expect(call[1]?.method).toBe('DELETE')
-    expect(await screen.findByText('Engine deleted, 2 queued runs removed')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Engine settings')).not.toBeInTheDocument())
   })
 
-  it('says a runner-bound, enabled engine will re-register on the runner\'s next advertisement', async () => {
+  it('does not offer deletion for a runner-owned engine', async () => {
     stubFetch({
       '/api/engines': [SF_REMOTE],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/runners/status': runnersStatus([
         runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
       ]),
     })
     renderPage(<EnginesPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete sf-remote' }))
-    expect(
-      await screen.findByText(/will re-register the next time that runner connects/),
-    ).toBeInTheDocument()
+    await openEngine('sf-remote')
+    expect(await screen.findByText(/open gpu-box under Compute capacity below/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
   })
 
-  it('says nothing about re-registering for a local engine, or one that is disabled', async () => {
+  it('offers removal for a local engine but not a disabled runner-owned one', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH, { ...SF_REMOTE, enabled: false }],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus([
         runner({ id: 3, name: 'gpu-box', engines: [remoteEngine({ id: 7, name: 'sf-remote' })] }),
@@ -602,16 +882,11 @@ describe('EnginesPage — delete engine', () => {
     })
     renderPage(<EnginesPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete stockfish' }))
-    expect(
-      await screen.findByText(/Delete stockfish\? This removes the engine and unqueues its pending analyses\./),
-    ).toBeInTheDocument()
-    expect(screen.queryByText(/will re-register/)).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await openEngine('stockfish')
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete sf-remote' }))
-    expect(await screen.findByText(/Delete sf-remote\?/)).toBeInTheDocument()
-    expect(screen.queryByText(/will re-register/)).not.toBeInTheDocument()
+    await openEngine('sf-remote')
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
   })
 })
 
@@ -633,8 +908,6 @@ describe('EngineDetail', () => {
             engine={engine}
             host={hosts.get(7)}
             hostKnown
-            tiers={[]}
-            expertMode={false}
             onDeleted={() => {}}
           />
         </MemoryRouter>
@@ -650,80 +923,171 @@ describe('EngineDetail', () => {
     // The header of the same card, which never had a stale copy to disagree with.
     expect(screen.getAllByText('sf-fast').length).toBeGreaterThan(0)
   })
+
+  it('describes a browser engine as where it runs, never as a file', () => {
+    // `wasm:stockfish-18` is an identifier, not a location. Under a label reading "Path" it
+    // would have the owner looking for a file, and the remote wording would send them to a
+    // `runner.yaml` on a machine that is a browser tab.
+    const hosts = hostByEngineId(
+      runnersStatus([
+        runner({
+          id: 5,
+          name: 'Chrome on macOS',
+          browser: true,
+          slots: 1,
+          engines: [
+            remoteEngine({
+              id: 8,
+              name: 'Stockfish (Chrome on macOS)',
+              path: 'wasm:stockfish-18',
+              path_scheme: 'wasm',
+              version: 'Stockfish 18',
+            }),
+          ],
+        }),
+      ]),
+    )
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <Providers client={client}>
+        <MemoryRouter>
+          <EngineDetail
+            engine={{
+              id: 8,
+              name: 'Stockfish (Chrome on macOS)',
+              kind: 'uci',
+              path: 'wasm:stockfish-18',
+              path_scheme: 'wasm',
+              version: 'Stockfish 18',
+              options: { Threads: 8 },
+              enabled: true,
+              created_at: '2026-08-29T07:00:00Z',
+            }}
+            host={hosts.get(8)}
+            hostKnown
+            onDeleted={() => {}}
+          />
+        </MemoryRouter>
+      </Providers>,
+    )
+
+    expect(screen.getByLabelText<HTMLInputElement>('Where it runs')).toHaveValue(
+      'In Chrome on macOS',
+    )
+    expect(screen.queryByLabelText('Path')).toBeNull()
+    expect(screen.queryByText(/wasm:stockfish-18/)).toBeNull()
+    expect(screen.queryByText(/runner\.yaml/)).toBeNull()
+    expect(screen.getByText(/no file on any machine/)).toBeInTheDocument()
+  })
 })
 
-describe('EnginesPage — expert mode', () => {
-  it('keeps the options editor and test run behind expert mode, off by default', async () => {
+describe('EnginesPage — one page', () => {
+  const routes = {
+    '/api/engines': [STOCKFISH],
+    '/api/engines/roles': ROLES,
+    '/api/engines/probe': PROBE,
+    '/api/runners/status': runnersStatus(),
+  }
+
+  it('shows assignments, inventory and capacity together without tabs', async () => {
+    stubFetch(routes)
+    renderPage(<EnginesPage />)
+
+    expect(await screen.findByText('What runs what')).toBeInTheDocument()
+    expect(screen.getByText('Engine inventory')).toBeInTheDocument()
+    expect(screen.getByText('Compute capacity')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remote runner' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+  })
+
+  it('keeps old Machines links useful by showing the whole page', async () => {
+    stubFetch(routes)
+    renderPage(<EnginesPage />, MACHINES)
+
+    expect(await screen.findByText('Engine inventory')).toBeInTheDocument()
+    expect(screen.getByText('Compute capacity')).toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+  })
+
+  it('explains remote runners before registration', async () => {
+    stubFetch(routes)
+    renderPage(<EnginesPage />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'How remote runners work' }))
+    expect(screen.getByText(/connects outward to this Blunderbase deployment/)).toBeInTheDocument()
+    expect(screen.getByText(/token shown once and a paste-ready/)).toBeInTheDocument()
+    expect(screen.getByText(/documentation is ready/)).toBeInTheDocument()
+  })
+
+  it('keeps only one engine or capacity detail open', async () => {
+    stubFetch(routes)
+    renderPage(<EnginesPage />)
+
+    await openEngine('stockfish')
+    expect(await screen.findByLabelText('Path')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand this server' }))
+    expect(await screen.findByText(/queued and .* running here/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Path')).not.toBeInTheDocument()
+  })
+})
+
+describe('EnginesPage — more settings', () => {
+  it('keeps options and test runs behind the opened engine’s disclosure', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
 
-    expect(
-      await screen.findByText('UCI options and test runs live behind expert mode.'),
-    ).toBeInTheDocument()
+    await openEngine('stockfish')
+    expect(screen.getByRole('button', { name: /More settings/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
     expect(screen.queryByLabelText('Threads')).not.toBeInTheDocument()
-    expect(screen.queryByPlaceholderText('Filter options')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Test run' })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Position')).not.toBeInTheDocument()
   })
 
-  it('reveals the options editor and test run once expert mode is switched on', async () => {
+  it('reveals options and test run for that engine', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
 
-    await screen.findByText('UCI options and test runs live behind expert mode.')
-    await userEvent.click(screen.getByRole('switch', { name: 'Expert mode' }))
+    await openMoreSettings('stockfish')
 
     expect(await screen.findByLabelText('Threads')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Test run' })).toBeInTheDocument()
-    expect(
-      screen.queryByText('UCI options and test runs live behind expert mode.'),
-    ).not.toBeInTheDocument()
-  })
-
-  it('renders already expanded when a prior visit left expert mode on', async () => {
-    window.localStorage.setItem(ENGINE_EXPERT_MODE_KEY, 'true')
-    stubFetch({
-      '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus(),
-    })
-    renderPage(<EnginesPage />)
-
-    expect(await screen.findByLabelText('Threads')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Test run' })).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Expert mode' })).toHaveAttribute(
-      'aria-checked',
+    expect(screen.getByRole('button', { name: /More settings/ })).toHaveAttribute(
+      'aria-expanded',
       'true',
     )
   })
 
-  it('round-trips the toggle through localStorage', async () => {
+  it('closes advanced settings without closing the engine', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
-      '/api/engines/tiers': TIERS,
+      '/api/engines/roles': ROLES,
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
 
-    const toggle = await screen.findByRole('switch', { name: 'Expert mode' })
-    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await openMoreSettings('stockfish')
+    await screen.findByLabelText('Threads')
+    await userEvent.click(screen.getByRole('button', { name: /More settings/ }))
 
-    await userEvent.click(toggle)
-    expect(window.localStorage.getItem(ENGINE_EXPERT_MODE_KEY)).toBe('true')
-
-    await userEvent.click(toggle)
-    expect(window.localStorage.getItem(ENGINE_EXPERT_MODE_KEY)).toBe('false')
+    expect(screen.queryByLabelText('Threads')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Path')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /More settings/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
   })
 })

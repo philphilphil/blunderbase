@@ -20,10 +20,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.base import Base
-from backend.db.enums import Classification, EngineKind, Platform, RunStatus, Tier
+from backend.db.enums import Classification, EngineKind, EngineRole, Platform, RunStatus, Tier
 from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval
 from backend.db.session import create_db_engine
 from backend.services import analysis, app_settings, import_service
+from backend.services import engines as engines_service
 from backend.services import games as games_service
 from backend.workers import AnalysisWorkers, analysis_queue
 
@@ -150,12 +151,12 @@ def _register(
         name=name,
         kind=kind,
         path=fake_engine_command(tmp_path, **scenario),
-        default_tier=Tier.QUICK if kind is EngineKind.UCI else None,
         enabled=True,
     )
     with sessions() as session:
         session.add(engine)
         session.commit()
+        engines_service.assign_default_roles(session, engine)
     return engine
 
 
@@ -587,17 +588,21 @@ async def test_an_engine_whose_binary_has_gone_is_failed_without_a_retry(
     assert "no longer at" in (run.error or "")
 
 
-async def test_an_engine_switched_off_after_enqueueing_hands_over_to_the_tier(
+async def test_an_engine_switched_off_after_enqueueing_hands_over_to_the_tiers_engine(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
-    """Disabling an engine must not fail the runs already queued against it."""
+    """Disabling an engine must not fail the runs already queued against it.
+
+    What stands in is the engine the owner has assigned to the tier — here, the one they
+    moved the role to — and never merely the next one that happens to be registered.
+    """
     first = _register(db, tmp_path, name="Old", go_default={"crash": True})
     _import_game(db, fixtures_dir)
-    _register(db, tmp_path, name="New", go=QUICK_REPLIES)
+    replacement = _register(db, tmp_path, name="New", go=QUICK_REPLIES)
     with db() as session:
         session.get(Engine, first.id).enabled = False
         session.commit()
-        replacement = session.scalars(select(Engine).where(Engine.name == "New")).one().id
+        engines_service.set_role_engine(session, EngineRole.QUICK, replacement.id)
 
     await _drain(settings, db)
 
@@ -607,8 +612,29 @@ async def test_an_engine_switched_off_after_enqueueing_hands_over_to_the_tier(
 
     assert run.status is RunStatus.DONE
     assert run.engine_id == first.id, "the row still records what it was queued against"
-    assert replacement != first.id
+    assert replacement.id != first.id
     assert len(rows) == 6
+
+
+async def test_nothing_stands_in_for_the_tiers_own_engine_when_it_is_switched_off(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """The owner's rule: no silent substitution. A second engine nobody assigned is not it."""
+    first = _register(db, tmp_path, name="Old", go=QUICK_REPLIES)
+    _import_game(db, fixtures_dir)
+    _register(db, tmp_path, name="Spare", go=QUICK_REPLIES)
+    with db() as session:
+        session.get(Engine, first.id).enabled = False
+        session.commit()
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = session.scalars(select(AnalysisRun)).one()
+
+    assert run.status is RunStatus.FAILED
+    assert run.attempts == 1, "the assignment will not have changed on a second try either"
+    assert "'Old' is assigned to the quick tier and is switched off" in (run.error or "")
 
 
 # --- restart --------------------------------------------------------------
@@ -777,6 +803,33 @@ async def test_every_configured_level_is_baked_into_every_ply(
     assert all(sorted(row.maia_policy) == ["1500", "1900"] for row in rows)
     assert rows[0].maia_policy["1500"][0]["uci"] == "e2e4"
     assert rows[1].maia_policy["1900"][0]["uci"] == "e7e5"
+
+
+async def test_a_run_queued_without_a_maia_pass_never_asks_the_model(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """A working Maia is registered and scripted, and the run still does not go near it.
+
+    Which is the saving: the process is never started and the pool slot is never taken.
+    """
+    with db() as session:
+        app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 0)
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _register(db, tmp_path, kind=EngineKind.MAIA, name="Maia", go=_maia_script())
+    _import_game(db, fixtures_dir)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        rows = analysis.get_move_evals(session, run.id)
+
+    assert run.status is RunStatus.DONE
+    assert run.maia is False
+    # Not a degraded run: nothing was skipped, because nothing was asked for.
+    assert run.error is None
+    assert [row.ply for row in rows] == [0, 1, 2, 3, 4, 5]
+    assert [row.ply for row in rows if row.maia_policy] == []
 
 
 async def test_a_fill_pass_adds_a_level_without_searching_again(

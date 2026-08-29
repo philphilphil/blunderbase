@@ -5,6 +5,7 @@
  */
 import { apiUrl, http, requestDownload, type QueryValue } from './client'
 import type {
+  AnalysisCoverage,
   AnalysisRequest,
   AppSettings,
   AppSettingsUpdate,
@@ -19,6 +20,8 @@ import type {
   EngineCreate,
   EngineDeleteResult,
   EngineResponse,
+  EngineRolesResponse,
+  EngineRolesUpdate,
   EngineUpdate,
   ExplorerResponse,
   GameCardList,
@@ -55,12 +58,14 @@ import type {
   QueueCleared,
   QueueStatus,
   ResurfaceResponse,
+  RetryFailedReceipt,
   RunnerCreate,
   RunnerCreated,
   RunnerResponse,
   RunnersStatus,
   RunnerUpdate,
   RunResponse,
+  RunStatus,
   SampleRequest,
   SampleResponse,
   SearchResponse,
@@ -196,8 +201,35 @@ export const cancelBackfill = (tier: Tier = 'quick') =>
  */
 export const clearQueue = () => http.post<QueueCleared>('/analysis/queue/clear')
 
-export const listRuns = (gameId: number, tier?: Tier) =>
-  http.get<RunResponse[]>('/analysis/runs', { query: { game_id: gameId, tier } })
+/**
+ * The whole library's analysis state in one call — what has been analysed with what, what
+ * a backfill of each tier would queue, and what this deployment's own history says either
+ * would cost. The Analysis page renders from nothing else.
+ */
+export const getCoverage = () => http.get<AnalysisCoverage>('/analysis/coverage')
+
+/**
+ * Newest first. One of `gameId` and `status` has to be given: the backend refuses a
+ * listing that narrows by neither rather than paging the whole run table.
+ */
+export const listRuns = (
+  gameId?: number,
+  tier?: Tier,
+  query: { status?: RunStatus; limit?: number } = {},
+) =>
+  http.get<RunResponse[]>('/analysis/runs', {
+    query: { game_id: gameId, tier, status: query.status, limit: query.limit },
+  })
+
+/**
+ * Queue a fresh pass for every game behind a failed run — the one press that clears a few
+ * hundred failures from a tier that had no engine on the day the library was imported.
+ * No ids means every failure. 409 `tier_unavailable` when that tier still has no engine.
+ */
+export const retryFailedRuns = (runIds?: number[]) =>
+  http.post<RetryFailedReceipt>('/analysis/runs/retry-failed', {
+    body: runIds && runIds.length > 0 ? { run_ids: runIds } : {},
+  })
 
 export const getRun = (runId: number) => http.get<RunResponse>(`/analysis/runs/${runId}`)
 
@@ -284,6 +316,26 @@ export const probeEngine = (body: ProbeRequest) =>
   http.post<ProbeResponse>('/engines/probe', { body })
 
 export const listTierStatus = () => http.get<TierStatusResponse[]>('/engines/tiers')
+
+/**
+ * What runs what: the engine assigned to each of the three roles, in one read.
+ *
+ * Supersedes `listTierStatus` for anything drawing the whole picture — human moves is a
+ * role the tier list has no member for, and widening `Tier` to give it one would corrupt a
+ * type the whole analysis pipeline stores on every run.
+ */
+export const listEngineRoles = () => http.get<EngineRolesResponse>('/engines/roles')
+
+/**
+ * Assign engines to roles. Only the keys that are sent are written, so the roles form saves
+ * one dropdown without touching the other two, and `null` is how a role is emptied.
+ *
+ * The response is the whole assignment afterwards — every role's status, not just the ones
+ * that changed — because switching Deep to an engine that is switched off changes nothing
+ * about Quick but does change what the page has to say about Deep.
+ */
+export const setEngineRoles = (body: EngineRolesUpdate) =>
+  http.put<EngineRolesResponse>('/engines/roles', { body })
 
 export const testRunEngine = (id: number, body: SampleRequest = {}) =>
   http.post<SampleResponse>(`/engines/${id}/test-run`, { body })

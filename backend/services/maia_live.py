@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import Session
 
 from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING
-from backend.db.enums import EngineKind
+from backend.db.enums import EngineRole
 from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
 
@@ -296,13 +296,14 @@ class LiveMaia:
         elsewhere = _any_maia(session)
         if elsewhere is not None:
             raise LiveMaiaUnavailableError(
-                f"the only human-move model, {elsewhere.name!r}, is on "
+                f"the model chosen for human moves, {elsewhere.name!r}, is on "
                 f"{engines_service.engine_host(session, elsewhere)}, and a live query is "
-                f"answered here; register a Maia on this host to use it on the board"
+                f"answered here; register a Maia on this host and choose it to use it on "
+                f"the board"
             )
         raise LiveMaiaUnavailableError(
-            "no human-move model is registered on this host, so there is nothing to ask "
-            "what a human would play"
+            "no human-move model is chosen, so there is nothing to ask what a human would "
+            "play"
         )
 
     def _levels(
@@ -414,16 +415,12 @@ def _policy_moves() -> int:
 
 
 def _any_maia(session: Session) -> Engine | None:
-    """Any enabled Maia at all, wherever it lives — for the reason a refusal gives."""
-    from sqlalchemy import select
+    """The chosen human-move model wherever it lives — for the reason a refusal gives.
 
-    from backend.db.models import Engine
-
-    return session.scalars(
-        select(Engine)
-        .where(Engine.enabled.is_(True), Engine.kind == EngineKind.MAIA)
-        .order_by(Engine.id)
-    ).first()
+    The assignment rather than any Maia on the machine: an unchosen model is not what a
+    board would have asked, so naming it would send the owner after the wrong engine.
+    """
+    return engines_service.engine_for_role(session, EngineRole.HUMAN)
 
 
 # The process-wide session. One warm Maia per deployment, whichever board is asking.

@@ -27,6 +27,7 @@ from backend.db.models import (
     ImportJob,
     Position,
 )
+from backend.services import engines as engines_service
 from backend.services import import_service
 from backend.services.import_service import ImportFailure, ParsedGame
 
@@ -64,12 +65,12 @@ def _add_engine(session: Session, **changes: Any) -> Engine:
         name=changes.pop("name", "Stockfish"),
         kind=changes.pop("kind", EngineKind.UCI),
         path="/opt/homebrew/bin/stockfish",
-        default_tier=changes.pop("default_tier", Tier.QUICK),
         enabled=changes.pop("enabled", True),
         **changes,
     )
     session.add(engine)
     session.commit()
+    engines_service.assign_default_roles(session, engine)
     return engine
 
 
@@ -340,10 +341,11 @@ def test_a_later_import_still_evaluates_after_one_that_skipped_it(
     assert _count(session, AnalysisRun) == 1
 
 
-def test_an_enabled_uci_engine_stands_in_when_no_tier_default_is_set(
+def test_an_import_queues_against_the_engine_assigned_to_the_quick_tier(
     session: Session, fixtures_dir: Path
 ) -> None:
-    engine = _add_engine(session, default_tier=None)
+    engine = _add_engine(session)
+    _add_engine(session, name="Spare")
 
     import_service.run_import(session, "pgn", path=_multi_game(fixtures_dir))
 
@@ -363,7 +365,7 @@ def test_no_enabled_engine_means_no_run_and_a_clean_import(
 
 
 def test_a_maia_engine_is_never_the_quick_stand_in(session: Session) -> None:
-    _add_engine(session, name="Maia 1700", kind=EngineKind.MAIA, default_tier=None)
+    _add_engine(session, name="Maia 1700", kind=EngineKind.MAIA)
     assert import_service.quick_tier_engine(session) is None
 
 

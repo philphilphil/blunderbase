@@ -1,11 +1,33 @@
+import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
+import { Toaster } from 'sonner'
 
 import { useBackfillRun } from '@/lib/analysis'
+import { browserRunner } from '@/lib/runner'
 
 import { BackfillTakeover } from './BackfillTakeover'
 import { CommandPaletteProvider } from './CommandPalette'
 import { SideNav } from './SideNav'
 import { TopBar } from './TopBar'
+
+/**
+ * `sonner`'s own styles are switched off (`unstyled`) and every slot rebuilt from the
+ * app's semantic classes, so a toast reads as part of Blunderbase in both themes rather
+ * than as a widget from somewhere else — the same reason nothing in this app names a hex.
+ */
+const TOAST_CLASSES = {
+  toast:
+    'flex items-center gap-2.5 rounded-xl border border-edge-strong bg-elevated px-3.5 py-3 text-[0.78125rem] text-ink shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]',
+  title: 'text-ink',
+  description: 'text-dim',
+  icon: 'flex-none',
+  actionButton: 'rounded-md bg-accent-teal px-2 py-1 text-accent-ink',
+  cancelButton: 'rounded-md bg-raised px-2 py-1 text-dim',
+  closeButton: 'border-edge bg-elevated text-dim hover:text-ink',
+  success: 'border-good/30',
+  error: 'border-blunder/30',
+  info: 'border-info/30',
+}
 
 /**
  * Layout 1a "Studio": a 46px titlebar over a 200px rail and the page's own canvas.
@@ -19,6 +41,14 @@ import { TopBar } from './TopBar'
  * stays in the URL underneath, so releasing puts the owner back on the page they left.
  */
 export function AppShell() {
+  // If a browser runner is installed in this browser, this is where it comes back: the
+  // shell is what a signed-in tab mounts, and the link has to be alive on every page rather
+  // than only while somebody is looking at `/engines`. A no-op when nothing is installed,
+  // and safe to call again — the client ignores a resume it is already connected for.
+  useEffect(() => {
+    browserRunner.resume()
+  }, [])
+
   const backfill = useBackfillRun()
   if (backfill) return <BackfillTakeover run={backfill} />
 
@@ -33,6 +63,11 @@ export function AppShell() {
           </main>
         </div>
       </div>
+      <Toaster
+        position="bottom-right"
+        gap={8}
+        toastOptions={{ unstyled: true, classNames: TOAST_CLASSES }}
+      />
     </CommandPaletteProvider>
   )
 }

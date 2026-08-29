@@ -4,12 +4,16 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { toast } from '@/lib/toast'
+
 import { QueueCard } from './QueueCard'
 import type { RunActivity } from './useRunActivity'
 
 /** The socket's rows, which this card only reads: the hook has its own tests. */
 const activity = vi.hoisted(() => ({ current: [] as RunActivity[] }))
 vi.mock('./useRunActivity', () => ({ useRunActivity: () => activity.current }))
+
+vi.mock('@/lib/toast', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -102,5 +106,18 @@ describe('QueueCard', () => {
 
     await waitFor(() => expect(calls).toContain('POST /api/analysis'))
     expect(calls).not.toContain('POST /api/analysis/maia-fill')
+  })
+
+  it('toasts a failed retry, since the row has no panel of its own to say so in', async () => {
+    activity.current = [run({ tier: 'deep', status: 'failed', error: 'engine exited' })]
+    routes['POST /api/analysis'] = () =>
+      json(409, { error: 'no_engine', detail: 'no engine is registered for deep' })
+    draw()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'retry' }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('no engine is registered for deep'),
+    )
   })
 })

@@ -1027,7 +1027,10 @@ class RunnerClient:
 
     async def _add_maia(self, job: Job, evals: list[MoveEval]) -> str | None:
         """The human-policy pass. A Maia that will not answer degrades, never fails."""
-        if job.maia is None or not evals:
+        # A plan that carries no Maia pass costs this runner nothing: no process, no slot.
+        # A plan from a server that predates the flag carries it as true, so the runner does
+        # what it always did.
+        if not job.plan.maia or job.maia is None or not evals:
             return None
 
         def work(adapter: Adapter) -> int:

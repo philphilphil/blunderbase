@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     # to `<root>/web/dist`; a directory that was never built simply is not served, which
     # is the normal case in development (the Vite dev server has the page instead).
     web_dist: Path | None = None
+    # Whether the page is served cross-origin isolated (`Cross-Origin-Opener-Policy:
+    # same-origin` plus `Cross-Origin-Embedder-Policy: require-corp`). That is the browser's
+    # price for `SharedArrayBuffer`, which a multi-threaded WASM engine cannot run without —
+    # so it is on, and the cost is that every cross-origin subresource the page loads must
+    # opt in with CORP. Off is for a deployment behind a proxy that rewrites the headers, or
+    # one that has added an asset from another origin: the page then works exactly as before
+    # and a browser engine falls back to one thread. See `api/web.py`.
+    cross_origin_isolation: bool = True
 
     # Engine processes running at once, shared across tiers. Workers are asyncio tasks in
     # the API process, so this caps CPU rather than connections.

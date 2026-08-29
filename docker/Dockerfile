@@ -18,6 +18,13 @@ RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web ./
+# The browser engine's neural net is downloaded here, into the image, rather than by the
+# page that uses it: an instance on a network with no way out — or simply one whose owner
+# would rather not have a page reach fishtest — still gets a working engine, and the file is
+# then served from the same origin as everything else. It is pinned by sha256 in
+# `scripts/engine-assets.mjs`, so this layer cannot silently change under a rebuild; the
+# build below runs the same command and finds the cache warm.
+RUN node scripts/engine-assets.mjs fetch
 # No VITE_API_BASE: the client's default `/api` is what the backend serves the routers
 # under, so every request the browser makes is same-origin. Baking a host in here is what
 # breaks a hosted instance — the page would call the visitor's own machine.

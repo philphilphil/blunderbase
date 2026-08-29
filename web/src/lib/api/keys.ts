@@ -41,7 +41,15 @@ export const queryKeys = {
    * the fill button catches up as the runs it queued come back.
    */
   maiaFill: (): QueryKey => ['analysis', 'maia-fill'],
+  /**
+   * The Analysis page's whole picture. Under `['analysis']` for the same reason the fill
+   * count is: every socket frame about a run makes the split, the backlog counts and the
+   * estimates stale, and `invalidationsFor` already names that prefix.
+   */
+  coverage: (): QueryKey => ['analysis', 'coverage'],
   runs: (gameId: number, tier?: Tier): QueryKey => ['analysis', 'runs', gameId, tier ?? null],
+  /** The failures, listed by status rather than by game — no game to key them under. */
+  failedRuns: (limit: number): QueryKey => ['analysis', 'runs', 'failed', limit],
   run: (runId: number): QueryKey => ['analysis', 'run', runId],
   runEvals: (runId: number, window: { ply_start?: number; ply_end?: number } = {}): QueryKey => [
     'analysis',
@@ -86,6 +94,7 @@ export const queryKeys = {
   engineList: (enabledOnly = false): QueryKey => ['engines', 'list', enabledOnly],
   engine: (id: number): QueryKey => ['engines', 'detail', id],
   engineTiers: (): QueryKey => ['engines', 'tiers'],
+  engineRoles: (): QueryKey => ['engines', 'roles'],
 
   runners: (): QueryKey => ['runners'],
   runnerList: (): QueryKey => ['runners', 'list'],

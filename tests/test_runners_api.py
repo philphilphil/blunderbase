@@ -21,11 +21,12 @@ from fastapi.testclient import TestClient
 from backend.api.app import create_app
 from backend.config import Settings
 from backend.db.enums import RunStatus
+from backend.db.session import get_sessionmaker
 from backend.runners import protocol
-from backend.runners.config import WS_PATH, RunnerConfig
+from backend.runners.config import WS_PATH, WS_SUBPROTOCOL, RunnerConfig
 from backend.services import runners as runners_service
 from tests.conftest import running_app, socket_headers
-from tests.fake_runner import FakeRunner, connect
+from tests.fake_runner import WASM_AD, FakeRunner, connect
 from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
 from tests.test_runner_gateway import (
     dispatch_for,
@@ -64,9 +65,7 @@ def create(api: TestClient, name: str = "gpu-box", **body: Any) -> dict[str, Any
 def local_engine(api: TestClient, tmp_path: Path) -> int:
     """A scripted UCI binary on this host, registered the way the Engines page registers one."""
     path = fake_engine_command(tmp_path, name="FakeFish 1", options=STOCKFISH_OPTIONS)
-    created = api.post(
-        "/engines", json={"name": "fakefish", "path": path, "default_tier": "quick"}
-    )
+    created = api.post("/engines", json={"name": "fakefish", "path": path})
     assert created.status_code == 201, created.text
     return int(created.json()["id"])
 
@@ -306,6 +305,104 @@ def test_a_revoked_token_opens_nothing(api: TestClient, settings: Settings) -> N
         code, _reason = FakeRunner(ws).closed()
 
     assert code == protocol.WS_CLOSE_UNAUTHORIZED
+
+
+# --- the handshake a browser can perform ------------------------------------
+#
+# `new WebSocket(url, protocols)` is the whole of what a tab can send: no headers, and a
+# token in the query string would be written into every access log on the way. So the
+# token rides in `Sec-WebSocket-Protocol` behind a sentinel, and the accept has to echo the
+# sentinel back or the browser fails the handshake — including when it is about to refuse.
+
+
+def test_a_tab_may_present_its_token_as_a_subprotocol(
+    api: TestClient, settings: Settings
+) -> None:
+    _runner_id, token = register(settings, "this-browser", slots=1)
+
+    with api.websocket_connect(WS_PATH, subprotocols=[WS_SUBPROTOCOL, token]) as socket:
+        assert socket.accepted_subprotocol == WS_SUBPROTOCOL
+        runner = FakeRunner(socket, name="this-browser", slots=1)
+        welcome = runner.hello(browser=True)
+
+    assert welcome["runner"] == "this-browser"
+    with get_sessionmaker(settings)() as session:
+        assert runners_service.runner_by_name(session, "this-browser").browser is True
+
+
+def test_a_tabs_engine_is_listed_as_something_other_than_a_file(
+    api: TestClient, settings: Settings
+) -> None:
+    """The page has to say "in this browser" rather than render `wasm:…` as a path, so the
+    scheme is on the payload and no client has to parse the string to find it."""
+    _runner_id, token = register(settings, "this-browser", slots=1)
+
+    with api.websocket_connect(WS_PATH, subprotocols=[WS_SUBPROTOCOL, token]) as socket:
+        FakeRunner(socket, name="this-browser", slots=1, engines=[WASM_AD]).hello(browser=True)
+        listing = api.get("/runners").json()
+        engines = api.get("/engines").json()
+
+    row = listing[0]
+    assert row["browser"] is True
+    assert row["engines"][0]["path"] == "wasm:stockfish-18"
+    assert row["engines"][0]["path_scheme"] == "wasm"
+    assert engines[0]["path_scheme"] == "wasm"
+
+
+def test_a_refused_tab_is_still_answered_with_the_subprotocol_it_offered(
+    api: TestClient,
+) -> None:
+    """Otherwise the browser fails the handshake itself and the 4401 never reaches it."""
+    with api.websocket_connect(
+        WS_PATH, subprotocols=[WS_SUBPROTOCOL, "bb_rnr_nobody"]
+    ) as socket:
+        assert socket.accepted_subprotocol == WS_SUBPROTOCOL
+        code, _reason = FakeRunner(socket).closed()
+
+    assert code == protocol.WS_CLOSE_UNAUTHORIZED
+
+
+def test_a_socket_offering_only_the_sentinel_carries_no_token(api: TestClient) -> None:
+    with api.websocket_connect(WS_PATH, subprotocols=[WS_SUBPROTOCOL]) as socket:
+        code, _reason = FakeRunner(socket).closed()
+
+    assert code == protocol.WS_CLOSE_UNAUTHORIZED
+
+
+def test_a_subprotocol_without_the_sentinel_is_not_a_credential(
+    api: TestClient, settings: Settings
+) -> None:
+    """A bare list of protocols is somebody else's contract, not a token to read."""
+    _runner_id, token = register(settings, "gpu-box")
+
+    with api.websocket_connect(WS_PATH, subprotocols=[token]) as socket:
+        assert socket.accepted_subprotocol is None
+        code, _reason = FakeRunner(socket).closed()
+
+    assert code == protocol.WS_CLOSE_UNAUTHORIZED
+
+
+def test_a_token_in_the_query_string_opens_nothing(api: TestClient, settings: Settings) -> None:
+    """It would be logged by every proxy it passed through, so it is not read."""
+    _runner_id, token = register(settings, "gpu-box")
+
+    with api.websocket_connect(f"{WS_PATH}?token={token}") as socket:
+        code, _reason = FakeRunner(socket).closed()
+
+    assert code == protocol.WS_CLOSE_UNAUTHORIZED
+
+
+def test_the_header_still_opens_the_socket_and_says_nothing_about_a_browser(
+    api: TestClient, settings: Settings
+) -> None:
+    """The Python runner is unchanged by any of this."""
+    _runner_id, token = register(settings, "gpu-box")
+
+    with connect(api, token) as runner:
+        assert runner.welcome is not None
+
+    with get_sessionmaker(settings)() as session:
+        assert runners_service.runner_by_name(session, "gpu-box").browser is False
 
 
 def test_revoking_a_runner_that_is_not_there_is_a_named_404(api: TestClient) -> None:

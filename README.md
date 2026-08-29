@@ -115,4 +115,9 @@ releases and testing are in [docs/reference.md](docs/reference.md).
 ## License
 
 No `LICENSE` file yet, so all rights are reserved by default until one is added. The image
-ships Debian's Stockfish package (GPL-3.0), unmodified and separately licensed.
+ships Debian's Stockfish package (GPL-3.0), unmodified and separately licensed. It also
+ships `@lichess-org/stockfish-web` — Stockfish compiled to WebAssembly, declared
+`AGPL-3.0-or-later` by its npm package and distributed with the GNU GPL v3 as its LICENSE
+file — together with the neural network it loads. Both are unmodified and separately
+licensed too, and both are served as their own files in the web output rather than bundled
+into any JavaScript of ours.

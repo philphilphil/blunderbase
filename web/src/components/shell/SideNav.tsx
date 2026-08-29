@@ -15,6 +15,7 @@ import {
   Cpu,
   Download,
   Flame,
+  Gauge,
   LayoutDashboard,
   Library,
   Radio,
@@ -24,6 +25,7 @@ import {
 import type { ComponentType, ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
+import { StatusDot } from '@/components/badges/StatusDot'
 import { useEngines, useGames, useLiveState } from '@/lib/api/queries'
 import type { Color } from '@/lib/api/types'
 import { useEvents } from '@/lib/events/EventsProvider'
@@ -56,8 +58,13 @@ const WORKSPACE: NavItem[] = [
   { to: '/live', label: 'Live', icon: Radio },
 ]
 
+/**
+ * Where games come from, what has been run over them, and what runs it — in that order,
+ * which is the order the work happens in.
+ */
 const DATA: NavItem[] = [
   { to: '/import', label: 'Import', icon: Download },
+  { to: '/analysis', label: 'Analysis', icon: Gauge },
   { to: '/settings/engines', label: 'Engines', icon: Cpu },
 ]
 
@@ -177,12 +184,7 @@ function EngineRoster() {
           className="flex items-center gap-2.5 rounded-md px-2 py-[0.4375rem] text-[0.8125rem] text-soft"
           title={engine.path}
         >
-          <span
-            className={cn(
-              'mx-1 size-1.5 flex-none rounded-full',
-              engine.enabled ? 'bg-emerald-400 shadow-[0_0_0.375rem_0.0625rem] shadow-emerald-400/70' : 'bg-faint',
-            )}
-          />
+          <StatusDot tone={engine.enabled ? 'healthy' : 'away'} className="mx-1" />
           <span className="truncate">{engine.name}</span>
         </div>
       ))}

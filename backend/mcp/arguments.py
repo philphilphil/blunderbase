@@ -42,6 +42,22 @@ def tier(value: str | None, default: Tier = Tier.DEEP) -> Tier:
     return member(Tier, value, "tier") or default
 
 
+def flag(value: bool | str | None, field: str) -> bool | None:
+    """A yes/no a model may have typed as a word rather than sent as a boolean.
+
+    None stays None, because for these arguments it is a third answer — "whatever the
+    deployment is configured for" — and not a way of saying no.
+    """
+    if value is None or isinstance(value, bool):
+        return value
+    text = str(value).strip().casefold()
+    if text in {"true", "yes", "on", "1"}:
+        return True
+    if text in {"false", "no", "off", "0"}:
+        return False
+    raise CoachError(BAD_ARGUMENT, f"{field} is yes or no, not {value!r}", allowed=[True, False])
+
+
 def platform(value: str | None) -> Source | None:
     """A platform name as the source it imports through: "otb" is a manual entry."""
     if value is None:

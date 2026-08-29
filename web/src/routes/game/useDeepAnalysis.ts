@@ -4,6 +4,7 @@ import { useRequestAnalysis, useRuns } from '@/lib/api/queries'
 import type { RunResponse } from '@/lib/api/types'
 import { useEventListener } from '@/lib/events/EventsProvider'
 import type { AnalysisProgressEvent, AnalysisRunEvent } from '@/lib/events/types'
+import { toast } from '@/lib/toast'
 
 export interface RunProgress {
   done: number
@@ -17,10 +18,17 @@ export interface RunProgress {
  * the deep button can be pressed while that is still going), and a listener that checked
  * `game_id` alone would interleave two counters into one bar and let whichever run finished
  * first clear the other one's progress.
+ *
+ * A refusal is toasted. Nothing falls back any more: if the engine assigned to Deep is
+ * switched off or on a machine that is not connected, the POST is refused with a sentence
+ * naming it ("'sf-nuc' runs on 'nuc', which is not connected"), and the button's only trace
+ * of that was a red tint and a tooltip nobody hovers. The sentence is passed through rather
+ * than replaced — it is the same one the Engines page shows for that role, and it says
+ * which engine and what to do about it.
  */
 export function useDeepAnalysis(gameId: number) {
   const runs = useRuns(gameId)
-  const analysis = useRequestAnalysis()
+  const analysis = useRequestAnalysis({ onError: (error) => toast.error(error.message) })
 
   /** The last `analysis.progress` frame, tagged with the run it belongs to. */
   const [progress, setProgress] = useState<(RunProgress & { runId: number }) | null>(null)

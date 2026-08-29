@@ -22,7 +22,7 @@ from backend.adapters.pool import EnginePool, EngineSpec
 from backend.adapters.stockfish import StockfishAdapter, probe_engine
 from backend.config import Settings
 from backend.db.base import Base
-from backend.db.enums import EngineKind, RunStatus, Tier
+from backend.db.enums import EngineKind, RunStatus
 from backend.db.models import AnalysisRun
 from backend.db.session import create_db_engine
 from backend.services import app_settings
@@ -103,7 +103,6 @@ def test_a_real_engine_registered_through_the_service_can_be_test_run(
         name="Stockfish",
         path=stockfish_path(),
         options={"Threads": 1},
-        default_tier=Tier.QUICK,
     )
 
     sample = sample_eval(session, engine.id, ITALIAN, nodes=100_000, multipv=2)
@@ -144,7 +143,6 @@ async def test_a_real_quick_pass_runs_a_whole_game_through_the_workers(
                 name="Stockfish",
                 path=stockfish_path(),
                 options={"Threads": 1},
-                default_tier=Tier.QUICK,
             )
             job = run_import(owned, "pgn", path=str(fixtures_dir / "analysis_game.pgn"))
             assert job.games_imported == 1, job.errors

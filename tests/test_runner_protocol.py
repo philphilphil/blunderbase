@@ -187,11 +187,45 @@ def test_a_snapshot_carries_lines_in_the_shape_the_database_stores() -> None:
             owner_color=Color.BLACK,
         ),
         _game_plan(maia_target_elo=1700),
+        _game_plan(maia=False),
+        _game_plan(maia_both_sides=False),
     ],
-    ids=["a game", "a bare fen", "chess960", "a maia target elo"],
+    ids=[
+        "a game",
+        "a bare fen",
+        "chess960",
+        "a maia target elo",
+        "no maia pass",
+        "the owner's moves only",
+    ],
 )
 def test_a_plan_comes_back_the_plan_it_was(plan: RunPlan) -> None:
     assert protocol.decode_plan(protocol.encode_plan(plan)) == plan
+
+
+def test_whether_maia_runs_crosses_the_wire_with_the_plies_it_would_ask_about() -> None:
+    """A runner has no settings to read either out of, so both travel with the plan."""
+    encoded = protocol.decode(
+        protocol.encode(protocol.encode_plan(_game_plan(maia=False, maia_both_sides=False)))
+    )
+
+    assert (encoded["maia"], encoded["maia_both_sides"]) == (False, False)
+    decoded = protocol.decode_plan(encoded)
+    assert decoded.maia_ratings() == []
+    # White in `_game_plan`, so the owner's own moves are the even plies.
+    assert decoded.maia_plies() == [0]
+
+
+def test_a_plan_from_a_host_that_predates_the_flags_still_asks_maia_about_both_sides() -> None:
+    """The backwards-compatibility rule `maia_target_elo` is kept for, applied to the flags."""
+    older = protocol.encode_plan(_game_plan())
+    del older["maia"]
+    del older["maia_both_sides"]
+
+    decoded = protocol.decode_plan(older)
+
+    assert (decoded.maia, decoded.maia_both_sides) == (True, True)
+    assert decoded.maia_plies() == [0, 1]
 
 
 def test_a_target_elo_crosses_the_wire_so_a_runner_computes_the_same_levels() -> None:
@@ -326,6 +360,26 @@ def test_an_advertisement_round_trips() -> None:
         }
     )
 
+    assert EngineAd.from_dict(protocol.decode(protocol.encode(ad.as_dict()))) == ad
+    assert ad.probe().option("Threads") is not None
+
+
+def test_an_engine_that_is_not_a_file_advertises_the_same_way() -> None:
+    """A browser tab's WASM build: the path is an identifier, and the wire does not care."""
+    ad = EngineAd.from_dict(
+        {
+            "name": "wasm-sf",
+            "kind": "uci",
+            "path": "wasm:stockfish-18",
+            "version": "Stockfish 18 (WASM)",
+            "tier": "quick",
+            "options": {"Threads": 4},
+            "declared_options": [STOCKFISH_OPTION],
+            "streams": True,
+        }
+    )
+
+    assert ad.path == "wasm:stockfish-18"
     assert EngineAd.from_dict(protocol.decode(protocol.encode(ad.as_dict()))) == ad
     assert ad.probe().option("Threads") is not None
 

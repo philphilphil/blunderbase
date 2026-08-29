@@ -24,6 +24,7 @@ from backend.db.models import (
 )
 from backend.db.session import session_scope
 from backend.services import auth as auth_service
+from backend.services import engines as engines_service
 from backend.services import import_service
 
 
@@ -228,9 +229,12 @@ def test_analyze_queues_a_pass_per_game_without_running_it(
 ) -> None:
     assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
     with session_scope(settings) as session:
-        session.add(
-            Engine(name="Stockfish", kind=EngineKind.UCI, path="/usr/bin/stockfish", enabled=True)
+        engine = Engine(
+            name="Stockfish", kind=EngineKind.UCI, path="/usr/bin/stockfish", enabled=True
         )
+        session.add(engine)
+        session.commit()
+        engines_service.assign_default_roles(session, engine)
     capsys.readouterr()
 
     assert main(["analyze", "--queue-only"]) == 0
@@ -251,18 +255,19 @@ def test_analyze_runs_the_queue_down_in_this_process(
     """`blunderbase analyze` is the headless half of the workers the API process runs."""
     assert main(["db", "upgrade"]) == 0
     with session_scope(settings) as session:
-        session.add(
-            Engine(
-                name="FakeFish",
-                kind=EngineKind.UCI,
-                path=fake_engine_command(
-                    tmp_path,
-                    options=STOCKFISH_OPTIONS,
-                    go_default={"info": ["depth 8 score cp 20 nodes 100"], "bestmove": "(none)"},
-                ),
-                enabled=True,
-            )
+        engine = Engine(
+            name="FakeFish",
+            kind=EngineKind.UCI,
+            path=fake_engine_command(
+                tmp_path,
+                options=STOCKFISH_OPTIONS,
+                go_default={"info": ["depth 8 score cp 20 nodes 100"], "bestmove": "(none)"},
+            ),
+            enabled=True,
         )
+        session.add(engine)
+        session.commit()
+        engines_service.assign_default_roles(session, engine)
     assert main(["import", "pgn", str(fixtures_dir / "analysis_game.pgn")]) == 0
     capsys.readouterr()
 
@@ -276,14 +281,14 @@ def test_analyze_runs_the_queue_down_in_this_process(
     assert run.status is RunStatus.DONE
 
 
-def test_analyze_says_so_when_no_engine_is_registered(
+def test_analyze_says_so_when_no_engine_is_assigned_to_the_tier(
     settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
     capsys.readouterr()
 
     assert main(["analyze", "--queue-only"]) == 1
-    assert "no engine is registered yet" in capsys.readouterr().out
+    assert "no engine is assigned to the quick tier" in capsys.readouterr().out
 
 
 def test_set_password_asks_twice_and_stores_a_hash(

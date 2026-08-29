@@ -12,10 +12,13 @@ Both of those worlds go out through `asyncio.to_thread`:
   otherwise stall every other worker's engine;
 - the engine, because a UCI search is a blocking read on a pipe.
 
-One run is two passes over the same positions: Stockfish for the evaluation, then Maia for
-the human policy. They are sequential rather than nested because both draw on the same
-`analysis_concurrency` semaphore, and a worker holding a slot while waiting for a second
-one deadlocks the moment that cap is a single process.
+One run is up to two passes over the same positions: Stockfish for the evaluation, then —
+where the run was queued asking for it — Maia for the human policy. They are sequential
+rather than nested because both draw on the same `analysis_concurrency` semaphore, and a
+worker holding a slot while waiting for a second one deadlocks the moment that cap is a
+single process. A run that carries no Maia pass never opens the process or takes the slot:
+the Maia half is 40-70% of a quick run's cost, so skipping it is the whole point of the
+flag rather than a detail of it.
 
 A set also says that the runs it holds are alive, every `HEARTBEAT_SECONDS`. That is what
 tells another starting process which `running` rows are a dead one's to collect and which
@@ -292,7 +295,9 @@ class AnalysisWorkers:
 
     async def _add_maia(self, context: RunContext, evals: list[MoveEval]) -> str | None:
         """Run the human-policy pass. A Maia that will not answer degrades, never fails."""
-        if context.maia_spec is None or not evals:
+        # A run queued without one is not a degraded run and has nothing to note: no engine
+        # is started and no slot is taken, which is the saving the flag exists for.
+        if not context.plan.maia or context.maia_spec is None or not evals:
             return None
         plan = context.plan
 
@@ -372,12 +377,20 @@ class AnalysisWorkers:
             engine = session.get(Engine, run.engine_id) if run.engine_id else None
             if engine is None or not engine.enabled or engine.runner_id is not None:
                 # The engine named at enqueue time has since been deleted, switched off or
-                # moved to a runner; the tier's current local choice stands in rather than
-                # the run failing. Remote work is claimed by the gateway, not by this set,
-                # so a remote engine reaching here is a race, not a job to attempt.
+                # moved to a runner; the engine the owner has assigned to this tier stands
+                # in, where that one is on this host. Remote work is claimed by the gateway,
+                # not by this set, so a remote engine reaching here is a race, not a job to
+                # attempt.
                 engine = engines_service.engine_for_tier(session, run.tier, local_only=True)
             if engine is None:
-                raise analysis.AnalysisError("no engine is available for this tier")
+                # Nothing substitutes for an assignment, so this run is one the deployment
+                # cannot serve as configured. Failed with the reason the roles form would
+                # show, and without a retry: a second attempt hits the same wall.
+                status = engines_service.tier_status(session, run.tier)
+                raise analysis.AnalysisError(
+                    status.reason
+                    or f"the engine assigned to the {run.tier.value} tier is not on this host"
+                )
             if not engines_service.binary_present(engine.path):
                 raise analysis.AnalysisError(
                     f"the binary for {engine.name!r} is no longer at {engine.path}"

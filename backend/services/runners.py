@@ -276,6 +276,7 @@ def mark_connected(
     transport: str = "websocket",
     version: str | None = None,
     slots: int | None = None,
+    browser: bool = False,
 ) -> Runner:
     """Record that a runner is here, and announce it.
 
@@ -283,8 +284,13 @@ def mark_connected(
     yaml that asks for more does not get it. It is taken to *lower* the number for this
     connection, though — see `effective_slots` — because a runner that says it has two
     slots must not be handed four jobs.
+
+    `browser` *is* written, every time: what kind of host is dialling in is a fact about
+    this connection rather than a setting the owner made, and the same token could open a
+    tab today and start a script tomorrow. `analysis.requeue_stale_runs` is what reads it.
     """
     runner.connected = True
+    runner.browser = bool(browser)
     runner.version = None if version is None else str(version)[:32]
     runner.last_seen_at = utcnow()
     session.commit()
@@ -414,6 +420,9 @@ def runner_payload(
         "slots": runner.slots,
         "version": runner.version,
         "connected": runner.connected,
+        # What kind of host last dialled in. A browser tab is listed differently and is
+        # forgiven differently, so the page has to be able to tell.
+        "browser": runner.browser,
         "transport": live.get("transport"),
         "last_seen_at": None if runner.last_seen_at is None else runner.last_seen_at.isoformat(),
         "created_at": runner.created_at.isoformat(),
@@ -433,10 +442,16 @@ def engine_payload(engine: Engine) -> dict[str, Any]:
         "kind": engine.kind.value,
         "version": engine.version,
         "path": engine.path,
+        # Not every engine is a file. A browser tab advertises `wasm:stockfish-18`, and
+        # the page has to say "in this browser" rather than render that as a path.
+        "path_scheme": engines_service.path_scheme(engine.path),
         "enabled": engine.enabled,
-        "default_tier": None if engine.default_tier is None else engine.default_tier.value,
-        # Maia answers with a policy rather than a search, so it never drives a stream.
-        "streams": engine.kind.value == "uci",
+        # What the host said it will answer, and only then what the kind allows: a Maia
+        # answers with a policy rather than a search, so it never drives a stream whatever
+        # it claims. The stored flag is the runner's own word — a host that implements
+        # queue work and no analysis boards says so in its advertisement, and inferring
+        # `true` from the kind here is what let the picker offer a board nobody answers.
+        "streams": engine.streams and engine.kind.value == "uci",
     }
 
 
@@ -633,7 +648,6 @@ def config_yaml(runner: Runner, token: str, *, server_url: str) -> str:
             "  # One entry per engine on THIS machine. Edit the paths before starting.",
             "  - name: sf-remote",
             "    path: /usr/games/stockfish",
-            "    tier: deep",
             "    options:",
             "      Threads: 8",
             "",

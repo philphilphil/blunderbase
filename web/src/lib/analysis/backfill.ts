@@ -8,7 +8,7 @@
  * filters: which tier, how many runs the POST took on, and when it began. Everything else
  * is read back off the queue.
  *
- * Follows `routes/engines/expertMode.ts`'s localStorage + `useSyncExternalStore` idiom, so
+ * Follows `lib/board/linePreviewPrefs.ts`'s localStorage + `useSyncExternalStore` idiom, so
  * a second tab watching the same pass follows along and clears with it.
  */
 import { useSyncExternalStore } from 'react'

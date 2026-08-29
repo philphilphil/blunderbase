@@ -4,8 +4,8 @@
   "version": "0.4.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node scripts/engine-assets.mjs fetch && vite",
+    "build": "node scripts/engine-assets.mjs fetch && tsc -b && vite build",
     "typecheck": "tsc -b --force",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,6 +16,7 @@
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@lichess-org/chessground": "^10.1.1",
+    "@lichess-org/stockfish-web": "0.4.2",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-label": "^2.1.15",
@@ -36,6 +37,7 @@
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
+    "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

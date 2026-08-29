@@ -92,12 +92,11 @@ def local_engine(
     api: TestClient,
     tmp_path: Path,
     name: str = "fakefish",
-    tier: str | None = "quick",
     **scenario: Any,
 ) -> int:
     """One scripted UCI binary on this host, registered the way the Engines page does it."""
     path = fake_engine_command(tmp_path, name="FakeFish 1", options=STOCKFISH_OPTIONS, **scenario)
-    created = api.post("/engines", json={"name": name, "path": path, "default_tier": tier})
+    created = api.post("/engines", json={"name": name, "path": path})
     assert created.status_code == 201, created.text
     return int(created.json()["id"])
 
@@ -355,8 +354,11 @@ def test_a_one_shot_evaluation_never_starts_a_runner_s_binary(
         assert refused.json()["error"] == "tier_unavailable"
         assert "sf-remote" in refused.json()["detail"]
 
-        # A binary on this host, claiming a different tier: the fallback finds it anyway.
-        local_engine(api, tmp_path, tier="deep")
+        # A binary on this host is not enough on its own: nothing falls back to an engine
+        # the owner has not assigned, so the quick role has to be moved to it.
+        here = local_engine(api, tmp_path)
+        assert api.post("/analysis/position", json={"fen": STARTING_FEN}).status_code == 409
+        assert api.put("/engines/roles", json={"quick": here}).status_code == 200
         answered = api.post("/analysis/position", json={"fen": STARTING_FEN, "nodes": 1000})
 
     assert answered.status_code == 200, answered.text

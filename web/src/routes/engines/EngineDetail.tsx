@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { Loader2, Play, RefreshCw, Trash2 } from 'lucide-react'
+import { ChevronRight, Loader2, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 
-import { TierBadge } from '@/components/badges/TierBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,21 +12,18 @@ import {
   useTestRunEngine,
   useUpdateEngine,
 } from '@/lib/api/queries'
-import type {
-  EngineResponse,
-  EngineUpdate,
-  SampleRequest,
-  Tier,
-  TierStatusResponse,
-} from '@/lib/api/types'
+import type { EngineResponse, EngineUpdate, SampleRequest } from '@/lib/api/types'
 import { isRemote, type EngineHost } from '@/lib/engines/hosts'
+import { readCredential } from '@/lib/runner'
 import { cn } from '@/lib/utils'
 
+import { KindBadge, RoleBadge } from './EngineBadges'
 import { HostBadge } from './HostBadge'
 import { OptionsEditor } from './OptionsEditor'
 import { SampleResult } from './SampleResult'
 import { Toggle } from './Toggle'
 import { declaredOptions, draftFrom, resolveDraft, type OptionDraft } from './options'
+import { NO_ROLES, roleLabel, type EngineRoles } from './roles'
 
 const DEFAULT_NODES = 200_000
 const DEFAULT_MULTIPV = 3
@@ -72,6 +68,13 @@ function Section({
  * spawning whatever this host happens to have at a remote path is the one thing worse than
  * a disabled button.
  *
+ * A browser runner is the same kind of row and needs different words for all of it. There
+ * is no yaml to send anybody to, no machine to log into, and `path` is `wasm:stockfish-18`,
+ * which is an identifier rather than a location — printed under a label saying "Path" it
+ * would have the owner searching a filesystem for a file that was never there. `inBrowser`
+ * below is that branch, and it reads the backend's own `path_scheme` rather than parsing
+ * the path here.
+ *
  * Which of the two a row is comes from `/runners/status`, a different read from the one that
  * fetched the row — so there is a third state, `hostKnown === false`, while that read is in
  * flight or after it failed. Nothing that touches the binary happens in it: "not known to be
@@ -81,8 +84,8 @@ export function EngineDetail({
   engine,
   host,
   hostKnown,
-  tiers,
-  expertMode,
+  roles = NO_ROLES,
+  embedded = false,
   onDeleted,
 }: {
   engine: EngineResponse
@@ -90,21 +93,35 @@ export function EngineDetail({
   host?: EngineHost
   /** Whether `/runners/status` has answered — until it has, `host` says nothing. */
   hostKnown: boolean
-  tiers: TierStatusResponse[]
-  /** Whether UCI options and test runs are shown, or just the binary basics. */
-  expertMode: boolean
+  /** What this engine is assigned to, from `/engines/roles` (`roles.ts`). */
+  roles?: EngineRoles
+  /** Full-width under its inventory row; the summary above already names and locates it. */
+  embedded?: boolean
   onDeleted: () => void
 }) {
   const remote = isRemote(host)
   /** Known to be somebody else's, or not yet known to be ours. */
   const locked = remote || !hostKnown
   const runnerName = host?.runnerName ?? 'that machine'
+  /**
+   * Whether this engine lives inside a browser tab rather than on a filesystem.
+   *
+   * Read off `path_scheme`, which the backend derives — `services.engines.path_scheme` — so
+   * that no client parses `wasm:stockfish-18` for itself and no client is ever one release
+   * behind on what a scheme means. `browser` on the runner says the same thing about the
+   * *host*; either is enough, and a wasm engine on a host that has not been read yet still
+   * must not be described as a file.
+   */
+  const inBrowser = engine.path_scheme === 'wasm' || host?.browser === true
+  const whereItRuns = installedHere(host) ? 'in this browser' : `in ${runnerName}`
   const [name, setName] = useState(engine.name)
   const [path, setPath] = useState(engine.path)
-  const [tier, setTier] = useState<Tier | ''>(engine.default_tier ?? '')
   const [draft, setDraft] = useState<OptionDraft>(() => draftFrom(engine.options))
   const [probeAsked, setProbeAsked] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // The inventory row is already one disclosure level. Advanced controls belong to this
+  // engine rather than to a global mode, and close when another detail replaces this one.
+  const [moreSettings, setMoreSettings] = useState(false)
 
   const [fen, setFen] = useState('')
   const [nodes, setNodes] = useState(String(DEFAULT_NODES))
@@ -134,7 +151,6 @@ export function EngineDetail({
     onSuccess: (saved) => {
       setName(saved.name)
       setPath(saved.path)
-      setTier(saved.default_tier ?? '')
       setDraft(draftFrom(saved.options))
     },
   })
@@ -143,18 +159,16 @@ export function EngineDetail({
 
   const renamed = name.trim() !== engine.name
   const repathed = path.trim() !== engine.path
-  const retiered = (tier || null) !== (engine.default_tier ?? null)
   // An options change can only be trusted once the probe has said what this binary
   // declares; until then the editor is read-only anyway.
   const optionsChanged = probe.isSuccess && resolved.changed
-  const dirty = renamed || repathed || retiered || optionsChanged
+  const dirty = renamed || repathed || optionsChanged
   const blocked = Object.keys(resolved.errors).length > 0
 
   function save() {
     const body: EngineUpdate = {}
     if (renamed) body.name = name.trim()
     if (repathed) body.path = path.trim()
-    if (retiered) body.default_tier = tier || null
     if (optionsChanged && resolved.options) body.options = resolved.options
     if (Object.keys(body).length === 0) return
     update.mutate({ id: engine.id, body })
@@ -176,26 +190,32 @@ export function EngineDetail({
     testRun.mutate({ id: engine.id, body })
   }
 
-  const claimed = tiers.filter((status) => status.engine_id === engine.id)
-
   return (
-    <div className="flex flex-1 flex-col rounded-xl border border-line bg-panel">
+    <div
+      className={cn(
+        'flex flex-1 flex-col',
+        embedded
+          ? 'border-t border-hairline bg-elevated/35'
+          : 'rounded-xl border border-line bg-panel',
+      )}
+    >
       <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
-        <span className="text-xs font-semibold text-ink">{engine.name}</span>
-        <span
-          className={cn(
-            'rounded-sm border px-1.5 py-px text-[0.625rem]',
-            engine.kind === 'maia'
-              ? 'border-deep/28 bg-deep/10 text-deep'
-              : 'border-edge bg-elevated text-soft',
-          )}
-        >
-          {engine.kind}
-        </span>
-        {engine.version ? (
-          <span className="truncate font-mono text-[0.65625rem] text-dim">{engine.version}</span>
-        ) : null}
-        <HostBadge host={host} />
+        {embedded ? (
+          <span className="text-[0.6875rem] text-dim">
+            {locked ? 'Runner-owned settings are read-only here' : 'Engine settings'}
+          </span>
+        ) : (
+          <>
+            <span className="text-xs font-semibold text-ink">{engine.name}</span>
+            <KindBadge kind={engine.kind} />
+            {engine.version ? (
+              <span className="truncate font-mono text-[0.65625rem] text-dim">
+                {engine.version}
+              </span>
+            ) : null}
+            <HostBadge host={host} />
+          </>
+        )}
         <div className="flex-1" />
         <span className="text-[0.6875rem] text-dim">{engine.enabled ? 'Enabled' : 'Disabled'}</span>
         <Toggle
@@ -206,19 +226,17 @@ export function EngineDetail({
         />
       </div>
 
-      <Section
-        title="Binary"
-        aside={
-          claimed.length > 0 ? (
-            <div className="flex gap-1.5">
-              {claimed.map((status) => (
-                <TierBadge key={status.tier} tier={status.tier} />
-              ))}
-            </div>
-          ) : null
-        }
-      >
-        {remote ? (
+      <Section title="Binary" aside={<RoleBadge roles={roles} />}>
+        {remote && inBrowser ? (
+          // A tab has no yaml and no filesystem, so the sentence a remote *machine* gets
+          // would be three wrong instructions in a row.
+          <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
+            Runs <span className="font-medium text-soft">{whereItRuns}</span>. This row is the
+            tab&rsquo;s own advertisement and is rewritten every time it connects — there is no
+            file to point at and nothing here to edit. It goes away when the browser runner is
+            uninstalled.
+          </p>
+        ) : remote ? (
           <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
             Advertised by <span className="font-medium text-soft">{runnerName}</span>. This row is
             that machine&rsquo;s advertisement and is rewritten every time it connects — change it
@@ -232,65 +250,80 @@ export function EngineDetail({
             on this one.
           </p>
         )}
-        <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`engine-${engine.id}-name`}>Name</Label>
-            {/*
-              A row nobody can edit has no draft to preserve, and the runner rewrites it on
-              every connection — so it is read from the row rather than from the state this
-              card started with, which the header next to it would otherwise contradict.
-            */}
-            <Input
-              id={`engine-${engine.id}-name`}
-              value={remote ? engine.name : name}
-              spellCheck={false}
-              readOnly={locked}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`engine-${engine.id}-tier`}>Default tier</Label>
-            {remote ? (
-              <Input
-                id={`engine-${engine.id}-tier`}
-                value={engine.default_tier ?? 'none'}
-                readOnly
-                onChange={() => {}}
-              />
-            ) : (
-              <select
-                id={`engine-${engine.id}-tier`}
-                value={tier}
-                disabled={locked}
-                onChange={(event) => setTier(event.target.value as Tier | '')}
-                className="h-8 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50 disabled:opacity-50"
-              >
-                <option value="">none</option>
-                <option value="quick">quick</option>
-                <option value="deep">deep</option>
-              </select>
-            )}
-          </div>
-        </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`engine-${engine.id}-path`}>Path</Label>
+          <Label htmlFor={`engine-${engine.id}-name`}>Name</Label>
+          {/*
+            A row nobody can edit has no draft to preserve, and the runner rewrites it on
+            every connection — so it is read from the row rather than from the state this
+            card started with, which the header next to it would otherwise contradict.
+          */}
           <Input
-            id={`engine-${engine.id}-path`}
-            value={remote ? engine.path : path}
+            id={`engine-${engine.id}-name`}
+            value={remote ? engine.name : name}
             spellCheck={false}
             readOnly={locked}
-            className="font-mono"
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+        {/*
+          There is no field here for what this engine runs, and there was one: a "default
+          tier" the resolution could fall back away from, so the card offered a setting that
+          did not decide anything. What it runs is an assignment, made in one place for all
+          three roles — this card says which of them this engine holds and points at it.
+        */}
+        <p className="text-[0.65625rem] leading-[1.5] text-dim">
+          {roles.length > 0 ? (
+            <>
+              Assigned to <span className="font-medium text-soft">{roleLabel(roles)}</span>.
+            </>
+          ) : (
+            'Assigned to nothing, so it runs only when a test run or an analysis board asks for it by name.'
+          )}{' '}
+          Which engine runs what is chosen under{' '}
+          <span className="font-medium text-soft">What runs what</span> at the top of this page.
+        </p>
+        <div className="flex flex-col gap-1.5">
+          {/*
+            A wasm engine's `path` is `wasm:stockfish-18`, which is an identifier and not a
+            location. Printing it in a field labelled "Path" would invite the owner to look
+            for it, so the field is relabelled and answers the question it is really being
+            asked: where does this thing run.
+          */}
+          <Label htmlFor={`engine-${engine.id}-path`}>{inBrowser ? 'Where it runs' : 'Path'}</Label>
+          <Input
+            id={`engine-${engine.id}-path`}
+            value={inBrowser ? capitalise(whereItRuns) : remote ? engine.path : path}
+            spellCheck={false}
+            readOnly={locked}
+            className={inBrowser ? undefined : 'font-mono'}
             onChange={(event) => setPath(event.target.value)}
           />
           <p className="text-[0.65625rem] text-dim">
-            {remote
-              ? `A path on ${runnerName}, not here.`
-              : 'A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary.'}
+            {inBrowser
+              ? 'The build ships with Blunderbase and is loaded by the tab itself. There is no file on any machine.'
+              : remote
+                ? `A path on ${runnerName}, not here.`
+                : 'A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary.'}
           </p>
         </div>
       </Section>
 
-      {expertMode ? (
+      <button
+        type="button"
+        aria-expanded={moreSettings}
+        onClick={() => setMoreSettings((open) => !open)}
+        className="flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left transition-colors hover:bg-raised"
+      >
+        <span className="text-[0.6875rem] font-medium text-soft">More settings</span>
+        <span className="text-[0.65625rem] text-dim">UCI options and test runs</span>
+        <div className="flex-1" />
+        <ChevronRight
+          className={cn('size-3.5 text-faint transition-transform', moreSettings && 'rotate-90')}
+          aria-hidden
+        />
+      </button>
+
+      {moreSettings ? (
         <>
           <Section
             title="UCI options"
@@ -358,9 +391,18 @@ export function EngineDetail({
           {remote ? (
             <Section title="Test run">
               <p className="text-[0.6875rem] leading-[1.6] text-dim">
-                A test run starts the binary here;{' '}
-                <span className="font-mono text-soft">{engine.path}</span> is a path on{' '}
-                <span className="font-medium text-soft">{runnerName}</span>.
+                {inBrowser ? (
+                  <>
+                    A test run starts a binary on this host. This engine has none — it runs{' '}
+                    <span className="font-medium text-soft">{whereItRuns}</span>.
+                  </>
+                ) : (
+                  <>
+                    A test run starts the binary here;{' '}
+                    <span className="font-mono text-soft">{engine.path}</span> is a path on{' '}
+                    <span className="font-medium text-soft">{runnerName}</span>.
+                  </>
+                )}
               </p>
             </Section>
           ) : (
@@ -446,22 +488,26 @@ export function EngineDetail({
             </Section>
           )}
         </>
-      ) : (
-        <div className="border-t border-hairline px-3.5 py-3.5">
-          <p className="text-[0.6875rem] leading-[1.6] text-dim">
-            UCI options and test runs live behind expert mode.
-          </p>
-        </div>
-      )}
+      ) : null}
 
       <div className="mt-auto flex items-center gap-2 border-t border-hairline px-3.5 py-2.5">
         {remote ? (
           // Removing the row would delete an advertisement the runner recreates on its next
           // connection. Revoking the runner in the section below is the honest way out.
           <p className="text-[0.6875rem] leading-[1.6] text-dim">
-            Nothing here is editable. Change this engine in{' '}
-            <span className="font-mono text-soft">runner.yaml</span> on {runnerName}, or revoke
-            the runner under Runners below.
+            {inBrowser ? (
+              <>
+                Nothing here is editable. This row belongs to a browser tab — uninstall it under{' '}
+                <span className="font-medium text-soft">This browser</span> in Compute capacity
+                below, or revoke the runner there.
+              </>
+            ) : (
+              <>
+                Nothing here is editable. Change this engine in{' '}
+                <span className="font-mono text-soft">runner.yaml</span> on {runnerName}, or open{' '}
+                {runnerName} under Compute capacity below to revoke it.
+              </>
+            )}
           </p>
         ) : confirmDelete ? (
           <>
@@ -524,4 +570,22 @@ export function EngineDetail({
       ) : null}
     </div>
   )
+}
+
+/**
+ * Whether this host is the browser runner installed *here*, so the card can say "in this
+ * browser" rather than name a tab the owner is not looking at.
+ *
+ * Read from the stored credential rather than from anything the server said: only this
+ * browser knows which runner id it holds a token for, and a second browser looking at the
+ * same deployment sees the same row and must not claim it.
+ */
+function installedHere(host: EngineHost | undefined): boolean {
+  if (!host || host.runnerId === null) return false
+  return readCredential()?.runnerId === host.runnerId
+}
+
+/** `in this browser` → `In this browser`, for a field value rather than a sentence. */
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }

@@ -6,6 +6,7 @@ export {
   BACKFILL_RUN_KEY,
   type BackfillRun,
 } from './backfill'
+export { formatDuration } from './duration'
 export {
   formatNps,
   formatVariation,

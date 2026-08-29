@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, Request, status
 from backend.api.deps import SessionDep, SettingsDep, not_found, ply_range, wake_workers
 from backend.api.routes.runners import live_picture, local_picture
 from backend.api.schemas import (
+    AnalysisCoverage,
     AnalysisRequest,
     BackfillCancelled,
     BackfillPreview,
@@ -28,15 +29,21 @@ from backend.api.schemas import (
     QueuedRun,
     QueueStatus,
     RefusedGame,
+    RetryFailedReceipt,
+    RetryFailedRequest,
     RunResponse,
 )
 from backend.config import Settings
-from backend.db.enums import Tier
+from backend.db.enums import RunStatus, Tier
 from backend.db.session import session_scope
 from backend.services import analysis as analysis_service
 from backend.services import runners as runners_service
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
+
+# A run listing is something to look through, not something to page: the failures a client
+# lists are read a screenful at a time and the count beside them comes from `/coverage`.
+MAX_RUNS = 200
 
 
 @router.post(
@@ -56,6 +63,7 @@ def enqueue(request: Request, session: SessionDep, body: AnalysisRequest) -> Any
         depth=body.depth,
         priority=body.priority,
         elos=body.elos,
+        maia=body.maia,
     )
     wake_workers(request)
     return run
@@ -87,6 +95,7 @@ def enqueue_batch(
         depth=body.depth,
         priority=body.priority,
         elos=body.elos,
+        maia=body.maia,
     )
     wake_workers(request)
     return BatchAnalysisResponse(
@@ -245,13 +254,57 @@ async def queue_status(request: Request, settings: SettingsDep) -> QueueStatus:
     )
 
 
-@router.get("/runs", response_model=list[RunResponse], summary="The runs over one game")
+@router.get(
+    "/coverage",
+    response_model=AnalysisCoverage,
+    summary="What the library has been analysed with, and what finishing it would cost",
+)
+def coverage(session: SessionDep, settings: SettingsDep) -> AnalysisCoverage:
+    """The Analysis page's whole picture in one call.
+
+    The counts come off the same statements the buttons beside them write with, and the
+    estimates off this deployment's own finished runs — see `services.analysis.coverage`.
+    """
+    return AnalysisCoverage.model_validate(
+        analysis_service.coverage(session, settings=settings)
+    )
+
+
+@router.get(
+    "/runs", response_model=list[RunResponse], summary="The runs over one game, or in one status"
+)
 def list_runs(
     session: SessionDep,
-    game_id: Annotated[int, Query(description="the game whose runs to list")],
+    game_id: Annotated[int | None, Query(description="the game whose runs to list")] = None,
     tier: Tier | None = None,
+    status: Annotated[
+        RunStatus | None, Query(description="narrow to one status, e.g. failed")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_RUNS)] = 50,
 ) -> list[Any]:
-    return analysis_service.list_runs(session, game_id, tier=tier)
+    """Newest first. One of `game_id` and `status` has to be given — see the service."""
+    return analysis_service.list_runs(session, game_id, tier=tier, status=status, limit=limit)
+
+
+@router.post(
+    "/runs/retry-failed",
+    response_model=RetryFailedReceipt,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Queue a fresh pass for the games behind the failed runs",
+)
+def retry_failed(
+    request: Request, session: SessionDep, body: RetryFailedRequest | None = None
+) -> RetryFailedReceipt:
+    """Pick the failures back up: a new run per game, under the tier its failure had.
+
+    Never a resurrection of the failed row — that row is the record of what went wrong, and
+    a retry is a new run for the same reason every re-analysis is. A game that has since
+    been analysed is skipped rather than queued twice.
+    """
+    run_ids = (body or RetryFailedRequest()).run_ids
+    receipt = analysis_service.retry_failed(session, run_ids)
+    wake_workers(request)
+    return RetryFailedReceipt(queued=receipt["queued"], skipped=receipt["skipped"])
 
 
 @router.get("/runs/{run_id}", response_model=RunResponse, summary="One run's status")

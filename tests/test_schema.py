@@ -64,7 +64,6 @@ def seed(session: Session) -> dict[str, int]:
         path="/opt/homebrew/bin/stockfish",
         version="17",
         options={"Threads": 2, "Hash": 256},
-        default_tier=Tier.QUICK,
     )
     session.add_all([account, engine])
     session.flush()
@@ -198,7 +197,6 @@ def test_every_table_roundtrips(sessions: sessionmaker[Session]) -> None:
         assert engine.kind is EngineKind.UCI
         assert engine.options == {"Threads": 2, "Hash": 256}
         assert engine.enabled is True
-        assert engine.default_tier is Tier.QUICK
 
         job = reader.get(ImportJob, ids["job"])
         assert job is not None

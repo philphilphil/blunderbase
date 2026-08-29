@@ -21,6 +21,7 @@ from backend.db.enums import (
     Classification,
     Color,
     EngineKind,
+    EngineRole,
     JobStatus,
     NoteSource,
     Platform,
@@ -91,9 +92,9 @@ class PasswordChange(Input):
 
 
 class AppSettings(BaseModel):
-    """Everything the Settings page shows: eight numbers.
+    """Everything the Settings page shows: eleven numbers.
 
-    Seven of them are nullable, and null is never "not loaded yet" — it is the deployment
+    Ten of them are nullable, and null is never "not loaded yet" — it is the deployment
     saying nobody has set this one, and what is in force is the default
     `services.app_settings` names, which is why the page can show that default under an
     empty box rather than pretending to a value.
@@ -110,7 +111,19 @@ class AppSettings(BaseModel):
     )
     maia_elos: list[int] = Field(
         default_factory=list,
-        description="every rating Maia is asked at, both sides of the board, lowest first",
+        description="every rating Maia is asked at, lowest first",
+    )
+    maia_on_quick: int | None = Field(
+        default=None, description="1 if a quick pass also asks the human-move model"
+    )
+    maia_on_deep: int | None = Field(
+        default=None,
+        description="1 if a deep pass also asks the human-move model; off by default, "
+        "because it would recompute the policy the quick pass already stored",
+    )
+    maia_both_sides: int | None = Field(
+        default=None,
+        description="1 to ask Maia about every ply, 0 for the owner's own moves only",
     )
     quick_nodes: int | None = Field(
         default=None, description="nodes per position in the automatic pass on import"
@@ -152,6 +165,16 @@ class AppSettingsUpdate(Input):
         default=None,
         description="one to five ratings; a longer list keeps the lowest, out of range is "
         "clamped, and null clears them back to the default",
+    )
+    maia_on_quick: int | None = Field(
+        default=None, description="1 if a quick pass also asks the human-move model"
+    )
+    maia_on_deep: int | None = Field(
+        default=None, description="1 if a deep pass also asks the human-move model"
+    )
+    maia_both_sides: int | None = Field(
+        default=None,
+        description="1 to ask Maia about every ply, 0 for the owner's own moves only",
     )
     quick_nodes: int | None = None
     deep_nodes: int | None = None
@@ -371,6 +394,11 @@ class AnalysisRequest(Input):
         default=None,
         description="Maia levels for this run alone; omitted, it uses the configured ones",
     )
+    maia: bool | None = Field(
+        default=None,
+        description="whether this run also asks the human-move model; omitted, the tier's "
+        "own setting decides (`maia_on_quick`, `maia_on_deep`)",
+    )
 
     @model_validator(mode="after")
     def _paired_ply_range(self) -> AnalysisRequest:
@@ -406,6 +434,11 @@ class BatchAnalysisRequest(Input):
     elos: list[int] | None = Field(
         default=None,
         description="Maia levels for these runs alone; omitted, they use the configured ones",
+    )
+    maia: bool | None = Field(
+        default=None,
+        description="whether these runs also ask the human-move model; omitted, the tier's "
+        "own setting decides (`maia_on_quick`, `maia_on_deep`)",
     )
 
     @model_validator(mode="after")
@@ -534,6 +567,95 @@ class QueueCleared(BaseModel):
     outstanding: int
 
 
+class CoverageLevel(Payload):
+    """One Maia level and how many games carry it."""
+
+    elo: int
+    games: int = 0
+
+
+class CoverageMissing(Payload):
+    """What a backfill of each tier would queue if it were started now.
+
+    Not the complement of the coverage buckets: a game with a deep pass and no quick one is
+    missing a quick pass, and is counted here under `quick` while it counts as analysed in
+    the split above.
+    """
+
+    quick: int = 0
+    deep: int = 0
+
+
+class CoverageMaia(Payload):
+    """Which Maia levels the library carries, against the ones configured now.
+
+    `games_with_any` and `per_level` are two different readings and a page needs both: a
+    library analysed while Maia was centred on each game's own rating has Maia everywhere
+    and none of it at the level the owner is asking about today. Those levels are
+    `orphan_levels`, and `missing_games` is what the fill button would queue.
+    """
+
+    configured: list[int] = Field(default_factory=list)
+    games_with_any: int = 0
+    per_level: list[CoverageLevel] = Field(default_factory=list)
+    missing_games: int = 0
+    orphan_levels: list[CoverageLevel] = Field(default_factory=list)
+
+
+class CoverageEstimates(Payload):
+    """What finishing each tier would cost, in engine-seconds, from this deployment's own history.
+
+    Raw seconds of work rather than of waiting: `concurrency` is how many of them run at
+    once, so the wall-clock answer is the one divided by the other. Null where too few
+    finished runs carry the budget configured now to average — a made-up number on this
+    page is worse than an empty space.
+
+    `maia_seconds` prices the third button, the fill: measured off finished `maia_only`
+    runs, which cost what asking the human-move model costs and nothing like what a search
+    does, over the plies of the games still missing a level.
+    """
+
+    quick_seconds: float | None = None
+    deep_seconds: float | None = None
+    maia_seconds: float | None = None
+    concurrency: int = 1
+
+
+class AnalysisCoverage(Payload):
+    """The whole library's analysis state, as the Analysis page reads it.
+
+    `no_pass`, `quick_only` and `deep` partition the library and add up to `total`.
+    """
+
+    total: int = 0
+    no_pass: int = 0
+    quick_only: int = 0
+    deep: int = 0
+    missing: CoverageMissing = Field(default_factory=CoverageMissing)
+    failed: int = 0
+    maia: CoverageMaia = Field(default_factory=CoverageMaia)
+    estimates: CoverageEstimates = Field(default_factory=CoverageEstimates)
+
+
+class RetryFailedRequest(Input):
+    """Which failed runs to pick back up. Empty means every one of them."""
+
+    run_ids: list[int] | None = Field(
+        default=None, description="the failed runs to retry; omitted means all of them"
+    )
+
+
+class RetryFailedReceipt(Payload):
+    """What a retry queued, and how many failures it did not turn into a run.
+
+    `skipped` counts a game whose pass has since succeeded, a second failure over a game
+    already being retried, and a run over a bare FEN, which names no game to re-analyse.
+    """
+
+    queued: int = 0
+    skipped: int = 0
+
+
 class RunResponse(Row):
     id: int
     game_id: int | None = None
@@ -552,6 +674,9 @@ class RunResponse(Row):
     # borrow that tier's engine and its place in the queue, so the tier alone does not say
     # what the run did: `maia_only` is what tells a fill from an analysis pass.
     maia_only: bool = False
+    # Whether this run's search is followed by a human-move pass, as it was settled when the
+    # run was queued: what the caller asked for, or the tier's setting at that moment.
+    maia: bool = True
     maia_elos: list[int] | None = None
     created_at: datetime
     started_at: datetime | None = None
@@ -763,8 +888,19 @@ class EngineResponse(Row):
     version: str | None = None
     options: dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
-    default_tier: Tier | None = None
     created_at: datetime
+    # None means `path` is a path on some filesystem. A scheme — `wasm` — means it is not,
+    # and the UI has to say where the engine lives ("in this browser") instead of showing
+    # `wasm:stockfish-18` as though it were a file. Derived here so no client has to parse
+    # the path to find out, which would be one more copy of the vocabulary.
+    path_scheme: str | None = None
+
+    @model_validator(mode="after")
+    def _scheme(self) -> EngineResponse:
+        from backend.services.engines import path_scheme
+
+        self.path_scheme = path_scheme(self.path)
+        return self
 
 
 class EngineCreate(Input):
@@ -772,7 +908,6 @@ class EngineCreate(Input):
     path: str = Field(min_length=1, max_length=512)
     kind: EngineKind = EngineKind.UCI
     options: dict[str, Any] = Field(default_factory=dict)
-    default_tier: Tier | None = None
     enabled: bool = True
 
 
@@ -783,11 +918,10 @@ class EngineUpdate(Input):
     path: str | None = Field(default=None, min_length=1, max_length=512)
     kind: EngineKind | None = None
     options: dict[str, Any] | None = None
-    default_tier: Tier | None = None
     enabled: bool | None = None
 
     def changes(self) -> dict[str, Any]:
-        """`default_tier=None` is a real value, so what was sent is what is applied."""
+        """A field that was sent is applied; one that was left out is not touched."""
         return self.model_dump(exclude_unset=True)
 
 
@@ -840,6 +974,47 @@ class TierStatusResponse(BaseModel):
     engine_name: str | None = None
     available: bool = False
     reason: str | None = None
+
+
+class RoleStatusResponse(BaseModel):
+    """One role and the engine assigned to it — `services.engines.role_status`.
+
+    `configured` separates "the owner has not chosen an engine for this", which is a shape
+    and not a fault, from "they chose one and it cannot run", which always names it.
+    """
+
+    role: EngineRole
+    engine_id: int | None = None
+    engine_name: str | None = None
+    available: bool = False
+    configured: bool = False
+    reason: str | None = None
+
+
+class EngineRoles(Input):
+    """The assignment to write. A key that was not sent is left alone.
+
+    `null` is a real value here and means "unassign", which is why absence has to mean
+    something else: a form that saves one dropdown must not clear the other two.
+    """
+
+    quick: int | None = None
+    deep: int | None = None
+    human: int | None = None
+
+    def changes(self) -> dict[str, int | None]:
+        return self.model_dump(exclude_unset=True)
+
+
+class EngineRolesResponse(BaseModel):
+    """What runs what: one status per role, in QUICK, DEEP, HUMAN order.
+
+    Human moves is a role beside the two tiers rather than a third `Tier`, because `Tier`
+    is a search budget stored on every run row and widening it to carry a role would
+    corrupt it. See `db.enums.EngineRole`.
+    """
+
+    roles: list[RoleStatusResponse] = Field(default_factory=list)
 
 
 # --- notes ----------------------------------------------------------------
@@ -975,6 +1150,10 @@ class RunnerPoll(Frame):
     engines: list[dict[str, Any]] | None = None
     free_slots: int | None = Field(default=None, ge=0)
     active_runs: list[RunnerActiveRun] = Field(default_factory=list)
+    # The same field a `hello` carries, so a poller registers exactly as a socket does. No
+    # browser is expected here — a tab that could only poll would have no analysis board —
+    # but the two transports describing themselves differently would be a trap.
+    browser: bool = False
 
 
 class RunnerPollResponse(BaseModel):
@@ -1030,8 +1209,10 @@ class RunnerResultResponse(BaseModel):
 class RunnerEngine(Payload):
     """`services.runners.engine_payload`: an engine as its host advertises it.
 
-    A runner-bound engine is read-mostly here — its truth is the yaml on that machine, and
-    `path` is a path over there — so the UI shows it rather than offering to edit it.
+    A runner-bound engine is read-mostly here — its truth is the configuration on that
+    machine, and `path` is a path over there — so the UI shows it rather than offering to
+    edit it. Unless `path_scheme` is set, in which case `path` is not a path at all but the
+    name of an engine the runner carries inside itself.
     """
 
     id: int
@@ -1039,8 +1220,11 @@ class RunnerEngine(Payload):
     kind: EngineKind
     version: str | None = None
     path: str | None = None
+    path_scheme: str | None = Field(
+        default=None,
+        description="`wasm` where `path` names an engine inside the runner rather than a file",
+    )
     enabled: bool = True
-    default_tier: Tier | None = None
     streams: bool = Field(default=False, description="whether it can drive an analysis board")
 
 
@@ -1057,6 +1241,9 @@ class RunnerResponse(Payload):
     slots: int = 1
     version: str | None = None
     connected: bool = False
+    browser: bool = Field(
+        default=False, description="a browser tab rather than a process on a machine"
+    )
     transport: str | None = Field(default=None, description="websocket | poll | null")
     last_seen_at: datetime | None = None
     created_at: datetime | None = None

@@ -63,7 +63,6 @@ const STATUS: RunnersStatus = {
         kind: 'uci',
         path: '/usr/games/stockfish',
         enabled: true,
-        default_tier: 'deep',
         streams: true,
       },
     ],
@@ -89,7 +88,6 @@ const STATUS: RunnersStatus = {
           kind: 'uci',
           path: '/usr/games/stockfish',
           enabled: true,
-          default_tier: 'deep',
           streams: true,
         },
         {
@@ -98,7 +96,6 @@ const STATUS: RunnersStatus = {
           kind: 'uci',
           path: '/usr/games/stockfish',
           enabled: true,
-          default_tier: 'quick',
           streams: true,
         },
       ],

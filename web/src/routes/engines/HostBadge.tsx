@@ -1,3 +1,4 @@
+import { StatusDot } from '@/components/badges/StatusDot'
 import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
@@ -27,12 +28,7 @@ export function HostBadge({ host, className }: { host?: EngineHost; className?: 
           className="inline-flex items-center gap-1 rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.59375rem] text-soft"
           title={host.connected ? undefined : `${host.runnerName} is not connected`}
         >
-          <span
-            className={cn(
-              'size-1 flex-none rounded-full',
-              host.connected ? 'bg-accent-teal' : 'bg-faint',
-            )}
-          />
+          <StatusDot tone={host.connected ? 'healthy' : 'away'} className="size-1" />
           {host.runnerName}
         </span>
       )}

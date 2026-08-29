@@ -166,7 +166,7 @@ claude mcp add --transport http blunderbase https://blunderbase.example.com/mcp 
   --header "Authorization: Bearer <a key from Settings → MCP, or your password>"
 ```
 
-## Two settings worth knowing
+## Three settings worth knowing
 
 `BLUNDERBASE_PUBLIC_URL` is how this deployment is reached from outside. It is written
 into the `runner.yaml` the create-runner flow hands over; without it the server can only
@@ -178,3 +178,16 @@ carries a bearer token on every frame, so it should be `https://`, and the runne
 only from `127.0.0.1` by default, so a proxy running in another container needs its
 address (or `*` on a network only the proxy can reach) for the app to know the request
 arrived over TLS.
+
+`BLUNDERBASE_CROSS_ORIGIN_ISOLATION` is on by default, and it is the one thing here a
+proxy can silently break. The page is served with `Cross-Origin-Opener-Policy:
+same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, which is the browser's price
+for `SharedArrayBuffer` — and an analysis engine running in a tab is single-threaded
+without one. So **pass both headers through untouched**, the way rule 1 says to pass
+`Authorization`: neither Caddy nor the nginx snippets above touch a response header, but a
+proxy configured to add its own COOP or COEP, or to strip what it did not set, will take
+the threads away with no error anywhere. The consequence of leaving it on is that every
+**cross-origin** subresource the page loads must opt in with `Cross-Origin-Resource-Policy`
+or the browser blocks it — the build loads none, so nothing is affected today, but a proxy
+that injects a script tag from its own domain is. Set it to `false` in either case: the
+page then works exactly as it did before, on one thread.

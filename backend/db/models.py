@@ -136,7 +136,17 @@ class Engine(Base):
     version: Mapped[str | None] = mapped_column(String(64))
     options: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    default_tier: Mapped[Tier | None] = mapped_column(EnumString(Tier))
+    # Whether the host that advertised this engine answers `stream_open` — its own word,
+    # persisted rather than inferred. A binary on this host advertises nothing and drives
+    # a board as it always has, which is what the default says; a runner that implements
+    # queue work and no analysis boards says `streams: false` in its `hello`, and the
+    # picker has to be able to see that rather than offer a board nobody will answer.
+    streams: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )
+    # No `default_tier`: an engine says what kind of thing it is and nothing about which
+    # job it does. The three jobs are assignments the owner makes, stored as settings and
+    # resolved by `services.engines` — see `EngineRole`.
     # NULL means the binary is on this host. A row that names a runner is that runner's
     # advertisement of what it can run, and `path` is a path on *its* filesystem.
     runner_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("runners.id"))
@@ -166,6 +176,15 @@ class Runner(Base):
     slots: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     version: Mapped[str | None] = mapped_column(String(32))
     connected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Whether this runner is a browser tab rather than a process on a machine, as it said
+    # so in its `hello`. Written on every connection, because the same token could be used
+    # by a tab today and by a script tomorrow. What it is for is `requeue_stale_runs`: a
+    # tab is expected to vanish — a closed laptop, a locked phone, a background tab whose
+    # timers are throttled — and a run it was holding when it did must not spend one of its
+    # two attempts on that.
+    browser: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     last_seen_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
@@ -354,6 +373,11 @@ class AnalysisRun(Base):
     ply_end: Mapped[int | None] = mapped_column(Integer)
     # Higher runs first: deep jobs jump the FIFO queue because someone is waiting on them.
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Whether a Maia pass follows this run's search at all. Copied off the tier's setting
+    # when the run is queued, for the reason the budget is: a run queued to be searched and
+    # nothing else must not grow a human-move pass because a setting moved while it waited.
+    # Always true on a `maia_only` row — a fill with no Maia would be no pass at all.
+    maia: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     # A pass that asks Maia and nothing else: no search, and its rows carry a policy and no
     # evaluation. What "fill in the missing Maia levels" queues over a game that has already
     # been searched, so the levels are added without paying for Stockfish twice.
@@ -417,9 +441,13 @@ class MoveEval(Base):
     classification: Mapped[Classification | None] = mapped_column(EnumString(Classification))
     best_move_uci: Mapped[str | None] = mapped_column(String(UCI_LENGTH))
     # Multi-PV lines: [{"multipv": 1, "cp": 34, "mate": null, "pv": ["e2e4", ...]}, ...]
-    best_lines: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
+    # `none_as_null` on both of these because "there is no policy here" has to be SQL NULL:
+    # a plain JSON column stores Python None as the JSON literal `null`, which is a value,
+    # and a row holding it answers `IS NOT NULL` while decoding to None. That is what had
+    # `_settled_maia_levels` reading whole runs as carrying no Maia levels at all (0011).
+    best_lines: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON(none_as_null=True))
     # Maia's predicted human move per rating level: {"1700": [{"uci": "e2e4", "p": 0.31}, ...]}
-    maia_policy: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    maia_policy: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
 
     run: Mapped[AnalysisRun] = relationship(back_populates="move_evals")
     position: Mapped[Position | None] = relationship()

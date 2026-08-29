@@ -65,9 +65,7 @@ def local_engine(api: TestClient, tmp_path: Path, **scenario: Any) -> int:
     path = fake_engine_command(
         tmp_path, name="FakeFish 1", options=STOCKFISH_OPTIONS, **scenario
     )
-    created = api.post(
-        "/engines", json={"name": "fakefish", "path": path, "default_tier": "deep"}
-    )
+    created = api.post("/engines", json={"name": "fakefish", "path": path})
     assert created.status_code == 201, created.text
     return int(created.json()["id"])
 

@@ -26,6 +26,7 @@ import type {
   BatchAnalysisRequest,
   EngineCreate,
   EngineDeleteResult,
+  EngineRolesUpdate,
   EngineUpdate,
   GameFilters,
   GamesDeleted,
@@ -165,9 +166,11 @@ export function useAppSettings(options?: Options<Awaited<ReturnType<typeof api.g
  *
  * The Maia levels are not only this page's: they ride on the bootstrap payload
  * (`useMaiaElos`) and they are the levels the analysis board asks its live questions at.
- * So the write invalidates `auth` and `maia` as well as its own key — and `analysis`, whose
- * `maia-fill` count is an answer about the levels that were just changed — and the game
- * page picks them up without a reload.
+ * So the write invalidates `auth` and `maia` as well as its own key — and `analysis` whole,
+ * because the coverage answer's Maia block is a reading *of* the levels that were just
+ * changed: which of them the library carries, how many games are missing one, and what a
+ * fill would therefore cost. The game page and the Analysis page both catch up without a
+ * reload.
  */
 export function useSaveAppSettings(
   options?: UseMutationOptions<AppSettings, Error, AppSettingsUpdate>,
@@ -180,7 +183,7 @@ export function useSaveAppSettings(
       client.setQueryData(queryKeys.settings(), args[0])
       void client.invalidateQueries({ queryKey: queryKeys.auth() })
       void client.invalidateQueries({ queryKey: queryKeys.maia() })
-      void client.invalidateQueries({ queryKey: queryKeys.maiaFill() })
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
       options?.onSuccess?.(...args)
     },
   })
@@ -265,6 +268,60 @@ export function useRuns(gameId: number, tier?: Tier, options?: Options<Awaited<R
     queryKey: queryKeys.runs(gameId, tier),
     queryFn: () => api.listRuns(gameId, tier),
     ...options,
+  })
+}
+
+/**
+ * The whole library's analysis state — the Analysis page's single read.
+ *
+ * Under `['analysis']`, so the existing socket invalidation carries it: a run finishing
+ * moves the coverage split, the backlog counts and the estimates at once, and this is one
+ * request rather than the six the page would otherwise assemble a contradiction from.
+ */
+export function useCoverage(options?: Options<Awaited<ReturnType<typeof api.getCoverage>>>) {
+  return useQuery({ queryKey: queryKeys.coverage(), queryFn: api.getCoverage, ...options })
+}
+
+/**
+ * The failed runs, newest first — the listing that did not exist, so a failure was
+ * invisible once the socket frames announcing it had passed.
+ */
+export function useFailedRuns(
+  limit = FAILED_RUN_LIMIT,
+  options?: Options<Awaited<ReturnType<typeof api.listRuns>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.failedRuns(limit),
+    queryFn: () => api.listRuns(undefined, undefined, { status: 'failed', limit }),
+    ...options,
+  })
+}
+
+/** A screenful of failures. The count beside them comes from `/analysis/coverage`. */
+export const FAILED_RUN_LIMIT = 50
+
+/**
+ * Pick the failures back up. Invalidates `['analysis']` whole: the retry queues runs, so
+ * the queue, the coverage split and the failed listing all moved at once.
+ *
+ * A 409 `tier_unavailable` is the expected refusal, not a bug — the tier behind the
+ * failures still has no engine — and the caller is the one that can say so in words.
+ */
+export function useRetryFailed(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.retryFailedRuns>>,
+    Error,
+    number[] | undefined
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (runIds: number[] | undefined) => api.retryFailedRuns(runIds),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
   })
 }
 
@@ -517,6 +574,43 @@ export function useEngines(
 
 export function useTierStatus(options?: Options<Awaited<ReturnType<typeof api.listTierStatus>>>) {
   return useQuery({ queryKey: queryKeys.engineTiers(), queryFn: api.listTierStatus, ...options })
+}
+
+/**
+ * What runs what: the engine assigned to each role, and whether it can run. `['engines']` is
+ * a prefix of this key, so a runner connecting — which flips `enabled` on its rows and with
+ * it whether an assigned engine is available — already invalidates it.
+ */
+export function useEngineRoles(options?: Options<Awaited<ReturnType<typeof api.listEngineRoles>>>) {
+  return useQuery({ queryKey: queryKeys.engineRoles(), queryFn: api.listEngineRoles, ...options })
+}
+
+/**
+ * Assign engines to roles. Only the keys sent are written; `null` empties a role.
+ *
+ * The PUT answers with the whole assignment, so it is written into the roles cache directly
+ * rather than only invalidated: the select the owner just changed would otherwise snap back
+ * to the stored value until the refetch landed, which reads as a save that did not take. The
+ * `['engines']` invalidation on top of that is for everything else that names a role — the
+ * roster's badges and the detail card.
+ */
+export function useSetEngineRoles(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.setEngineRoles>>,
+    Error,
+    EngineRolesUpdate
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: EngineRolesUpdate) => api.setEngineRoles(body),
+    ...options,
+    onSuccess: (...args) => {
+      client.setQueryData(queryKeys.engineRoles(), args[0])
+      void client.invalidateQueries({ queryKey: queryKeys.engines() })
+      options?.onSuccess?.(...args)
+    },
+  })
 }
 
 export function useAddEngine(

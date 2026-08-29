@@ -40,8 +40,20 @@ browser out.
 
 Engines are rows, not configuration: **Settings → Engines**, give it a path (a file, a
 command line, or a name on `PATH`), and Blunderbase probes the binary, reads the options
-it declares and validates what you set against them. Tiers point at engine IDs, so which
-engine runs the quick pass and which runs the deep one is a UI choice.
+it declares and validates what you set against them. The owner assigns one engine to each
+of Quick, Deep and Human moves; nothing falls back. If the engine assigned to a role is
+switched off, deleted or on a machine that is not connected, that role does not run and
+says which engine and why — no other engine quietly takes over.
+
+The page has two tabs. **Engines** opens with "what runs what" — one row each for Quick,
+Deep and Human moves, naming the engine assigned to it and, when it cannot run, saying why
+in words. Below it is the roster and one engine's whole card. **Machines** (`?tab=machines`,
+a link you can be sent to) is the runners, this browser as a runner, and their tokens. An
+engine advertises only what kind of thing it is — a UCI engine or a human-move model — and
+never claims a role, so a runner's yaml cannot decide what its engines are used for. The
+first engine of a kind to be registered does take the roles it fits, which is what makes a
+fresh install and a first-time runner work without a visit to the form; it never takes one
+that is already assigned.
 
 The image ships **Stockfish** at `/usr/games/stockfish`, and `stockfish` on `PATH` reaches
 it — either spelling works in the path field. **Maia** is an lc0 build with its own
@@ -59,20 +71,23 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_DB_PATH` | `<root>/data/blunderbase.db` | the SQLite file (`/data/blunderbase.db` in the image) |
 | `BLUNDERBASE_DATA_DIR` | `<root>/data` | everything written that is not the database |
 | `BLUNDERBASE_WEB_DIST` | `<root>/web/dist` | the built web app; a directory that is not there is simply not served |
+| `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` | `true` | serve the page with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, which is what a browser wants before it will give a tab a `SharedArrayBuffer` — and without one an engine running in the browser is single-threaded. The cost is that every **cross-origin** subresource must opt in with CORP or be blocked; the build loads none today. Turn it off for a proxy that rewrites the headers, or a page that has to load an asset from somewhere else |
 | `BLUNDERBASE_HOST` `BLUNDERBASE_PORT` | `127.0.0.1` `8765` | what `serve` binds |
 | `BLUNDERBASE_MCP_BEARER_KEY` | — | one more token `/mcp` accepts, beside the minted keys and the owner's password; for compose files and automation |
 | `BLUNDERBASE_ANALYSIS_CONCURRENCY` | cores − 2 | engine processes at once, across every tier |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
 
-The engine budgets, the classification thresholds and the Maia levels are **not**
-variables. They are app settings: stored in the database, edited on the Settings page
+The engine budgets, the classification thresholds and everything about the Maia pass are
+**not** variables. They are app settings: stored in the database, edited on the Settings page
 (`GET`/`PUT /api/settings`, `backend/services/app_settings.py`), and read where they are
 used, so a change takes effect on the next thing you click rather than the next restart.
 Unset means the default in that table, not a null.
 
 | Setting | Default | |
 |---|---|---|
-| `maia_target_elo` | `2000` | the single rating every Maia question is asked at — the rating you are playing towards, clamped to 1100–2000. Analysis bakes it into every ply of both sides and the analysis board queries it live, so nothing ever asks about two different humans |
+| `maia_target_elo` | `2000` | the single rating every Maia question is asked at — the rating you are playing towards, clamped to 1100–2000. Analysis bakes it into every ply it asks about and the analysis board queries it live, so nothing ever asks about two different humans |
+| `maia_on_quick` `maia_on_deep` | `1` `0` | whether a pass of that tier also asks the human-move model. Read when a run is queued, like the budgets. The Maia half is 40-70% of a quick pass, and a deep pass would recompute the policy the quick one already stored, so deep is off — use the fill button to add levels to a game that only ever had a deep pass |
+| `maia_both_sides` | `1` | ask Maia about every ply, both colours. `0` asks about your own moves only and halves what the pass costs; you lose "what will a human opposite me fall into", which is a question about the positions your opponent moves in. Read per plan, not at enqueue |
 | `quick_nodes` `deep_nodes` `deep_multipv` | `250000` `2000000` `4` | the per-position budget of each tier, and the lines a deep pass keeps. Read when a run is queued, so they size the next run rather than the queue |
 | `inaccuracy_threshold` `mistake_threshold` `blunder_threshold` | `5` `10` `15` | win-percentage points lost by the mover — Lichess's own cuts on the same curve. The three have to rise; a set of them that does not is the one change refused rather than clamped |
 | `default_owner_rating` | `1500` | the rating to stand in for yours where the game carries none — an OTB PGN, an unrated game |

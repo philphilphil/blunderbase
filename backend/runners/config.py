@@ -52,6 +52,18 @@ WS_PATH = "/runner/ws"
 POLL_PATH = "/runner/poll"
 RUNS_PATH = "/runner/runs"
 
+# How a runner that cannot set a header presents its token. The browser's `WebSocket`
+# constructor takes a URL and a list of subprotocols and nothing else, so a tab offers two
+# of them — this sentinel, which names the scheme, and the token itself as the second
+# entry — and the server echoes the sentinel back on the accept. The definition lives here
+# because both halves of the handshake have to spell it identically, and this module is
+# already where the paths a runner dials are written down.
+#
+# Deliberately **not** a query parameter, which is the obvious thing to reach for next: a
+# bearer token in a URL is written into every access log and proxy log the request passes
+# through, and there is no taking it back out of them.
+WS_SUBPROTOCOL = "blunderbase.runner.v1"
+
 TOP_LEVEL = frozenset(
     {
         "server",
@@ -82,6 +94,9 @@ class EngineConfig:
     name: str
     path: str
     kind: str = UCI_KIND
+    # Accepted and ignored, and no longer documented as a thing to set: which engine serves
+    # which job is the owner's assignment on the server, not a claim this machine can make.
+    # A yaml that still carries `tier:` starts rather than being refused.
     tier: str | None = None
     options: dict[str, Any] = field(default_factory=dict)
     # None means "whatever this kind of engine can do"; a yaml may say otherwise.

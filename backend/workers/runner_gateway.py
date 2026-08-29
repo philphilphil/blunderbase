@@ -460,7 +460,7 @@ class RunnerGateway:
 
         registration = await self._db(
             self._register, runner.id, ads, hello.get("slots"), hello.get("version"),
-            link.transport,
+            link.transport, bool(hello.get("browser")),
         )
         resumed, cancelled = await self._db(self._reconcile, reported, inherited)
         link.runner_id = runner.id
@@ -1111,6 +1111,7 @@ class RunnerGateway:
         slots: Any,
         version: Any,
         transport: str,
+        browser: bool = False,
     ) -> Registration:
         with self.sessions() as session:
             runner = runners_service.require_runner(session, runner_id)
@@ -1121,6 +1122,7 @@ class RunnerGateway:
                 transport=transport,
                 version=None if version is None else str(version),
                 slots=None if slots is None else int(slots),
+                browser=browser,
             )
             return Registration(
                 name=runner.name,
@@ -1164,7 +1166,9 @@ class RunnerGateway:
                     **engines_service.AcceptedEngine(
                         name=engine.name, engine_id=engine.id, accepted=True
                     ).as_dict(),
-                    "streams": _streams(engine.kind is EngineKind.UCI, transport),
+                    "streams": _streams(
+                        engine.streams and engine.kind is EngineKind.UCI, transport
+                    ),
                 }
                 for engine in engines_service.engines_of_runner(session, runner.id)
                 if engine.enabled

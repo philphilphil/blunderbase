@@ -516,7 +516,7 @@ def enqueue_quick_analysis(session: Session, game: Game) -> AnalysisRun | None:
 
 
 def quick_tier_engine(session: Session) -> Engine | None:
-    """The engine the quick tier should use: its own default, else any enabled UCI engine."""
+    """The engine assigned to the quick tier, if it can run. None means no pass is queued."""
     return engines.engine_for_tier(session, Tier.QUICK)
 
 

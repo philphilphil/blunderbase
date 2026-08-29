@@ -8,6 +8,7 @@ import { QueueDestinations } from '@/components/shell/QueueDestinations'
 import { useGames, useMaiaFill, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
 import type { RunStatus } from '@/lib/api/types'
 import { TIER_STYLES } from '@/lib/chess/classification'
+import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 import { Bar, ErrorBlock } from '@/routes/stats/kit/states'
@@ -113,10 +114,13 @@ export function QueueCard() {
   const activity = useRunActivity()
   // Only to put a name on a run's game; the rows stand without it.
   const games = useGames({ limit: LOOKUP })
-  const retry = useRequestAnalysis()
+  // Neither mutation has a panel of its own on this card — a row's only trace of the press
+  // is the "queued" label going back to "retry", which said nothing at all if the retry
+  // itself failed. A toast is the whole fix: there is nowhere here to put a red sentence.
+  const retry = useRequestAnalysis({ onError: (error) => toast.error(error.message) })
   // A failed fill is retried as a fill: `retry` would queue a whole engine pass over a
   // game that has already had one, which is hours of search for the levels it is missing.
-  const refill = useMaiaFill()
+  const refill = useMaiaFill({ onError: (error) => toast.error(error.message) })
 
   const queued = queue.data?.queued ?? 0
   const running = queue.data?.running ?? 0

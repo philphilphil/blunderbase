@@ -8,13 +8,13 @@ from typing import Any
 
 import pytest
 from sqlalchemy import event as sa_event
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from backend.adapters.maia import PolicyMove
 from backend.adapters.pool import EngineSpec
 from backend.adapters.stockfish import UciOption
-from backend.config import MAIA_MAX_RATING
+from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.enums import (
     Classification,
     Color,
@@ -27,6 +27,7 @@ from backend.db.enums import (
 from backend.db.models import AnalysisRun, Engine, Game, MoveEval
 from backend.db.types import utcnow
 from backend.services import analysis, app_settings, explorer
+from backend.services import engines as engines_service
 from backend.services import games as games_service
 from backend.services.engines import TierUnavailableError
 
@@ -38,12 +39,14 @@ def _engine(session: Session, **changes: Any) -> Engine:
         name=changes.pop("name", "Stockfish"),
         kind=changes.pop("kind", EngineKind.UCI),
         path=changes.pop("path", "/usr/bin/stockfish"),
-        default_tier=changes.pop("default_tier", Tier.QUICK),
         enabled=changes.pop("enabled", True),
         **changes,
     )
     session.add(engine)
     session.commit()
+    # As `add_engine` does: the first engine of a kind takes the roles it fits, so a test
+    # that registers one engine has a deployment that can run something.
+    engines_service.assign_default_roles(session, engine)
     return engine
 
 
@@ -294,6 +297,167 @@ def test_a_position_run_asks_about_the_one_position_it_has(session: Session) -> 
     assert plan.maia_plies() == [0]
 
 
+# --- whether there is a Maia pass at all ----------------------------------
+
+
+def test_a_quick_run_carries_a_maia_pass_and_a_deep_run_does_not(session: Session) -> None:
+    """The defaults: the import pass pays for Maia, the deep pass would only repeat it."""
+    _engine(session)
+    game = _game(session)
+
+    quick = analysis.request_analysis(session, game_id=game.id)
+    deep = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+    assert (quick.maia, deep.maia) == (True, False)
+    assert analysis.build_plan(session, quick).maia is True
+    assert analysis.build_plan(session, deep).maia is False
+
+
+def test_a_run_records_the_tiers_setting_at_the_moment_it_was_queued(
+    session: Session,
+) -> None:
+    """Settled at enqueue, like the budget: a setting that moves afterwards moves nothing."""
+    _engine(session)
+    game = _game(session)
+    app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 0)
+    app_settings.set_value(session, app_settings.MAIA_ON_DEEP, 1)
+
+    quick = analysis.request_analysis(session, game_id=game.id)
+    deep = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+    assert (quick.maia, deep.maia) == (False, True)
+
+    app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 1)
+
+    assert analysis.build_plan(session, quick).maia is False
+
+
+def test_a_caller_may_ask_for_a_maia_pass_the_tier_is_not_configured_for(
+    session: Session,
+) -> None:
+    """An override belongs to the run; the deployment's own setting does not move."""
+    _engine(session)
+    game = _game(session)
+
+    asked = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP, maia=True)
+    refused = analysis.request_analysis(session, game_id=game.id, maia=False)
+
+    assert (asked.maia, refused.maia) == (True, False)
+    assert app_settings.get_maia_on_deep(session) is False
+    assert app_settings.get_maia_on_quick(session) is True
+
+
+def test_a_batch_queues_every_run_with_the_maia_pass_it_was_asked_for(
+    session: Session,
+) -> None:
+    _engine(session)
+    games = [_game(session, plies=plies) for plies in (2, 4)]
+
+    queued, refused = analysis.request_analysis_batch(
+        session, [game.id for game in games], maia=False
+    )
+
+    assert refused == []
+    assert [run.maia for run in queued] == [False, False]
+
+
+def test_a_run_without_a_maia_pass_asks_about_no_level_at_all(session: Session) -> None:
+    """Not "the default level": no question is put, so nothing is stored and nothing asked."""
+    app_settings.set_maia_elos(session, [1500, 1900])
+    plan = _plan(session, maia=False)
+    rows = [MoveEval(run_id=plan.run_id, ply=ply) for ply in plan.plies]
+    adapter = _FakeMaia()
+
+    assert plan.maia_ratings() == []
+    assert analysis.apply_maia(plan, rows, adapter) == 0  # type: ignore[arg-type]
+    assert adapter.asked == []
+    assert not rows[0].maia_policy
+
+
+def test_maia_is_asked_about_the_owners_own_moves_when_both_sides_is_off(
+    session: Session,
+) -> None:
+    """Half the plies is half the cost of the pass, and the half kept is the owner's."""
+    _engine(session)
+    game = _game(session)
+    app_settings.set_value(session, app_settings.MAIA_BOTH_SIDES, 0)
+    run = analysis.request_analysis(session, game_id=game.id)
+
+    # The owner has White in `_game`, so the even plies are the ones they moved in.
+    assert analysis.build_plan(session, run).maia_plies() == [0, 2, 4]
+
+    game.owner_color = Color.BLACK
+    session.commit()
+
+    assert analysis.build_plan(session, run).maia_plies() == [1, 3, 5]
+
+
+def test_a_game_with_no_owner_is_asked_about_both_sides_either_way(session: Session) -> None:
+    """There is no colour to filter on, so the filter is not a way to ask for nothing."""
+    _engine(session)
+    game = _game(session)
+    game.owner_color = None
+    session.commit()
+    app_settings.set_value(session, app_settings.MAIA_BOTH_SIDES, 0)
+    run = analysis.request_analysis(session, game_id=game.id)
+
+    assert analysis.build_plan(session, run).maia_plies() == [0, 1, 2, 3, 4, 5]
+
+
+def test_both_sides_is_read_per_plan_rather_than_baked_into_the_run(
+    session: Session,
+) -> None:
+    """A live setting, like the thresholds: the next plan built is the one the owner chose."""
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+    app_settings.set_value(session, app_settings.MAIA_BOTH_SIDES, 0)
+
+    assert analysis.build_plan(session, run).maia_plies() == [0, 2, 4]
+
+
+def test_a_fill_pass_carries_its_maia_pass_whatever_the_tier_is_configured_for(
+    session: Session,
+) -> None:
+    """A fill with no human-move pass would search nothing and ask nothing: no pass at all."""
+    _engine(session)
+    _engine(session, name="maia", kind=EngineKind.MAIA)
+    game = _game(session)
+    app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 0)
+    analysis.complete_run(session, analysis.request_analysis(session, game_id=game.id), [])
+
+    receipt = analysis.queue_maia_fill(session)
+
+    assert receipt["queued"] == 1
+    assert [(run.maia, run.maia_only) for run in receipt["runs"]] == [(True, True)]
+
+
+def test_a_plan_cannot_be_a_fill_pass_with_the_maia_pass_switched_off() -> None:
+    """The invariant, wherever a plan comes from — a row, a wire frame, a test."""
+    plan = analysis.RunPlan(
+        run_id=1,
+        tier=Tier.QUICK,
+        game_id=7,
+        fen=None,
+        variant="standard",
+        initial_fen=None,
+        moves_uci=("e2e4", "e7e5"),
+        moves_san=("e4", "e5"),
+        position_ids=(None, None, None),
+        ply_start=0,
+        ply_end=2,
+        nodes=1,
+        depth=None,
+        multipv=1,
+        thresholds=THRESHOLDS,
+        maia=False,
+        maia_only=True,
+    )
+
+    assert plan.maia is True
+    assert plan.maia_ratings() == [MAIA_MAX_RATING]
+
+
 # --- asking Maia about the plies ------------------------------------------
 
 
@@ -475,7 +639,7 @@ def test_the_rows_of_a_maia_only_pass_carry_no_evaluation(session: Session) -> N
 
 def _maia(session: Session) -> Engine:
     return _engine(
-        session, name="Maia", kind=EngineKind.MAIA, path="/usr/bin/lc0", default_tier=None
+        session, name="Maia", kind=EngineKind.MAIA, path="/usr/bin/lc0"
     )
 
 
@@ -874,7 +1038,7 @@ def _remote_engine(session: Session, name: str, **changes: Any) -> Engine:
 
 def test_a_search_here_and_the_only_maia_on_a_runner_is_refused(session: Session) -> None:
     _engine(session, name="stockfish")
-    _remote_engine(session, "maia-remote", kind=EngineKind.MAIA, default_tier=None)
+    _remote_engine(session, "maia-remote", kind=EngineKind.MAIA)
     game = _game(session)
 
     with pytest.raises(analysis.AnalysisRequestError) as refused:
@@ -887,19 +1051,40 @@ def test_a_search_here_and_the_only_maia_on_a_runner_is_refused(session: Session
 
 
 def test_a_search_on_a_runner_and_the_only_maia_here_is_refused(session: Session) -> None:
-    remote = _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
-    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None)
+    remote = _remote_engine(session, "sf-remote")
+    _engine(session, name="maia", kind=EngineKind.MAIA)
     game = _game(session)
 
     with pytest.raises(analysis.AnalysisRequestError, match="must be on one machine"):
-        analysis.request_analysis(session, game_id=game.id, engine_id=remote.id, tier=Tier.DEEP)
+        analysis.request_analysis(
+            session, game_id=game.id, engine_id=remote.id, tier=Tier.DEEP, maia=True
+        )
+
+
+def test_a_run_that_asks_for_no_maia_has_nothing_to_strand(session: Session) -> None:
+    """The rule is about a run whose two passes would land on two machines.
+
+    A run with one pass has one host. Refusing it would put every engine that cannot host a
+    human-move model — a browser tab's WASM build most of all — out of reach the moment a
+    Maia is enabled anywhere else in the deployment.
+    """
+    remote = _remote_engine(session, "sf-remote")
+    _engine(session, name="maia", kind=EngineKind.MAIA)
+    game = _game(session)
+
+    run = analysis.request_analysis(
+        session, game_id=game.id, engine_id=remote.id, tier=Tier.DEEP, maia=False
+    )
+
+    assert run.status is RunStatus.QUEUED
+    assert run.maia is False
 
 
 def test_a_host_with_its_own_maia_is_not_mixed(session: Session) -> None:
-    remote = _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
-    _remote_engine(session, "maia-remote", kind=EngineKind.MAIA, default_tier=None)
+    remote = _remote_engine(session, "sf-remote")
+    _remote_engine(session, "maia-remote", kind=EngineKind.MAIA)
     _engine(session, name="stockfish")
-    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None)
+    _engine(session, name="maia", kind=EngineKind.MAIA)
     game = _game(session)
 
     remote_run = analysis.request_analysis(session, game_id=game.id, engine_id=remote.id)
@@ -911,15 +1096,15 @@ def test_a_host_with_its_own_maia_is_not_mixed(session: Session) -> None:
 
 def test_a_deployment_with_no_maia_at_all_has_nothing_to_mix(session: Session) -> None:
     """The pass simply does not happen, which is exactly today's behaviour."""
-    _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
+    _remote_engine(session, "sf-remote")
     game = _game(session)
 
     assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
 
 
 def test_a_maia_that_is_switched_off_strands_nobody(session: Session) -> None:
-    _remote_engine(session, "sf-remote", default_tier=Tier.DEEP)
-    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None, enabled=False)
+    _remote_engine(session, "sf-remote")
+    _engine(session, name="maia", kind=EngineKind.MAIA, enabled=False)
     game = _game(session)
 
     assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
@@ -927,8 +1112,8 @@ def test_a_maia_that_is_switched_off_strands_nobody(session: Session) -> None:
 
 def test_a_run_on_the_maia_itself_is_not_a_mixed_host_run(session: Session) -> None:
     """Nothing is stranded when the engine named *is* the model."""
-    maia = _remote_engine(session, "maia-remote", kind=EngineKind.MAIA, default_tier=None)
-    _engine(session, name="maia", kind=EngineKind.MAIA, default_tier=None)
+    maia = _remote_engine(session, "maia-remote", kind=EngineKind.MAIA)
+    _engine(session, name="maia", kind=EngineKind.MAIA)
     game = _game(session)
 
     assert analysis.request_analysis(session, game_id=game.id, engine_id=maia.id).id
@@ -1528,6 +1713,58 @@ def test_nothing_running_means_nothing_to_collect(session: Session) -> None:
     assert analysis.requeue_stale_runs(session) == []
 
 
+def _browser_engine(session: Session, name: str = "wasm-sf") -> Engine:
+    """An engine advertised by a browser tab: not a binary, and not a machine."""
+    from backend.services import runners as runners_service
+
+    runner, _token = runners_service.create_runner(session, "this-browser", slots=1)
+    runner.browser = True
+    engine = _engine(session, name=name, path="wasm:stockfish-18")
+    engine.runner_id = runner.id
+    session.commit()
+    return engine
+
+
+def test_a_browser_tab_that_flaps_twice_does_not_fail_the_run(session: Session) -> None:
+    """A tab is expected to vanish; two of those must not be two spent attempts.
+
+    Closing it, locking the phone it is on, or leaving it in the background long enough for
+    its timers to be throttled past the detach window are all ordinary, and none of them
+    says anything about the run — where a machine that has stopped answering twice has
+    broken.
+    """
+    engine = _browser_engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(
+        session, game_id=game.id, engine_id=engine.id, maia=False
+    )
+
+    for _ in range(analysis.MAX_ATTEMPTS + 1):
+        claimed = analysis.claim_next_run(session, engine_ids=[engine.id])
+        assert claimed is not None and claimed.id == run.id
+        _went_quiet(session, claimed)
+
+        assert [collected.id for collected in analysis.requeue_stale_runs(session)] == [run.id]
+        assert run.status is RunStatus.QUEUED
+        assert run.attempts == 0, "the tab went away; that is not a try the run spent"
+        assert run.error == analysis.BROWSER_GONE_MESSAGE
+
+
+def test_a_browser_engine_that_really_fails_still_spends_its_attempts(session: Session) -> None:
+    """The refund is for "the host went away", not for "the work went wrong"."""
+    engine = _browser_engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id, engine_id=engine.id, maia=False)
+
+    for _ in range(analysis.MAX_ATTEMPTS):
+        run = analysis.claim_next_run(session, engine_ids=[engine.id])
+        assert run is not None
+        status = analysis.fail_run(session, run, "the engine rejected the position")
+
+    assert status is RunStatus.FAILED
+    assert run.attempts == analysis.MAX_ATTEMPTS
+
+
 # --- events ---------------------------------------------------------------
 
 
@@ -1882,7 +2119,7 @@ def test_a_beat_for_a_run_that_was_taken_away_says_so(session: Session) -> None:
 
 def test_a_claim_can_be_narrowed_to_one_hosts_engines(session: Session) -> None:
     mine = _engine(session, name="mine")
-    theirs = _engine(session, name="theirs", default_tier=None)
+    theirs = _engine(session, name="theirs")
     ours = _queued(session, mine.id)
     _queued(session, theirs.id)
 
@@ -1912,7 +2149,7 @@ def test_a_run_with_no_engine_belongs_to_nobody_in_particular(session: Session) 
 
 def test_an_excluded_engines_run_is_left_where_it_is(session: Session) -> None:
     local = _engine(session, name="local")
-    remote = _engine(session, name="remote", default_tier=None)
+    remote = _engine(session, name="remote")
     _queued(session, remote.id)
     mine = _queued(session, local.id)
 
@@ -1978,3 +2215,287 @@ def test_abandoning_a_run_announces_that_it_is_queued_again(session: Session) ->
         cancel()
 
     assert [event["event"] for event in events] == [analysis.EVENT_RUN_QUEUED]
+
+
+# --- what the library has been analysed with ------------------------------
+
+
+def _finished(
+    session: Session,
+    game: Game,
+    tier: Tier = Tier.QUICK,
+    *,
+    status: RunStatus = RunStatus.DONE,
+    seconds: float = 6.0,
+    nodes: int | None = None,
+    multipv: int | None = None,
+    maia_only: bool = False,
+    elos: list[int] | None = None,
+) -> AnalysisRun:
+    """A full-game run over `game` that took `seconds`, at today's budget unless told otherwise."""
+    started = utcnow()
+    deep = Tier(tier) is Tier.DEEP
+    run = AnalysisRun(
+        game_id=game.id,
+        tier=tier,
+        status=status,
+        nodes=nodes
+        if nodes is not None
+        else (app_settings.DEEP_NODES_DEFAULT if deep else app_settings.QUICK_NODES_DEFAULT),
+        multipv=multipv
+        if multipv is not None
+        else (app_settings.DEEP_MULTIPV_DEFAULT if deep else 1),
+        maia_only=maia_only,
+        maia_elos=elos,
+        started_at=started,
+        finished_at=started + timedelta(seconds=seconds),
+    )
+    session.add(run)
+    session.commit()
+    return run
+
+
+def test_a_run_whose_first_row_holds_a_json_null_still_reports_its_levels(
+    session: Session,
+) -> None:
+    """The defect 0011 cleared: `'null'` is a value, and it answers `IS NOT NULL`.
+
+    A ply nobody asked Maia about — the opponent's move under `maia_both_sides` off — was
+    written by a JSON column as the literal `null` rather than as SQL NULL. The run's
+    representative row is the first one carrying a policy, and picking that one made the
+    whole run report no levels, so the fill button re-queued work the library already had.
+    """
+    _engine(session)
+    _maia(session)
+    game = _game(session)
+    run = AnalysisRun(
+        game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE, nodes=1, multipv=1
+    )
+    session.add(run)
+    session.flush()
+    session.add_all(
+        [
+            MoveEval(run_id=run.id, ply=0, move_uci="e2e4"),
+            MoveEval(
+                run_id=run.id,
+                ply=1,
+                move_uci="e7e5",
+                maia_policy={"1500": [{"uci": "e7e5", "rank": 1}]},
+            ),
+        ]
+    )
+    session.commit()
+    # What the column used to write where it meant to write nothing.
+    session.execute(
+        text("UPDATE move_evals SET maia_policy = 'null' WHERE run_id = :run AND ply = 0"),
+        {"run": run.id},
+    )
+    session.commit()
+    app_settings.set_maia_elos(session, [1500])
+
+    assert analysis.maia_fill_status(session)["missing_games"] == 0
+    assert analysis.queue_maia_fill(session)["queued"] == 0
+
+
+def test_a_policy_that_is_not_there_is_stored_as_sql_null(session: Session) -> None:
+    """The column half of the same fix: no row written from here on needs the migration."""
+    _engine(session)
+    game = _game(session)
+    run = AnalysisRun(
+        game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE, nodes=1, multipv=1
+    )
+    session.add(run)
+    session.flush()
+    session.add(MoveEval(run_id=run.id, ply=0, move_uci="e2e4"))
+    session.commit()
+
+    stored = session.execute(
+        text("SELECT maia_policy, best_lines FROM move_evals WHERE run_id = :run"),
+        {"run": run.id},
+    ).one()
+
+    assert stored == (None, None)
+
+
+def test_coverage_splits_the_library_by_the_pass_each_game_has(session: Session) -> None:
+    """Every field of the page's picture, over a library with one game of each shape."""
+    _engine(session)
+    quick_only = _game(session, plies=6)
+    deep = _game(session, plies=4)
+    _game(session, plies=2)
+    failed = _game(session, plies=6)
+    run = _finished(session, quick_only)
+    _finished(session, deep, Tier.DEEP)
+    _finished(session, failed, status=RunStatus.FAILED)
+    # A level nobody asks about any more: Maia used to be centred on the game's own rating.
+    session.add(
+        MoveEval(run_id=run.id, ply=0, move_uci="e2e4", maia_policy={"1234": [{"uci": "e2e4"}]})
+    )
+    session.commit()
+
+    assert analysis.coverage(session, settings=Settings(analysis_concurrency=3)) == {
+        "total": 4,
+        "no_pass": 2,
+        "quick_only": 1,
+        "deep": 1,
+        # Not the complement of the split: the deep-only game is missing a quick pass, and
+        # a failed run leaves its game as unanalysed as it was.
+        "missing": {"quick": 3, "deep": 3},
+        "failed": 1,
+        "maia": {
+            "configured": [MAIA_MAX_RATING],
+            "games_with_any": 1,
+            "per_level": [{"elo": MAIA_MAX_RATING, "games": 0}],
+            "missing_games": 2,
+            "orphan_levels": [{"elo": 1234, "games": 1}],
+        },
+        "estimates": {
+            "quick_seconds": None,
+            "deep_seconds": None,
+            "maia_seconds": None,
+            "concurrency": 3,
+        },
+    }
+
+
+def test_the_estimate_averages_only_the_budget_that_is_configured_now(session: Session) -> None:
+    """The 447 deep runs from an experiment at 500 nodes are not what a pass costs today."""
+    _engine(session)
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
+        _finished(session, _game(session, plies=6), seconds=6.0)
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
+        _finished(session, _game(session, plies=6), seconds=60.0, nodes=500)
+    _game(session, plies=4)
+
+    estimate = analysis.coverage(session)["estimates"]["quick_seconds"]
+
+    # A second per ply over the four plies with no pass — not the 5.5 the two budgets
+    # averaged together would have promised.
+    assert estimate == pytest.approx(4.0)
+
+
+def test_the_estimate_is_none_until_there_is_history_worth_averaging(session: Session) -> None:
+    _engine(session)
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES - 1):
+        _finished(session, _game(session, plies=6), seconds=6.0)
+    _game(session, plies=4)
+
+    assert analysis.coverage(session)["estimates"] == {
+        "quick_seconds": None,
+        "deep_seconds": None,
+        "maia_seconds": None,
+        "concurrency": analysis.get_settings().analysis_concurrency,
+    }
+
+
+def test_the_fill_is_priced_off_the_fills_this_deployment_has_finished(
+    session: Session,
+) -> None:
+    """The third button's estimate: fill seconds per ply, over the plies still missing a level.
+
+    A fill searches nothing, so the quick tier's per-ply cost is no guide to it at all —
+    the sample is `maia_only` runs and the games priced are the ones `maia_fill_targets`
+    would queue.
+    """
+    _engine(session)
+    _maia(session)
+    app_settings.set_maia_elos(session, [1500])
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
+        filled = _game(session, plies=6)
+        _finished(session, filled, seconds=60.0)
+        _finished(session, filled, seconds=3.0, maia_only=True, elos=[1500])
+    # Analysed, never filled: four plies of work the button still has in front of it.
+    _finished(session, _game(session, plies=4), seconds=60.0)
+
+    estimate = analysis.coverage(session)["estimates"]["maia_seconds"]
+
+    # Half a second a ply over four plies — not the ten a quick pass costs here.
+    assert estimate == pytest.approx(2.0)
+
+
+def test_the_fill_estimate_ignores_the_passes_that_searched(session: Session) -> None:
+    """Five finished quick passes and no fill measure nothing about what a fill costs."""
+    _engine(session)
+    _maia(session)
+    app_settings.set_maia_elos(session, [1500])
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
+        _finished(session, _game(session, plies=6), seconds=6.0)
+
+    assert analysis.coverage(session)["estimates"]["maia_seconds"] is None
+
+
+# --- picking the failures back up -----------------------------------------
+
+
+def test_the_failed_runs_can_be_listed_without_naming_a_game(session: Session) -> None:
+    """The listing that did not exist: a failed run is invisible once the socket frames pass."""
+    _engine(session)
+    first = _finished(session, _game(session), status=RunStatus.FAILED)
+    second = _finished(session, _game(session), status=RunStatus.FAILED)
+    _finished(session, _game(session))
+
+    listed = analysis.list_runs(session, status=RunStatus.FAILED)
+
+    assert [run.id for run in listed] == [second.id, first.id]
+    assert [run.id for run in analysis.list_runs(session, status=RunStatus.FAILED, limit=1)] == [
+        second.id
+    ]
+
+
+def test_a_run_listing_has_to_narrow_by_something(session: Session) -> None:
+    with pytest.raises(analysis.AnalysisRequestError, match="a game or a status"):
+        analysis.list_runs(session)
+
+
+def test_a_retry_is_a_new_run_under_the_tier_that_failed(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    failed = _finished(session, game, Tier.DEEP, status=RunStatus.FAILED)
+
+    assert analysis.retry_failed(session) == {"queued": 1, "skipped": 0}
+
+    queued = session.scalars(
+        select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
+    ).one()
+    assert queued.id != failed.id
+    assert (queued.game_id, queued.tier) == (game.id, Tier.DEEP)
+    # The failure stays where it is: it is the record of what went wrong.
+    assert session.get(AnalysisRun, failed.id).status is RunStatus.FAILED
+
+
+def test_a_retry_skips_a_game_that_already_has_a_live_run(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    _finished(session, game, status=RunStatus.FAILED)
+    _finished(session, game)
+
+    assert analysis.retry_failed(session) == {"queued": 0, "skipped": 1}
+    assert analysis.list_runs(session, game.id, status=RunStatus.QUEUED) == []
+
+
+def test_a_retry_can_be_narrowed_to_the_runs_that_were_named(session: Session) -> None:
+    _engine(session)
+    wanted = _finished(session, _game(session), status=RunStatus.FAILED)
+    _finished(session, _game(session), status=RunStatus.FAILED)
+
+    assert analysis.retry_failed(session, [wanted.id]) == {"queued": 1, "skipped": 0}
+
+    queued = session.scalars(
+        select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
+    ).one()
+    assert queued.game_id == wanted.game_id
+
+
+def test_a_retry_announces_every_run_it_queued(session: Session) -> None:
+    """Same announcement a batch makes: the queue widgets fold these in one at a time."""
+    _engine(session)
+    _finished(session, _game(session), status=RunStatus.FAILED)
+    _finished(session, _game(session), status=RunStatus.FAILED)
+    events: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(events.append)
+    try:
+        analysis.retry_failed(session)
+    finally:
+        cancel()
+
+    assert [event["event"] for event in events] == [analysis.EVENT_RUN_QUEUED] * 2

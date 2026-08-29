@@ -23,6 +23,7 @@ from backend.db.migrate import upgrade_to_head
 from backend.db.models import Engine, Runner
 from backend.db.session import get_sessionmaker
 from backend.services import app_settings, maia_live
+from backend.services import engines as engines_service
 from backend.services.maia_live import (
     LiveMaia,
     LiveMaiaUnavailableError,
@@ -94,6 +95,9 @@ def register_maia(
     )
     session.add(engine)
     session.commit()
+    # The human-move role, as `add_engine` would have filled it: nothing resolves a Maia
+    # any more except the assignment.
+    engines_service.assign_default_roles(session, engine)
     return engine
 
 

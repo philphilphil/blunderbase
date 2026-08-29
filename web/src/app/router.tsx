@@ -2,6 +2,7 @@ import { createBrowserRouter, Link } from 'react-router-dom'
 
 import { AppShell } from '@/components/shell/AppShell'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { AnalysisPage } from '@/routes/analysis'
 import { DashboardPage } from '@/routes/dashboard'
 import { EnginesPage } from '@/routes/engines'
 import { ExplorerPage } from '@/routes/explorer'
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
       { path: 'notes', element: <NotesPage /> },
       { path: 'stats', element: <StatsPage /> },
       { path: 'import', element: <ImportPage /> },
+      { path: 'analysis', element: <AnalysisPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'settings/engines', element: <EnginesPage /> },
       // Under settings rather than at `/mcp`: that path is the MCP server itself, and a

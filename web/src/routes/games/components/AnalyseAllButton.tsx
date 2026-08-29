@@ -1,9 +1,7 @@
-import { Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
-import { Button } from '@/components/ui/button'
-import { startBackfillRun } from '@/lib/analysis'
-import { useBackfillPreview, useStartBackfill } from '@/lib/api/queries'
+import { ConfirmBackfill } from '@/components/analysis/ConfirmBackfill'
+import { useBackfillPreview } from '@/lib/api/queries'
 
 import { formatCount } from '../format'
 
@@ -19,6 +17,10 @@ import { formatCount } from '../format'
  * The button carries the real number rather than a bare verb: "Analyse all 8,412" is the
  * one thing that tells the owner whether this is the hours-long job they think it is,
  * before they commit to it.
+ *
+ * Quick, and only quick: the tier picker belongs on the Analysis page, where the estimate
+ * that makes a deep pass a decision is shown beside it. This one stays a single button on
+ * the library, where the question is "and the rest of them" rather than "with what".
  */
 const TIER = 'quick'
 
@@ -43,74 +45,9 @@ export function AnalyseAllButton() {
       </button>
 
       {asking && pending ? (
-        <ConfirmAnalyseAll pending={pending} onClose={() => setAsking(false)} />
+        <ConfirmBackfill tier={TIER} pending={pending} onClose={() => setAsking(false)} />
       ) : null}
     </>
   )
 }
 
-/**
- * Asked before the app is taken over, not after: a pass this long is a decision about the
- * evening, so the sentence says how long, what it costs and how to get out again.
- */
-function ConfirmAnalyseAll({ pending, onClose }: { pending: number; onClose: () => void }) {
-  const start = useStartBackfill({
-    onSuccess: (started) => {
-      // A pass with nothing in it is no pass: the preview was stale, and the button
-      // relabelling itself is the whole answer.
-      if (started.queued > 0) {
-        startBackfillRun({ tier: started.tier, total: started.queued, startedAt: Date.now() })
-      }
-      onClose()
-    },
-  })
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !start.isPending) onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose, start.isPending])
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !start.isPending) onClose()
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="analyse-all-title"
-        className="bb-card flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
-      >
-        <div className="flex flex-col gap-1.5">
-          <h2 id="analyse-all-title" className="text-[0.875rem] font-semibold text-ink">
-            Analyse the whole library
-          </h2>
-          <p className="text-[0.75rem] leading-[1.65] text-dim">
-            {formatCount(pending)} {pending === 1 ? 'game gets' : 'games get'} a quick pass.
-            That is hours of engine time, and Blunderbase shows you nothing but the progress
-            until it is through. You can stop it at any point.
-          </p>
-        </div>
-
-        {start.isError ? (
-          <p className="text-[0.71875rem] leading-relaxed text-blunder">{start.error.message}</p>
-        ) : null}
-
-        <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={start.isPending}>
-            Not now
-          </Button>
-          <Button type="button" disabled={start.isPending} onClick={() => start.mutate(TIER)}>
-            {start.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-            Start the pass
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}

@@ -6,8 +6,11 @@ import { cn } from '@/lib/utils'
  * The switch the Engines page uses, grown to the size a footer row can carry: the track is
  * what reads as on or off, and the button around it is a full row-height hit target so the
  * switch is no harder to hit than the pickers beside it.
+ *
+ * Exported because the Settings page needs the same switch beside a label and a caption,
+ * and a third spelling of an on/off track is a third thing to keep in step with the theme.
  */
-function Toggle({
+export function Toggle({
   checked,
   onChange,
   label,

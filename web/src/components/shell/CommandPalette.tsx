@@ -17,6 +17,7 @@ import {
   Cpu,
   Download,
   Flame,
+  Gauge,
   LayoutDashboard,
   Library,
   Network,
@@ -90,7 +91,13 @@ const PAGES: PageRoute[] = [
   { label: 'Notes', hint: 'everything written down', icon: StickyNote, to: '/notes' },
   { label: 'Live', hint: 'the game being played now', icon: Radio, to: '/live' },
   { label: 'Import', hint: 'lichess, chess.com, PGN', icon: Download, to: '/import' },
-  { label: 'Engines', hint: 'the roster and its tiers', icon: Cpu, to: '/settings/engines' },
+  {
+    label: 'Analysis',
+    hint: 'coverage, backfills and what they cost',
+    icon: Gauge,
+    to: '/analysis',
+  },
+  { label: 'Engines', hint: 'the roster and what runs what', icon: Cpu, to: '/settings/engines' },
   { label: 'Settings', hint: 'the deployment', icon: Settings, to: '/settings' },
   { label: 'MCP', hint: 'connect your assistant', icon: Bot, to: '/settings/mcp' },
   {

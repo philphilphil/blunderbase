@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { probeEngine } from '@/lib/api/endpoints'
 import { useAddEngine } from '@/lib/api/queries'
-import type { EngineKind, EngineResponse, ProbeResponse, Tier } from '@/lib/api/types'
+import type { EngineKind, EngineResponse, ProbeResponse } from '@/lib/api/types'
 
 /**
  * Add an engine by path.
@@ -15,6 +15,12 @@ import type { EngineKind, EngineResponse, ProbeResponse, Tier } from '@/lib/api/
  * The backend probes on the way in and refuses a binary it cannot start, so the Probe
  * button is not a formality: it is the same check, run early, with the engine's own name
  * and option count as the receipt.
+ *
+ * Kind is the only thing the form says about what the engine is *for*, and it says it in
+ * the owner's words rather than the protocol's — a normal engine, or one that plays like a
+ * person. Which job it does is not asked here: a new engine fills any role still empty
+ * (`services.engines.assign_default_roles`), and the rest is decided under "What runs what"
+ * where all three roles are seen together.
  */
 export function AddEngineForm({
   onAdded,
@@ -26,7 +32,6 @@ export function AddEngineForm({
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [kind, setKind] = useState<EngineKind>('uci')
-  const [tier, setTier] = useState<Tier | ''>('')
   const [invalid, setInvalid] = useState<string | null>(null)
 
   const probe = useMutation<ProbeResponse, Error, void>({
@@ -44,13 +49,7 @@ export function AddEngineForm({
       return
     }
     setInvalid(null)
-    add.mutate({
-      name: name.trim(),
-      path: path.trim(),
-      kind,
-      default_tier: tier || null,
-      enabled: true,
-    })
+    add.mutate({ name: name.trim(), path: path.trim(), kind, enabled: true })
   }
 
   const declared = probe.data?.options?.length ?? 0
@@ -120,7 +119,7 @@ export function AddEngineForm({
         </div>
       ) : null}
 
-      <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_6.875rem_7.5rem]">
+      <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_11.25rem]">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="add-engine-name">Name</Label>
           <Input
@@ -139,21 +138,8 @@ export function AddEngineForm({
             onChange={(event) => setKind(event.target.value as EngineKind)}
             className="h-8 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50"
           >
-            <option value="uci">uci</option>
-            <option value="maia">maia</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="add-engine-tier">Default tier</Label>
-          <select
-            id="add-engine-tier"
-            value={tier}
-            onChange={(event) => setTier(event.target.value as Tier | '')}
-            className="h-8 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50"
-          >
-            <option value="">none</option>
-            <option value="quick">quick</option>
-            <option value="deep">deep</option>
+            <option value="uci">Normal engine</option>
+            <option value="maia">Human moves (Maia)</option>
           </select>
         </div>
       </div>

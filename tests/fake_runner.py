@@ -35,13 +35,27 @@ THREADS = {
     "managed": False,
 }
 
+# No `tier`. A runner cannot claim a job — the owner assigns Quick, Deep and Human moves on
+# the server — and the key is only still tolerated so that a runner built before that keeps
+# connecting. `test_runners_service` is where an ad that still carries one is covered.
 STOCKFISH_AD: dict[str, Any] = {
     "name": "sf-remote",
     "kind": "uci",
     "path": "/usr/games/stockfish",
     "version": "Stockfish 17",
-    "tier": "deep",
     "options": {"Threads": 8},
+    "declared_options": [THREADS],
+    "streams": True,
+}
+
+# A browser tab's engine: no binary anywhere, so its "path" is an identifier behind a
+# scheme and only the tab that advertised it can start it.
+WASM_AD: dict[str, Any] = {
+    "name": "wasm-sf",
+    "kind": "uci",
+    "path": "wasm:stockfish-18",
+    "version": "Stockfish 18 (WASM)",
+    "options": {"Threads": 4},
     "declared_options": [THREADS],
     "streams": True,
 }
@@ -112,6 +126,7 @@ class FakeRunner:
         engines: Sequence[Mapping[str, Any]] | None = None,
         proto: int | None = None,
         slots: int | None = None,
+        browser: bool = False,
     ) -> dict[str, Any]:
         """Announce, and hand back the `welcome`. `proto=` is how a mismatch is staged."""
         frame = protocol.hello(
@@ -120,6 +135,7 @@ class FakeRunner:
             slots=self.slots if slots is None else slots,
             engines=self.engines if engines is None else engines,
             active_runs=active_runs,
+            browser=browser,
         )
         if proto is not None:
             frame["proto"] = proto

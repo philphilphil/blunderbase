@@ -5,17 +5,27 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are nine of them, in four groups.
+There are fifteen of them, in six groups.
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
 is playing towards and the ones they want to contrast with, not the one they have. Batch
-analysis bakes *every* configured level into every ply of both sides, and the analysis
+analysis bakes *every* configured level into every ply it asks about, and the analysis
 board's live queries ask the same set, so no two surfaces ever speak for two different
 humans. It is a list rather than a number because the interesting reading is a comparison:
 what a 1500 plays here and what a 1900 plays here, side by side. One to five of them, each
 clamped to what Maia can answer; an install that never opened the Settings page is pinned
 to the top of that range alone, [2000]. `maia_target_elo` survives as the first of them,
 which is what every caller that only ever wanted one level still reads.
+
+**Where the Maia pass runs at all** — `maia_on_quick`, `maia_on_deep`, `maia_both_sides`,
+each 0 or 1. The Maia pass costs 40-70% of a quick run, so which tiers pay for it is a
+choice rather than a fact about a run. Quick is on by default because it is the pass every
+imported game gets; deep is off, because a deep run would recompute a policy identical to
+the one the quick run stored, and the fill flow (`maia_only`) is what adds levels to a game
+that only ever had a deep pass. `maia_both_sides` off asks Maia about the owner's own moves
+only, which halves what a run pays for it. The two tier flags are read when a run is
+enqueued, alongside its budget; `maia_both_sides` is read per plan, alongside the
+thresholds.
 
 **The analysis budgets** — `quick_nodes`, `deep_nodes`, `deep_multipv`. What one position
 costs in each tier, and how many lines a deep run keeps. Read when a run is enqueued, so
@@ -27,6 +37,13 @@ is judged by the new ones and one analysed before it keeps what it was judged by
 
 **The default owner rating.** The rating to stand in for the owner's when the game itself
 carries none — an OTB PGN, an unrated game.
+
+**The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
+engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
+They are identities, not numbers with a range, so they are outside `SETTINGS` and outside
+`replace` entirely — there is no clamp that could rescue an engine id, and a save of the
+analysis form must not wipe the deployment's wiring. `services.engines` is where they mean
+something; here they are three rows and their accessors, the way `maia_elos` is.
 
 A value outside what a setting can mean is clamped, never refused: an owner aiming at 2200
 gets Maia's top level rather than a form that will not save. The one exception is the
@@ -48,6 +65,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING
+from backend.db.enums import EngineRole, Tier
 from backend.db.models import AppSetting
 
 # --- the keys -------------------------------------------------------------
@@ -57,6 +75,12 @@ MAIA_TARGET_ELO = "maia_target_elo"
 # and a range, and this is a set of them, so it is read and written by its own pair of
 # functions rather than through `set_value` / `replace`.
 MAIA_ELOS = "maia_elos"
+# The three switches over the Maia pass itself, each stored as 0 or 1. Ordinary members of
+# `SETTINGS`: a flag is a number with a range of one step, and giving it its own machinery
+# would buy nothing but a second way to read a row.
+MAIA_ON_QUICK = "maia_on_quick"
+MAIA_ON_DEEP = "maia_on_deep"
+MAIA_BOTH_SIDES = "maia_both_sides"
 QUICK_NODES = "quick_nodes"
 DEEP_NODES = "deep_nodes"
 DEEP_MULTIPV = "deep_multipv"
@@ -64,9 +88,29 @@ INACCURACY_THRESHOLD = "inaccuracy_threshold"
 MISTAKE_THRESHOLD = "mistake_threshold"
 BLUNDER_THRESHOLD = "blunder_threshold"
 DEFAULT_OWNER_RATING = "default_owner_rating"
+# The three role assignments, each a nullable engine id. Not in `SETTINGS` for the same
+# reason `MAIA_ELOS` is not: those are single numbers with a range and a clamp, and an
+# engine id has neither — the nearest sensible engine to one that is gone is no engine.
+QUICK_ENGINE_ID = "quick_engine_id"
+DEEP_ENGINE_ID = "deep_engine_id"
+HUMAN_ENGINE_ID = "human_engine_id"
+
+ROLE_KEYS: dict[EngineRole, str] = {
+    EngineRole.QUICK: QUICK_ENGINE_ID,
+    EngineRole.DEEP: DEEP_ENGINE_ID,
+    EngineRole.HUMAN: HUMAN_ENGINE_ID,
+}
 
 # --- what each one falls back to, and what it may be ----------------------
 
+# The quick pass is the one every imported game gets, so it is where the human-move columns
+# are worth their 40-70%. A deep pass is not: it would recompute a policy identical to the
+# one already stored, since Maia answers a position rather than a search budget. Both sides
+# by default, because "what will a human opposite me fall into" is a question about the
+# positions the opponent moves in.
+MAIA_ON_QUICK_DEFAULT = 1
+MAIA_ON_DEEP_DEFAULT = 0
+MAIA_BOTH_SIDES_DEFAULT = 1
 QUICK_NODES_DEFAULT = 250_000
 DEEP_NODES_DEFAULT = 2_000_000
 DEEP_MULTIPV_DEFAULT = 4
@@ -90,6 +134,9 @@ MAX_MULTIPV = 10
 MIN_THRESHOLD = 0.0
 MAX_THRESHOLD = 100.0
 MIN_OWNER_RATING = 1
+# A flag's range: off, on, and nothing in between for a clamp to land on.
+FLAG_OFF = 0
+FLAG_ON = 1
 # How many Maia levels one deployment may carry. Every level is a full extra policy query
 # per ply of every run, so this is a budget as much as a UI limit; five columns is also
 # about as many as the game panel can put side by side and still be read.
@@ -124,6 +171,27 @@ SETTINGS: tuple[Setting, ...] = (
         default=MAIA_MAX_RATING,
         low=MAIA_MIN_RATING,
         high=MAIA_MAX_RATING,
+        whole=True,
+    ),
+    Setting(
+        key=MAIA_ON_QUICK,
+        default=MAIA_ON_QUICK_DEFAULT,
+        low=FLAG_OFF,
+        high=FLAG_ON,
+        whole=True,
+    ),
+    Setting(
+        key=MAIA_ON_DEEP,
+        default=MAIA_ON_DEEP_DEFAULT,
+        low=FLAG_OFF,
+        high=FLAG_ON,
+        whole=True,
+    ),
+    Setting(
+        key=MAIA_BOTH_SIDES,
+        default=MAIA_BOTH_SIDES_DEFAULT,
+        low=FLAG_OFF,
+        high=FLAG_ON,
         whole=True,
     ),
     Setting(key=QUICK_NODES, default=QUICK_NODES_DEFAULT, low=MIN_NODES, high=None, whole=True),
@@ -260,6 +328,74 @@ def get_maia_target_elo(session: Session) -> int:
     client that predates the list, and a surface that shows a single number shows this one.
     """
     return get_maia_elos(session)[0]
+
+
+def get_role_engine_id(session: Session, role: EngineRole) -> int | None:
+    """The engine the owner assigned to this role, or None because nobody has.
+
+    Only the id is stored, and only the id is answered: whether that engine still exists,
+    is switched on, or is of a kind the role can use is `services.engines`'s question, and
+    asking it here would put half of it in two places.
+    """
+    row = session.get(AppSetting, ROLE_KEYS[EngineRole(role)])
+    if row is None:
+        return None
+    value = row.value
+    if isinstance(value, bool) or not isinstance(value, int):
+        # A hand-edited row. Unassigned is the honest reading of a value that is not an id.
+        return None
+    return value
+
+
+def set_role_engine_id(session: Session, role: EngineRole, engine_id: int | None) -> int | None:
+    """Assign an engine to a role, or unassign it. Returns what is assigned afterwards.
+
+    None deletes the row rather than writing a null, as every other setting does: "the
+    owner has not chosen" and "the owner chose nothing" are one state, and the state is
+    that the role does not run.
+    """
+    key = ROLE_KEYS[EngineRole(role)]
+    if engine_id is None:
+        session.execute(delete(AppSetting).where(AppSetting.key == key))
+        session.commit()
+        return None
+    row = session.get(AppSetting, key)
+    if row is None:
+        session.add(AppSetting(key=key, value=int(engine_id)))
+    else:
+        row.value = int(engine_id)
+    session.commit()
+    return int(engine_id)
+
+
+def _flag(session: Session, key: str) -> bool:
+    """One 0/1 setting as the bool its callers want, its default where no row says."""
+    value = stored(session, key)
+    return bool(BY_KEY[key].default if value is None else value)
+
+
+def get_maia_on_quick(session: Session) -> bool:
+    """Whether a quick pass queued now also asks the human-move model."""
+    return _flag(session, MAIA_ON_QUICK)
+
+
+def get_maia_on_deep(session: Session) -> bool:
+    """Whether a deep pass queued now also asks the human-move model.
+
+    Off unless the owner turns it on: Maia answers a position rather than a search budget,
+    so a deep run's policy is the quick run's policy computed a second time.
+    """
+    return _flag(session, MAIA_ON_DEEP)
+
+
+def get_maia_both_sides(session: Session) -> bool:
+    """Whether Maia is asked about every ply, or only the ones the owner moved in."""
+    return _flag(session, MAIA_BOTH_SIDES)
+
+
+def maia_for_tier(session: Session, tier: Tier) -> bool:
+    """Whether a run of this tier, queued now, carries a Maia pass at all."""
+    return get_maia_on_deep(session) if Tier(tier) is Tier.DEEP else get_maia_on_quick(session)
 
 
 def get_quick_nodes(session: Session) -> int:

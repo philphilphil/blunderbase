@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.adapters import lichess, pgn_import
-from backend.db.enums import EngineKind, JobStatus, Platform, Result, Source, Speed, Tier
+from backend.db.enums import EngineKind, JobStatus, Platform, Result, Source, Speed
 from backend.db.models import Account, AnalysisRun, Engine, Game, ImportJob
 from backend.services.import_service import ImportFailure, ParsedGame, run_import
 
@@ -221,7 +221,6 @@ def test_a_sync_can_store_its_games_without_queueing_a_pass(
             name="Stockfish",
             kind=EngineKind.UCI,
             path="/opt/homebrew/bin/stockfish",
-            default_tier=Tier.QUICK,
             enabled=True,
         )
     )

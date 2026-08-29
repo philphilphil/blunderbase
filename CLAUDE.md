@@ -87,6 +87,13 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
   LF by `.gitattributes` because `docker/entrypoint.sh` and `scripts/*.sh` run under `sh`.
 - Do not commit unless asked. When asked, plain imperative subjects in the style of the
   log (`fix(web): …`, `chore: …`).
+- **Do not drive the app in a browser.** No Playwright, no browser automation, no starting
+  a server to click through the UI. Run `make test` and the lint/typecheck commands above,
+  say plainly what that does and does not prove, and then hand it to the owner to try —
+  and wait for their answer before going further. The owner is at a real browser and the
+  app is one keystroke away for them; an agent driving a second copy is slower, tests a
+  browser nobody uses, and fights the owner's own `make run` for port 8765. If a change
+  can only be judged in a browser, say so and stop there.
 - **Releases are always triggered by the owner.** Never write the changelog, run
   `make release` or `make publish` on your own initiative — only when told to, and then
   follow the steps below.

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useCancelBackfill, useQueueStatus } from '@/lib/api/queries'
-import { clearBackfillRun, type BackfillRun } from '@/lib/analysis'
+import { clearBackfillRun, formatDuration, type BackfillRun } from '@/lib/analysis'
 import { formatCount } from '@/routes/games/format'
 
 /**
@@ -73,7 +73,7 @@ export function BackfillTakeover({ run }: { run: BackfillRun }) {
   // behind us took is the only honest evidence about the ones ahead.
   const remaining =
     done >= ETA_MIN_DONE && done < run.total && elapsed >= ETA_MIN_ELAPSED_MS
-      ? formatRemaining(((run.total - done) * elapsed) / done / 1000)
+      ? formatDuration(((run.total - done) * elapsed) / done / 1000)
       : null
 
   const stalled = queue.data?.workers === false
@@ -186,14 +186,4 @@ export function BackfillTakeover({ run }: { run: BackfillRun }) {
       </section>
     </div>
   )
-}
-
-/** `3h 20m`, `14m`, `under a minute` — the granularity the number deserves and no more. */
-function formatRemaining(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 60) return 'under a minute'
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
 }

@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.adapters import chesscom
-from backend.db.enums import Color, EngineKind, JobStatus, Platform, Result, Source, Speed, Tier
+from backend.db.enums import Color, EngineKind, JobStatus, Platform, Result, Source, Speed
 from backend.db.models import Account, AnalysisRun, Engine, Game, GamePosition
 from backend.services import import_service
 
@@ -303,7 +303,6 @@ def test_a_sync_can_store_its_games_without_queueing_a_pass(
             name="Stockfish",
             kind=EngineKind.UCI,
             path="/opt/homebrew/bin/stockfish",
-            default_tier=Tier.QUICK,
             enabled=True,
         )
     )

@@ -10,7 +10,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.db.enums import EngineKind, RunStatus, Tier
+from backend.db.enums import EngineKind, EngineRole, RunStatus, Tier
 from backend.db.models import AnalysisRun, Credential, Engine, Runner
 from backend.runners.protocol import EngineAd
 from backend.services import analysis
@@ -62,12 +62,12 @@ def _local_engine(session: Session, name: str = "stockfish", **changes: Any) -> 
         name=name,
         kind=changes.pop("kind", EngineKind.UCI),
         path=changes.pop("path", "/usr/bin/stockfish"),
-        default_tier=changes.pop("default_tier", Tier.QUICK),
         enabled=changes.pop("enabled", True),
         **changes,
     )
     session.add(engine)
     session.commit()
+    engines_service.assign_default_roles(session, engine)
     return engine
 
 
@@ -435,6 +435,49 @@ def test_maia_is_never_offered_as_a_stream(session: Session) -> None:
     assert (payload["kind"], payload["streams"]) == ("maia", False)
 
 
+def test_a_runner_that_advertises_no_streams_is_taken_at_its_word(session: Session) -> None:
+    """The flag is the host's answer, not an inference from its kind.
+
+    A browser tab runs `run_dispatch` and answers no `stream_open`, and it says so. Reading
+    `kind == "uci"` here instead is what let the analysis-board picker offer it and then
+    wait forever for a `stream_started`.
+    """
+    runner, _token = runners_service.create_runner(session, "this browser")
+    engines_service.sync_runner_engines(
+        session, runner, [_ad("wasm-sf", path="wasm:stockfish-18", streams=False)]
+    )
+    engine = engines_service.engines_of_runner(session, runner.id)[0]
+
+    payload = runners_service.engine_payload(engine)
+
+    assert engine.streams is False
+    assert (payload["kind"], payload["streams"]) == ("uci", False)
+
+
+def test_a_runner_that_learns_to_stream_is_taken_at_its_word_too(session: Session) -> None:
+    """The row is overwritten from the advertisement, so an upgraded tab is offered boards."""
+    runner, _token = runners_service.create_runner(session, "this browser")
+    engines_service.sync_runner_engines(
+        session, runner, [_ad("wasm-sf", path="wasm:stockfish-18", streams=False)]
+    )
+
+    engines_service.sync_runner_engines(
+        session, runner, [_ad("wasm-sf", path="wasm:stockfish-18", streams=True)]
+    )
+    engine = engines_service.engines_of_runner(session, runner.id)[0]
+
+    assert engine.streams is True
+    assert runners_service.engine_payload(engine)["streams"] is True
+
+
+def test_an_engine_on_this_host_advertises_nothing_and_drives_a_board(session: Session) -> None:
+    """Nothing advertises for a local binary, so the column's default is the whole answer."""
+    engine = _local_engine(session)
+
+    assert engine.streams is True
+    assert runners_service.engine_payload(engine)["streams"] is True
+
+
 def test_the_breakdown_says_where_the_backlog_will_be_worked(session: Session) -> None:
     local = _local_engine(session)
     runner, _token = runners_service.create_runner(session, "gpu-box", slots=4)
@@ -582,9 +625,12 @@ def test_an_advertisement_becomes_an_engine_row(session: Session) -> None:
     assert engine.kind is EngineKind.UCI
     assert engine.path == "/usr/games/stockfish"
     assert engine.version == "Stockfish 17"
-    assert engine.default_tier is Tier.DEEP
     assert engine.options == {"Threads": 8}
     assert engine.enabled is True
+    # The ad's `tier: deep` is accepted and ignored — a runner cannot claim a job — but a
+    # role nobody had filled goes to the first engine that fits it.
+    assert engines_service.engine_for_tier(session, Tier.QUICK).id == engine.id
+    assert engines_service.engine_for_tier(session, Tier.DEEP).id == engine.id
 
 
 def test_re_advertising_updates_the_row_rather_than_adding_one(session: Session) -> None:
@@ -598,7 +644,6 @@ def test_re_advertising_updates_the_row_rather_than_adding_one(session: Session)
     assert again[0].engine_id == first[0].engine_id
     engine = session.get(Engine, again[0].engine_id)
     assert (engine.path, engine.options) == ("/opt/stockfish", {"Threads": 2})
-    assert engine.default_tier is Tier.QUICK
 
 
 def test_an_engine_the_runner_stops_advertising_is_disabled_not_deleted(
@@ -736,28 +781,58 @@ def test_a_switched_off_remote_engine_is_still_not_this_hosts_work(session: Sess
     assert engines_service.runner_engine_ids(session, runner.id) == []
 
 
-def test_the_local_fallback_never_reaches_for_a_remote_binary(session: Session) -> None:
-    local = _local_engine(session, "stockfish", default_tier=None)
+def test_a_local_only_ask_never_reaches_for_a_remote_binary(session: Session) -> None:
+    """And never substitutes: the assigned engine being elsewhere is no engine here."""
+    _local_engine(session, "stockfish")
     runner, _token = runners_service.create_runner(session, "gpu-box")
-    engines_service.sync_runner_engines(session, runner, [_ad()])
+    accepted = engines_service.sync_runner_engines(session, runner, [_ad()])
+    engines_service.set_role_engine(session, EngineRole.DEEP, accepted[0].engine_id)
 
     assert engines_service.engine_for_tier(session, Tier.DEEP).name == "sf-remote"
-    assert engines_service.engine_for_tier(session, Tier.DEEP, local_only=True).id == local.id
+    assert engines_service.engine_for_tier(session, Tier.DEEP, local_only=True) is None
 
 
-def test_a_host_uses_the_maia_it_has(session: Session) -> None:
-    local_maia = _local_engine(session, "maia", kind=EngineKind.MAIA, default_tier=None)
+def test_a_first_time_runners_engine_fills_a_role_nobody_has_filled(session: Session) -> None:
+    """What keeps a deployment whose only engine arrived over the wire able to run one."""
+    runner, _token = runners_service.create_runner(session, "gpu-box")
+
+    accepted = engines_service.sync_runner_engines(session, runner, [_ad(), _ad("spare")])
+
+    assert engines_service.engine_for_tier(session, Tier.QUICK).id == accepted[0].engine_id
+    assert engines_service.engine_for_tier(session, Tier.DEEP).id == accepted[0].engine_id
+
+
+def test_a_re_advertised_engine_does_not_refill_a_role_the_owner_emptied(
+    session: Session,
+) -> None:
+    runner, _token = runners_service.create_runner(session, "gpu-box")
+    engines_service.sync_runner_engines(session, runner, [_ad()])
+    engines_service.set_role_engine(session, EngineRole.DEEP, None)
+
+    engines_service.sync_runner_engines(session, runner, [_ad()])
+
+    assert engines_service.engine_for_tier(session, Tier.DEEP) is None
+
+
+def test_the_maia_a_host_uses_is_the_one_the_owner_chose(session: Session) -> None:
+    """One model is chosen for the whole deployment, and only its own host answers with it."""
+    local_maia = _local_engine(session, "maia", kind=EngineKind.MAIA)
     runner, _token = runners_service.create_runner(session, "gpu-box")
     accepted = engines_service.sync_runner_engines(
         session, runner, [_ad("maia-remote", kind="maia", tier=None)]
     )
 
     assert engines_service.maia_engine_for_host(session, None).id == local_maia.id
+    assert engines_service.maia_engine_for_host(session, runner.id) is None
+
+    engines_service.set_role_engine(session, EngineRole.HUMAN, accepted[0].engine_id)
+
+    assert engines_service.maia_engine_for_host(session, None) is None
     assert engines_service.maia_engine_for_host(session, runner.id).id == accepted[0].engine_id
 
 
 def test_a_host_without_maia_simply_has_none(session: Session) -> None:
-    _local_engine(session, "maia", kind=EngineKind.MAIA, default_tier=None)
+    _local_engine(session, "maia", kind=EngineKind.MAIA)
     runner, _token = runners_service.create_runner(session, "gpu-box")
     engines_service.sync_runner_engines(session, runner, [_ad()])
 
