@@ -28,32 +28,6 @@
   <img src="docs/screenshots/stats.png" alt="Stats" />
 </p>
 
-## MCP
-
-Blunderbase exposes an [MCP](https://modelcontextprotocol.io/) server so your agent can
-query games, stats and positions, request deep analysis, keep coaching notes, and drive
-the live board. Payloads are compact and token-conscious; the model narrates stored
-engine facts and never freestyles chess analysis.
-
-```bash
-claude mcp add blunderbase -- uv run --directory /path/to/blunderbase blunderbase mcp
-claude mcp add --transport http blunderbase https://blunderbase.example/mcp \
-  --header "Authorization: Bearer <a key from Assistant, or your password>"
-```
-
-The bearer token is your password, or better, a key minted per client on **Assistant** —
-stored hashed, shown once, revocable without touching the password. See
-[docs/reference.md](docs/reference.md#signing-in).
-
-**Examples:**
-```
-You:   "Check my last two games"
-Coach: get_last_games → get_game → narrates the two evals worth talking about
-
-You:   "What should I train?"
-Coach: get_worst_recent_moments → get_stats → a plan grounded in your actual blunders
-```
-
 ## Tech Stack
 
 | Layer | Tech |
