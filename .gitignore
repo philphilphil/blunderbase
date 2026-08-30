@@ -18,6 +18,7 @@ coverage.json
 *.db-wal
 .env
 /.uv-desktop-cache/
+/.pnpm-store/
 /desktop/node_modules/
 /desktop/.pyinstaller/
 /desktop/src-tauri/binaries/
