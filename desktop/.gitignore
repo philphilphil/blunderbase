@@ -1,0 +1,5 @@
+node_modules/
+.pyinstaller/
+src-tauri/binaries/
+src-tauri/icons/
+src-tauri/target/

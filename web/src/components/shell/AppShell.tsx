@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
 import { browserRunner } from '@/lib/runner'
+import { NativeFeedback } from '@/lib/desktop/NativeFeedback'
+import { PgnDropOverlay } from '@/lib/desktop/PgnDropOverlay'
 
 import { CommandPaletteProvider } from './CommandPalette'
 import { NavDrawer, SideNav } from './SideNav'
@@ -50,21 +52,76 @@ export function AppShell() {
   }, [])
 
   const [navOpen, setNavOpen] = useState(false)
+  const main = useRef<HTMLElement>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
   const closeNav = useCallback(() => setNavOpen(false), [])
   const openNav = useCallback(() => setNavOpen(true), [])
 
+  // A route change starts at the page rather than wherever focus happened to be in the
+  // previous screen. The main landmark remains visible because it takes no custom outline.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => main.current?.focus({ preventScroll: true }))
+    return () => cancelAnimationFrame(frame)
+  }, [location.pathname])
+
+  useEffect(() => {
+    const routes: Record<string, string> = {
+      '1': '/',
+      '2': '/games',
+      '3': '/explorer',
+      '4': '/notes',
+      '5': '/stats',
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      const route = event.shiftKey && event.key.toLowerCase() === 'i' ? '/import' : routes[event.key]
+      if (!route) return
+      event.preventDefault()
+      navigate(route)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [navigate])
+
   return (
     <CommandPaletteProvider>
+      <a
+        href="#main-content"
+        className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-xs font-semibold text-accent-ink transition-transform focus:translate-y-0"
+      >
+        Skip to content
+      </a>
       <div className="flex h-full min-h-0 flex-col bg-surface">
         <TopBar onOpenNav={openNav} />
         <div className="flex min-h-0 flex-1">
           <SideNav />
-          <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <Outlet />
+          <main
+            ref={main}
+            id="main-content"
+            tabIndex={-1}
+            className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
+          >
+            <Suspense
+              fallback={
+                <div
+                  role="status"
+                  className="flex flex-1 items-center justify-center text-xs text-dim"
+                >
+                  Loading…
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </main>
         </div>
       </div>
       <NavDrawer open={navOpen} onClose={closeNav} />
+      <PgnDropOverlay />
+      <NativeFeedback />
       <Toaster
         position="bottom-right"
         gap={8}

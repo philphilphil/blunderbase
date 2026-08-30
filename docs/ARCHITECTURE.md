@@ -3,6 +3,9 @@
 Decisions made in phase 1 that everything later has to live with. The visual design lives
 in `docs/design/`; this file is only about the shape of the code.
 
+Desktop, Docker, Companion, and synchronization ownership are documented in
+[Target Distribution Architecture](distribution.md).
+
 ## One service layer, three consumers
 
 ```
