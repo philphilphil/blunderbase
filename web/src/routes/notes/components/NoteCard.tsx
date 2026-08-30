@@ -31,8 +31,6 @@ export interface NoteCardProps {
   tagSuggestions?: string[]
   /** Clicking a tag chip filters the list by it. */
   onTagClick?: (tag: string) => void
-  /** Set on the resurfaced strip, where a board would crowd the row. */
-  compact?: boolean
 }
 
 export function NoteCard({
@@ -40,7 +38,6 @@ export function NoteCard({
   highlighted = false,
   tagSuggestions = [],
   onTagClick,
-  compact = false,
 }: NoteCardProps) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(note.text)
@@ -59,7 +56,15 @@ export function NoteCard({
 
   const scope = scopeOf(note)
   const ply = notePlyLabel(note.ply)
-  const href = typeof note.game_id === 'number' ? noteHref(note) : null
+  // A note about a game opens the game; a note about a position on its own opens the
+  // opening explorer rooted there. Only a note anchored to neither has nowhere to go.
+  const href = typeof note.game_id === 'number' || note.fen ? noteHref(note) : null
+  const opensExplorer = typeof note.game_id !== 'number' && Boolean(note.fen)
+  const openLabel = opensExplorer
+    ? 'Open this position in the opening explorer'
+    : ply
+      ? `Open the game at ${ply}`
+      : 'Open the game'
   const line = note.line ? lineText(note.line) : null
   const source = note.source ? SOURCE_LABELS[note.source] : undefined
 
@@ -89,7 +94,7 @@ export function NoteCard({
           : 'border-line',
       )}
     >
-      {note.fen && !compact ? (
+      {note.fen ? (
         <MiniBoard
           fen={note.fen}
           label={ply ? `The position at ${ply}` : 'The position this note is about'}
@@ -122,8 +127,8 @@ export function NoteCard({
           {href ? (
             <Link
               to={href}
-              title={ply ? `Open the game at ${ply}` : 'Open the game'}
-              aria-label={ply ? `Open the game at ${ply}` : 'Open the game'}
+              title={openLabel}
+              aria-label={openLabel}
               className="text-faint transition-colors hover:text-accent-teal"
             >
               <ExternalLink className="size-3.5" aria-hidden />

@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import type { NoteResponse, ResurfaceResponse, TagCount } from '@/lib/api/types'
+import type { NoteResponse, TagCount } from '@/lib/api/types'
 
 import { NotesPage } from './NotesPage'
 
@@ -53,23 +53,6 @@ const NOTES: NoteResponse[] = [
   },
 ]
 
-const RESURFACED: ResurfaceResponse = {
-  items: [
-    {
-      note: {
-        id: 7,
-        text: 'This structure keeps coming back.',
-        tags: [],
-        fen: FEN,
-        created_at: '2026-06-01T10:00:00Z',
-        updated_at: '2026-06-01T10:00:00Z',
-      },
-      reason: 'recurred',
-      games: [31, 32],
-    },
-  ],
-}
-
 const TAGS: TagCount[] = [
   { tag: 'opening', notes: 4 },
   { tag: 'endgame', notes: 2 },
@@ -90,7 +73,6 @@ function stubFetch() {
     const url = String(input)
     const path = url.split('?')[0]!
     if (path.endsWith('/notes/tags')) return json(200, TAGS)
-    if (path.endsWith('/notes/resurface')) return json(200, RESURFACED)
     if (path.endsWith('/notes/export')) {
       return new Response('# notes', {
         status: 200,
@@ -140,12 +122,12 @@ describe('NotesPage', () => {
 
     expect(await screen.findByText('phib vs maia')).toBeInTheDocument()
     expect(screen.getByText('1–0 · 2026-08-20')).toBeInTheDocument()
-    expect(screen.getByText('Positions and loose notes')).toBeInTheDocument()
+    expect(screen.getByText('Opening lines and loose notes')).toBeInTheDocument()
 
-    const headings = screen.getAllByText(/phib vs maia|Positions and loose notes/)
+    const headings = screen.getAllByText(/phib vs maia|Opening lines and loose notes/)
     expect(headings.map((node) => node.textContent)).toEqual([
       'phib vs maia',
-      'Positions and loose notes',
+      'Opening lines and loose notes',
     ])
     // The game note draws its position, and links into the game at its ply.
     expect(screen.getByRole('img', { name: 'The position at 4…' })).toBeInTheDocument()
@@ -166,14 +148,6 @@ describe('NotesPage', () => {
     await waitFor(() => expect(listedWith().some((url) => url.includes('tags=endgame'))).toBe(true))
   })
 
-  it('shows a resurfaced note with the games its position came back in', async () => {
-    draw()
-
-    expect(await screen.findByText('Worth another look')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '#31' })).toHaveAttribute('href', '/games/31')
-    expect(screen.getByRole('link', { name: '#32' })).toHaveAttribute('href', '/games/32')
-  })
-
   it('fetches the note a link named when the filters do not show it', async () => {
     draw('/notes?note=99&scope=game')
 
@@ -189,7 +163,7 @@ describe('NotesPage', () => {
       revokeObjectURL: vi.fn(),
     }))
     draw('/notes?scope=free')
-    await screen.findByText('Positions and loose notes')
+    await screen.findByText('Opening lines and loose notes')
 
     await user.click(screen.getByRole('button', { name: /markdown/i }))
 

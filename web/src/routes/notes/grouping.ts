@@ -19,7 +19,10 @@ export function scopeOf(note: NoteResponse): NoteScope {
 
 export const SCOPE_BADGES: Record<NoteScope, string> = {
   game: 'game',
-  position: 'position',
+  // Not "position": every note is about a position, so the word said nothing about which
+  // kind this is. What this scope actually means is a note written against a position on
+  // its own rather than against a game of yours — which is the opening explorer's note.
+  position: 'opening line',
   line: 'variation',
   free: 'loose',
 }
@@ -66,11 +69,15 @@ export function lineText(line: Pick<LineResponse, 'base_ply' | 'sans' | 'moves'>
  * Where clicking the note goes.
  *
  * A note that knows its game opens that game at the ply it is about, and at the variation
- * it pinned when it pinned one. A note that knows only a position has nowhere else to be
- * than this screen, so it links to itself — which is what the command palette needs.
+ * it pinned when it pinned one. A note that knows only a position opens the opening
+ * explorer rooted there — `?fen=` is that entry point, and it is where such a note was
+ * written. Only a note anchored to nothing links to itself, which is what the command
+ * palette needs to be able to show it at all.
  */
 export function noteHref(note: NoteResponse): string {
-  if (typeof note.game_id !== 'number') return `/notes?note=${note.id}`
+  if (typeof note.game_id !== 'number') {
+    return note.fen ? `/explorer?fen=${encodeURIComponent(note.fen)}` : `/notes?note=${note.id}`
+  }
   const params = new URLSearchParams()
   if (typeof note.ply === 'number' && note.ply > 0) params.set('ply', String(note.ply))
   if (typeof note.line_id === 'number') params.set('line', String(note.line_id))
@@ -78,7 +85,7 @@ export function noteHref(note: NoteResponse): string {
   return `/games/${note.game_id}${query ? `?${query}` : ''}`
 }
 
-/** A note as one line — the palette's row and the resurfaced strip both want this. */
+/** A note as one line — what the command palette's row shows. */
 export function oneLine(note: NoteResponse, max = 80): string {
   const first = note.text.split('\n', 1)[0]?.trim() ?? ''
   if (!first) return 'note'
@@ -168,7 +175,7 @@ export function groupNotes(notes: readonly NoteResponse[]): NoteGroup[] {
     ordered.push({
       key: 'loose',
       gameId: null,
-      title: 'Positions and loose notes',
+      title: 'Opening lines and loose notes',
       subtitle: null,
       href: null,
       notes: [...loose].sort((left, right) => writtenAt(right) - writtenAt(left)),

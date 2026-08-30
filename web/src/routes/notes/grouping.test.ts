@@ -69,8 +69,13 @@ describe('noteHref', () => {
     expect(noteHref(note({ id: 4, game_id: 42 }))).toBe('/games/42')
   })
 
-  it('sends a note with no game to the notes screen, on itself', () => {
-    expect(noteHref(note({ id: 9, fen: '8/8/8/8/8/8/8/K6k w - - 0 1' }))).toBe('/notes?note=9')
+  it('opens a note about a position in the explorer, rooted at that position', () => {
+    expect(noteHref(note({ id: 9, fen: '8/8/8/8/8/8/8/K6k w - - 0 1' }))).toBe(
+      `/explorer?fen=${encodeURIComponent('8/8/8/8/8/8/8/K6k w - - 0 1')}`,
+    )
+  })
+
+  it('leaves a note anchored to nothing on itself, because there is nowhere to go', () => {
     expect(noteHref(note({ id: 10 }))).toBe('/notes?note=10')
   })
 })

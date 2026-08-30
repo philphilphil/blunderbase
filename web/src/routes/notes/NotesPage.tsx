@@ -2,10 +2,8 @@
  * `/notes` — everything written down, in one place.
  *
  * The screen the coach's memory needs and the game page cannot be: notes are written
- * against a game, a variation, a bare position or nothing at all, and the ones that matter
- * most are the ones about a position you keep reaching. So the top of the page is
- * `GET /notes/resurface` (why you should read anything at all today) and the body is the
- * filtered list, grouped by game, with the loose notes last.
+ * against a game, a variation, a bare position or nothing at all. The body is the filtered
+ * list, grouped by game, with the loose notes last.
  *
  * Filters live in the URL, like the library's, so a cut of the notes is a link — and so is
  * one note: `/notes?note=12` is where the command palette sends a note that has no game to
@@ -25,7 +23,6 @@ import type { NoteExportFormat } from '@/lib/api/types'
 
 import { NoteCard } from './components/NoteCard'
 import { NoteFilterBar } from './components/NoteFilterBar'
-import { ResurfacedNotes } from './components/ResurfacedNotes'
 import {
   filterCount,
   filtersFromParams,
@@ -68,13 +65,6 @@ export function NotesPage() {
     [setParams, highlighted],
   )
 
-  const highlight = useCallback(
-    (id: number) => {
-      setParams(paramsFromFilters(filters, { note: id }), { replace: true })
-    },
-    [setParams, filters],
-  )
-
   const suggestions = useMemo(() => (tags.data ?? []).map((row) => row.tag), [tags.data])
   const addTag = useCallback(
     (tag: string) => {
@@ -104,8 +94,6 @@ export function NotesPage() {
       />
 
       <NoteFilterBar filters={filters} onChange={setFilters} />
-
-      <ResurfacedNotes highlighted={highlighted} onHighlight={highlight} />
 
       {notes.isPending ? (
         <div className="flex flex-col gap-2">
