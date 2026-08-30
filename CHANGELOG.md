@@ -4,6 +4,11 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.8.3 — 2026-08-30
+
+- Fixed heavy dashboard traffic starving the server during backfills
+- Changed the player profile to read only what it counts
+
 ## v0.8.2 — 2026-08-30
 
 - Fixed the app locking up during large analysis backfills
