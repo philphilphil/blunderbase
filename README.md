@@ -28,6 +28,14 @@
   <img src="docs/screenshots/stats.png" alt="Stats" />
 </p>
 
+## Roadmap
+- Desktop app for Linux, Mac and Windows
+- Mobile companion app for iOS and Android
+- Sync-Service to keep multiple blunderbase's in sync
+- Multi-Engine-Analysis on the same game, for the engine nerds
+- Puzzles out of your games
+- Import games of others for study and analysis 
+
 ## Tech Stack
 
 | Layer | Tech |
