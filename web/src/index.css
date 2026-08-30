@@ -283,6 +283,10 @@
   --color-edge: var(--bb-edge);
   --color-edge-strong: var(--bb-edge-strong);
   --color-edge-hover: var(--bb-edge-hover);
+  /* The alias this one was missing: `--bb-edge-input` and shadcn's `--input` were both
+     wired up, but nothing generated `border-edge-input`, so the six buttons asking for it
+     drew a `currentColor` border in the weight of their own text. */
+  --color-edge-input: var(--bb-edge-input);
 
   /* text */
   --color-bright: var(--bb-text-bright);
