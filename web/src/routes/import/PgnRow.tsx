@@ -57,6 +57,7 @@ export function PgnRow({
 
   function drop(event: DragEvent<HTMLTableRowElement>) {
     event.preventDefault()
+    event.stopPropagation()
     setOver(false)
     accept(event.dataTransfer.files)
   }
@@ -80,6 +81,7 @@ export function PgnRow({
   return (
     <>
       <TableRow
+        data-pgn-drop-target
         data-state={progress ? 'selected' : undefined}
         onDragOver={(event) => {
           event.preventDefault()

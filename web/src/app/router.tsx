@@ -2,18 +2,23 @@ import { createBrowserRouter, Link } from 'react-router-dom'
 
 import { AppShell } from '@/components/shell/AppShell'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
-import { AnalysisPage, EnginePassesPage, MaiaSettingsPage } from '@/routes/analysis'
-import { DashboardPage } from '@/routes/dashboard'
-import { EnginesPage } from '@/routes/engines'
-import { ExplorerPage } from '@/routes/explorer'
-import { GamePage } from '@/routes/game'
-import { GamesPage } from '@/routes/games'
-import { HelpPage } from '@/routes/help'
-import { ImportPage } from '@/routes/import'
-import { LivePage } from '@/routes/live'
-import { McpPage } from '@/routes/mcp'
-import { NotesPage } from '@/routes/notes'
-import { StatsPage } from '@/routes/stats'
+
+import {
+  AnalysisPage,
+  DashboardPage,
+  EnginePassesPage,
+  EnginesPage,
+  ExplorerPage,
+  GamePage,
+  GamesPage,
+  HelpPage,
+  ImportPage,
+  LivePage,
+  MaiaSettingsPage,
+  McpPage,
+  NotesPage,
+  StatsPage,
+} from './lazyRoutes'
 
 function NotFound() {
   return (

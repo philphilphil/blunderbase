@@ -1,0 +1,12 @@
+{
+  "name": "blunderbase-desktop",
+  "private": true,
+  "version": "0.8.2",
+  "scripts": {
+    "build": "sh scripts/build-macos.sh",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

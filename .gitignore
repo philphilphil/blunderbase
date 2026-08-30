@@ -17,3 +17,10 @@ coverage.json
 *.db-shm
 *.db-wal
 .env
+/.uv-desktop-cache/
+/desktop/node_modules/
+/desktop/.pyinstaller/
+/desktop/src-tauri/binaries/
+/desktop/src-tauri/gen/
+/desktop/src-tauri/icons/
+/desktop/src-tauri/target/

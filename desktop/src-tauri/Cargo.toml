@@ -1,0 +1,23 @@
+[package]
+name = "blunderbase-desktop"
+version = "0.8.2"
+description = "Self-contained desktop application for Blunderbase"
+authors = ["Blunderbase"]
+edition = "2021"
+
+[lib]
+name = "blunderbase_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+rand = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"

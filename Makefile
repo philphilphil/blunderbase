@@ -1,4 +1,4 @@
-.PHONY: run backend web install test migrate mcp mcp-http mcp-key release publish
+.PHONY: run backend web desktop install test migrate mcp mcp-http mcp-key release publish
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -29,9 +29,13 @@ backend: migrate
 web:
 	cd web && pnpm dev
 
+desktop:
+	cd desktop && pnpm build
+
 install:
 	uv sync
 	cd web && pnpm install
+	cd desktop && pnpm install
 
 migrate:
 	uv run blunderbase db upgrade
