@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from pathlib import Path
 
 import pytest
@@ -8,7 +10,10 @@ from sqlalchemy import inspect
 
 from backend.api.app import create_app
 from backend.config import Settings
-from backend.db.session import get_engine
+from backend.db.enums import Color, Result, RunStatus, Source, Tier
+from backend.db.migrate import upgrade_to_head
+from backend.db.models import AnalysisRun, Game, MoveEval
+from backend.db.session import get_engine, get_sessionmaker
 from tests.conftest import running_app
 
 INDEX = "<!doctype html><title>Blunderbase</title><div id=root></div>"
@@ -36,11 +41,68 @@ def test_health_is_served_and_the_database_is_migrated(settings: Settings) -> No
     assert inspect(get_engine(settings)).has_table("games")
 
 
+def test_health_is_answered_on_the_event_loop(settings: Settings) -> None:
+    """A `def` here would queue behind a saturated threadpool and time the healthcheck out.
+
+    Asserted on the endpoint rather than by filling the pool: what keeps the check honest
+    is that the function is a coroutine one, and that it asks the database nothing.
+    """
+    routes = [
+        route for route in create_app(settings).routes if getattr(route, "path", None) == "/health"
+    ]
+    assert routes, "no /health route"
+    assert all(asyncio.iscoroutinefunction(route.endpoint) for route in routes)
+
+
 def test_the_analysis_workers_run_for_as_long_as_the_server_does(settings: Settings) -> None:
     app = create_app(settings)
     with TestClient(app):
         assert app.state.workers.running
     assert not app.state.workers.running
+
+
+def test_the_server_folds_the_stat_summaries_a_library_is_missing(settings: Settings) -> None:
+    """A library analysed before the summaries existed is folded without anyone asking.
+
+    Polled rather than waited on: the fold runs in a thread off the lifespan's own task, so
+    the assertion is that it happens, not that it has happened by the time startup returns.
+    """
+    upgrade_to_head(settings)
+    with get_sessionmaker(settings)() as session:
+        game = Game(
+            source=Source.PGN,
+            dedup_hash="folded-by-the-server",
+            white_name="owner",
+            black_name="opponent",
+            owner_color=Color.WHITE,
+            result=Result.WHITE_WIN,
+            pgn="1. e4",
+            moves_uci=["e2e4"],
+            moves_san=["e4"],
+            ply_count=1,
+        )
+        session.add(game)
+        session.commit()
+        run = AnalysisRun(game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE)
+        session.add(run)
+        session.flush()
+        session.add(MoveEval(run_id=run.id, ply=0, win_loss=40.0))
+        session.commit()
+        game_id, run_id = game.id, run.id
+
+    with TestClient(create_app(settings)):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            with get_sessionmaker(settings)() as session:
+                folded = session.get(Game, game_id)
+                assert folded is not None
+                if folded.stat_summary is not None:
+                    assert folded.stat_summary["run_id"] == run_id
+                    assert folded.stat_owner_moves == 1
+                    break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("the server never folded the library")
 
 
 def test_the_workers_can_be_switched_off(settings: Settings) -> None:

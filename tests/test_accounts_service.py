@@ -163,6 +163,32 @@ def test_a_reconciliation_reports_what_it_filled_in(session: Session) -> None:
     assert accounts.reconcile_games(session) == accounts.Reconciled(linked=0, colored=0)
 
 
+def test_learning_the_owners_colour_throws_away_the_stats_folded_without_it(
+    session: Session,
+) -> None:
+    """A game with no owner counts all of its plies; one with an owner counts half of them.
+
+    So a summary folded before the account existed is not stale by any run's reckoning and
+    is wrong all the same — it is cleared here, and the backfill sweep folds it again.
+    """
+    game = _add_game(session, white=OWNER, owner_color=None)
+    game.stat_summary = {"run_id": 7, "owner_moves": 4}
+    game.stat_owner_moves = 4
+    game.stat_blunders = 2
+    game.stat_worst_win_loss = 40.0
+    session.commit()
+
+    accounts.register_account(session, Platform.CHESSCOM, OWNER)
+
+    assert game.owner_color is Color.WHITE
+    assert game.stat_summary is None
+    assert (game.stat_owner_moves, game.stat_blunders, game.stat_worst_win_loss) == (
+        None,
+        None,
+        None,
+    )
+
+
 def test_the_game_summary_reports_the_opponent_and_the_ratings_after_a_repair(
     session: Session,
 ) -> None:

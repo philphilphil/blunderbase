@@ -11,7 +11,14 @@ from sqlalchemy import select
 import backend
 from backend.cli import _import_options, build_parser, main
 from backend.config import Settings
-from backend.db.enums import EngineKind, JobStatus, Platform, RunStatus, Tier
+from backend.db.enums import (
+    Classification,
+    EngineKind,
+    JobStatus,
+    Platform,
+    RunStatus,
+    Tier,
+)
 from backend.db.models import (
     Account,
     AnalysisRun,
@@ -99,6 +106,39 @@ def test_db_rebuild_cards_fills_the_column_for_a_library_analysed_before_it(
         cards = [game.card for game in session.scalars(select(Game)) if game.card is not None]
         assert len(cards) == 1
         assert cards[0]["eval_curve"] == [{"ply": 0, "win": 52.0}]
+
+
+def test_db_rebuild_stats_folds_a_library_analysed_before_the_summaries(
+    settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["db", "upgrade"]) == 0
+    with session_scope(settings) as session:
+        session.add(Account(platform=Platform.LICHESS, username="blunderbase", is_owner=True))
+    assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
+    with session_scope(settings) as session:
+        game = session.scalars(select(Game).order_by(Game.id)).first()
+        assert game is not None
+        run = AnalysisRun(game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE)
+        session.add(run)
+        session.flush()
+        session.add(
+            MoveEval(
+                run_id=run.id, ply=0, win_loss=40.0, classification=Classification.BLUNDER
+            )
+        )
+    capsys.readouterr()
+
+    assert main(["db", "rebuild-stats"]) == 0
+
+    assert "rebuilt the stat summary of 1 game(s)" in capsys.readouterr().out
+    with session_scope(settings) as session:
+        folded = [game for game in session.scalars(select(Game)) if game.stat_summary is not None]
+        assert len(folded) == 1
+        assert folded[0].stat_blunders == 1
+        assert folded[0].stat_worst_win_loss == 40.0
+    # A second run has nothing left to fold and says so.
+    assert main(["db", "rebuild-stats"]) == 0
+    assert "rebuilt the stat summary of 0 game(s)" in capsys.readouterr().out
 
 
 def test_unknown_source_lookup_names_the_known_ones() -> None:

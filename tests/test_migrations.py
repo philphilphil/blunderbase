@@ -73,6 +73,8 @@ def test_indexes_the_hot_queries_need_exist(settings: Settings) -> None:
     assert ("token_hash",) in unique("runners")
     assert ("name",) in unique("mcp_keys")
     assert ("key_hash",) in unique("mcp_keys")
+    # What the worst-moments ranking walks instead of every eval in the library.
+    assert ("stat_worst_win_loss",) in indexed("games")
 
 
 def test_the_queue_claim_order_is_served_entirely_by_its_index(settings: Settings) -> None:
@@ -279,6 +281,42 @@ def test_every_engine_that_predates_the_streams_flag_drives_a_board(settings: Se
     command.downgrade(config, "0012_runner_browser")
 
     assert "streams" not in _columns(engine, "engines")
+
+
+def test_the_stat_summaries_arrive_empty_over_an_existing_library(settings: Settings) -> None:
+    """Nothing is folded by the migration: a game analysed before it keeps answering the
+    slow way until the sweep reaches it, which is what makes the upgrade instant."""
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "0015_queue_claim_index")
+
+    engine = get_engine(settings)
+    assert "stat_summary" not in _columns(engine, "games")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO games "
+                "(source, dedup_hash, white_name, black_name, result, variant, pgn, "
+                "moves_uci, moves_san, ply_count, imported_at) "
+                "VALUES ('pgn', 'deadbeef', 'owner', 'opponent', '1-0', 'standard', "
+                "'1. e4', '[]', '[]', 0, :now)"
+            ),
+            {"now": "2026-08-01 12:00:00"},
+        )
+
+    command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        assert connection.execute(
+            text(
+                "SELECT stat_summary, stat_owner_moves, stat_blunders, stat_worst_win_loss "
+                "FROM games"
+            )
+        ).all() == [(None, None, None, None)]
+
+    command.downgrade(config, "0015_queue_claim_index")
+
+    assert not {column for column in _columns(engine, "games") if column.startswith("stat_")}
 
 
 def _add_engine(connection: Any, name: str, **columns: Any) -> None:

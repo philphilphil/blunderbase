@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -1087,6 +1088,271 @@ def test_a_dimension_that_raises_is_never_cached(
             stats.get_stats(analysed.session, "rating_trend", bucket="fortnight")
     assert stats.get_stats(analysed.session, "rating_trend", bucket="year")["buckets"]
     assert calls == [1]
+
+
+# ------------------------------------------------------- stats cache, under concurrency
+#
+# These three drive `_cached` directly rather than a dimension. The rule being proved is
+# what happens to callers that arrive *during* a scan, which needs a compute that blocks
+# until the test says so — and a real dimension would be blocking with the library's one
+# Session half-read on another thread, which proves nothing about the cache and plenty
+# about SQLAlchemy. The dimensions' route into `_cached` is covered above.
+
+# The compute a caller must never reach, because it is being served from the cache.
+def never() -> Any:
+    raise AssertionError("the library was scanned again")
+
+
+def test_a_stale_payload_is_served_while_one_caller_recomputes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Expiry means "start a refresh", not "everyone scan": the meltdown, in one test."""
+    moment = [1000.0]
+    monkeypatch.setattr(stats, "_clock", lambda: moment[0])
+    key = stats._cache_key("stale")
+    assert stats._cached(key, lambda: "first") == "first"
+    moment[0] += stats.STATS_CACHE_TTL_SECONDS + 1
+
+    started, released = threading.Event(), threading.Event()
+
+    def slow() -> Any:
+        started.set()
+        assert released.wait(10)
+        return "second"
+
+    refreshed: list[Any] = []
+    thread = threading.Thread(target=lambda: refreshed.append(stats._cached(key, slow)))
+    thread.start()
+    assert started.wait(10)
+
+    # Arriving mid-scan: the payload being replaced, at once, off no connection at all.
+    assert stats._cached(key, never) == "first"
+
+    released.set()
+    thread.join(10)
+    assert refreshed == ["second"]
+    # And the refresh is what everyone gets from here.
+    assert stats._cached(key, never) == "second"
+
+
+def test_concurrent_misses_on_one_key_are_one_scan() -> None:
+    """A key nobody has computed has nothing to serve stale, so the waiters queue — but on
+    the one computation, not on a scan each."""
+    key = stats._cache_key("miss")
+    calls = [0]
+    # All five are through before any of them is, so the four that are not the computer are
+    # provably inside `_cached` while the computer sits in `slow`.
+    at_the_door = threading.Barrier(5)
+    inside, released = threading.Event(), threading.Event()
+
+    def slow() -> Any:
+        calls[0] += 1
+        inside.set()
+        assert released.wait(10)
+        return "only"
+
+    answers: list[Any] = []
+    guard = threading.Lock()
+
+    def call() -> None:
+        at_the_door.wait(10)
+        answer = stats._cached(key, slow)
+        with guard:
+            answers.append(answer)
+
+    threads = [threading.Thread(target=call) for _ in range(5)]
+    for thread in threads:
+        thread.start()
+    assert inside.wait(10)
+    released.set()
+    for thread in threads:
+        thread.join(10)
+
+    assert calls == [1]
+    assert answers == ["only"] * 5
+
+
+def test_a_refresh_that_raises_leaves_the_stale_payload_standing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The one caller that ran the scan wears the error; nobody else sees it."""
+    moment = [1000.0]
+    monkeypatch.setattr(stats, "_clock", lambda: moment[0])
+    key = stats._cache_key("failing-refresh")
+    assert stats._cached(key, lambda: "first") == "first"
+    moment[0] += stats.STATS_CACHE_TTL_SECONDS + 1
+
+    started, released = threading.Event(), threading.Event()
+
+    def boom() -> Any:
+        started.set()
+        assert released.wait(10)
+        raise RuntimeError("the scan failed")
+
+    raised: list[RuntimeError] = []
+
+    def refresh() -> None:
+        try:
+            stats._cached(key, boom)
+        except RuntimeError as error:
+            raised.append(error)
+
+    thread = threading.Thread(target=refresh)
+    thread.start()
+    assert started.wait(10)
+    assert stats._cached(key, never) == "first"
+
+    released.set()
+    thread.join(10)
+    assert [str(error) for error in raised] == ["the scan failed"]
+    # The entry it could not replace is untouched, and the slot is free to try again.
+    assert stats._CACHE[key][1] == "first"
+    assert stats._cached(key, lambda: "second") == "second"
+
+
+# ------------------------------------------------------ stats, off the stored folds
+#
+# Every dimension has two ways to the same answer: hydrate every analysed ply of every
+# game, or add up what each game folded once when its run finished. The first test here is
+# the one that matters — the two are asked the same questions and have to give the same
+# payload, byte for byte, or a deployment's numbers would move on the day its backfill
+# finished.
+
+
+def fold_every_summary(session: Session) -> int:
+    """Run the backfill to the end the way the server's own boot task does, and in chunks
+    small enough that finishing takes several of them."""
+    folded = 0
+    while done := stats.rebuild_stat_summaries(session, limit=2):
+        folded += done
+    return folded
+
+
+def every_aggregation(session: Session, **narrowing: Any) -> dict[str, Any]:
+    """Every dimension and the worst-moments ranking, over the same narrowing."""
+    payloads: dict[str, Any] = {
+        dimension: stats.get_stats(session, dimension, **narrowing)
+        for dimension in stats.DIMENSIONS
+    }
+    payloads["worst_moments"] = stats.get_worst_recent_moments(session, amount=5, **narrowing)
+    return payloads
+
+
+def test_the_folded_and_the_scanned_answers_are_the_same_payload(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = analysed.session
+    assert stats._summaries_ready(session) is False
+    narrowings = {
+        "everything": {},
+        "rapid": {"filters": GameFilters(speed=Speed.RAPID)},
+        "since march": {"filters": GameFilters(since=datetime(2026, 3, 1, tzinfo=UTC))},
+    }
+    scanned = {name: every_aggregation(session, **kwargs) for name, kwargs in narrowings.items()}
+
+    assert fold_every_summary(session) == 3
+    # Which also clears the memo of the library having been unfolded when it was asked.
+    stats.reset_stats_cache()
+    assert stats._summaries_ready(session) is True
+
+    # Counted rather than assumed: an answer that agreed by quietly taking the scan again
+    # would prove nothing about the folds at all.
+    scans = [
+        counting(monkeypatch, stats, name)
+        for name in ("_eval_rows", "_blunder_counts", "_owner_move_counts")
+    ]
+    folded = {name: every_aggregation(session, **kwargs) for name, kwargs in narrowings.items()}
+    assert scans == [[0], [0], [0]]
+    assert folded == scanned
+    # And the questions were not all answered with nothing.
+    assert scanned["everything"]["blunders_by_phase"]["total"]["blunder"] == 4
+    assert scanned["rapid"]["blunders_by_phase"]["total"]["moves"] == 5
+
+
+def test_a_game_folds_its_own_counts_onto_its_row(analysed: Library) -> None:
+    session = analysed.session
+    fold_every_summary(session)
+
+    game = session.get(Game, analysed["qg000006"].id)
+    assert game is not None
+    assert game.stat_owner_moves == 5
+    assert game.stat_blunders == 2
+    assert game.stat_worst_win_loss == 55.0
+    assert game.stat_summary is not None
+    assert game.stat_summary["phases"]["middlegame"]["blunder"] == 2
+    assert game.stat_summary["pieces"]["queen"]["moves"] == 1
+
+    # A game nothing has analysed folds to nothing at all, and is left out of every
+    # aggregation exactly as it is left out of the scan.
+    untouched = session.get(Game, analysed["qg000002"].id)
+    assert untouched is not None
+    assert untouched.stat_summary is None
+    assert untouched.stat_owner_moves is None
+    assert untouched.stat_worst_win_loss is None
+
+
+def test_a_question_the_folds_cannot_answer_still_scans(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A summary carries the default clock bands and the owner's blunders. Anything else is
+    a question about the evals, and is asked of them however folded the library is."""
+    session = analysed.session
+    fold_every_summary(session)
+    stats.reset_stats_cache()
+    assert stats._summaries_ready(session) is True
+    calls = counting(monkeypatch, stats, "_eval_rows")
+
+    stats.get_stats(session, "time_trouble_loss")
+    stats.get_worst_recent_moments(session, amount=3)
+    assert calls == [0]
+
+    custom = stats.get_stats(session, "time_trouble_loss", thresholds=[150])
+    mistakes = stats.get_worst_recent_moments(
+        session, amount=3, classifications=(Classification.MISTAKE,)
+    )
+    assert calls == [2]
+    assert {bucket["key"] for bucket in custom["buckets"]} == {"<150s", ">=150s", "unknown"}
+    assert [moment["classification"] for moment in mistakes] == ["mistake", "mistake"]
+
+
+def test_moments_that_gave_away_exactly_as_much_rank_the_same_way_either_side(
+    library: Library, engine_row: Engine
+) -> None:
+    """Ties are the common case, not the exotic one: every blunder into a forced mate gives
+    away the same 99.88. Which of them the ranking shows has to be the same answer however
+    it was reached, and the same answer on the next refresh."""
+    session = library.session
+    for source_id in ("qg000001", "qg000004", "qg000006"):
+        analyse(
+            session,
+            library[source_id],
+            [
+                {"ply": 0, "classification": Classification.BLUNDER, "win_loss": 99.88},
+                {"ply": 2, "classification": Classification.BLUNDER, "win_loss": 99.88},
+            ],
+            engine=engine_row,
+        )
+    scanned = stats.get_worst_recent_moments(session, amount=4)
+
+    fold_every_summary(session)
+    stats.reset_stats_cache()
+
+    folded = stats.get_worst_recent_moments(session, amount=4)
+    assert [(moment["game"]["id"], moment["ply"]) for moment in folded] == [
+        (moment["game"]["id"], moment["ply"]) for moment in scanned
+    ]
+    # Oldest game first, then earliest ply, rather than whatever the scan reached first.
+    assert [moment["ply"] for moment in folded] == [0, 2, 0, 2]
+
+
+def test_the_backfill_folds_one_chunk_at_a_time_and_says_when_it_is_done(
+    analysed: Library,
+) -> None:
+    """Resumable rather than one long transaction: three analysed games, two at a time."""
+    session = analysed.session
+    assert stats.rebuild_stat_summaries(session, limit=2) == 2
+    assert stats.rebuild_stat_summaries(session, limit=2) == 1
+    assert stats.rebuild_stat_summaries(session, limit=2) == 0
 
 
 # --------------------------------------------------------------------------- notes

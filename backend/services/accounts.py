@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.enums import Color, Platform, Source
 from backend.db.models import Account, Game
+from backend.services import stats as stats_service
 
 # Which platform's accounts name the owner in a game from this source. A PGN or a manual
 # game belongs to no platform, so it matches an account by username alone.
@@ -199,12 +200,29 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
             )
             if target.is_owner:
                 filled.colored += _fill(
-                    session, and_(played, Game.owner_color.is_(None)), {Game.owner_color: color}
+                    session,
+                    and_(played, Game.owner_color.is_(None)),
+                    # Learning whose side is whose changes which plies are the owner's, and
+                    # so changes every stat folded out of the game — a game with no owner
+                    # contributes all of its plies, one with an owner half of them. The fold
+                    # goes with the colour, in the same statement, and the backfill sweep
+                    # refolds what this cleared.
+                    {
+                        Game.owner_color: color,
+                        Game.stat_summary: None,
+                        Game.stat_owner_moves: None,
+                        Game.stat_blunders: None,
+                        Game.stat_worst_win_loss: None,
+                    },
                 )
     session.commit()
     # The rows went out as bulk statements, so whatever this Session had already loaded
     # still remembers the values from before; the next read of one comes off the database.
     session.expire_all()
+    if filled.colored:
+        # Games this just coloured have no fold any more, so the aggregations have to go
+        # back to reading the evals until the sweep has folded them again.
+        stats_service.reset_summaries_ready()
     return filled
 
 

@@ -26,7 +26,7 @@ from backend.db.enums import (
 )
 from backend.db.models import AnalysisRun, Engine, Game, MoveEval
 from backend.db.types import utcnow
-from backend.services import analysis, app_settings, explorer
+from backend.services import analysis, app_settings, explorer, stats
 from backend.services import engines as engines_service
 from backend.services import games as games_service
 from backend.services.engines import TierUnavailableError
@@ -1725,6 +1725,60 @@ def test_a_run_over_a_bare_position_has_no_card_to_store(session: Session) -> No
     assert run.game_id is None
     assert game.card is None
     assert session.scalars(select(Game.card)).all() == [None]
+
+
+# --- the stat summary a finished run leaves behind -------------------------
+
+
+def test_finishing_a_run_stores_the_stat_summary_in_the_same_commit(session: Session) -> None:
+    """What every stats dimension reads instead of the game's evals, written where the
+    evals are: one commit, so nothing can ever see one without the other."""
+    _engine(session)
+    game = _game(session)
+    run = analysis.request_analysis(session, game_id=game.id)
+    rows = [
+        MoveEval(ply=0, win_after=52.0, win_loss=4.0, classification=Classification.INACCURACY),
+        MoveEval(ply=2, win_after=12.0, win_loss=40.0, classification=Classification.BLUNDER),
+        # The opponent's move: theirs to learn from, not the owner's.
+        MoveEval(ply=1, win_loss=60.0, classification=Classification.BLUNDER),
+    ]
+
+    commits = _CountingCommits(session)
+    with commits:
+        analysis.complete_run(session, run, rows)
+
+    assert commits.count == 1
+    assert game.stat_summary is not None
+    assert game.stat_summary["run_id"] == run.id
+    assert game.stat_owner_moves == 2
+    assert game.stat_blunders == 1
+    assert game.stat_worst_win_loss == 40.0
+    assert [moment["ply"] for moment in game.stat_summary["worst"]] == [2, 0]
+    assert stats.rebuild_stat_summaries(session) == 0
+
+
+def test_a_newer_pass_replaces_the_summary_the_last_one_left(session: Session) -> None:
+    """The summary describes the game's primary run, and a full pass becomes that run."""
+    _engine(session)
+    game = _game(session)
+    first = analysis.request_analysis(session, game_id=game.id)
+    analysis.complete_run(
+        session, first, [MoveEval(ply=0, win_loss=40.0, classification=Classification.BLUNDER)]
+    )
+    second = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+
+    analysis.complete_run(
+        session,
+        second,
+        [MoveEval(ply=0, win_loss=4.0, classification=Classification.INACCURACY)],
+    )
+
+    assert game.stat_summary is not None
+    assert game.stat_summary["run_id"] == second.id
+    assert game.stat_blunders == 0
+    assert game.stat_worst_win_loss is None
+    # Which leaves the backfill sweep nothing to catch up on.
+    assert stats.rebuild_stat_summaries(session) == 0
 
 
 # --- failure and retry ----------------------------------------------------

@@ -261,6 +261,7 @@ class Game(Base):
         UniqueConstraint("source", "source_id", name="uq_games_source_source_id"),
         Index("ix_games_played_at", "played_at"),
         Index("ix_games_dedup_hash", "dedup_hash"),
+        Index("ix_games_stat_worst_win_loss", "stat_worst_win_loss"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -310,6 +311,27 @@ class Game(Base):
     # analysed yet, and for one analysed before this column existed: a reader that finds
     # NULL computes the card the slow way.
     card: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+    # The stats half of the same idea: this game's contribution to every aggregation,
+    # folded out of its primary run (`stats.primary_runs()` — the newest done, full-game,
+    # UCI pass) and written in the same commit that finishes one. A dimension used to
+    # hydrate every analysed ply of every game in the library to answer; with these it sums
+    # one row per game. `services.stats` builds it and is the only thing that reads it.
+    #
+    # NULL for a game no full-game pass has finished, and for one analysed before the
+    # column existed: the full scan is still there, and is what answers until the backfill
+    # sweep has been over the library.
+    stat_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Analysed owner moves and owner blunders in that run — the two numbers the per-game
+    # dimensions are a rate over — as columns rather than inside the JSON, so a query that
+    # already selects game rows picks them up without parsing anything.
+    stat_owner_moves: Mapped[int | None] = mapped_column(Integer)
+    stat_blunders: Mapped[int | None] = mapped_column(Integer)
+    # The most win percentage the owner gave away in a single blunder of that run; NULL
+    # when it holds none. A real, indexed column because "the worst moments in the library"
+    # is then an ordered walk of that index over games rather than a scan of every eval
+    # behind them.
+    stat_worst_win_loss: Mapped[float | None] = mapped_column(Float)
 
     import_job_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("import_jobs.id"))
 

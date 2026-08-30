@@ -3,12 +3,13 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import Future
 from dataclasses import dataclass, fields, is_dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, NamedTuple
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import Integer, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.db.enums import Classification, Color, EngineKind, RunStatus
@@ -53,6 +54,32 @@ OPENING_PLIES = 24
 # "time trouble" means here; a caller with a different idea passes its own.
 TIME_TROUBLE_THRESHOLDS: tuple[float, ...] = (10.0, 30.0, 60.0)
 
+# How many of a game's own worst moments its summary keeps. The dashboard asks for five and
+# the coach for a handful more, and a moment only reaches that list by being among the worst
+# in the whole library — so a game would have to hold twenty-four of the library's worst
+# moments by itself before the twenty-fifth could ever be wanted. The cap trims the mildest,
+# which are the ones nothing ranks anyway.
+STAT_SUMMARY_WORST_MOMENTS = 24
+
+# How many games a summary backfill folds before it commits and lets go of the write lock.
+STAT_SUMMARY_BACKFILL_CHUNK = 100
+
+# How long the "every summary is current" answer is trusted while it is still False. True is
+# kept forever — `analysis.complete_run` is what keeps it true — so this is only the cost of
+# noticing that a backfill has finished, paid once a minute for as long as one is running.
+SUMMARIES_READY_RECHECK_SECONDS = 60.0
+
+# How many extra games the worst-moments ranking reads past the ones it needs. A game's
+# stored maximum is only its own worst moment, so a game can hold several of the answer;
+# the margin is what absorbs that.
+WORST_MOMENT_GAME_MARGIN = 8
+
+# How the ranking breaks a tie, in SQL and in Python alike. Ties are the common case rather
+# than the exotic one — every blunder into a forced mate gives away the same 99.88 — and
+# "whatever the scan happened to reach first" is both unstable between refreshes and
+# something the folded path could not reproduce. Oldest game first, then earliest ply.
+WORST_MOMENT_ORDER = (MoveEval.win_loss.desc(), AnalysisRun.game_id.asc(), MoveEval.ply.asc())
+
 BUCKETS = ("day", "week", "month", "year")
 
 SAN_PIECES = {"N": "knight", "B": "bishop", "R": "rook", "Q": "queen", "K": "king"}
@@ -63,6 +90,8 @@ LOSS_CLASSIFICATIONS = (
     Classification.MISTAKE,
     Classification.BLUNDER,
 )
+# The same three as they are read off a row and written into a summary: strings.
+LOSS_CLASSIFICATION_NAMES = tuple(str(value) for value in LOSS_CLASSIFICATIONS)
 
 # Fields that are a level rather than a count, so summing them across buckets is wrong.
 NON_ADDITIVE = frozenset({"key", "end_rating", "rating"})
@@ -82,6 +111,12 @@ STATS_CACHE_TTL_SECONDS = 10.0
 # text — so entries are capped and the oldest goes when the cap is reached, rather than the
 # cache growing with everything anyone ever asked for.
 STATS_CACHE_MAX_ENTRIES = 64
+# How many of these scans may be in the database at once, across all keys. Each one holds a
+# threadpool thread and a pooled connection for its whole length, and the dashboard asks for
+# a dozen keys at a time: letting every expired key scan at once is precisely the pile-up
+# that wedged the pool during a backfill. Two, because one would serialise a genuinely cold
+# dashboard behind a single slot and the box this runs on has no more scans than that in it.
+STATS_CACHE_MAX_CONCURRENT_COMPUTES = 2
 
 # The clock the TTL is measured on. Monotonic, so a system clock adjustment cannot strand
 # an entry in the future; named here so a test can hand the cache a clock of its own.
@@ -89,6 +124,18 @@ _clock = time.monotonic
 
 _CACHE_LOCK = threading.Lock()
 _CACHE: dict[tuple[Any, ...], tuple[float, Any]] = {}
+# The key currently being computed, and the future its computer will fill. Guarded by
+# `_CACHE_LOCK` — a slot appears and disappears in the same critical section that reads and
+# writes the entry beside it, so nobody ever sees a key with neither.
+_INFLIGHT: dict[tuple[Any, ...], Future[Any]] = {}
+_COMPUTE_SLOTS = threading.Semaphore(STATS_CACHE_MAX_CONCURRENT_COMPUTES)
+
+# Whether every game with a primary run has a summary of that run, and when that was last
+# asked. Guarded by `_READY_LOCK`, which is never held across the query itself: two callers
+# that both look are two identical reads, and the answer they write is the same one.
+_READY_LOCK = threading.Lock()
+_SUMMARIES_READY = False
+_SUMMARIES_CHECKED_AT: float | None = None
 
 
 class UnknownDimensionError(ValueError):
@@ -122,6 +169,10 @@ class GameRow:
     rating: int | None
     opponent_rating: int | None
     eco: str | None
+    # The game's own folded counts over its primary run, or None where it has no summary.
+    # Read here rather than through a second grouped query over every eval in the library.
+    owner_moves: int | None = None
+    blunders: int | None = None
 
 
 def reset_stats_cache() -> None:
@@ -130,9 +181,32 @@ def reset_stats_cache() -> None:
     The cache is keyed by what was asked for and by nothing that says which library
     answered, which is what makes it a cache in a process serving one database and a leak
     anywhere a second one appears. Tests call this between libraries.
+
+    The in-flight slots go too: a test that left one behind would hand the next library's
+    first caller the previous one's answer — and so does the memo of whether the per-game
+    summaries are complete, which is a fact about the database rather than about the
+    process, and is emphatically not a fact about the *next* one.
     """
     with _CACHE_LOCK:
         _CACHE.clear()
+        _INFLIGHT.clear()
+    reset_summaries_ready()
+
+
+def reset_summaries_ready() -> None:
+    """Ask the library again whether every game with a run has a current summary.
+
+    For a writer that can make a folded library unfolded: `accounts.reconcile_games`
+    throwing away the folds of games it has just learned the owner's colour for. Without
+    this the memo would go on saying the folds were complete and those games would be
+    quietly left out of every aggregation until the process restarted; with it the
+    dimensions go back to the scan, which is the slow answer rather than the wrong one,
+    until the sweep has folded them again.
+    """
+    global _SUMMARIES_READY, _SUMMARIES_CHECKED_AT
+    with _READY_LOCK:
+        _SUMMARIES_READY = False
+        _SUMMARIES_CHECKED_AT = None
 
 
 def get_stats(
@@ -150,8 +224,9 @@ def get_stats(
     for one dimension over one window without building a filter object, and the UI can
     pass the filter set the games table is already showing.
 
-    The answer is cached for `STATS_CACHE_TTL_SECONDS`; an unknown dimension is still
-    rejected before anything is looked up, and a handler that raises caches nothing.
+    The answer is cached for `STATS_CACHE_TTL_SECONDS` and handed out past that for as long
+    as its replacement is being computed; an unknown dimension is still rejected before
+    anything is looked up, and a handler that raises caches nothing.
     """
     if dimension in PLANNED_DIMENSIONS:
         raise UnknownDimensionError(
@@ -229,12 +304,28 @@ def get_worst_recent_moments(
     Cached like the dimensions are, and keyed on `days` rather than on the moment that
     window starts at: the start moves with every call and the ranking does not, so keying
     on the derived timestamp would be a key that never repeats.
+
+    Blunders — what everyone but a caller that says otherwise asks for — are ranked off the
+    games' own stored worst move once the library is folded. Any other set of
+    classifications is a question the folds do not answer, and takes the scan.
     """
     if amount <= 0:
         return []
+
+    def compute() -> list[dict[str, Any]]:
+        # A game keeps its own worst `STAT_SUMMARY_WORST_MOMENTS` and no more, so a caller
+        # asking for more moments than that could be asking for one the fold trimmed.
+        foldable = (
+            tuple(classifications) == (Classification.BLUNDER,)
+            and amount <= STAT_SUMMARY_WORST_MOMENTS
+        )
+        if foldable and _summaries_ready(session):
+            return _worst_moments_from_summaries(session, days, amount, filters)
+        return _worst_recent_moments(session, days, amount, filters, classifications)
+
     return _cached(
         _cache_key("get_worst_recent_moments", days, amount, filters, classifications),
-        lambda: _worst_recent_moments(session, days, amount, filters, classifications),
+        compute,
     )
 
 
@@ -257,7 +348,7 @@ def _worst_recent_moments(
         session,
         scope,
         extra_conditions=conditions,
-        order_by=MoveEval.win_loss.desc(),
+        order_by=WORST_MOMENT_ORDER,
         limit=max(amount, 0),
     )
     if not rows:
@@ -272,25 +363,85 @@ def _worst_recent_moments(
         game = stored.get(row.game_id)
         if game is None:
             continue
-        moments.append(
-            {
-                "game": game_summary(game),
-                "ply": row.ply,
-                "move_number": row.ply // 2 + 1,
-                "san": row.move_san,
-                "uci": row.move_uci,
-                "classification": row.classification,
-                "win_loss": row.win_loss,
-                "phase": phase_of(row.fen, row.ply),
-                "piece": piece_of(row.move_san, row.move_uci, row.fen),
-                "fen": row.fen,
-                "best_move_uci": row.best_move_uci,
-                "best_move_san": best_move_san(row.fen, row.best_move_uci),
-                "run_id": row.run_id,
-                "tier": row.tier,
-            }
-        )
+        moments.append(_moment_of(game, _worst_entry(row), row.run_id))
     return moments
+
+
+def _worst_moments_from_summaries(
+    session: Session, days: int | None, amount: int, filters: GameFilters | None
+) -> list[dict[str, Any]]:
+    """The same ranking, off the games' own worst move rather than off every eval there is.
+
+    `stat_worst_win_loss` is the worst blunder in a game, so every blunder in that game is
+    at most that. Order the games by `(that column desc, id asc)` — the same tie-break the
+    ranking itself uses — and every game before some game g holds a moment that outranks
+    every moment of g: on a higher column outright, or on the same column and a lower game
+    id. A moment in the true top `amount` is preceded by fewer than `amount` moments, so
+    its game is preceded by fewer than `amount` games, so the first `amount` games hold the
+    whole answer. The margin past that costs a few rows and is there for the arithmetic
+    being wrong.
+    """
+    since = None if days is None else datetime.now(UTC) - timedelta(days=days)
+    scope = _scope(filters, since, None)
+    statement = (
+        select(Game)
+        .where(Game.stat_worst_win_loss.is_not(None), *game_conditions(scope))
+        .order_by(Game.stat_worst_win_loss.desc(), Game.id.asc())
+        .limit(amount + WORST_MOMENT_GAME_MARGIN)
+    )
+    ranked = []
+    for game in session.scalars(statement):
+        summary = game.stat_summary or {}
+        for entry in summary.get("worst", ()):
+            if entry["classification"] == str(Classification.BLUNDER):
+                key = _worst_moment_key(entry["win_loss"], game.id, entry["ply"])
+                ranked.append((key, _moment_of(game, entry, summary["run_id"])))
+    ranked.sort(key=lambda pair: pair[0])
+    return [moment for _key, moment in ranked[:amount]]
+
+
+def _worst_moment_key(win_loss: float, game_id: int, ply: int) -> tuple[float, int, int]:
+    """`WORST_MOMENT_ORDER` as a sort key, for the ranking that reads the folds."""
+    return (-win_loss, game_id, ply)
+
+
+def _worst_entry(row: EvalRow) -> dict[str, Any]:
+    """One move a game gave something away on, in the fields a summary keeps of it."""
+    return {
+        "ply": row.ply,
+        "san": row.move_san,
+        "uci": row.move_uci,
+        "classification": row.classification,
+        "win_loss": row.win_loss,
+        "fen": row.fen,
+        "best_move_uci": row.best_move_uci,
+        "tier": row.tier,
+    }
+
+
+def _moment_of(game: Game, entry: Mapping[str, Any], run_id: int) -> dict[str, Any]:
+    """One ranked moment as every caller reads it, built from those same fields.
+
+    The board-derived halves — the phase, the piece, the engine's move in SAN — are worked
+    out here rather than stored, because they are a pure function of the FEN and cost
+    nothing for the handful of moments that are actually handed out.
+    """
+    return {
+        "game": game_summary(game),
+        "ply": entry["ply"],
+        "move_number": entry["ply"] // 2 + 1,
+        "san": entry["san"],
+        "uci": entry["uci"],
+        "classification": entry["classification"],
+        "win_loss": entry["win_loss"],
+        "phase": phase_of(entry["fen"], entry["ply"]),
+        "piece": piece_of(entry["san"], entry["uci"], entry["fen"]),
+        "fen": entry["fen"],
+        "best_move_uci": entry["best_move_uci"],
+        "best_move_san": best_move_san(entry["fen"], entry["best_move_uci"]),
+        "run_id": run_id,
+        "tier": entry["tier"],
+    }
 
 
 def phase_of(fen: str | None, ply: int) -> str:
@@ -337,6 +488,8 @@ def best_move_san(fen: str | None, uci: str | None) -> str | None:
 def _blunders_by_phase(
     session: Session, scope: GameFilters, options: dict[str, Any]
 ) -> dict[str, Any]:
+    if _summaries_ready(session):
+        return _summary_classification_buckets(session, scope, "phases", PHASES)
     rows = _eval_rows(session, scope)
     return _classification_buckets(rows, PHASES, lambda row: phase_of(row.fen, row.ply))
 
@@ -344,6 +497,8 @@ def _blunders_by_phase(
 def _blunders_by_piece(
     session: Session, scope: GameFilters, options: dict[str, Any]
 ) -> dict[str, Any]:
+    if _summaries_ready(session):
+        return _summary_classification_buckets(session, scope, "pieces", PIECES)
     rows = _eval_rows(session, scope)
     return _classification_buckets(
         rows, PIECES, lambda row: piece_of(row.move_san, row.move_uci, row.fen)
@@ -354,12 +509,8 @@ def _performance_by_speed(
     session: Session, scope: GameFilters, options: dict[str, Any]
 ) -> dict[str, Any]:
     rows = _game_rows(session, scope)
-    return _performance_buckets(
-        rows,
-        _blunder_counts(session, scope),
-        _owner_move_counts(session, scope),
-        lambda row: row.speed or "unknown",
-    )
+    moves, blunders = _analysed_counts(session, scope, rows)
+    return _performance_buckets(rows, blunders, moves, lambda row: row.speed or "unknown")
 
 
 def _performance_by_hour(
@@ -373,10 +524,11 @@ def _performance_by_hour(
     """
     offset = timedelta(hours=float(options.get("tz_offset", 0.0)))
     rows = [row for row in _game_rows(session, scope) if row.played_at is not None]
+    moves, blunders = _analysed_counts(session, scope, rows)
     payload = _performance_buckets(
         rows,
-        _blunder_counts(session, scope),
-        _owner_move_counts(session, scope),
+        blunders,
+        moves,
         lambda row: f"{(row.played_at + offset).hour:02d}",
         order=None,
     )
@@ -388,29 +540,53 @@ def _performance_by_hour(
 def _time_trouble_loss(
     session: Session, scope: GameFilters, options: dict[str, Any]
 ) -> dict[str, Any]:
-    """Eval given away by how much clock the mover had left when they moved."""
-    thresholds = tuple(
-        sorted(float(value) for value in options.get("thresholds", TIME_TROUBLE_THRESHOLDS))
-    )
-    rows = _eval_rows(session, scope)
-    clocks = _clock_index(session, scope)
+    """Eval given away by how much clock the mover had left when they moved.
 
-    def bucket(row: EvalRow) -> str:
-        remaining = _remaining_clock(clocks.get(row.game_id), row.ply)
-        if remaining is None:
-            return "unknown"
-        for threshold in thresholds:
-            if remaining < threshold:
-                return f"<{_seconds(threshold)}"
-        return f">={_seconds(thresholds[-1])}" if thresholds else "any"
+    A summary carries the default bands and only those, so a caller asking about bands of
+    its own is asking a question the folds cannot answer and gets the scan. Which is the
+    right trade: the dashboard asks the default question, and a custom one is asked by hand.
+    """
+    thresholds = _normalised_thresholds(options.get("thresholds", TIME_TROUBLE_THRESHOLDS))
+    order = _clock_bucket_order(thresholds)
+    default = thresholds == _normalised_thresholds(TIME_TROUBLE_THRESHOLDS)
+    if default and _summaries_ready(session):
+        payload = _summary_classification_buckets(session, scope, "clock", order)
+    else:
+        rows = _eval_rows(session, scope)
+        clocks = _clock_index(session, scope)
+        payload = _classification_buckets(
+            rows,
+            order,
+            lambda row: _clock_bucket(
+                _remaining_clock(clocks.get(row.game_id), row.ply), thresholds
+            ),
+        )
+    payload["thresholds"] = list(thresholds)
+    return payload
 
+
+def _normalised_thresholds(values: Iterable[float]) -> tuple[float, ...]:
+    """Time-trouble bands as they are compared and labelled: floats, ascending."""
+    return tuple(sorted(float(value) for value in values))
+
+
+def _clock_bucket_order(thresholds: Sequence[float]) -> tuple[str, ...]:
+    """The bands' labels, tightest first, with the catch-alls last."""
     order = [f"<{_seconds(threshold)}" for threshold in thresholds]
     if thresholds:
         order.append(f">={_seconds(thresholds[-1])}")
     order.append("unknown")
-    payload = _classification_buckets(rows, tuple(order), bucket)
-    payload["thresholds"] = list(thresholds)
-    return payload
+    return tuple(order)
+
+
+def _clock_bucket(remaining: float | None, thresholds: Sequence[float]) -> str:
+    """Which band a move played with `remaining` seconds left belongs in."""
+    if remaining is None:
+        return "unknown"
+    for threshold in thresholds:
+        if remaining < threshold:
+            return f"<{_seconds(threshold)}"
+    return f">={_seconds(thresholds[-1])}" if thresholds else "any"
 
 
 def _rating_trend(
@@ -422,8 +598,7 @@ def _rating_trend(
         raise ValueError(f"unknown bucket {period!r}; known buckets: {', '.join(BUCKETS)}")
 
     rows = [row for row in _game_rows(session, scope) if row.played_at is not None]
-    blunders = _blunder_counts(session, scope)
-    moves = _owner_move_counts(session, scope)
+    moves, blunders = _analysed_counts(session, scope, rows)
 
     buckets: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -495,33 +670,78 @@ def _scope(
 
 
 def _cached(key: tuple[Any, ...], compute: Callable[[], Any]) -> Any:
-    """`compute()`'s answer, recomputed at most once every `STATS_CACHE_TTL_SECONDS`.
+    """`compute()`'s answer, computed by one caller at a time and stale-served to the rest.
 
-    Every caller inside the window is handed the *same* object rather than a copy. That is
-    safe because everything cached here is built out of plain dicts, lists and scalars —
-    no ORM row survives into a payload — and because nothing downstream writes to what it
-    was given: the routes hand the payload to a response model, and the MCP tools copy the
-    fields they want into a payload of their own.
+    Every caller is handed the *same* object rather than a copy. That is safe because
+    everything cached here is built out of plain dicts, lists and scalars — no ORM row
+    survives into a payload — and because nothing downstream writes to what it was given:
+    the routes hand the payload to a response model, and the MCP tools copy the fields they
+    want into a payload of their own.
 
-    `compute()` runs outside the lock. Holding it across the scan is the one thing that
-    would make this worse than no cache at all, by queueing a refetch storm behind the
-    first miss instead of letting the hits through. Two callers that miss together both
-    compute and the later writer wins, which costs one duplicate scan and never a wrong
-    answer.
+    An entry is kept past its TTL rather than treated as absent, which is the whole point.
+    A payload inside the window is simply returned. Past it, exactly one caller recomputes,
+    on its own request thread, and everyone else arriving meanwhile is handed the entry it
+    is replacing — slightly out of date, immediately, off no connection at all. Expiry used
+    to mean "absent", so every request that arrived during a scan started a scan of its
+    own; with a dozen live keys, a ten-second TTL and a multi-second scan apiece, the
+    dashboard's refetch storm during a backfill kept dozens of them running at once, each
+    pinning a threadpool thread and a pooled connection until both pools wedged. That is
+    the failure this shape exists to make impossible.
+
+    A key nobody has ever computed has nothing to serve stale, so those callers do queue —
+    on the one future, not on a scan each. `STATS_CACHE_MAX_CONCURRENT_COMPUTES` then caps
+    how many *distinct* keys may scan at once, which is the same bound across the dimensions
+    the dashboard opens together.
+
+    A compute that raises leaves the stale entry exactly where it was, still servable, and
+    reaches only the caller that ran it (and anyone queued on that first computation). The
+    slot is freed either way, so the next caller may try again.
+
+    Deadlock is avoided by never nesting the three: a compute slot is taken only after the
+    lock is dropped, and a caller waiting on someone else's future holds neither.
     """
     now = _clock()
     with _CACHE_LOCK:
         entry = _CACHE.get(key)
         if entry is not None and entry[0] > now:
             return entry[1]
-    payload = compute()
+        ticket = _INFLIGHT.get(key)
+        ours = ticket is None
+        if ticket is None:
+            ticket = _INFLIGHT[key] = Future()
+    if ours:
+        return _refresh(key, compute, ticket)
+    if entry is not None:
+        return entry[1]
+    return ticket.result()
+
+
+def _refresh(key: tuple[Any, ...], compute: Callable[[], Any], ticket: Future[Any]) -> Any:
+    """Run the one computation for `key`, publish it and free the slot.
+
+    The caller has already claimed `key` by putting `ticket` in `_INFLIGHT`; this is the
+    claim being honoured, outside the lock.
+    """
+    try:
+        with _COMPUTE_SLOTS:
+            payload = compute()
+    except BaseException as error:
+        with _CACHE_LOCK:
+            _INFLIGHT.pop(key, None)
+        ticket.set_exception(error)
+        raise
     with _CACHE_LOCK:
+        # The entry and the slot move together, so a caller under the lock sees either a
+        # computation in flight beside the payload it is replacing, or a fresh payload and
+        # no computation — never a key with neither.
+        _INFLIGHT.pop(key, None)
         # Re-inserted rather than assigned, so a refreshed entry goes to the back of the
         # queue and the cap drops what has genuinely been idle longest.
         _CACHE.pop(key, None)
         _CACHE[key] = (_clock() + STATS_CACHE_TTL_SECONDS, payload)
         while len(_CACHE) > STATS_CACHE_MAX_ENTRIES:
             _CACHE.pop(next(iter(_CACHE)))
+    ticket.set_result(payload)
     return payload
 
 
@@ -556,14 +776,20 @@ def _hashable(value: Any) -> Any:
     return value
 
 
-def primary_runs() -> Any:
+def primary_runs(game_id: int | None = None) -> Any:
     """The one run per game that stats read: the newest done full-game UCI pass.
 
     A run over a ply range is deliberately excluded — a deep pass over the endgame would
     otherwise shadow the quick pass for the plies it covers and leave the game's numbers
     half from one engine budget and half from another. Maia runs are excluded too: they
     predict a human move, they do not judge one.
+
+    `game_id` narrows the same definition to one game, which is what turns a fold of one
+    game's summary from a grouped pass over every run in the library into an index lookup.
+    Only a narrowing: what it selects for that game is exactly what the unrestricted form
+    selects for it.
     """
+    conditions = [] if game_id is None else [AnalysisRun.game_id == game_id]
     return (
         select(func.max(AnalysisRun.id))
         .select_from(AnalysisRun)
@@ -574,21 +800,33 @@ def primary_runs() -> Any:
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
             or_(Engine.id.is_(None), Engine.kind == EngineKind.UCI),
+            *conditions,
         )
         .group_by(AnalysisRun.game_id)
         .scalar_subquery()
     )
 
 
+def primary_run_id(session: Session, game_id: int) -> int | None:
+    """Which run a game's stats are read from, or None when no pass has finished over it."""
+    return session.scalar(select(primary_runs(game_id)))
+
+
 def _eval_rows(
     session: Session,
     scope: GameFilters,
     *,
+    game: int | None = None,
     extra_conditions: Sequence[Any] = (),
-    order_by: Any = None,
+    order_by: Sequence[Any] = (),
     limit: int | None = None,
 ) -> list[EvalRow]:
     """The owner's own analysed moves, with the FEN each was played in.
+
+    `game` restricts the whole thing to one game — the primary-run subquery included, so
+    the narrow form costs a lookup rather than a grouped pass over every run there is. It
+    is what a summary is folded from, which is what makes a summary and a scan of the same
+    library agree about which rows count: there is one query here, not two.
 
     The position comes from the eval row where the engine recorded one and from the game's
     own position index where it did not, so a run written before that column was filled in
@@ -622,14 +860,15 @@ def _eval_rows(
         )
         .outerjoin(Position, Position.id == position_id)
         .where(
-            AnalysisRun.id.in_(primary_runs()),
+            AnalysisRun.id.in_(primary_runs(game)),
             owner_move_condition(),
+            *([] if game is None else [Game.id == game]),
             *game_conditions(scope),
             *extra_conditions,
         )
     )
-    if order_by is not None:
-        statement = statement.order_by(order_by)
+    if order_by:
+        statement = statement.order_by(*order_by)
     if limit:
         statement = statement.limit(limit)
 
@@ -650,6 +889,196 @@ def _eval_rows(
     ]
 
 
+# ----------------------------------------------------------- the per-game summaries
+#
+# What a game contributes to every aggregation above, folded once and kept on the game row.
+# The fold is the same query the scan uses, narrowed to one game, so the two can never
+# disagree about which plies count; the reading paths above merge the folds instead of
+# hydrating the plies, and fall back to the scan whenever the library is not fully folded.
+
+
+def refresh_game_stats(session: Session, game: Game) -> dict[str, Any] | None:
+    """Recompute a game's stored stat summary, leaving the commit to the caller.
+
+    Deliberately without one, exactly as `games.refresh_card` is: this belongs inside the
+    transaction that changed the game's finished runs, so the summary and the evals it
+    describes become visible together and no reader can catch one without the other.
+
+    A game whose primary run has gone — the whole library re-imported, say — is written
+    back to nothing rather than left describing a run that no longer answers for it.
+    """
+    run_id = primary_run_id(session, game.id)
+    rows = [] if run_id is None else _eval_rows(session, GameFilters(), game=game.id)
+    summary = None if run_id is None else _summarise(game, run_id, rows)
+    given_away = [
+        row.win_loss
+        for row in rows
+        if row.win_loss is not None and row.classification == str(Classification.BLUNDER)
+    ]
+    game.stat_summary = summary
+    game.stat_owner_moves = None if summary is None else summary["owner_moves"]
+    game.stat_blunders = (
+        None if summary is None else summary["counts"][str(Classification.BLUNDER)]
+    )
+    game.stat_worst_win_loss = max(given_away) if given_away else None
+    return summary
+
+
+def _summarise(game: Game, run_id: int, rows: Sequence[EvalRow]) -> dict[str, Any]:
+    """One game's analysed owner moves, added up every way a dimension asks for.
+
+    Every group a dimension buckets by is here — phase, piece, clock band — because the
+    bucket a move belongs to is a property of the move, and a game's own moves do not move
+    between buckets when the filters change. What the filters choose is which games are
+    added up, and that is a predicate over game rows.
+
+    The clock bands are the default `TIME_TROUBLE_THRESHOLDS` ones. A caller with its own
+    idea of time trouble is asking a question these buckets cannot answer, and gets the
+    scan.
+    """
+    clocks = (game.clocks, game.initial_clock)
+    counts = dict.fromkeys(LOSS_CLASSIFICATION_NAMES, 0)
+    summary: dict[str, Any] = {
+        "run_id": run_id,
+        "owner_moves": 0,
+        "evaluated": 0,
+        "loss_sum": 0.0,
+        "counts": counts,
+        "phases": {},
+        "pieces": {},
+        "clock": {},
+    }
+    worst: list[dict[str, Any]] = []
+    for row in rows:
+        summary["owner_moves"] += 1
+        if row.win_loss is not None:
+            summary["evaluated"] += 1
+            summary["loss_sum"] += row.win_loss
+        if row.classification in counts:
+            counts[row.classification] += 1
+        for group, name in (
+            ("phases", phase_of(row.fen, row.ply)),
+            ("pieces", piece_of(row.move_san, row.move_uci, row.fen)),
+            (
+                "clock",
+                _clock_bucket(
+                    _remaining_clock(clocks, row.ply),
+                    _normalised_thresholds(TIME_TROUBLE_THRESHOLDS),
+                ),
+            ),
+        ):
+            _count_into(summary[group].setdefault(name, _summary_bucket()), row)
+        if row.win_loss is not None and row.classification in counts:
+            worst.append(_worst_entry(row))
+    # Ranked the way the library-wide ranking ranks, so the cap trims the moments that
+    # ranking would have reached last.
+    worst.sort(key=lambda moment: _worst_moment_key(moment["win_loss"], game.id, moment["ply"]))
+    summary["worst"] = worst[:STAT_SUMMARY_WORST_MOMENTS]
+    return summary
+
+
+def _summary_bucket() -> dict[str, Any]:
+    """One group of one game's moves, in the fields an aggregate is built out of."""
+    return {
+        "moves": 0,
+        "evaluated": 0,
+        "loss_sum": 0.0,
+        **dict.fromkeys(LOSS_CLASSIFICATION_NAMES, 0),
+    }
+
+
+def _count_into(bucket: dict[str, Any], row: EvalRow) -> None:
+    """Add one move to a group, counting exactly what `_classification_buckets` counts."""
+    bucket["moves"] += 1
+    if row.win_loss is not None:
+        bucket["evaluated"] += 1
+        bucket["loss_sum"] += row.win_loss
+    if row.classification in LOSS_CLASSIFICATION_NAMES:
+        bucket[row.classification] += 1
+
+
+def _stale_summary_ids(session: Session, limit: int) -> list[int]:
+    """Games whose stored summary is missing, or describes a run that is no longer theirs.
+
+    The one definition of "not folded yet": the readiness check asks it for one row and the
+    backfill asks it for a chunk, so a library the sweep says it has finished is a library
+    the dimensions are allowed to read the fold of.
+
+    Deliberately unordered. Which games come back does not matter — every chunk fixes the
+    ones it is handed, so any order finishes — and an ORDER BY would make the readiness
+    check sort the whole library to answer a question about its first row.
+    """
+    described = func.json_extract(Game.stat_summary, "$.run_id").cast(Integer)
+    statement = (
+        select(Game.id)
+        .select_from(AnalysisRun)
+        .join(Game, AnalysisRun.game_id == Game.id)
+        .where(
+            AnalysisRun.id.in_(primary_runs()),
+            or_(Game.stat_summary.is_(None), described != AnalysisRun.id),
+        )
+        .limit(max(limit, 1))
+    )
+    return list(session.scalars(statement))
+
+
+def _summaries_ready(session: Session) -> bool:
+    """Whether every game with a primary run has a summary of that run.
+
+    Which is the whole precondition for reading the folds instead of the plies: a game
+    missing its summary would simply be left out of the answer, and one describing an older
+    run would be counted at the wrong budget.
+
+    Memoised, in two halves, because the answer changes in one direction only. Once true it
+    is true forever: `analysis.complete_run` writes the summary inside the same commit that
+    makes the run primary, so nothing this process can do makes a folded library unfolded
+    again. While it is false — a library imported before the columns existed, with the
+    backfill still walking it — the question costs a query, so it is asked at most once
+    every `SUMMARIES_READY_RECHECK_SECONDS` and every dimension in between takes the scan
+    it was taking anyway.
+    """
+    global _SUMMARIES_READY, _SUMMARIES_CHECKED_AT
+    with _READY_LOCK:
+        if _SUMMARIES_READY:
+            return True
+        checked = _SUMMARIES_CHECKED_AT
+    if checked is not None and _clock() - checked < SUMMARIES_READY_RECHECK_SECONDS:
+        return False
+    ready = not _stale_summary_ids(session, limit=1)
+    with _READY_LOCK:
+        _SUMMARIES_READY = _SUMMARIES_READY or ready
+        _SUMMARIES_CHECKED_AT = _clock()
+        return _SUMMARIES_READY
+
+
+def rebuild_stat_summaries(
+    session: Session, *, limit: int = STAT_SUMMARY_BACKFILL_CHUNK
+) -> int:
+    """Fold up to `limit` games that have not been folded yet; how many were. 0 means done.
+
+    Only a library analysed before the summaries existed needs this — from then on every
+    finished run folds its own game — and it is a convenience rather than a requirement:
+    the dimensions scan the evals until it has finished, so an un-swept library is slow,
+    not wrong.
+
+    One chunk per call rather than a sweep with a loop inside it, so the caller decides
+    when to stop: the one the server starts at boot is cancelled between chunks at
+    shutdown, and each chunk is a committed step nothing has to redo. Committing per chunk
+    is also what lets it run beside a live server, SQLite having one writer.
+    """
+    rebuilt = 0
+    for game_id in _stale_summary_ids(session, limit=limit):
+        game = session.get(Game, game_id)
+        if game is not None:
+            refresh_game_stats(session, game)
+            rebuilt += 1
+    session.commit()
+    # Nothing here needs the games again, and a sweep over a large library would otherwise
+    # keep every one of them — PGN and all — in the identity map.
+    session.expunge_all()
+    return rebuilt
+
+
 def _game_rows(session: Session, scope: GameFilters) -> list[GameRow]:
     statement = (
         select(
@@ -662,6 +1091,8 @@ def _game_rows(session: Session, scope: GameFilters) -> list[GameRow]:
             Game.white_rating,
             Game.black_rating,
             Game.eco,
+            Game.stat_owner_moves,
+            Game.stat_blunders,
         )
         .where(Game.owner_color.is_not(None), *game_conditions(scope))
         .order_by(Game.played_at.asc().nulls_last(), Game.id.asc())
@@ -677,6 +1108,8 @@ def _game_rows(session: Session, scope: GameFilters) -> list[GameRow]:
         white_rating,
         black_rating,
         eco,
+        owner_moves,
+        blunders,
     ) in session.execute(statement):
         owner_white = owner_color == Color.WHITE
         rows.append(
@@ -689,9 +1122,31 @@ def _game_rows(session: Session, scope: GameFilters) -> list[GameRow]:
                 rating=white_rating if owner_white else black_rating,
                 opponent_rating=black_rating if owner_white else white_rating,
                 eco=eco,
+                owner_moves=owner_moves,
+                blunders=blunders,
             )
         )
     return rows
+
+
+def _analysed_counts(
+    session: Session, scope: GameFilters, rows: Sequence[GameRow]
+) -> tuple[dict[int, int], dict[int, int]]:
+    """Analysed owner moves and owner blunders per game: `(moves, blunders)`.
+
+    Off the game rows already in hand where the library is folded, and off two grouped
+    queries over every eval in it where it is not.
+
+    A game is in both dicts or in neither, and it is in them only when its primary run
+    actually holds an owner move — which is what a grouped count over the evals emits, and
+    what `analyzed_games` means downstream. A folded game with no owner move in its run is
+    therefore left out exactly as the group-by leaves it out.
+    """
+    if not _summaries_ready(session):
+        return _owner_move_counts(session, scope), _blunder_counts(session, scope)
+    moves = {row.id: row.owner_moves for row in rows if row.owner_moves}
+    blunders = {row.id: row.blunders or 0 for row in rows if row.owner_moves}
+    return moves, blunders
 
 
 def _blunder_counts(session: Session, scope: GameFilters) -> dict[int, int]:
@@ -769,6 +1224,45 @@ def _classification_buckets(
             if row.classification in bucket["counts"]:
                 bucket["counts"][row.classification] += 1
 
+    return _finish_classification_buckets(buckets, overall, order)
+
+
+def _summary_classification_buckets(
+    session: Session, scope: GameFilters, group: str, order: Sequence[str]
+) -> dict[str, Any]:
+    """The payload `_classification_buckets` builds, added up out of the stored folds.
+
+    One row per game instead of one per analysed ply, and the same finishing arithmetic on
+    the way out, so which path answered is not something a caller can tell. A game with no
+    summary has no primary run and so contributed no rows to the scan either.
+    """
+    buckets: dict[str, dict[str, Any]] = {}
+    overall = _empty_classification_bucket("total")
+    statement = select(Game.stat_summary).where(
+        Game.stat_summary.is_not(None), *game_conditions(scope)
+    )
+    for summary in session.scalars(statement):
+        for name, counted in summary[group].items():
+            _merge_classification_bucket(
+                buckets.setdefault(name, _empty_classification_bucket(name)), counted
+            )
+            _merge_classification_bucket(overall, counted)
+    return _finish_classification_buckets(buckets, overall, order)
+
+
+def _merge_classification_bucket(bucket: dict[str, Any], counted: Mapping[str, Any]) -> None:
+    """Add one game's group to a bucket the aggregate is accumulating."""
+    bucket["moves"] += counted["moves"]
+    bucket["evaluated"] += counted["evaluated"]
+    bucket["loss_sum"] += counted["loss_sum"]
+    for name in LOSS_CLASSIFICATION_NAMES:
+        bucket["counts"][name] += counted[name]
+
+
+def _finish_classification_buckets(
+    buckets: dict[str, dict[str, Any]], overall: dict[str, Any], order: Sequence[str]
+) -> dict[str, Any]:
+    """The known buckets in the order they are named, then whatever else turned up."""
     ordered = [
         _finish_classification_bucket(buckets[name])
         for name in list(order) + [name for name in sorted(buckets) if name not in order]

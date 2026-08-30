@@ -226,6 +226,27 @@ zone) are not things SQL can work out. The queries fetch narrow tuples under SQL
 the bucketing happens in Python. Same reason `notes` matches tags after the read:
 `notes.tags` is a plain JSON column, and searching inside one is a scan either way.
 
+**What a game says about itself is written down when it changes.** Two columns' worth: a
+game's `card` (its eval curve and worst moments, folded out of every finished run) and its
+`stat_summary` plus the three scalars beside it (its contribution to every aggregation,
+folded out of the one primary run). Both are rewritten inside `analysis.complete_run`'s
+commit — the only moment either can change — so nothing can read a fold that describes
+evals it cannot see, or miss one it can. Without them a page of fifty games is a hundred
+queries and a dimension is a walk over every analysed ply in the library: 194k rows for one
+answer at nine thousand games, several of them at a hundred thousand. With them a dimension
+sums one row per game and the worst-moments ranking is an index walk over
+`games.stat_worst_win_loss`.
+
+Neither is a source of truth, and that is what keeps them safe. A missing card is computed
+on the way out; the summaries are read only while `stats._summaries_ready()` — no game with
+a primary run is missing one or describing an older one — and the scan is what answers
+until then, so a library upgraded from before the columns existed is slow rather than
+wrong. `stats.rebuild_stat_summaries` is the sweep that ends that, a committed chunk at a
+time: the server runs it in the background at boot, and `blunderbase db rebuild-stats` runs
+it by hand. A question the folds do not hold — time trouble at bands of the caller's own,
+worst moments of some other classification — takes the scan whatever the state of the
+library.
+
 Two conventions worth knowing: a `limit` of 0 means "no limit" throughout, and payload
 builders drop `None` keys, because a chat model pays for every one of them.
 

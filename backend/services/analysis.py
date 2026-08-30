@@ -50,6 +50,7 @@ from backend.db.types import utcnow
 from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
 from backend.services import games as games_service
+from backend.services import stats as stats_service
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import chess
@@ -1751,8 +1752,8 @@ def complete_run(
     the local worker, which holds the run for the length of its own search — this behaves
     exactly as it always has.
 
-    This is also the only moment a game's card can change, so the card is rewritten here,
-    inside the same commit.
+    This is also the only moment a game's card or its stat summary can change, so both are
+    rewritten here, inside the same commit.
     """
     _require_attempt(run, attempt_token)
     session.execute(delete(MoveEval).where(MoveEval.run_id == run.id))
@@ -1763,20 +1764,25 @@ def complete_run(
     run.finished_at = utcnow()
     run.error = None
     run.stderr = None
-    _refresh_game_card(session, run)
+    _refresh_game_rollups(session, run)
     session.commit()
     emit_run_event(run_event(EVENT_RUN_DONE, run, evals=len(evals)))
 
 
-def _refresh_game_card(session: Session, run: AnalysisRun) -> None:
-    """Rebuild the game's stored card from the run that has just finished, plus its elders.
+def _refresh_game_rollups(session: Session, run: AnalysisRun) -> None:
+    """Rebuild what the game keeps precomputed about its own runs: its card and its stats.
 
-    Uncommitted on purpose: `complete_run`'s commit carries both, so a listing can never
-    read a card that describes a run nobody can see yet, or miss one it already can. The
-    flush is what makes the rebuild see the rows this call has only just added — sessions
-    here run with autoflush off, and the rebuild reads back through a query.
+    The card is folded out of every finished run over the game; the stat summary out of the
+    one run an aggregation reads (`stats.primary_runs()`), which the run that has just
+    finished may well have become.
 
-    A run over a bare position belongs to no game and so has no card to keep.
+    Uncommitted on purpose: `complete_run`'s commit carries all of it, so a listing can
+    never read a card that describes a run nobody can see yet, and a dimension can never
+    add up a summary for evals that are not visible — or miss one that is. The flush is
+    what makes the rebuild see the rows this call has only just added; sessions here run
+    with autoflush off, and both rebuilds read back through a query.
+
+    A run over a bare position belongs to no game and so has neither to keep.
     """
     if run.game_id is None:
         return
@@ -1784,6 +1790,7 @@ def _refresh_game_card(session: Session, run: AnalysisRun) -> None:
     game = session.get(Game, run.game_id)
     if game is not None:
         games_service.refresh_card(session, game)
+        stats_service.refresh_game_stats(session, game)
 
 
 def fail_run(

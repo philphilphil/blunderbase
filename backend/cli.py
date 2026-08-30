@@ -20,6 +20,7 @@ from backend.services import engines as engines_service
 from backend.services import games as games_service
 from backend.services import import_service
 from backend.services import runners as runners_service
+from backend.services import stats as stats_service
 
 
 def _positive_int(value: str) -> int:
@@ -145,6 +146,9 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     db_commands.add_parser("upgrade", help="apply pending migrations")
     db_commands.add_parser(
         "rebuild-cards", help="recompute the stored card of every analysed game"
+    )
+    db_commands.add_parser(
+        "rebuild-stats", help="recompute the stored stat summary of every analysed game"
     )
 
     demo = commands.add_parser("demo", help="build an anonymous database for screenshots")
@@ -425,6 +429,16 @@ def command_db(args: argparse.Namespace, settings: Settings) -> int:
         with session_scope(settings) as session:
             rebuilt = games_service.rebuild_game_cards(session)
         print(f"rebuilt the card of {rebuilt} game(s)")
+    if args.db_command == "rebuild-stats":
+        # For a library analysed before the summaries existed, and the same bargain: the
+        # dimensions scan the evals until this has run, so it buys speed rather than
+        # correctness. The server runs the same sweep at boot; this is for doing it now.
+        upgrade_to_head(settings)
+        rebuilt = 0
+        with session_scope(settings) as session:
+            while folded := stats_service.rebuild_stat_summaries(session):
+                rebuilt += folded
+        print(f"rebuilt the stat summary of {rebuilt} game(s)")
     return 0
 
 

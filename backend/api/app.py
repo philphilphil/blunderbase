@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from typing import Any
 
 from fastapi import FastAPI
@@ -18,7 +19,7 @@ from backend.api.web import install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_engine, get_sessionmaker
-from backend.services import maia_live
+from backend.services import maia_live, stats
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers
@@ -28,6 +29,12 @@ from backend.workers.runner_streams import RemoteStreamBackend
 
 TITLE = "Blunderbase"
 DESCRIPTION = "A personal chess database. Every route is a thin wrapper over `backend.services`."
+
+# How long the stat-summary folder waits between passes once it has found nothing to fold.
+# It is looking for the games an account reconciliation unfolded, which is a rare event and
+# not one anybody is watching a clock over, so this is long enough to cost nothing and short
+# enough that the dimensions are not left scanning for an afternoon.
+STAT_SUMMARY_IDLE_SECONDS = 300.0
 
 # Below this a gzip member's own header and trailer cost more than the compression saves,
 # so a short body is sent as it is. Every payload worth the trade — a page of game cards, a
@@ -64,6 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     streams = _analysis_boards(settings, workers, gateway)
     app.state.streams = streams
     await streams.start()
+    summaries = asyncio.create_task(_backfill_stat_summaries(settings))
     try:
         async with AsyncExitStack() as stack:
             # The mounted transport keeps its sessions in a task group this context opens.
@@ -72,6 +80,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await stack.enter_async_context(app.state.mcp.session_manager.run())
             yield
     finally:
+        # Cancelled first, and between chunks: every chunk it has finished is committed, so
+        # there is nothing here to wait for and nothing to lose by stopping now.
+        summaries.cancel()
+        with suppress(asyncio.CancelledError):
+            await summaries
         await wait_for_imports(app.state.imports)
         # Before the gateway and the workers, in that order: an analysis board holds a slot
         # on one of them, and both have to still be there for it to give the slot back to.
@@ -85,6 +98,56 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await asyncio.to_thread(maia_live.shutdown)
         events.stop()
         app.state.loop = None
+
+
+async def _backfill_stat_summaries(settings: Settings) -> None:
+    """Fold the per-game stat summaries of any game that is missing one, a chunk at a time.
+
+    A finished run folds its own game, so on a library that has always had these columns
+    this finds nothing and says nothing. What it is for is the two ways a game can be left
+    unfolded: a library imported and analysed before the columns existed, and the games
+    `accounts.reconcile_games` throws the folds of away when it learns whose side is whose.
+    Until every game is folded the stats dimensions answer by scanning every analysed ply
+    of every one of them, which is exactly what this exists to stop — so it runs on its
+    own rather than waiting for the owner to find a CLI command.
+
+    It idles rather than finishing, because the second case can happen at any time and a
+    library that healed only on the next restart is not healed. Idling costs one indexed
+    lookup every `IDLE_SECONDS`.
+
+    Each chunk is one committed transaction in a thread, so it takes SQLite's single writer
+    for a moment at a time and hands it back; the loop is cancelled between chunks at
+    shutdown and whatever it had folded stands. Nothing here may take the server down with
+    it: a library that cannot be folded is a slow one, not a broken one.
+    """
+    sessions = get_sessionmaker(settings)
+
+    def fold() -> int:
+        with sessions() as session:
+            return stats.rebuild_stat_summaries(session)
+
+    while True:
+        started = time.monotonic()
+        folded = 0
+        try:
+            while done := await asyncio.to_thread(fold):
+                if not folded:
+                    logger.info("folding the stat summaries of games that are missing one")
+                folded += done
+        except asyncio.CancelledError:
+            if folded:
+                logger.info("stat summary backfill stopped after %s game(s)", folded)
+            raise
+        except Exception:
+            logger.exception("stat summary backfill failed after %s game(s)", folded)
+        else:
+            if folded:
+                logger.info(
+                    "stat summaries folded for %s game(s) in %.1fs",
+                    folded,
+                    time.monotonic() - started,
+                )
+        await asyncio.sleep(STAT_SUMMARY_IDLE_SECONDS)
 
 
 def _analysis_boards(
@@ -154,7 +217,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.include_router(router)
 
     @app.get("/health", tags=["meta"])
-    def health() -> dict[str, str]:
+    async def health() -> dict[str, str]:
+        """Whether this process is answering, and nothing more.
+
+        `async` on purpose, and touching neither the database nor a service: a `def` route
+        is run in Starlette's threadpool, so the container's healthcheck would queue behind
+        whatever has filled it — a backfill's worth of analysis requests, say — and time
+        out while the process was perfectly alive. Answered on the event loop it cannot be
+        starved by work in the pool, which is the one thing a healthcheck must not be.
+        """
         return {"status": "ok"}
 
     # `/mcp` is mounted by the lifespan rather than here — see `_mount_mcp`.

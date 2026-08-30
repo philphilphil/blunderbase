@@ -101,9 +101,16 @@ analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 `uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`,
 `accounts <list|add|reconcile>`, `analyze` (queue a
 tier and drain it in this process), `mcp [--transport stdio|http]`, `set-password`,
-`db upgrade`, `db rebuild-cards`, and `demo create`. The
+`db upgrade`, `db rebuild-cards`, `db rebuild-stats`, and `demo create`. The
 queue is `analysis_runs` rows rather than a broker, so `blunderbase analyze` is safe to
 run while the server is up, and nothing is lost across a restart.
+
+`db rebuild-cards` and `db rebuild-stats` recompute what a game keeps precomputed about its
+own analysis — the card the games table draws, and the per-game summary every stats
+dimension adds up. Neither is ever required: a finished run rewrites both for its own game,
+and what is missing is computed the slow way on the way out. They are for a library
+analysed before those columns existed, and `serve` already runs the summary sweep in the
+background at boot, so the command is only for doing it now and watching it finish.
 
 `accounts add lichess <username>` names a username as one of yours and claims the games
 already stored under it — that is what fills in the colour, opponent and ratings of an
