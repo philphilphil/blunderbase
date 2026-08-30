@@ -2553,6 +2553,49 @@ def test_the_estimate_averages_only_the_budget_that_is_configured_now(session: S
     assert estimate == pytest.approx(4.0)
 
 
+def test_the_estimate_includes_work_of_that_tier_already_in_the_queue(session: Session) -> None:
+    """After Backfill is pressed, its remaining time must not collapse to zero."""
+    _engine(session)
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
+        _finished(session, _game(session, plies=6), seconds=6.0)
+    _finished(session, _game(session, plies=4), status=RunStatus.QUEUED)
+    _game(session, plies=2)
+
+    estimate = analysis.coverage(session)["estimates"]["quick_seconds"]
+
+    # A second per ply over four already queued plies plus two not queued yet.
+    assert estimate == pytest.approx(6.0)
+
+
+def test_coverage_scans_each_library_wide_source_once(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The missing-work and settled-level scans used to repeat during one page load."""
+    _engine(session)
+    _finished(session, _game(session))
+    settled_original = analysis._settled_maia_levels
+    missing_original = analysis._missing_games
+    settled_calls = 0
+    missing_calls: list[Tier] = []
+
+    def counted_settled(*args: Any, **kwargs: Any) -> dict[int, set[str]]:
+        nonlocal settled_calls
+        settled_calls += 1
+        return settled_original(*args, **kwargs)
+
+    def counted_missing(tier: Tier, **kwargs: Any) -> Any:
+        missing_calls.append(Tier(tier))
+        return missing_original(tier, **kwargs)
+
+    monkeypatch.setattr(analysis, "_settled_maia_levels", counted_settled)
+    monkeypatch.setattr(analysis, "_missing_games", counted_missing)
+
+    analysis.coverage(session)
+
+    assert settled_calls == 1
+    assert missing_calls == [Tier.QUICK, Tier.DEEP]
+
+
 def test_the_estimate_is_none_until_there_is_history_worth_averaging(session: Session) -> None:
     _engine(session)
     for _ in range(analysis.ESTIMATE_MIN_SAMPLES - 1):
@@ -2585,11 +2628,21 @@ def test_the_fill_is_priced_off_the_fills_this_deployment_has_finished(
         _finished(session, filled, seconds=3.0, maia_only=True, elos=[1500])
     # Analysed, never filled: four plies of work the button still has in front of it.
     _finished(session, _game(session, plies=4), seconds=60.0)
+    # Another two plies are already in the fill queue and must remain in its estimate.
+    queued = _game(session, plies=2)
+    _finished(session, queued, seconds=60.0)
+    _finished(
+        session,
+        queued,
+        status=RunStatus.QUEUED,
+        maia_only=True,
+        elos=[1500],
+    )
 
     estimate = analysis.coverage(session)["estimates"]["maia_seconds"]
 
-    # Half a second a ply over four plies — not the ten a quick pass costs here.
-    assert estimate == pytest.approx(2.0)
+    # Half a second a ply over four new and two queued plies — not the ten a quick pass costs.
+    assert estimate == pytest.approx(3.0)
 
 
 def test_the_fill_estimate_ignores_the_passes_that_searched(session: Session) -> None:

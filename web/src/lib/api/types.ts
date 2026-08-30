@@ -580,7 +580,8 @@ export interface CoverageMaia {
 
 /**
  * What finishing each piece of work would cost, in engine-seconds measured off this
- * deployment's own finished runs.
+ * deployment's own finished runs. Matching work already queued or running is included,
+ * so the estimate keeps counting down after a backfill is pressed.
  *
  * Seconds of *work*, not of waiting: `concurrency` is how many run at once, so the
  * wall-clock answer is the one divided by the other. Null where too few finished runs

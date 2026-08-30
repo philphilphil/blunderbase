@@ -33,6 +33,12 @@ function plural(count: number, one: string, many = `${one}s`): string {
   return `${formatCount(count)} ${count === 1 ? one : many}`
 }
 
+function remainingEstimate(seconds: number | null, concurrency: number, pending: number) {
+  if (seconds === 0) return null
+  const label = estimateLabel(seconds, concurrency)
+  return label && pending === 0 ? `${label} remaining` : label
+}
+
 function ActionCard({
   icon: Icon,
   title,
@@ -45,7 +51,7 @@ function ActionCard({
   icon: ComponentType<{ className?: string }>
   title: string
   blurb: ReactNode
-  /** What the press would take on, already worded — "6,879 games", "nothing left". */
+  /** What the press would take on, already worded — "6,879 games", "nothing to queue". */
   figure: string
   /** The wall-clock cost, or null where nothing has been measured yet. */
   estimate: string | null
@@ -101,8 +107,8 @@ function BackfillCard({
           ? 'A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass.'
           : 'The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off.'
       }
-      figure={pending === 0 ? 'nothing left' : plural(pending, 'game')}
-      estimate={estimateLabel(seconds, concurrency)}
+      figure={pending === 0 ? 'nothing to queue' : plural(pending, 'game')}
+      estimate={remainingEstimate(seconds, concurrency, pending)}
       footer={
         <>
           {receipt ? (
@@ -161,8 +167,8 @@ function MaiaFillCard({
       icon={Wand2}
       title="Fill missing Maia levels"
       blurb="Adds the configured levels to games that already have a pass. Maia-only — nothing is searched again — so it costs minutes where a re-analysis would cost the weekend."
-      figure={missing === 0 ? 'every game has every level' : plural(missing, 'game')}
-      estimate={estimateLabel(seconds, concurrency)}
+      figure={missing === 0 ? 'nothing to queue' : plural(missing, 'game')}
+      estimate={remainingEstimate(seconds, concurrency, missing)}
       footer={
         <>
           {receipt ? (
@@ -271,7 +277,7 @@ export function LibraryActions({ coverage }: { coverage: AnalysisCoverage }) {
       </div>
       <p className="text-[0.625rem] leading-[1.5] text-dim-2">
         Times are approximate: measured off this deployment&rsquo;s own finished runs at the
-        budget configured now, over{' '}
+        budget configured now, including matching work already queued or running, over{' '}
         {concurrency === 1 ? 'one run at a time' : `${concurrency} runs at a time`}. A blank
         means too few runs have finished at that budget to be worth averaging.
       </p>

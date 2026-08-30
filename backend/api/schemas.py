@@ -613,9 +613,10 @@ class CoverageEstimates(Payload):
     finished runs carry the budget configured now to average — a made-up number on this
     page is worse than an empty space.
 
-    `maia_seconds` prices the third button, the fill: measured off finished `maia_only`
-    runs, which cost what asking the human-move model costs and nothing like what a search
-    does, over the plies of the games still missing a level.
+    Each estimate includes matching work already queued or running, so it remains a useful
+    remaining-time estimate after a backfill is pressed. `maia_seconds` prices the third
+    button, the fill: measured off finished `maia_only` runs, which cost what asking the
+    human-move model costs and nothing like what a search does.
     """
 
     quick_seconds: float | None = None

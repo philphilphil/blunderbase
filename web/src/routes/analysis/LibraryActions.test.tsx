@@ -172,7 +172,24 @@ describe('LibraryActions', () => {
 
     expect(screen.getByRole('button', { name: /backfill quick/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /backfill deep/i })).toBeDisabled()
-    expect(screen.getAllByText('nothing left')).toHaveLength(2)
+    expect(screen.getAllByText('nothing to queue')).toHaveLength(2)
+  })
+
+  it('calls a non-zero estimate remaining when that tier has nothing new to queue', () => {
+    draw(
+      coverage({
+        missing: { quick: 0, deep: 0 },
+        estimates: {
+          quick_seconds: 1200,
+          deep_seconds: 2400,
+          maia_seconds: 0,
+          concurrency: 4,
+        },
+      }),
+    )
+
+    expect(screen.getByText('~5m remaining')).toBeInTheDocument()
+    expect(screen.getByText('~10m remaining')).toBeInTheDocument()
   })
 
   it('queues the fill over the whole library and says what it queued', async () => {

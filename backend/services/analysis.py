@@ -877,6 +877,14 @@ def maia_fill_targets(
     A game whose fill is already queued or running counts as needing nothing: the levels are
     on their way, and clicking the button twice must not queue the work twice.
     """
+    targets, complete, _configured, _settled = _maia_fill_picture(session, game_ids)
+    return targets, complete
+
+
+def _maia_fill_picture(
+    session: Session, game_ids: Sequence[int] | None = None
+) -> tuple[dict[int, list[int]], int, list[int], dict[int, set[str]]]:
+    """The fill targets plus the settled-level scan the coverage page also renders."""
     configured = app_settings_service.get_maia_elos(session)
     wanted = [str(level) for level in configured]
     only = None if game_ids is None else {int(game_id) for game_id in game_ids}
@@ -909,7 +917,7 @@ def maia_fill_targets(
             complete += 1
         else:
             targets[game_id] = missing
-    return targets, complete
+    return targets, complete, configured, have
 
 
 def _stored_policy() -> ColumnElement[bool]:
@@ -1110,21 +1118,23 @@ def coverage(session: Session, *, settings: Settings | None = None) -> dict[str,
     # Settled once and handed to both readers of it: the games a fill would queue are what
     # the Maia block counts and what its estimate is priced over, and asking twice would
     # mean walking every finished run of the library a second time.
-    fill_targets, _complete = maia_fill_targets(session)
+    fill_targets, _complete, configured, settled = _maia_fill_picture(session)
+    quick_missing, quick_plies = _missing_work(session, Tier.QUICK)
+    deep_missing, deep_plies = _missing_work(session, Tier.DEEP)
     return {
         "total": int(total or 0),
         "no_pass": int(no_pass or 0),
         "quick_only": int(quick_only or 0),
         "deep": int(deep or 0),
         "missing": {
-            "quick": count_missing(session, Tier.QUICK),
-            "deep": count_missing(session, Tier.DEEP),
+            "quick": quick_missing,
+            "deep": deep_missing,
         },
         "failed": int(failed or 0),
-        "maia": _maia_coverage(session, fill_targets),
+        "maia": _maia_coverage(fill_targets, configured, settled),
         "estimates": {
-            "quick_seconds": _tier_estimate(session, Tier.QUICK),
-            "deep_seconds": _tier_estimate(session, Tier.DEEP),
+            "quick_seconds": _tier_estimate(session, Tier.QUICK, quick_plies),
+            "deep_seconds": _tier_estimate(session, Tier.DEEP, deep_plies),
             "maia_seconds": _maia_estimate(session, fill_targets),
             "concurrency": int(resolved.analysis_concurrency),
         },
@@ -1136,7 +1146,11 @@ def _counted(clause: ColumnElement[bool]) -> ColumnElement[int]:
     return func.coalesce(func.sum(case((clause, 1), else_=0)), 0)
 
 
-def _maia_coverage(session: Session, fill_targets: Mapping[int, list[int]]) -> dict[str, Any]:
+def _maia_coverage(
+    fill_targets: Mapping[int, list[int]],
+    configured: Sequence[int],
+    settled: Mapping[int, set[str]],
+) -> dict[str, Any]:
     """Which Maia levels the library actually carries, against the ones configured now.
 
     Read off `_settled_maia_levels` for every game at once, which is the same source the
@@ -1154,9 +1168,7 @@ def _maia_coverage(session: Session, fill_targets: Mapping[int, list[int]]) -> d
     rather than asked for again: `coverage` prices the fill over the very same games, and
     the two must not be able to disagree about which they are.
     """
-    configured = app_settings_service.get_maia_elos(session)
     wanted = {str(level) for level in configured}
-    settled = _settled_maia_levels(session)
     per_key: Counter[str] = Counter()
     for keys in settled.values():
         per_key.update(keys)
@@ -1178,13 +1190,14 @@ def _maia_coverage(session: Session, fill_targets: Mapping[int, list[int]]) -> d
     }
 
 
-def _tier_estimate(session: Session, tier: Tier) -> float | None:
+def _tier_estimate(session: Session, tier: Tier, missing_plies: int) -> float | None:
     """Engine-seconds a backfill of this tier would take, or None because nothing measured it.
 
     Measured rather than guessed, from the runs this deployment has actually finished:
     their wall time over their games' plies is what a ply costs here, and the plies a
-    backfill would queue is how many of them are left. The caller divides by the
-    concurrency it is told and formats — this is the raw cost of the work, not of the wait.
+    backfill would queue plus matching work already queued or running is how many of them
+    are left. The caller divides by the concurrency it is told and formats — this is the
+    raw cost of the work, not of the wait.
 
     Only runs carrying the budget a run enqueued *today* would carry count. A budget is
     what the time was spent on, so averaging across two of them measures nothing: this
@@ -1198,7 +1211,8 @@ def _tier_estimate(session: Session, tier: Tier) -> float | None:
     """
     tier = Tier(tier)
     rate = _seconds_per_ply(session, tier)
-    return None if rate is None else rate * _pending_plies(session, tier)
+    work_plies = missing_plies + _outstanding_plies(session, tier)
+    return None if rate is None else rate * work_plies
 
 
 def _maia_estimate(session: Session, fill_targets: Mapping[int, list[int]]) -> float | None:
@@ -1210,13 +1224,15 @@ def _maia_estimate(session: Session, fill_targets: Mapping[int, list[int]]) -> f
     nothing and asks the human-move model about every ply — so a tier's per-ply cost says
     nothing about it, which is why the sample is `maia_only` runs and only those.
 
-    Priced over `fill_targets` rather than over the whole library: a fill queues a run per
-    game that is missing a configured level, and those are the games whose plies are paid
-    for. The same mapping the Maia block counts `missing_games` from, so the button's
-    "1,240 games" and its "about 40m" are two readings of one set.
+    Priced over `fill_targets` plus matching fills already queued or running. The Maia
+    block's `missing_games` remains what another press would newly queue; the estimate is
+    all of the matching work still left, so it keeps counting after that press.
     """
     rate = _seconds_per_ply(session, MAIA_FILL_TIER, maia_only=True)
-    return None if rate is None else rate * _fill_plies(session, fill_targets)
+    work_plies = _fill_plies(session, fill_targets) + _outstanding_plies(
+        session, MAIA_FILL_TIER, maia_only=True
+    )
+    return None if rate is None else rate * work_plies
 
 
 def _seconds_per_ply(session: Session, tier: Tier, *, maia_only: bool = False) -> float | None:
@@ -1258,13 +1274,30 @@ def _seconds_per_ply(session: Session, tier: Tier, *, maia_only: bool = False) -
     return seconds / plies
 
 
-def _pending_plies(session: Session, tier: Tier) -> int:
-    """How many plies a backfill of this tier still has to search."""
+def _missing_work(session: Session, tier: Tier) -> tuple[int, int]:
+    """How many games and plies a backfill would newly put into this tier's queue."""
     missing = _missing_games(tier).subquery()
-    total = session.scalar(
-        select(func.coalesce(func.sum(Game.ply_count), 0))
+    games, plies = session.execute(
+        select(func.count(), func.coalesce(func.sum(Game.ply_count), 0))
         .select_from(missing)
         .join(Game, Game.id == missing.c.id)
+    ).one()
+    return int(games or 0), int(plies or 0)
+
+
+def _outstanding_plies(session: Session, tier: Tier, *, maia_only: bool = False) -> int:
+    """Plies of this kind already queued or running, and therefore still to be paid for."""
+    total = session.scalar(
+        select(func.coalesce(func.sum(Game.ply_count), 0))
+        .select_from(AnalysisRun)
+        .join(Game, Game.id == AnalysisRun.game_id)
+        .where(
+            AnalysisRun.tier == Tier(tier),
+            AnalysisRun.status.in_([RunStatus.QUEUED, RunStatus.RUNNING]),
+            AnalysisRun.ply_start.is_(None),
+            AnalysisRun.ply_end.is_(None),
+            AnalysisRun.maia_only.is_(maia_only),
+        )
     )
     return int(total or 0)
 
