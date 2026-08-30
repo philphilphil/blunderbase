@@ -7,11 +7,10 @@
  * two the data does support — blunders per game and the
  * average rating the bucket was played at — rather than an invented number.
  */
-import { useStats } from '@/lib/api/queries'
-import { SPEEDS, type GameFilters, type StatsBucket } from '@/lib/api/types'
+import { SPEEDS, type StatsBucket } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
-import { Async, LoadingRows, StatCard } from '../kit/states'
+import { Async, LoadingRows, StatCard, type StatsQuery } from '../kit/states'
 import { asPercent, buckets, numOr } from '../kit/analytics'
 
 const SPEED_LABELS: Record<string, string> = {
@@ -66,8 +65,7 @@ function sentence(rows: Row[]): string | undefined {
     : `You blunder ${Math.abs(gap).toFixed(1)} more per game at ${slow.label.toLowerCase()} than at ${fast.label.toLowerCase()}, which is the opposite of the usual excuse.`
 }
 
-export function TimeControlCard({ filters }: { filters: GameFilters }) {
-  const query = useStats('performance_by_speed', filters)
+export function TimeControlCard({ query }: { query: StatsQuery }) {
   const rows: Row[] = buckets(query.data)
     .map((bucket: StatsBucket) => ({
       key: bucket.key,

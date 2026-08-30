@@ -7,17 +7,16 @@
  */
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 
-import { useStats } from '@/lib/api/queries'
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
-import type { GameFilters, StatsBucket } from '@/lib/api/types'
+import type { StatsBucket } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
 
-import { Async, LoadingChart, StatCard } from '../kit/states'
+import { Async, LoadingChart, StatCard, type StatsQuery } from '../kit/states'
 import { asPercent, buckets, numOr, total } from '../kit/analytics'
 
 /** The backend's `PIECES`, in the order a chess player expects to read them. */
@@ -34,8 +33,7 @@ const CHART: ChartConfig = {
   blunders: { label: 'Blunders', color: 'var(--bb-blunder)' },
 }
 
-export function BlundersByPieceCard({ filters }: { filters: GameFilters }) {
-  const query = useStats('blunders_by_piece', filters)
+export function BlundersByPieceCard({ query }: { query: StatsQuery }) {
   const found = buckets(query.data)
   const overall = total(query.data)
   const all = numOr(overall, 'blunder')

@@ -1,7 +1,14 @@
 import type { QueryKey } from '@tanstack/react-query'
 
 import type { GameFilters, Source, Tier } from './types'
-import type { CompareQuery, ExplorerQuery, GameDetailQuery, GameQuery, NoteQuery } from './endpoints'
+import type {
+  CompareQuery,
+  ExplorerQuery,
+  GameDetailQuery,
+  GameQuery,
+  NoteQuery,
+  StatsDashboardQuery,
+} from './endpoints'
 
 /**
  * One place every query key is built.
@@ -77,6 +84,11 @@ export const queryKeys = {
   stats: (): QueryKey => ['stats'],
   statsDimensions: (): QueryKey => ['stats', 'dimensions'],
   statsProfile: (): QueryKey => ['stats', 'profile'],
+  statsDashboard: (query: StatsDashboardQuery = {}): QueryKey => [
+    'stats',
+    'dashboard',
+    query,
+  ],
   statsDimension: (dimension: string, filters: GameFilters = {}): QueryKey => [
     'stats',
     'dimension',

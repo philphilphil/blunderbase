@@ -752,6 +752,13 @@ export interface StatsResponse extends Extra {
   total?: StatsBucket
 }
 
+export interface StatsDashboardResponse extends Extra {
+  anchor: string
+  since?: string | null
+  until: string
+  dimensions: Record<string, StatsResponse>
+}
+
 export interface ComparisonResponse extends Extra {
   dimension: string
   then: Extra

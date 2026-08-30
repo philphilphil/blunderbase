@@ -8,7 +8,16 @@
  */
 import type { CSSProperties, ReactNode } from 'react'
 
+import type { StatsResponse } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
+
+export interface StatsQuery {
+  data: StatsResponse | undefined
+  isPending: boolean
+  isError: boolean
+  error: Error | null
+  refetch: () => unknown
+}
 
 // --- the card ------------------------------------------------------------
 

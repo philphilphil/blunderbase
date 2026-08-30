@@ -856,6 +856,15 @@ class StatsResponse(Payload):
     until: datetime | None = None
 
 
+class StatsDashboardResponse(Payload):
+    """Every Stats-page aggregation over one server-anchored window."""
+
+    anchor: datetime
+    since: datetime | None = None
+    until: datetime
+    dimensions: dict[str, StatsResponse]
+
+
 class ComparisonResponse(Payload):
     """`services.stats.compare_periods`."""
 

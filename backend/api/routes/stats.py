@@ -13,6 +13,7 @@ from backend.api.schemas import (
     DimensionList,
     MomentResponse,
     ProfileResponse,
+    StatsDashboardResponse,
     StatsResponse,
 )
 from backend.services import stats as stats_service
@@ -33,6 +34,20 @@ def list_dimensions() -> DimensionList:
 @router.get("/profile", response_model=ProfileResponse, summary="Ratings, volume, platforms")
 def profile(session: SessionDep) -> Any:
     return stats_service.get_player_profile(session)
+
+
+@router.get(
+    "/dashboard",
+    response_model=StatsDashboardResponse,
+    summary="Every Stats-page aggregation over one anchored window",
+)
+def dashboard(
+    session: SessionDep,
+    filters: FiltersDep,
+    days: Annotated[int | None, Query(ge=1, le=3650)] = None,
+) -> Any:
+    """Anchor once at the newest matching game and aggregate every card in one read."""
+    return stats_service.get_dashboard(session, days=days, filters=filters)
 
 
 @router.get(

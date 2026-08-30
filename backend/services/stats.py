@@ -252,6 +252,105 @@ def get_stats(
     return _cached(_cache_key("get_stats", dimension, scope, options), compute)
 
 
+def get_dashboard(
+    session: Session,
+    *,
+    days: int | None = None,
+    filters: GameFilters | None = None,
+) -> dict[str, Any]:
+    """All Stats-page dimensions over one stable, newest-game-anchored window.
+
+    This is deliberately not six calls to :func:`get_stats`: the three game dimensions
+    share one game-row read and the three move dimensions share one summary read. Besides
+    removing five HTTP round trips, that prevents the page from repeating the same scans.
+    """
+    if days is not None and days <= 0:
+        raise ValueError("days must be positive")
+
+    base = replace(filters) if filters is not None else GameFilters()
+    # The endpoint owns its time window; all the other GameFilters still narrow it.
+    base.since = None
+    base.until = None
+
+    def compute() -> dict[str, Any]:
+        latest = session.scalar(
+            select(func.max(Game.played_at)).where(
+                Game.owner_color.is_not(None), *game_conditions(base)
+            )
+        )
+        anchor = _utc(latest) if latest is not None else datetime.now(UTC)
+        scope = replace(
+            base,
+            since=None if days is None else anchor - timedelta(days=days),
+            until=anchor,
+        )
+
+        game_rows = _game_rows(session, scope)
+        moves, blunders = _analysed_counts(session, scope, game_rows)
+
+        speed = _performance_buckets(
+            game_rows, blunders, moves, lambda row: row.speed or "unknown"
+        )
+        hour = _performance_by_hour_rows(game_rows, moves, blunders, 0.0)
+        trend = _rating_trend_rows(game_rows, moves, blunders, "month")
+
+        clock_order = _clock_bucket_order(
+            _normalised_thresholds(TIME_TROUBLE_THRESHOLDS)
+        )
+        if _summaries_ready(session):
+            summaries = list(
+                session.scalars(
+                    select(Game.stat_summary).where(
+                        Game.stat_summary.is_not(None), *game_conditions(scope)
+                    )
+                )
+            )
+            phase = _classification_from_summaries(summaries, "phases", PHASES)
+            piece = _classification_from_summaries(summaries, "pieces", PIECES)
+            clock = _classification_from_summaries(summaries, "clock", clock_order)
+        else:
+            eval_rows = _eval_rows(session, scope)
+            phase = _classification_buckets(
+                eval_rows, PHASES, lambda row: phase_of(row.fen, row.ply)
+            )
+            piece = _classification_buckets(
+                eval_rows,
+                PIECES,
+                lambda row: piece_of(row.move_san, row.move_uci, row.fen),
+            )
+            clocks = _clock_index(session, scope)
+            clock = _classification_buckets(
+                eval_rows,
+                clock_order,
+                lambda row: _clock_bucket(
+                    _remaining_clock(clocks.get(row.game_id), row.ply),
+                    TIME_TROUBLE_THRESHOLDS,
+                ),
+            )
+        clock["thresholds"] = list(TIME_TROUBLE_THRESHOLDS)
+
+        payloads = {
+            "performance_by_speed": speed,
+            "blunders_by_phase": phase,
+            "blunders_by_piece": piece,
+            "time_trouble_loss": clock,
+            "performance_by_hour": hour,
+            "rating_trend": trend,
+        }
+        for dimension, payload in payloads.items():
+            payload["dimension"] = dimension
+            payload["since"] = _stamp(scope.since)
+            payload["until"] = _stamp(scope.until)
+        return {
+            "anchor": _stamp(anchor),
+            "since": _stamp(scope.since),
+            "until": _stamp(scope.until),
+            "dimensions": payloads,
+        }
+
+    return _cached(_cache_key("get_dashboard", days, base), compute)
+
+
 def compare_periods(
     session: Session,
     dimension: str,
@@ -525,18 +624,29 @@ def _performance_by_hour(
     the owner's local one, which the database does not know at all. `tz_offset` is in
     hours east of UTC.
     """
-    offset = timedelta(hours=float(options.get("tz_offset", 0.0)))
-    rows = [row for row in _game_rows(session, scope) if row.played_at is not None]
+    tz_offset = float(options.get("tz_offset", 0.0))
+    rows = _game_rows(session, scope)
     moves, blunders = _analysed_counts(session, scope, rows)
+    return _performance_by_hour_rows(rows, moves, blunders, tz_offset)
+
+
+def _performance_by_hour_rows(
+    rows: Sequence[GameRow],
+    moves: dict[int, int],
+    blunders: dict[int, int],
+    tz_offset: float,
+) -> dict[str, Any]:
+    offset = timedelta(hours=tz_offset)
+    dated = [row for row in rows if row.played_at is not None]
     payload = _performance_buckets(
-        rows,
+        dated,
         blunders,
         moves,
         lambda row: f"{(row.played_at + offset).hour:02d}",
         order=None,
     )
     payload["buckets"].sort(key=lambda bucket: bucket["key"])
-    payload["tz_offset"] = float(options.get("tz_offset", 0.0))
+    payload["tz_offset"] = tz_offset
     return payload
 
 
@@ -600,11 +710,21 @@ def _rating_trend(
     if period not in BUCKETS:
         raise ValueError(f"unknown bucket {period!r}; known buckets: {', '.join(BUCKETS)}")
 
-    rows = [row for row in _game_rows(session, scope) if row.played_at is not None]
+    rows = _game_rows(session, scope)
     moves, blunders = _analysed_counts(session, scope, rows)
+    return _rating_trend_rows(rows, moves, blunders, period)
+
+
+def _rating_trend_rows(
+    rows: Sequence[GameRow],
+    moves: dict[int, int],
+    blunders: dict[int, int],
+    period: str,
+) -> dict[str, Any]:
+    dated = [row for row in rows if row.played_at is not None]
 
     buckets: dict[str, dict[str, Any]] = {}
-    for row in rows:
+    for row in dated:
         key = _period_key(row.played_at, period)
         bucket = buckets.setdefault(
             key,
@@ -1239,12 +1359,18 @@ def _summary_classification_buckets(
     the way out, so which path answered is not something a caller can tell. A game with no
     summary has no primary run and so contributed no rows to the scan either.
     """
-    buckets: dict[str, dict[str, Any]] = {}
-    overall = _empty_classification_bucket("total")
     statement = select(Game.stat_summary).where(
         Game.stat_summary.is_not(None), *game_conditions(scope)
     )
-    for summary in session.scalars(statement):
+    return _classification_from_summaries(session.scalars(statement), group, order)
+
+
+def _classification_from_summaries(
+    summaries: Iterable[Mapping[str, Any]], group: str, order: Sequence[str]
+) -> dict[str, Any]:
+    buckets: dict[str, dict[str, Any]] = {}
+    overall = _empty_classification_bucket("total")
+    for summary in summaries:
         for name, counted in summary[group].items():
             _merge_classification_bucket(
                 buckets.setdefault(name, _empty_classification_bucket(name)), counted
@@ -1493,3 +1619,9 @@ def _is_number(value: Any) -> bool:
 def _stamp(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
 
+
+def _utc(value: datetime) -> datetime:
+    """SQLite returns stored UTC datetimes without tzinfo; normalise both DB backends."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

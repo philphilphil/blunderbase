@@ -5,10 +5,9 @@
  * where they happen, and the blunder rate underneath it is what says whether that is
  * because more moves are played there.
  */
-import { useStats } from '@/lib/api/queries'
-import type { GameFilters, StatsBucket } from '@/lib/api/types'
+import type { StatsBucket } from '@/lib/api/types'
 
-import { Async, LoadingRows, MeterRow, StatCard } from '../kit/states'
+import { Async, LoadingRows, MeterRow, StatCard, type StatsQuery } from '../kit/states'
 import { asPercent, buckets, numOr, total } from '../kit/analytics'
 
 /** The backend's `phase_of`: ply < 24 is the opening, and thin material is an endgame. */
@@ -31,13 +30,12 @@ function sentence(rows: { label: string; blunders: number; share: number }[], al
 }
 
 export function BlundersByPhaseCard({
-  filters,
+  query,
   className,
 }: {
-  filters: GameFilters
+  query: StatsQuery
   className?: string
 }) {
-  const query = useStats('blunders_by_phase', filters)
   const found = buckets(query.data)
   const overall = total(query.data)
   const all = numOr(overall, 'blunder')

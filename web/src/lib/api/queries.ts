@@ -543,6 +543,17 @@ export function useProfile(options?: Options<Awaited<ReturnType<typeof api.getPr
   return useQuery({ queryKey: queryKeys.statsProfile(), queryFn: api.getProfile, ...options })
 }
 
+export function useStatsDashboard(
+  query: api.StatsDashboardQuery = {},
+  options?: Options<Awaited<ReturnType<typeof api.getStatsDashboard>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.statsDashboard(query),
+    queryFn: () => api.getStatsDashboard(query),
+    ...options,
+  })
+}
+
 export function useStats(
   dimension: string,
   filters: GameFilters = {},

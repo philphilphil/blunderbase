@@ -14,11 +14,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
-import { useStats } from '@/lib/api/queries'
-import type { GameFilters, StatsBucket } from '@/lib/api/types'
+import type { StatsBucket } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
 
-import { Async, LoadingChart, StatCard } from '../kit/states'
+import { Async, LoadingChart, StatCard, type StatsQuery } from '../kit/states'
 import { buckets, numOr } from '../kit/analytics'
 
 /** `<10s` / `<30s` / `<60s` / `>=60s`, as `stats._time_trouble_loss` spells its keys. */
@@ -51,8 +50,7 @@ function sentence(rows: { label: string; loss: number }[]): string | undefined {
   return `With ${tightest.label} on the clock you give away ${ratio.toFixed(1)}× what you give away at leisure. No surprise, but it is now numbered.`
 }
 
-export function ClockPressureCard({ filters }: { filters: GameFilters }) {
-  const query = useStats('time_trouble_loss', filters)
+export function ClockPressureCard({ query }: { query: StatsQuery }) {
   const all = buckets(query.data)
   const unknown = all.find((bucket: StatsBucket) => bucket.key === 'unknown')
   const rows = all

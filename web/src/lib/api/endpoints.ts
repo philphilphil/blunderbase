@@ -73,6 +73,7 @@ import type {
   SampleResponse,
   SearchResponse,
   Source,
+  StatsDashboardResponse,
   StatsResponse,
   StreamCreate,
   StreamResponse,
@@ -291,6 +292,13 @@ export const findPositions = (
 export const listDimensions = () => http.get<DimensionList>('/stats/dimensions')
 
 export const getProfile = () => http.get<ProfileResponse>('/stats/profile')
+
+export interface StatsDashboardQuery extends GameFilters {
+  days?: number
+}
+
+export const getStatsDashboard = (query: StatsDashboardQuery = {}) =>
+  http.get<StatsDashboardResponse>('/stats/dashboard', { query: filterParams(query) })
 
 export const getWorstMoments = (
   query: GameFilters & { days?: number; amount?: number } = {},

@@ -870,6 +870,31 @@ def test_a_window_narrows_every_dimension(analysed: Library) -> None:
     assert payload["since"] == "2026-03-01T00:00:00+00:00"
 
 
+def test_the_dashboard_matches_six_dimensions_but_reads_games_once(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = analysed.session
+    fold_every_summary(session)
+    stats.reset_stats_cache()
+    assert stats._summaries_ready(session) is True
+
+    game_reads = counting(monkeypatch, stats, "_game_rows")
+    eval_reads = counting(monkeypatch, stats, "_eval_rows")
+    dashboard = stats.get_dashboard(session, days=90)
+
+    assert game_reads == [1]
+    assert eval_reads == [0]
+    scope = GameFilters(
+        since=datetime.fromisoformat(dashboard["since"]),
+        until=datetime.fromisoformat(dashboard["until"]),
+    )
+    expected = {
+        dimension: stats.get_stats(session, dimension, filters=scope)
+        for dimension in stats.DIMENSIONS
+    }
+    assert dashboard["dimensions"] == expected
+
+
 def test_filters_narrow_a_dimension(analysed: Library) -> None:
     payload = stats.get_stats(
         analysed.session, "blunders_by_phase", filters=GameFilters(speed=Speed.RAPID)

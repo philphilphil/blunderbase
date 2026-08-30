@@ -17,11 +17,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
-import { useStats } from '@/lib/api/queries'
-import type { GameFilters, StatsBucket } from '@/lib/api/types'
+import type { StatsBucket } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
 
-import { Async, LegendSwatch, LoadingChart, StatCard } from '../kit/states'
+import { Async, LegendSwatch, LoadingChart, StatCard, type StatsQuery } from '../kit/states'
 import { asPercent, buckets, num, numOr, periodLabel } from '../kit/analytics'
 
 const CHART: ChartConfig = {
@@ -48,8 +47,7 @@ function ThenNow({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function ProgressCard({ filters }: { filters: GameFilters }) {
-  const query = useStats('rating_trend', filters)
+export function ProgressCard({ query }: { query: StatsQuery }) {
   const rows: Row[] = buckets(query.data).map((bucket: StatsBucket) => ({
     key: bucket.key,
     label: periodLabel(bucket.key),

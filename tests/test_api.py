@@ -1009,6 +1009,25 @@ def test_one_dimension_aggregates_over_the_filtered_games(api: TestClient) -> No
     ]["blunder"] == 0
 
 
+def test_the_dashboard_returns_every_dimension_over_one_anchored_window(
+    api: TestClient,
+) -> None:
+    body = api.get("/stats/dashboard", params={"days": 90}).json()
+
+    assert body["anchor"] == "2026-03-20T10:45:00Z"
+    assert body["since"] == "2025-12-20T10:45:00Z"
+    assert set(body["dimensions"]) == {
+        "blunders_by_phase",
+        "blunders_by_piece",
+        "performance_by_speed",
+        "performance_by_hour",
+        "time_trouble_loss",
+        "rating_trend",
+    }
+    assert body["dimensions"]["performance_by_speed"]["total"]["games"] == 6
+    assert body["dimensions"]["blunders_by_phase"]["total"]["blunder"] == 1
+
+
 def test_two_periods_can_be_compared(api: TestClient) -> None:
     body = api.get(
         "/stats/compare",

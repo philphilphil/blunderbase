@@ -19,8 +19,8 @@ import { useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
-import { useProfile, useStats } from '@/lib/api/queries'
-import type { Color, GameFilters, StatsBucket } from '@/lib/api/types'
+import { useStatsDashboard } from '@/lib/api/queries'
+import type { Color, GameFilters, StatsBucket, StatsResponse } from '@/lib/api/types'
 import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
 
@@ -44,12 +44,11 @@ import {
   total,
   useCompare,
   windowProse,
-  windowRange,
   type WindowKey,
 } from './kit/analytics'
 import { downloadCsv, exportRows, toCsv } from './kit/csv'
 import { REPORTS, reportFrom } from './reports'
-import { DeltaText, Segmented, StatTile } from './kit/states'
+import { DeltaText, Segmented, StatTile, type StatsQuery } from './kit/states'
 
 type ColorChoice = 'both' | Color
 
@@ -59,38 +58,60 @@ interface DeltaPayload {
   total?: StatsBucket
 }
 
+const WINDOW_DAYS: Record<WindowKey, number | undefined> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '1y': 365,
+  all: undefined,
+}
+
+function dimensionQuery(
+  query: {
+    data?: { dimensions: Record<string, StatsResponse> }
+    isPending: boolean
+    isError: boolean
+    error: Error | null
+    refetch: () => unknown
+  },
+  dimension: string,
+): StatsQuery {
+  return { ...query, data: query.data?.dimensions[dimension] }
+}
+
 export function StatsPage() {
   const [params] = useSearchParams()
   const report = reportFrom(params)
   const reportLabel = REPORTS.find((entry) => entry.key === report)!.label
-  const profile = useProfile()
-  const lastGame =
-    typeof profile.data?.volume?.last_game === 'string' ? profile.data.volume.last_game : null
-
   const [windowKey, setWindowKey] = useState<WindowKey>('90d')
   const [color, setColor] = useState<ColorChoice>('both')
   const [comparing, setComparing] = useState(false)
 
-  // Every window ends at the newest game rather than at the clock, so a database that has
-  // not been synced this month still has a "last 90 days" worth reading. See `anchorOf`.
-  const anchor = useMemo(() => anchorOf(lastGame), [lastGame])
+  const dashboard = useStatsDashboard({
+    ...(WINDOW_DAYS[windowKey] === undefined ? {} : { days: WINDOW_DAYS[windowKey] }),
+    ...(color === 'both' ? {} : { color }),
+  })
+
+  // The server finds the anchor and calculates against it in the same request. The old
+  // profile-first path rendered six clock-anchored queries, then replaced all six when
+  // the newest-game timestamp arrived.
+  const anchor = useMemo(() => anchorOf(dashboard.data?.anchor ?? null), [dashboard.data?.anchor])
 
   const filters = useMemo<GameFilters>(
     () => ({
-      ...windowRange(windowKey, anchor),
+      ...(dashboard.data?.since ? { since: dashboard.data.since } : {}),
+      ...(dashboard.data?.until ? { until: dashboard.data.until } : {}),
       ...(color === 'both' ? {} : { color }),
     }),
-    [windowKey, anchor, color],
+    [dashboard.data?.since, dashboard.data?.until, color],
   )
 
-  // Each of these shares its cache entry with the card that draws it — same key, one
-  // fetch — and together they are what "Export CSV" writes out.
-  const speed = useStats('performance_by_speed', filters)
-  const phase = useStats('blunders_by_phase', filters)
-  const piece = useStats('blunders_by_piece', filters)
-  const clock = useStats('time_trouble_loss', filters)
-  const hour = useStats('performance_by_hour', filters)
-  const trend = useStats('rating_trend', filters)
+  const speed = dimensionQuery(dashboard, 'performance_by_speed')
+  const phase = dimensionQuery(dashboard, 'blunders_by_phase')
+  const piece = dimensionQuery(dashboard, 'blunders_by_piece')
+  const clock = dimensionQuery(dashboard, 'time_trouble_loss')
+  const hour = dimensionQuery(dashboard, 'performance_by_hour')
+  const trend = dimensionQuery(dashboard, 'rating_trend')
 
   const canCompare = precedingWindow(filters) !== null
   const compareSpeed = useCompare('performance_by_speed', filters, {
@@ -286,25 +307,25 @@ export function StatsPage() {
       >
         {report === 'overview' ? (
           <>
-            <BlundersByPhaseCard filters={filters} />
-            <TimeControlCard filters={filters} />
-            <ClockPressureCard filters={filters} />
-            <ProgressCard filters={filters} />
+            <BlundersByPhaseCard query={phase} />
+            <TimeControlCard query={speed} />
+            <ClockPressureCard query={clock} />
+            <ProgressCard query={trend} />
           </>
         ) : null}
         {report === 'blunders' ? (
           <>
-            <BlundersByPhaseCard filters={filters} className="xl:self-start" />
-            <BlundersByPieceCard filters={filters} />
+            <BlundersByPhaseCard query={phase} className="xl:self-start" />
+            <BlundersByPieceCard query={piece} />
           </>
         ) : null}
         {report === 'clock' ? (
           <>
-            <ClockPressureCard filters={filters} />
-            <TimeOfDayCard filters={filters} />
+            <ClockPressureCard query={clock} />
+            <TimeOfDayCard query={hour} />
           </>
         ) : null}
-        {report === 'progress' ? <ProgressCard filters={filters} /> : null}
+        {report === 'progress' ? <ProgressCard query={trend} /> : null}
       </div>
     </PageBody>
   )

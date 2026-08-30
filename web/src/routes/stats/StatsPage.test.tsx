@@ -15,7 +15,8 @@ import { exportRows, toCsv } from './kit/csv'
 
 const useStats = vi.hoisted(() => vi.fn())
 const useProfile = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api/queries', () => ({ useStats, useProfile }))
+const useStatsDashboard = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/queries', () => ({ useStats, useProfile, useStatsDashboard }))
 
 /** Just the fields the cards read off a query result. */
 function result(state: Partial<UseQueryResult<StatsResponse, Error>>) {
@@ -71,38 +72,38 @@ const PHASES: StatsResponse = {
 }
 
 describe('BlundersByPhaseCard — component states (design 1c)', () => {
-  beforeEach(() => useStats.mockReset())
-
   it('shows a skeleton while the aggregation is in flight', () => {
-    useStats.mockReturnValue(result({ isPending: true }))
-    render(<BlundersByPhaseCard filters={{}} />)
+    render(<BlundersByPhaseCard query={result({ isPending: true })} />)
     expect(screen.getByTestId('loading')).toBeInTheDocument()
   })
 
   it('shows the failure and a way out when the request fails', () => {
-    useStats.mockReturnValue(result({ isError: true, error: new Error('backend unreachable') }))
-    render(<BlundersByPhaseCard filters={{}} />)
+    render(
+      <BlundersByPhaseCard
+        query={result({ isError: true, error: new Error('backend unreachable') })}
+      />,
+    )
     expect(screen.getByRole('alert')).toHaveTextContent('backend unreachable')
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 
   it('says so when the window holds no analysed moves', () => {
-    useStats.mockReturnValue(
-      result({
-        data: {
-          dimension: 'blunders_by_phase',
-          buckets: [],
-          total: { key: 'total', moves: 0 },
-        },
-      }),
+    render(
+      <BlundersByPhaseCard
+        query={result({
+          data: {
+            dimension: 'blunders_by_phase',
+            buckets: [],
+            total: { key: 'total', moves: 0 },
+          },
+        })}
+      />,
     )
-    render(<BlundersByPhaseCard filters={{}} />)
     expect(screen.getByTestId('empty')).toHaveTextContent(/no analysed moves/i)
   })
 
   it('draws every phase, its count and its share of the blunders', () => {
-    useStats.mockReturnValue(result({ data: PHASES }))
-    render(<BlundersByPhaseCard filters={{}} />)
+    render(<BlundersByPhaseCard query={result({ data: PHASES })} />)
 
     expect(screen.getByText('31 blunders')).toBeInTheDocument()
     expect(screen.getByText('Middlegame')).toBeInTheDocument()
@@ -113,8 +114,7 @@ describe('BlundersByPhaseCard — component states (design 1c)', () => {
   })
 
   it('names the worst phase in the footer', () => {
-    useStats.mockReturnValue(result({ data: PHASES }))
-    render(<BlundersByPhaseCard filters={{}} />)
+    render(<BlundersByPhaseCard query={result({ data: PHASES })} />)
     expect(screen.getByText(/90% of them happen in the middlegame/i)).toBeInTheDocument()
   })
 })
@@ -197,6 +197,7 @@ describe('StatsPage — where the scope controls live', () => {
     // about what the aggregations say.
     useStats.mockReturnValue(result({ isPending: true }))
     useProfile.mockReturnValue(result({ isPending: true }))
+    useStatsDashboard.mockReturnValue(result({ isPending: true }))
     vi.stubGlobal('WebSocket', FakeSocket)
   })
 
@@ -217,6 +218,14 @@ describe('StatsPage — where the scope controls live', () => {
     expect(titlebar).toBeEmptyDOMElement()
     expect(screen.getByRole('group', { name: 'Window' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Colour' })).toBeInTheDocument()
+  })
+
+  it('loads the page through one anchored dashboard query', () => {
+    stubViewport(false)
+    draw()
+
+    expect(useStatsDashboard).toHaveBeenCalledWith({ days: 90 })
+    expect(useProfile).not.toHaveBeenCalled()
   })
 
 })

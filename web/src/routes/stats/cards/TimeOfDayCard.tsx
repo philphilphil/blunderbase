@@ -14,11 +14,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
-import { useStats } from '@/lib/api/queries'
-import type { GameFilters, StatsBucket } from '@/lib/api/types'
+import type { StatsBucket } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
 
-import { Async, LoadingChart, LegendSwatch, StatCard } from '../kit/states'
+import { Async, LoadingChart, LegendSwatch, StatCard, type StatsQuery } from '../kit/states'
 import { asPercent, buckets, numOr } from '../kit/analytics'
 
 const CHART: ChartConfig = {
@@ -49,8 +48,7 @@ function sentence(rows: Row[]): string | undefined {
   return `You are at your loosest around ${worst.hour}:00 UTC (${(worst.blundersPerGame ?? 0).toFixed(1)} blunders a game) and at your tightest around ${best.hour}:00 (${(best.blundersPerGame ?? 0).toFixed(1)}).`
 }
 
-export function TimeOfDayCard({ filters }: { filters: GameFilters }) {
-  const query = useStats('performance_by_hour', filters)
+export function TimeOfDayCard({ query }: { query: StatsQuery }) {
   const found = buckets(query.data)
   const rows: Row[] = HOURS.map((hour) => {
     const bucket = found.find((entry: StatsBucket) => entry.key.padStart(2, '0') === hour)
