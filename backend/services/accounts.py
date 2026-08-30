@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.enums import Color, Platform, Source
 from backend.db.models import Account, Game
+from backend.services import explorer as explorer_service
 from backend.services import stats as stats_service
 
 # Which platform's accounts name the owner in a game from this source. A PGN or a manual
@@ -199,9 +200,14 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
                 session, and_(played, account_column.is_(None)), {account_column: target.id}
             )
             if target.is_owner:
+                claimed = and_(played, Game.owner_color.is_(None))
+                # Read before the update, because after it these games no longer match:
+                # which positions have to be refolded is a question about the rows as they
+                # are now. Usually empty, which is one indexed lookup and nothing else.
+                recolored = list(session.scalars(select(Game.id).where(claimed)))
                 filled.colored += _fill(
                     session,
-                    and_(played, Game.owner_color.is_(None)),
+                    claimed,
                     # Learning whose side is whose changes which plies are the owner's, and
                     # so changes every stat folded out of the game — a game with no owner
                     # contributes all of its plies, one with an owner half of them. The fold
@@ -215,6 +221,9 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
                         Game.stat_worst_win_loss: None,
                     },
                 )
+                # The explorer's per-colour book is wrong for exactly the same reason: a
+                # game with no owner was in none of its rows and now belongs in one side's.
+                explorer_service.mark_games_dirty(session, recolored)
     session.commit()
     # The rows went out as bulk statements, so whatever this Session had already loaded
     # still remembers the values from before; the next read of one comes off the database.

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import event, inspect, select, update
+from sqlalchemy import event, func, inspect, select, update
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
@@ -24,8 +24,19 @@ from backend.db.enums import (
     Speed,
     Tier,
 )
-from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval, Note, Position
-from backend.services import explorer, notes, stats
+from backend.db.models import (
+    Account,
+    AnalysisRun,
+    Engine,
+    Game,
+    GamePosition,
+    MoveEval,
+    Note,
+    Position,
+    PositionMove,
+    PositionTotal,
+)
+from backend.services import analysis, explorer, notes, stats
 from backend.services import games as games_service
 from backend.services import live as live_service
 from backend.services.games import GameFilters
@@ -33,8 +44,29 @@ from backend.services.import_service import run_import
 
 OWNER = "blunderbase"
 START_EPD = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
+AFTER_E4_E5 = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -"
 # Two kings, two rooks and pawns: well under the endgame material threshold.
 ENDGAME_FEN = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 4 30"
+
+# The same Ruy Lopez the fixture's first two games play, by a move order that reaches it
+# from the other side: a transposition, which is what a positional book has to count.
+TRANSPOSED_PGN = """[Event "Rated Blitz game"]
+[Site "https://lichess.org/qg000007"]
+[Date "2026.04.01"]
+[White "blunderbase"]
+[Black "transposer"]
+[Result "1-0"]
+[UTCDate "2026.04.01"]
+[UTCTime "12:00:00"]
+[WhiteElo "1770"]
+[BlackElo "1750"]
+[TimeControl "300+3"]
+[ECO "C65"]
+[Opening "Ruy Lopez: Berlin Defense"]
+[Termination "Normal"]
+
+1. Nf3 Nc6 2. e4 e5 3. Bb5 Nf6 4. d3 d6 1-0
+"""
 
 
 @dataclass(slots=True)
@@ -676,6 +708,71 @@ def test_the_tree_averages_the_eval_given_away_per_continuation(analysed: Librar
     assert knight["blunders"] == 0
 
 
+def test_a_continuation_the_owner_never_played_reports_no_accuracy(analysed: Library) -> None:
+    """The tree is the owner's, so a move only the opponent made says nothing about them.
+
+    After 3.Bc4 it is Black's move and the owner is White in both games that get here, one
+    of which — the decoy — has that very ply classified a blunder. Counting it would put an
+    opponent's mistake in a column headed by the owner's name; reporting a clean zero
+    instead would credit them with a move they never played. Both are wrong, so the answer
+    is no owner moves, no blunders and no average at all.
+    """
+    session = analysed.session
+    after_bc4 = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq -"
+    decoy = analysed["qg000003"]
+    assert decoy.owner_color == Color.WHITE
+    blunder = session.scalars(
+        select(MoveEval).join(AnalysisRun).where(AnalysisRun.game_id == decoy.id, MoveEval.ply == 5)
+    ).one()
+    assert blunder.classification == Classification.BLUNDER  # Black's move, and a bad one
+
+    tree = explorer.opening_explorer(session, fen=after_bc4)
+    assert tree["side_to_move"] == "black"
+    bishop = next(node for node in tree["moves"] if node["uci"] == "f8c5")
+    assert bishop["games"] == 2
+    assert bishop["owner_moves"] == 0
+    assert bishop["blunders"] == 0
+    assert bishop["evaluated"] == 0
+    assert bishop["avg_win_loss"] is None
+
+
+def test_a_book_built_before_the_owner_only_rule_still_reads_as_the_owner(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No migration, no rebuild: the read path is what makes an old row the owner's.
+
+    A `position_moves` row is keyed by owner colour and `side_to_move` belongs to the
+    position, so a row where the two differ folded the opponent's moves and nothing else —
+    whatever it stored in the accuracy columns. Poking a pre-fix build's numbers back into
+    such a row stands in for a library nobody has swept, and the tree must not repeat them.
+    """
+    session = analysed.session
+    after_bc4 = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq -"
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    while explorer.rebuild_position_books(session):
+        pass
+    position = explorer.find_position(session, after_bc4)
+    assert position.book_state == explorer.BOOK_BUILT
+
+    session.execute(
+        update(PositionMove)
+        .where(PositionMove.position_id == position.id, PositionMove.move_uci == "f8c5")
+        .values(evaluated=1, blunders=1, loss_sum=60.0)
+    )
+    session.commit()
+
+    bishop = next(
+        node
+        for node in explorer.opening_explorer(session, fen=after_bc4)["moves"]
+        if node["uci"] == "f8c5"
+    )
+    assert bishop["games"] == 2  # the frequency columns are untouched
+    assert bishop["owner_moves"] == 0
+    assert bishop["blunders"] == 0
+    assert bishop["evaluated"] == 0
+    assert bishop["avg_win_loss"] is None
+
+
 def test_find_positions_lists_the_games_that_reached_one(library: Library) -> None:
     rows = explorer.find_positions(library.session, START_EPD)
     assert len(rows) == 6
@@ -687,6 +784,210 @@ def test_find_positions_lists_the_games_that_reached_one(library: Library) -> No
     assert [row["game"]["source_id"] for row in white_only] == ["qg000005"]
 
 
+def test_the_stored_book_answers_exactly_as_the_live_fold_does(
+    analysed: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The book is a cache, so a built position and a cold one have to be indistinguishable.
+
+    Every position starts dirty, so the first pass over these queries is the live fold; the
+    second is the same queries after the sweep has built the hot ones and marked the rest
+    cold. Six games clear no real hotness threshold, so the threshold is lowered to put the
+    opening positions on the built side of the cut and leave the deep ones on the other —
+    which is what makes both paths, and the walk that mixes them, part of the comparison.
+    """
+    session = analysed.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+
+    queries: list[dict[str, Any]] = [
+        {},
+        {"color": Color.WHITE},
+        {"color": Color.BLACK},
+        {"fen": AFTER_E4_E5},
+        {"fen": AFTER_E4_E5, "min_games": 2},
+        {"fen": AFTER_E4_E5, "limit": 1},
+        {"eco": "C6"},
+    ]
+    live = [explorer.opening_explorer(session, **query) for query in queries]
+
+    while explorer.rebuild_position_books(session):
+        pass
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_BUILT
+    assert {state for state in session.scalars(select(Position.book_state))} == {
+        explorer.BOOK_BUILT,
+        explorer.BOOK_COLD,
+    }
+
+    assert [explorer.opening_explorer(session, **query) for query in queries] == live
+
+
+def test_find_positions_caps_the_newest_games_in_the_database(library: Library) -> None:
+    """The ordering and the cap are SQL's: the tail is never fetched to be thrown away."""
+    rows = explorer.find_positions(library.session, START_EPD, limit=2)
+    assert [row["game"]["source_id"] for row in rows] == ["qg000006", "qg000005"]
+
+
+def test_only_the_positions_enough_games_reach_are_worth_a_book(library: Library) -> None:
+    """The long tail is deliberately left out: a six-game library is entirely long tail."""
+    session = library.session
+    settled = 0
+    while done := explorer.rebuild_position_books(session):
+        settled += done
+
+    assert settled == session.scalar(select(func.count()).select_from(Position))
+    assert {state for state in session.scalars(select(Position.book_state))} == {
+        explorer.BOOK_COLD
+    }
+    assert session.scalar(select(func.count()).select_from(PositionMove)) == 0
+    assert session.scalar(select(func.count()).select_from(PositionTotal)) == 0
+
+
+def test_an_import_sends_the_positions_it_touched_back_to_the_sweep(
+    library: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = library.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    while explorer.rebuild_position_books(session):
+        pass
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_BUILT
+
+    run_import(session, Source.PGN, text=TRANSPOSED_PGN)
+
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_DIRTY
+    # And the answer is right again straight away, because a dirty position folds live.
+    assert explorer.opening_explorer(session)["totals"]["games"] == 7
+
+
+def test_a_finished_run_sends_the_games_positions_back_to_the_sweep(
+    library: Library, engine_row: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = library.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    while explorer.rebuild_position_books(session):
+        pass
+
+    run = AnalysisRun(
+        game_id=library["qg000001"].id,
+        engine_id=engine_row.id,
+        tier=Tier.QUICK,
+        status=RunStatus.RUNNING,
+    )
+    session.add(run)
+    session.commit()
+    analysis.complete_run(
+        session,
+        run,
+        [MoveEval(ply=1, classification=Classification.BLUNDER, win_loss=50.0)],
+    )
+
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_DIRTY
+
+
+def test_emptying_the_library_throws_the_whole_book_away(
+    library: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = library.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    while explorer.rebuild_position_books(session):
+        pass
+    assert session.scalar(select(func.count()).select_from(PositionMove)) > 0
+
+    games_service.delete_all_games(session)
+
+    assert session.scalar(select(func.count()).select_from(PositionMove)) == 0
+    assert session.scalar(select(func.count()).select_from(PositionTotal)) == 0
+    # The positions themselves survive a wipe, so they go back to the sweep rather than out.
+    assert {state for state in session.scalars(select(Position.book_state))} == {
+        explorer.BOOK_DIRTY
+    }
+
+
+def test_the_book_walk_counts_a_game_that_transposed_into_the_line(library: Library) -> None:
+    """The walk is positional: standing in the position is what counts, not how you got there.
+
+    The seventh game plays the same Ruy Lopez by a different move order, so it never
+    appears in the first four plies of the line and joins it at the fifth. Bb5 goes from
+    two games to three — and that is exactly where the difference between a *position's*
+    statistics and a *line's* depth shows: from the initial array the transposing game
+    never played those first four moves, so the Berlin it agrees on is not a line anyone
+    played end to end and the depth stops at Bb5. Ask from the Berlin's own position, where
+    the transposition is real, and it is book.
+    """
+    session = library.session
+    before = explorer.opening_explorer(session)
+    assert [(node["san"], node["games"]) for node in before["main_line"]][4:] == [
+        ("Bb5", 2),
+        ("a6", 1),
+    ]
+
+    run_import(session, Source.PGN, text=TRANSPOSED_PGN)
+
+    after = explorer.opening_explorer(session)
+    assert [(node["san"], node["games"]) for node in after["main_line"]] == [
+        ("e4", 5),
+        ("e5", 4),
+        ("Nf3", 4),
+        ("Nc6", 4),
+        # Three games stand here, but only the two that came the direct way played the
+        # whole line to get here, and they part company immediately afterwards.
+        ("Bb5", 3),
+        ("a6", 1),
+    ]
+    assert after["book_depth"] == 5
+    assert after["leaves_book_because"] == "line not played"
+
+    after_bb5 = "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq -"
+    berlin = explorer.opening_explorer(session, fen=after_bb5)
+    assert [(node["san"], node["games"]) for node in berlin["main_line"]] == [
+        ("Nf6", 2),
+        ("d3", 2),
+        ("d6", 1),
+    ]
+    assert berlin["book_depth"] == 2
+    assert berlin["leaves_book_because"] == "novelty"
+
+
+def _games_that_played(session: Session, ucis: Sequence[str]) -> set[int]:
+    """Games whose first plies are exactly these moves, worked out the naive way.
+
+    Deliberately not the service's own join: a check that the reported depth is a line
+    somebody played is worth nothing if it is computed by the code under test.
+    """
+    played: dict[int, dict[int, str | None]] = {}
+    for game_id, ply, move_uci in session.execute(
+        select(GamePosition.game_id, GamePosition.ply, GamePosition.move_uci)
+    ):
+        played.setdefault(game_id, {})[ply] = move_uci
+    return {
+        game_id
+        for game_id, moves in played.items()
+        if all(moves.get(ply) == uci for ply, uci in enumerate(ucis))
+    }
+
+
+def test_the_book_depth_stops_where_the_line_stops_being_one_anyone_played(
+    library: Library,
+) -> None:
+    """A depth is a claim about a line, so it has to be a line games actually played.
+
+    The greedy walk chooses each move from the games standing in that one position, which
+    lets it stitch a run out of games that never met — every step reporting a real two, no
+    game having played the whole thing. What comes back is capped to the deepest prefix
+    `BOOK_MIN_GAMES` games played end to end.
+    """
+    session = library.session
+    run_import(session, Source.PGN, text=TRANSPOSED_PGN)
+
+    tree = explorer.opening_explorer(session)
+    depth = tree["book_depth"]
+    ucis = [node["uci"] for node in tree["main_line"]]
+    # Every step of the walk is still chosen positionally — three games stand after Bb5.
+    assert [node["games"] for node in tree["main_line"][:depth]] == [5, 4, 4, 4, 3]
+    assert len(_games_that_played(session, ucis[:depth])) >= explorer.BOOK_MIN_GAMES
+    # And one move further is where it stops being a line: the departing move belongs to a
+    # single game, which is what ends the book rather than what extends it.
+    assert len(_games_that_played(session, ucis[: depth + 1])) < explorer.BOOK_MIN_GAMES
+
+
 def test_a_position_no_game_reached_is_an_empty_tree(library: Library) -> None:
     fen = "rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1"
     tree = explorer.opening_explorer(library.session, fen=fen)
@@ -694,6 +995,135 @@ def test_a_position_no_game_reached_is_an_empty_tree(library: Library) -> None:
     assert tree["totals"]["games"] == 0
     assert tree["leaves_book_because"] == "no games"
     assert explorer.find_positions(library.session, fen) == []
+
+
+def test_the_tree_names_the_queried_position_out_of_the_book(library: Library) -> None:
+    after_e4_e5 = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -"
+    tree = explorer.opening_explorer(library.session, fen=after_e4_e5)
+    # No line, so only the position itself is looked up and nothing knows how deep it is.
+    assert tree["opening"] == {"eco": "C20", "name": "King's Pawn Game", "ply": None}
+
+
+def test_a_line_past_the_book_takes_its_name_from_an_ancestor(library: Library) -> None:
+    # 1.d4 Nf6 2.c4 e6 3.Nf3 d5 4.Nc3 Bb4 — the Ragozin, which the book does name.
+    ragozin = ["d2d4", "g8f6", "c2c4", "e7e6", "g1f3", "d7d5", "b1c3", "f8b4"]
+    tree = explorer.opening_explorer(library.session, line=ragozin)
+    assert tree["opening"] == {
+        "eco": "D38",
+        "name": "Queen's Gambit Declined: Ragozin Defense",
+        "ply": 8,
+    }
+
+    # …and eight plies further, where the book has nothing at all to say. The name is the
+    # ancestor's and `ply` says which ancestor, which is the whole reason `line` exists.
+    deeper = [*ragozin, "c1g5", "h7h6", "g5h4", "c7c5", "e2e3", "b8c6", "a2a3", "b4c3"]
+    assert explorer.opening_explorer(library.session, line=deeper)["opening"] == tree["opening"]
+
+
+def test_the_line_names_the_opening_and_never_chooses_the_position(library: Library) -> None:
+    after_e4 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
+    tree = explorer.opening_explorer(
+        library.session, fen=after_e4, line=["d2d4", "g8f6", "c2c4", "e7e6"]
+    )
+    # The tree is still the initial array's; only the name came from the line.
+    assert tree["fen"] == after_e4
+    assert tree["totals"]["games"] == 6
+    assert tree["opening"]["name"] == "Indian Defense: Normal Variation"
+
+
+def test_an_unplayable_move_truncates_the_naming_walk(library: Library) -> None:
+    tree = explorer.opening_explorer(library.session, line=["e2e4", "e7e5", "e2e4"])
+    assert tree["opening"] == {"eco": "C20", "name": "King's Pawn Game", "ply": 2}
+    garbled = explorer.opening_explorer(library.session, line=["not-a-move"])
+    assert garbled["opening"] is None
+
+
+def test_a_position_the_book_does_not_name_reports_no_opening(library: Library) -> None:
+    assert explorer.opening_explorer(library.session)["opening"] is None
+
+
+def test_a_continuation_names_the_opening_it_leads_into(library: Library) -> None:
+    """Both first moves are named a ply in, so both continuations carry a name."""
+    tree = explorer.opening_explorer(library.session)
+    keyed = {node["uci"]: node for node in tree["moves"]}
+    assert keyed["e2e4"]["eco"] == "B00"
+    assert keyed["e2e4"]["name"] == "King's Pawn Game"
+    assert keyed["d2d4"]["eco"] == "A40"
+    assert keyed["d2d4"]["name"] == "Queen's Pawn Game"
+
+
+def test_an_unnamed_child_does_not_inherit_the_parents_name(library: Library) -> None:
+    """1.e4 e5 2.Nf3 Nc6 3.Bb5 a6, the Morphy Defense, is named — but nobody in the
+    library plays anything from here except 4.Ba4, and that position is not in the book.
+    The continuation has to report no name rather than repeating its parent's.
+    """
+    morphy = "r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq -"
+    tree = explorer.opening_explorer(library.session, fen=morphy)
+    assert tree["opening"] == {"eco": "C70", "name": "Ruy Lopez: Morphy Defense", "ply": None}
+    keyed = {node["uci"]: node for node in tree["moves"]}
+    assert keyed["b5a4"]["eco"] is None
+    assert keyed["b5a4"]["name"] is None
+
+
+def test_an_illegal_continuation_gets_no_name_rather_than_raising(library: Library) -> None:
+    """A move node's `uci` always comes from a game that actually played it, so this is
+    only ever reached defensively — but a caller-supplied `fen` can still make the root
+    itself unparseable, and that must not turn into a 500."""
+    session = library.session
+    moves: list[dict] = [{"uci": "e2e4"}]
+    explorer._annotate_continuations(session, moves, "not a position")
+    assert moves == [{"uci": "e2e4", "eco": None, "name": None, "note": None}]
+
+    moves = [{"uci": "e2e5"}]  # e2 to e5 in one move: not legal from the start
+    explorer._annotate_continuations(session, moves, explorer.START_EPD)
+    assert moves == [{"uci": "e2e5", "eco": None, "name": None, "note": None}]
+
+
+def test_a_continuation_carries_the_owners_note_on_where_it_leads(library: Library) -> None:
+    """A note about a move is a note about the position it reaches, and the newest wins.
+
+    The note is written with a full FEN, counters and an illegal en-passant square and all,
+    the way anything pasted into the app arrives; it has to land on the same position the
+    tree walked its way to, or the table and the notes card would be talking past each
+    other.
+    """
+    session = library.session
+    after_e4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+    notes.save_note(session, "played this for years")
+    older = notes.save_note(session, "the open games, when I want a fight", fen=after_e4)
+    newer = notes.save_note(session, "stop playing the Italian on autopilot", fen=after_e4)
+
+    keyed = {node["uci"]: node for node in explorer.opening_explorer(session)["moves"]}
+    assert keyed["e2e4"]["note"] == {
+        "id": newer.id,
+        "text": "stop playing the Italian on autopilot",
+    }
+    assert older.id != newer.id
+
+
+def test_a_continuation_with_nothing_written_about_it_reports_no_note(library: Library) -> None:
+    """Null rather than a missing key — and never the queried position's own note, which
+    belongs to the card under the table rather than to every row in it."""
+    session = library.session
+    notes.save_note(session, "the first move is the whole plan", fen=START_EPD)
+
+    keyed = {node["uci"]: node for node in explorer.opening_explorer(session)["moves"]}
+    assert keyed["e2e4"]["note"] is None
+    assert keyed["d2d4"]["note"] is None
+
+
+def test_an_empty_tree_still_carries_the_book_name(library: Library) -> None:
+    # 1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.Ba4 Nf6 5.O-O Be7 6.Re1 b5 — nobody in the library has
+    # gone this far, so there is no tree to show, and the position is still called something.
+    line = ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6", "e1g1", "f8e7",
+            "f1e1", "b7b5"]
+    tree = explorer.opening_explorer(
+        library.session,
+        fen="r1bqk2r/2ppbppp/p1n2n2/1p2p3/B3P3/5N2/PPPP1PPP/RNBQR1K1 w kq -",
+        line=line,
+    )
+    assert tree["totals"]["games"] == 0
+    assert tree["opening"] == {"eco": "C84", "name": "Ruy Lopez: Closed", "ply": 10}
 
 
 def test_get_or_create_position_normalises_and_is_idempotent(session: Session) -> None:
@@ -1785,35 +2215,6 @@ def test_a_note_from_an_empty_live_board_is_refused(session: Session) -> None:
 
 
 # --------------------------------------------------------------------------- resurfacing
-
-
-def test_a_position_note_resurfaces_with_the_games_it_came_back_in(library: Library) -> None:
-    session = library.session
-    notes.save_note(session, "the starting position, again", fen=START_EPD)
-    notes.save_note(session, "nothing to do with a board")
-
-    items = notes.resurface_notes(session)
-    assert [item["reason"] for item in items] == ["recurred"]
-    assert items[0]["note"]["text"] == "the starting position, again"
-    # Every fixture game starts from it.
-    assert len(items[0]["games"]) == len(library.all)
-
-
-def test_a_note_nobody_has_touched_resurfaces_as_stale(session: Session) -> None:
-    fresh = notes.save_note(session, "written today", ["plan"])
-    old = notes.save_note(session, "written in January", ["plan"])
-    session.execute(
-        update(Note)
-        .where(Note.id == old.id)
-        .values(updated_at=datetime.now(UTC) - timedelta(days=60))
-    )
-    session.commit()
-
-    items = notes.resurface_notes(session)
-    assert [item["note"]["id"] for item in items] == [old.id]
-    assert items[0]["reason"] == "stale"
-    assert fresh.id not in [item["note"]["id"] for item in items]
-    assert notes.resurface_notes(session, 0) == []
 
 
 # --------------------------------------------------------------------------- export

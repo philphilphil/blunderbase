@@ -17,6 +17,7 @@ from backend.services import accounts as accounts_service
 from backend.services import analysis as analysis_service
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
+from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services import import_service
 from backend.services import runners as runners_service
@@ -149,6 +150,9 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     )
     db_commands.add_parser(
         "rebuild-stats", help="recompute the stored stat summary of every analysed game"
+    )
+    db_commands.add_parser(
+        "rebuild-book", help="recompute the explorer's precomputed book over every position"
     )
 
     demo = commands.add_parser("demo", help="build an anonymous database for screenshots")
@@ -439,6 +443,16 @@ def command_db(args: argparse.Namespace, settings: Settings) -> int:
             while folded := stats_service.rebuild_stat_summaries(session):
                 rebuilt += folded
         print(f"rebuilt the stat summary of {rebuilt} game(s)")
+    if args.db_command == "rebuild-book":
+        # The explorer's own version of the same bargain: a position the book does not
+        # describe is folded live, so this buys speed rather than correctness. The server
+        # runs the same sweep in the background; this is for doing the whole library now.
+        upgrade_to_head(settings)
+        settled = 0
+        with session_scope(settings) as session:
+            while done := explorer_service.rebuild_position_books(session):
+                settled += done
+        print(f"settled the explorer book of {settled} position(s)")
     return 0
 
 

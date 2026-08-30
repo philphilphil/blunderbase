@@ -24,11 +24,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from weakref import WeakKeyDictionary
 
-from sqlalchemy import ColumnElement, or_, select, text, true
+from sqlalchemy import ColumnElement, select, text
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import Session
 
@@ -37,7 +37,7 @@ from backend.db.fts import NOTES_FTS, notes_fts_exists
 from backend.db.models import Game, GamePosition, Line, Note, Position
 from backend.db.types import utcnow
 from backend.services import events as events_service
-from backend.services.explorer import find_position, get_or_create_position
+from backend.services.explorer import find_position, get_or_create_position, normalize_fen
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import chess
@@ -59,11 +59,6 @@ EVENT_LINE_DELETED = "line.deleted"
 # What "worth re-reading" means. A position note whose position turned up in a game
 # imported inside the window is news; any note nobody has touched in three weeks is a
 # reminder. Both are deliberately generous — this is a nudge, not a queue.
-RESURFACE_RECENT_DAYS = 30
-RESURFACE_STALE_DAYS = 21
-RESURFACE_LIMIT = 20
-REASON_RECURRED = "recurred"
-REASON_STALE = "stale"
 
 # The scopes a listing can be narrowed to, by which anchors a note carries.
 SCOPES = ("game", "position", "line", "free")
@@ -299,6 +294,57 @@ def get_note(session: Session, note_id: int) -> Note | None:
     return session.get(Note, note_id)
 
 
+def latest_note_by_fen(session: Session, fens: Iterable[str]) -> dict[str, Note]:
+    """The newest note on each of a batch of positions, keyed by the FEN it was asked for.
+
+    One query for the whole batch rather than one per position: the caller is the explorer
+    annotating a page of twenty continuations at once, and a lookup per row would be twenty
+    round trips over one small table.
+
+    Which notes belong to a position is the same rule `search_notes(fen=…)` applies — the
+    note's `position_id`, newest by `(created_at, id)` — because the move table and the
+    notes card show the same position and must never name different notes for it. A FEN
+    nobody has written about, one no `Position` row exists for, and one that is not a
+    position at all are all simply absent from the answer.
+    """
+    epds: dict[str, str] = {}
+    for fen in fens:
+        if fen in epds:
+            continue
+        try:
+            epds[fen] = normalize_fen(fen)[0]
+        except ValueError:
+            continue
+    if not epds:
+        return {}
+
+    ids = {
+        epd: position_id
+        for position_id, epd in session.execute(
+            select(Position.id, Position.fen).where(Position.fen.in_(set(epds.values())))
+        )
+    }
+    if not ids:
+        return {}
+
+    newest: dict[int, Note] = {}
+    statement = (
+        select(Note)
+        .where(Note.position_id.in_(ids.values()))
+        .order_by(Note.created_at.desc(), Note.id.desc())
+    )
+    for note in session.scalars(statement):
+        newest.setdefault(note.position_id, note)
+
+    found: dict[str, Note] = {}
+    for fen, epd in epds.items():
+        position_id = ids.get(epd)
+        note = newest.get(position_id) if position_id is not None else None
+        if note is not None:
+            found[fen] = note
+    return found
+
+
 def search_notes(
     session: Session,
     *,
@@ -420,64 +466,6 @@ def normalize_tags(tags: Sequence[str]) -> list[str]:
         seen.add(folded)
         cleaned.append(trimmed)
     return cleaned
-
-
-# --- resurfacing -----------------------------------------------------------
-
-
-def resurface_notes(session: Session, limit: int = RESURFACE_LIMIT) -> list[dict[str, Any]]:
-    """Notes worth re-reading, and why.
-
-    Two reasons, and they are the two ways a note becomes relevant again without anybody
-    asking for it. `recurred` is a position note whose position turned up in a game
-    imported inside `RESURFACE_RECENT_DAYS` — the games it recurred in come with it, and
-    the game the note was written against does not count as one. `stale` is a note nobody
-    has touched in `RESURFACE_STALE_DAYS`.
-
-    Recurrences come first and are ordered by how recently the position came back, so the
-    top of the list is what the owner played this week.
-    """
-    cap = max(int(limit), 0)
-    if cap == 0:
-        return []
-    now = utcnow()
-
-    recurred = (
-        select(Note, Game.id, Game.imported_at)
-        .join(GamePosition, GamePosition.position_id == Note.position_id)
-        .join(Game, Game.id == GamePosition.game_id)
-        .where(
-            Note.position_id.is_not(None),
-            Game.imported_at >= now - timedelta(days=RESURFACE_RECENT_DAYS),
-            or_(Note.game_id.is_(None), Note.game_id != Game.id),
-        )
-    )
-    hits: dict[int, dict[str, Any]] = {}
-    for note, game_id, imported_at in session.execute(recurred):
-        entry = hits.setdefault(note.id, {"note": note, "games": [], "at": imported_at})
-        if game_id not in entry["games"]:
-            entry["games"].append(game_id)
-        entry["at"] = max(entry["at"], imported_at)
-
-    items = [
-        {"note": note_payload(entry["note"]), "reason": REASON_RECURRED, "games": entry["games"]}
-        for entry in sorted(hits.values(), key=lambda entry: entry["at"], reverse=True)
-    ]
-
-    stale = (
-        select(Note)
-        .where(
-            Note.updated_at < now - timedelta(days=RESURFACE_STALE_DAYS),
-            Note.id.not_in(hits.keys()) if hits else true(),
-        )
-        .order_by(Note.updated_at.desc(), Note.id.desc())
-        .limit(cap)
-    )
-    items.extend(
-        {"note": note_payload(note), "reason": REASON_STALE, "games": []}
-        for note in session.scalars(stale)
-    )
-    return items[:cap]
 
 
 # --- export ----------------------------------------------------------------
@@ -670,7 +658,7 @@ def _line_ply(line: Line, ply: int | None) -> int:
 
 
 def _fen_at(session: Session, line: Line | None, game_id: int | None, ply: int) -> str | None:
-    """The position a note is about, so a mainline or line note resurfaces like a FEN one."""
+    """The position a note is about, so a mainline or line note is found like a FEN one."""
     if line is not None:
         board = _board_at(line.game, line.base_ply)
         try:

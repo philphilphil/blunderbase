@@ -61,6 +61,24 @@ weights and is deliberately not bundled: mount it into the container and registe
 path. No Maia degrades rather than fails — you lose the human-move predictions, not the
 evaluation.
 
+## Opening names
+
+The explorer names a position from a vendored copy of
+[lichess-org/chess-openings](https://github.com/lichess-org/chess-openings) — 3,810
+openings, **CC0-1.0**, taken at commit `4b86227` (2026-08-04). It lives as
+`backend/data/openings.tsv` (`epd`, `eco`, `name`) with the licence text beside it as
+`backend/data/openings.COPYING.txt`, and it is read by `backend/adapters/openings.py`.
+
+Upstream ships no EPDs — its `dist/` build is a CI artifact — so the keys are derived here
+by replaying each opening's PGN. `uv run python scripts/build_openings.py` regenerates the
+table from the pinned commit (`--ref master` for what is current, `--source <dir>` for a
+local checkout); bump `UPSTREAM_REF` in the script and the commit above together.
+
+The book is shallow — most openings are named three to five plies in and none past
+seventeen — so `/explorer` takes the line it was reached by (`?line=e2e4,e7e5`) and names
+the deepest ancestor the book knows, reporting which ply that was. Where the book knows
+nothing, the web app falls back to the ECO tags on the owner's own games.
+
 ## Configuration
 
 Every setting is an environment variable with a `BLUNDERBASE_` prefix
@@ -101,7 +119,8 @@ analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 `uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`,
 `accounts <list|add|reconcile>`, `analyze` (queue a
 tier and drain it in this process), `mcp [--transport stdio|http]`, `set-password`,
-`db upgrade`, `db rebuild-cards`, `db rebuild-stats`, and `demo create`. The
+`db upgrade`, `db rebuild-cards`, `db rebuild-stats`, `db rebuild-book`, and
+`demo create`. The
 queue is `analysis_runs` rows rather than a broker, so `blunderbase analyze` is safe to
 run while the server is up, and nothing is lost across a restart.
 
@@ -111,6 +130,12 @@ dimension adds up. Neither is ever required: a finished run rewrites both for it
 and what is missing is computed the slow way on the way out. They are for a library
 analysed before those columns existed, and `serve` already runs the summary sweep in the
 background at boot, so the command is only for doing it now and watching it finish.
+
+`db rebuild-book` is the same bargain for the opening explorer: it folds the continuations
+of every position enough games reach to be worth writing down, and marks the rest as
+deliberately left out. A position the book does not describe is folded live exactly as it
+always was, so this buys speed rather than correctness — and `serve` runs this sweep in the
+background too.
 
 `accounts add lichess <username>` names a username as one of yours and claims the games
 already stored under it — that is what fills in the colour, opponent and ratings of an

@@ -242,7 +242,10 @@ class Position(Base):
     """A position reached in any game, stored once and pointed at by every game that hit it."""
 
     __tablename__ = "positions"
-    __table_args__ = (Index("ix_positions_zobrist_key", "zobrist_key"),)
+    __table_args__ = (
+        Index("ix_positions_zobrist_key", "zobrist_key"),
+        Index("ix_positions_book_state", "book_state"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # The normalised FEN (board, side to move, castling, en passant) — the identity of the
@@ -251,6 +254,15 @@ class Position(Base):
     # python-chess's polyglot zobrist hash as hex, for cheap lookups next to the FEN.
     zobrist_key: Mapped[str] = mapped_column(String(ZOBRIST_LENGTH), nullable=False)
     side_to_move: Mapped[Color] = mapped_column(EnumString(Color), nullable=False)
+    # Whether the precomputed book below describes this position, and if not, why not.
+    # 0 dirty — something that feeds the book changed, rebuild me; 1 built — the
+    # `position_moves` and `position_totals` rows are authoritative; 2 cold — deliberately
+    # left out because too few games reach it to be worth a row, so it is computed live.
+    # `services.explorer` owns the values (`BOOK_DIRTY` / `BOOK_BUILT` / `BOOK_COLD`) and
+    # the sweep that settles them; indexed because that sweep's whole job is finding 0s.
+    book_state: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
 
 
 class Game(Base):
@@ -374,6 +386,101 @@ class GamePosition(Base):
 
     game: Mapped[Game] = relationship(back_populates="positions")
     position: Mapped[Position] = relationship()
+
+
+class PositionMove(Base):
+    """One continuation out of one position, already folded. The explorer's book.
+
+    The explorer used to fold every `game_positions` row of a position on every request,
+    and the initial array is nine and a half thousand of them. A position's continuations
+    only change when a game that reaches it is imported, analysed, recoloured or deleted,
+    so the fold is written down then — one row per (position, owner colour, move), holding
+    exactly the counters `services.explorer._tree` accumulates.
+
+    Only *hot* positions get rows: `explorer.BOOK_MIN_OCCURRENCES` is the cut, and the
+    long tail of positions one game has ever reached folds live in microseconds. Which
+    side of the cut a position is on is `positions.book_state`.
+
+    Per owner colour rather than summed, because every read is filtered by colour or by
+    neither, and the sums merge — a game has one owner colour, so "both" is white's row
+    plus black's. `next_position_id` is what makes the book walk positional: it is where
+    this move lands, so the walk follows a pointer instead of replaying a board.
+    """
+
+    __tablename__ = "position_moves"
+    __table_args__ = (
+        UniqueConstraint(
+            "position_id",
+            "owner_color",
+            "move_uci",
+            name="uq_position_moves_position_id_owner_color_move_uci",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    position_id: Mapped[int] = mapped_column(Integer, ForeignKey("positions.id"), nullable=False)
+    owner_color: Mapped[Color] = mapped_column(EnumString(Color), nullable=False)
+    move_uci: Mapped[str] = mapped_column(String(UCI_LENGTH), nullable=False)
+    move_san: Mapped[str | None] = mapped_column(String(SAN_LENGTH))
+    # The position this move reaches, NULL only where no game carried on far enough to
+    # record one. Chess makes it a property of (position, move), not of the game.
+    next_position_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("positions.id"))
+
+    # Distinct games that played the move, and the rows they did it in: a game that reached
+    # the position twice and played the same move both times is one game, two occurrences.
+    games: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    occurrences: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Occurrences where the owner was the one to move, and where an eval reached the ply.
+    # The three accuracy counters are the owner's alone: a row whose `owner_color` is not
+    # the position's `side_to_move` folded only opponent moves and counts none of them.
+    # Rows written before that rule still hold the mover's numbers and the explorer reads
+    # them as zero (`services.explorer._tree_from_book`) until the sweep rebuilds them.
+    owner_moves: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evaluated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    blunders: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Distinct games again, split by how they ended for the owner. Their sum falls short of
+    # `games` by the games with no decided result.
+    wins: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    draws: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    losses: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Sums rather than averages, because an average cannot be merged with another one:
+    # `avg_win_loss` is `loss_sum / evaluated` and `avg_ply` is `ply_sum / occurrences`.
+    loss_sum: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    ply_sum: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_played: Mapped[datetime | None] = mapped_column(UtcDateTime)
+
+
+class PositionTotal(Base):
+    """A position's own row in the book: every game through it, however it continued.
+
+    Not the sum of its `PositionMove` rows, and that is the whole reason it exists. The
+    explorer's totals count a game once per position, but a game that visits a position
+    twice and plays two different moves is counted under both moves — summing the moves
+    would report it twice. `ended_here` is the other half: occurrences with no move at all,
+    which no move row could hold.
+    """
+
+    __tablename__ = "position_totals"
+    __table_args__ = (
+        UniqueConstraint(
+            "position_id", "owner_color", name="uq_position_totals_position_id_owner_color"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    position_id: Mapped[int] = mapped_column(Integer, ForeignKey("positions.id"), nullable=False)
+    owner_color: Mapped[Color] = mapped_column(EnumString(Color), nullable=False)
+
+    games: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    wins: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    draws: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    losses: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Occurrences where the game stopped here rather than playing on.
+    ended_here: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # How many occurrences arrived at each ply, keyed by ply as a string because JSON has
+    # no integer keys. The explorer reports the commonest as the tree's `root_ply`, and a
+    # mode is the one number here that cannot be recovered from a sum or an average.
+    ply_counts: Mapped[dict[str, int]] = mapped_column(JSON, nullable=False, default=dict)
 
 
 class AnalysisRun(Base):
@@ -529,8 +636,8 @@ class Note(Base):
     """Coach-written memory: free text plus tags, attached to a game, a position or nothing.
 
     Three anchors, and a note may carry any combination of them. `game_id` says which game
-    it is about, `position_id` which position (that is what makes a note resurface when the
-    same position turns up in a new game), and `line_id` which variation. `ply` reads
+    it is about, `position_id` which position (that is what lets the explorer find the note
+    for a position, however the owner reached it), and `line_id` which variation. `ply` reads
     against whichever of the first two applies: a half-move count into the game's mainline,
     or — with `line_id` set — a half-move count on the same scale as the line's `base_ply`,
     so `ply == base_ply` is the branch point and `base_ply + k` is k moves into the line.

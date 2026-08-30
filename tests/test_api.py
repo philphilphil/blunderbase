@@ -973,6 +973,27 @@ def test_the_explorer_answers_from_the_initial_array(api: TestClient) -> None:
     assert body["main_line"]
 
 
+def test_the_explorer_names_the_line_it_was_reached_by(api: TestClient) -> None:
+    line = "d2d4,g8f6,c2c4,e7e6,g1f3,d7d5,b1c3,f8b4,c1g5,h7h6"
+    body = api.get("/explorer", params={"line": line}).json()
+
+    # Ten plies in, named from the eighth: the book stops before the position does.
+    assert body["opening"] == {
+        "eco": "D38",
+        "name": "Queen's Gambit Declined: Ragozin Defense",
+        "ply": 8,
+    }
+
+
+def test_a_garbled_line_costs_a_name_and_never_the_tree(api: TestClient) -> None:
+    body = api.get("/explorer", params={"line": "e2e4,NOT A MOVE,e7e5"}).json()
+
+    # `parseLineParam` drops what does not look like a move and the API spells it the same,
+    # so the tree still answers and the surviving crumbs still name it.
+    assert body["totals"]["games"] == 6
+    assert body["opening"]["name"] == "King's Pawn Game"
+
+
 def test_the_games_that_reached_a_position_come_back_with_their_outcomes(
     api: TestClient,
 ) -> None:
@@ -1354,18 +1375,6 @@ def test_notes_are_narrowed_by_scope(api: TestClient, seeded: dict[str, int]) ->
     scoped = api.get("/notes", params={"scope": "game"}).json()
     assert [note["id"] for note in scoped] == [seeded["note_id"]]
     assert error_of(api.get("/notes", params={"scope": "sideways"})) == "invalid_request"
-
-
-def test_resurfaced_notes_name_the_games_the_position_came_back_in(
-    api: TestClient, seeded: dict[str, int]
-) -> None:
-    api.post("/notes", json={"text": "how every one of these starts", "fen": START})
-    api.post("/notes", json={"text": "nothing to do with a board"})
-
-    items = api.get("/notes/resurface").json()["items"]
-    assert [item["reason"] for item in items] == ["recurred"]
-    assert items[0]["note"]["text"] == "how every one of these starts"
-    assert len(items[0]["games"]) == 6
 
 
 def test_notes_export_as_markdown_and_as_pgn(api: TestClient, seeded: dict[str, int]) -> None:

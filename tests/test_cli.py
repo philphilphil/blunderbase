@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from fake_uci import STOCKFISH_OPTIONS, fake_engine_command
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 import backend
 from backend.cli import _import_options, build_parser, main
@@ -28,11 +28,12 @@ from backend.db.models import (
     GamePosition,
     ImportJob,
     MoveEval,
+    Position,
 )
 from backend.db.session import session_scope
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
-from backend.services import import_service
+from backend.services import explorer, import_service
 
 
 def test_every_prewired_source_is_a_cli_choice(settings: Settings) -> None:
@@ -139,6 +140,30 @@ def test_db_rebuild_stats_folds_a_library_analysed_before_the_summaries(
     # A second run has nothing left to fold and says so.
     assert main(["db", "rebuild-stats"]) == 0
     assert "rebuilt the stat summary of 0 game(s)" in capsys.readouterr().out
+
+
+def test_db_rebuild_book_settles_every_position_and_then_has_nothing_left(
+    settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["db", "upgrade"]) == 0
+    with session_scope(settings) as session:
+        session.add(Account(platform=Platform.LICHESS, username="blunderbase", is_owner=True))
+    assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
+    capsys.readouterr()
+
+    assert main(["db", "rebuild-book"]) == 0
+
+    with session_scope(settings) as session:
+        positions = session.scalar(select(func.count()).select_from(Position))
+    assert f"settled the explorer book of {positions} position(s)" in capsys.readouterr().out
+    # A handful of games is entirely long tail, so every one of them is deliberately cold
+    # and a second run finds nothing to settle.
+    with session_scope(settings) as session:
+        assert {state for state in session.scalars(select(Position.book_state))} == {
+            explorer.BOOK_COLD
+        }
+    assert main(["db", "rebuild-book"]) == 0
+    assert "settled the explorer book of 0 position(s)" in capsys.readouterr().out
 
 
 def test_unknown_source_lookup_names_the_known_ones() -> None:

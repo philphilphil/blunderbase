@@ -51,8 +51,6 @@ DEFAULT_CONTINUATIONS = 12
 MAX_CONTINUATIONS = 40
 DEFAULT_NOTES = 20
 MAX_NOTES = 100
-DEFAULT_RESURFACE = 8
-MAX_RESURFACE = 40
 # An export is a document rather than a listing, and a document the size of the whole
 # memory is one nobody reads. This is the ceiling; the filters are the answer.
 MAX_EXPORT_NOTES = 200
@@ -85,9 +83,9 @@ of it a move gave away, and a classification only appears on an inaccuracy, mist
 blunder. Start wide (get_last_games, get_worst_recent_moments, get_stats) and drill down
 (get_game, opening_explorer, find_positions) rather than pulling whole games first.
 Deep analysis is queued, not immediate: request_analysis returns a run id to poll.
-Write what you learn down with save_note, and open a session with search_notes or
-resurface_notes; a note can be pinned to a variation as well as to a move (save_line,
-get_lines), and export_notes hands the memory back as one document.
+Write what you learn down with save_note, and open a session with search_notes; a note can
+be pinned to a variation as well as to a move (save_line, get_lines), and export_notes
+hands the memory back as one document.
 Maia is asked at every level this deployment is configured for, so the reading is a
 comparison: get_game carries them all per ply, maia_policy asks a live position, and
 maia_fill backfills a level a game was analysed before.
@@ -411,9 +409,11 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         min_games: int = 1,
     ) -> TextContent:
         """The owner's personal opening tree from a position: how often they played each
-        continuation, how they scored, the average win% it gave away, and where they
-        leave their own book. Enter by FEN, by ECO code, or by neither for the starting
-        position. There is no reference database here — this is their games only."""
+        continuation, how they scored, the average win% they gave away playing it, and
+        where they leave their own book. Enter by FEN, by ECO code, or by neither for the
+        starting position. There is no reference database here — this is their games only.
+        The accuracy numbers (`blunders`, `avg_win_loss`) count the owner's own moves, so
+        they are zero and null on a continuation only the opponent ever played there."""
         start = args.fen(fen, required=False)
         with coach.session() as session:
             tree = explorer_service.opening_explorer(
@@ -724,25 +724,6 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                 for line in notes_service.get_lines(session, int(game_id))
             ]
         return payloads.result({"lines": rows, "count": len(rows)})
-
-    @server.tool()
-    @guarded
-    def resurface_notes(limit: int = DEFAULT_RESURFACE) -> TextContent:
-        """Notes worth re-reading now, with the reason each came back up: `recurred` means
-        the position it is about turned up again in a game imported in the last month (the
-        game ids come with it), `stale` means nobody has touched it in three weeks. Open a
-        session with this next to search_notes — it is the half the owner has forgotten."""
-        count = args.capped(limit, DEFAULT_RESURFACE, MAX_RESURFACE)
-        with coach.session() as session:
-            items = [
-                {
-                    "note": payloads.note_row(item["note"]),
-                    "reason": item["reason"],
-                    "games": item["games"],
-                }
-                for item in notes_service.resurface_notes(session, count)
-            ]
-        return payloads.result({"items": items, "count": len(items)})
 
     @server.tool()
     @guarded

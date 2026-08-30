@@ -20,7 +20,7 @@ from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_engine, get_sessionmaker
 from backend.runtime import capabilities_for
-from backend.services import maia_live, stats
+from backend.services import explorer, maia_live, stats
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers
@@ -36,6 +36,11 @@ DESCRIPTION = "A personal chess database. Every route is a thin wrapper over `ba
 # not one anybody is watching a clock over, so this is long enough to cost nothing and short
 # enough that the dimensions are not left scanning for an afternoon.
 STAT_SUMMARY_IDLE_SECONDS = 300.0
+
+# The same, for the explorer's book. Shorter, because unlike a reconciliation this one has
+# something to do after every import and every finished run — the positions those touched
+# went dirty — and the explorer is a page somebody is looking at rather than a nightly job.
+BOOK_IDLE_SECONDS = 60.0
 
 # Below this a gzip member's own header and trailer cost more than the compression saves,
 # so a short body is sent as it is. Every payload worth the trade — a page of game cards, a
@@ -76,6 +81,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.streams = streams
     await streams.start()
     summaries = asyncio.create_task(_backfill_stat_summaries(settings))
+    books = asyncio.create_task(_backfill_position_books(settings))
     try:
         async with AsyncExitStack() as stack:
             # The mounted transport keeps its sessions in a task group this context opens.
@@ -88,8 +94,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Cancelled first, and between chunks: every chunk it has finished is committed, so
         # there is nothing here to wait for and nothing to lose by stopping now.
         summaries.cancel()
+        books.cancel()
         with suppress(asyncio.CancelledError):
             await summaries
+        with suppress(asyncio.CancelledError):
+            await books
         await wait_for_imports(app.state.imports)
         # Before the gateway and the workers, in that order: an analysis board holds a slot
         # on one of them, and both have to still be there for it to give the slot back to.
@@ -154,6 +163,51 @@ async def _backfill_stat_summaries(settings: Settings) -> None:
                     time.monotonic() - started,
                 )
         await asyncio.sleep(STAT_SUMMARY_IDLE_SECONDS)
+
+
+async def _backfill_position_books(settings: Settings) -> None:
+    """Settle the positions the explorer's book does not describe yet, a chunk at a time.
+
+    Unlike the stat summaries, nothing folds a position on its own: an import, a finished
+    run, a reconciliation and a wipe all mark positions dirty and leave the folding here,
+    because one game's positions are shared with every other game that reached them and a
+    run cannot afford to refold a thousand of them inside its commit.
+
+    So this idles rather than finishing, and on a busy library it finds work most times it
+    wakes. Each chunk is one committed transaction in a thread, so it takes SQLite's single
+    writer for a moment at a time and hands it back; the loop is cancelled between chunks at
+    shutdown and whatever it settled stands. A position it has not reached folds live, so
+    nothing here may take the server down with it — a book that cannot be built is a slow
+    explorer, not a broken one.
+    """
+    sessions = get_sessionmaker(settings)
+
+    def settle() -> int:
+        with sessions() as session:
+            return explorer.rebuild_position_books(session)
+
+    while True:
+        started = time.monotonic()
+        settled = 0
+        try:
+            while done := await asyncio.to_thread(settle):
+                if not settled:
+                    logger.info("building the explorer book of positions that are missing one")
+                settled += done
+        except asyncio.CancelledError:
+            if settled:
+                logger.info("explorer book backfill stopped after %s position(s)", settled)
+            raise
+        except Exception:
+            logger.exception("explorer book backfill failed after %s position(s)", settled)
+        else:
+            if settled:
+                logger.info(
+                    "explorer book settled for %s position(s) in %.1fs",
+                    settled,
+                    time.monotonic() - started,
+                )
+        await asyncio.sleep(BOOK_IDLE_SECONDS)
 
 
 def _analysis_boards(

@@ -825,11 +825,39 @@ class ExplorerResponse(Payload):
     side_to_move: Color | None = None
     path: list[dict[str, Any]] = Field(default_factory=list)
     root_ply: int | None = None
+    opening: dict[str, Any] | None = Field(
+        default=None,
+        description="what the vendored book calls this position — `eco`, `name` and the "
+        "`ply` the name was found at. The book stops naming positions three to five plies "
+        "in, so with a `line` the name is the deepest *ancestor* it knows and `ply` says "
+        "which one; without a line only the position itself is looked up and `ply` is null. "
+        "Null when the book names nothing along the way",
+    )
     totals: dict[str, Any] = Field(default_factory=dict)
-    moves: list[dict[str, Any]] = Field(default_factory=list)
+    moves: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="one entry per continuation (`services.explorer._node`): frequency, "
+        "score, average win percentage given away, and `eco`/`name` — what the vendored "
+        "book calls the position *this move reaches*. Null far more often than not: a name "
+        "is reported only when that child position is itself in the book, never inherited "
+        "from the parent, because the book stops naming positions three to five plies in "
+        "and inheriting would repeat the same string down every row after that. `note` is "
+        "the owner's own newest note on that same child position — `{id, text}`, the text "
+        "whole rather than shortened, and null where they have written nothing",
+    )
     main_line: list[dict[str, Any]] = Field(default_factory=list)
-    book_depth: int = 0
-    leaves_book_with: dict[str, Any] | None = None
+    book_depth: int = Field(
+        default=0,
+        description="plies from the queried position that at least two of the owner's "
+        "games played *end to end*, not merely one position at a time. Each step of "
+        "`main_line` is still chosen from the games standing in that position, so its "
+        "`games` count can be higher than the number that played the whole line",
+    )
+    leaves_book_with: dict[str, Any] | None = Field(
+        default=None,
+        description="the move the games that got to `book_depth` played next — the first "
+        "improvisation. Null when every one of them ended there",
+    )
     leaves_book_because: str | None = None
 
 
@@ -1131,18 +1159,6 @@ class NoteUpdate(Input):
 class TagCount(BaseModel):
     tag: str
     notes: int
-
-
-class ResurfaceItem(Payload):
-    """One note worth re-reading, and why it came back up."""
-
-    note: NoteResponse
-    reason: str
-    games: list[int] = Field(default_factory=list)
-
-
-class ResurfaceResponse(BaseModel):
-    items: list[ResurfaceItem] = Field(default_factory=list)
 
 
 # --- runner gateway -------------------------------------------------------

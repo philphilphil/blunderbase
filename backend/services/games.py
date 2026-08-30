@@ -132,7 +132,15 @@ def delete_all_games(session: Session) -> Wiped:
     that are gone left off — importing nothing. Dropping the history is what makes the next
     sync a fresh one.
     """
+    # Imported here rather than at the top because `services.explorer` imports this module:
+    # the explorer is built on what a game and an outcome mean, and this is the one write
+    # that has to reach back the other way.
+    from backend.services import explorer as explorer_service
+
     wiped = Wiped()
+    # Before the join rows go, because it is those rows that say which positions a game
+    # touched. Every game is going, so every position's fold is wrong.
+    explorer_service.discard_position_books(session)
     of_a_game = select(AnalysisRun.id).where(AnalysisRun.game_id.is_not(None))
     _deleted(session, delete(MoveEval).where(MoveEval.run_id.in_(of_a_game)))
     wiped.runs = _deleted(session, delete(AnalysisRun).where(AnalysisRun.game_id.is_not(None)))

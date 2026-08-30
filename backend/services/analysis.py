@@ -49,6 +49,7 @@ from backend.db.models import AnalysisRun, Engine, Game, GamePosition, MoveEval,
 from backend.db.types import utcnow
 from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
+from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services import stats as stats_service
 
@@ -1803,11 +1804,14 @@ def complete_run(
 
 
 def _refresh_game_rollups(session: Session, run: AnalysisRun) -> None:
-    """Rebuild what the game keeps precomputed about its own runs: its card and its stats.
+    """Rebuild what the game keeps precomputed about its own runs: its card, stats and book.
 
     The card is folded out of every finished run over the game; the stat summary out of the
     one run an aggregation reads (`stats.primary_runs()`), which the run that has just
-    finished may well have become.
+    finished may well have become. The explorer's book is not rebuilt here but marked
+    stale: a game's positions are shared with every other game that reached them, so what
+    changes is not this game's row but a thousand positions' folds, and settling those is
+    the sweep's work rather than a finishing run's.
 
     Uncommitted on purpose: `complete_run`'s commit carries all of it, so a listing can
     never read a card that describes a run nobody can see yet, and a dimension can never
@@ -1824,6 +1828,7 @@ def _refresh_game_rollups(session: Session, run: AnalysisRun) -> None:
     if game is not None:
         games_service.refresh_card(session, game)
         stats_service.refresh_game_stats(session, game)
+        explorer_service.mark_positions_dirty(session, game.id)
 
 
 def fail_run(

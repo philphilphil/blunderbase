@@ -561,6 +561,17 @@ async def test_opening_explorer_enters_by_eco(coach: MCPServer, analysed: dict[s
     assert payload["path"]
 
 
+async def test_opening_explorer_names_the_position_from_the_book(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    # The tool hands the service payload straight to the model, so the vendored name needed
+    # nothing added here. The coach asks by FEN and never by path, which is why the lookup
+    # is the position's own and `ply` is absent rather than an ancestor's.
+    fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -"
+    payload = await call(coach, "opening_explorer", fen=fen)
+    assert payload["opening"] == {"eco": "C20", "name": "King's Pawn Game"}
+
+
 async def test_opening_explorer_caps_its_continuations(
     coach: MCPServer, analysed: dict[str, Game]
 ) -> None:
@@ -769,20 +780,6 @@ async def test_save_line_folds_a_line_that_is_already_kept(
     assert longer["id"] == first["id"]
     assert longer["moves"] == ["d7d6", "d2d4", "e5d4"]
     assert (await call(coach, "get_lines", game_id=game.id))["count"] == 1
-
-
-async def test_resurface_notes_says_why_each_note_came_back(
-    coach: MCPServer, analysed: dict[str, Game], session: Session
-) -> None:
-    """A position note whose position is in a freshly imported game is the recurrence."""
-    game = analysed["qg000001"]
-    await call(coach, "save_note", text="the Berlin start", fen=START_FEN)
-
-    payload = await call(coach, "resurface_notes")
-    assert payload["count"] == 1
-    item = payload["items"][0]
-    assert item["reason"] == "recurred"
-    assert game.id in item["games"]
 
 
 async def test_export_notes_hands_back_the_document(

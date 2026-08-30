@@ -31,6 +31,7 @@ from backend.db.models import (
 from backend.db.types import utcnow
 from backend.services import accounts as accounts_service
 from backend.services import analysis, engines
+from backend.services import explorer as explorer_service
 from backend.services.accounts import AccountIndex, fold
 from backend.services.analysis import QUICK_PRIORITY  # noqa: F401  (the pipeline's own priority)
 
@@ -482,6 +483,10 @@ def store_positions(
             for ply, (fen, _zobrist, _side, uci, san) in enumerate(rows)
         ],
     )
+    # A position one more game has reached counts one more game, so whatever the explorer
+    # had folded about it is now short by this game. Inside the transaction that stored the
+    # join rows, so nothing can read a book that disagrees with them.
+    explorer_service.mark_positions_dirty(session, game.id)
 
 
 def enqueue_quick_analysis(session: Session, game: Game) -> AnalysisRun | None:

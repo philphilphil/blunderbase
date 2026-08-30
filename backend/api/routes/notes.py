@@ -13,7 +13,6 @@ from backend.api.schemas import (
     NoteCreate,
     NoteResponse,
     NoteUpdate,
-    ResurfaceResponse,
     TagCount,
 )
 from backend.services import notes as notes_service
@@ -81,18 +80,6 @@ def save_note(session: SessionDep, body: NoteCreate) -> Any:
 @router.get("/tags", response_model=list[TagCount], summary="Every tag in use")
 def list_tags(session: SessionDep) -> list[Any]:
     return notes_service.list_tags(session)
-
-
-@router.get("/resurface", response_model=ResurfaceResponse, summary="Notes worth re-reading")
-def resurface(
-    session: SessionDep,
-    limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = notes_service.RESURFACE_LIMIT,
-) -> Any:
-    """Position notes whose position came back in a recent game, plus notes gone quiet.
-
-    Each item says which of the two it is and, for a recurrence, the games it turned up in.
-    """
-    return {"items": notes_service.resurface_notes(session, limit)}
 
 
 @router.get(

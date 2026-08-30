@@ -256,10 +256,26 @@ builders drop `None` keys, because a chat model pays for every one of them.
 
 The explorer is a `GamePosition` index walk, never a PGN scan. A tree is one query over
 the position's join rows; the "where do I leave book" walk follows the most-played
-continuation one position at a time, computing the next position from the move rather than
-searching for it, so a transposition into the same line is followed correctly. Book means
-the owner's own book — there is no reference database by design — so the walk stops at the
-first move they have played in only one game.
+continuation one position at a time, and it is *positional* — every game that has ever
+stood in a position counts at that node, whether or not it was following the line at the
+previous one, which is what a book means everywhere else and what makes a transposition
+count. Book means the owner's own book — there is no reference database by design — so the
+walk stops at the first move they have played in only one game.
+
+The explorer has its own written-down fold, for the same reason the games do, and one
+extra: a position is shared by every game that reached it, so the numbers change when
+*any* of them does. `position_moves` is one row per (position, owner colour, move) holding
+exactly the counters the tree accumulates, and `position_totals` is the position's own row
+— not the sum of the moves', because a game that visits a position twice and plays two
+different moves is counted once by the totals and under both moves. Only the hot positions
+get rows (`explorer.BOOK_MIN_OCCURRENCES`): on a real library 452k of 463k positions are
+reached by exactly one game and fold live in microseconds, while a thousand-odd carry the
+whole cost. `positions.book_state` says which side of that cut a position is on and is the
+sweep's work queue — every writer that can change a fold (an import, a finished run, a
+reconciliation, a wipe) marks the positions it touched dirty inside its own transaction,
+and `explorer.rebuild_position_books` settles them a committed chunk at a time, in the
+background at boot and by hand as `blunderbase db rebuild-book`. A position the sweep has
+not reached folds live, so an un-swept library is slow rather than wrong.
 
 ## Testing
 
