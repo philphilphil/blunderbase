@@ -564,15 +564,42 @@ def opponent_rating(game: Game) -> int | None:
     return None
 
 
-def platform_of(game: Game, accounts: dict[int, Account]) -> str | None:
+@dataclass(slots=True)
+class ProfileRow:
+    """One of the owner's games, reduced to what the profile actually reads."""
+
+    id: int
+    played_at: datetime | None
+    source: Source
+    speed: Speed | None
+    result: Result
+    owner_color: Color | None
+    white_rating: int | None
+    black_rating: int | None
+    white_account_id: int | None
+    black_account_id: int | None
+
+    @property
+    def account_id(self) -> int | None:
+        """The account on the owner's side of the board, where a row names one."""
+        return self.white_account_id if self.owner_color == Color.WHITE else self.black_account_id
+
+    @property
+    def rating(self) -> int | None:
+        """The owner's rating in this game — `owner_rating` off the same two columns."""
+        if self.owner_color == Color.WHITE:
+            return self.white_rating
+        if self.owner_color == Color.BLACK:
+            return self.black_rating
+        return None
+
+
+def platform_of(row: ProfileRow, accounts: dict[int, Account]) -> str | None:
     """Where a game was played: the owner's account if one claims it, else its source."""
-    account_id = (
-        game.white_account_id if game.owner_color == Color.WHITE else game.black_account_id
-    )
-    account = accounts.get(account_id) if account_id is not None else None
+    account = accounts.get(row.account_id) if row.account_id is not None else None
     if account is not None:
         return str(account.platform)
-    platform = PLATFORM_FOR_SOURCE.get(game.source)
+    platform = PLATFORM_FOR_SOURCE.get(row.source)
     return str(platform) if platform is not None else None
 
 
@@ -583,17 +610,46 @@ def get_player_profile(
 
     Rating series are per platform *and* speed, because a bullet rating and a classical
     rating on the same site are two different numbers and averaging them says nothing.
+
+    This is the one read that walks the *whole* library, so it selects the ten columns it
+    adds up rather than hydrating games: a `select(Game)` would parse every one of their
+    PGNs, cards and stat summaries to count a rating and a result, which on a library of a
+    few thousand games is seconds of a worker thread the rest of the app is queueing for.
     """
     accounts = {
         account.id: account for account in session.scalars(select(Account).order_by(Account.id))
     }
-    games = list(
-        session.scalars(
-            select(Game)
-            .where(Game.owner_color.is_not(None))
-            .order_by(Game.played_at.asc().nulls_last(), Game.id.asc())
+    statement = (
+        select(
+            Game.id,
+            Game.played_at,
+            Game.source,
+            Game.speed,
+            Game.result,
+            Game.owner_color,
+            Game.white_rating,
+            Game.black_rating,
+            Game.white_account_id,
+            Game.black_account_id,
         )
+        .where(Game.owner_color.is_not(None))
+        .order_by(Game.played_at.asc().nulls_last(), Game.id.asc())
     )
+    games = [
+        ProfileRow(
+            id=row.id,
+            played_at=row.played_at,
+            source=row.source,
+            speed=row.speed,
+            result=row.result,
+            owner_color=row.owner_color,
+            white_rating=row.white_rating,
+            black_rating=row.black_rating,
+            white_account_id=row.white_account_id,
+            black_account_id=row.black_account_id,
+        )
+        for row in session.execute(statement)
+    ]
 
     series: dict[tuple[str | None, str | None], list[dict[str, Any]]] = {}
     volume: dict[str, dict[str, int]] = {"source": {}, "speed": {}, "platform": {}, "year": {}}
@@ -612,19 +668,17 @@ def get_player_profile(
             _bump(volume["year"], str(game.played_at.year))
             first = game.played_at if first is None else min(first, game.played_at)
             last = game.played_at if last is None else max(last, game.played_at)
-        outcome = outcome_of(game)
+        outcome = outcome_from(game.owner_color, game.result)
         if outcome is not None:
             counts[outcome] += 1
 
-        rating = owner_rating(game)
+        rating = game.rating
         if rating is not None and game.played_at is not None:
             series.setdefault((platform, speed), []).append(
                 {"at": _stamp(game.played_at), "rating": rating, "game_id": game.id}
             )
 
-        account_id = (
-            game.white_account_id if game.owner_color == Color.WHITE else game.black_account_id
-        )
+        account_id = game.account_id
         if account_id is not None:
             entry = per_account.setdefault(account_id, {"games": 0, "first": None, "last": None})
             entry["games"] += 1

@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, NamedTuple
 
 from sqlalchemy import Integer, and_, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, undefer
 
 from backend.db.enums import Classification, Color, EngineKind, RunStatus
 from backend.db.models import AnalysisRun, Engine, Game, GamePosition, MoveEval, Position
@@ -385,6 +385,9 @@ def _worst_moments_from_summaries(
     scope = _scope(filters, since, None)
     statement = (
         select(Game)
+        # `stat_summary` is deferred for every other reader; this is the one that wants it,
+        # and asking for it here is one fetch for the whole page rather than one per game.
+        .options(undefer(Game.stat_summary))
         .where(Game.stat_worst_win_loss.is_not(None), *game_conditions(scope))
         .order_by(Game.stat_worst_win_loss.desc(), Game.id.asc())
         .limit(amount + WORST_MOMENT_GAME_MARGIN)

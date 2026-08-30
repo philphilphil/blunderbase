@@ -17,6 +17,7 @@ from backend.config import Settings, get_settings
 from backend.db import models  # noqa: F401  (importing registers every table on Base.metadata)
 from backend.db.base import Base
 from backend.db.session import create_db_engine, reset_engines
+from backend.services.auth import forget_valid_tokens
 from backend.services.stats import reset_stats_cache
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -40,6 +41,20 @@ def _fresh_stats_cache() -> Iterator[None]:
     reset_stats_cache()
     yield
     reset_stats_cache()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_auth_cache() -> Iterator[None]:
+    """No test gets in on a cookie another test's guard confirmed.
+
+    The guard takes a validated token on trust for a few seconds, in a dict keyed by the
+    token and by nothing that says which deployment issued it — the same shape of leak as
+    the stats cache above, closed in the same place. Tokens are random, so this is belt and
+    braces; a test that reaches into `auth_sessions` itself is where it would not be.
+    """
+    forget_valid_tokens()
+    yield
+    forget_valid_tokens()
 
 
 @pytest.fixture()

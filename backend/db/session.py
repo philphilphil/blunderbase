@@ -14,8 +14,18 @@ from backend.config import Settings, get_settings
 # Shared by HTTP, imports, MCP and both kinds of analysis host. Local queue work is bounded
 # to one connection in `workers.analysis_queue`; this pool supplies foreground headroom and
 # short bursts elsewhere rather than being the queue's concurrency control.
+#
+# The ceiling is deliberately generous. A SQLite connection is a file handle, not a seat on
+# a server, so an idle one costs a few kilobytes and no remote resource at all; what really
+# bounds how much work is in flight is anyio's worker threadpool — 40 tokens, which every
+# `def` handler and every `to_thread.run_sync` queues for — plus the bounded background
+# users. So the ceiling is here to make a connection *leak* fail loudly rather than to
+# ration connections, and it is sized so that sessions which are merely finished cannot
+# reach it: `get_session` holds its connection until the generator's cleanup gets a thread,
+# so under saturation many more sessions than there are running requests are each holding
+# one while they queue for a slot to let go in.
 POOL_SIZE = 10
-MAX_OVERFLOW = 50
+MAX_OVERFLOW = 150
 # What a caller waits for a connection before it is told there is none. Deliberately short:
 # a pool with nothing left is a server that is already overloaded, and the useful answer is
 # an error the caller sees in seconds rather than sixty request threads each hanging for

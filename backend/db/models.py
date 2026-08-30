@@ -321,7 +321,13 @@ class Game(Base):
     # NULL for a game no full-game pass has finished, and for one analysed before the
     # column existed: the full scan is still there, and is what answers until the backfill
     # sweep has been over the library.
-    stat_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    #
+    # Deferred, because it is several kilobytes of JSON that only `services.stats` reads
+    # and every other `select(Game)` in the app — a games page, a game detail, an import
+    # sweep — was paying to fetch and parse it per row. The one path that hydrates games to
+    # read it (`stats._worst_moments_from_summaries`) undefers it on its own query, so no
+    # reader trades the eager parse for a lazy load per row.
+    stat_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON, deferred=True)
     # Analysed owner moves and owner blunders in that run — the two numbers the per-game
     # dimensions are a rate over — as columns rather than inside the JSON, so a query that
     # already selects game rows picks them up without parsing anything.

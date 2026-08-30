@@ -107,7 +107,10 @@ class AuthGuard:
     after the handshake — is refused by the same rule as everything else.
 
     The check is a database read and the loop must not do one: it goes out to a worker
-    thread, the same place a `def` handler's queries run.
+    thread, the same place a `def` handler's queries run — and because those threads are
+    the scarce thing under load, a token the database has just confirmed is taken on trust
+    for a few seconds (`auth_service.token_recently_validated`) rather than costing that
+    thread and those two reads again on the very next request of the same burst.
     """
 
     def __init__(self, app: ASGIApp, settings: Settings) -> None:
@@ -129,11 +132,21 @@ class AuthGuard:
         await error_response(401, state, DETAIL[state])(scope, receive, send)
 
     def state(self, token: str | None) -> str:
-        """Whether this cookie gets in, and if not, which of the two reasons it is."""
+        """Whether this cookie gets in, and if not, which of the two reasons it is.
+
+        A cookie confirmed moments ago answers without a Session at all; anything else —
+        an unknown cookie, no cookie, a deployment nobody has set a password on — is
+        decided by the database, and only the yes is worth remembering.
+        """
+        if auth_service.token_recently_validated(token):
+            return AUTHENTICATED
         with get_sessionmaker(self.settings)() as session:
             if auth_service.setup_required(session):
                 return SETUP_REQUIRED
-            return AUTHENTICATED if auth_service.validate_session(session, token) else UNAUTHORIZED
+            if not token or not auth_service.validate_session(session, token):
+                return UNAUTHORIZED
+        auth_service.remember_valid_token(token)
+        return AUTHENTICATED
 
 
 async def _deny_socket(receive: Receive, send: Send, state: str) -> None:

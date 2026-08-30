@@ -498,6 +498,81 @@ def test_the_events_socket_is_refused_without_a_cookie(signed_in: TestClient) ->
     assert caught.value.code == WS_CLOSE_UNAUTHORIZED
 
 
+# --- the shortcut past re-reading a cookie ---------------------------------
+
+
+def counting_validate(monkeypatch: pytest.MonkeyPatch) -> list[str | None]:
+    """Every cookie the guard actually took to the database, as it takes it."""
+    calls: list[str | None] = []
+    real = auth_service.validate_session
+
+    def counted(session: Session, token: str | None) -> bool:
+        calls.append(token)
+        return real(session, token)
+
+    monkeypatch.setattr(auth_service, "validate_session", counted)
+    return calls
+
+
+def test_a_confirmed_cookie_is_taken_on_trust_for_the_next_few_seconds(
+    signed_in: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two database reads per request is what a refetch storm multiplies. The first request
+    of a burst pays them; the rest of it inside the TTL are answered without a Session."""
+    looked_up = counting_validate(monkeypatch)
+
+    for _ in range(3):
+        assert signed_in.get("/games").status_code == 200
+
+    assert len(looked_up) == 1
+
+
+def test_a_cookie_the_database_refused_is_never_remembered(
+    signed_in: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only a yes is worth holding: a stranger's cookie costs the read every single time."""
+    looked_up = counting_validate(monkeypatch)
+    signed_in.cookies.clear()
+    signed_in.cookies.set(COOKIE_NAME, "not-a-token-anyone-issued")
+
+    for _ in range(3):
+        assert signed_in.get("/games").status_code == 401
+
+    assert len(looked_up) == 3
+    assert auth_service.token_recently_validated("not-a-token-anyone-issued") is False
+
+
+def test_signing_out_ends_the_shortcut_on_the_spot(signed_in: TestClient) -> None:
+    """Well inside the TTL, so what shuts the cookie out is the revocation clearing it."""
+    token = signed_in.cookies[COOKIE_NAME]
+    assert signed_in.get("/games").status_code == 200
+    assert auth_service.token_recently_validated(token) is True
+
+    assert signed_in.post("/auth/logout").status_code == 204
+
+    assert auth_service.token_recently_validated(token) is False
+    signed_in.cookies.set(COOKIE_NAME, token)
+    assert signed_in.get("/games").status_code == 401
+
+
+def test_changing_the_password_forgets_every_confirmed_cookie(session: Session) -> None:
+    auth_service.set_password(session, PASSWORD)
+    token = auth_service.create_session(session)
+    auth_service.remember_valid_token(token)
+
+    auth_service.change_password(session, PASSWORD, OTHER)
+
+    assert auth_service.token_recently_validated(token) is False
+
+
+def test_a_note_that_has_run_out_is_not_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The TTL is the whole of the revocation lag another process can leave behind."""
+    monkeypatch.setattr(auth_service, "VALID_TOKEN_TTL_SECONDS", 0.0)
+    auth_service.remember_valid_token("a-token-from-a-moment-ago")
+
+    assert auth_service.token_recently_validated("a-token-from-a-moment-ago") is False
+
+
 # --- the migration ---------------------------------------------------------
 
 

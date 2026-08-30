@@ -3,6 +3,10 @@
 Decisions made in phase 1 that everything later has to live with. The visual design lives
 in `docs/design/`; this file is only about the shape of the code.
 
+This document describes the current application architecture. The target hosting,
+synchronization, and data-ownership model is defined in
+[distribution.md](distribution.md).
+
 ## One service layer, three consumers
 
 ```

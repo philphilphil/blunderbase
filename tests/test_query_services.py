@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import event, inspect, select, update
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
@@ -539,6 +540,37 @@ def test_player_profile_series_are_per_platform_and_speed(library: Library) -> N
     assert keyed[("lichess", "blitz")]["current"] == 1820
     assert keyed[("lichess", "rapid")]["min"] == 1800
     assert keyed[("lichess", "bullet")]["games"] == 1
+
+
+def test_player_profile_splits_a_two_account_library_by_platform(library: Library) -> None:
+    """Which platform a game counts under is the account that played it, not its source.
+
+    The one-account fixture never tells the account lookup from the source fallback; two
+    accounts on two sites do, and the profile reads those ids off the game rows.
+    """
+    session = library.session
+    chesscom = Account(platform=Platform.CHESSCOM, username="blunderbase-cc", is_owner=True)
+    session.add(chesscom)
+    session.commit()
+    # The two January blitz games move to the other site; the owner played white in both.
+    for source_id in ("qg000001", "qg000002"):
+        library[source_id].white_account_id = chesscom.id
+    session.commit()
+
+    profile = games_service.get_player_profile(session)
+
+    assert profile["volume"]["games"] == 6
+    assert profile["volume"]["by_platform"] == {"chesscom": 2, "lichess": 4}
+    assert {row["username"]: row["games"] for row in profile["accounts"]} == {
+        OWNER: 4,
+        "blunderbase-cc": 2,
+    }
+    keyed = {(row["platform"], row["speed"]): row for row in profile["ratings"]}
+    assert keyed[("chesscom", "blitz")]["games"] == 2
+    assert keyed[("chesscom", "blitz")]["current"] == 1760
+    # And the site the owner still plays on keeps only the blitz game that stayed.
+    assert keyed[("lichess", "blitz")]["games"] == 1
+    assert keyed[("lichess", "blitz")]["current"] == 1820
 
 
 def test_player_profile_keeps_a_fully_recent_series_uncapped(library: Library) -> None:
@@ -1289,6 +1321,51 @@ def test_a_game_folds_its_own_counts_onto_its_row(analysed: Library) -> None:
     assert untouched.stat_summary is None
     assert untouched.stat_owner_moves is None
     assert untouched.stat_worst_win_loss is None
+
+
+@contextmanager
+def counting_statements(session: Session) -> Iterator[list[str]]:
+    """Every SQL statement the session's engine runs while the block is open."""
+    statements: list[str] = []
+    engine = session.get_bind()
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def _record(conn, cursor, statement, parameters, context, executemany) -> None:  # type: ignore[no-untyped-def]
+        statements.append(statement)
+
+    try:
+        yield statements
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+
+
+def test_a_listing_never_reads_a_fold_and_the_ranking_reads_them_in_one_query(
+    analysed: Library,
+) -> None:
+    """`stat_summary` is kilobytes of JSON per game that only the stats service reads.
+
+    So it is deferred, and a page of games — which parses each row it does load — never
+    fetches it at all. The one reader that hydrates games to read it asks for it on its own
+    query, which is the half that matters: deferring a column a loop touches would trade
+    one wide query for one narrow query per row.
+    """
+    session = analysed.session
+    fold_every_summary(session)
+    stats.reset_stats_cache()
+    assert stats._summaries_ready(session) is True
+    session.expunge_all()
+
+    with counting_statements(session) as listing:
+        listed = games_service.search_games(session, GameFilters(), limit=50)
+    assert len(listed) == 6
+    assert [statement for statement in listing if "stat_summary" in statement] == []
+    assert all("stat_summary" in inspect(game).unloaded for game in listed)
+
+    session.expunge_all()
+    with counting_statements(session) as ranking:
+        moments = stats.get_worst_recent_moments(session, amount=3)
+    assert [moment["win_loss"] for moment in moments] == [55.0, 42.0, 35.0]
+    assert len([statement for statement in ranking if "stat_summary" in statement]) == 1
 
 
 def test_a_question_the_folds_cannot_answer_still_scans(

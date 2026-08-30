@@ -29,6 +29,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import threading
+import time
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, select
@@ -59,6 +61,10 @@ SESSION_REFRESH_AFTER = timedelta(days=1)
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_BASE = timedelta(seconds=5)
 LOCKOUT_MAX = timedelta(minutes=5)
+
+# How long a token that has just been checked against the database is taken on trust; see
+# `remember_valid_token`.
+VALID_TOKEN_TTL_SECONDS = 5.0
 
 
 class AuthError(Exception):
@@ -130,6 +136,7 @@ def reset_password(session: Session, password: str) -> None:
     credential.locked_until = None
     session.execute(delete(AuthSession))
     session.commit()
+    forget_valid_tokens()
 
 
 def verify_password(session: Session, password: str) -> bool:
@@ -224,6 +231,7 @@ def revoke_session(session: Session, token: str | None) -> bool:
         delete(AuthSession).where(AuthSession.token_hash == _token_hash(token))
     ).rowcount
     session.commit()
+    forget_valid_tokens()
     return bool(removed)
 
 
@@ -231,6 +239,7 @@ def revoke_all_sessions(session: Session) -> int:
     """Sign every browser out, this one included. How many were open."""
     removed = session.execute(delete(AuthSession)).rowcount
     session.commit()
+    forget_valid_tokens()
     return int(removed)
 
 
@@ -240,12 +249,73 @@ def prune_sessions(session: Session, *, now: datetime | None = None) -> int:
         delete(AuthSession).where(AuthSession.expires_at <= (now or utcnow()))
     ).rowcount
     session.commit()
+    if removed:
+        forget_valid_tokens()
     return int(removed)
 
 
 def open_session_count(session: Session) -> int:
     """How many browsers are signed in."""
     return int(session.scalar(select(func.count()).select_from(AuthSession)) or 0)
+
+
+# --- the shortcut past re-reading a token ----------------------------------
+
+# Tokens the database has confirmed, against the monotonic moment it confirmed them.
+_VALID_TOKENS: dict[str, float] = {}
+_VALID_TOKENS_LOCK = threading.Lock()
+
+
+def token_recently_validated(token: str | None) -> bool:
+    """Whether this exact token was confirmed live less than `VALID_TOKEN_TTL_SECONDS` ago.
+
+    The guard in front of every non-exempt request asks the database twice — is there a
+    credential, is this cookie a session — and in a refetch storm that is two reads per
+    request through the same worker threads everything else is queueing for. One owner and
+    one password is the whole user model here, so a few seconds of revocation lag is a
+    cheaper thing to spend than those reads.
+
+    Only successes are ever remembered. A token that is not in here, or whose note has run
+    out, costs exactly the round trip it always did, and neither a refusal nor the
+    setup-required state is cached at all — the first-run screen must never be answered
+    out of a dictionary.
+    """
+    if not token:
+        return False
+    with _VALID_TOKENS_LOCK:
+        checked_at = _VALID_TOKENS.get(token)
+        if checked_at is None:
+            return False
+        if time.monotonic() - checked_at >= VALID_TOKEN_TTL_SECONDS:
+            del _VALID_TOKENS[token]
+            return False
+        return True
+
+
+def remember_valid_token(token: str) -> None:
+    """Take this token on trust for the next `VALID_TOKEN_TTL_SECONDS`.
+
+    Every revocation in this module — a logout, a password change, a prune that drops an
+    expired session — clears the whole cache, so inside this process the note cannot
+    outlive what it stands for. Another process (a stdio MCP client, `blunderbase
+    set-password`) keeps its own and cannot be told, which is what the TTL is for and why
+    it is seconds rather than minutes: the database is the truth, and this is only ever a
+    short-lived note that it has just been asked.
+    """
+    now = time.monotonic()
+    with _VALID_TOKENS_LOCK:
+        # Evicted here rather than on a timer: the only thing that adds an entry is a
+        # successful check, and one owner means a browser or two, not a population.
+        for known, checked_at in list(_VALID_TOKENS.items()):
+            if now - checked_at >= VALID_TOKEN_TTL_SECONDS:
+                del _VALID_TOKENS[known]
+        _VALID_TOKENS[token] = now
+
+
+def forget_valid_tokens() -> None:
+    """Drop every note, so the next check of any token goes to the database again."""
+    with _VALID_TOKENS_LOCK:
+        _VALID_TOKENS.clear()
 
 
 # --- internals -------------------------------------------------------------
