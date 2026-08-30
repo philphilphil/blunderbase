@@ -18,10 +18,10 @@ function plural(count: number, one: string, many = `${one}s`): string {
  * hardest to reason about: nothing else on that screen touched a game. Here it reads as
  * the other end of the same sentence as Connect an account and Upload a PGN.
  *
- * One line, like the rating beside it: what the button does belongs in the dialog that
- * asks for the password (`DeleteAllGamesDialog`), which is where a person is actually
- * deciding — a paragraph spelling out the consequences above an unpressed button is read
- * by nobody and makes the row twice as tall as it earns.
+ * One line, like the rating beside it: what the button does belongs in the confirmation
+ * (`DeleteAllGamesDialog`), which is where a person is actually deciding — a paragraph
+ * spelling out the consequences above an unpressed button is read by nobody and makes the
+ * row twice as tall as it earns.
  */
 export function LibraryManagement() {
   const games = useGames({ limit: 1 })

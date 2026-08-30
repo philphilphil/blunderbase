@@ -40,6 +40,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { useSearch } from '@/lib/api/queries'
 import type { GameSummary, NoteResponse, OpeningHit, OpponentHit } from '@/lib/api/types'
+import type { RuntimeCapabilities } from '@/lib/api/types'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 import { paramsFromFilters } from '@/routes/games/filters'
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
@@ -113,17 +115,22 @@ function matches(query: string, ...fields: (string | undefined)[]): boolean {
  * only worth the space once they have been asked for, so the resting list is the nine
  * routes and nothing else.
  */
-function pageItems(query: string, saved: ReturnType<typeof useSavedFilters>): PaletteItem[] {
-  const items: PaletteItem[] = PAGES.filter((page) => matches(query, page.label, page.hint)).map(
-    (page) => ({
-      id: `page:${page.to}`,
-      group: 'Pages',
-      label: page.label,
-      hint: page.hint,
-      icon: page.icon,
-      to: page.to,
-    }),
-  )
+function pageItems(
+  query: string,
+  saved: ReturnType<typeof useSavedFilters>,
+  capabilities: RuntimeCapabilities,
+): PaletteItem[] {
+  const items: PaletteItem[] = PAGES.filter(
+    (page) =>
+      (capabilities.mcp || page.to !== '/assistant') && matches(query, page.label, page.hint),
+  ).map((page) => ({
+    id: `page:${page.to}`,
+    group: 'Pages',
+    label: page.label,
+    hint: page.hint,
+    icon: page.icon,
+    to: page.to,
+  }))
   if (!query) return items
 
   for (const report of REPORTS) {
@@ -283,18 +290,19 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
   const saved = useSavedFilters()
   const search = useSearch(query, PER_GROUP)
+  const capabilities = useRuntimeCapabilities()
 
   const needle = query.trim().toLowerCase()
   const answered = search.data
 
   const items = useMemo(() => {
-    const pages = pageItems(needle, saved)
+    const pages = pageItems(needle, saved, capabilities)
     if (needle.length < MIN_QUERY || !answered) return pages
     return [
       ...pages,
       ...searchItems(answered.games, answered.opponents, answered.openings, answered.notes),
     ]
-  }, [needle, saved, answered])
+  }, [needle, saved, answered, capabilities])
 
   // A new set of rows starts at the top: the highlight belongs to the list, not to a
   // position that happened to survive a keystroke. Adjusted during the render that

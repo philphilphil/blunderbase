@@ -3,6 +3,8 @@
  * `backend/api/schemas.py`. Nothing here caches — that is TanStack Query's job in
  * `queries.ts`.
  */
+import { desktopBootstrapHeaders } from '@/lib/desktop/nativeBridge'
+
 import { apiUrl, http, requestDownload, type QueryValue } from './client'
 import type {
   AnalysisCoverage,
@@ -91,7 +93,8 @@ export const health = () => http.get<Health>('/health')
 // --- auth -----------------------------------------------------------------
 
 /** Never guarded — this is the call the page makes before it renders anything. */
-export const authStatus = () => http.get<AuthStatus>('/auth/status')
+export const authStatus = () =>
+  http.get<AuthStatus>('/auth/status', { headers: desktopBootstrapHeaders() })
 
 /** First run only: a second caller gets a 409 `already_configured`. */
 export const setupPassword = (password: string) =>
@@ -144,10 +147,10 @@ export const getGame = (id: number, query: GameDetailQuery = {}) =>
 /**
  * Every game, and everything that only exists because of one: its analysis, its notes and
  * the sync history the next import would otherwise resume from. Accounts, engines and
- * notes about a position stay. A POST because the password rides in the body, and it is
- * checked again server-side — a session is not consent to this one.
+ * notes about a position stay. Server mode checks its password again; desktop confirms
+ * through its native, passwordless session.
  */
-export const deleteAllGames = (password: string) =>
+export const deleteAllGames = (password?: string) =>
   http.post<GamesDeleted>('/games/delete-all', { body: { password } })
 
 // --- import ---------------------------------------------------------------

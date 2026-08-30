@@ -66,6 +66,7 @@ export interface RequestOptions {
   /** Sent verbatim as `text/plain` — the PGN upload endpoint takes the file as the body. */
   text?: string
   signal?: AbortSignal
+  headers?: Record<string, string>
 }
 
 async function readError(response: Response): Promise<ApiError> {
@@ -87,7 +88,7 @@ async function readError(response: Response): Promise<ApiError> {
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', query, body, text, signal } = options
-  const headers: Record<string, string> = { accept: 'application/json' }
+  const headers: Record<string, string> = { accept: 'application/json', ...options.headers }
   let payload: BodyInit | undefined
 
   if (text !== undefined) {

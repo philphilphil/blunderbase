@@ -17,6 +17,7 @@ import type {
 } from '@/lib/api/types'
 
 import { hostByEngineId } from '@/lib/engines/hosts'
+import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
 
 import { EngineDetail } from './EngineDetail'
 import { EnginesPage } from './EnginesPage'
@@ -981,6 +982,28 @@ describe('EnginesPage — one page', () => {
     expect(screen.getByText('Compute capacity')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remote runner' })).toBeInTheDocument()
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+  })
+
+  it('keeps only this computer when remote runners are unavailable', async () => {
+    stubFetch({
+      '/api/engines': [STOCKFISH],
+      '/api/engines/roles': ROLES,
+      '/api/runners/status': runnersStatus(),
+    })
+    renderPage(
+      <RuntimeCapabilitiesProvider
+        capabilities={{ password_auth: false, mcp: false, remote_runners: false }}
+      >
+        <EnginesPage />
+      </RuntimeCapabilitiesProvider>,
+    )
+
+    expect(
+      await screen.findByText('The engines and analysis capacity on this computer.'),
+    ).toBeInTheDocument()
+    expect((await screen.findAllByText('This computer')).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /remote runner/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('This browser')).not.toBeInTheDocument()
   })
 
   it('explains remote runners before registration', async () => {

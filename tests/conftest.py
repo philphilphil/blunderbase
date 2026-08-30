@@ -91,6 +91,8 @@ def settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Settin
     # An operator's own exported environment must not decide what the suite tests.
     monkeypatch.delenv("BLUNDERBASE_MCP_BEARER_KEY", raising=False)
     monkeypatch.delenv("BLUNDERBASE_ANALYSIS_CONCURRENCY", raising=False)
+    monkeypatch.delenv("BLUNDERBASE_RUNTIME_MODE", raising=False)
+    monkeypatch.delenv("BLUNDERBASE_DESKTOP_TOKEN", raising=False)
     get_settings.cache_clear()
     reset_engines()
     yield get_settings()

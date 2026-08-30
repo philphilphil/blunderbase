@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 
 import { useLogout, useProfile } from '@/lib/api/queries'
 import type { AccountSummary } from '@/lib/api/types'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 import { ChangePasswordDialog } from '@/routes/auth'
 
@@ -35,6 +36,7 @@ const ITEM =
  * rather than about their games.
  */
 export function AccountMenu() {
+  const capabilities = useRuntimeCapabilities()
   const profile = useProfile()
   const logout = useLogout()
   const [open, setOpen] = useState(false)
@@ -94,7 +96,9 @@ export function AccountMenu() {
                 <p className="truncate text-[0.6875rem] font-medium text-ink">
                   No account connected
                 </p>
-                <p className="truncate text-[0.625rem] text-dim">signed in as the owner</p>
+                <p className="truncate text-[0.625rem] text-dim">
+                  {capabilities.password_auth ? 'signed in as the owner' : 'local library'}
+                </p>
               </>
             ) : (
               accounts.map((connected) => (
@@ -121,48 +125,56 @@ export function AccountMenu() {
             <Users className="size-3.5" aria-hidden />
             Connected accounts
           </Link>
-          <Link
-            to="/assistant"
-            role="menuitem"
-            className={ITEM}
-            onClick={() => setOpen(false)}
-          >
-            <Bot className="size-3.5" aria-hidden />
-            Assistant
-          </Link>
+          {capabilities.mcp ? (
+            <Link
+              to="/assistant"
+              role="menuitem"
+              className={ITEM}
+              onClick={() => setOpen(false)}
+            >
+              <Bot className="size-3.5" aria-hidden />
+              Assistant
+            </Link>
+          ) : null}
           <Link to="/help" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <CircleHelp className="size-3.5" aria-hidden />
             How analysis works
           </Link>
-          <button
-            type="button"
-            role="menuitem"
-            className={ITEM}
-            onClick={() => {
-              setOpen(false)
-              setChanging(true)
-            }}
-          >
-            <KeyRound className="size-3.5" aria-hidden />
-            Change password
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={cn(ITEM, 'hover:text-blunder')}
-            disabled={logout.isPending}
-            onClick={() => {
-              setOpen(false)
-              logout.mutate()
-            }}
-          >
-            <LogOut className="size-3.5" aria-hidden />
-            Sign out
-          </button>
+          {capabilities.password_auth ? (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                className={ITEM}
+                onClick={() => {
+                  setOpen(false)
+                  setChanging(true)
+                }}
+              >
+                <KeyRound className="size-3.5" aria-hidden />
+                Change password
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={cn(ITEM, 'hover:text-blunder')}
+                disabled={logout.isPending}
+                onClick={() => {
+                  setOpen(false)
+                  logout.mutate()
+                }}
+              >
+                <LogOut className="size-3.5" aria-hidden />
+                Sign out
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
 
-      {changing ? <ChangePasswordDialog onClose={() => setChanging(false)} /> : null}
+      {capabilities.password_auth && changing ? (
+        <ChangePasswordDialog onClose={() => setChanging(false)} />
+      ) : null}
     </div>
   )
 }

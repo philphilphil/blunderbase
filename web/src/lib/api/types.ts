@@ -49,6 +49,18 @@ export interface ErrorBody {
 
 // --- auth -----------------------------------------------------------------
 
+export interface RuntimeCapabilities {
+  password_auth: boolean
+  mcp: boolean
+  remote_runners: boolean
+}
+
+export const SERVER_CAPABILITIES: RuntimeCapabilities = {
+  password_auth: true,
+  mcp: true,
+  remote_runners: true,
+}
+
 /**
  * What every `/auth` route answers with: is there a password, and do I have it.
  *
@@ -60,6 +72,7 @@ export interface ErrorBody {
 export interface AuthStatus {
   setup_required: boolean
   authenticated: boolean
+  capabilities: RuntimeCapabilities
   /** The first of `maia_elos` — for a screen that shows a single level. */
   maia_target_elo: number
   /**

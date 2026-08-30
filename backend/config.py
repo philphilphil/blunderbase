@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +34,12 @@ class Settings(BaseSettings):
     )
 
     root: Path = ROOT
+    # The same build runs as a networked server and inside the desktop shell. The mode is
+    # runtime configuration so the backend, web UI and tests all see the same capabilities.
+    runtime_mode: Literal["server", "desktop"] = "server"
+    # A desktop launch authenticates its own webview transparently with this per-launch
+    # secret. It is deliberately unrelated to the owner's persistent server password.
+    desktop_token: SecretStr = SecretStr("")
     # Everything the app writes that is not the database: downloaded engines, weights,
     # uploaded PGNs. Defaults to `<root>/data`.
     data_dir: Path | None = None
@@ -101,6 +108,10 @@ class Settings(BaseSettings):
         self.data_dir = self._resolve(self.data_dir, self.root / "data")
         self.database_path = self._resolve(self.database_path, self.data_dir / "blunderbase.db")
         self.web_dist = self._resolve(self.web_dist, self.root / "web" / "dist")
+        if self.runtime_mode == "desktop":
+            token = self.desktop_token.get_secret_value()
+            if len(token) != 64 or any(character not in "0123456789abcdef" for character in token):
+                raise ValueError("desktop mode needs a 64-character lowercase hexadecimal token")
         return self
 
     def _resolve(self, value: Path | None, fallback: Path) -> Path:

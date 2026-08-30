@@ -5,13 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import { http } from '@/lib/api/client'
-import { DEFAULT_MAIA_TARGET_ELO } from '@/lib/api/types'
+import { DEFAULT_MAIA_TARGET_ELO, SERVER_CAPABILITIES } from '@/lib/api/types'
 import type { AuthStatus } from '@/lib/api/types'
 
 import { AuthGate } from './AuthGate'
 
 /** A socket that never connects on its own — the gate is not what this file is testing. */
 class FakeSocket {
+  static instances: FakeSocket[] = []
   onopen: (() => void) | null = null
   onmessage: ((event: MessageEvent<string>) => void) | null = null
   onerror: (() => void) | null = null
@@ -19,6 +20,7 @@ class FakeSocket {
   readonly url: string
   constructor(url: string) {
     this.url = url
+    FakeSocket.instances.push(this)
   }
   close() {}
 }
@@ -30,13 +32,16 @@ function json(status: number, body: unknown) {
   })
 }
 
-const LEVEL = { maia_target_elo: DEFAULT_MAIA_TARGET_ELO }
+const LEVEL = {
+  maia_target_elo: DEFAULT_MAIA_TARGET_ELO,
+  capabilities: SERVER_CAPABILITIES,
+}
 const SIGNED_IN: AuthStatus = { setup_required: false, authenticated: true, ...LEVEL }
 const SIGNED_OUT: AuthStatus = { setup_required: false, authenticated: false, ...LEVEL }
 const FRESH: AuthStatus = { setup_required: true, authenticated: false, ...LEVEL }
 
 /** Every route the test wants to answer, keyed `METHOD /api/path`. */
-type Routes = Record<string, () => Response>
+type Routes = Record<string, () => Response | Promise<Response>>
 
 let routes: Routes
 
@@ -71,6 +76,7 @@ function renderApp() {
 }
 
 beforeEach(() => {
+  FakeSocket.instances = []
   routes = { 'GET /api/games': () => json(200, { total: 0, limit: 0, offset: 0, games: [] }) }
   vi.stubGlobal('WebSocket', FakeSocket)
   stubFetch()
@@ -110,6 +116,22 @@ describe('AuthGate', () => {
     expect(screen.getByTestId('auth-loading')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Sign in' })).not.toBeInTheDocument()
     expect(screen.queryByText('the app')).not.toBeInTheDocument()
+  })
+
+  it('does not open the event socket before the session is authenticated', async () => {
+    let answerStatus!: (response: Response) => void
+    routes['GET /api/auth/status'] = () =>
+      new Promise<Response>((resolve) => {
+        answerStatus = resolve
+      })
+    renderApp()
+
+    expect(screen.getByTestId('auth-loading')).toBeInTheDocument()
+    expect(FakeSocket.instances).toHaveLength(0)
+
+    answerStatus(json(200, SIGNED_IN))
+    expect(await screen.findByText('the app')).toBeInTheDocument()
+    expect(FakeSocket.instances).toHaveLength(1)
   })
 
   it('goes straight into the app once the password is accepted', async () => {

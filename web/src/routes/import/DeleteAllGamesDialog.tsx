@@ -4,16 +4,16 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { useDeleteAllGames } from '@/lib/api/queries'
 import type { GamesDeleted } from '@/lib/api/types'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { FormError, PasswordField } from '@/routes/auth/AuthScreen'
 import { authErrorMessage } from '@/routes/auth/password'
 
 /**
  * The confirmation in front of emptying the library.
  *
- * It asks for the password rather than for a typed phrase because that is what the backend
- * asks for: being signed in is a session, not a decision. The count is on the button for
- * the same reason the sentence names what survives — the number is what tells the owner
- * whether this is the database they think it is.
+ * A server asks for its owner password again: being signed in is a session, not a decision.
+ * Desktop has no persistent password and uses this explicit destructive dialog as the
+ * confirmation. In both cases the count names whether this is the library the owner means.
  */
 export function DeleteAllGamesDialog({
   games,
@@ -25,6 +25,7 @@ export function DeleteAllGamesDialog({
   onClose: () => void
   onDone: (deleted: GamesDeleted) => void
 }) {
+  const capabilities = useRuntimeCapabilities()
   const [password, setPassword] = useState('')
   const wipe = useDeleteAllGames({ onSuccess: onDone })
 
@@ -36,8 +37,8 @@ export function DeleteAllGamesDialog({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (!password || wipe.isPending) return
-    wipe.mutate(password)
+    if ((capabilities.password_auth && !password) || wipe.isPending) return
+    wipe.mutate(capabilities.password_auth ? password : undefined)
   }
 
   const message = wipe.isError ? authErrorMessage(wipe.error) : null
@@ -68,22 +69,29 @@ export function DeleteAllGamesDialog({
           </p>
         </div>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <PasswordField
-            id="delete-all-games-password"
-            label="Your password"
-            value={password}
-            onChange={(value) => {
-              setPassword(value)
-              wipe.reset()
-            }}
-            autoComplete="current-password"
-            autoFocus
-            invalid={Boolean(message)}
-          />
+          {capabilities.password_auth ? (
+            <PasswordField
+              id="delete-all-games-password"
+              label="Your password"
+              value={password}
+              onChange={(value) => {
+                setPassword(value)
+                wipe.reset()
+              }}
+              autoComplete="current-password"
+              autoFocus
+              invalid={Boolean(message)}
+            />
+          ) : null}
           {message ? <FormError>{message}</FormError> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="destructive" disabled={!password || wipe.isPending}>
+            <Button
+              type="submit"
+              variant="destructive"
+              autoFocus={!capabilities.password_auth}
+              disabled={(capabilities.password_auth && !password) || wipe.isPending}
+            >
               {wipe.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
               Delete them
             </Button>

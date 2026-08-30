@@ -189,6 +189,7 @@ fn spawn_backend(
     database_path: &Path,
     log: &Path,
     port: u16,
+    desktop_token: &str,
 ) -> Result<Child, Box<dyn std::error::Error>> {
     let stdout = File::options().create(true).append(true).open(log)?;
     let stderr = stdout.try_clone()?;
@@ -196,6 +197,8 @@ fn spawn_backend(
         .args(["serve", "--host", "127.0.0.1", "--port", &port.to_string()])
         .env("BLUNDERBASE_DATA_DIR", data_dir)
         .env("BLUNDERBASE_DB_PATH", database_path)
+        .env("BLUNDERBASE_RUNTIME_MODE", "desktop")
+        .env("BLUNDERBASE_DESKTOP_TOKEN", desktop_token)
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr))
@@ -370,7 +373,14 @@ pub fn run() {
             let executable = backend_executable(&resource_dir);
 
             append_log(&log, "starting bundled backend");
-            let child = spawn_backend(&executable, &data_dir, &database_path, &log, port)?;
+            let child = spawn_backend(
+                &executable,
+                &data_dir,
+                &database_path,
+                &log,
+                port,
+                &feedback_token,
+            )?;
             app.manage(BackendChild(Mutex::new(Some(child))));
 
             let feedback_app = app.handle().clone();

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { AuthProvider, useAuth } from '@/lib/auth/AuthProvider'
+import { EventsProvider } from '@/lib/events/EventsProvider'
 import { AuthLoading, LoginPage, SetupPage } from '@/routes/auth'
 
 /**
@@ -8,9 +9,9 @@ import { AuthLoading, LoginPage, SetupPage } from '@/routes/auth'
  *
  * The shell is not rendered — not hidden, not behind an overlay — until the status call
  * says there is a session, so a signed-out browser never mounts a page that would fire a
- * dozen guarded requests to be refused. It sits inside `<Providers>` rather than around
- * them so that the query cache, the theme and the `/events` socket are the same ones on
- * both sides of the door.
+ * dozen guarded requests to be refused. `/events` mounts only on the authenticated side:
+ * a desktop launch rotates its cookie, so a socket opened during the status request could
+ * be refused with the previous launch's cookie and undo a successful bootstrap.
  */
 function Gate({ children }: { children: ReactNode }) {
   const { status } = useAuth()
@@ -22,7 +23,7 @@ function Gate({ children }: { children: ReactNode }) {
     case 'login':
       return <LoginPage />
     default:
-      return <>{children}</>
+      return <EventsProvider>{children}</EventsProvider>
   }
 }
 

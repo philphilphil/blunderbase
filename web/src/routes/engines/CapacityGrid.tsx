@@ -24,6 +24,7 @@ import { RunnerCard } from './RunnerCard'
  * browser Stockfish on This browser, yaml-configured engines on a remote runner.
  */
 export function CapacityGrid({
+  remoteRunnersEnabled,
   status,
   isLoading,
   error,
@@ -32,6 +33,7 @@ export function CapacityGrid({
   onOpenDetail,
   onEngineAdded,
 }: {
+  remoteRunnersEnabled: boolean
   status?: RunnersStatus
   isLoading: boolean
   error: Error | null
@@ -51,30 +53,36 @@ export function CapacityGrid({
         <div className="min-w-0">
           <h2 className="text-xs font-semibold text-ink">Compute capacity</h2>
           <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
-            This server, this browser, and remote machines that can take engine work.
+            {remoteRunnersEnabled
+              ? 'This server, this browser, and remote machines that can take engine work.'
+              : 'The engines and analysis capacity on this computer.'}
           </p>
         </div>
         <div className="flex-1" />
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          aria-label="How remote runners work"
-          title="How remote runners work"
-          aria-expanded={openDetail === 'remote-info'}
-          onClick={() => toggle('remote-info')}
-        >
-          <Info aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => toggle('add-remote-runner')}
-          aria-expanded={openDetail === 'add-remote-runner'}
-        >
-          <Plus aria-hidden />
-          Remote runner
-        </Button>
+        {remoteRunnersEnabled ? (
+          <>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="How remote runners work"
+              title="How remote runners work"
+              aria-expanded={openDetail === 'remote-info'}
+              onClick={() => toggle('remote-info')}
+            >
+              <Info aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => toggle('add-remote-runner')}
+              aria-expanded={openDetail === 'add-remote-runner'}
+            >
+              <Plus aria-hidden />
+              Remote runner
+            </Button>
+          </>
+        ) : null}
       </div>
 
       {error ? (
@@ -86,39 +94,57 @@ export function CapacityGrid({
           </Button>
         </div>
       ) : isLoading || !status ? (
-        <div className="grid grid-cols-3 gap-2.5 max-md:grid-cols-1" data-testid="machines-loading">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
+        <div
+          className={
+            remoteRunnersEnabled
+              ? 'grid grid-cols-3 gap-2.5 max-md:grid-cols-1'
+              : 'grid grid-cols-1 gap-2.5'
+          }
+          data-testid="machines-loading"
+        >
+          {remoteRunnersEnabled ? <Skeleton className="h-20 w-full" /> : null}
+          {remoteRunnersEnabled ? <Skeleton className="h-20 w-full" /> : null}
           <Skeleton className="h-20 w-full" />
         </div>
       ) : (
         // One machine card per row below `md`. `col-span-full` details keep working:
         // a full span of one column is still the whole width.
-        <div className="grid grid-cols-3 gap-2.5 max-md:grid-cols-1">
+        <div
+          className={
+            remoteRunnersEnabled
+              ? 'grid grid-cols-3 gap-2.5 max-md:grid-cols-1'
+              : 'grid grid-cols-1 gap-2.5'
+          }
+        >
           <ServerCard
             local={status.local}
+            localOnly={!remoteRunnersEnabled}
             expanded={openDetail === 'server'}
             onToggle={() => toggle('server')}
             adding={openDetail === 'add-engine'}
             onAdd={() => toggle('add-engine')}
           />
-          <BrowserRunnerSection
-            runner={browserRunner}
-            expanded={openDetail === 'browser'}
-            onToggleExpand={() => toggle('browser')}
-            layout="card"
-          />
-          {remoteRunners.map((runner) => (
-            <RunnerCard
-              key={runner.id}
-              runner={runner}
-              expanded={openDetail === `runner:${runner.id}`}
-              onToggleExpand={() => toggle(`runner:${runner.id}`)}
+          {remoteRunnersEnabled ? (
+            <BrowserRunnerSection
+              runner={browserRunner}
+              expanded={openDetail === 'browser'}
+              onToggleExpand={() => toggle('browser')}
               layout="card"
             />
-          ))}
+          ) : null}
+          {remoteRunnersEnabled
+            ? remoteRunners.map((runner) => (
+                <RunnerCard
+                  key={runner.id}
+                  runner={runner}
+                  expanded={openDetail === `runner:${runner.id}`}
+                  onToggleExpand={() => toggle(`runner:${runner.id}`)}
+                  layout="card"
+                />
+              ))
+            : null}
 
-          {openDetail === 'remote-info' ? <RemoteRunnerInfo /> : null}
+          {remoteRunnersEnabled && openDetail === 'remote-info' ? <RemoteRunnerInfo /> : null}
           {openDetail === 'add-engine' ? (
             <div className="order-1 col-span-full">
               <AddEngineForm
@@ -127,7 +153,7 @@ export function CapacityGrid({
               />
             </div>
           ) : null}
-          {openDetail === 'add-remote-runner' ? (
+          {remoteRunnersEnabled && openDetail === 'add-remote-runner' ? (
             <div className="order-1 col-span-full">
               <CreateRunnerForm onCancel={() => onOpenDetail(null)} />
             </div>
@@ -135,7 +161,7 @@ export function CapacityGrid({
         </div>
       )}
 
-      {!isLoading && !error && remoteRunners.length === 0 ? (
+      {remoteRunnersEnabled && !isLoading && !error && remoteRunners.length === 0 ? (
         <p className="text-[0.6875rem] text-dim-2">
           No remote runners are registered. This server and browser still work independently.
         </p>
@@ -147,12 +173,14 @@ export function CapacityGrid({
 /** This process owns path-based engines, so it alone carries the add-engine action. */
 function ServerCard({
   local,
+  localOnly,
   expanded,
   onToggle,
   adding,
   onAdd,
 }: {
   local: LocalHost
+  localOnly: boolean
   expanded: boolean
   onToggle: () => void
   adding: boolean
@@ -163,14 +191,14 @@ function ServerCard({
   return (
     <MachineRow
       tone={local.workers ? 'connected' : 'degraded'}
-      name="This server"
+      name={localOnly ? 'This computer' : 'This server'}
       caption={local.workers ? 'ready for queued work' : 'not draining the queue'}
-      type="Server"
+      type={localOnly ? 'Computer' : 'Server'}
       slots={total === null ? String(used) : `${used}/${total}`}
       engines={String(local.engines.length)}
       expanded={expanded}
       onToggleExpand={onToggle}
-      ariaLabel={`${expanded ? 'Collapse' : 'Expand'} this server`}
+      ariaLabel={`${expanded ? 'Collapse' : 'Expand'} ${localOnly ? 'this computer' : 'this server'}`}
       layout="card"
       actions={
         <Button type="button" size="sm" variant="ghost" onClick={onAdd} aria-expanded={adding}>

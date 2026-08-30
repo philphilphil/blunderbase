@@ -24,7 +24,7 @@ from backend.api.routes import (
     streams,
 )
 
-ROUTERS: tuple[APIRouter, ...] = (
+CORE_ROUTERS: tuple[APIRouter, ...] = (
     auth.router,
     games.router,
     accounts.router,
@@ -38,12 +38,17 @@ ROUTERS: tuple[APIRouter, ...] = (
     search.router,
     live.router,
     maia.router,
-    runner_gateway.router,
-    runners.router,
-    mcp_keys.router,
+    runners.status_router,
     settings.router,
     streams.router,
     events.router,
 )
 
-__all__ = ["ROUTERS"]
+REMOTE_RUNNER_ROUTERS: tuple[APIRouter, ...] = (runner_gateway.router, runners.router)
+MCP_ROUTERS: tuple[APIRouter, ...] = (mcp_keys.router,)
+
+# The complete server surface remains useful to callers that inspect the module. App
+# construction chooses the runtime subset below rather than teaching each handler modes.
+ROUTERS: tuple[APIRouter, ...] = CORE_ROUTERS + REMOTE_RUNNER_ROUTERS + MCP_ROUTERS
+
+__all__ = ["CORE_ROUTERS", "MCP_ROUTERS", "REMOTE_RUNNER_ROUTERS", "ROUTERS"]

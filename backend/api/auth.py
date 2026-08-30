@@ -20,9 +20,15 @@ An unauthenticated request is always JSON, never a redirect: the client is a fet
 and a 302 to a login page it cannot render is worse than a status it can branch on. When
 nobody has chosen a password yet the body says `setup_required` instead of `unauthorized`,
 which is how the UI knows to show the setup screen rather than the login one.
+
+Desktop mode keeps the same guard but replaces the persistent owner password with a
+per-launch token supplied by the native shell. Passwordless there means transparent
+authentication, not an unguarded loopback API.
 """
 
 from __future__ import annotations
+
+import secrets
 
 from anyio import to_thread
 from fastapi import FastAPI
@@ -33,9 +39,11 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from backend.api.errors import error_response
 from backend.config import Settings
 from backend.db.session import get_sessionmaker
+from backend.runtime import capabilities_for
 from backend.services import auth as auth_service
 
 COOKIE_NAME = "blunderbase_session"
+DESKTOP_TOKEN_HEADER = "x-blunderbase-desktop-token"
 COOKIE_MAX_AGE = int(auth_service.SESSION_TTL.total_seconds())
 COOKIE_SAMESITE = "lax"
 
@@ -138,6 +146,14 @@ class AuthGuard:
         an unknown cookie, no cookie, a deployment nobody has set a password on — is
         decided by the database, and only the yes is worth remembering.
         """
+        capabilities = capabilities_for(self.settings)
+        if not capabilities.password_auth:
+            expected = self.settings.desktop_token.get_secret_value()
+            return (
+                AUTHENTICATED
+                if token is not None and secrets.compare_digest(token, expected)
+                else UNAUTHORIZED
+            )
         if auth_service.token_recently_validated(token):
             return AUTHENTICATED
         with get_sessionmaker(self.settings)() as session:

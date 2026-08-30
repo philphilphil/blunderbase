@@ -42,6 +42,11 @@ export function hasNativeBridge(): boolean {
   return config !== null
 }
 
+/** The one request that turns the launch secret into an HTTP-only backend cookie. */
+export function desktopBootstrapHeaders(): Record<string, string> {
+  return config ? { 'x-blunderbase-desktop-token': config.token } : {}
+}
+
 export function sendNativeNotification(title: string, body: string): Promise<void> {
   return send('notify', { title, body })
 }

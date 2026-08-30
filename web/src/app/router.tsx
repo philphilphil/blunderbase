@@ -1,7 +1,9 @@
-import { createBrowserRouter, Link } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { createBrowserRouter, Link, Navigate } from 'react-router-dom'
 
 import { AppShell } from '@/components/shell/AppShell'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import {
   AnalysisPage,
@@ -31,6 +33,10 @@ function NotFound() {
   )
 }
 
+function McpRoute({ children }: { children: ReactNode }) {
+  return useRuntimeCapabilities().mcp ? <>{children}</> : <Navigate to="/" replace />
+}
+
 /**
  * Every route in one place. Screens live in their own directory under `src/routes/` and
  * are re-exported from an `index.ts`, so a page can be rebuilt without this file or the
@@ -53,7 +59,14 @@ export const router = createBrowserRouter([
       { path: 'analysis/maia', element: <MaiaSettingsPage /> },
       { path: 'engines', element: <EnginesPage /> },
       // `/mcp` is the server itself, so the human-facing setup page uses `/assistant`.
-      { path: 'assistant', element: <McpPage /> },
+      {
+        path: 'assistant',
+        element: (
+          <McpRoute>
+            <McpPage />
+          </McpRoute>
+        ),
+      },
       { path: 'live', element: <LivePage /> },
       { path: 'help', element: <HelpPage /> },
       { path: '*', element: <NotFound /> },

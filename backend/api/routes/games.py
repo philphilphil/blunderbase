@@ -7,9 +7,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from backend.api.deps import FiltersDep, SessionDep, not_found, ply_range
+from backend.api.deps import FiltersDep, SessionDep, SettingsDep, not_found, ply_range
 from backend.api.errors import ApiError
 from backend.api.schemas import GameDetail, GameList, GamesDeleted, GamesWipe
+from backend.runtime import capabilities_for
 from backend.services import auth as auth_service
 from backend.services import games as games_service
 
@@ -42,19 +43,25 @@ def list_games(
 
 
 @router.post("/delete-all", response_model=GamesDeleted, summary="Delete every game")
-def delete_all_games(session: SessionDep, body: GamesWipe) -> GamesDeleted:
-    """Empty the library, on the owner's password rather than on their cookie.
+def delete_all_games(
+    session: SessionDep, settings: SettingsDep, body: GamesWipe
+) -> GamesDeleted:
+    """Empty the library, rechecking the owner password when this runtime has one.
 
     A POST rather than a DELETE because the password travels in the body, and a body on a
-    DELETE is something clients and proxies disagree about. The password is checked the way
-    the login route checks it, lockout and all: a browser that is already signed in has
-    proved it is *a* session, not that the person at it meant this.
+    DELETE is something clients and proxies disagree about. On a server the password is
+    checked the way the login route checks it, lockout and all: a browser that is already
+    signed in has proved it is *a* session, not that the person at it meant this. Desktop
+    has no owner password; its native session and explicit destructive dialog are the two
+    checks instead.
 
     Accounts, engines, runners and the settings stay; so do notes about a position rather
     than about a game. The sync history goes, so the next sync of a source starts over —
     see `services.games.delete_all_games`.
     """
-    if not auth_service.verify_password(session, body.password):
+    if capabilities_for(settings).password_auth and (
+        body.password is None or not auth_service.verify_password(session, body.password)
+    ):
         raise ApiError(
             status.HTTP_401_UNAUTHORIZED, "invalid_password", "that is not the password"
         )

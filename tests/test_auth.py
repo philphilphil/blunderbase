@@ -30,6 +30,11 @@ from tests.conftest import OWNER_PASSWORD, running_app
 
 PASSWORD = "correct-horse-battery"
 OTHER = "a-different-password"
+SERVER_CAPABILITIES = {
+    "password_auth": True,
+    "mcp": True,
+    "remote_runners": True,
+}
 
 # Every router, by a path that answers on an empty database.
 ROUTE_FAMILIES = (
@@ -263,6 +268,7 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
     assert unconfigured.get("/auth/status").json() == {
         "setup_required": True,
         "authenticated": False,
+        "capabilities": SERVER_CAPABILITIES,
         "maia_target_elo": MAIA_MAX_RATING,
         "maia_elos": [MAIA_MAX_RATING],
     }
@@ -273,12 +279,14 @@ def test_setup_is_required_until_a_password_is_chosen(unconfigured: TestClient) 
     assert response.json() == {
         "setup_required": False,
         "authenticated": True,
+        "capabilities": SERVER_CAPABILITIES,
         "maia_target_elo": MAIA_MAX_RATING,
         "maia_elos": [MAIA_MAX_RATING],
     }
     assert unconfigured.get("/auth/status").json() == {
         "setup_required": False,
         "authenticated": True,
+        "capabilities": SERVER_CAPABILITIES,
         "maia_target_elo": MAIA_MAX_RATING,
         "maia_elos": [MAIA_MAX_RATING],
     }
@@ -296,6 +304,7 @@ def test_the_status_carries_the_deployments_maia_target_elo(settings: Settings) 
         assert client.post("/auth/login", json={"password": OWNER_PASSWORD}).json() == {
             "setup_required": False,
             "authenticated": True,
+            "capabilities": SERVER_CAPABILITIES,
             "maia_target_elo": 1700,
             "maia_elos": [1700],
         }

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
+import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
 
 import { LibraryManagement } from './LibraryManagement'
 
@@ -49,5 +50,25 @@ describe('LibraryManagement', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByRole('status')).toHaveTextContent('Deleted 6 games, 4 analysis runs and 1 note.')
+  })
+
+  it('uses the destructive confirmation without asking desktop users for a password', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <Providers client={client}>
+        <RuntimeCapabilitiesProvider
+          capabilities={{ password_auth: false, mcp: false, remote_runners: false }}
+        >
+          <LibraryManagement />
+        </RuntimeCapabilitiesProvider>
+      </Providers>,
+    )
+
+    await screen.findByText('6 games in this database')
+    await userEvent.click(screen.getByRole('button', { name: /reset imported library/i }))
+    expect(screen.queryByLabelText('Your password')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /delete them/i }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

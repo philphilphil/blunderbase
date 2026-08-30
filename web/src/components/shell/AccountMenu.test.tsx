@@ -99,6 +99,21 @@ describe('AccountMenu', () => {
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument()
   })
 
+  it('shows no server credentials or MCP setup in the desktop runtime', async () => {
+    routes['GET /api/auth/status'] = () =>
+      json(200, {
+        setup_required: false,
+        authenticated: true,
+        capabilities: { password_auth: false, mcp: false, remote_runners: false },
+      })
+    draw()
+    await openMenu()
+
+    expect(screen.queryByRole('menuitem', { name: /^assistant$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /change password/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /sign out/i })).not.toBeInTheDocument()
+  })
+
   it('heads the menu with every connected account, the owner marked', async () => {
     routes['GET /api/stats/profile'] = () =>
       json(200, {

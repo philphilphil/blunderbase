@@ -13,12 +13,13 @@ from starlette.middleware.gzip import GZipMiddleware
 from backend.api.auth import install_auth
 from backend.api.errors import install_error_handlers
 from backend.api.events import EventBroker
-from backend.api.routes import ROUTERS
+from backend.api.routes import CORE_ROUTERS, MCP_ROUTERS, REMOTE_RUNNER_ROUTERS
 from backend.api.routes.imports import wait_for_imports
 from backend.api.web import install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_engine, get_sessionmaker
+from backend.runtime import capabilities_for
 from backend.services import maia_live, stats
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
@@ -57,7 +58,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     upgrade_to_head(settings)
     logger.info("database pool ready: %s", get_engine(settings).pool.status())
     _clear_stale_connections(settings)
-    _mount_mcp(app, settings)
+    capabilities = capabilities_for(settings)
+    if capabilities.mcp:
+        _mount_mcp(app, settings)
     app.state.loop = asyncio.get_running_loop()
     events: EventBroker = app.state.events
     events.start()
@@ -65,9 +68,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.workers = workers
     if settings.analysis_workers:
         await workers.start()
-    gateway = RunnerGateway(settings=settings)
+    gateway = RunnerGateway(settings=settings) if capabilities.remote_runners else None
     app.state.gateway = gateway
-    await gateway.start()
+    if gateway is not None:
+        await gateway.start()
     streams = _analysis_boards(settings, workers, gateway)
     app.state.streams = streams
     await streams.start()
@@ -77,7 +81,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # The mounted transport keeps its sessions in a task group this context opens.
             # It is a route rather than a sub-application, so nothing else would ever
             # start it.
-            await stack.enter_async_context(app.state.mcp.session_manager.run())
+            if app.state.mcp is not None:
+                await stack.enter_async_context(app.state.mcp.session_manager.run())
             yield
     finally:
         # Cancelled first, and between chunks: every chunk it has finished is committed, so
@@ -90,7 +95,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # on one of them, and both have to still be there for it to give the slot back to.
         await streams.stop()
         app.state.streams = None
-        await gateway.stop()
+        if gateway is not None:
+            await gateway.stop()
         app.state.gateway = None
         await workers.stop()
         # The warm Maia the analysis board queries is a process this one started and
@@ -151,7 +157,7 @@ async def _backfill_stat_summaries(settings: Settings) -> None:
 
 
 def _analysis_boards(
-    settings: Settings, workers: AnalysisWorkers, gateway: RunnerGateway
+    settings: Settings, workers: AnalysisWorkers, gateway: RunnerGateway | None
 ) -> StreamBroker:
     """The infinite-analysis broker, wired to both hosts it can serve a board on.
 
@@ -164,9 +170,10 @@ def _analysis_boards(
     broker.register_backend(
         LocalStreamBackend.name, LocalStreamBackend(broker, pool=workers.pool, settings=settings)
     )
-    remote = RemoteStreamBackend(gateway, broker, settings=settings)
-    remote.install()
-    broker.register_backend(RemoteStreamBackend.name, remote)
+    if gateway is not None:
+        remote = RemoteStreamBackend(gateway, broker, settings=settings)
+        remote.install()
+        broker.register_backend(RemoteStreamBackend.name, remote)
     return broker
 
 
@@ -213,7 +220,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.mcp = None
 
     install_error_handlers(app)
-    for router in ROUTERS:
+    capabilities = capabilities_for(settings)
+    routers = list(CORE_ROUTERS)
+    if capabilities.remote_runners:
+        routers.extend(REMOTE_RUNNER_ROUTERS)
+    if capabilities.mcp:
+        routers.extend(MCP_ROUTERS)
+    for router in routers:
         app.include_router(router)
 
     @app.get("/health", tags=["meta"])

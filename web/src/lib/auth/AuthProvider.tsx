@@ -12,8 +12,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, typ
 
 import { queryKeys } from '@/lib/api/keys'
 import { useAuthStatus } from '@/lib/api/queries'
-import { DEFAULT_MAIA_TARGET_ELO } from '@/lib/api/types'
+import { DEFAULT_MAIA_TARGET_ELO, SERVER_CAPABILITIES } from '@/lib/api/types'
 import type { AuthStatus } from '@/lib/api/types'
+import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
 
 import { onSessionLost, reportSessionRestored } from './session'
 
@@ -36,6 +37,11 @@ const AuthContext = createContext<AuthValue | null>(null)
 /** Pure, and the whole routing decision: what the server said maps onto one screen. */
 export function phaseOf(status: AuthStatus | undefined): AuthPhase {
   if (!status) return 'loading'
+  // A desktop launch with a missing/invalid launch token cannot be repaired with an owner
+  // password, so it must never expose the server login form.
+  if (status.capabilities && !status.capabilities.password_auth && !status.authenticated) {
+    return 'loading'
+  }
   if (status.setup_required) return 'setup'
   return status.authenticated ? 'ready' : 'login'
 }
@@ -54,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         queryClient.setQueryData<AuthStatus>(queryKeys.auth(), (previous) => ({
           setup_required: reason === 'setup_required',
           authenticated: false,
+          capabilities: previous?.capabilities ?? SERVER_CAPABILITIES,
           // The deployment's Maia level outlives the session that was told about it.
           maia_target_elo: previous?.maia_target_elo ?? DEFAULT_MAIA_TARGET_ELO,
         }))
@@ -90,7 +97,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [status, query.isError, recheck],
   )
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      <RuntimeCapabilitiesProvider
+        capabilities={query.data?.capabilities ?? SERVER_CAPABILITIES}
+      >
+        {children}
+      </RuntimeCapabilitiesProvider>
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth(): AuthValue {

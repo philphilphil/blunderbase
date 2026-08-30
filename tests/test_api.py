@@ -334,6 +334,14 @@ def test_a_wipe_without_the_password_takes_nothing(api: TestClient) -> None:
     assert api.get("/games").json()["total"] == 6
 
 
+def test_a_server_wipe_with_no_password_takes_nothing(api: TestClient) -> None:
+    response = api.post("/games/delete-all", json={})
+
+    assert response.status_code == 401
+    assert error_of(response) == "invalid_password"
+    assert api.get("/games").json()["total"] == 6
+
+
 def test_the_owners_password_empties_the_library_and_says_what_it_took(
     settings: Settings, api: TestClient
 ) -> None:

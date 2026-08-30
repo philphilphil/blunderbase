@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, type Download } from './client'
 import * as api from './endpoints'
 import { queryKeys } from './keys'
-import { DEFAULT_MAIA_TARGET_ELO } from './types'
+import { DEFAULT_MAIA_TARGET_ELO, SERVER_CAPABILITIES } from './types'
 import type {
   AnalysisRequest,
   AppSettings,
@@ -138,6 +138,7 @@ export function useLogout(options?: UseMutationOptions<void, Error, void>) {
     client.setQueryData<AuthStatus>(queryKeys.auth(), (previous) => ({
       setup_required: false,
       authenticated: false,
+      capabilities: previous?.capabilities ?? SERVER_CAPABILITIES,
       maia_target_elo: previous?.maia_target_elo ?? DEFAULT_MAIA_TARGET_ELO,
     }))
   return useMutation({
@@ -223,7 +224,7 @@ export function useGame(
 }
 
 /**
- * Empty the library, on the owner's password rather than on their session.
+ * Empty the library after the confirmation appropriate to this runtime.
  *
  * The invalidation is deliberately whole prefixes rather than the keys this page happens
  * to hold: every screen the app has ever rendered was rendered against games that no
@@ -231,10 +232,12 @@ export function useGame(
  * sync history and the notes list all go back to the server — what comes back is empty,
  * which is the point.
  */
-export function useDeleteAllGames(options?: UseMutationOptions<GamesDeleted, Error, string>) {
+export function useDeleteAllGames(
+  options?: UseMutationOptions<GamesDeleted, Error, string | undefined>,
+) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (password: string) => api.deleteAllGames(password),
+    mutationFn: (password: string | undefined) => api.deleteAllGames(password),
     ...options,
     onSuccess: (...args) => {
       for (const queryKey of [

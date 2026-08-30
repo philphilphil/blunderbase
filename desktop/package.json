@@ -4,6 +4,8 @@
   "version": "0.8.3",
   "scripts": {
     "build": "sh scripts/build-macos.sh",
+    "build:macos": "sh scripts/build-macos.sh",
+    "build:windows": "pwsh -NoProfile -File scripts/build-windows.ps1",
     "tauri": "tauri"
   },
   "devDependencies": {

@@ -37,6 +37,7 @@ export function EngineInventory({
   hostKnown,
   openDetail,
   onOpenDetail,
+  localLabel = 'This server',
 }: {
   engines: EngineResponse[]
   hosts: Map<number, EngineHost>
@@ -44,6 +45,7 @@ export function EngineInventory({
   hostKnown: boolean
   openDetail: string | null
   onOpenDetail: (detail: string | null) => void
+  localLabel?: string
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-panel">
@@ -102,7 +104,7 @@ export function EngineInventory({
                 className="max-md:hidden"
               />
               <span className="truncate text-[0.6875rem] text-dim max-md:hidden">
-                {hostLabel(host, hostKnown)}
+                {hostLabel(host, hostKnown, localLabel)}
               </span>
               <span
                 className={cn(
@@ -150,9 +152,13 @@ function engineState(
   return { label: 'On', tone: 'on' }
 }
 
-function hostLabel(host: EngineHost | undefined, hostKnown: boolean): string {
+function hostLabel(
+  host: EngineHost | undefined,
+  hostKnown: boolean,
+  localLabel: string,
+): string {
   if (!hostKnown) return 'Checking…'
-  if (!host || host.runnerId === null) return 'This server'
+  if (!host || host.runnerId === null) return localLabel
   if (host.browser) return 'This browser'
   return host.runnerName ?? 'Remote runner'
 }

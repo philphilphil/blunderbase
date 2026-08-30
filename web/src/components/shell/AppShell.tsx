@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { browserRunner } from '@/lib/runner'
 import { NativeFeedback } from '@/lib/desktop/NativeFeedback'
 import { PgnDropOverlay } from '@/lib/desktop/PgnDropOverlay'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import { CommandPaletteProvider } from './CommandPalette'
 import { NavDrawer, SideNav } from './SideNav'
@@ -43,13 +44,15 @@ const TOAST_CLASSES = {
  * reach across the layout for each other.
  */
 export function AppShell() {
+  const capabilities = useRuntimeCapabilities()
   // If a browser runner is installed in this browser, this is where it comes back: the
   // shell is what a signed-in tab mounts, and the link has to be alive on every page rather
   // than only while somebody is looking at `/engines`. A no-op when nothing is installed,
   // and safe to call again — the client ignores a resume it is already connected for.
   useEffect(() => {
-    browserRunner.resume()
-  }, [])
+    if (capabilities.remote_runners) browserRunner.resume()
+    else browserRunner.stop()
+  }, [capabilities.remote_runners])
 
   const [navOpen, setNavOpen] = useState(false)
   const main = useRef<HTMLElement>(null)

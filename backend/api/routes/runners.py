@@ -32,11 +32,13 @@ from backend.api.schemas import (
 from backend.config import Settings
 from backend.db.session import session_scope
 from backend.runners import protocol
+from backend.runtime import capabilities_for
 from backend.services import runners as runners_service
 from backend.services import streams as streams_service
 from backend.workers import runner_gateway
 
 router = APIRouter(prefix="/runners", tags=["runners"])
+status_router = APIRouter(prefix="/runners", tags=["runners"])
 
 
 # --- the live half ----------------------------------------------------------
@@ -111,7 +113,7 @@ async def create_runner(
     )
 
 
-@router.get("/status", response_model=RunnersStatus, summary="Where engine work can run")
+@status_router.get("/status", response_model=RunnersStatus, summary="Where engine work can run")
 async def runners_status(request: Request, settings: SettingsDep) -> Any:
     """This host and every runner side by side, with the backlog split between them.
 
@@ -119,7 +121,8 @@ async def runners_status(request: Request, settings: SettingsDep) -> Any:
     """
     live = live_picture(request)
     local = local_picture(request, settings)
-    return await asyncio.to_thread(_status, settings, live, local)
+    include_remote = capabilities_for(settings).remote_runners
+    return await asyncio.to_thread(_status, settings, live, local, include_remote)
 
 
 @router.patch("/{runner_id}", response_model=RunnerResponse, summary="Rename or resize a runner")
@@ -181,10 +184,16 @@ def _one(settings: Settings, runner_id: int, live: dict[int, dict[str, Any]]) ->
 
 
 def _status(
-    settings: Settings, live: dict[int, dict[str, Any]], local: dict[str, Any]
+    settings: Settings,
+    live: dict[int, dict[str, Any]],
+    local: dict[str, Any],
+    include_remote: bool = True,
 ) -> dict[str, Any]:
     with session_scope(settings) as session:
-        return runners_service.status_payload(session, live=live, local=local)
+        payload = runners_service.status_payload(session, live=live, local=local)
+    if not include_remote:
+        payload["runners"] = []
+    return payload
 
 
 def _create(

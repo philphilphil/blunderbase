@@ -29,6 +29,7 @@ from backend.db.enums import (
     Source,
     Tier,
 )
+from backend.runtime import RuntimeCapabilities
 
 
 class Payload(BaseModel):
@@ -56,13 +57,15 @@ class AuthStatus(BaseModel):
     """What the page asks before it renders anything: is there a password, and do I have it.
 
     It is also the only payload every screen already has by the time it renders, which is
-    why the one piece of deployment-wide configuration the UI needs rides along on it: the
-    Maia page owns that value (`/settings` below), but every other screen needs it to
-    render and none of them should have to wait on a second call for it.
+    why runtime capabilities and the deployment-wide Maia configuration ride along on it.
+    The browser can hide unavailable surfaces before they mount or issue requests.
     """
 
     setup_required: bool
     authenticated: bool
+    capabilities: RuntimeCapabilities = Field(
+        description="optional surfaces exposed by this running installation",
+    )
     maia_target_elo: int = Field(
         description="the first rating every Maia question on this deployment is asked at",
     )
@@ -230,9 +233,13 @@ class GameList(BaseModel):
 
 
 class GamesWipe(Input):
-    """The owner's password again. Holding a session is not consent to empty the library."""
+    """The owner's password again where password authentication is available.
 
-    password: str = Field(min_length=1)
+    Desktop has a native, single-owner session and confirms the destructive action in its
+    dialog without inventing a persistent password solely for this request.
+    """
+
+    password: str | None = Field(default=None, min_length=1)
 
 
 class GamesDeleted(BaseModel):

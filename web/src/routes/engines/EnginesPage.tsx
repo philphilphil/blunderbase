@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useEngineRoles, useEngines, useRunnersStatus } from '@/lib/api/queries'
 import { hostByEngineId } from '@/lib/engines/hosts'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import { CapacityGrid } from './CapacityGrid'
 import { EngineInventory } from './EngineInventory'
@@ -24,6 +25,7 @@ import { engineRoles } from './roles'
  * remain expanded; here the summaries stay visible and every new detail replaces the old.
  */
 export function EnginesPage() {
+  const capabilities = useRuntimeCapabilities()
   const engines = useEngines()
   const roles = useEngineRoles()
   const status = useRunnersStatus()
@@ -88,8 +90,9 @@ export function EnginesPage() {
               <Cpu className="size-5 text-faint" aria-hidden />
               <p className="text-[0.78125rem] text-soft">No engines are registered.</p>
               <p className="max-w-md text-[0.71875rem] leading-[1.5] text-dim">
-                Add a path-based engine from This server below, install browser Stockfish, or
-                connect a remote runner whose yaml advertises its engines.
+                {capabilities.remote_runners
+                  ? 'Add a path-based engine below, install browser Stockfish, or connect a remote runner.'
+                  : 'Add a path-based engine on this computer below.'}
               </p>
             </div>
           ) : (
@@ -100,11 +103,13 @@ export function EnginesPage() {
               hostKnown={status.isSuccess}
               openDetail={openDetail}
               onOpenDetail={setOpenDetail}
+              localLabel={capabilities.remote_runners ? 'This server' : 'This computer'}
             />
           )}
         </section>
 
         <CapacityGrid
+          remoteRunnersEnabled={capabilities.remote_runners}
           status={status.data}
           isLoading={status.isPending}
           error={status.error}
