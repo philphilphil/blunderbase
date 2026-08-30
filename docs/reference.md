@@ -135,16 +135,18 @@ moves both plus `uv.lock` in one `chore: release vX.Y.Z` commit, then adds an an
 `importlib.metadata`, the sidebar footer via Vite's `define`.
 
 It refuses to run on a dirty tree, off `main`, on a version that is not `X.Y.Z`
-(optionally `X.Y.Z-rc.1`), or when the tag already exists. Nothing is pushed — publish it
-yourself:
+(optionally `X.Y.Z-rc.1`), or when the tag already exists. Nothing is pushed until you
+publish it:
 
 ```bash
-git push origin main --follow-tags
+make publish
 ```
 
-That tag push builds the image again and publishes
-`ghcr.io/philphilphil/blunderbase:0.2.0` and `:0.2`, on top of the `latest` and
-`sha-<short>` the main push publishes.
+Publishing pushes main and the tag, waits for that commit's main CI, then creates the
+GitHub release. The release builds the image once and publishes
+`ghcr.io/philphilphil/blunderbase:0.2.0`, `:0.2`, `latest`, and `sha-<short>`.
+If that build fails, dispatch `release.yml` with the existing tag to rebuild and deploy it;
+dispatching it without a tag only redeploys the current `latest`.
 
 ## Testing
 
@@ -166,5 +168,6 @@ The default run also goes across your cores (`-n auto`, in `pyproject.toml`): th
 share nothing but a temporary SQLite file apiece. Together with the markers that takes the
 backend suite from about 140 seconds to under 20. Use `-n0` when you want a breakpoint.
 
-CI runs both: the default suite and `-m slow`, and `release.yml` runs CI before it deploys,
-so the tag that ships is a tag both passed on. `engine` runs nowhere but your machine.
+CI runs both: the default suite and `-m slow`. `make publish` waits for both before opening
+the release, so the tag that ships is a tag both passed on. `engine` runs nowhere but your
+machine.

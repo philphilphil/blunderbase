@@ -1,15 +1,29 @@
 name: ci
 
-# Every push and every pull request: lint, test, and build the image. The build is the
-# point — a Dockerfile or frontend break should fail here, not the first time someone
-# cuts a release. Nothing is published unless a release triggered the run.
+# Code changes are linted and tested here. The production image is built once, by the
+# release workflow; rebuilding it for every commit spends runner time without publishing
+# anything.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - 'docs/**'
   pull_request:
-  # release.yml runs this whole file before it deploys, so the tag that ships is the tag
-  # the suite passed on.
-  workflow_call:
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - 'docs/**'
+
+permissions:
+  contents: read
+
+# A newer commit on the same branch makes the older result obsolete. This matters most
+# on main, where several small pushes would otherwise consume a full run each.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -24,9 +38,8 @@ jobs:
       # `engine`-marked tests want a real Stockfish or Maia binary and are not part of
       # any run here.
       - run: uv run pytest
-      # `slow` is deselected locally — seven tests that wait out reconnect windows and
-      # shutdown grace periods, forty seconds between them. This is the run that means
-      # nobody has to.
+      # `slow` is deselected from the default run — seven tests that wait out reconnect
+      # windows and shutdown grace periods. CI opts into them once here.
       - run: uv run pytest -m slow
 
   web:
@@ -48,45 +61,3 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
-
-  image:
-    # Built on every run so a broken Dockerfile fails a pull request. Pushed only when a
-    # GitHub release triggered the run — the registry holds releases, not commits.
-    needs: [backend, web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        if: github.event_name == 'release'
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ghcr.io/philphilphil/blunderbase
-          # `latest` is what compose pulls, and only a full release moves it: a
-          # prerelease publishes its own version tags and leaves `latest` where it was.
-          # `latest=false` is load-bearing — the default `latest=auto` would re-add it on
-          # any semver tag, prereleases included, and undo that guard. The sha tag is
-          # what a rollback names.
-          flavor: latest=false
-          tags: |
-            type=sha,format=short
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          push: ${{ github.event_name == 'release' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

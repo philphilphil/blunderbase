@@ -7,25 +7,73 @@ on:
   release:
     types: [published]
   # Redeploy whatever `latest` currently is, without cutting anything. For when the
-  # server drifted, not for shipping code.
+  # server drifted, not for shipping code. Supplying an existing release tag rebuilds
+  # that image first — the recovery path when a release build itself failed.
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing vX.Y.Z tag to rebuild; empty only redeploys latest
+        required: false
+        type: string
 
 jobs:
-  ci:
-    if: github.event_name == 'release'
-    uses: ./.github/workflows/ci.yml
+  image:
+    # `make publish` waits for this commit's main CI before creating the release. Build
+    # the artifact once here, where it is also published.
+    if: github.event_name == 'release' || inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
     permissions:
       contents: read
       packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: Verify release source
+        id: source
+        run: |
+          git tag --points-at HEAD --list "$RELEASE_TAG" | grep -Fxq "$RELEASE_TAG"
+          echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/philphilphil/blunderbase
+          # `latest` is what compose pulls, and only a full release moves it: a
+          # prerelease publishes its version tags and leaves `latest` where it was. The
+          # sha tag is what a rollback names.
+          flavor: latest=false
+          tags: |
+            type=raw,value=sha-${{ steps.source.outputs.short_sha }}
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.RELEASE_TAG }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease || github.event_name == 'workflow_dispatch' && !contains(inputs.release_tag, '-') }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     # A prerelease publishes its image but never moves `latest`, and `latest` is what the
     # stack pulls — so there would be nothing new to deploy.
-    needs: ci
+    needs: image
     if: >-
       !cancelled()
-      && (needs.ci.result == 'success' || needs.ci.result == 'skipped')
-      && !github.event.release.prerelease
+      && (needs.image.result == 'success' || needs.image.result == 'skipped')
+      && (github.event_name == 'workflow_dispatch' || !github.event.release.prerelease)
     runs-on: ubuntu-latest
     concurrency:
       group: komodo-blunderbase

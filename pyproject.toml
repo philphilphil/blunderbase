@@ -44,7 +44,7 @@ packages = ["backend"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Across the cores by default: the suite is 1,363 tests that each want their own SQLite
+# Across the cores by default: the suite is 1,337 tests that each want their own SQLite
 # file and share nothing, which is the shape xdist is for — a hundred seconds becomes
 # under twenty, and a single file costs no more than it did. `-n0` puts it back on one
 # process, which is what a `pdb` breakpoint or a `-s` print wants.
@@ -54,7 +54,7 @@ testpaths = ["tests"]
 # says nothing about which test it was. Sixty seconds is far outside anything here — the
 # whole default run is two minutes on CI and the seven `slow` tests together are thirty —
 # so a test that hits it is stuck, and the traceback names it.
-addopts = "-q -n auto --timeout=60"
+addopts = "-q -n auto --timeout=60 -m 'not slow and not engine'"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [

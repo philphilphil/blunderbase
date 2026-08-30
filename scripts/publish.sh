@@ -4,8 +4,8 @@
 # Driven by `make publish`.
 #
 # This is the step that leaves the machine. Everything before it is local and reversible;
-# publishing the release is what builds the image, moves `latest` and tells Komodo to
-# pull, so it is deliberately a separate command you run once you have looked at the tag.
+# publishing waits for main CI, then the release builds the image, moves `latest` and tells
+# Komodo to pull. It is deliberately a separate command you run after looking at the tag.
 #
 # The release body is the changelog's section for this version, not the tag message —
 # `--notes-from-tag` would publish "Blunderbase v0.3.0" and nothing else, and the notes
@@ -63,6 +63,7 @@ esac
 if [ -n "${BB_DRY:-}" ]; then
 	echo "publish: dry run for $tag — nothing pushed"
 	echo "  git push origin main --follow-tags"
+	echo "  wait for this commit's main CI to pass"
 	echo "  gh release create $tag --title \"Blunderbase $tag\" $prerelease --notes-file -"
 	echo "  notes:"
 	echo "$notes" | sed 's/^/    /'
@@ -70,9 +71,26 @@ if [ -n "${BB_DRY:-}" ]; then
 fi
 
 git push origin main --follow-tags
+
+# The release workflow builds and deploys; it does not spend another pair of runners
+# repeating the backend and web suites. Wait for the push workflow that already owns
+# that proof before creating the release. A newly pushed run can take a moment to appear.
+sha=$(git rev-parse HEAD)
+run_id=""
+attempt=0
+while [ -z "$run_id" ] && [ "$attempt" -lt 30 ]; do
+	run_id=$(gh run list --workflow=ci.yml --event=push --commit="$sha" --limit=1 \
+		--json databaseId --jq '.[0].databaseId // empty')
+	[ -n "$run_id" ] || sleep 2
+	attempt=$((attempt + 1))
+done
+[ -n "$run_id" ] || die "main CI for $sha did not appear within 60 seconds"
+echo "publish: waiting for main CI run $run_id"
+gh run watch "$run_id" --exit-status || die "main CI failed; the release was not created"
+
 # shellcheck disable=SC2086  # $prerelease is a flag or nothing, and must not be quoted.
 printf '%s\n' "$notes" |
 	gh release create "$tag" --title "Blunderbase $tag" $prerelease --notes-file -
 
-echo "publish: $tag released. CI builds the image and Komodo pulls it — watch it with"
+echo "publish: $tag released. The release builds the image and Komodo pulls it — watch it with"
 echo "  gh run watch \$(gh run list --workflow=release --limit=1 --json databaseId --jq '.[0].databaseId')"
