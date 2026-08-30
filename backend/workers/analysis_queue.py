@@ -6,11 +6,13 @@ owns nothing but the plumbing: N asyncio tasks in the API process, the engine po
 concurrency cap, and the boundary between the event loop and the two blocking worlds it
 has to talk to.
 
-Both of those worlds go out through `asyncio.to_thread`:
+Both blocking worlds leave the event loop, but on deliberately different executors:
 
-- the database, because SQLAlchemy here is synchronous and a claim or a commit would
-  otherwise stall every other worker's engine;
-- the engine, because a UCI search is a blocking read on a pipe.
+- every database transition goes through one queue-owned thread. SQLite has one writer,
+  so more threads add connection pressure rather than write throughput; the one-thread
+  ceiling also reserves the shared pool for HTTP, imports, MCP and remote runners;
+- engine calls use `asyncio.to_thread`, because UCI searches are blocking reads on pipes
+  and remain parallel up to `analysis_concurrency`.
 
 One run is up to two passes over the same positions: Stockfish for the evaluation, then —
 where the run was queued asking for it — Maia for the human policy. They are sequential
@@ -36,9 +38,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
@@ -63,6 +69,16 @@ IDLE_CHECK_SECONDS = 0.02
 # How often the runs this set is executing are marked alive. Several beats fit inside
 # `analysis.STALE_AFTER_SECONDS`, so a slow beat is not mistaken for a dead process.
 HEARTBEAT_SECONDS = 10.0
+# SQLite has one writer. One queue database thread is therefore both the fastest useful
+# write concurrency and a hard ceiling on how many connections local analysis can take
+# from HTTP, imports, MCP and remote runners. Engine work remains as parallel as before.
+DB_THREADS = 1
+# A full pool and SQLite's writer lock are backpressure, not failed chess analysis. Retried
+# calls sleep outside the database thread so foreground work gets a chance to finish.
+DB_RETRY_INITIAL_SECONDS = 0.05
+DB_RETRY_MAX_SECONDS = 1.0
+
+T = TypeVar("T")
 
 
 class EngineFailure(Exception):
@@ -107,6 +123,7 @@ class AnalysisWorkers:
         self._owns_pool = pool is None
         self._tasks: list[asyncio.Task[None]] = []
         self._heartbeat: asyncio.Task[None] | None = None
+        self._db_executor: ThreadPoolExecutor | None = None
         self._stopping = asyncio.Event()
         self._wake = asyncio.Event()
         self._busy = 0
@@ -130,7 +147,19 @@ class AnalysisWorkers:
         if self._tasks:
             return
         self._stopping.clear()
-        await asyncio.to_thread(self._requeue_stale)
+        self._db_executor = ThreadPoolExecutor(
+            max_workers=DB_THREADS, thread_name_prefix="analysis-db"
+        )
+        try:
+            await self._db(self._requeue_stale)
+        except BaseException:
+            self._shutdown_db_executor()
+            raise
+        logger.info(
+            "starting %s analysis engine worker(s) with %s database thread(s)",
+            self.concurrency,
+            DB_THREADS,
+        )
         self._tasks = [
             asyncio.create_task(self._worker(), name=f"analysis-worker-{index}")
             for index in range(self.concurrency)
@@ -156,6 +185,7 @@ class AnalysisWorkers:
         if self._owns_pool and self._pool is not None:
             await self._pool.close()
             self._pool = None
+        self._shutdown_db_executor()
 
     async def __aenter__(self) -> AnalysisWorkers:
         await self.start()
@@ -173,7 +203,7 @@ class AnalysisWorkers:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while loop.time() < deadline:
-            outstanding = await asyncio.to_thread(self._outstanding)
+            outstanding = await self._db(self._outstanding)
             if outstanding == 0 and self._busy == 0:
                 return True
             await asyncio.sleep(IDLE_CHECK_SECONDS)
@@ -189,7 +219,7 @@ class AnalysisWorkers:
             # to hand back to the queue.
             claimed: list[int] = []
             try:
-                run_id = await asyncio.to_thread(self._claim, claimed)
+                run_id = await self._db(self._claim, claimed)
             except asyncio.CancelledError:
                 for claimed_id in claimed:
                     self._abandon(claimed_id)
@@ -233,7 +263,7 @@ class AnalysisWorkers:
             if not run_ids:
                 continue
             try:
-                await asyncio.to_thread(self._touch, run_ids)
+                await self._db(self._touch, run_ids)
             except Exception:
                 logger.exception("could not mark runs %s alive", run_ids)
 
@@ -245,20 +275,20 @@ class AnalysisWorkers:
         stale-run sweep is what collects a run this could not release.
         """
         try:
-            await asyncio.to_thread(self._fail, run_id, error, None, True)
+            await self._db(self._fail, run_id, error, None, True)
         except Exception:
             logger.exception("could not release analysis run %s", run_id)
 
     async def _execute(self, run_id: int) -> None:
         try:
-            context = await asyncio.to_thread(self._prepare, run_id)
+            context = await self._db(self._prepare, run_id)
         except analysis.AnalysisError as exc:
             # A run this database cannot describe — no engine, a binary that has moved,
             # a game that is gone. A second attempt would hit exactly the same wall.
-            await asyncio.to_thread(self._fail, run_id, str(exc), None, False)
+            await self._db(self._fail, run_id, str(exc), None, False)
             return
         except Exception as exc:
-            await asyncio.to_thread(self._fail, run_id, _message(exc), None, True)
+            await self._db(self._fail, run_id, _message(exc), None, True)
             return
         if context is None:
             return
@@ -266,14 +296,14 @@ class AnalysisWorkers:
         try:
             evals = await self._analyse(context)
         except EngineFailure as failure:
-            await asyncio.to_thread(self._fail, run_id, failure.error, failure.stderr, True)
+            await self._db(self._fail, run_id, failure.error, failure.stderr, True)
             return
         except Exception as exc:
-            await asyncio.to_thread(self._fail, run_id, _message(exc), None, True)
+            await self._db(self._fail, run_id, _message(exc), None, True)
             return
 
         note = await self._add_maia(context, evals)
-        await asyncio.to_thread(self._finish, run_id, evals, note)
+        await self._db(self._finish, run_id, evals, note)
 
     async def _analyse(self, context: RunContext) -> list[MoveEval]:
         plan = context.plan
@@ -323,6 +353,49 @@ class AnalysisWorkers:
                 raise EngineFailure(_message(exc), _stderr_of(adapter)) from exc
 
     # --- the database side (always on a thread) ---------------------------
+
+    async def _db(self, fn: Callable[..., T], *args: Any) -> T:
+        """Run one short database transaction on the queue's single thread.
+
+        Pool exhaustion and SQLite's busy/locked answer mean "try later", not "the engine
+        failed". Retrying here preserves the buffered result and its attempt while bounding
+        this whole worker set to one checked-out connection. Callers see every other error:
+        a missing table or invalid statement is a bug, not backpressure to hide forever.
+        """
+        loop = asyncio.get_running_loop()
+        executor = self._db_executor
+        if executor is None:
+            raise RuntimeError("analysis database executor is not running")
+        delay = DB_RETRY_INITIAL_SECONDS
+        waiting = False
+        while True:
+            try:
+                result = await loop.run_in_executor(executor, fn, *args)
+            except Exception as exc:
+                if not _database_backpressure(exc):
+                    raise
+                if not waiting:
+                    logger.warning(
+                        "analysis database is busy during %s; retrying without spending "
+                        "the run's attempt: %s",
+                        getattr(fn, "__name__", type(fn).__name__),
+                        _message(exc),
+                    )
+                    waiting = True
+                await asyncio.sleep(delay)
+                delay = min(DB_RETRY_MAX_SECONDS, delay * 2)
+                continue
+            if waiting:
+                logger.info(
+                    "analysis database available again during %s",
+                    getattr(fn, "__name__", type(fn).__name__),
+                )
+            return result
+
+    def _shutdown_db_executor(self) -> None:
+        executor, self._db_executor = self._db_executor, None
+        if executor is not None:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     @property
     def pool(self) -> EnginePool:
@@ -446,6 +519,16 @@ def _stderr_of(adapter: Any) -> str | None:
 def _message(exc: BaseException) -> str:
     text = str(exc).strip()
     return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
+
+
+def _database_backpressure(exc: BaseException) -> bool:
+    """Whether retrying the same transaction later is the correct response."""
+    if isinstance(exc, PoolTimeoutError):
+        return True
+    if not isinstance(exc, OperationalError):
+        return False
+    message = str(exc).lower()
+    return "database is locked" in message or "database is busy" in message
 
 
 async def drain(

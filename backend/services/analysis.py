@@ -1534,9 +1534,10 @@ def claim_next_run(
 ) -> AnalysisRun | None:
     """Take the highest-priority queued run and mark it running, or return None if idle.
 
-    The claim is a conditional UPDATE rather than a `SELECT … FOR UPDATE`, because SQLite
-    has no row locks at all and the same statement has to be correct on both back ends: a
-    second worker's UPDATE simply matches no row and it looks at the next candidate.
+    The candidate subquery and conditional UPDATE are one statement. SQLite has no row
+    locks, so selecting first made every worker choose the same id and race to update it;
+    all but one then repeated the sorted read. `RETURNING` makes the write itself the claim:
+    a second process begins its statement after the first commits and chooses the next row.
 
     The two filters are how one queue serves several kinds of worker. `engine_ids` narrows
     the claim to the engines one runner advertises; `exclude_engine_ids` is what a local
@@ -1561,46 +1562,46 @@ def claim_next_run(
         return None
     if app_settings_service.get_queue_paused(session):
         return None
-    while True:
-        statement = (
-            select(AnalysisRun.id)
-            .where(AnalysisRun.status == RunStatus.QUEUED)
-            .order_by(
-                AnalysisRun.priority.desc(), AnalysisRun.created_at.asc(), AnalysisRun.id.asc()
-            )
-            .limit(1)
+    candidate = (
+        select(AnalysisRun.id)
+        .where(AnalysisRun.status == RunStatus.QUEUED)
+        .order_by(
+            AnalysisRun.priority.desc(), AnalysisRun.created_at.asc(), AnalysisRun.id.asc()
         )
-        if engine_ids is not None:
-            statement = statement.where(AnalysisRun.engine_id.in_(list(engine_ids)))
-        if exclude_engine_ids:
-            statement = statement.where(
-                (AnalysisRun.engine_id.is_(None))
-                | (AnalysisRun.engine_id.not_in(list(exclude_engine_ids)))
-            )
-        candidate = session.scalars(statement).first()
-        if candidate is None:
-            return None
-        claimed = session.execute(
-            update(AnalysisRun)
-            .where(AnalysisRun.id == candidate, AnalysisRun.status == RunStatus.QUEUED)
-            .values(
-                status=RunStatus.RUNNING,
-                started_at=utcnow(),
-                heartbeat_at=utcnow(),
-                finished_at=None,
-                attempts=AnalysisRun.attempts + 1,
-                attempt_token=secrets.token_hex(ATTEMPT_TOKEN_BYTES),
-            )
+        .limit(1)
+    )
+    if engine_ids is not None:
+        candidate = candidate.where(AnalysisRun.engine_id.in_(list(engine_ids)))
+    if exclude_engine_ids:
+        candidate = candidate.where(
+            (AnalysisRun.engine_id.is_(None))
+            | (AnalysisRun.engine_id.not_in(list(exclude_engine_ids)))
         )
-        session.commit()
-        if claimed.rowcount != 1:
-            continue
-        run = session.get(AnalysisRun, candidate)
-        if run is None:
-            continue
-        session.refresh(run)
-        emit_run_event(run_event(EVENT_RUN_STARTED, run))
-        return run
+    claimed_id = session.scalar(
+        update(AnalysisRun)
+        .where(
+            AnalysisRun.id == candidate.scalar_subquery(),
+            AnalysisRun.status == RunStatus.QUEUED,
+        )
+        .values(
+            status=RunStatus.RUNNING,
+            started_at=utcnow(),
+            heartbeat_at=utcnow(),
+            finished_at=None,
+            attempts=AnalysisRun.attempts + 1,
+            attempt_token=secrets.token_hex(ATTEMPT_TOKEN_BYTES),
+        )
+        .returning(AnalysisRun.id)
+    )
+    session.commit()
+    if claimed_id is None:
+        return None
+    run = session.get(AnalysisRun, claimed_id)
+    if run is None:  # pragma: no cover - the claimed row cannot disappear inside this call
+        return None
+    session.refresh(run)
+    emit_run_event(run_event(EVENT_RUN_STARTED, run))
+    return run
 
 
 def heartbeat_runs(session: Session, run_ids: Sequence[int]) -> None:

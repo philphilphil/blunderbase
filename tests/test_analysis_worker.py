@@ -9,13 +9,16 @@ end. The scores are scripted, which is what makes the classifications assertable
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fake_uci import MAIA_OPTIONS, STOCKFISH_OPTIONS, fake_engine_command
 from sqlalchemy import Engine as SaEngine
-from sqlalchemy import select
+from sqlalchemy import event, select
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import MAIA_MAX_RATING, Settings
@@ -521,6 +524,42 @@ async def test_a_worker_survives_an_error_no_run_path_expects(
     assert len(rows) == 6
 
 
+async def test_a_pool_checkout_failure_retries_the_write_without_spending_an_attempt(
+    db: sessionmaker[Session],
+    settings: Settings,
+    tmp_path: Path,
+    fixtures_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Database backpressure is not an engine failure and must not rerun the game."""
+    _register(db, tmp_path, go=QUICK_REPLIES)
+    _import_game(db, fixtures_dir)
+    stored = analysis.complete_run
+    calls = 0
+
+    def once(session: Session, run: AnalysisRun, evals: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise PoolTimeoutError(
+                "QueuePool limit of size 10 overflow 50 reached, connection timed out"
+            )
+        stored(session, run, evals)
+
+    monkeypatch.setattr(analysis, "complete_run", once)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = session.scalars(select(AnalysisRun)).one()
+        rows = analysis.get_move_evals(session, run.id)
+
+    assert calls == 2, "the same buffered result was written again"
+    assert run.status is RunStatus.DONE
+    assert run.attempts == 1, "database pressure did not rerun the engine"
+    assert len(rows) == 6
+
+
 @pytest.mark.slow
 async def test_a_shutdown_hands_a_run_back_without_spending_its_retry(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
@@ -914,6 +953,49 @@ async def test_no_maia_engine_is_not_an_error(
 
 
 # --- the pool the workers share -------------------------------------------
+
+
+async def test_queue_database_work_cannot_exhaust_the_shared_connection_pool(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Many queue workers still create at most one concurrent database caller.
+
+    A deliberately tiny pool makes the production failure deterministic: before the queue
+    owns a bounded executor, three idle workers run their claim queries concurrently, one
+    holds the only connection, and the others raise SQLAlchemy's QueuePool timeout.
+    """
+    engine = create_db_engine(
+        f"sqlite+pysqlite:///{tmp_path / 'tiny-pool.db'}",
+        pool_size=1,
+        max_overflow=0,
+        pool_timeout=0.01,
+    )
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def slow_reads(
+        _connection: Any,
+        _cursor: Any,
+        statement: str,
+        _parameters: Any,
+        _context: Any,
+        _many: bool,
+    ) -> None:
+        if statement.lstrip().upper().startswith("SELECT"):
+            time.sleep(0.04)
+
+    settings = Settings(root=tmp_path, analysis_concurrency=3, analysis_poll_seconds=0.005)
+    workers = AnalysisWorkers(settings=settings, sessions=sessions)
+    caplog.set_level(logging.WARNING, logger=analysis_queue.__name__)
+    try:
+        await workers.start()
+        await asyncio.sleep(0.15)
+    finally:
+        await workers.stop()
+        engine.dispose()
+
+    assert "QueuePool limit" not in caplog.text
 
 
 async def test_the_workers_take_their_concurrency_cap_from_configuration(

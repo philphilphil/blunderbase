@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
 
-# Sized for worker threads rather than HTTP concurrency: every Session owns its own
-# connection, and an analysis run holds one for as long as it buffers its MoveEvals.
+# Shared by HTTP, imports, MCP and both kinds of analysis host. Local queue work is bounded
+# to one connection in `workers.analysis_queue`; this pool supplies foreground headroom and
+# short bursts elsewhere rather than being the queue's concurrency control.
 POOL_SIZE = 10
 MAX_OVERFLOW = 50
 # What a caller waits for a connection before it is told there is none. Deliberately short:

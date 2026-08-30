@@ -17,7 +17,7 @@ from backend.api.routes.imports import wait_for_imports
 from backend.api.web import install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
-from backend.db.session import get_sessionmaker
+from backend.db.session import get_engine, get_sessionmaker
 from backend.services import maia_live
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
@@ -48,6 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     settings: Settings = app.state.settings
     upgrade_to_head(settings)
+    logger.info("database pool ready: %s", get_engine(settings).pool.status())
     _clear_stale_connections(settings)
     _mount_mcp(app, settings)
     app.state.loop = asyncio.get_running_loop()

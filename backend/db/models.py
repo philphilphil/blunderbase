@@ -354,7 +354,6 @@ class AnalysisRun(Base):
     __tablename__ = "analysis_runs"
     __table_args__ = (
         Index("ix_analysis_runs_game_id", "game_id"),
-        Index("ix_analysis_runs_status_priority_created_at", "status", "priority", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -412,6 +411,17 @@ class AnalysisRun(Base):
         passive_deletes=True,
         order_by="MoveEval.ply",
     )
+
+
+# Mixed directions matter: claims take high priority first and FIFO inside it. Declared
+# against the mapped columns so SQLAlchemy preserves those directions in schema creation.
+Index(
+    "ix_analysis_runs_status_priority_created_at",
+    AnalysisRun.status,
+    AnalysisRun.priority.desc(),
+    AnalysisRun.created_at.asc(),
+    AnalysisRun.id.asc(),
+)
 
 
 class MoveEval(Base):

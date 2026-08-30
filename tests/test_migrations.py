@@ -75,6 +75,21 @@ def test_indexes_the_hot_queries_need_exist(settings: Settings) -> None:
     assert ("key_hash",) in unique("mcp_keys")
 
 
+def test_the_queue_claim_order_is_served_entirely_by_its_index(settings: Settings) -> None:
+    """A library-sized queue must not be sorted into a temporary B-tree for every claim."""
+    upgrade_to_head(settings)
+    with get_engine(settings).connect() as connection:
+        plan = connection.execute(
+            text(
+                "EXPLAIN QUERY PLAN SELECT id FROM analysis_runs "
+                "WHERE status = 'queued' "
+                "ORDER BY priority DESC, created_at ASC, id ASC LIMIT 1"
+            )
+        ).all()
+
+    assert not any("TEMP B-TREE" in str(detail).upper() for row in plan for detail in row)
+
+
 def test_sqlite_runs_in_wal_mode(settings: Settings) -> None:
     upgrade_to_head(settings)
     with get_engine(settings).connect() as connection:

@@ -32,14 +32,17 @@ drives a subprocess and hands plain data back to a service.
 ## Sync SQLAlchemy, not async
 
 The database layer is synchronous: `Session`, `sessionmaker`, `create_engine`. The
-analysis workers are asyncio tasks, and they will do their database work in a worker
-thread (`asyncio.to_thread` / `run_in_executor`) rather than through an async Session.
+analysis workers are asyncio tasks, and they do database work on one dedicated worker
+thread rather than through an async Session. Engine calls still use the event loop's
+general thread executor and remain parallel up to `analysis_concurrency`.
 
 Why:
 
 - The expensive thing in an analysis run is the engine subprocess, not the database. A run
   buffers its `MoveEval` rows in memory and commits them once at the end, so the write
-  lock is held for milliseconds. Async DB drivers buy concurrency we do not need.
+  lock is held for milliseconds. SQLite has one writer, so several queue DB threads add
+  waiting connections rather than throughput; one thread dispatches every local claim,
+  heartbeat and completion while the engines work in parallel.
 - SQLite's asyncio support is a thread pool underneath in any case, so an async Session
   would be the same threads with more machinery.
 - The predecessor ran this exact pattern in production against the same workload, and
@@ -47,7 +50,8 @@ Why:
 
 Practical consequence: a `Session` belongs to one thread. `backend.db.session` pools with
 the default `QueuePool`, so every Session gets its own connection; never share one across
-threads, and never hold one open across an `await`.
+threads, and never hold one open across an `await`. A local analysis run opens separate,
+short Sessions to claim, prepare and finish; it holds no connection while an engine thinks.
 
 ## One SQLite file
 
@@ -177,10 +181,19 @@ A subscriber that raises is ignored: it must never be able to abort a sync.
 
 The queue is the `analysis_runs` table, not a broker: a run survives a restart because it
 is a row. Workers claim the highest `priority` queued row (deep = 10 beats quick = 0, so a
-deep request someone is waiting on jumps the FIFO), mark it `running`, and on completion
-write every `MoveEval` and the terminal status in one commit. A crash writes `failed` with
-the engine's stderr and buys one retry (`attempts` < `MAX_ATTEMPTS`). Re-analysis is
-always a new run; old runs are never overwritten.
+deep request someone is waiting on jumps the FIFO) with one conditional `UPDATE …
+RETURNING`, mark it `running`, and on completion write every `MoveEval` and the terminal
+status in one commit. The claim index matches that mixed order — priority descending,
+then creation and id ascending — so a library backfill is an index walk rather than one
+temporary sort per game.
+
+All local queue database transitions pass through one dedicated thread. This does not cap
+engine concurrency: N workers can still have N engines searching, but only one of their
+short SQLite transactions can hold a pooled connection. Pool checkout exhaustion and
+SQLite busy/locked errors are retried with backoff around the same transition, retaining
+the buffered result and attempt; they are infrastructure pressure, not engine failures.
+A crash writes `failed` with the engine's stderr and buys one retry (`attempts` <
+`MAX_ATTEMPTS`). Re-analysis is always a new run; old runs are never overwritten.
 
 ## The query side
 
