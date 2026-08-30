@@ -4,6 +4,11 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.8.2 — 2026-08-30
+
+- Fixed the app locking up during large analysis backfills
+- Changed stats to read precomputed per-game summaries
+
 ## v0.8.1 — 2026-08-30
 
 - Fixed large analysis batches exhausting database connections
