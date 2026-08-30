@@ -51,6 +51,19 @@ describe('CoverageSplit', () => {
     expect(screen.getByText('100 games')).toBeInTheDocument()
   })
 
+  it('uses a real colour for quick and reserves grey for games with no pass', () => {
+    render(
+      <CoverageSplit
+        coverage={coverage({ total: 100, no_pass: 50, quick_only: 30, deep: 20 })}
+      />,
+    )
+
+    const [deep, quick, noPass] = screen.getByRole('img').children
+    expect(deep).toHaveClass('bg-deep')
+    expect(quick).toHaveClass('bg-accent-teal')
+    expect(noPass).toHaveClass('bg-edge-strong')
+  })
+
   /**
    * The library this was built for: 6,879 of 7,714 games have never been analysed, so one
    * segment is 89% of the bar. The design has to survive that — the two small buckets keep

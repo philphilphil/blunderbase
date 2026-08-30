@@ -41,7 +41,7 @@ const BUCKETS: Bucket[] = [
     key: 'quick_only',
     label: 'Quick only',
     hint: 'the automatic pass on import, and no deep pass yet',
-    barClass: 'bg-meter-2',
+    barClass: 'bg-accent-teal',
   },
   {
     key: 'no_pass',

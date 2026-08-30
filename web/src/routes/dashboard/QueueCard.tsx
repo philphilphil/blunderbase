@@ -5,6 +5,7 @@
 import { Link } from 'react-router-dom'
 
 import { QueueDestinations } from '@/components/shell/QueueDestinations'
+import { QueueMeter } from '@/components/shell/QueueMeter'
 import { useGames, useMaiaFill, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
 import type { RunStatus } from '@/lib/api/types'
 import { TIER_STYLES } from '@/lib/chess/classification'
@@ -164,17 +165,12 @@ export function QueueCard() {
         <Bar className="h-[0.1875rem] w-full" />
       ) : (
         <>
-          <div className="h-[0.1875rem] overflow-hidden rounded-sm bg-track">
-            <div
-              className={cn(
-                'h-full transition-[width] duration-500',
-                workersOff ? 'bg-mistake' : 'bg-accent-teal',
-              )}
-              style={{
-                width: outstanding === 0 ? '0%' : `${(running / outstanding) * 100}%`,
-              }}
-            />
-          </div>
+          <QueueMeter
+            queued={queued}
+            running={running}
+            stopped={workersOff}
+            className="h-[0.1875rem] w-full bg-track"
+          />
 
           {destinations.length > 1 ? (
             <div className="border-t border-hairline pt-2">

@@ -60,6 +60,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('QueueIndicator', () => {
+  it('draws the whole outstanding queue as running and waiting work, not as progress', async () => {
+    draw()
+
+    const meter = await screen.findByRole('img', { name: '4 running, 825 queued' })
+    expect(meter.children).toHaveLength(2)
+    expect((meter.children[0] as HTMLElement).style.width).toBe(`${(4 / 829) * 100}%`)
+    expect((meter.children[1] as HTMLElement).style.width).toBe(`${(825 / 829) * 100}%`)
+  })
+
   it('offers no Clear while nothing is queued', async () => {
     routes['GET /api/analysis/queue'] = () => json(200, queue(0, 0))
     draw()

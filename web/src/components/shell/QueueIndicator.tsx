@@ -6,13 +6,15 @@ import { useClearQueue, useQueueStatus, useSetQueuePaused } from '@/lib/api/quer
 import { cn } from '@/lib/utils'
 
 import { QueueDestinations } from './QueueDestinations'
+import { QueueMeter } from './QueueMeter'
 
 /**
- * The titlebar queue widget from the design: a label, a 64×3 bar and `3/7` in mono.
+ * The titlebar queue widget from the design: a label, a 64×3 meter and `3/7` in mono.
  *
- * `/analysis/queue` reports queued and running counts, so "total" is the two added
- * together and "done" is what is no longer queued — the widget is about the work that is
- * outstanding right now, not about a run's history.
+ * `/analysis/queue` reports queued and running counts, so the meter fills its whole width
+ * with the outstanding work and splits it into running and waiting segments. It cannot be
+ * an honest progress bar: the queue has no stable start or batch total, and new work may
+ * arrive at any time.
  *
  * The tooltip carries the same sentence the `title` attribute used to, plus the
  * per-destination split when there is more than one place the work can go.
@@ -62,15 +64,12 @@ export function QueueIndicator({ className }: { className?: string }) {
             >
               {paused ? 'Paused' : idle ? 'Idle' : 'Analysing'}
             </span>
-            <div className="h-[0.1875rem] w-16 overflow-hidden rounded-sm bg-edge max-md:w-8">
-              <div
-                className={cn(
-                  'h-full transition-[width] duration-500',
-                  paused || data?.workers === false ? 'bg-mistake' : 'bg-accent-teal',
-                )}
-                style={{ width: total === 0 ? '0%' : `${Math.round((running / total) * 100)}%` }}
-              />
-            </div>
+            <QueueMeter
+              queued={queued}
+              running={running}
+              stopped={paused || data?.workers === false}
+              className="h-[0.1875rem] w-16 max-md:w-8"
+            />
             <span
               className={cn(
                 'font-mono text-[0.6875rem] tabular',
