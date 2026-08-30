@@ -62,7 +62,7 @@ wheels = [
 
 [[package]]
 name = "blunderbase"
-version = "0.8.2"
+version = "0.8.3"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
