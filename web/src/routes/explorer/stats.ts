@@ -2,11 +2,14 @@
  * Reading `services.explorer.opening_explorer` the way design 2c draws it.
  *
  * Everything here is derived from what the endpoint actually sends. `score` is 0..1 from
- * the owner's side, `avg_win_loss` is win percentage given away by whoever was to move,
- * averaged over the games that have been analysed — `null` until something has looked at
- * the move, which is why an unanalysed continuation shows an em dash rather than a zero.
+ * the owner's side, `avg_win_loss` is win percentage the *owner* gave away playing this
+ * move, averaged over their occurrences that have been analysed — `null` until something
+ * has looked at one, which is why an unanalysed continuation shows an em dash rather than
+ * a zero. `blunders` and `evaluated` count the owner's moves the same way, so both are
+ * zero on a continuation only the opponent played (`owner_moves === 0`) and the table
+ * shows a dash there too: never having played a move is not having played it well.
  */
-import type { ExplorerMove, ExplorerResponse, GameSummary } from '@/lib/api/types'
+import type { ExplorerMove, GameSummary } from '@/lib/api/types'
 import { MINUS } from '@/lib/chess/evaluation'
 
 /** The three-part win / draw / loss bar, as percentages that always add up to 100. */
@@ -75,9 +78,14 @@ export function dropTone(avg: number | null | undefined): string {
 }
 
 /**
- * The average win percentage given away over the whole node, weighted by how often each
- * continuation was played. The endpoint reports this per move but not for the position, and
- * the summary card in design 2c wants one number for the line.
+ * The average win percentage the owner gave away over the whole node, weighted by how many
+ * of their own moves each continuation folded. The endpoint reports this per move but not
+ * for the position, and the summary card in design 2c wants one number for the line.
+ *
+ * Continuations the owner never played carry a null `avg_win_loss` and a zero `evaluated`,
+ * so they drop out of both sums rather than pulling the average towards a zero they did
+ * not earn. A node where the owner was never to move leaves nothing to weight and the
+ * answer is `null` — no drop to report, which is not the same as a drop of nothing.
  */
 export function averageDrop(moves: readonly ExplorerMove[]): number | null {
   let weight = 0
@@ -93,10 +101,14 @@ export function averageDrop(moves: readonly ExplorerMove[]): number | null {
 }
 
 /**
- * The continuation that costs the most, among those played often enough to mean anything.
+ * The continuation that costs the most, among those the owner played often enough to mean
+ * anything.
  *
  * A move has to actually give something away to qualify: in a line where every move is
- * accurate there is no worst move, and naming one anyway would be a lie in red type.
+ * accurate there is no worst move, and naming one anyway would be a lie in red type. The
+ * drop is the owner's own, so the sample the threshold guards has to be theirs as well —
+ * `owner_moves`, not `games`, which at a position they answer rather than ask counts
+ * mostly their opponents. An empty candidate list is the honest `null`.
  */
 export function worstContinuation(
   moves: readonly ExplorerMove[],
@@ -106,7 +118,7 @@ export function worstContinuation(
     (move) =>
       typeof move.avg_win_loss === 'number' &&
       move.avg_win_loss >= minDrop &&
-      (move.games ?? 0) >= minGames,
+      (move.owner_moves ?? move.games ?? 0) >= minGames,
   )
   if (candidates.length === 0) return null
   return candidates.reduce((worst, move) =>
@@ -115,21 +127,19 @@ export function worstContinuation(
 }
 
 /**
- * The short note in the last column: what is actually true about this continuation, not a
- * generated opinion. Ordered so the most useful thing wins.
+ * `book_depth` in moves, which is what a book is talked about in.
+ *
+ * The service counts plies (`services.explorer.book_walk`) and an odd count is half a move
+ * deeper than the whole number it floors to. Half a move is not a thing to print and
+ * rounding it up would overstate the very number this whole walk exists to keep honest, so
+ * an odd depth is worded as "over N" and a single ply says so in words.
  */
-export function moveNote(move: ExplorerMove, tree: ExplorerResponse): string | null {
-  const main = tree.main_line?.[0]
-  const leaves = tree.leaves_book_with as { uci?: string } | null | undefined
-  if (main?.uci === move.uci) return 'main line'
-  if (tree.book_depth === 0 && leaves?.uci === move.uci) return 'leaves your book'
-  if ((move.blunders ?? 0) > 0) {
-    return `${move.blunders} blunder${move.blunders === 1 ? '' : 's'} from here`
-  }
-  if ((move.games ?? 0) === 1) return 'played once'
-  if ((move.games ?? 0) <= 3) return `${move.games} games, thin sample`
-  if ((move.evaluated ?? 0) === 0) return 'not analysed'
-  return null
+export function bookDepthLabel(plies: number): string {
+  const moves = Math.floor(plies / 2)
+  const noun = moves === 1 ? 'move' : 'moves'
+  if (plies % 2 === 0) return `${moves} ${noun}`
+  if (moves === 0) return 'a single move'
+  return `over ${moves} ${noun}`
 }
 
 /** Why the book walk stopped, in words rather than the service's own vocabulary. */
@@ -137,6 +147,8 @@ export function bookReason(reason: string | null | undefined): string {
   switch (reason) {
     case 'novelty':
       return 'you have only played the next move once'
+    case 'line not played':
+      return 'no two games of yours played the whole line'
     case 'no continuation':
       return 'no game of yours goes further'
     case 'depth limit':

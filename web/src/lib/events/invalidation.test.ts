@@ -106,9 +106,14 @@ describe('invalidationsFor — notes', () => {
     expect(has(keys, queryKeys.games())).toBe(false)
   })
 
-  it('refetches only the notes for a standalone note', () => {
+  it('refetches the notes and the explorer for a standalone note', () => {
+    // The explorer whatever the note hangs on: its move rows carry the newest note on the
+    // position each move leads to, and a note that names no game still names a position.
     const keys = invalidationsFor({ ...note, event: 'note.created', game_id: null })
-    expect(names(keys)).toEqual([JSON.stringify(queryKeys.notes())])
+    expect(names(keys)).toEqual([
+      JSON.stringify(queryKeys.notes()),
+      JSON.stringify(queryKeys.explorer()),
+    ])
   })
 
   it('takes the kept lines with it when the note is about a variation', () => {

@@ -1,6 +1,13 @@
 /**
  * Design 2c's "Your results in this line" card: the win/draw/loss bar, the score, the
  * average win percentage given away from here and the continuation that costs the most.
+ *
+ * The bar and the score are every game through the position; the two accuracy readings
+ * are the owner's own moves only, because that is what the service now counts. At a
+ * position where the opponent is to move there are no owner moves to average, so
+ * `averageDrop` is null and shows an em dash and `worstContinuation` has no candidate and
+ * the "worst move here" corner drops out — right, since nothing on the card would be the
+ * owner's play. Both are already null-safe; neither invents a zero.
  */
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ExplorerResponse } from '@/lib/api/types'

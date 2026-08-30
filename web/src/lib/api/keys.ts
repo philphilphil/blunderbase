@@ -124,7 +124,6 @@ export const queryKeys = {
   noteList: (query: NoteQuery = {}): QueryKey => ['notes', 'list', query],
   note: (id: number): QueryKey => ['notes', 'detail', id],
   noteTags: (): QueryKey => ['notes', 'tags'],
-  noteResurface: (limit: number | null = null): QueryKey => ['notes', 'resurface', limit],
 
   /**
    * Kept variations. Their own prefix rather than a corner of `['games']`: pinning a line

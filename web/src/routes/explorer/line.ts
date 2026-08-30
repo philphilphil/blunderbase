@@ -11,13 +11,17 @@
  */
 import { Chess } from 'chessops/chess'
 import { chessgroundDests } from 'chessops/compat'
-import { makeFen } from 'chessops/fen'
+import { makeFen, parseFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
 import type { Move, NormalMove, SquareName } from 'chessops/types'
 import { makeUci, parseUci } from 'chessops/util'
 
 export interface LineStep {
-  /** 0-based, counted from the initial position — ply 0 is White's first move. */
+  /**
+   * 0-based and absolute: ply 0 is White's first move of the game, whatever the line was
+   * rooted at. A line rooted mid-game starts counting from that position's own ply, so a
+   * move keeps the number a player would call it by.
+   */
   ply: number
   uci: string
   san: string
@@ -36,15 +40,43 @@ export interface LinePosition {
   dests: Map<SquareName, SquareName[]>
   /** True when the requested line could not be played to the end. */
   truncated: boolean
+  /** The FEN the line was replayed from, when it did not start at the initial array. */
+  root: string | null
+  /** The ply the root position sits at — 0 for the initial array. */
+  basePly: number
+}
+
+/**
+ * The position a line is replayed from, and the ply it sits at.
+ *
+ * A root FEN is how the explorer is reachable from somewhere that knows a position but not
+ * the moves that reached it — a note written about a position, a coach's link. Anything
+ * unreadable falls back to the initial array rather than throwing: a bad link should land
+ * you somewhere, not on an error.
+ */
+function rootPosition(fen: string | null | undefined): { position: Chess; basePly: number } {
+  if (!fen) return { position: Chess.default(), basePly: 0 }
+  const setup = parseFen(fen)
+  if (setup.isErr) return { position: Chess.default(), basePly: 0 }
+  const position = Chess.fromSetup(setup.value)
+  if (position.isErr) return { position: Chess.default(), basePly: 0 }
+  const { fullmoves, turn } = setup.value
+  return {
+    position: position.value,
+    basePly: Math.max(0, (fullmoves - 1) * 2 + (turn === 'black' ? 1 : 0)),
+  }
 }
 
 function isNormal(move: Move): move is NormalMove {
   return 'from' in move
 }
 
-/** Replay a list of UCI moves from the start. Anything illegal ends the line there. */
-export function buildLine(ucis: readonly string[]): LinePosition {
-  const position = Chess.default()
+/**
+ * Replay a list of UCI moves from `rootFen`, or from the initial array without one.
+ * Anything illegal ends the line there.
+ */
+export function buildLine(ucis: readonly string[], rootFen?: string | null): LinePosition {
+  const { position, basePly } = rootPosition(rootFen)
   const steps: LineStep[] = []
   let truncated = false
 
@@ -56,17 +88,19 @@ export function buildLine(ucis: readonly string[]): LinePosition {
     }
     // `makeSanAndPlay` needs the position *before* the move to disambiguate, and plays it.
     const san = makeSanAndPlay(position, move)
-    steps.push({ ply: steps.length, uci: makeUci(move), san })
+    steps.push({ ply: basePly + steps.length, uci: makeUci(move), san })
   }
 
   return {
     steps,
     fen: makeFen(position.toSetup()),
     turn: position.turn,
-    ply: steps.length,
+    ply: basePly + steps.length,
     lastMove: steps.at(-1)?.uci ?? null,
     dests: chessgroundDests(position),
     truncated,
+    root: rootFen ?? null,
+    basePly,
   }
 }
 
@@ -80,7 +114,7 @@ export function withMove(
   orig: string,
   dest: string,
 ): string[] | null {
-  const position = replay(line.steps)
+  const position = replay(line.steps, line.root)
   const plain = parseUci(`${orig}${dest}`)
   if (!plain || !isNormal(plain)) return null
 
@@ -92,13 +126,20 @@ export function withMove(
   return [...line.steps.map((step) => step.uci), makeUci(move)]
 }
 
-/** The UCI list truncated to `ply` moves — clicking a breadcrumb crumb. */
+/**
+ * The UCI list truncated so the line ends at `ply` — clicking a breadcrumb crumb.
+ *
+ * `ply` is absolute, like `LineStep.ply`, so a caller can name the ply it wants without
+ * knowing where the line was rooted. Below the root it clamps to the root itself, which is
+ * what the breadcrumb's `start` crumb asks for by passing 0.
+ */
 export function truncateTo(line: LinePosition, ply: number): string[] {
-  return line.steps.slice(0, Math.max(0, ply)).map((step) => step.uci)
+  const kept = Math.max(0, ply - line.basePly)
+  return line.steps.slice(0, kept).map((step) => step.uci)
 }
 
-function replay(steps: readonly LineStep[]): Chess {
-  const position = Chess.default()
+function replay(steps: readonly LineStep[], rootFen: string | null = null): Chess {
+  const { position } = rootPosition(rootFen)
   for (const step of steps) {
     const move = parseUci(step.uci)
     if (move && position.isLegal(move)) position.play(move)

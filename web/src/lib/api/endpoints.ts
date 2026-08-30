@@ -60,7 +60,6 @@ import type {
   QueueCleared,
   QueuePaused,
   QueueStatus,
-  ResurfaceResponse,
   RetryFailedReceipt,
   RunnerCreate,
   RunnerCreated,
@@ -277,6 +276,12 @@ export interface ExplorerQuery {
   color?: 'white' | 'black'
   limit?: number
   min_games?: number
+  /**
+   * `e2e4,e7e5` — how this position was reached. Naming only: the tree is still the one
+   * `fen` asks for. The opening book stops naming positions a few plies in, so a position
+   * any deeper takes its name from an ancestor, and only the path says which one.
+   */
+  line?: string
 }
 
 export const explore = (query: ExplorerQuery = {}) =>
@@ -406,9 +411,6 @@ export const listTags = () => http.get<TagCount[]>('/notes/tags')
  * The notes worth re-reading: ones whose position came back in a recently imported game,
  * and ones nobody has touched in three weeks. Each item says which of the two it is.
  */
-export const resurfaceNotes = (limit?: number) =>
-  http.get<ResurfaceResponse>('/notes/resurface', { query: { limit } })
-
 /** The href of an export, for a link that wants one. `exportNotes` is what a button uses. */
 export const exportNotesUrl = (format: NoteExportFormat = 'md', query: NoteExportQuery = {}) =>
   apiUrl('/notes/export', { ...noteParams(query), format })

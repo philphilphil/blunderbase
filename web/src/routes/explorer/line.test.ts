@@ -106,3 +106,49 @@ describe('plyLabel', () => {
     expect(plyLabel(9)).toBe('5…')
   })
 })
+
+/**
+ * A line rooted at a bare position — how a note written about a position links back into
+ * the explorer, where nobody recorded the move order that reached it.
+ */
+describe('a line rooted at a position', () => {
+  // After 1.e4 c5 2.Nf3: Black to move, so ply 3 is the next half-move.
+  const SICILIAN = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
+
+  it('counts plies from the root rather than from the initial array', () => {
+    const line = buildLine([], SICILIAN)
+    expect(line.fen).toBe(SICILIAN)
+    expect(line.turn).toBe('black')
+    expect(line.basePly).toBe(3)
+    expect(line.ply).toBe(3)
+    expect(line.steps).toEqual([])
+  })
+
+  it('numbers moves played from the root the way a player would call them', () => {
+    const line = buildLine(['b8c6', 'd2d4'], SICILIAN)
+    expect(line.steps.map((step) => step.san)).toEqual(['Nc6', 'd4'])
+    expect(line.steps.map((step) => step.ply)).toEqual([3, 4])
+    expect(plyLabel(line.steps[1]!.ply)).toBe('3.')
+    expect(line.ply).toBe(5)
+  })
+
+  it('truncates on an absolute ply and clamps below the root to the root itself', () => {
+    const line = buildLine(['b8c6', 'd2d4'], SICILIAN)
+    expect(truncateTo(line, 4)).toEqual(['b8c6'])
+    // What the breadcrumb's `start` crumb asks for: everything back to the root.
+    expect(truncateTo(line, 0)).toEqual([])
+  })
+
+  it('plays a further move from the root position, not from the initial array', () => {
+    const line = buildLine([], SICILIAN)
+    expect(withMove(line, 'b8', 'c6')).toEqual(['b8c6'])
+    // White is not to move here, so a white move is not legal.
+    expect(withMove(line, 'd2', 'd4')).toBeNull()
+  })
+
+  it('falls back to the initial array rather than throwing on a FEN it cannot read', () => {
+    const line = buildLine([], 'not a position')
+    expect(line.fen).toBe(START)
+    expect(line.basePly).toBe(0)
+  })
+})

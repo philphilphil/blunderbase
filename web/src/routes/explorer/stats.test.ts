@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ExplorerMove, ExplorerResponse, GameSummary } from '@/lib/api/types'
+import type { ExplorerMove, GameSummary } from '@/lib/api/types'
 
 import {
   averageDrop,
+  bookDepthLabel,
   bookReason,
   commonOpening,
   dropTone,
   formatAvgDrop,
-  moveNote,
   scorePercent,
   scoreTone,
   splitOf,
@@ -71,6 +71,16 @@ describe('the average-drop column', () => {
   it('has no average when nothing has been analysed', () => {
     expect(averageDrop([move({ uci: 'e2e4', evaluated: 0 })])).toBeNull()
   })
+
+  it('has no average where the owner never moved, rather than an average of zero', () => {
+    // Every game here is one the opponent chose the move in: `evaluated` counts the
+    // owner's moves only, so there is nothing to weight and nothing to report.
+    const moves = [
+      move({ uci: 'g1f3', games: 57, owner_moves: 0, evaluated: 0, avg_win_loss: null }),
+      move({ uci: 'd2d4', games: 12, owner_moves: 0, evaluated: 0, avg_win_loss: null }),
+    ]
+    expect(averageDrop(moves)).toBeNull()
+  })
 })
 
 describe('worstContinuation', () => {
@@ -87,6 +97,16 @@ describe('worstContinuation', () => {
     expect(worstContinuation([move({ uci: 'e7e5', games: 9 })])).toBeNull()
   })
 
+  it('measures the sample in the owner’s own moves, not in games', () => {
+    // 40 games through e7e6, but the owner played it twice; the drop is theirs, so the
+    // "played often enough to mean anything" threshold has to be theirs too.
+    const moves = [
+      move({ uci: 'e7e5', avg_win_loss: 3, games: 20, owner_moves: 20 }),
+      move({ uci: 'e7e6', avg_win_loss: 9, games: 40, owner_moves: 1 }),
+    ]
+    expect(worstContinuation(moves)?.uci).toBe('e7e5')
+  })
+
   it('names no worst move when the whole line is accurate', () => {
     expect(
       worstContinuation([
@@ -97,40 +117,24 @@ describe('worstContinuation', () => {
   })
 })
 
-describe('moveNote', () => {
-  const tree = {
-    moves: [],
-    main_line: [{ uci: 'e7e5', san: 'e5', ply: 0, games: 5 }],
-    book_depth: 0,
-    leaves_book_with: { uci: 'e7e5', san: 'e5', ply: 0, games: 1 },
-    path: [],
-    totals: {},
-  } as unknown as ExplorerResponse
-
-  it('names the main line first', () => {
-    expect(moveNote(move({ uci: 'e7e5', games: 5 }), tree)).toBe('main line')
+describe('bookDepthLabel', () => {
+  it('turns a ply count into moves', () => {
+    expect(bookDepthLabel(0)).toBe('0 moves')
+    expect(bookDepthLabel(2)).toBe('1 move')
+    expect(bookDepthLabel(18)).toBe('9 moves')
   })
 
-  it('flags the blunders behind a move', () => {
-    expect(moveNote(move({ uci: 'g8f6', games: 8, blunders: 2 }), tree)).toBe(
-      '2 blunders from here',
-    )
-  })
-
-  it('is honest about a thin sample', () => {
-    expect(moveNote(move({ uci: 'd7d5', games: 1 }), tree)).toBe('played once')
-    expect(moveNote(move({ uci: 'c7c6', games: 3 }), tree)).toBe('3 games, thin sample')
-  })
-
-  it('says when nothing has looked at a move', () => {
-    expect(moveNote(move({ uci: 'b7b6', games: 9, evaluated: 0 }), tree)).toBe('not analysed')
-    expect(moveNote(move({ uci: 'b7b6', games: 9, evaluated: 9 }), tree)).toBeNull()
+  it('never prints half a move, and never rounds one up', () => {
+    expect(bookDepthLabel(1)).toBe('a single move')
+    expect(bookDepthLabel(3)).toBe('over 1 move')
+    expect(bookDepthLabel(19)).toBe('over 9 moves')
   })
 })
 
 describe('bookReason', () => {
   it('says what the service’s reason means', () => {
     expect(bookReason('novelty')).toContain('only played the next move once')
+    expect(bookReason('line not played')).toContain('no two games of yours')
     expect(bookReason('no games')).toContain('never reached')
     expect(bookReason('something new')).toBe('something new')
   })

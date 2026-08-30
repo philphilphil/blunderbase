@@ -65,10 +65,13 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     // the game detail payload, so that one game is refetched, but the games *table* is
     // untouched. A note pinned to a variation also changes what that game's kept lines
     // carry, which is its own prefix — so only a note that names a line pays for it.
+    // The explorer is unconditional: every move row in its tree carries the newest note on
+    // the position that move leads to, and a note is written against a position whether or
+    // not it names a game, so any note event can have changed one of those rows.
     case 'note.created':
     case 'note.updated':
     case 'note.deleted': {
-      const keys: QueryKey[] = [queryKeys.notes()]
+      const keys: QueryKey[] = [queryKeys.notes(), queryKeys.explorer()]
       const anchors = event as { game_id?: number | null; line_id?: number | null }
       if (typeof anchors.line_id === 'number') keys.push(queryKeys.lines())
       if (typeof anchors.game_id === 'number') keys.push(['games', 'detail', anchors.game_id])

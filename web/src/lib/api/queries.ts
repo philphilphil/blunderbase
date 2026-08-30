@@ -874,23 +874,6 @@ export function useNoteTags(options?: Options<Awaited<ReturnType<typeof api.list
 }
 
 /**
- * The notes worth re-reading — a recurrence in a recent game, or three weeks of silence.
- *
- * Under `['notes']`, so writing a note refreshes the section: what the owner has just
- * rewritten is no longer stale, and the list should stop saying so.
- */
-export function useResurfacedNotes(
-  limit?: number,
-  options?: Options<Awaited<ReturnType<typeof api.resurfaceNotes>>>,
-) {
-  return useQuery({
-    queryKey: queryKeys.noteResurface(limit ?? null),
-    queryFn: () => api.resurfaceNotes(limit),
-    ...options,
-  })
-}
-
-/**
  * Write a note. What it touches depends on what it landed on, which the answer names: a
  * note on a game rides in that game's detail payload, and a note that pinned a variation
  * has just created a line the game page renders.
@@ -929,7 +912,8 @@ export function useUpdateNote(
 
 /**
  * Forget a note. The answer is a 204, so nothing here knows what the note hung on: every
- * game detail and every line list goes back to the server rather than the one that held it.
+ * game detail, every line list and the explorer's trees go back to the server rather than
+ * the one that held it.
  */
 export function useDeleteNote(options?: UseMutationOptions<void, Error, number>) {
   const client = useQueryClient()
@@ -941,6 +925,7 @@ export function useDeleteNote(options?: UseMutationOptions<void, Error, number>)
         queryKeys.notes(),
         queryKeys.lines(),
         queryKeys.gameDetails(),
+        queryKeys.explorer(),
       ]) {
         void client.invalidateQueries({ queryKey })
       }
@@ -972,9 +957,16 @@ export function useExportNotes(
   })
 }
 
-/** What one note write makes stale: the notes, its game's detail, and any line it pinned. */
+/**
+ * What one note write makes stale: the notes, the explorer, its game's detail, and any line
+ * it pinned.
+ *
+ * The explorer always, and whatever the note landed on: its move rows carry the newest note
+ * on the position each move leads to, so a note written anywhere can have changed one of
+ * them, and the tree would otherwise keep showing the note it was fetched with.
+ */
 function noteWritten(client: ReturnType<typeof useQueryClient>, note: NoteResponse): void {
-  const keys = [queryKeys.notes()]
+  const keys = [queryKeys.notes(), queryKeys.explorer()]
   if (typeof note.line_id === 'number') keys.push(queryKeys.lines())
   if (typeof note.game_id === 'number') keys.push(queryKeys.gameDetail(note.game_id))
   for (const queryKey of keys) void client.invalidateQueries({ queryKey })

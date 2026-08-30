@@ -25,11 +25,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useExplorer, usePositionOccurrences } from '@/lib/api/queries'
-import type { Color, ExplorerMove } from '@/lib/api/types'
+import type { Color, ExplorerMove, ExplorerResponse } from '@/lib/api/types'
 import { isTyping } from '@/routes/game/useBoardKeys'
 import { cn } from '@/lib/utils'
 
-import { BookCard } from './components/BookCard'
 import { GamesInLine } from './components/GamesInLine'
 import { LineBreadcrumb } from './components/LineBreadcrumb'
 import { LineSummary } from './components/LineSummary'
@@ -39,14 +38,23 @@ import {
   buildLine,
   formatLineParam,
   parseLineParam,
+  plyLabel,
   truncateTo,
   withMove,
+  type LinePosition,
 } from './line'
-import { commonOpening } from './stats'
+import { bookDepthLabel, commonOpening } from './stats'
 
 /** How many continuations and how many games to ask for. */
 const MOVE_LIMIT = 24
 const GAME_LIMIT = 14
+
+// `viewOnly` is one of the three keys chessground only reads at creation (`Board`'s own
+// comment), so toggling it per hover would rebuild the board on every pointer-enter and
+// -leave — dropping the `movable.dests` effect below, which only reapplies them on
+// `line.dests` changing. An empty dests map gets the same "no drag can start" protection
+// through a plain `set()`, no rebuild involved.
+const NO_DESTS: LinePosition['dests'] = new Map()
 
 export function ExplorerPage() {
   const [params, setParams] = useSearchParams()
@@ -54,12 +62,45 @@ export function ExplorerPage() {
 
   const ucis = useMemo(() => parseLineParam(params.get('line')), [params])
   const scope = (params.get('color') as Color | null) ?? undefined
-  const line = useMemo(() => buildLine(ucis), [ucis])
+  // `?fen=` roots the tree at a position whose move order nobody recorded — how a note
+  // written about a position links back here, and how the coach can hand over a board.
+  // `?line=` still walks from it, so the two compose and the breadcrumb stays honest: it
+  // shows the moves actually played from the root, and nothing before it.
+  const rootFen = params.get('fen')
+  const line = useMemo(() => buildLine(ucis, rootFen), [ucis, rootFen])
 
   const [flipped, setFlipped] = useState(false)
   const boardApi = useRef<Api | null>(null)
   // The longest line visited, so "forward" can walk back into what was just undone.
   const trail = useRef<string[]>(ucis)
+
+  // A hovered continuation — one ply from `MoveTreeTable`, the whole book run from
+  // `BookRun` — played on the board without touching the URL or the selected line, so the
+  // back button still walks the real tree, not a preview nobody chose. Tagged with the line
+  // it was hovered from and checked against the current one at render time, the same idiom
+  // `useLinePreview` uses: kept rather than cleared by an effect, so a click that plays the
+  // hovered move (which changes the line but not necessarily the hover) never leaves a stale
+  // preview one or more plies ahead of the line it just produced.
+  const [previewed, setPreviewed] = useState<{ line: string; continuation: string[] } | null>(
+    null,
+  )
+  const preview =
+    previewed?.line === formatLineParam(ucis) && previewed.continuation.length > 0
+      ? previewed.continuation
+      : null
+  const onPreview = useCallback(
+    (continuation: string[] | null) =>
+      setPreviewed(
+        continuation && continuation.length > 0
+          ? { line: formatLineParam(ucis), continuation }
+          : null,
+      ),
+    [ucis],
+  )
+  const previewLine = useMemo(
+    () => (preview ? buildLine([...ucis, ...preview]) : null),
+    [ucis, preview],
+  )
 
   const setLine = useCallback(
     (next: readonly string[], { remember = true }: { remember?: boolean } = {}) => {
@@ -82,21 +123,31 @@ export function ExplorerPage() {
     [params, setParams],
   )
 
-  const tree = useExplorer({ fen: line.fen, color: scope, limit: MOVE_LIMIT })
+  const tree = useExplorer({
+    fen: line.fen,
+    color: scope,
+    limit: MOVE_LIMIT,
+    // Naming only — the tree is still the one `fen` asks for. The book stops naming
+    // positions a few plies in, so the path is what lets a deep position take its name
+    // from the ancestor that has one.
+    line: formatLineParam(line.steps.map((step) => step.uci)),
+  })
   const occurrences = usePositionOccurrences(line.fen, { color: scope, limit: GAME_LIMIT })
 
   // chessground needs the legal destinations to accept a drag, and `Board` has no prop for
   // them — it publishes its `Api` for exactly this kind of thing. `configure` deep-merges,
-  // so what is written here survives the wrapper's own `set()` calls.
+  // so what is written here survives the wrapper's own `set()` calls. Emptying them is also
+  // how a preview is made undraggable — see `NO_DESTS`.
   useEffect(() => {
     boardApi.current?.set({
-      movable: { free: false, showDests: true, dests: line.dests },
+      movable: { free: false, showDests: true, dests: previewLine ? NO_DESTS : line.dests },
     })
-  }, [line.dests])
+  }, [line.dests, previewLine])
 
   const back = useCallback(() => {
     if (line.steps.length === 0) return
-    setLine(truncateTo(line, line.steps.length - 1), { remember: false })
+    // `truncateTo` takes an absolute ply, and `line.ply` is where the *next* move would go.
+    setLine(truncateTo(line, line.ply - 1), { remember: false })
   }, [line, setLine])
 
   const forward = useCallback(() => {
@@ -130,22 +181,28 @@ export function ExplorerPage() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [back, forward])
 
-  const opening = useMemo(
-    () => commonOpening(occurrences.data ?? []),
-    [occurrences.data],
-  )
+  // The vendored book first, the owner's own ECO tags second. The book names a position
+  // whether or not anyone has played it, which is most of the tree; `commonOpening` still
+  // answers where the book runs out — and it is what `openLibrary` takes its ECO from, since
+  // that filter searches the tags the games actually carry.
+  const tagged = useMemo(() => commonOpening(occurrences.data ?? []), [occurrences.data])
+  const booked = tree.data?.opening ?? null
+  const opening = booked ?? tagged
   const orientation = flipped ? (scope === 'black' ? 'white' : 'black') : (scope ?? 'white')
   const totalGames = (tree.data?.totals.games as number | undefined) ?? 0
 
+  // Deliberately the tagged code and not the book's: `/games?eco=` filters on the codes the
+  // owner's own games carry, and a book code none of them was tagged with lands on an empty
+  // library page.
   const openLibrary = useMemo(() => {
-    const eco = opening?.eco
+    const eco = tagged?.eco
     if (!eco) return null
     return () => {
       const query = new URLSearchParams({ eco })
       if (scope) query.set('color', scope)
       navigate(`/games?${query.toString()}`)
     }
-  }, [opening?.eco, scope, navigate])
+  }, [tagged?.eco, scope, navigate])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -176,10 +233,12 @@ export function ExplorerPage() {
           </div>
 
           <Board
-            fen={line.fen}
+            fen={previewLine?.fen ?? line.fen}
             orientation={orientation}
-            lastMove={line.lastMove}
-            turnColor={line.turn}
+            lastMove={previewLine?.lastMove ?? line.lastMove}
+            turnColor={previewLine?.turn ?? line.turn}
+            // Never `viewOnly` for the preview — see the `dests` effect above. A drag
+            // while one is showing is stopped by emptying the destinations instead.
             viewOnly={false}
             onMove={(orig, dest) => {
               const next = withMove(line, orig, dest)
@@ -233,14 +292,34 @@ export function ExplorerPage() {
             </span>
           </div>
 
+          {/*
+            Under the board rather than in the tree pane: a note is about the position on
+            the board, and it is written while looking at it. It also keeps the right pane
+            to one thing — the tree and the games under it — which is what makes the tree's
+            ten-row cap enough to hold everything below the table still.
+          */}
+          <PositionNotes fen={line.fen} />
+
           <LineSummary tree={tree.data} ply={line.ply} loading={tree.isPending} />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto max-md:flex-none max-md:overflow-visible">
-          <div className="flex flex-none items-center gap-2.5 max-md:flex-wrap">
-            <span className="text-[0.75rem] font-semibold text-ink">Your move tree from here</span>
-            <div className="flex-1" />
-            <ScopeToggle scope={scope} onChange={setScope} />
+          <div className="flex flex-none flex-col gap-1.5">
+            <div className="flex items-center gap-2.5 max-md:flex-wrap">
+              <span className="text-[0.75rem] font-semibold text-ink">
+                Your move tree from here
+              </span>
+              <div className="flex-1" />
+              <ScopeToggle scope={scope} onChange={setScope} />
+            </div>
+            {tree.data && totalGames > 0 ? (
+              <BookRun
+                tree={tree.data}
+                rootPly={line.ply}
+                onFollow={(book) => setLine([...ucis, ...book])}
+                onPreview={onPreview}
+              />
+            ) : null}
           </div>
 
           {tree.isError ? (
@@ -266,17 +345,8 @@ export function ExplorerPage() {
                 ply={line.ply}
                 loading={tree.isPending}
                 onPlay={(move: ExplorerMove) => play(move.uci)}
+                onPreview={onPreview}
               />
-
-              <PositionNotes fen={line.fen} />
-
-              {tree.data && totalGames > 0 ? (
-                <BookCard
-                  tree={tree.data}
-                  rootPly={line.ply}
-                  onFollow={(book) => setLine([...ucis, ...book])}
-                />
-              ) : null}
 
               <GamesInLine
                 games={occurrences.data ?? []}
@@ -289,6 +359,101 @@ export function ExplorerPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+interface BookMove {
+  ply?: number
+  uci?: string
+  san?: string
+  games?: number
+}
+
+/**
+ * Where the owner's preparation ends, as one line of ordinary text under the pane's header.
+ *
+ * It replaced an amber-edged card, and the card is the point: the two things it carried
+ * that exist nowhere else are how far the book runs from the position on the board and the
+ * move that leaves it, and a panel around two facts was the wrong amount of furniture for
+ * them. A `book_depth` of zero renders nothing at all rather than a line announcing that
+ * the owner is out of book: there is no book to describe from here, and the move table's
+ * own numbers — one game, nothing evaluated — already say what little there is to say.
+ *
+ * `book_depth` counts plies and a book is talked about in moves, so it goes through
+ * `bookDepthLabel`, which refuses to print a half-move.
+ *
+ * Both mentions of a real position are hoverable exactly the way a `MoveTreeTable` row is —
+ * the departing move previews the book line plus that move, `Follow it` previews the whole
+ * book line — because looking without going is how the rest of this page works, and they
+ * mirror on focus so a keyboard reaches the same previews.
+ */
+function BookRun({
+  tree,
+  rootPly,
+  onFollow,
+  onPreview,
+}: {
+  tree: ExplorerResponse
+  /** The ply the first continuation from this position occupies. */
+  rootPly: number
+  /** Replay the whole book line from here. */
+  onFollow: (ucis: string[]) => void
+  onPreview?: (continuation: string[] | null) => void
+}) {
+  const depth = tree.book_depth ?? 0
+  if (depth === 0) return null
+
+  const line = (tree.main_line ?? []) as BookMove[]
+  const leaves = (tree.leaves_book_with ?? null) as BookMove | null
+  const followable = line.slice(0, depth).map((step) => step.uci ?? '')
+  const complete = followable.every(Boolean)
+  const leavesUci = complete && leaves?.uci ? leaves.uci : null
+
+  const label = leaves?.san
+    ? `${plyLabel(rootPly + (leaves.ply ?? depth))}${leaves.san}`
+    : null
+
+  return (
+    <p className="text-[0.78125rem] leading-relaxed text-body-2">
+      Your book runs {bookDepthLabel(depth)} deep from here
+      {label ? (
+        <>
+          , leaving it at{' '}
+          {leavesUci ? (
+            <button
+              type="button"
+              onPointerEnter={() => onPreview?.([...followable, leavesUci])}
+              onPointerLeave={() => onPreview?.(null)}
+              onFocus={() => onPreview?.([...followable, leavesUci])}
+              onBlur={() => onPreview?.(null)}
+              className="font-mono text-ink underline decoration-dotted underline-offset-2 hover:text-bright"
+            >
+              {label}
+            </button>
+          ) : (
+            <span className="font-mono text-ink">{label}</span>
+          )}
+        </>
+      ) : null}
+      {complete ? (
+        <>
+          {' — '}
+          <button
+            type="button"
+            onClick={() => onFollow(followable)}
+            onPointerEnter={() => onPreview?.(followable)}
+            onPointerLeave={() => onPreview?.(null)}
+            onFocus={() => onPreview?.(followable)}
+            onBlur={() => onPreview?.(null)}
+            className="text-accent-teal hover:text-accent-link"
+          >
+            Follow it
+          </button>
+        </>
+      ) : (
+        '.'
+      )}
+    </p>
   )
 }
 

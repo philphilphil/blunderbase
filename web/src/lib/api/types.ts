@@ -707,6 +707,39 @@ export interface ExplorerMove extends Extra {
   blunders?: number
   avg_ply?: number | null
   last_played?: string | null
+  /**
+   * What the vendored opening book calls the position *this move reaches* — null far more
+   * often than not. Reported only when that child position is itself named in the book;
+   * an unnamed child never inherits its parent's name, since the book stops naming
+   * positions three to five plies in and inheriting would repeat the same string down
+   * every row after that. A name here reads as "this move enters that opening".
+   */
+  eco?: string | null
+  name?: string | null
+  /**
+   * The owner's own newest note on the position this move reaches, whole rather than
+   * shortened — the table truncates it, and `PositionNotes` is where it is written and
+   * read in full. Null where they have written nothing about where this move goes.
+   */
+  note?: ExplorerMoveNote | null
+}
+
+/** A note as a move row carries it: enough to show it and to find it again. */
+export interface ExplorerMoveNote extends Extra {
+  id: number
+  text: string
+}
+
+/**
+ * What the vendored opening book calls a position. `ply` is where along the queried line
+ * the name was found — the book stops naming positions three to five plies in, so it is
+ * usually an ancestor rather than the position itself, and it is null when no line was
+ * sent and only the position was looked up.
+ */
+export interface ExplorerOpening extends Extra {
+  eco: string
+  name: string
+  ply?: number | null
 }
 
 export interface ExplorerResponse extends Extra {
@@ -716,6 +749,7 @@ export interface ExplorerResponse extends Extra {
   side_to_move?: Color | null
   path: (Extra & { uci?: string; san?: string; ply?: number })[]
   root_ply?: number | null
+  opening?: ExplorerOpening | null
   totals: Extra & { games?: number; wins?: number; draws?: number; losses?: number }
   moves: ExplorerMove[]
   main_line: ExplorerMove[]
@@ -1077,19 +1111,6 @@ export interface TagCount {
 }
 
 /** Why a note came back up: its position recurred in a recent game, or it has gone quiet. */
-export type ResurfaceReason = 'recurred' | 'stale'
-
-export interface ResurfaceItem extends Extra {
-  note: NoteResponse
-  reason: ResurfaceReason
-  /** For `recurred`, the games the position turned up in. Empty for `stale`. */
-  games: number[]
-}
-
-export interface ResurfaceResponse {
-  items: ResurfaceItem[]
-}
-
 /** `md` for a person to read, `pgn` for a board program to open. */
 export type NoteExportFormat = 'md' | 'pgn'
 
