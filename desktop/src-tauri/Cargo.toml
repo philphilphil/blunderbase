@@ -1,6 +1,6 @@
 [package]
 name = "blunderbase-desktop"
-version = "0.8.3"
+version = "0.9.0"
 description = "Self-contained desktop application for Blunderbase"
 authors = ["Blunderbase"]
 edition = "2021"
