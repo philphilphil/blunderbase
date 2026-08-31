@@ -25,3 +25,6 @@ coverage.json
 /desktop/src-tauri/gen/
 /desktop/src-tauri/icons/
 /desktop/src-tauri/target/
+
+# Playwright MCP scratch output — never part of the repo.
+.playwright-mcp/
