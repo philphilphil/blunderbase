@@ -273,6 +273,48 @@ class MoveRow(Payload):
     run_id: int | None = None
 
 
+class GameBookMove(Payload):
+    """One continuation out of a position the owner has stood in before.
+
+    Deliberately the same quantities, under the same names, that `/explorer`'s move tree
+    reports for a continuation (`services.explorer._node`), so the strip beside the board
+    and the explorer page read as one feature rather than two vocabularies for one fold.
+    `games`, the split and `score` count every game through the move whoever played it;
+    `avg_win_loss` and `blunders` count the owner's own moves alone, which is why they are
+    null / zero on a continuation only the opponent ever played there (`owner_moves == 0`).
+    """
+
+    uci: str
+    san: str | None = None
+    games: int = 0
+    wins: int = 0
+    draws: int = 0
+    losses: int = 0
+    score: float | None = Field(default=None, description="0..1, the owner's score from here")
+    occurrences: int = 0
+    owner_moves: int = 0
+    evaluated: int = 0
+    avg_win_loss: float | None = Field(
+        default=None,
+        description="win percentage the owner gave away playing this move, averaged over "
+        "the times they were the one to move; null until something has analysed one",
+    )
+    blunders: int = 0
+    avg_ply: float | None = None
+    last_played: str | None = None
+
+
+class GameBookEntry(Payload):
+    """What the owner's other games did from one position of this game."""
+
+    games: int = Field(default=0, description="the owner's games that reached this position")
+    wins: int = 0
+    draws: int = 0
+    losses: int = 0
+    score: float | None = None
+    moves: list[GameBookMove] = Field(default_factory=list)
+
+
 class GameDetail(Payload):
     """`services.games.get_game_detail`."""
 
@@ -281,6 +323,18 @@ class GameDetail(Payload):
     moves: list[MoveRow] = Field(default_factory=list)
     runs: list[dict[str, Any]] = Field(default_factory=list)
     notes: list[dict[str, Any]] | None = None
+    book: dict[int, GameBookEntry] = Field(
+        default_factory=dict,
+        description="the explorer's answer for the positions this game stood in, keyed by "
+        "the ply *before* which the position sits — so the key is how many moves have been "
+        "played, and it is the position on the board at that point. A key exists only where "
+        "at least two of the owner's games reached the position, which is the explorer's own "
+        "definition of book; the overwhelming majority of positions are reached by one game "
+        "and carry no key at all rather than an empty one, so a typical game has entries for "
+        "its opening and nothing after. Shipped with the game rather than fetched per "
+        "position, because stepping through a game must not be a request per ply. The keys "
+        "are strings in JSON, as every integer-keyed mapping is",
+    )
 
 
 # --- accounts -------------------------------------------------------------

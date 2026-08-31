@@ -1,16 +1,25 @@
-import { SideDot } from '@/components/badges/SideDot'
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { RunStatusBadge, TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
-import type { Color, GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
+import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { formatNodes } from '@/lib/chess/evaluation'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
-import { formatGameDate, formatResult, formatTimeControl } from '../gameModel'
+import { formatResult, formatTimeControl } from '../gameModel'
 
 /**
- * The block above the board: opening, where the game came from, both players with their
- * ratings and the result, and on the right what analysis has been done to it and when.
+ * The one line above the board: what the game *is* — opening, ECO, where it came from, at
+ * what time control, how it ended — and, quiet and right-aligned, what has been done to it.
+ *
+ * One line, and a fixed one. The players used to be a third line here and are now the rows
+ * flanking the board (`BoardPanel`), because this bar is the board's height budget spent on
+ * text: every line here is a line the board is not. `BoardPanel`'s budget names this
+ * element's `h-[1.875rem]` by number, so the height is declared rather than emergent —
+ * `overflow-hidden` and `whitespace-nowrap` mean a long opening name is truncated instead of
+ * wrapping the bar to two lines behind the budget's back.
+ *
+ * The date is not here: `AppShell`'s breadcrumb already carries it (`GamePage` passes it),
+ * and the one thing this line cannot afford is a second copy of something.
  */
 export function GameHeaderBar({
   game,
@@ -26,62 +35,56 @@ export function GameHeaderBar({
   className?: string
 }) {
   const timeControl = formatTimeControl(game)
-  const winner = game.result === '1-0' ? 'white' : game.result === '0-1' ? 'black' : null
 
   return (
-    <div className={cn('flex items-start gap-2.5', className)}>
-      <div className="flex min-w-0 flex-1 flex-col gap-[0.3125rem]">
-        <div className="flex items-center gap-2">
-          <h1 className="truncate text-sm font-semibold text-ink">
-            {game.opening ?? 'Unnamed opening'}
-          </h1>
-          {game.eco ? (
-            <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.6875rem] tabular text-dim">
-              {game.eco}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-dim">
-          <SourceBadge source={game.source} size="sm" />
-          {timeControl ? <span className="font-mono">{timeControl}</span> : null}
-          <span className="text-faint-2">·</span>
-          <span className="font-mono tabular">{formatResult(game.result)}</span>
-          {game.rated === false ? <span className="text-faint">casual</span> : null}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 text-[0.71875rem]">
-          <Player
-            side="white"
-            name={game.white}
-            rating={game.white_rating}
-            isOwner={game.color === 'white'}
-            won={winner === 'white'}
-          />
-          <span className="text-faint-2">vs</span>
-          <Player
-            side="black"
-            name={game.black}
-            rating={game.black_rating}
-            isOwner={game.color === 'black'}
-            won={winner === 'black'}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-none flex-col items-end gap-[0.3125rem]">
-        {active ? (
-          <RunStatusBadge status={active.status} />
-        ) : best ? (
-          <TierBadge tier={best.tier} depth={best.depth} nodes={nodeLabel(best)} />
-        ) : (
-          <UnanalysedBadge />
-        )}
-        <span className="font-mono text-[0.625rem] text-faint">
-          {best?.finished_at ? `analysed ${relative(best.finished_at)}` : 'never analysed'}
+    <div
+      data-testid="game-header"
+      className={cn(
+        'flex h-[1.875rem] flex-none items-center gap-2 overflow-hidden whitespace-nowrap',
+        className,
+      )}
+    >
+      {/* The only element on the line allowed to shrink: everything after it is a chip or a
+          handful of mono characters, and a truncated ECO or result says nothing at all. */}
+      <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
+        {game.opening ?? 'Unnamed opening'}
+      </h1>
+      {game.eco ? (
+        <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.6875rem] tabular text-dim">
+          {game.eco}
         </span>
-        <span className="font-mono text-[0.625rem] text-faint">{formatGameDate(game.played_at)}</span>
-      </div>
+      ) : null}
+      <SourceBadge source={game.source} size="sm" className="flex-none" />
+      {timeControl ? (
+        <span className="flex-none font-mono text-[0.6875rem] text-dim">{timeControl}</span>
+      ) : null}
+      <span className="flex-none text-faint-2">·</span>
+      <span className="flex-none font-mono text-[0.6875rem] tabular text-soft">
+        {formatResult(game.result)}
+      </span>
+      {game.rated === false ? (
+        <span className="flex-none text-[0.6875rem] text-faint">casual</span>
+      ) : null}
+
+      {/* The spacer is what makes the analysis state right-aligned rather than a sixth fact
+          about the game: it is about the app's work, not about the game. */}
+      <div className="flex-1" />
+
+      {active ? (
+        <RunStatusBadge status={active.status} className="flex-none" />
+      ) : best ? (
+        <TierBadge
+          tier={best.tier}
+          depth={best.depth}
+          nodes={nodeLabel(best)}
+          className="flex-none"
+        />
+      ) : (
+        <UnanalysedBadge className="flex-none" />
+      )}
+      <span className="flex-none font-mono text-[0.625rem] text-faint">
+        {best?.finished_at ? `analysed ${relative(best.finished_at)}` : 'never analysed'}
+      </span>
     </div>
   )
 }
@@ -90,40 +93,4 @@ function nodeLabel(run: GameRunSummary): string | null {
   const nodes = formatNodes(run.nodes)
   const multipv = run.multipv && run.multipv > 1 ? ` · MPV ${run.multipv}` : ''
   return nodes === '—' ? null : `${nodes}n${multipv}`
-}
-
-/**
- * One of the two players. The disc in front of the name is which side they had — the same
- * disc the games table draws in its colour column — and *not* whether they won: a green
- * dot beside "Black" read as a colour and made the header disagree with the board it sits
- * above. Winning is said by the name's tone instead, the way the games table says it.
- */
-function Player({
-  side,
-  name,
-  rating,
-  isOwner,
-  won,
-}: {
-  side: Color
-  name: string | null | undefined
-  rating: number | null | undefined
-  isOwner: boolean
-  won: boolean
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <SideDot side={side} size="sm" />
-      <span
-        className={cn(
-          'truncate',
-          isOwner && 'font-medium',
-          won ? 'text-good' : isOwner ? 'text-ink' : 'text-soft',
-        )}
-      >
-        {name ?? 'unknown'}
-      </span>
-      <span className="font-mono text-[0.65625rem] tabular text-faint">{rating ?? '—'}</span>
-    </span>
-  )
 }

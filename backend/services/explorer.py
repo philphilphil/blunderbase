@@ -252,6 +252,160 @@ def opening_explorer(
     }
 
 
+def position_books(
+    session: Session,
+    position_ids: Iterable[int],
+    *,
+    color: Color | None = None,
+    min_games: int = BOOK_MIN_GAMES,
+    limit: int = 0,
+) -> dict[int, dict[str, Any]]:
+    """Several positions' trees at once, keyed by position — only the ones that repeat.
+
+    The narrow entry point behind a game's shipped book (`services.games.game_book`), which
+    wants one strip of continuations per ply rather than one page per position. It is the
+    same fold `opening_explorer` runs, the stored book where a position has one and a live
+    fold where it does not, minus everything that belongs to a *page*: no book walk, no
+    opening names, no notes on each child. Those are what make a tree expensive — a walk is
+    tens of queries — and a per-ply strip asks none of them.
+
+    A position comes back only when at least `min_games` of the owner's games reached it,
+    which is the same cut `book_walk` stops at: a move played once is not book. On a real
+    library 452k of 463k positions are reached by exactly one game, so most of a game's
+    plies produce no key at all, and a caller that finds none has paid for two queries.
+    Continuations themselves are *not* cut that way — a position two games reached where
+    they played different moves is precisely the "I have been here and improvised twice"
+    the strip exists to show, and hiding both moves would leave it empty.
+
+    Counting the games is deliberately not the fold: a built position's count is a column of
+    `position_totals`, and everything else is counted in one grouped query over the join
+    rows it is cold *because* it has few of. The fold then runs only for the handful of
+    positions that earned it.
+
+    `limit` caps the continuations per position (0 for all of them); they arrive most-played
+    first, as everywhere else. Positions with no continuation at all — every game that stood
+    there ended there — are left out rather than returned empty, because the panel that
+    reads this draws nothing where there is no key.
+    """
+    positions: dict[int, Position] = {}
+    for chunk in _chunks(position_ids):
+        if chunk is None:
+            continue
+        for position in session.scalars(select(Position).where(Position.id.in_(chunk))):
+            positions[position.id] = position
+    if not positions:
+        return {}
+
+    built = [key for key, position in positions.items() if position.book_state == BOOK_BUILT]
+    counts = _stored_game_counts(session, built, color=color)
+    counts.update(
+        _live_game_counts(session, [key for key in positions if key not in counts], color=color)
+    )
+
+    books: dict[int, dict[str, Any]] = {}
+    for key, position in positions.items():
+        if counts.get(key, 0) < max(min_games, 1):
+            continue
+        if position.book_state == BOOK_BUILT:
+            moves, totals, _ended, _root_ply = _tree_from_book(
+                session, position, color=color, min_games=1
+            )
+        else:
+            occurrences = position_occurrences(session, key, color=color)
+            moves, totals, _ended = _tree(occurrences, position.side_to_move, min_games=1)
+        if not moves:
+            continue
+        books[key] = {**totals, "moves": moves[: max(limit, 0)] if limit else moves}
+    return books
+
+
+def position_book(
+    session: Session,
+    fen: str,
+    *,
+    color: Color | None = None,
+    min_games: int = BOOK_MIN_GAMES,
+    limit: int = 0,
+) -> dict[str, Any] | None:
+    """One position's strip of continuations, for a board that has left the game line.
+
+    The game ships its own book with it (`services.games.game_book`), which covers stepping
+    through the game and costs no request at all. This is the other half: the moment a reader
+    plays a move of their own — walking a book line, or just dragging a piece — the board
+    stands somewhere that payload cannot describe, and the strip for *that* position has to
+    be asked for.
+
+    Deliberately not `opening_explorer`: that builds the explorer *page* — a book walk,
+    opening names, a note count per child — which is tens of queries, and none of it is on
+    the strip beside a board. This is `position_books` for one position, and it answers
+    `None` for the overwhelming majority of positions, which are the ones no two of the
+    owner's games ever reached.
+
+    A FEN that is not a position answers `None` rather than raising: the caller is a board,
+    and a board that has wandered somewhere unparseable wants an empty strip, not an error.
+    """
+    try:
+        position = find_position(session, fen)
+    except ValueError:
+        return None
+    if position is None:
+        return None
+    return position_books(
+        session, [position.id], color=color, min_games=min_games, limit=limit
+    ).get(position.id)
+
+
+def _stored_game_counts(
+    session: Session, position_ids: Sequence[int], *, color: Color | None
+) -> dict[int, int]:
+    """How many of the owner's games reached each *built* position, off its stored totals.
+
+    Summed rather than read, because a position has one row per owner colour and an
+    unfiltered count is white's row plus black's — the same merge `_tree_from_book` does.
+    """
+    counts: dict[int, int] = {}
+    for chunk in _chunks(position_ids):
+        if chunk is None:
+            continue
+        statement = (
+            select(PositionTotal.position_id, func.sum(PositionTotal.games))
+            .where(PositionTotal.position_id.in_(chunk))
+            .group_by(PositionTotal.position_id)
+        )
+        if color is not None:
+            statement = statement.where(PositionTotal.owner_color == color)
+        for position_id, games in session.execute(statement):
+            counts[position_id] = int(games or 0)
+    return counts
+
+
+def _live_game_counts(
+    session: Session, position_ids: Sequence[int], *, color: Color | None
+) -> dict[int, int]:
+    """The same count for positions with no stored book, in one query for all of them.
+
+    Distinct games and not join rows: a game that stood in a position twice is one game
+    here, exactly as the fold counts it. Cheap by construction — a position only lacks a
+    book because too few games reach it — and the honest fallback for a library the sweep
+    has not been over yet, which stays slow rather than wrong.
+    """
+    counts: dict[int, int] = {}
+    for chunk in _chunks(position_ids):
+        if chunk is None:
+            continue
+        statement = (
+            select(GamePosition.position_id, func.count(func.distinct(GamePosition.game_id)))
+            .join(Game, GamePosition.game_id == Game.id)
+            .where(GamePosition.position_id.in_(chunk), Game.owner_color.is_not(None))
+            .group_by(GamePosition.position_id)
+        )
+        if color is not None:
+            statement = statement.where(Game.owner_color == color)
+        for position_id, games in session.execute(statement):
+            counts[position_id] = int(games or 0)
+    return counts
+
+
 def find_positions(
     session: Session, fen: str, color: Color | None = None, limit: int = 20
 ) -> list[dict[str, Any]]:

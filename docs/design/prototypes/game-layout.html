@@ -1,0 +1,1120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Blunderbase — game layout</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  Blunderbase — game / analysis screen.
+
+  A static design mockup. It is NOT part of the build: no framework, no Tailwind, no
+  bundler, nothing under web/ imports it. Open the file in a browser.
+  Tokens are lifted from web/src/index.css so it sits in the real palette; the game,
+  the engine output and the eval curve are fabricated but internally consistent.
+
+  The layout: the board big and flush LEFT, everything else on the right. The left
+  column holds the board and nothing that is not the board — one header line, the
+  player rows flanking it, the eval bar, one compact transport row. The eval graph
+  moved right, and emptying that bottom strip is what lets the board be big.
+
+  The right column is ONE grid, 340px / 360px, so the Maia/Stockfish divider and the
+  moves/notes divider are the same line at the same x, running unbroken from the top of
+  the engine band down to where the graph starts. Top to bottom: the engine band
+  (Stockfish takes the wider track, because a principal variation is the one thing here
+  that wants width), the move table beside the notes region, the eval graph spanning
+  both tracks, then the continuous-analysis footer.
+
+  There is no flagged-moments list: the move table already colour-codes all 23 with
+  glyph badges, and `◂ mistake ▸` jumps between them. The accuracy counts ride on the
+  eval graph's header line, where the legend dot and the count are the same mark.
+
+  The preset buttons set the frame's width AND height (the board is bound by the height
+  budget, so width alone would understate it), and the layout is written with container
+  queries against the frame, so the presets really do change the layout. The readout
+  reports the board size the page actually rendered. Below 1600 the right column folds
+  to a single track and the Notes tab returns to carry the notes region.
+-->
+<style>
+  /* ---- tokens (web/src/index.css) ---------------------------------------------------- */
+  :root {
+    --void:#08090b; --panel:#0b0d10; --surface:#0e1013; --surface-2:#0e1114;
+    --elevated:#12151a; --elevated-2:#12161b; --raised:#14181d; --raised-2:#14191f;
+    --selected:#1a1f26; --hairline:#1a1e24; --line:#1f242b; --edge:#22272f;
+    --edge-strong:#2c333c; --edge-hover:#39414c; --edge-input:#262d36;
+    --text-bright:#fbfcfd; --text:#e7eaef; --text-2:#dfe3e8; --body:#c8cfd8;
+    --body-2:#c1c8d1; --body-3:#b6bec9; --muted:#949ca8; --muted-2:#8a929d;
+    --dim:#646c78; --dim-2:#5c646f; --dim-3:#7d858f; --faint:#4d545e; --faint-2:#3a4049;
+    --accent:#3ecfd6; --accent-hover:#5fdde3; --accent-link:#7de1e7; --accent-ink:#062a2c;
+    --blunder:#f0524a; --blunder-ink:#1a0605; --mistake:#e0872f; --inaccuracy:#c9b23e;
+    --good:#9ec49a; --info:#8fb6c9; --brilliant:#b287ff; --deep:#c9b0ff;
+    --board-light:#a7b3bb; --board-dark:#5c6a73;
+    --track:#1c2128; --meter:#2f3d47; --meter-2:#3a424b;
+    --row-active:#151b22; --cell:#181d23; --cell-strong:#1e242b; --eval-track:#1a1e24;
+    --side-white:#dfe3e8; --side-black:#20242a; --side-black-edge:#3a424b;
+    --graph-bg:#0e1216; --graph-grid:#1a1f25; --graph-axis:#2a313a; --graph-tick:#454c56;
+    --chip-neutral:#141619; --chip-info:#141922; --chip-info-edge:#23303c;
+    --scroll-thumb:#252b33; --shadow:rgb(0 0 0 / .9);
+  }
+
+  /* Light restates the same names, exactly as `:root.light` does in index.css — the
+     neutral ramp inverted by contrast rank, so the quietest label in the dark is still
+     the quietest label here, and teal and purple darkened only as far as AA demands.
+     Every tint in this file is a color-mix over one of these, so nothing needs a second
+     rule to follow the theme. */
+  .light {
+    --void:#f4f6f8; --panel:#ffffff; --surface:#eef1f5; --surface-2:#edf0f4;
+    --elevated:#e9edf2; --elevated-2:#f2f5f8; --raised:#e4e9ef; --raised-2:#e2e7ee;
+    --selected:#d9e0e8; --hairline:#e3e7ec; --line:#dce1e8; --edge:#d1d8e0;
+    --edge-strong:#bcc5cf; --edge-hover:#98a2ae; --edge-input:#c8d0da;
+    --text-bright:#05070a; --text:#12161c; --text-2:#1a1f26; --body:#2b323b;
+    --body-2:#333a44; --body-3:#3f4751; --muted:#4f5761; --muted-2:#565e69;
+    --dim:#626a75; --dim-2:#68707b; --dim-3:#5e6671; --faint:#7e8792; --faint-2:#949da8;
+    --accent:#0a7b82; --accent-hover:#086a70; --accent-link:#096f75; --accent-ink:#ffffff;
+    --blunder:#e5332a; --blunder-ink:#ffffff; --mistake:#f27a1a; --inaccuracy:#77650c;
+    --good:#2f7343; --info:#33697f; --brilliant:#6d34d6; --deep:#7b4cd8;
+    --board-light:#e9edf0; --board-dark:#8fa0ac;
+    --track:#dbe1e8; --meter:#a8b8c4; --meter-2:#99a3ae;
+    --row-active:#e6ebf1; --cell:#eaeef3; --cell-strong:#dfe5ec; --eval-track:#d5dbe2;
+    --side-white:#ffffff; --side-black:#4b545e; --side-black-edge:#4b545e;
+    --graph-bg:#eef1f5; --graph-grid:#dfe4ea; --graph-axis:#c6ced7; --graph-tick:#666e79;
+    --chip-neutral:#edeff2; --chip-info:#e6eef4; --chip-info-edge:#b9cdda;
+    --scroll-thumb:#c5ccd5; --shadow:rgb(15 23 32 / .22);
+  }
+
+  /* ---- base -------------------------------------------------------------------------- */
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--void); color: var(--body);
+    font: 13px/1.5 Geist, ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "Geist Mono", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  button, input, textarea { font: inherit; color: inherit; }
+  .scroll { overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+  .scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; }
+  .scroll::-webkit-scrollbar-track { background: transparent; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    background: var(--elevated); border: 1px solid var(--edge); border-radius: 6px;
+    padding: 3px 7px; font-size: 11px; color: var(--muted);
+  }
+  .chip.act { color: var(--text); border-color: var(--edge-strong); background: var(--raised); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .spacer { flex: 1; min-width: 0; }
+  .lab { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+
+  /* ---- harness ----------------------------------------------------------------------- */
+  .harness {
+    flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 9px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  /* the board sits at ply 23, a position the owner would truthfully have visited once,
+     so the mockup needs a way to see both Book states — present, and genuinely absent */
+  .bookseg { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); }
+  .bookseg .seg { display: inline-flex; border: 1px solid var(--edge); border-radius: 6px; overflow: hidden; background: var(--elevated); }
+  .bookseg button { appearance: none; background: none; border: 0; border-right: 1px solid var(--edge); color: var(--muted); font-size: 11px; padding: 4px 9px; cursor: pointer; }
+  .bookseg button:last-child { border-right: 0; }
+  .bookseg button:hover { color: var(--text); background: var(--raised); }
+  .bookseg button.on { background: var(--raised-2); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+  .presets { display: inline-flex; gap: 5px; align-items: center; }
+  .presets button {
+    appearance: none; background: var(--elevated); border: 1px solid var(--edge); border-radius: 6px;
+    color: var(--dim); font-size: 11px; padding: 4px 8px; cursor: pointer;
+    font-family: "Geist Mono", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+  }
+  .presets button:hover { color: var(--text); border-color: var(--edge-hover); }
+  .presets button.on { background: var(--raised-2); color: var(--text); border-color: var(--edge-strong); }
+  .readout { font-size: 11.5px; color: var(--text-2); display: inline-flex; align-items: center; gap: 8px; }
+  .readout .band { color: var(--dim); }
+  .readout .bpx { color: var(--accent); }
+
+  /* The frame carries a real height as well as a real width: the board is bound by the
+     height budget, so a content-derived frame would understate it badly. A frame taller
+     than the viewport is panned, never squashed — squashing brings the distortion back. */
+  .stage { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; align-items: flex-start; justify-content: safe center; }
+  .frame {
+    flex: none; position: relative; width: 1900px; height: 1160px;
+    container-type: size; container-name: frame;
+    background: var(--surface); border: 1px solid var(--edge); border-radius: 12px;
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px -30px var(--shadow);
+  }
+  .frame.fit { width: 100%; height: 100%; }
+
+  /* ---- app shell --------------------------------------------------------------------- */
+  .titlebar {
+    height: 46px; flex: none; display: flex; align-items: center; gap: 12px;
+    padding: 0 16px; border-bottom: 1px solid var(--hairline); background: var(--panel);
+  }
+  .logo { width: 13px; height: 13px; background: var(--accent); border-radius: 2px; transform: rotate(45deg); }
+  .wordmark { color: var(--text); font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
+  .rule { width: 1px; height: 18px; background: var(--line); }
+  .crumb { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--dim); }
+  .crumb .sep { color: var(--faint-2); }
+  .crumb .here { color: var(--body-3); }
+
+  .shellbody { flex: 1; min-height: 0; display: flex; }
+  .nav {
+    width: 200px; flex: none; border-right: 1px solid var(--hairline); background: var(--panel);
+    display: flex; flex-direction: column; padding: 14px 10px 10px; gap: 2px;
+  }
+  .nav .lab { padding: 6px 8px 8px; }
+  .nav a {
+    display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px;
+    color: var(--muted); font-size: 13px; text-decoration: none; cursor: pointer;
+  }
+  .nav a:hover { background: var(--raised); color: var(--text); }
+  .nav a.on { background: var(--raised-2); color: var(--text); font-weight: 500; box-shadow: inset 2px 0 0 var(--accent); }
+  .nav a .sq { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--faint); flex: none; }
+  .nav a.on .sq { border-color: var(--accent); }
+  .nav .foot { margin-top: auto; border-top: 1px solid var(--hairline); padding: 12px 8px 4px; display: flex; flex-direction: column; gap: 5px; }
+  .nav .foot .t { font-size: 11px; color: var(--dim); }
+  .meter { height: 3px; border-radius: 2px; background: var(--hairline); overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--meter-2); }
+
+  .phone { flex: 1; min-width: 0; display: none; flex-direction: column; }
+
+  /* ---- panel furniture --------------------------------------------------------------- */
+  .tabs { height: 38px; flex: none; display: flex; align-items: stretch; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--hairline); }
+  .tabs .t { display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 12px; color: var(--dim); cursor: pointer; }
+  .tabs .t:hover { color: var(--body-3); }
+  .tabs .t.on { color: var(--text); font-weight: 500; box-shadow: inset 0 -2px 0 var(--accent); }
+  .tabs .n { font-size: 10px; color: var(--faint); font-family: "Geist Mono", ui-monospace, monospace; }
+  .tabs .meta { display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--faint); font-family: "Geist Mono", ui-monospace, monospace; }
+  .tabs .meta b { font-weight: 400; color: var(--dim); cursor: pointer; }
+
+  /* one-line game header, spanning every column */
+  .headbar {
+    height: 44px; flex: none; display: flex; align-items: center; gap: 9px;
+    padding: 0 16px; border-bottom: 1px solid var(--hairline); background: var(--panel);
+    overflow: hidden; white-space: nowrap;
+  }
+  .headbar .name { color: var(--text); font-size: 14px; font-weight: 600; }
+  .headbar .sep { color: var(--faint-2); }
+  .headbar .res { color: var(--body-3); }
+  .headbar .q { font-size: 10.5px; color: var(--faint); }
+  .eco { font-family: "Geist Mono", ui-monospace, monospace; font-size: 11px; color: var(--dim); border: 1px solid var(--edge); border-radius: 4px; padding: 1px 5px; }
+  .src { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 4px; background: var(--chip-info); border: 1px solid var(--chip-info-edge); color: var(--info); font-size: 11px; }
+  .tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); font-size: 11px; font-weight: 500; }
+
+  /* board — the square is whichever of the width or the height budget runs out first,
+     capped at --bsize. --vchrome is the player rows + scrubber + tools row above and below. */
+  .boardblock {
+    --bw: min(var(--bsize), calc(100cqw - 22px), calc(100cqh - var(--vchrome)));
+    width: calc(var(--bw) + 22px); display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  }
+  .boardrow { display: flex; gap: 8px; align-items: stretch; }
+  .evalbar { width: 14px; flex: none; border-radius: 3px; overflow: hidden; background: var(--eval-track); position: relative; display: flex; flex-direction: column; }
+  .evalbar .b { background: var(--side-black); }
+  .evalbar .w { background: var(--side-white); flex: 1; }
+  .evalbar .mid { position: absolute; left: 0; right: 0; height: 1px; background: var(--accent); opacity: .8; }
+
+  /* players flank the board by orientation — opponent above, you below */
+  .pname { display: flex; align-items: center; gap: 8px; height: 24px; padding-left: 22px; font-size: 12px; }
+  .side { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  .side.w { background: var(--side-white); }
+  .side.b { background: var(--side-black); border: 1px solid var(--side-black-edge); }
+  .pname .nm { color: var(--text); font-weight: 500; }
+  .pname .r { font-size: 11px; color: var(--dim); font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .pname .cap { font-size: 13px; line-height: 1; letter-spacing: -1px; color: var(--dim-3); }
+  .pname .bal { font-size: 11px; color: var(--muted); font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .pname .bal.down { color: var(--faint); }
+
+  .board {
+    position: relative; width: var(--bw); aspect-ratio: 1; border-radius: 3px; overflow: hidden;
+    background-image: conic-gradient(var(--board-dark) 25%, var(--board-light) 25% 50%, var(--board-dark) 50% 75%, var(--board-light) 75%);
+    background-size: 25% 25%;
+    font-size: calc(var(--bw) / 9);
+  }
+  .board .layer { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); }
+  .board .mark { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--blunder) 85%, transparent); border-radius: 2px; }
+  .board .pc { display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .board .pc img { width: 100%; height: 100%; display: block; }
+  .board svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* one compact transport row under the board — the eval graph lives in the right column,
+     and emptying this strip is what lets the board be big */
+  .transport { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 30px; flex: none; }
+  .tgroup { display: flex; border: 1px solid var(--edge); border-radius: 6px; overflow: hidden; background: var(--elevated); }
+  .tgroup button { appearance: none; background: none; border: 0; border-right: 1px solid var(--edge); color: var(--muted); font-size: 12px; padding: 5px 9px; cursor: pointer; }
+  .tgroup button:last-child { border-right: 0; }
+  .tgroup button:hover { background: var(--selected); color: var(--text); }
+  .tgroup button.on { background: var(--selected); color: var(--text); }
+  .tgroup button.warm { color: var(--mistake); }
+  .tbtn { appearance: none; background: var(--elevated); border: 1px solid var(--edge); border-radius: 6px; color: var(--muted); font-size: 11.5px; padding: 4px 9px; cursor: pointer; white-space: nowrap; }
+  .tbtn:hover { color: var(--text); border-color: var(--edge-hover); }
+  .score { font-size: 11.5px; color: var(--text); background: var(--chip-info); border: 1px solid var(--edge); border-radius: 4px; padding: 2px 7px; }
+
+  /* eval graph */
+  .gcard { display: flex; flex-direction: column; gap: 7px; padding: 10px 12px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-height: 0; }
+  .gcard .gh { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+  .graph { flex: 1; min-height: 0; width: 100%; }
+  .graph svg { display: block; }
+  .graph circle.hit { cursor: pointer; }
+  .graph circle.hit:hover { r: 5.5; }
+  .gaxis { flex: none; display: flex; justify-content: space-between; font-size: 9px; color: var(--graph-tick); font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  /* engine band */
+  /* Two cards with a gap, never one surface split by a rule: at 25/75 an internal
+     divider would land at ~175px while the moves/notes boundary stays at 340, and two
+     lines that nearly agree is the thing we were fixing. Two objects sitting on the
+     column ground can be any proportion without implying a column line. */
+  .eband { display: grid; grid-template-columns: 175px minmax(0, 1fr); gap: 10px; margin: 12px; }
+  .epanel { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .ehead { display: flex; align-items: center; gap: 7px; padding: 9px 11px 7px; font-size: 11.5px; }
+  .ehead .nm { color: var(--text); font-weight: 600; font-size: 12px; }
+  .ehead .m { font-size: 10px; color: var(--dim); font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .ehead .box { font-size: 10px; color: var(--dim); border: 1px solid var(--edge); border-radius: 4px; padding: 1px 5px; font-family: "Geist Mono", ui-monospace, monospace; }
+  .ehead .box.drop { cursor: pointer; color: var(--body-3); }
+  .ehead .box.drop:hover { border-color: var(--edge-hover); color: var(--text); }
+
+  /* Move · percentage · delta and nothing else. Without the bar the 175px card is
+     comfortable: 22 padding + 16 gaps + mv 46 + pct 28 + delta 44 = 156 of 173, so the
+     pre-squeeze widths all come back and the move takes the 17px of slack. */
+  .maia { padding-bottom: 8px; }
+  /* The played percentage is the row element's own background, so it costs no width —
+     which is why it works at 175px where a bar column did not — and it runs the full
+     height BEHIND the move, the percentage and the delta alike. Not a pseudo-element
+     over the text, not a reserved strip. A HARD stop, never a fade: it is a
+     measurement, and you have to be able to compare two rows by eye. Purple is Maia's
+     identity colour (docs/design/README.md); teal would blur the engine/human contrast
+     the panel exists to draw. 14% measured 1.20:1 against --panel — too faint to read;
+     26% gives 1.52:1 while the move text on top still clears 6.8:1. */
+  .maia .row {
+    display: flex; align-items: baseline; gap: 8px;
+    margin: 0 5px; padding: 3px 6px; border-radius: 4px;
+    background: linear-gradient(to right,
+      color-mix(in srgb, var(--brilliant) 26%, transparent) 0 var(--p),
+      transparent var(--p));
+  }
+  .maia .row .mv { flex: 1; min-width: 46px; font-size: 11px; color: var(--body-3); font-family: "Geist Mono", ui-monospace, monospace; }
+  /* the percentage is the panel's only quantity now, so it carries the weight */
+  .maia .row .pct { width: 28px; text-align: right; font-size: 11px; color: var(--text); font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .maia .row .d { width: 44px; text-align: right; font-size: 9.5px; color: var(--dim); border: 1px solid var(--line); border-radius: 3px; padding: 1px 4px; font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  /* the played move is the blunder under examination, so it matches its ?? in the move table */
+  .maia .row .d.played { color: var(--blunder); border-color: color-mix(in srgb, var(--blunder) 30%, transparent); }
+  /* "best" is the ! classification glyph, because that is what it is */
+  .maia .row .d.best { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: transparent; text-align: center; font-weight: 700; }
+  /* unranked: the cell keeps its width so the column stays a column, and draws nothing */
+  .maia .row .d:empty { border-color: transparent; }
+
+  .sf .line { display: flex; align-items: flex-start; gap: 9px; padding: 5px 11px; font-family: "Geist Mono", ui-monospace, monospace; font-size: 11.5px; }
+  .sf .line:hover { background: var(--row-active); }
+  .sf .line .ev { min-width: 48px; text-align: right; padding: 2px 6px; border-radius: 3px; background: var(--cell); color: var(--body-3); font-variant-numeric: tabular-nums; }
+  .sf .line.best .ev { background: var(--cell-strong); color: var(--text); }
+  .sf .line.played { background: color-mix(in srgb, var(--blunder) 6%, transparent); }
+  .sf .line.played .ev { background: color-mix(in srgb, var(--blunder) 13%, transparent); color: var(--blunder); }
+  /* the PV wraps rather than truncating — that is what the wider track is for */
+  .sf .line .pv { flex: 1; min-width: 0; color: var(--muted); line-height: 1.55; }
+  .sf .line .pv .h { color: var(--text); }
+  .sf .line .pv .h.bad { color: var(--blunder); }
+  .sf .line .tag { font-size: 9.5px; color: var(--blunder); border: 1px solid color-mix(in srgb, var(--blunder) 35%, transparent); border-radius: 3px; padding: 1px 4px; }
+
+  /* move table */
+  .mtwrap { flex: 1; min-height: 0; }
+  .mt { padding: 4px 6px 10px; font-family: "Geist Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .mt .r { display: flex; align-items: center; height: 26px; border-radius: 5px; padding: 0 6px; }
+  .mt .r:hover { background: var(--elevated); }
+  .mt .r.cur { background: var(--row-active); }
+  .mt .n { width: 32px; flex: none; color: var(--faint); }
+  .mt .r.cur .n { color: var(--dim); }
+  .mt .m { flex: 1; min-width: 0; padding: 0 4px; display: flex; align-items: center; gap: 5px; color: var(--body); cursor: pointer; }
+  .mt .m:hover { color: var(--text-bright); }
+  /* %clk from the PGN — what the mover had left before playing, which in 3+2 blitz is
+     the explanation, so time trouble is coloured: the late blunders and the sub-0:20
+     clocks are the same story */
+  /* a move that has a note says so, so notes are reachable from the game and not only
+     from the list; teal because a note is the reader's own mark, not the engine's */
+  .nmark { width: 9px; height: 9px; flex: none; color: var(--accent); opacity: .85; }
+  .nmark path { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+  .mt .m:hover .nmark { opacity: 1; }
+  .mt .clk { width: 36px; flex: none; text-align: right; padding-right: 6px; font-size: 10.5px; color: var(--faint); }
+  .mt .clk.low { color: var(--mistake); }
+  .mt .m.sel { color: var(--text-bright); border-radius: 4px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); height: 20px; }
+  /* content-width, not a fixed box: a one-character `?` in an 18px badge is mostly air,
+     while `??` fills it. Padding sizes both, so they read as the same family. */
+  .gl { display: inline-flex; align-items: center; justify-content: center; padding: 0 3px; height: 15px; border-radius: 3px; font-size: 10px; font-weight: 700; font-family: "Geist Mono", ui-monospace, monospace; }
+  /* prefixed, and deliberately: the bare `m` these once used is also the move cell's own
+     class, so `.mt .m { flex: 1 }` was stretching every `?` badge across the row */
+  .gl-b  { background: var(--blunder); color: var(--blunder-ink); }
+  .gl-m  { background: color-mix(in srgb, var(--mistake) 16%, transparent); color: var(--mistake); }
+  .gl-i  { background: color-mix(in srgb, var(--inaccuracy) 14%, transparent); color: var(--inaccuracy); }
+  .gl-q  { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+  .gl-g  { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .gl-br { background: color-mix(in srgb, var(--brilliant) 14%, transparent); color: var(--brilliant); }
+  .sv-b { color: var(--blunder); } .sv-m { color: var(--mistake); } .sv-i { color: var(--inaccuracy); }
+  .sv-q { color: var(--info); } .sv-g { color: var(--accent); } .sv-br { color: var(--brilliant); }
+
+  /* one cluster per player: the side dot names whose it is and matches the half of the
+     curve they own — white fills above the axis, black below. Three `5 vs 2`s in a row
+     asked the reader to hold which number was whose; two labelled groups do not. */
+  .gstat { display: inline-flex; align-items: center; gap: 7px; padding: 2px 7px; border-radius: 5px; background: var(--cell); font-size: 10.5px; white-space: nowrap; }
+  .gstat .gwho { max-width: 96px; overflow: hidden; text-overflow: ellipsis; color: var(--body-3); }
+  .gstat .gc { font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .gstat .gc i { margin-left: 2px; font-style: normal; font-weight: 700; opacity: .75; }
+  .gstat .gc-b { color: var(--blunder); }
+  .gstat .gc-m { color: var(--mistake); }
+  .gstat .gc-i { color: var(--inaccuracy); }
+  .gstat .gacpl { font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--dim); }
+  .gh .onlymine { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--dim); white-space: nowrap; cursor: pointer; user-select: none; }
+  .gh .onlymine input { width: 11px; height: 11px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+
+  /* note composer */
+  .composer { flex: none; border-top: 1px solid var(--hairline); padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); }
+  /* the active note loads into the textarea, so the header says you are editing one */
+  .composer .chd { display: flex; align-items: center; gap: 8px; font-size: 10px; }
+  .composer .chd .mv { font-family: "Geist Mono", ui-monospace, monospace; font-size: 10.5px; color: var(--accent); }
+  .composer .chd .when { color: var(--faint); }
+  .composer .chd .edit { border: 1px solid var(--edge); border-radius: 4px; padding: 1px 6px; color: var(--dim); cursor: pointer; }
+  .composer .chd .edit:hover { color: var(--text); border-color: var(--edge-hover); }
+  .composer textarea.filled { color: var(--text); }
+  .composer input.filled { color: var(--body-3); }
+  .composer textarea {
+    resize: none; height: 62px; padding: 8px 9px; border-radius: 6px;
+    background: var(--surface-2); border: 1px solid var(--edge-input); color: var(--body);
+    font-size: 12.5px; line-height: 1.5; outline: none;
+  }
+  .composer textarea::placeholder, .composer input::placeholder { color: var(--faint); }
+  .composer textarea:focus, .composer input:focus { border-color: var(--edge-hover); }
+  .composer .row { display: flex; gap: 8px; }
+  .composer input { flex: 1; min-width: 0; padding: 6px 9px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--edge-input); font-size: 12px; outline: none; }
+  .composer button { appearance: none; border: 0; border-radius: 6px; padding: 6px 12px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .composer button:hover { background: var(--accent-hover); }
+
+  /* the notes region — the Book panel when there is book, then the composer (carrying
+     this ply's saved note) and the game's other notes */
+  .notescol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .notescol .spacer { flex: 1; min-height: 0; }
+
+  /* Book — the explorer's per-position answer over the owner's own games. Four of the
+     explorer's seven columns, in its order and its vocabulary, so the two screens read
+     as one feature; the full table wants ~440px and this track is 340. */
+  /* A table of rows you read and click through, so it is dressed like the move table
+     across the divider — flat on the column's own ground, no card. The rounded-card
+     treatment is for the two engine panels, which are objects floating on that ground. */
+  .book { flex: none; padding: 0 6px 8px; }
+  .book .br { display: grid; grid-template-columns: 58px 34px minmax(0, 1fr) 52px; align-items: center; gap: 8px; height: 26px; border-radius: 5px; padding: 0 6px; font-size: 11px; font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .book .br.hd { height: 20px; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--hairline); border-radius: 0; font-family: Geist, ui-sans-serif, sans-serif; }
+  .book .br:not(.hd):hover { background: var(--elevated); }
+  .book .br .mv { font-family: "Geist Mono", ui-monospace, monospace; color: var(--body-3); }
+  .book .br .g { text-align: right; font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--dim); }
+  .book .br .drop { text-align: right; font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--mistake); }
+  .book .br.hd .g, .book .br.hd .drop { color: var(--faint); }
+  .split { display: flex; height: 8px; border-radius: 2px; overflow: hidden; background: var(--track); }
+  .split i { display: block; height: 100%; }
+  .split .sw { background: var(--good); }
+  .split .sd { background: var(--meter); }
+  .split .sl { background: var(--blunder); }
+  /* the boundary is the interesting thing: book is a move played more than once */
+  /* a tab pane now, so it takes the room rather than sitting under the composer, and each
+     note gets two lines of its text instead of one elided one */
+  .nlist { min-height: 0; padding: 4px 6px 8px; }
+  .nlist .nr { display: flex; align-items: baseline; gap: 9px; padding: 6px 6px; border-radius: 5px; cursor: pointer; }
+  .nlist .nr.cur { background: var(--row-active); }
+  .nempty { padding: 18px 12px; font-size: 11.5px; color: var(--faint); }
+  .ntabs { padding: 0 8px; }
+  .nlist .nr:hover { background: var(--elevated); }
+  .nlist .nr .mv { width: 56px; flex: none; font-family: "Geist Mono", ui-monospace, monospace; font-size: 11px; color: var(--dim); }
+  .nlist .nr .tx { flex: 1; min-width: 0; font-size: 12px; line-height: 1.45; color: var(--muted-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* ---- the layout: board left, everything else right --------------------------------- */
+  .work { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(620px, 700px); }
+
+  /* the board column is a size container, so the board is
+     min(width budget, height budget, --bsize) — and holds nothing but the board */
+  .col-board {
+    container-type: size; container-name: bcol;
+    --bsize: 920px; --vchrome: 148px;
+    grid-column: 1;
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: 10px; padding: 16px; min-width: 0; border-right: 1px solid var(--hairline);
+  }
+  .col-board .headbar { width: 100%; height: 30px; padding: 0; border-bottom: 0; }
+
+  /* The right column is one grid, so the Maia/Stockfish divider and the moves/notes
+     divider are the same line at the same x, running the height of the column. Stockfish
+     gets the wider track: a principal variation is the one thing here that wants width. */
+  .rightcol {
+    grid-column: 2; display: grid; min-width: 0; min-height: 0;
+    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+  .rightcol > .eband    { grid-area: 1 / 1 / 2 / -1; }
+  /* the moves/notes rule is now the only line in the column, so it agrees with nothing */
+  .rightcol > .movescol { grid-area: 2 / 1; border-right: 1px solid var(--hairline); }
+  .rightcol > .notescol { grid-area: 2 / 2; }
+  .rightcol > .gcard    { grid-area: 3 / 1 / 4 / -1; }
+  .rightcol > .movefoot { grid-area: 4 / 1 / 5 / -1; }
+  .movescol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .rightcol > .gcard { height: 170px; margin: 12px; }
+  .movefoot { border-top: 1px solid var(--hairline); padding: 8px 12px; display: flex; align-items: center; }
+  /* no Notes tab: the notes region has its own track at every width down to the phone,
+     so a tab would be a second door to a room already open */
+  .tabs .tab-notes { display: none; }
+
+  /* ---- phone ------------------------------------------------------------------------- */
+  .phone .ptop { flex: none; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .phone .boardblock { --bw: 300px; width: 322px; max-width: 100%; margin-inline: auto; }
+  .phone .ptabs { flex: none; display: flex; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+  .phone .ptabs button { appearance: none; flex: 1; background: none; border: 0; padding: 9px 2px; font-size: 11.5px; color: var(--dim); cursor: pointer; }
+  .phone .ptabs button.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+  .phone .ppane { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .phone .ppane.on { display: flex; }
+  .phone .gcard { margin: 12px; flex: none; height: 150px; }
+  .phone .notescol { flex: 1; }
+  .phone .eband { grid-template-columns: minmax(0, 1fr); }
+
+  /* ---- container-query bands --------------------------------------------------------- */
+  @container frame (min-width: 2200px) {
+    .work { grid-template-columns: minmax(0, 1fr) minmax(700px, 860px); }
+    .col-board { --bsize: 1200px; }
+  }
+  /* The two tracks survive all the way down to the phone, they just narrow. Folding them
+     into one was the wrong instinct: stacking notes under the move table would cost the
+     table the height it needs far sooner than a narrower track costs it width. A move row
+     needs ~236px (32 for the number, 72 for two clocks, 12 padding, ~60 per move cell),
+     so 250 is the floor and everything above it is comfort. */
+  @container frame (max-width: 1599.98px) {
+    .work { grid-template-columns: minmax(0, 1fr) minmax(560px, 640px); }
+    .col-board { --bsize: 760px; }
+    .rightcol { grid-template-columns: 300px minmax(0, 1fr); }
+  }
+  /* 768–1280 is repaired by the SideNav collapsing to an icon rail — that is ~150px back,
+     and it is what pays for keeping both tracks here. */
+  @container frame (min-width: 768px) and (max-width: 1279.98px) {
+    .nav { width: 48px; padding: 14px 6px 10px; }
+    .nav .lab, .nav .tx, .nav .foot .t, .nav .foot .num { display: none; }
+    .nav a { justify-content: center; padding: 8px 0; }
+    .nav .foot { padding: 12px 0 4px; }
+    .work { grid-template-columns: minmax(0, 1fr) minmax(520px, 580px); }
+    .col-board { --bsize: 560px; --vchrome: 182px; }
+    .rightcol { grid-template-columns: 250px minmax(0, 1fr); }
+    .rightcol > .gcard { margin: 10px; height: 150px; }
+  }
+  @container frame (max-width: 767.98px) {
+    .nav, .work { display: none; }
+    .phone { display: flex; }
+    .titlebar .crumb, .titlebar .rule, .titlebar .kbd { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="harness">
+  <div class="readout mono">
+    <span id="dims">— × —</span><span class="band" id="band">—</span><span class="bpx" id="bpx">—</span>
+  </div>
+  <div class="bookseg" id="bookseg">
+    <span>Book:</span>
+    <span class="seg">
+      <button data-b="opening" class="on">opening</button>
+      <button data-b="middlegame">middlegame</button>
+    </span>
+  </div>
+  <div class="bookseg" id="themeseg">
+    <span>Theme:</span>
+    <span class="seg">
+      <button data-t="dark" class="on">dark</button>
+      <button data-t="light">light</button>
+    </span>
+  </div>
+  <div class="presets" id="presets">
+    <button data-w="2560" data-h="1440">2560</button>
+    <button data-w="1900" data-h="1160" class="on">1900</button>
+    <button data-w="1680" data-h="1050">1680</button>
+    <button data-w="1440" data-h="900">1440</button>
+    <button data-w="1024" data-h="768">1024</button>
+    <button data-w="390" data-h="844">390</button>
+    <button data-w="fit">Fit window</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="frame" id="frame"></div>
+</div>
+
+<script>
+/* ==================================================================================
+   Data — one fabricated but internally consistent blitz game.
+   ================================================================================== */
+
+const GAME = {
+  opening: 'Sicilian Defense: French Variation, Open', eco: 'B40',
+  source: 'Lichess', speed: 'Blitz 3+2', result: '0-1', date: '30 Aug 2026',
+  white: { name: 'phib', rating: 1309 }, black: { name: 'Guido_Hannessen', rating: 1245 },
+  tier: 'Quick · 250kn', analysed: 'analysed 2h ago', plies: 86, flagged: 23,
+};
+
+/* white san, white glyph, black san, black glyph */
+const MOVES = [
+  ['e4', '!', 'c5', ''],        ['Nf3', '!', 'e6', '!'],      ['d4', '!', 'cxd4', '!'],
+  ['Nxd4', '!', 'g6', '?!'],    ['Nc3', '!', 'Bg7', '?'],     ['Bc4', '??', 'Qb6', '??'],
+  ['Nb3', '?', 'Nc6', ''],      ['O-O', '?!', 'Nge7', '!'],   ['Be3', '!', 'Qb4', '?'],
+  ['Qd3', '??', 'Ne5', '!'],    ['Qe2', '?!', 'Nxc4', '??'],  ['a3', '??', 'Nxe3', '?'],
+  ['axb4', '!', 'Nxf1', '!'],   ['Kxf1', '!', 'O-O', '!'],    ['Qe3', '', 'b6', '!'],
+  ['f4', '?!', 'Bb7', ''],      ['Nb5', '', 'd5', '?!'],      ['Nd6', '', 'd4', '?!'],
+  ['Nxd4', '!', 'Bc6', ''],     ['e5', '!', 'Rfd8', ''],      ['Qc3', '?!', 'Bd5', '?!'],
+  ['Rd1', '?!', 'Nf5', '?'],    ['N4xf5', '!', 'gxf5', '!'],  ['Nc4', '??', 'Rac8', '?'],
+  ['Rxd5', '?', 'exd5', '!'],   ['e6', '??', 'Bxc3', '!'],    ['bxc3', '', 'dxc4', '!'],
+  ['exf7+', '!', 'Kxf7', '!'],  ['h4', '', 'Rd1+', ''],       ['Kf2', '', 'Re8', ''],
+];
+const CUR_MOVE = 12;          /* board sits after 12.a3 */
+const CUR_PLY = 22;
+
+/* Time each player had left BEFORE playing that move — the app's own definition, which
+   is the mover's own previous reading (ply - 2), not the clock after the move. White,
+   then black. 3+2: White burns the clock and the late blunders land under 0:20 —
+   24.Nc4 at 0:19, 26.e6 at 0:11. */
+const CLOCKS = [
+  ['3:00', '3:00'], ['2:56', '2:58'], ['2:52', '2:56'], ['2:47', '2:53'], ['2:41', '2:50'],
+  ['2:30', '2:44'], ['2:22', '2:41'], ['2:15', '2:37'], ['2:06', '2:33'], ['1:52', '2:28'],
+  ['1:44', '2:22'], ['1:31', '2:16'], ['1:26', '2:14'], ['1:22', '2:12'], ['1:15', '2:08'],
+  ['1:06', '2:04'], ['0:58', '1:59'], ['0:51', '1:54'], ['0:44', '1:50'], ['0:39', '1:46'],
+  ['0:33', '1:41'], ['0:27', '1:36'], ['0:24', '1:33'], ['0:19', '1:29'], ['0:15', '1:24'],
+  ['0:11', '1:20'], ['0:09', '1:18'], ['0:07', '1:15'], ['0:06', '1:13'], ['0:04', '1:10'],
+];
+
+
+/* white win-percentage, one point per move; 44 moves, decisive for black from ~24 */
+const CURVE = [
+  50, 52, 51, 53, 52, 54, 46, 43, 45, 38, 36, 33, 64, 67, 65, 63, 61, 58, 56, 53, 49,
+  45, 47, 31, 27, 15, 11, 9, 8, 7, 6, 6, 5, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1, 0,
+];
+const CURVE_BLUNDERS = [5, 9, 11, 23, 25];   /* moves 6, 10, 12, 24, 26 */
+const CURVE_MISTAKES = [6, 21, 24];          /* moves 7, 22, 25 */
+/* the opponent's, drawn only when "only mine" is off. Same disc, same colour: whose it
+   was is already told by the direction the curve jumps, so the mark does not repeat it. */
+const CURVE_BLUNDERS_OPP = [5, 10];
+const CURVE_MISTAKES_OPP = [4, 8, 11, 21, 23];
+let ONLY_MINE = true;
+const CURVE_CURSOR = 10.5;                   /* before White's 12th — half a move back */
+
+/* Maia produces ONLY the first number. MaiaMove carries uci/san/rank/probability and no
+   evaluation whatsoever — the policy share is the one thing on this panel that is Maia's.
+   The second column is STOCKFISH's, crossed in by humanMoves(): the played move takes the
+   backend's stored verdict, an unplayed move that Stockfish ranked takes the win-%
+   difference from the top line, and a move the engine never ranked gets no verdict at all
+   — deliberately blank, rather than a flattering or damning guess. The unit is
+   win-percentage points, never pawns, and below 0.05 the app shows the classification
+   badge in place of a number.
+   san, policy %, verdict, source */
+/* WHITE's candidates, because the board stands before White's move. The question in the
+   position is the bishop on e3: attacked by the knight on c4, and White is already a piece
+   down. Stepping it aside keeps the c4 knight tied to the queen's defence, so a3 wins it
+   back next move. Playing a3 first lets …Nxe3 in between, and the queen then costs a rook
+   and a bishop to take. Every move here is legal in the FEN above — b3 is not, the White
+   knight stands on it. */
+const MAIA = [
+  ['Bd4',  34, 'best', 'best'],     /* multipv 1 — the bishop steps aside, a3 wins the knight next */
+  ['a3',   27, '−18%', 'played'],   /* played — chases the queen a move too early, ?? */
+  ['Rfd1', 15, '−5%',  'engine'],   /* multipv 2 */
+  ['Na5',  13, '',     'none'],     /* unranked — hits c4 but walks into …b6 */
+  ['Bf4',  11, '',     'none'],     /* unranked — the passive retreat */
+];
+
+/* position after 12.a3 — white a-pawn on a3, black knight on c4, bishops traded off */
+/* The position the mistake is made FROM, one ply short of the move itself — the app
+   seeks to ply-1 for exactly this reason: standing after the move would show the position
+   the mistake already produced, which explains nothing. White to move, about to play a3.
+   Differs from the position after 12.a3 only in the a-pawn (a2, not a3). */
+const FEN = 'r1b1k2r/pp1pnpbp/4p1p1/8/1qn1P3/1NN1B3/PPP1QPPP/R4RK1';
+const GLYPH_CHAR = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙', k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+const PIECE_URL = t => `https://lichess1.org/assets/piece/cburnett/${t === t.toUpperCase() ? 'w' : 'b'}${t.toUpperCase()}.svg`;
+
+/* the piece SVGs are the only remote asset; if they do not load, fall back to a glyph */
+window.pieceFallback = (img, t) => {
+  const cell = img.parentElement;
+  cell.textContent = GLYPH_CHAR[t];
+  cell.style.color = t === t.toUpperCase() ? 'var(--text-bright)' : '#14181c';
+};
+
+const GK = { '??': 'gl-b', '?': 'gl-m', '?!': 'gl-i', '!?': 'gl-q', '!': 'gl-g', '!!': 'gl-br' };
+const SV = { '??': 'sv-b', '?': 'sv-m', '?!': 'sv-i', '!?': 'sv-q', '!': 'sv-g', '!!': 'sv-br' };
+const glyph = g => (g ? `<span class="gl ${GK[g]}">${g}</span>` : '');
+
+/* A move that carries a note is marked in the table, so the notes are findable from the
+   game rather than only from the list. Built from the note labels themselves — `6.Bc4`
+   is White's, `6…Bc4` would be Black's — so the mark and the list can never disagree. */
+const NOTE_ICON =
+  '<svg class="nmark" viewBox="0 0 12 12" aria-hidden="true">' +
+  '<path d="M2.6 1.6h4.6L9.4 3.8v6.6H2.6z"/><path d="M4.3 5.6h3.4M4.3 7.6h2.2"/></svg>';
+const noted = (no, side) => (NOTED.has(no + side) ? NOTE_ICON : '');
+/* under twenty seconds is time trouble — that is where the late blunders are */
+const low = clk => { const [m, s] = clk.split(':'); return +m * 60 + +s < 20 ? ' low' : ''; };
+
+/* ==================================================================================
+   Eval graph — the path is regenerated from CURVE, never hand-written.
+   ================================================================================== */
+
+let gid = 0;
+function graphSVG(w, h) {
+  const id = 'g' + (gid++);
+  const n = CURVE.length, mid = h / 2;
+  const x = i => (i / (n - 1)) * w;
+  const y = v => mid - ((v - 50) / 50) * mid;
+  const pts = CURVE.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const curve = 'M' + pts.join(' L');
+  const lo = Math.floor(CURVE_CURSOR), hi = Math.ceil(CURVE_CURSOR), t = CURVE_CURSOR - lo;
+  const cx = +x(CURVE_CURSOR).toFixed(1);
+  const cy = +y(CURVE[lo] + (CURVE[hi] - CURVE[lo]) * t).toFixed(1);
+  /* the dots are the click targets — jumping between mistakes is what this chart is for */
+  const dot = (i, fill, label) =>
+    `<circle class="hit" cx="${x(i).toFixed(1)}" cy="${y(CURVE[i]).toFixed(1)}" r="3.5" fill="${fill}" ` +
+    `stroke="var(--graph-bg)" stroke-width="1.5"><title>move ${i + 1} · ${label}</title></circle>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <defs>
+      <clipPath id="${id}-up"><rect x="0" y="0" width="${w}" height="${mid}"/></clipPath>
+      <clipPath id="${id}-dn"><rect x="0" y="${mid}" width="${w}" height="${h - mid}"/></clipPath>
+    </defs>
+    <rect x="0" y="0" width="${w}" height="${h}" fill="var(--graph-bg)"/>
+    <line x1="0" y1="${(mid / 2).toFixed(1)}" x2="${w}" y2="${(mid / 2).toFixed(1)}" stroke="var(--graph-grid)"/>
+    <line x1="0" y1="${(mid * 1.5).toFixed(1)}" x2="${w}" y2="${(mid * 1.5).toFixed(1)}" stroke="var(--graph-grid)"/>
+    <path d="${curve} L${w},${h} L0,${h} Z" fill="color-mix(in srgb, var(--side-white) 55%, transparent)" clip-path="url(#${id}-up)"/>
+    <path d="${curve} L${w},0 L0,0 Z" fill="color-mix(in srgb, var(--side-black) 85%, transparent)" clip-path="url(#${id}-dn)"/>
+    <line x1="0" y1="${mid}" x2="${w}" y2="${mid}" stroke="var(--graph-axis)"/>
+    <path d="${curve}" fill="none" stroke="var(--text-2)" stroke-width="1.6" stroke-linejoin="round"/>
+    ${(ONLY_MINE ? CURVE_MISTAKES : CURVE_MISTAKES.concat(CURVE_MISTAKES_OPP))
+        .map(i => dot(i, 'var(--mistake)', 'mistake')).join('')}
+    ${(ONLY_MINE ? CURVE_BLUNDERS : CURVE_BLUNDERS.concat(CURVE_BLUNDERS_OPP))
+        .map(i => dot(i, 'var(--blunder)', 'blunder')).join('')}
+    <line x1="${cx}" y1="0" x2="${cx}" y2="${h}" stroke="var(--accent)" stroke-dasharray="2 3"/>
+    <path d="M${cx - 5},0 L${cx + 5},0 L${cx},7 Z" fill="var(--accent)"/>
+    <circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--accent)" stroke="var(--graph-bg)" stroke-width="2"/>
+  </svg>`;
+}
+
+/* the graph needs a measured box, so it is painted after layout and on every resize */
+/* Repaints on resize only, since the SVG is rebuilt from scratch each time. `force` is for
+   the changes that alter what is drawn without altering the box — the "only mine" toggle. */
+function paintGraphs(force) {
+  for (const el of document.querySelectorAll('.graph')) {
+    const w = Math.round(el.clientWidth), h = Math.round(el.clientHeight);
+    if (w > 20 && h > 20 && (force || el.dataset.w !== String(w) || el.dataset.h !== String(h))) {
+      el.dataset.w = w; el.dataset.h = h; el.innerHTML = graphSVG(w, h);
+    }
+  }
+}
+
+/* ==================================================================================
+   Panel builders
+   ================================================================================== */
+
+const H = {};
+
+H.titlebar = () => `
+  <div class="titlebar">
+    <div class="logo"></div><span class="wordmark">Blunderbase</span>
+    <div class="rule"></div>
+    <div class="crumb">
+      <span>Library</span><span class="sep">/</span>
+      <span class="mono">${GAME.date}</span><span class="sep">/</span>
+      <span class="here">${GAME.white.name} vs ${GAME.black.name}</span>
+    </div>
+    <div class="spacer"></div>
+    <span class="chip mono kbd">⌘K</span>
+  </div>`;
+
+H.nav = () => `
+  <nav class="nav">
+    <div class="lab">Workspace</div>
+    <a><span class="sq"></span><span class="tx">Dashboard</span></a>
+    <a class="on"><span class="sq"></span><span class="tx">Games</span></a>
+    <a><span class="sq"></span><span class="tx">Openings</span></a>
+    <a><span class="sq"></span><span class="tx">Stats</span></a>
+    <a><span class="sq"></span><span class="tx">Blunder log</span></a>
+    <div style="height:14px"></div>
+    <div class="lab">Engines</div>
+    <a><span class="dot" style="background:var(--accent);margin:0 4px"></span><span class="tx">Stockfish 17</span></a>
+    <a><span class="dot" style="background:var(--faint);margin:0 4px"></span><span class="tx">Maia 1100–1900</span></a>
+    <div class="foot">
+      <div class="t">Deep coverage</div>
+      <div class="meter"><i style="width:64%"></i></div>
+      <div class="num mono" style="font-size:10px;color:var(--faint)">412 / 640 games</div>
+    </div>
+  </nav>`;
+
+/* one line, spanning every column; the players have moved down to flank the board */
+H.headbar = () => `
+  <div class="headbar">
+    <span class="name">${GAME.opening}</span>
+    <span class="eco">${GAME.eco}</span>
+    <span class="src"><span class="dot" style="background:var(--info)"></span>${GAME.source}</span>
+    <span class="mono" style="font-size:11.5px;color:var(--dim)">${GAME.speed}</span>
+    <span class="sep">·</span>
+    <span class="mono res" style="font-size:11.5px">${GAME.result}</span>
+    <div class="spacer"></div>
+    <span class="tier">${GAME.tier}</span>
+    <span class="q mono">${GAME.analysed}</span>
+  </div>`;
+
+H.board = () => {
+  let pieces = '';
+  FEN.split('/').forEach((row, r) => {
+    let f = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) { f += +ch; continue; }
+      pieces += `<div class="pc" style="grid-area:${r + 1}/${f + 1}">` +
+        `<img draggable="false" alt="" src="${PIECE_URL(ch)}" onerror="pieceFallback(this,'${ch}')"></div>`;
+      f++;
+    }
+  });
+  /* the marks are 12.a3's from/to — a2 (row 7) and a3 (row 6); the teal arrow is what
+     the engine would play instead, 12.Bd4, e3 -> d4 */
+  return `<div class="board">
+    <div class="layer">
+      <div class="mark" style="grid-area:7/1"></div>
+      <div class="mark" style="grid-area:6/1"></div>
+    </div>
+    <div class="layer">${pieces}</div>
+    <svg class="arrows" viewBox="0 0 8 8">
+      <g opacity=".92">
+        <line x1="4.29" y1="5.29" x2="4.03" y2="5.03" stroke="var(--accent)" stroke-width=".16" stroke-linecap="round"/>
+        <polygon points="3.76,4.76 4.18,4.88 3.88,5.18" fill="var(--accent)"/>
+      </g>
+    </svg>
+  </div>`;
+};
+
+/* players flank the board by orientation: opponent above, you below, each with the
+   pieces they have taken and the material balance */
+H.player = (side) => {
+  const p = side === 'w' ? GAME.white : GAME.black;
+  const caps = side === 'w' ? '♟' : '♙♗';
+  const bal = side === 'w' ? '−3' : '+3';
+  return `<div class="pname">
+    <span class="side ${side}"></span>
+    <span class="nm">${p.name}</span><span class="r">${p.rating}</span>
+    <span class="cap">${caps}</span>
+    <span class="bal${side === 'w' ? ' down' : ''}">${bal}</span>
+  </div>`;
+};
+
+H.axis = () => `<div class="gaxis"><span>1</span><span>8</span><span>16</span><span>24</span><span>32</span><span>40</span><span>43</span></div>`;
+
+/* one compact row under the board — the eval graph is in the right column now */
+H.transport = () => `
+  <div class="transport">
+    <div class="tgroup">
+      <button title="First">⏮</button><button title="Back">◀</button>
+      <button class="on" title="Forward">▶</button><button title="Last">⏭</button>
+    </div>
+    <div class="tgroup" title="Jump between flagged moves">
+      <button class="warm">◂</button><button class="warm" style="padding:4px 7px">mistake</button><button class="warm">▸</button>
+    </div>
+    <button class="tbtn">⇅ Flip</button>
+    <button class="tbtn">Hints</button>
+    <button class="tbtn">Quick</button>
+    <button class="tbtn">Deep</button>
+    <button class="tbtn">＋ Note</button>
+    <div class="spacer"></div>
+    <span class="mono" style="font-size:11px;color:var(--dim)">ply ${CUR_PLY} / ${GAME.plies}</span>
+    <span class="score mono">-2.90</span>
+  </div>`;
+
+H.boardBlock = () => `
+  <div class="boardblock">
+    ${H.player('b')}
+    <div class="boardrow">
+      <div class="evalbar">
+        <div class="b" style="height:78%"></div><div class="w"></div><div class="mid" style="top:78%"></div>
+      </div>
+      ${H.board()}
+    </div>
+    ${H.player('w')}
+    ${H.transport()}
+  </div>`;
+
+/* the accuracy counts ride on the header line: the legend dot and the count are the
+   same mark, so the summary costs no band of its own */
+/* One player's tally, as its own group. Reading three `5 vs 2`s in a row asks the reader
+   to hold which number is whose; two labelled clusters, each behind the side dot that also
+   says which half of the curve is theirs, does not. Glyphs rather than words because the
+   move table has already taught them. */
+H.gstat = (side, name, [b, m, i], acpl) => `
+  <span class="gstat">
+    <span class="side ${side}"></span><span class="gwho">${name}</span>
+    <span class="gc gc-b">${b}<i>??</i></span>
+    <span class="gc gc-m">${m}<i>?</i></span>
+    <span class="gc gc-i">${i}<i>?!</i></span>
+    <span class="gacpl">ACPL ${acpl}</span>
+  </span>`;
+
+H.graphCard = () => `
+  <div class="gcard">
+    <div class="gh">
+      <span>Evaluation</span>
+      <label class="onlymine"><input type="checkbox" id="onlymine"${ONLY_MINE ? ' checked' : ''}>only mine</label>
+      <div class="spacer"></div>
+      ${H.gstat('w', GAME.white.name, [5, 2, 5], 120)}
+      ${H.gstat('b', GAME.black.name, [2, 5, 4], 89)}
+    </div>
+    <div class="graph"></div>
+    ${H.axis()}
+  </div>`;
+
+H.maia = () => `
+  <div class="epanel maia">
+    <div class="ehead">
+      <span class="dot" style="background:var(--brilliant)"></span>
+      <span class="nm">Maia 1500</span>
+      <div class="spacer"></div>
+      <span class="box drop">level ▾</span>
+    </div>
+    ${MAIA.map(([mv, pct, d, kind]) => `
+      <div class="row" style="--p:${pct}%">
+        <span class="mv">${mv}</span>
+        <span class="pct">${pct}%</span>
+        <span class="d ${kind}">${d}</span>
+      </div>`).join('')}
+  </div>`;
+
+H.stockfish = () => `
+  <div class="epanel sf">
+    <div class="ehead">
+      <span class="dot" style="background:var(--accent)"></span>
+      <span class="nm">stockfish-remote</span>
+      <div class="spacer"></div>
+      <span class="m">250k nodes</span>
+      <span class="box">MPV 3</span>
+    </div>
+    <div class="line best">
+      <span class="ev">-2.90</span>
+      <span class="pv"><span class="h">12.Bd4</span> O-O 13.a3 Qb6 14.Qxc4 d5 15.Qe2 dxe4 16.Nxe4</span>
+    </div>
+    <div class="line">
+      <span class="ev">-3.40</span>
+      <span class="pv"><span class="h">12.Rfd1</span> Nxe3 13.Qxe3 O-O 14.a3 Qb6 15.Qxb6 axb6 16.Nd4</span>
+    </div>
+    <div class="line played">
+      <span class="ev">-4.62</span>
+      <span class="pv"><span class="h bad">12.a3</span> Nxe3 13.axb4 Nxf1 14.Kxf1 O-O 15.Qe3 b6 16.f4 Bb7</span>
+      <span class="tag">played</span>
+    </div>
+  </div>`;
+
+/* Flagged is the move table filtered, not a second list — there is no separate flagged
+   panel any more; the table already colour-codes all 23 with glyph badges, and the
+   `◂ mistake ▸` transport buttons carry the jump-to-the-next-one job. Notes appears
+   only when the notes region has folded away; CSS hides it otherwise. */
+H.tabs = () => `
+  <div class="tabs">
+    <span class="t tab-moves on">Moves</span>
+    <span class="t tab-flagged">Flagged <span class="n">${GAME.flagged}</span></span>
+    <span class="t tab-notes">Notes</span>
+    <div class="spacer"></div>
+    <span class="meta"><span>${GAME.plies} plies</span><b>PGN</b></span>
+  </div>`;
+
+H.moveTable = () => `
+  <div class="mtwrap scroll">
+    <div class="mt">
+      ${MOVES.map(([w, wg, b, bg], i) => {
+        const no = i + 1, cur = no === CUR_MOVE, [wc, bc] = CLOCKS[i];
+        return `<div class="r${cur ? ' cur' : ''}">
+          <span class="n">${no}.</span>
+          <span class="m${cur ? ' sel' : ''} ${SV[wg] || ''}">${w}${glyph(wg)}${noted(no, 'w')}</span>
+          <span class="clk${low(wc)}">${wc}</span>
+          <span class="m ${SV[bg] || ''}">${b}${glyph(bg)}${noted(no, 'b')}</span>
+          <span class="clk${low(bc)}">${bc}</span>
+        </div>`;
+      }).join('')}
+      <div class="r"><span class="n">31.</span><span class="m" style="color:var(--faint)">…13 more</span><span class="clk"></span><span class="m"></span><span class="clk"></span></div>
+    </div>
+  </div>`;
+
+
+H.composer = () => `
+  <div class="composer">
+    <div class="chd">
+      <span class="mv">${PLY_NOTE.mv}</span><span class="when">${PLY_NOTE.when}</span>
+      <div class="spacer"></div><span class="edit">edit</span>
+    </div>
+    <textarea class="filled">${PLY_NOTE.text}</textarea>
+    <div class="row"><input class="filled" value="${PLY_NOTE.tags}"><button>Save note</button></div>
+  </div>`;
+
+/* the note saved against the current ply — it loads into the composer, so there is no
+   separate card for it */
+const PLY_NOTE = {
+  mv: '12.a3', when: 'saved 2d ago', tags: 'tactics, open-sicilian',
+  text: 'Stop poking at the queen while a piece is hanging. Count the defenders on e3 before the pawn move — b4 was not going anywhere.',
+};
+
+/* Book: the owner's own tree from this position — per continuation frequency, score and
+   average eval drop. A Sicilian after 2…e6, where a 1300 has been nine times. */
+const BOOK = {
+  games: 9,
+  /* san, games, [win, draw, loss], avg win-% drop */
+  rows: [
+    ['3.d4',  6, [3, 1, 2], '−9%'],
+    ['3.Nc3', 2, [0, 1, 1], '−16%'],
+    ['3.b3',  1, [0, 0, 1], '−24%'],
+  ],
+};
+/* The toggle in the harness flips this; in the app it is `totals.games >= 2`. */
+let IN_BOOK = true;
+/* this game's other notes, as one-line rows */
+const GAME_NOTES = [
+  ['6.Bc4', 'Bishop has no future on this diagonal against …e6'],
+  ['15.Qe3', 'Only decent square once the queen came off — remember this recapture'],
+  ['24.Nc4', 'Time trouble. Stopped counting defenders again.'],
+];
+
+/* Every note in the game, the composer's included. `ALL_NOTES` feeds the overlay;
+   `NOTED` is the same set keyed by ply, which is what marks the move table. Both are
+   derived from the one list, so a mark can never point at a note that isn't there. */
+const ALL_NOTES = [[PLY_NOTE.mv, PLY_NOTE.text], ...GAME_NOTES];
+const NOTED = new Set(
+  ALL_NOTES.map(([mv]) => {
+    const m = mv.match(/^(\d+)(\.|…)/);
+    return m[1] + (m[2] === '.' ? 'w' : 'b');
+  }),
+);
+
+/* Book is empty far more often than it is not: of 463k positions in the owner's tree,
+   452k are reached by exactly one game and only 1.1k by ten or more. So the panel renders
+   ONLY when two or more of the owner's games reached this position, and otherwise emits
+   nothing at all — no empty state, no placeholder box, no "no book data" line. That
+   conditionality is what makes this column work: Book is an opening-phase panel, notes
+   matter everywhere, and the two never fight for the same space. */
+H.book = () => (!IN_BOOK ? '' : `
+  <div class="book">
+    <div class="br hd"><span>Move</span><span class="g">Games</span><span>Score</span><span class="drop">Avg drop</span></div>
+    ${BOOK.rows.map(([mv, g, [w, d, l], drop]) => {
+      const t = w + d + l;
+      return `<div class="br">
+        <span class="mv">${mv}</span>
+        <span class="g">${g}</span>
+        <span class="split"><i class="sw" style="width:${w / t * 100}%"></i><i class="sd" style="width:${d / t * 100}%"></i><i class="sl" style="width:${l / t * 100}%"></i></span>
+        <span class="drop">${drop}</span>
+      </div>`;
+    }).join('')}
+  </div>`);
+
+H.noteList = () => (GAME_NOTES.length
+  ? `<div class="nlist scroll">
+      ${ALL_NOTES.map(([mv, tx], i) => `
+        <div class="nr${i === 0 ? ' cur' : ''}"><span class="mv">${mv}</span><span class="tx">${tx}</span></div>`).join('')}
+    </div>`
+  : `<div class="nempty">No notes in this game yet.</div>`);
+
+/* Book and Notes share one pane behind a tab, because they answer the same question at
+   different scopes — what happened here before, and what you wrote about it. The composer
+   is NOT in that pane: it belongs to the position on the board, so it stays put under
+   both, and switching tabs never moves the box you are typing in. */
+let NOTES_TAB = 'book';
+H.notesColumn = () => {
+  const tabs = IN_BOOK ? ['book', 'notes'] : ['notes'];
+  const on = tabs.includes(NOTES_TAB) ? NOTES_TAB : tabs[0];
+  return `
+  <section class="notescol">
+    <div class="tabs ntabs">
+      ${tabs.map(t => `<span class="t${t === on ? ' on' : ''}" data-nt="${t}">${t === 'book' ? 'Book' : 'Notes'}</span>`).join('')}
+      <div class="spacer"></div>
+      <span class="meta">${on === 'book' ? `<span>${BOOK.games} games</span>` : `<span>${ALL_NOTES.length} notes</span>`}</span>
+    </div>
+    ${on === 'book' ? H.book() : H.noteList()}
+    <div class="spacer"></div>
+    ${H.composer()}
+  </section>`;
+};
+
+H.continuous = () => `<span class="chip act">⚙ Continuous · deep · 3 lines</span>`;
+
+/* --- the left column: the board and nothing that is not the board ----------------- */
+H.boardColumn = () => `
+  <section class="col-board">
+    ${H.headbar()}
+    ${H.boardBlock()}
+  </section>`;
+
+/* --- the right column: one grid, so every divider is the same line ---------------- */
+H.rightColumn = () => `
+  <section class="rightcol">
+    <div class="eband">${H.maia()}${H.stockfish()}</div>
+    <div class="movescol">
+      ${H.tabs()}
+      ${H.moveTable()}
+    </div>
+    ${H.notesColumn()}
+    ${H.graphCard()}
+    <div class="movefoot">${H.continuous()}</div>
+  </section>`;
+
+H.work = () => `
+  <div class="work" id="work">
+    ${H.boardColumn()}
+    ${H.rightColumn()}
+  </div>`;
+
+/* --- phone ------------------------------------------------------------------------ */
+H.phone = () => `
+  <div class="phone">
+    ${H.headbar()}
+    <div class="ptop">${H.boardBlock()}</div>
+    <div class="ptabs" id="ptabs">
+      <button data-t="moves">Moves</button>
+      <button data-t="eval" class="on">Eval</button>
+      <button data-t="engine">Engine</button>
+      <button data-t="notes">Notes</button>
+    </div>
+    <div class="ppane" data-t="moves">${H.tabs()}${H.moveTable()}</div>
+    <div class="ppane on" data-t="eval">${H.graphCard()}</div>
+    <div class="ppane" data-t="engine"><div class="eband">${H.maia()}${H.stockfish()}</div></div>
+    <div class="ppane" data-t="notes">${H.notesColumn()}</div>
+  </div>`;
+
+
+/* ==================================================================================
+   Assemble + harness wiring
+   ================================================================================== */
+
+const frame = document.getElementById('frame');
+frame.innerHTML = H.titlebar() +
+  `<div class="shellbody">${H.nav()}${H.work()}${H.phone()}</div>`;
+
+/* Delegated: the notes column is re-rendered whole, both by the Book toggle and by its
+   own tabs, so neither the tabs nor anything in them stays the same element for long. */
+frame.addEventListener('click', e => {
+  const t = e.target.closest('.ntabs [data-nt]');
+  if (!t) return;
+  NOTES_TAB = t.dataset.nt;
+  for (const col of document.querySelectorAll('.notescol')) col.outerHTML = H.notesColumn();
+});
+
+/* Hides the opponent's marks, not their counts: the summary beside the graph stays a
+   two-player summary either way, which is what the app does. */
+frame.addEventListener('change', e => {
+  if (!e.target.matches('#onlymine')) return;
+  ONLY_MINE = e.target.checked;
+  paintGraphs(true);
+});
+
+/* The class goes on <body>, the way the app puts it on <html> — the harness follows the
+   theme too, which is the point: a light app framed in dark chrome flatters itself. */
+document.getElementById('themeseg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const o of document.querySelectorAll('#themeseg button')) o.classList.toggle('on', o === b);
+  document.body.classList.toggle('light', b.dataset.t === 'light');
+  paintGraphs();
+});
+document.getElementById('ptabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const o of document.querySelectorAll('#ptabs button')) o.classList.toggle('on', o === b);
+  for (const p of document.querySelectorAll('.ppane')) p.classList.toggle('on', p.dataset.t === b.dataset.t);
+  paintGraphs();
+});
+
+new ResizeObserver(() => { readout(); paintGraphs(); }).observe(frame);
+window.addEventListener('resize', () => { readout(); paintGraphs(); });
+readout();
+requestAnimationFrame(paintGraphs);
+</script>
+</body>
+</html>

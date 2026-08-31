@@ -3,11 +3,14 @@ import type { DrawShape } from '@lichess-org/chessground/draw'
 import { Check, ChevronLeft, ChevronRight, Flag, Loader2, StickyNote, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 
+import { SideDot } from '@/components/badges/SideDot'
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { GameRunSummary, MoveRow, RunResponse } from '@/lib/api/types'
+import type { Color, GameRunSummary, GameSummary, MoveRow, RunResponse } from '@/lib/api/types'
 import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
+import { materialBalance, type CapturedRole, type MaterialBalance } from '@/lib/chess/material'
+import { useWheelStep } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 
 import type { AnalysisLine } from '../analysisLine'
@@ -29,6 +32,15 @@ export interface BoardPanelProps {
   /** Back to the game line. Only offered while there is a line to leave. */
   onExitAnalysis?: () => void
   orientation: Side
+  /**
+   * The game, for the two player rows flanking the board — names, ratings and which side the
+   * owner had. Only that; everything else about the game is the header's business.
+   *
+   * Optional, and the rows are simply left out without it: below `md` `MobileGameView` names
+   * both players in its own header, and the panel is also rendered in tests and by the
+   * explorer's stand-in without a game behind it.
+   */
+  game?: GameSummary | null
   /** The move that produced this position, for the last-move highlight. */
   lastMove: MoveRow | undefined
   /** The move about to be played — what Maia and the flags describe. */
@@ -69,8 +81,9 @@ export interface BoardPanelProps {
   /**
    * The cursor the next (and previous) flagged move is made *from* — one ply before the
    * mistake, which is the position worth reading — or null where there is none that way.
-   * The same jump `j`/`shift+J` make; they are only drawn as buttons below `md`, where
-   * there is no keyboard to press and the flagged moves are the reason the page is open.
+   * The same jump `j`/`shift+J` make, and drawn as buttons at every width: getting to the
+   * blunder is what the page is opened for, and a keybinding with no affordance is a
+   * feature only the person who wrote it knows about.
    */
   nextFlagged?: number | null
   previousFlagged?: number | null
@@ -103,22 +116,18 @@ export interface BoardPanelProps {
   className?: string
 }
 
-/**
- * Wheel travel — in CSS pixels, whatever the device reports in — that counts as one move.
- * Tuned per-tick rather than per-notch: a mouse's discrete wheel tick is ~15px of deltaY,
- * so one tick alone crosses this and steps once. A trackpad's stream of small deltas is
- * added up to the same threshold and then reset, so one flick is one move rather than ten.
- */
-const WHEEL_STEP = 10
-
 /** Whose move it is in a FEN, straight off its second field. */
 function turnOf(fen: string): Side {
   return fen.split(/\s+/)[1] === 'b' ? 'black' : 'white'
 }
 
 /**
- * The board column's middle band: eval bar, board with its overlays, and the transport
- * toolbar. Square marks follow design 1c — the flagged move's two squares outlined in its
+ * The board column, whole: a player row, the eval bar and the board with its overlays, the
+ * other player row, and the transport toolbar. Nothing that is not about the board lives
+ * here — the eval curve, the notes and the engine panels are all in the right column, and
+ * that emptiness is what pays for the board's size (see the budget below).
+ *
+ * Square marks follow design 1c — the flagged move's two squares outlined in its
  * own colour, the engine's target and Maia's target as a teal and a purple mark.
  *
  * The arrows are about the position on the board, never about the move that happens next:
@@ -131,6 +140,7 @@ export function BoardPanel({
   onPlayMove,
   onExitAnalysis,
   orientation,
+  game,
   lastMove,
   upcoming,
   engineBest,
@@ -208,41 +218,10 @@ export function BoardPanel({
     return drawn
   }, [engineBest, hints, hoverMove, maia])
 
-  // Wheeling over the board steps the game: down is forwards, the way a move list reads.
-  // The listener is attached by hand because React's `onWheel` is passive, and a passive
-  // listener cannot stop the page from scrolling underneath the gesture.
+  // Wheeling over the board steps the game. The gesture is `useWheelStep`'s, shared with the
+  // eval curve, so the two surfaces on this page answer a wheel identically.
   const column = useRef<HTMLDivElement>(null)
-  // The listener is bound once, so the current cursor lives behind a ref (as in `Board`).
-  const seeking = useRef({ cursor, onSeek, onStep })
-  useEffect(() => {
-    seeking.current = { cursor, onSeek, onStep }
-  })
-  const travel = useRef(0)
-
-  useEffect(() => {
-    const node = column.current
-    if (!node) return
-    function onWheel(event: WheelEvent) {
-      // A pinch-zoom is a wheel event too, and is not a request for the next move.
-      if (event.ctrlKey) return
-      event.preventDefault()
-      // `deltaMode` is lines or pages on some browsers; both become rough pixels.
-      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1
-      const delta = event.deltaY * scale
-      if (delta === 0) return
-      // Turning round mid-gesture starts its own count rather than paying off the old one.
-      if (delta > 0 !== travel.current > 0) travel.current = 0
-      travel.current += delta
-      if (Math.abs(travel.current) < WHEEL_STEP) return
-      const step = travel.current > 0 ? 1 : -1
-      travel.current = 0
-      const { onStep: stepBy, onSeek: seek, cursor: at } = seeking.current
-      if (stepBy) stepBy(step)
-      else seek(at + step)
-    }
-    node.addEventListener('wheel', onWheel, { passive: false })
-    return () => node.removeEventListener('wheel', onWheel)
-  }, [])
+  useWheelStep(column, { cursor, onSeek, onStep })
 
   // Off the game line the board shows the analysis line's own position, and its last move
   // is the one the reader just played rather than the game's. At the head of a line — walked
@@ -258,6 +237,13 @@ export function BoardPanel({
   // or Maia arrow, nothing draggable. The preview's own shapes are all that is drawn on it.
   const previewing = previewFen != null
 
+  // The material on the board rather than the material in the game — the previewed or
+  // analysed position included. The player rows count pieces the reader can see; a row that
+  // reported the game's position while the board showed another one would be describing
+  // squares that are not on screen, which is the one thing a piece count must never do.
+  const boardFen = previewing ? previewFen : shown.fen
+  const material = useMemo(() => materialBalance(boardFen), [boardFen])
+
   // chessground needs the legal destinations to accept a drag, and `Board` has no prop for
   // them — it publishes its `Api` for exactly this (the explorer does the same). `set`
   // deep-merges, so what is written here survives the wrapper's own calls.
@@ -269,45 +255,80 @@ export function BoardPanel({
   }, [analysis])
 
   return (
-    <div ref={column} className={cn('flex flex-col gap-3.5 max-md:gap-2', className)}>
+    <div
+      ref={column}
+      // The panel is the width of the board it is about, not the width of the column it
+      // stands in — `min(100%, 100vh - 12.625rem)` is the board's own cap below with the
+      // 1.5rem the eval bar and its gap take added back to every term. So the
+      // player rows end where the board ends and the transport row's `flex-1` spacer parks
+      // the ply readout and the score chip against the board's right edge, instead of
+      // stranding them at the far side of a column that is wider than the board. (Which
+      // means these two numbers move whenever the budget below does. Below `md` there is no
+      // width here at all: the column is the board's width already.) `GameHeaderBar` is
+      // outside this panel and still spans the column, exactly as the design draws it.
+      className={cn(
+        'flex flex-col gap-2 md:w-[min(100%,calc(100vh-12.625rem))]',
+        className,
+      )}
+    >
+      {/*
+        The players flank the board, ordered by `orientation`: the reader's own side is the
+        one at the bottom of the board, so it is the one on the bottom row, and the row a
+        player is on always agrees with the half of the board their pieces start on.
+      */}
+      <PlayerRow side={orientation === 'white' ? 'black' : 'white'} game={game} material={material} />
+
       {/*
         The board column takes the page's spare width now (`GamePage`), and the board is
         square: every rem of width is a rem of height, and unchecked it would push the
-        transport row and the eval curve off the bottom of the window. So the board is
+        player row and the transport row off the bottom of the window. So the board is
         capped against the viewport, the way `/live` caps its own.
 
-        What stands above and below it, in the `rem` everything here is written in:
+        This is the *rebuilt* column: the eval curve and the note composer have moved to the
+        right column, and the header has gone from four lines to one. What is left standing
+        above and below the board, in the `rem` everything here is written in:
 
           2.875  the titlebar (`AppShell`/`TopBar`)
           2.25   the board column's `py-[1.125rem]`, both ends
-          1.75   its two `gap-3.5`s — header→panel, panel→curve
-          4      the `GameHeaderBar`: three stacked lines over `gap-[0.3125rem]`, and on
-                 the right a tier chip over two mono lines, which is the taller of the two
-          0.875  this panel's own `gap-3.5`, board row → transport row
+          0.875  its one remaining `gap-3.5`, header → this panel
+          1.875  the `GameHeaderBar` at its declared `h-[1.875rem]` — one line, fixed, so
+                 this number cannot drift when somebody adds a fact to it
+          3      the two player rows flanking the board, `h-6` each
+          1.5    this panel's three `gap-2`s: player → board row → player → transport
           1.75   the transport row: `text-xs` buttons at `py-[0.3125rem]`, plus their border
-          6.5    the eval curve at its `max-h-[6.5rem]` — reserved in full, not at its
-                 ~4.5rem floor, so a grown board never squeezes the graph down to it
-          7      the note composer at its `h-[6rem]`, plus the `gap-3.5` before the curve
           -----
-          27     which is `calc(100vh-20rem)`
+          14.125 which is `calc(100vh-14.125rem)`
+
+        (The old sum listed an eighth row for the note composer and totalled 27 while the
+        code used 20: the composer was a `basis-1/2` sibling of the curve and cost no height
+        of its own. Both are gone from this column now; the sum above is the whole of it.)
 
         The cap is on the `Board` element, which is the grid the rank column and the file
         row live in: its height is its width less 0.125rem (a 0.875rem rail and a 0.375rem
         gap come off the squares horizontally, a 0.375rem gap and a ~0.75rem file row go on
         vertically), so the capped board is a hair *shorter* than the room reserved for it.
-        Worked through at a short window — 900 physical pixels, where 1rem is 19.2 — the cap
-        is 516px, the board draws 513.6 tall, and 384px of chrome above and below it leaves
-        2.4px to spare: header, board, transport row and the full-height curve all fit.
+        Worked through at the design's own window — 1160 physical pixels tall, where 1rem is
+        19.2 — the chrome is 271.2px, the cap is 888.8px, the board draws 886.4 tall, and
+        the pair leaves 2.4px to spare. That is against 776px under the old budget: the
+        header's three lost lines and the emptied bottom strip are the whole of the gain.
+
+        There is deliberately no ceiling on top of that. One was tried — 48rem, on the
+        reasoning that ~115px squares are as large as a board wants to be — and it was the
+        wrong call: it binds on a tall display rather than a short one, so the owner's own
+        window sat at the cap with a stripe of dead space under the transport row, which is
+        exactly the complaint this whole rebuild set out to answer. The board is bounded by
+        the two things that are actually true about it — the width the column can give it
+        and the height left after the chrome — and by nothing else.
 
         The eval bar is not part of the cap: it is `flex-none` at `w-3.5` beside a
         `gap-2.5`, so the flex row hands the board what is left of the column after those
-        1.5rem and the bar can never be crowded out. `justify-center` is what a capped board
-        is for — once the board stops growing the leftover width is split either side, so
-        the pair sits in the middle of a wide column instead of hugging its left edge, while
-        the transport row under it (and the header and curve outside this panel) still span
-        the column entire.
+        1.5rem and the bar can never be crowded out. The row is `justify-start`, not
+        centred: the whole layout is the board flush left with everything else to the right
+        of it, and a capped board that drifted into the middle of a wide column would break
+        the one alignment the design is built on. Below `md` it centres instead, where the
+        board is the only thing in the column and has nothing to line up with.
       */}
-      <div className="flex items-start justify-center gap-2.5">
+      <div className="flex items-start justify-start gap-2.5 max-md:justify-center">
         {/* The bar mirrors the board: the side at the bottom of one is at the bottom of the
             other, so the reader's own side always grows towards them. */}
         <EvalBar win={win} score={score} orientation={orientation} className="self-stretch" />
@@ -351,7 +372,9 @@ export function BoardPanel({
           //   2.875  the titlebar (`AppShell`/`TopBar`)
           //   2.75   the phone header: players over result/ply/opening
           //   1      this panel's `max-md:py-2`, both ends
-          //   0.5    its `max-md:gap-2`, board row → transport
+          //   0.5    its one `gap-2`, board row → transport — the player rows are
+          //          `max-md:hidden` and a hidden flex child eats neither row nor gap,
+          //          which is why this sum is untouched by them
           //   4.2    the transport row, which wraps to two lines at 375px: the transport
           //          and flagged groups on the first, the four toggles and the score chip
           //          on the second, over a `max-md:gap-1.5` row gap
@@ -369,7 +392,7 @@ export function BoardPanel({
           // binds on a short phone (at 812 the board is already full width and the `100%`
           // wins), and short phones are the un-notched ones whose insets are zero.
           className={cn(
-            'min-w-0 max-w-[min(100%,calc(100vh-20rem))] flex-1 max-md:max-w-[min(100%,calc(100dvh-23rem))]',
+            'min-w-0 max-w-[min(100%,calc(100vh-14.125rem))] flex-1 max-md:max-w-[min(100%,calc(100dvh-23rem))]',
             previewDim && 'bb-preview-dim',
           )}
         >
@@ -382,6 +405,8 @@ export function BoardPanel({
           ) : null}
         </Board>
       </div>
+
+      <PlayerRow side={orientation} game={game} material={material} />
 
       {/*
         Below `md` this row wraps onto exactly two lines, and the split is designed rather
@@ -421,16 +446,18 @@ export function BoardPanel({
         </div>
 
         {/*
-          The flagged-move jumps, as their own group beside the transport: on a desktop they
-          are `j` and `shift+J` and this row stays exactly as it was, but a phone has no keys
-          to press, and getting to the blunder is what the page is opened for — tapping ⏭
-          twenty times to reach it is not a review.
+          The flagged-move jumps, as their own group beside the transport, at every width.
+          They used to be `md:hidden` — drawn for the phone, which has no keys to press,
+          and left to `j`/`shift+J` on the desktop. That was a keybinding with no affordance:
+          getting to the blunder is what the page is opened for, and the only way to find out
+          the jump existed was to read the shortcut sheet. Stepping ⏭ twenty times to reach
+          it is not a review on a mouse either.
 
           A group of its own rather than two more cells in the transport group: that group's
-          dividers are drawn by the cell *before* each boundary, so a cell that exists only
-          under `md` would leave the desktop row's last divider hanging.
+          dividers are drawn by the cell *before* each boundary, so the two sets stay
+          separately bounded and the transport group's last divider is its own business.
         */}
-        <div className="flex overflow-hidden rounded-md border border-edge bg-elevated md:hidden">
+        <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
           <TransportButton
             label="Previous flagged move"
             disabled={previousFlagged == null}
@@ -546,6 +573,90 @@ export function BoardPanel({
           {formatScore(score)}
         </span>
       </div>
+    </div>
+  )
+}
+
+/**
+ * A captured man, as a glyph, keyed by the side that *took* it: White's captures are black
+ * men and are drawn as the black figurines, Black's as the white ones. `materialBalance`
+ * hands back roles — a lib utility has no business choosing characters — so the mapping
+ * lives here, which is also where a later switch to real piece sprites would happen.
+ */
+const CAPTURED_GLYPH: Record<Color, Record<CapturedRole, string>> = {
+  white: { queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' },
+  black: { queen: '♕', rook: '♖', bishop: '♗', knight: '♘', pawn: '♙' },
+}
+
+/**
+ * One of the two slim rows flanking the board: side dot, name, rating, the men this player
+ * has taken and by how much they are ahead.
+ *
+ * It is the smallest thing that can carry the players, and deliberately so — it was three
+ * lines in the header until tonight, and the board's height budget names its `h-6` by
+ * number. So: one line, no wrapping, the name the only part that gives way.
+ *
+ * The material is here rather than beside the eval bar because it answers a different
+ * question. The bar says who is winning; `♟ −3` says why — and it says it against the
+ * player it belongs to, so there is nothing to work out about whose number it is.
+ *
+ * Hidden below `md`: `MobileGameView` names both players in its own pinned header, and the
+ * phone's board budget has no room to say it twice.
+ */
+function PlayerRow({
+  side,
+  game,
+  material,
+}: {
+  side: Color
+  game: GameSummary | null | undefined
+  material: MaterialBalance
+}) {
+  if (!game) return null
+
+  const name = side === 'white' ? game.white : game.black
+  const rating = side === 'white' ? game.white_rating : game.black_rating
+  // `materialBalance` states each side's own surplus and its own signed advantage, so the
+  // two rows read `♗ +3` and `−3` rather than the same number twice with the reader doing
+  // the flip. Equal takings have already cancelled there: only the surplus is drawn.
+  const { captured, advantage } = side === 'white' ? material.white : material.black
+  const owner = game.color === side
+
+  return (
+    // `pl-6` is the eval bar's `w-3.5` plus the board row's `gap-2.5`: the dot lines up with
+    // the board's left edge, not with the bar's, so the two rows and the squares share one
+    // margin. `h-6` is the budgeted height and `flex-none` keeps it that.
+    <div
+      data-testid="player-row"
+      data-side={side}
+      className="flex h-6 flex-none items-center gap-2 pl-6 max-md:hidden"
+    >
+      <SideDot side={side} size="sm" />
+      <span
+        className={cn('min-w-0 truncate text-[0.75rem]', owner ? 'font-medium text-ink' : 'text-soft')}
+      >
+        {name ?? 'unknown'}
+      </span>
+      <span className="flex-none font-mono text-[0.6875rem] tabular text-dim">{rating ?? '—'}</span>
+      {captured.length > 0 ? (
+        <span
+          aria-hidden
+          className="flex-none text-[0.8125rem] leading-none tracking-tighter text-dim-3"
+        >
+          {captured.map((role) => CAPTURED_GLYPH[side][role]).join('')}
+        </span>
+      ) : null}
+      {advantage !== 0 ? (
+        <span
+          className={cn(
+            'flex-none font-mono text-[0.6875rem] tabular',
+            advantage > 0 ? 'text-soft' : 'text-faint',
+          )}
+          title={advantage > 0 ? `Up ${advantage} in material` : `Down ${-advantage} in material`}
+        >
+          {advantage > 0 ? `+${advantage}` : `−${-advantage}`}
+        </span>
+      ) : null}
     </div>
   )
 }

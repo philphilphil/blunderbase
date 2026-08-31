@@ -1,5 +1,5 @@
-import { Pin, PinOff, StickyNote } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Pin, PinOff } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import type { Classification, MoveRow } from '@/lib/api/types'
@@ -8,7 +8,6 @@ import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { plyLabel, type MovePair } from '../gameModel'
-import type { NoteRow } from '../notesModel'
 
 /** The inline note design 1a puts under a flagged move: what it cost and what was better. */
 export interface MoveAnnotation {
@@ -20,7 +19,12 @@ export interface MoveAnnotation {
   bestSan: string | null
 }
 
-export type MoveTab = 'moves' | 'flagged' | 'notes'
+/**
+ * Two tabs, not three. `Notes` used to live here because the desktop column was the only
+ * place a note could be read; it now has a standing track of its own beside this one at
+ * every width down to the phone, so a tab would be a second door into an open room.
+ */
+export type MoveTab = 'moves' | 'flagged'
 
 /**
  * One line in the table, drawn inline under the move it hangs off.
@@ -93,19 +97,13 @@ export interface MoveListProps {
   /** Unpin a variation the server holds. */
   onUnpinVariation?: (lineId: number) => void
   onSelectPly: (ply: number) => void
-  /** This game's notes, in reading order (`notesModel.noteRows`) — the `Notes` tab. */
-  notes?: readonly NoteRow[]
   /** Mainline move indices that carry a note (`notesModel.notedMoveIndices`). */
   notedMoves?: ReadonlySet<number>
-  /** Jump to where a note hangs — its ply, or into the line it pinned. */
-  onSelectNote?: (note: NoteRow) => void
-  /** Open the composer on the position the board is showing. */
-  onAddNote?: () => void
   /**
    * The open tab, where the caller owns it. Undefined leaves the table in charge of its
    * own, which is what the desktop column does and has always done. The phone layout
-   * promotes these three tabs into a strip of its own that also holds Eval and Engine, so
-   * there the tab is page state and this table is told which one to draw.
+   * promotes these tabs into a strip of its own that also holds Eval, Engine and Notes,
+   * so there the tab is page state and this table is told which one to draw.
    */
   tab?: MoveTab
   /** Fires on a click in the tab row — meaningless while `showTabRow` is false. */
@@ -131,16 +129,18 @@ export interface MoveListProps {
  * one order, oldest first: a line keeps its place when the board walks back into it, and
  * only the styling and the lit move move.
  *
+ * A clock column follows each move where the game was played with one, quiet and mono, and
+ * turns `--bb-mistake` under twenty seconds: in a 3+2 blitz game time trouble is what
+ * explains the late blunders, and putting the two in the same row lets that correlation be
+ * read straight off the table instead of captioned under it.
+ *
  * The design's tab row is `Moves / Variations / Book`, with `PGN` pinned right. `PGN` is
  * here; the other two are not, and are not a matter of layout. A game carries one line —
  * `/games/{id}` sends a flat move list with no variation tree, and nothing in the API
  * accepts one — so a `Variations` tab would be an empty room. `Book` is a per-position
- * question the backend answers over `/explorer`, which is a screen of its own with a board
- * to walk; duplicating a slice of it under the move list would be a second, worse explorer.
- * The slot they leave carries `Flagged` and `Notes` instead: the game's mistakes, which is
- * what the whole screen is for and what the design's own eval graph and glyph badges point
- * at, and what the owner has written down about it — the one thing on this page that is
- * theirs rather than an engine's, and the reason a variation is worth pinning at all.
+ * question, and it now has a pane of its own in the track beside this one. The slot they
+ * leave carries `Flagged`: the game's mistakes, which is what the whole screen is for and
+ * what the design's own eval graph and glyph badges point at.
  */
 export function MoveList({
   pairs,
@@ -157,10 +157,7 @@ export function MoveList({
   onPinVariation,
   onUnpinVariation,
   onSelectPly,
-  notes,
   notedMoves,
-  onSelectNote,
-  onAddNote,
   tab: openTab,
   onTabChange,
   showTabRow = true,
@@ -190,6 +187,11 @@ export function MoveList({
     }
     return !folded || pair.moveNumber > collapsedThrough!
   })
+
+  // Built off every pair, not the filtered ones: a reading belongs to the move two plies
+  // after the one that produced it, and the fold or the `Flagged` tab may well have taken
+  // that earlier move off screen.
+  const clocks = useMemo(() => clocksBeforeMove(pairs), [pairs])
 
   // Every line on screen, in the order it was handed over — which is the order they were
   // walked. A line's place is its age and nothing else: walking back into one lights it and
@@ -270,21 +272,13 @@ export function MoveList({
             <span className="ml-1.5 font-mono text-[0.625rem] tabular text-blunder">{flaggedCount}</span>
           ) : null}
         </Tab>
-        <Tab active={tab === 'notes'} onClick={() => setTab('notes')}>
-          Notes
-          {notes && notes.length > 0 ? (
-            <span className="ml-1.5 font-mono text-[0.625rem] tabular text-accent-teal">
-              {notes.length}
-            </span>
-          ) : null}
-        </Tab>
         <div className="flex-1" />
         {/*
           `flex-none`, so whatever else this row has to give up, the PGN affordance is never
           the thing that gets clipped off the right edge.
 
-          The ply total goes below `md`: three tabs, a count and this pair do not fit across
-          a 375px screen, and of everything here it is the one thing said elsewhere — the
+          The ply total goes below `md`: the tabs, a count and this pair do not fit across a
+          375px screen, and of everything here it is the one thing said elsewhere — the
           phone's own header carries `ply 34/91`. The phone layout switches this whole row
           off (`showTabRow`) and draws its own strip, so this only bites a narrow desktop
           window; it is kept because that window is real and a clipped PGN button is not
@@ -298,10 +292,6 @@ export function MoveList({
       ) : null}
 
       <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto py-0.5">
-        {tab === 'notes' ? (
-          <NotesPane notes={notes} onSelectNote={onSelectNote} onAddNote={onAddNote} />
-        ) : (
-          <>
         {folded ? (
           <button
             type="button"
@@ -329,7 +319,6 @@ export function MoveList({
           {rows.map((pair) => {
             const isActivePair =
               pair.white?.ply === cursor || pair.black?.ply === cursor
-            const future = cursor >= 0 ? pair.moveNumber > cursorMove : pair.moveNumber > 0
             const annotated = annotation
               ? pair.white?.ply === annotation.ply || pair.black?.ply === annotation.ply
               : false
@@ -339,14 +328,10 @@ export function MoveList({
                   className={cn(
                     'flex h-7 items-center rounded-[0.3125rem] px-1.5',
                     isActivePair ? 'bg-row-active' : 'hover:bg-raised',
-                    future && !isActivePair && 'opacity-55 hover:opacity-100',
                   )}
                 >
                   <span
-                    className={cn(
-                      'w-[1.875rem] tabular',
-                      isActivePair ? 'text-dim' : 'text-faint',
-                    )}
+                    className={cn('w-[2rem] flex-none tabular', isActivePair ? 'text-dim' : 'text-faint')}
                   >
                     {pair.moveNumber}.
                   </span>
@@ -356,12 +341,14 @@ export function MoveList({
                     noted={pair.white ? notedMoves?.has(pair.white.ply) : false}
                     onSelectPly={onSelectPly}
                   />
+                  {clocks ? <ClockCell seconds={clocks.get(pair.white?.ply ?? -1)} /> : null}
                   <MoveCell
                     move={pair.black}
                     cursor={cursor}
                     noted={pair.black ? notedMoves?.has(pair.black.ply) : false}
                     onSelectPly={onSelectPly}
                   />
+                  {clocks ? <ClockCell seconds={clocks.get(pair.black?.ply ?? -1)} /> : null}
                 </div>
                 {annotated && annotation ? <Annotation annotation={annotation} /> : null}
                 {anchored.get(pair.moveNumber)}
@@ -369,92 +356,68 @@ export function MoveList({
             )
           })}
         </div>
-          </>
-        )}
       </div>
     </div>
   )
 }
 
 /**
- * The `Notes` tab: what the owner has written about this game, in the order a reader walks
- * it — the game's own notes by position, then the ones hanging off pinned variations.
+ * What each mover had left on their clock *before* they played, keyed by the ply that
+ * shows it — or null where this game was played without one.
  *
- * Each row is a jump: to the ply the note is about, or into the line it pinned, which is
- * what makes a note worth writing on this screen rather than in a document. Editing and
- * deleting live on `/notes`, where there is room for a board and a text box; here a note is
- * a bookmark into the game.
+ * The payload's `MoveRow.clock` is the reading *after* that ply, but the number worth
+ * putting beside a move is what its mover had when they sat down to choose it: their own
+ * previous reading, two plies back. `backend/services/stats.py:_remaining_clock` builds
+ * the app's whole time-trouble statistic on exactly that `ply - 2`, so matching it here is
+ * what keeps a `0:19` in this table and a `<20s` blunder on the Stats page meaning the
+ * same thing.
+ *
+ * Plies 0 and 1 have no previous reading of their own — `_remaining_clock` falls back to
+ * the game's initial time there, which a move row does not carry — so they stay blank.
+ * Null for a game with no readings at all: an empty column of dashes down the table would
+ * cost the two move cells their width and say nothing.
  */
-function NotesPane({
-  notes,
-  onSelectNote,
-  onAddNote,
-}: {
-  notes?: readonly NoteRow[]
-  onSelectNote?: (note: NoteRow) => void
-  onAddNote?: () => void
-}) {
-  if (!notes || notes.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-2.5 px-3 py-6">
-        <p className="text-center text-[0.71875rem] text-dim">Nothing written about this game.</p>
-        {onAddNote ? (
-          <button
-            type="button"
-            onClick={onAddNote}
-            className="flex items-center gap-1 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink"
-          >
-            <StickyNote className="size-3" aria-hidden />
-            Note this position
-          </button>
-        ) : null}
-      </div>
-    )
+function clocksBeforeMove(pairs: MovePair[]): Map<number, number> | null {
+  const before = new Map<number, number>()
+  for (const pair of pairs) {
+    for (const move of [pair.white, pair.black]) {
+      if (move?.clock === null || move?.clock === undefined) continue
+      before.set(move.ply + 2, move.clock)
+    }
   }
+  return before.size > 0 ? before : null
+}
 
+/** `139` -> `2:19`, the way a clock reads on the board. Negative or absent shows nothing. */
+function formatRemaining(seconds: number | undefined): string {
+  if (seconds === undefined || seconds < 0) return ''
+  const whole = Math.floor(seconds)
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
+}
+
+/** Under twenty seconds is time trouble — the band the late blunders fall in. */
+const TIME_TROUBLE = 20
+
+/**
+ * One clock reading, right-aligned against the move it belongs to and a size smaller than
+ * the move, because it is context and not the thing being read.
+ *
+ * `--bb-mistake` under twenty seconds, so a run of orange down the last ten rows sits
+ * beside the run of `??` badges that shares a cause. The cell keeps its width when there
+ * is nothing to show, so the column stays a column and the move cells do not jump.
+ */
+function ClockCell({ seconds }: { seconds: number | undefined }) {
+  const low = seconds !== undefined && seconds >= 0 && seconds < TIME_TROUBLE
   return (
-    <div data-testid="game-notes" className="flex flex-col gap-1 px-1.5 py-1">
-      {notes.map((row) => (
-        <button
-          key={row.note.id}
-          type="button"
-          onClick={() => onSelectNote?.(row)}
-          disabled={!onSelectNote}
-          className={cn(
-            'flex flex-col gap-1 rounded-[0.3125rem] px-2 py-1.5 text-left',
-            onSelectNote && 'hover:bg-raised',
-          )}
-        >
-          <span className="flex items-baseline gap-2 font-mono text-[0.6875rem]">
-            <span
-              className={cn('tabular', row.onLine ? 'text-brilliant' : 'text-accent-teal')}
-              title={row.onLine ? 'On a pinned variation' : 'On the game'}
-            >
-              {row.context ?? '—'}
-            </span>
-            {row.onLine ? <span className="text-faint-2">variation</span> : null}
-            {row.source && row.source !== 'web' ? (
-              <span className="text-faint-2">{row.source}</span>
-            ) : null}
-          </span>
-          <span className="whitespace-pre-wrap font-sans text-[0.71875rem] leading-[1.45] text-body">
-            {row.note.text}
-          </span>
-          {row.note.tags.length > 0 ? (
-            <span className="flex flex-wrap gap-1">
-              {row.note.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-sm border border-edge bg-chip-info px-1 font-mono text-[0.625rem] text-dim"
-                >
-                  {tag}
-                </span>
-              ))}
-            </span>
-          ) : null}
-        </button>
-      ))}
-    </div>
+    <span
+      data-testid="move-clock"
+      className={cn(
+        'w-[2.25rem] flex-none pr-1.5 text-right text-[0.65625rem] tabular',
+        low ? 'text-mistake' : 'text-faint',
+      )}
+    >
+      {formatRemaining(seconds)}
+    </span>
   )
 }
 
@@ -520,7 +483,7 @@ function MoveCell({
   noted?: boolean
   onSelectPly: (ply: number) => void
 }) {
-  if (!move?.san) return <span className="flex-1 px-1" />
+  if (!move?.san) return <span className="min-w-0 flex-1 px-1" />
   const glyph = glyphFor(move.classification)
   const flagged = isFlagged(move.classification)
   const active = move.ply === cursor
@@ -531,7 +494,10 @@ function MoveCell({
       onClick={() => onSelectPly(move.ply)}
       title={`${plyLabel(move.ply)}${move.san}${noted ? ' — noted' : ''}`}
       className={cn(
-        'flex h-5 flex-1 items-center gap-[0.3125rem] rounded-[0.25rem] px-1 text-left',
+        // `min-w-0` so the row can never push past the track: at the 250px band the two
+        // move cells are what has to give, and the san truncates rather than the number,
+        // the clock or the glyph badge being shoved off the right edge.
+        'flex h-5 min-w-0 flex-1 items-center gap-[0.3125rem] rounded-[0.25rem] px-1 text-left',
         active
           ? 'bg-accent-teal/10 text-bright shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--bb-accent)_55%,transparent)]'
           : flagged
@@ -547,19 +513,32 @@ function MoveCell({
 }
 
 /**
- * "Something is written about this position" — a dot, not a badge.
+ * "Something is written about this position" — the note sheet, outlined, at nine design
+ * pixels.
  *
- * The move list is dense and already carries a glyph column; a note is not a verdict on the
- * move and must not compete with one, so it is the smallest mark that can be seen at all,
- * in the accent the Notes tab uses for the game's own notes.
+ * It replaces the dot this used to be. A dot was the smallest mark that could be seen at
+ * all, but it read as another status pip beside the glyph badge; a page with a fold and two
+ * ruled lines says *what* it is at the same size, which is what makes a noted move findable
+ * from the table rather than only from the notes track. Teal, not a classification colour,
+ * because a note is the reader's own mark and not the engine's verdict — and outlined, not
+ * filled, so it stays quieter than the badge sitting next to it.
  */
 function NoteMark() {
   return (
-    <span
+    <svg
+      viewBox="0 0 12 12"
       aria-hidden
-      title="Noted"
-      className="size-1 flex-none rounded-full bg-accent-teal opacity-80"
-    />
+      focusable="false"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-[0.5625rem] flex-none text-accent-teal opacity-85"
+    >
+      <path d="M2.6 1.6h4.6L9.4 3.8v6.6H2.6z" />
+      <path d="M4.3 5.6h3.4M4.3 7.6h2.2" />
+    </svg>
   )
 }
 

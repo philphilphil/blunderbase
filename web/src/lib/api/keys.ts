@@ -76,6 +76,9 @@ export const queryKeys = {
 
   explorer: (): QueryKey => ['explorer'],
   explorerTree: (query: ExplorerQuery = {}): QueryKey => ['explorer', 'tree', query],
+  // Keyed by the position, not by the game: walking back and forth over the same square
+  // asks once, and two games that transpose share the answer.
+  explorerBook: (fen: string): QueryKey => ['explorer', 'book', fen],
   explorerPositions: (
     fen: string,
     query: { color?: 'white' | 'black'; limit?: number } = {},

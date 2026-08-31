@@ -8,9 +8,13 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Query
 
 from backend.api.deps import SessionDep
-from backend.api.schemas import ExplorerResponse, PositionOccurrence
+from backend.api.schemas import ExplorerResponse, GameBookEntry, PositionOccurrence
 from backend.db.enums import Color
 from backend.services import explorer as explorer_service
+
+# The same cap the game's own shipped book uses, so the two paths cannot disagree about how
+# long a strip beside the board is.
+from backend.services.games import BOOK_MAX_MOVES
 
 router = APIRouter(prefix="/explorer", tags=["explorer"])
 
@@ -53,6 +57,27 @@ def _line(value: str | None) -> list[str]:
     if not value:
         return []
     return [move for move in (part.strip().lower() for part in value.split(",")) if UCI.match(move)]
+
+
+@router.get(
+    "/book",
+    response_model=GameBookEntry | None,
+    summary="One position's strip of continuations",
+)
+def position_book(
+    session: SessionDep,
+    fen: Annotated[str, Query(description="the position on the board, as a FEN or an EPD")],
+    color: Annotated[Color | None, Query(description="only games the owner had this")] = None,
+) -> Any:
+    """The same strip a game ships with it, for a position that game does not contain.
+
+    A game carries the book for its own plies, so stepping through it costs no request. This
+    is what the board asks for once the reader has played a move of their own and stands
+    somewhere that payload cannot describe. Null for a position no two of the owner's games
+    reached — which is nearly all of them — and null rather than a 422 for a FEN that will
+    not parse, because the caller is a board and an empty strip is the useful answer.
+    """
+    return explorer_service.position_book(session, fen, color=color, limit=BOOK_MAX_MOVES)
 
 
 @router.get(

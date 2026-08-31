@@ -1,7 +1,7 @@
 import { ChevronDown, Columns3 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { LinePreviewSettingsButton } from '@/components/analysis/LinePreviewSettings'
+import { LinePreviewRowChip, LinePreviewSettingsButton } from '@/components/analysis/LinePreviewSettings'
 import { MiniBoard } from '@/components/board/MiniBoard'
 import type { GameRunSummary } from '@/lib/api/types'
 import {
@@ -154,7 +154,8 @@ export interface MaiaPanelProps {
  *
  * Compare mode is the third question, the one a single level cannot answer: *at which level
  * does this stop being the move people play*. Several levels' distributions only mean
- * anything against each other, so the grid takes the whole card while it is on — the
+ * anything against each other, so the grid takes the whole band while it is on and the
+ * engine card stands down — the
  * engine's verdict is already in every column's colour, and five columns squeezed into a
  * quarter of the width would be five ellipses.
  *
@@ -257,158 +258,163 @@ export function MaiaPanel({
   return (
     <div
       className={cn(
-        // One height for every position: the box sits on top of the move table, and a
-        // height that tracked how many rows the columns happen to have would bounce the
-        // table on every step through the game. A column with more to say scrolls.
-        // `relative` for the peek board, which hangs off the bottom edge.
+        // TWO CARDS WITH A GAP, never one surface split by a rule.
         //
-        // Below `md` the height comes off. The two halves are stacked there rather than
-        // side by side (see the grid), so a fixed 12rem would be showing half of each; the
-        // box is a card in a scrolling pane instead, and the pane does the scrolling.
-        'relative flex h-[12rem] flex-none flex-col border-t border-hairline bg-panel max-md:h-auto',
+        // The band used to be a single welded box with a divider down the middle, and that
+        // divider lined up with nothing: at 25/75 it fell a long way short of the
+        // moves/notes boundary below it, and two vertical lines that nearly agree read as a
+        // mistake. Two objects sitting on the column's own ground imply no column line at
+        // all, so they can take any proportion they like — and the moves/notes rule below
+        // is then the only line in the column, agreeing with nothing because there is
+        // nothing left to agree with. Stacking Maia over the engine would have dodged the
+        // same problem by spending height this column cannot afford, and would have thrown
+        // away the side-by-side human/engine contrast the panel exists to draw.
+        //
+        // A quarter to Maia, three to the engine: Maia is single moves and a number, the
+        // engine is whole variations, and an even split left the one half-empty while the
+        // other wrapped. The quarter has a floor — a SAN, a percentage and a delta chip
+        // side by side are about 9rem — so in a narrow column the engine's lines wrap a row
+        // sooner rather than Maia's becoming ellipses. Below `md` a quarter of a phone is
+        // 90 pixels, so the split is dropped and the two cards stack, Maia first, which is
+        // the order they are read in on a desktop.
+        //
+        // No fixed height any more: two cards size to their content, and the grid stretches
+        // them to the taller of the two so they still read as one band. The cap is a
+        // ceiling, not a height — a five-line multi-PV with wrapping variations must not
+        // eat the move table's room, and the card that hits it scrolls. It comes off where
+        // the cards are stacked, or it would be showing half of each.
+        //
+        // `relative` is for the peek board, which hangs off the bottom edge.
+        'relative grid max-h-[18rem] min-w-0 flex-none gap-2.5 max-md:max-h-none',
+        comparing
+          ? 'grid-cols-1'
+          : 'grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)] max-md:grid-cols-1',
         className,
       )}
       data-testid="maia-panel"
     >
-      {/*
-        A quarter to Maia, three to the engine: the human column is single moves and a
-        number, the engine column is whole variations, and an even split left the one
-        half-empty while the other wrapped. The quarter has a floor, though — a loss chip,
-        a SAN and a percentage side by side are about 9rem, and below that the column
-        truncates its own header — so in a narrow moves column the engine's rows wrap a
-        line sooner rather than the human rows becoming ellipses.
+      <section className="bb-card flex min-w-0 flex-col gap-1.5 overflow-y-auto px-2.5 py-2">
+        <div className="flex flex-nowrap items-center gap-[0.4375rem] px-1">
+          <span className="size-1.5 flex-none rounded-full bg-brilliant" />
+          {/*
+            The visible label is the level itself, with the picker laid over it: the
+            header has room for one reading of who this column speaks for, and "Maia
+            1700" is that reading whether or not it can be changed.
+          */}
+          <LevelLabel
+            rating={rating}
+            levels={comparing ? [] : levels}
+            onSelectLevel={onSelectLevel}
+          />
+          <div className="flex-1" />
+          {showHuman && live ? <LivePill pending={live.pending} /> : null}
+          {canCompare && onCompareChange ? (
+            <CompareToggle on={compare} onChange={onCompareChange} />
+          ) : null}
+        </div>
 
-        None of that survives 375px. A quarter of a phone is 90 pixels and three quarters is
-        270, and the engine's variations were wrapping every second ply — so below `md` the
-        split is dropped entirely and the two stack, each with the width to itself. Maia
-        first, which is the order they are read in on a desktop. The rule stays vertical up
-        there and becomes the line between the two rows down here.
-      */}
-      <div
-        className={cn(
-          'grid min-h-0 flex-1 divide-x divide-line max-md:divide-x-0 max-md:divide-y',
-          comparing
-            ? 'grid-cols-1'
-            : 'grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)] max-md:grid-cols-1',
+        {/* Switched off, the column holds its place and says nothing at all. */}
+        {!showHuman ? null : comparing ? (
+          <CompareGrid columns={comparison} onHoverMove={onHoverMove} onPlayLine={onPlayLine} />
+        ) : human.length === 0 ? (
+          <p className="px-1 py-2 text-[0.6875rem] text-dim">
+            {live?.pending ? 'Reading this position…' : '–'}
+          </p>
+        ) : (
+          // Tight rather than spaced: each row's own background is a measurement, and
+          // measurements you compare by eye belong on one stack with nothing between them.
+          <div className="flex flex-col gap-0.5">
+            {human.map((move) => (
+              <HumanRow
+                key={move.uci}
+                move={move}
+                onHoverMove={onHoverMove}
+                onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
+              />
+            ))}
+          </div>
         )}
-      >
-        <section className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5">
-          <div className="flex flex-nowrap items-center gap-[0.4375rem]">
-            <span className="size-1.5 flex-none rounded-full bg-brilliant" />
-            {/*
-              The visible label is the level itself, with the picker laid over it: the
-              header has room for one reading of who this column speaks for, and "Maia
-              1700" is that reading whether or not it can be changed.
-            */}
-            <LevelLabel
-              rating={rating}
-              levels={comparing ? [] : levels}
-              onSelectLevel={onSelectLevel}
+
+        {showHuman && live && rollout.length > 0 ? (
+          <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
+        ) : null}
+      </section>
+
+      {comparing ? null : (
+        // The wider card, and the one thing in this column that genuinely wants width: its
+        // variations wrap rather than truncate, which is what the three quarters buy.
+        <section
+          ref={linesRef}
+          data-testid="maia-engine-lines"
+          className="bb-card flex min-w-0 flex-col gap-1.5 overflow-y-auto px-2.5 py-2"
+        >
+          <div className="flex flex-wrap items-center gap-[0.4375rem] px-1">
+            <span
+              className={cn(
+                'size-1.5 flex-none rounded-full',
+                run ? 'bg-accent-teal' : 'bg-edge-strong',
+              )}
             />
+            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+              {run?.engine ?? 'No engine run'}
+            </span>
+            {/*
+              The label is the column's category, paired with the human column's own —
+              never the run's protocol kind, which lives on the engines page.
+            */}
             <div className="flex-1" />
-            {showHuman && live ? <LivePill pending={live.pending} /> : null}
-            {canCompare && onCompareChange ? (
-              <CompareToggle on={compare} onChange={onCompareChange} />
+            {run?.depth ? (
+              <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
             ) : null}
+            {nodes !== '—' ? (
+              <span className="font-mono text-[0.625rem] tabular text-dim">{nodes} nodes</span>
+            ) : null}
+            {run?.multipv ? (
+              <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
+                MPV {run.multipv}
+              </span>
+            ) : null}
+            {/*
+              Both preview controls, and only here: the cycler for what hovering a line does
+              and the gear for the rest of it. The live panel used to carry a second copy of
+              each — two places to change one preference — and since the rebuild this card
+              has the width to hold the pair without crowding the engine name.
+            */}
+            {onHoverLine ? <LinePreviewRowChip /> : null}
+            {onHoverLine ? <LinePreviewSettingsButton /> : null}
           </div>
 
-          {/* Switched off, the column holds its place and says nothing at all. */}
-          {!showHuman ? null : comparing ? (
-            <CompareGrid columns={comparison} onHoverMove={onHoverMove} onPlayLine={onPlayLine} />
-          ) : human.length === 0 ? (
-            <p className="py-2 text-[0.6875rem] text-dim">
-              {live?.pending ? 'Reading this position…' : '–'}
-            </p>
+          {engine.length === 0 ? (
+            <p className="px-1 py-2 text-[0.6875rem] text-dim">–</p>
           ) : (
-            <div className="flex flex-col gap-1">
-              {human.map((move) => (
-                <HumanRow
-                  key={move.uci}
-                  move={move}
-                  onHoverMove={onHoverMove}
-                  onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
-                />
-              ))}
+            <div className="flex flex-col gap-0.5">
+              {engine.map((line) => {
+                const id = runLineId(line.multipv)
+                // The preview's ply counts for this row only where the preview is on this
+                // row; on any other it stands nowhere, and the tokens say so by staying
+                // plain.
+                const at = previewLine === id ? (previewPly ?? null) : null
+                return (
+                  <EngineRow
+                    key={`${line.multipv}-${line.firstUci ?? 'x'}`}
+                    line={line}
+                    ply={ply}
+                    id={id}
+                    previewPly={at}
+                    scrub={prefs.scrub}
+                    onHoverMove={onHoverMove}
+                    onHoverLine={onHoverLine}
+                    onHovered={(row, over) =>
+                      setHovered((current) => (over ? row : current === row ? null : current))
+                    }
+                    onPlayLine={onPlayLine}
+                  />
+                )
+              })}
             </div>
           )}
-
-          {showHuman && live && rollout.length > 0 ? (
-            <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
-          ) : null}
         </section>
-
-        {comparing ? null : (
-          <section
-            ref={linesRef}
-            data-testid="maia-engine-lines"
-            className="flex min-w-0 flex-col gap-2 overflow-y-auto px-3 py-2.5"
-          >
-            <div className="flex flex-wrap items-center gap-[0.4375rem]">
-              <span
-                className={cn(
-                  'size-1.5 flex-none rounded-full',
-                  run ? 'bg-accent-teal' : 'bg-edge-strong',
-                )}
-              />
-              <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-                {run?.engine ?? 'No engine run'}
-              </span>
-              {/*
-                The label is the column's category, paired with the human column's own —
-                never the run's protocol kind, which lives on the engines page.
-              */}
-              <div className="flex-1" />
-              {run?.depth ? (
-                <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
-              ) : null}
-              {nodes !== '—' ? (
-                <span className="font-mono text-[0.625rem] tabular text-dim">{nodes} nodes</span>
-              ) : null}
-              {run?.multipv ? (
-                <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
-                  MPV {run.multipv}
-                </span>
-              ) : null}
-              {/*
-                The same gear as the live panel's, because these rows preview the same way:
-                the preferences belong wherever a line can be hovered, not on the one panel
-                that happened to get them first.
-              */}
-              {onHoverLine ? <LinePreviewSettingsButton /> : null}
-            </div>
-
-            {engine.length === 0 ? (
-              <p className="py-2 text-[0.6875rem] text-dim">–</p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {engine.map((line) => {
-                  const id = runLineId(line.multipv)
-                  // The preview's ply counts for this row only where the preview is on this
-                  // row; on any other it stands nowhere, and the tokens say so by staying
-                  // plain.
-                  const at = previewLine === id ? (previewPly ?? null) : null
-                  return (
-                    <EngineRow
-                      key={`${line.multipv}-${line.firstUci ?? 'x'}`}
-                      line={line}
-                      ply={ply}
-                      id={id}
-                      previewPly={at}
-                      scrub={prefs.scrub}
-                      onHoverMove={onHoverMove}
-                      onHoverLine={onHoverLine}
-                      onHovered={(row, over) =>
-                        setHovered((current) => (over ? row : current === row ? null : current))
-                      }
-                      onPlayLine={onPlayLine}
-                    />
-                  )
-                })}
-              </div>
-            )}
-          </section>
-        )}
-      </div>
+      )}
       {peek ? (
         // `pointer-events-none`, so walking along the tokens never lands on the popover and
         // takes the hover — the row's own state has to survive it.
@@ -657,9 +663,20 @@ function LivePill({ pending }: { pending: boolean }) {
 }
 
 /**
- * One human move: how often it is played, and what it costs. The SAN carries the engine's
- * verdict where the position's stored lines have one — that colour, next to a long bar, is
- * the whole "everybody at my level walks into this" reading.
+ * One human move: the move, how often it is played, and what it costs. Three cells and
+ * nothing else — a played-percentage bar of its own, an explanatory sentence under the list
+ * and a "human model" sub-label were all cut: at a quarter of the column the bar was eating
+ * the width the SAN needed, and the two labels were saying what the purple dot and the
+ * level in the header already say.
+ *
+ * The percentage is the ROW'S OWN BACKGROUND, running the full height behind all three
+ * cells. That is what makes it affordable here: a fill costs no width, where a bar column
+ * cost ~3rem of the 9rem this card has. A HARD stop and no fade — it is a measurement, and
+ * two rows have to be comparable by eye, which a gradient tail makes impossible. The colour
+ * is always Maia's own purple (`--bb-brilliant`, restated by `:root.light`, so 26% reads as
+ * a mark rather than an artefact on either ground) and never the verdict's: the verdict is
+ * the engine speaking and belongs to the SAN and the delta chip, while the fill is the one
+ * quantity on this card that is Maia's alone.
  */
 function HumanRow({
   move,
@@ -672,8 +689,8 @@ function HumanRow({
 }) {
   const verdict = glyphStyle(move.classification)
   const hue = verdict?.color ?? MAIA_HUE
-  const share = move.probability ?? 0
-  const loss = move.loss !== null && move.loss >= 0.05 ? formatWinLoss(move.loss) : null
+  const share = Math.min(100, Math.max(0, (move.probability ?? 0) * 100))
+  const stop = `${share.toFixed(1)}%`
 
   return (
     <button
@@ -685,42 +702,71 @@ function HumanRow({
       onMouseLeave={() => onHoverMove?.(null)}
       title={`Play ${move.san} on the analysis board`}
       className={cn(
-        'relative flex w-full items-baseline gap-1.5 overflow-hidden rounded-[0.25rem] border-l-2 px-1 py-[0.1875rem] text-left',
+        'flex w-full items-baseline gap-2 rounded-[0.25rem] border-l-2 px-1.5 py-[0.1875rem] text-left',
         move.played ? null : 'border-transparent',
-        onPlay ? 'hover:bg-raised' : 'cursor-default',
+        // The fill is an inline background, and an inline background beats any
+        // `hover:bg-*`, so the hover affordance is an inset ring instead — which also
+        // leaves the measurement itself untouched by the pointer.
+        onPlay ? 'hover:inset-ring-1 hover:inset-ring-edge-hover' : 'cursor-default',
       )}
-      style={move.played ? { borderLeftColor: hue, background: tint(hue, 7) } : undefined}
+      style={{
+        background: `linear-gradient(to right, ${tint(MAIA_HUE, 26)} 0 ${stop}, transparent ${stop})`,
+        ...(move.played ? { borderLeftColor: hue } : null),
+      }}
     >
-      {/* The probability, drawn as a fill behind the row — the narrow column has no room
-          for a bar of its own. */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0"
-        style={{ width: `${Math.min(100, share * 100)}%`, background: tint(hue, 8) }}
-      />
-      {/* The move's cost sits where the engine rows put their eval, so the two columns
-          read the same way: value first, then the move. */}
       <span
         className={cn(
-          'relative min-w-[2.5rem] flex-none rounded-[0.1875rem] px-1 py-px text-right font-mono text-[0.625rem] tabular',
-          verdict ? verdict.textClass : 'text-faint',
-        )}
-        style={verdict ? { background: tint(verdict.color, 13) } : undefined}
-      >
-        {loss ?? ''}
-      </span>
-      <span
-        className={cn(
-          'relative min-w-0 flex-1 truncate font-mono text-[0.6875rem]',
+          'min-w-0 flex-1 truncate font-mono text-[0.6875rem]',
           verdict ? verdict.textClass : 'text-soft',
         )}
       >
         {move.san}
       </span>
-      <span className="relative flex-none text-right font-mono text-[0.625rem] tabular text-dim">
+      {/* The card's only quantity now, so it carries the weight the loss chip used to. */}
+      <span className="w-[1.75rem] flex-none text-right font-mono text-[0.6875rem] tabular text-ink">
         {move.probability === null ? '—' : `${Math.round(move.probability * 100)}%`}
       </span>
+      <DeltaChip move={move} />
     </button>
+  )
+}
+
+/**
+ * What the move costs, in the engine's terms: a win-percentage delta, the `!` glyph where
+ * the engine's own top line is the move being described, and a cell that keeps its width
+ * and draws nothing where the engine never ranked it — deliberately blank rather than a
+ * flattering or damning guess, and blank without collapsing, so the column stays a column.
+ *
+ * Below 0.05 points the number is noise, so the glyph stands in for it; that is the same
+ * threshold the move list uses, which is why a `??` here and a `??` there agree.
+ */
+function DeltaChip({ move }: { move: HumanMoveView }) {
+  const verdict = glyphStyle(move.classification)
+  const best = move.classification === 'best'
+  const loss = move.loss !== null && move.loss >= 0.05 ? formatWinLoss(move.loss) : null
+  const shown = best ? (verdict?.glyph ?? '!') : loss
+
+  return (
+    <span
+      className={cn(
+        'w-[2.75rem] flex-none rounded-[0.1875rem] border px-1 py-px font-mono text-[0.59375rem] tabular',
+        best ? 'text-center font-bold' : 'text-right',
+        shown === null ? 'border-transparent' : verdict ? '' : 'border-line text-dim',
+      )}
+      style={
+        shown === null || !verdict
+          ? undefined
+          : best
+            ? {
+                color: verdict.color,
+                background: tint(verdict.color, 14),
+                borderColor: 'transparent',
+              }
+            : { color: verdict.color, borderColor: tint(verdict.color, 30) }
+      }
+    >
+      {shown ?? ''}
+    </span>
   )
 }
 

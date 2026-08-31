@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { AnalysisCoverage } from '@/lib/api/types'
+import { EventsProvider } from '@/lib/events/EventsProvider'
 
 import { AnalysisPage } from './AnalysisPage'
 
@@ -80,13 +81,20 @@ function stubFetch() {
   )
 }
 
+/**
+ * `Providers` no longer carries the `/events` socket — it hangs inside `AuthGate`, so a
+ * signed-out browser never dials it. A test that mounts a page on its own is standing in
+ * for the authenticated side of that gate, so it supplies the provider the gate would.
+ */
 function draw() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <Providers client={client}>
-      <MemoryRouter>
-        <AnalysisPage />
-      </MemoryRouter>
+      <EventsProvider>
+        <MemoryRouter>
+          <AnalysisPage />
+        </MemoryRouter>
+      </EventsProvider>
     </Providers>,
   )
 }
