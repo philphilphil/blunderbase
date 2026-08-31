@@ -405,7 +405,7 @@ function ConnectionDot() {
 
 /**
  * The pinned footer, the same on every screen: the library is local, and the bar is the
- * share of it a deep pass has been over — the closest thing to "how full is this database"
+ * share of it an engine pass has been over — the closest thing to "how full is this database"
  * the API can answer. The Games row already carries the library's total, so the footer no
  * longer restates it per route.
  *
@@ -414,9 +414,9 @@ function ConnectionDot() {
  */
 function NavFooter() {
   const all = useGames({ limit: 1 })
-  const deep = useGames({ deep_analyzed: true, limit: 1 })
+  const engineAnalysed = useGames({ analyzed: true, limit: 1 })
   const total = all.data?.total
-  const analysed = deep.data?.total
+  const analysed = engineAnalysed.data?.total
   const share = total && analysed !== undefined ? Math.min(100, (analysed / total) * 100) : 0
 
   // en-US commas on purpose: a locale that writes thousands with a dot turns "7.708"
@@ -424,7 +424,7 @@ function NavFooter() {
   const figure =
     total === undefined
       ? '—'
-      : `${(analysed ?? 0).toLocaleString('en-US')} of ${total.toLocaleString('en-US')} analyzed deeply`
+      : `${(analysed ?? 0).toLocaleString('en-US')} of ${total.toLocaleString('en-US')} engine analyzed`
 
   return (
     <div className="flex flex-col gap-[0.3125rem] border-t border-hairline px-2 pt-3 pb-1">

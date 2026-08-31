@@ -51,6 +51,27 @@ function draw({
 }
 
 describe('the rail footer', () => {
+  it('counts games with any engine analysis, whether quick or deep', () => {
+    useEngines.mockReturnValue(pending)
+    useLiveState.mockReturnValue(pending)
+    useEvents.mockReturnValue({ status: 'open', reconnects: 0 })
+    useGames.mockImplementation((query) => ({
+      data: { total: query.analyzed ? 2 : 9_553 },
+      isPending: false,
+    }))
+
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <SideNav />
+        </MemoryRouter>
+      </ThemeProvider>,
+    )
+
+    expect(useGames).toHaveBeenCalledWith({ analyzed: true, limit: 1 })
+    expect(screen.getByText('2 of 9,553 engine analyzed')).toBeInTheDocument()
+  })
+
   it('prints the version Vite baked in from package.json', () => {
     // Read off disk rather than restated, so a bump that misses `define` fails here.
     const { version } = JSON.parse(
