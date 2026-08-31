@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { RunnersStatus, StreamResponse, StreamSurface } from '@/lib/api/types'
+import { EventsProvider } from '@/lib/events/EventsProvider'
 
 import { useStreamSession, type StreamSessionApi } from './useStreamSession'
 
@@ -259,7 +260,8 @@ function Harness({ fen, surface = 'game' }: { fen: string | null; surface?: Stre
 /**
  * The hook under `Providers` and under `StrictMode`, which is how `main.tsx` mounts the
  * app — an effect that opened a session on its first pass has to close it when React tears
- * that pass down.
+ * that pass down. `EventsProvider` is spelled out because it hangs inside `AuthGate` in
+ * the real tree, not in `Providers`, and the hook listens on the socket it opens.
  */
 function renderHook(fen: string | null) {
   const client = new QueryClient({
@@ -268,7 +270,9 @@ function renderHook(fen: string | null) {
   const tree = (value: string | null) => (
     <StrictMode>
       <Providers client={client}>
-        <Harness fen={value} />
+        <EventsProvider>
+          <Harness fen={value} />
+        </EventsProvider>
       </Providers>
     </StrictMode>
   )

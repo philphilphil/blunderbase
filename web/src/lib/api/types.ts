@@ -345,12 +345,59 @@ export interface GameRunSummary extends Extra {
   finished_at?: string | null
 }
 
+/**
+ * One continuation out of the owner's own games, from a position this game passed through.
+ *
+ * A strict subset of `ExplorerMove` — same field names, minus the per-page extras — because
+ * it is the same fold over the same table (`services/explorer.position_books`). That is what
+ * lets the game screen's book table use the explorer's own `splitOf`/`scorePercent`/
+ * `formatAvgDrop` rather than a second, subtly different set.
+ */
+export interface GameBookMove extends Extra {
+  uci: string
+  san?: string | null
+  games: number
+  wins?: number
+  draws?: number
+  losses?: number
+  score?: number | null
+  occurrences?: number
+  owner_moves?: number
+  evaluated?: number
+  avg_win_loss?: number | null
+  blunders?: number
+  avg_ply?: number | null
+  last_played?: string | null
+}
+
+/** One position's book: how often the owner reached it, and what they played from it. */
+export interface GameBookEntry extends Extra {
+  games: number
+  wins?: number
+  draws?: number
+  losses?: number
+  score?: number | null
+  moves: GameBookMove[]
+}
+
 export interface GameDetail extends Extra {
   game: GameSummary
   ply_range?: [number, number] | null
   moves: MoveRow[]
   runs: GameRunSummary[]
   notes?: NoteResponse[] | null
+  /**
+   * The owner's own tree at the plies that have one, keyed by half-move **count** — the
+   * position *before* that ply, which is the position on the board after `count` moves. JSON
+   * object keys are strings, so the lookup is `book?.[String(ply)]`; a missing key means
+   * there is no book here, which is the common case (`0017_explorer_book`: 452k of 463k
+   * positions are reached by exactly one game).
+   *
+   * It ships with the game rather than from a per-position endpoint on purpose: a fetch per
+   * ply while stepping is the pattern that took the server down once already
+   * (`memory/blunderbase-meltdown-root-cause.md`).
+   */
+  book?: Record<string, GameBookEntry>
 }
 
 /** The query vocabulary shared by `/games` and every `/stats` dimension. */

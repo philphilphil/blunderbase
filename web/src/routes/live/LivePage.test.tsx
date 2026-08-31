@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { LiveState, RunnersStatus } from '@/lib/api/types'
+import { EventsProvider } from '@/lib/events/EventsProvider'
 
 import { LivePage } from './LivePage'
 
@@ -79,11 +80,18 @@ function json(payload: unknown, status = 200): Response {
   })
 }
 
+/**
+ * `Providers` no longer carries the `/events` socket — it hangs inside `AuthGate`, so a
+ * signed-out browser never dials it. A test that mounts a page on its own is standing in
+ * for the authenticated side of that gate, so it supplies the provider the gate would.
+ */
 function renderPage(ui: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <EventsProvider>
+        <MemoryRouter>{ui}</MemoryRouter>
+      </EventsProvider>
     </Providers>,
   )
 }
@@ -268,6 +276,8 @@ describe('LivePage', () => {
     renderPage(<LivePage />)
     await screen.findByText('kn1ghtmare — phib · ply 1')
 
+    // At rest the panel offers the switch and says what it is for. Nothing has been asked
+    // of the server yet.
     expect(screen.getByText('Analyse this position continuously.')).toBeInTheDocument()
     expect(streamCalls).toHaveLength(0)
 

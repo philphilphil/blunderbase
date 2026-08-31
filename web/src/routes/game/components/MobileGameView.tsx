@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
 import { RunStatusBadge, TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
@@ -10,19 +10,23 @@ import { formatResult } from '../gameModel'
 import { PgnButton, type MoveTab } from './MoveList'
 
 /**
- * The phone's tabs. Three of them are the move table's own, promoted out of it (see
- * `MoveList`'s `showTabRow`); Eval and Engine are the panels that have nowhere else to live
- * once the second column is gone.
+ * The phone's tabs. `moves` is the move table's own tab, promoted out of it (see
+ * `MoveList`'s `showTabRow`); the rest are the panels that have nowhere else to live once
+ * the second column is gone. `flagged` is still in the union because the table can still be
+ * *told* to draw that tab — it is simply no longer one of the strip's own (below).
  */
-export type MobileTab = MoveTab | 'eval' | 'engine'
+export type MobileTab = MoveTab | 'eval' | 'engine' | 'notes'
 
 /**
  * Reading order, not grouping order: Moves, then the two panels that describe the position
- * the board is on, then the two that are about the game as a whole. Flagged and Notes are
- * last because they are places you go on purpose — and the strip scrolls, so the two that
- * can fall off the right edge should be the two nobody reaches for mid-move.
+ * the board is on, then the one that is about what you wrote. Notes is last because it is a
+ * place you go on purpose.
+ *
+ * There is no Flagged tab any more. The Eval tab already carries `FlaggedMoments` — the same
+ * list of the curve's marks — directly under the curve that explains them, and two doors to
+ * one room is one door too many on a strip this narrow.
  */
-const MOBILE_TABS: readonly MobileTab[] = ['moves', 'eval', 'engine', 'flagged', 'notes']
+const MOBILE_TABS: readonly MobileTab[] = ['moves', 'eval', 'engine', 'notes']
 
 const TAB_LABEL: Record<MobileTab, string> = {
   moves: 'Moves',
@@ -48,20 +52,30 @@ export interface MobileGameViewProps {
    * the transport row below `md` — see `CompactHeader`.
    */
   score: Score | null
+  /**
+   * How many moves the engine flagged. It rides the *Eval* tab's label below, that being
+   * where the list it counts now lives — `FlaggedMoments` filters on the same predicate, so
+   * the number and the rows behind the tab are always the same number.
+   */
   flaggedCount: number
   noteCount: number
   tab: MobileTab
   onTabChange: (tab: MobileTab) => void
   /** `BoardPanel`, whole — eval bar, board and the transport row under it. */
   board: ReactNode
-  /** `MoveList`, already told which of its three tabs to draw. */
+  /** `MoveList`, already told which of its two tabs to draw. */
   moveList: ReactNode
   evalGraph: ReactNode
   /** `FlaggedMoments` — the curve's marks as a tappable list, under the curve. */
   flaggedMoments: ReactNode
   maiaPanel: ReactNode
   infinite: ReactNode
-  composer: ReactNode
+  /**
+   * `NotesTrack` — Book and Notes behind one tab row, with the note composer pinned under
+   * both. It is the whole of the Notes tab: the desktop's second track, unchanged, which is
+   * what keeps the book the phone sees and the book the desktop sees the same panel.
+   */
+  notesTrack: ReactNode
 }
 
 /**
@@ -100,7 +114,7 @@ export function MobileGameView({
   flaggedMoments,
   maiaPanel,
   infinite,
-  composer,
+  notesTrack,
 }: MobileGameViewProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -170,16 +184,14 @@ export function MobileGameView({
             {infinite}
           </div>
         ) : tab === 'notes' ? (
-          <>
-            {/*
-              The list above, the composer pinned under it like a message box. Reading what
-              is already written is the common visit and belongs where the eye lands; the
-              composer is where a phone keyboard will push it anyway, and the Note button in
-              the transport row switches to this tab and focuses it (`GamePage`).
-            */}
-            {moveList}
-            <div className="flex-none border-t border-hairline p-2">{composer}</div>
-          </>
+          /*
+            The desktop's notes track, whole: Book when the position has one, the game's
+            notes otherwise, and the composer pinned underneath like a message box. Reading
+            what is already written is the common visit and belongs where the eye lands; the
+            composer is where a phone keyboard will push it anyway, and the Note button in
+            the transport row switches to this tab and focuses it (`GamePage`).
+          */
+          notesTrack
         ) : (
           moveList
         )}
@@ -308,13 +320,23 @@ function Name({
 }
 
 /**
- * The five tabs, in one horizontally scrollable strip.
+ * The four tabs, each an equal quarter of the strip, ruled off top and bottom.
  *
- * Five labels plus two counts come to about 340 of the 356 usable pixels at 375 — they fit,
- * but only just, and a three-digit flagged count or a longer word would push the last one
- * off the edge silently. Scrolling the strip makes that overflow reachable instead of lost,
- * and the active tab is scrolled back into view so a tab switched from elsewhere (the Note
- * button jumps to Notes) is never left off-screen.
+ * Equal widths and no scroller — both of which this strip used to need. With Flagged gone
+ * the four labels and their two counts come to about 190 of the 356 usable pixels at 375,
+ * so there is no overflow left to make reachable, and machinery that scrolled an active tab
+ * back into view is dead weight on a strip nothing can fall off. Quarters are also the
+ * fairer target: a thumb going for Eval should not have to be more accurate than one going
+ * for Engine just because the word is shorter. This is the mockup's own phone strip
+ * (`game-layout.html`, `.phone .ptabs`, `flex: 1` per button between two hairlines).
+ *
+ * `h-[2.5rem]` rather than the mockup's 33px, and deliberately: at the app's 120 % root that
+ * is 48 physical pixels, which is a touch target, and it is the height `BoardPanel`'s
+ * `100dvh` budget counts for this strip. Changing it here silently changes the board.
+ *
+ * Two counts ride the labels. Notes carries its own. Flagged's moved to *Eval*, which is
+ * where the list it counts now lives: the tab went, the number did not, because "eight
+ * mistakes in this game" is the reason to open that tab at all.
  */
 function TabStrip({
   tab,
@@ -327,33 +349,24 @@ function TabStrip({
   flaggedCount: number
   noteCount: number
 }) {
-  const active = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    // `block: 'nearest'` so bringing a tab into view never scrolls an ancestor vertically —
-    // there is nothing above or below this strip that is allowed to move.
-    active.current?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
-  }, [tab])
-
   return (
     <div
       role="tablist"
       aria-label="Game panels"
-      className="flex h-[2.5rem] flex-none items-stretch gap-0.5 overflow-x-auto border-b border-hairline px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex h-[2.5rem] flex-none items-stretch border-y border-hairline"
     >
       {MOBILE_TABS.map((name) => {
-        const count = name === 'flagged' ? flaggedCount : name === 'notes' ? noteCount : 0
+        const count = name === 'eval' ? flaggedCount : name === 'notes' ? noteCount : 0
         const selected = tab === name
         return (
           <button
             key={name}
-            ref={selected ? active : undefined}
             type="button"
             role="tab"
             aria-selected={selected}
             onClick={() => onTabChange(name)}
             className={cn(
-              'flex flex-none items-center whitespace-nowrap px-2.5 text-xs',
+              'flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap text-xs',
               selected
                 ? 'font-medium text-ink shadow-[inset_0_-0.125rem_0_var(--bb-accent)]'
                 : 'text-dim hover:text-ink',
@@ -363,8 +376,8 @@ function TabStrip({
             {count > 0 ? (
               <span
                 className={cn(
-                  'ml-1.5 font-mono text-[0.625rem] tabular',
-                  name === 'flagged' ? 'text-blunder' : 'text-accent-teal',
+                  'font-mono text-[0.625rem] tabular',
+                  name === 'eval' ? 'text-blunder' : 'text-accent-teal',
                 )}
               >
                 {count}

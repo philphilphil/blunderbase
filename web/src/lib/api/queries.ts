@@ -521,6 +521,27 @@ export function useExplorer(
   })
 }
 
+/**
+ * The book for a position the shipped payload does not carry — see `api.getPositionBook`.
+ *
+ * `enabled` is the caller's, and the caller only turns it on once the board has left the
+ * game line: on the game's own plies the answer is already in hand, and asking per ply as
+ * somebody holds an arrow key down is the shape that took the server down once before.
+ */
+export function usePositionBook(
+  fen: string | null,
+  options?: Options<Awaited<ReturnType<typeof api.getPositionBook>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.explorerBook(fen ?? ''),
+    queryFn: () => api.getPositionBook(fen!),
+    enabled: fen !== null,
+    // A position's history does not change while the page is open.
+    staleTime: Infinity,
+    ...options,
+  })
+}
+
 export function usePositionOccurrences(
   fen: string,
   query: { color?: 'white' | 'black'; limit?: number } = {},

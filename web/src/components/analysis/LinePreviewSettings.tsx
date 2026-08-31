@@ -64,6 +64,44 @@ function Check({ id, label, checked, disabled, onChange }: {
   )
 }
 
+const ROW_MODES: RowPreview[] = ['arrows', 'overlay', 'play', 'peek', 'off']
+
+/** What each mode does, for the chip's `title` — the words, not the vocabulary. */
+const ROW_SAYS: Record<RowPreview, string> = {
+  arrows: 'draws the whole line as layered arrows',
+  overlay: 'shows where the pieces end up',
+  play: 'plays the line out on the board',
+  peek: 'opens a small board beside the row',
+  off: 'draws nothing',
+}
+
+/**
+ * The one-click cycler for what hovering a line does, next to the gear that opens the rest.
+ *
+ * It lives here rather than in a panel because both panels that show engine lines read the
+ * same preference, and it was previously declared in one of them — so the run panel and the
+ * live panel each grew their own copy of the same control. Now the run panel's Stockfish
+ * card carries the pair and the live panel carries neither; there is one place to change
+ * the setting and one place to look for it.
+ */
+export function LinePreviewRowChip() {
+  const prefs = useLinePreviewPrefs()
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        setLinePreviewPrefs({
+          row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
+        })
+      }
+      title={`Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`}
+      className="bb-chip flex-none px-1.5 py-px font-mono text-[0.625rem] text-dim transition-colors hover:text-ink"
+    >
+      {prefs.row}
+    </button>
+  )
+}
+
 export function LinePreviewSettingsButton() {
   const [open, setOpen] = useState(false)
   const prefs = useLinePreviewPrefs()

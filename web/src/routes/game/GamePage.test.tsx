@@ -13,6 +13,7 @@ import type {
   RunResponse,
   RunnersStatus,
 } from '@/lib/api/types'
+import { EventsProvider } from '@/lib/events/EventsProvider'
 
 import { toast } from '@/lib/toast'
 import { MOBILE_QUERY } from '@/lib/ui/media'
@@ -75,6 +76,17 @@ const DETAIL: GameDetail = {
     ply_count: 4,
   },
   ply_range: null,
+  // The owner's own tree from the starting position: two continuations he has been down
+  // before. Keyed by the ply the position precedes, as the service ships it.
+  book: {
+    0: {
+      games: 9,
+      moves: [
+        { uci: 'e2e4', san: 'e4', games: 6, wins: 3, draws: 1, losses: 2, avg_win_loss: 9 },
+        { uci: 'd2d4', san: 'd4', games: 3, wins: 0, draws: 1, losses: 2, avg_win_loss: 16 },
+      ],
+    },
+  },
   moves: [
     move(0, 'e4', 'e2e4', {
       classification: 'best',
@@ -298,17 +310,24 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
+/**
+ * `Providers` no longer carries the `/events` socket — it hangs inside `AuthGate`, so a
+ * signed-out browser never dials it. A test that mounts a page on its own is standing in
+ * for the authenticated side of that gate, so it supplies the provider the gate would.
+ */
 function renderPage(entry = '/games/14') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   })
   return render(
     <Providers client={client}>
-      <MemoryRouter initialEntries={[entry]}>
-        <Routes>
-          <Route path="/games/:id" element={<GamePage />} />
-        </Routes>
-      </MemoryRouter>
+      <EventsProvider>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/games/:id" element={<GamePage />} />
+          </Routes>
+        </MemoryRouter>
+      </EventsProvider>
     </Providers>,
   )
 }
@@ -341,10 +360,17 @@ describe('GamePage', () => {
     renderPage()
     expect(await screen.findByText('Scandinavian Defense')).toBeInTheDocument()
     expect(screen.getByText('B01')).toBeInTheDocument()
-    expect(screen.getByText('phib')).toBeInTheDocument()
-    expect(screen.getByText('1500')).toBeInTheDocument()
     expect(screen.getByText('0–1')).toBeInTheDocument()
     expect(screen.getByText(/analysed .* ago/)).toBeInTheDocument()
+
+    // The players are no longer part of the header line: they are two slim rows flanking
+    // the board, one per side, each with its own name and rating. The board is white-side
+    // up (the owner's colour), so the black row is the one above it.
+    const [top, bottom] = screen.getAllByTestId('player-row')
+    expect([top?.dataset.side, bottom?.dataset.side]).toEqual(['black', 'white'])
+    expect(within(bottom!).getByText('phib')).toBeInTheDocument()
+    expect(within(bottom!).getByText('1500')).toBeInTheDocument()
+    expect(within(top!).getByText('lichess AI level 2')).toBeInTheDocument()
 
     // Board is chessground, at the starting position. The board is playable (a move
     // branches an analysis line off the game), so chessground keeps a drag ghost of its
@@ -387,15 +413,40 @@ describe('GamePage', () => {
     const summary = screen.getByTestId('player-summaries')
     const plot = screen.getByTestId('evaluation-plot')
     expect(screen.getByRole('checkbox', { name: 'only mine' })).toBeChecked()
-    expect(summary).toHaveAccessibleName(/You:.*Opponent:/)
-    expect(within(summary).getByText('You')).toBeInTheDocument()
-    expect(within(summary).getByText('Opp.')).toBeInTheDocument()
-    expect(within(summary).getByText('Inaccuracies')).toBeInTheDocument()
-    expect(within(summary).getByText('Mistakes')).toBeInTheDocument()
-    expect(within(summary).getByText('Blunders')).toBeInTheDocument()
-    expect(within(summary).getByTitle('Average centipawn loss')).toHaveTextContent('ACPL')
-    expect(summary).toHaveTextContent('ACPL5260')
+
+    // Two labelled clusters now, white first — the half of the curve above the axis — each
+    // naming its own player rather than saying You/Opponent, and each stating its counts as
+    // a glyph-coloured number plus ACPL. The counts stay two-player whatever "only mine"
+    // says: that checkbox hides the opponent's marks on the plot, not the arithmetic.
+    const [white, black] = within(summary).getAllByRole('group')
+    expect(white).toHaveAccessibleName(
+      /^phib: 0 blunders, 1 mistakes, 1 inaccuracies, \d+ average centipawn loss$/,
+    )
+    expect(black).toHaveAccessibleName(
+      /^lichess AI level 2: 2 blunders, 0 mistakes, 0 inaccuracies, .* centipawn loss$/,
+    )
+    // Count and glyph are separate cells, not one token: that is what lets the numbers line
+    // up in a column of their own, which is the whole reason the block reads down the page.
+    expect(within(white!).getByTitle('1 mistakes')).toHaveTextContent(/^1$/)
+    expect(within(black!).getByTitle('2 blunders')).toHaveTextContent(/^2$/)
+    expect(within(white!).getByText('??')).toBeInTheDocument()
+    expect(within(white!).getByTitle('Average centipawn loss')).toHaveTextContent(/^ACPL$/)
     expect(summary.compareDocumentPosition(plot)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
+  it('walks a book continuation on the board, as a line like any other', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // The board is at the start, where the fixture's book has two continuations.
+    const row = await screen.findByRole('row', { name: /d4/ })
+    await user.click(row)
+
+    // Clicking one walks it: the board leaves the game line and the move joins the list as
+    // a variation, exactly as clicking an engine line's first move does.
+    expect(await screen.findByTestId('board-column')).toBeInTheDocument()
+    expect(screen.getByText('Back to game')).toBeInTheDocument()
   })
 
   it('puts the multi-PV box over the move table once a deep pass has run', async () => {
@@ -641,7 +692,11 @@ describe('GamePage', () => {
 
     // Two panels, two claims: what the run concluded, and what an engine could find now.
     expect(within(screen.getByTestId('maia-panel')).getByText('stockfish')).toBeInTheDocument()
-    expect(screen.getByText('Analyse this position continuously.')).toBeInTheDocument()
+    // At rest the live panel offers the switch itself — the continuous controls are on the
+    // footer, not behind anything that has to be opened first.
+    expect(
+      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
+    ).toBeInTheDocument()
     // Nothing is opened until the reader asks.
     expect(streamCalls).toHaveLength(0)
 
@@ -1046,14 +1101,20 @@ describe('GamePage', () => {
 })
 
 /**
- * The clamp is arithmetic over two things jsdom does not have: a laid-out row and a scaled
- * root. `rowWidth` gives the row the first, and the second is jsdom's own 16px `rem` — so
- * a 1200px row is 75rem, the move table's floor is 20rem and its ceiling the 48.75rem that
- * leaves the board its 26.25.
+ * The clamp is arithmetic over three things jsdom does not have: a laid-out row, a viewport
+ * wide enough to be in a band, and a scaled root. `rowWidth` supplies the first two — the
+ * row's measured width, and the `innerWidth` the floors are chosen by — and the third is
+ * jsdom's own 16px `rem`, so a 1200px row is 75rem here.
+ *
+ * `viewport` defaults to the row's own width, which is the coherent case. The board-floor
+ * test passes a wider one on purpose: below `xl` the board has no floor at all (`BANDS`),
+ * so a drag can hand the right column the whole row, and only in the `xl` band and up is
+ * there a board floor for the clamp to stop at.
  */
-function rowWidth(px: number): HTMLElement {
+function rowWidth(px: number, viewport = px): HTMLElement {
   const row = screen.getByTestId('moves-column').parentElement!
   row.getBoundingClientRect = () => new DOMRect(0, 0, px, 800)
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport })
   return screen.getByRole('separator', { name: 'Moves column width' })
 }
 
@@ -1089,31 +1150,45 @@ function memoryStorage(): Storage {
 
 describe('the board/moves splitter', () => {
   let storage: Storage
+  const viewport = window.innerWidth
 
   beforeEach(() => {
     storage = memoryStorage()
     vi.stubGlobal('localStorage', storage)
   })
 
-  it('lays the columns out at the design’s basis until the boundary is moved', async () => {
+  // `rowWidth` writes `innerWidth`, and the band it puts the page in decides both floors.
+  // Left standing it would follow the next test into a different band.
+  afterEach(() => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport })
+  })
+
+  it('sizes the board column to its board and gives the rest away, until the boundary is moved', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    expect(movesColumn()).toHaveClass('basis-[26rem]')
+    // Untouched, the board column is exactly as wide as the board it holds — the panel's own
+    // height budget plus the column's padding — and the right column takes what is left. That
+    // is what puts the splitter against the board's edge rather than at the end of a column
+    // padded out with slack. jsdom applies no CSS, so what is asserted is the class and that
+    // nothing has written an inline width.
+    expect(boardColumn()).toHaveClass('w-[calc(100vh-10.125rem)]', 'flex-none')
+    expect(movesColumn()).toHaveClass('flex-1')
     expect(movesColumn().style.flexBasis).toBe('')
   })
 
-  it('leaves the board column to grow into whatever is left', async () => {
+  it('hands the width back to the reader once the boundary is dragged', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
     const splitter = rowWidth(1200)
 
-    // The sized column is the move table's; the board is `flex-1` and carries no width of
-    // its own, before a drag or after one.
-    expect(boardColumn()).toHaveClass('flex-1')
-    expect(boardColumn().style.flexBasis).toBe('')
+    // The two swap roles on a drag: the right column takes the width that was chosen and the
+    // board column flexes into the remainder, so an explicit choice beats the default.
     drag(splitter, 560, 460)
+    expect(boardColumn()).toHaveClass('flex-1')
+    expect(boardColumn()).not.toHaveClass('flex-none')
     expect(boardColumn().style.flexBasis).toBe('')
+    expect(movesColumn()).toHaveClass('grow-0')
   })
 
   it('narrows the moves column with the drag, and stores where it settles', async () => {
@@ -1123,15 +1198,15 @@ describe('the board/moves splitter', () => {
 
     fireEvent.pointerDown(splitter, { button: 0, pointerId: 1, clientX: 560 })
     fireEvent.pointerMove(splitter, { pointerId: 1, clientX: 624 })
-    // Rightwards is the move table getting narrower: 64px is 4rem, off the 26rem the
-    // untouched page was laid out at.
-    expect(movesColumn().style.flexBasis).toBe('22rem')
-    expect(movesColumn()).not.toHaveClass('basis-[26rem]')
+    // Rightwards is the right column getting narrower: 64px is 4rem, off the 36rem a drag
+    // starts from where jsdom has laid the column out to nothing (`DEFAULT_RIGHT_REM`).
+    expect(movesColumn().style.flexBasis).toBe('32rem')
+    expect(movesColumn()).not.toHaveClass('basis-[28rem]')
     // Storage is written where the drag settles, not once per pointer move.
     expect(storage.getItem(MOVES_WIDTH_KEY)).toBeNull()
 
     fireEvent.pointerUp(splitter, { pointerId: 1, clientX: 624 })
-    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('22')
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('32')
   })
 
   it('widens it again when the drag goes the other way', async () => {
@@ -1140,25 +1215,29 @@ describe('the board/moves splitter', () => {
     const splitter = rowWidth(1200)
 
     drag(splitter, 560, 460)
-    // 100px leftwards is 6.25rem onto the 26.
-    expect(movesColumn().style.flexBasis).toBe('32.25rem')
-    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('32.25')
+    // 100px leftwards is 6.25rem onto the 36.
+    expect(movesColumn().style.flexBasis).toBe('42.25rem')
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('42.25')
   })
 
-  it('narrows it no further than the move table’s own floor', async () => {
+  it('narrows it no further than the column’s own floor', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
     const splitter = rowWidth(1200)
 
+    // 1200px of viewport is the narrow band, whose floor is a 250-design-pixel move track
+    // plus a readable book row beside it.
     drag(splitter, 560, 2400)
-    expect(movesColumn().style.flexBasis).toBe('20rem')
-    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('20')
+    expect(movesColumn().style.flexBasis).toBe('26.875rem')
+    expect(storage.getItem(MOVES_WIDTH_KEY)).toBe('26.875')
   })
 
   it('widens it no further than the board’s floor allows', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    const splitter = rowWidth(1200)
+    // A 1600px viewport, where the board has a floor at all: below `xl` it has none and a
+    // drag may hand the right column the whole row.
+    const splitter = rowWidth(1200, 1600)
 
     drag(splitter, 560, -400)
     // 75rem of row, less the 26.25rem the board never drops under.
@@ -1171,10 +1250,10 @@ describe('the board/moves splitter', () => {
     const splitter = rowWidth(1200)
 
     fireEvent.keyDown(splitter, { key: 'ArrowRight' })
-    expect(movesColumn().style.flexBasis).toBe('25rem')
+    expect(movesColumn().style.flexBasis).toBe('35rem')
     fireEvent.keyDown(splitter, { key: 'ArrowLeft' })
     fireEvent.keyDown(splitter, { key: 'ArrowLeft' })
-    expect(movesColumn().style.flexBasis).toBe('27rem')
+    expect(movesColumn().style.flexBasis).toBe('37rem')
     // The board's own arrows are bound on `window`, and did not see these.
     expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
   })
@@ -1185,10 +1264,13 @@ describe('the board/moves splitter', () => {
     const splitter = rowWidth(1200)
 
     drag(splitter, 560, 624)
-    expect(movesColumn().style.flexBasis).toBe('22rem')
+    expect(movesColumn().style.flexBasis).toBe('32rem')
 
+    // Back to the default, which is the board column sized to its board and this one taking
+    // the remainder — not a stored basis.
     fireEvent.doubleClick(splitter)
-    expect(movesColumn()).toHaveClass('basis-[26rem]')
+    expect(movesColumn()).toHaveClass('flex-1')
+    expect(boardColumn()).toHaveClass('flex-none')
     expect(movesColumn().style.flexBasis).toBe('')
     expect(storage.getItem(MOVES_WIDTH_KEY)).toBeNull()
   })
@@ -1199,15 +1281,16 @@ describe('the board/moves splitter', () => {
     await screen.findByText('Scandinavian Defense')
 
     expect(movesColumn().style.flexBasis).toBe('30rem')
-    expect(movesColumn()).not.toHaveClass('basis-[26rem]')
+    expect(movesColumn()).not.toHaveClass('basis-[28rem]')
   })
 
-  it('falls back to the design’s basis where the stored width is not one', async () => {
+  it('falls back to the default layout where the stored width is not a width', async () => {
     storage.setItem(MOVES_WIDTH_KEY, 'wide-ish')
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    expect(movesColumn()).toHaveClass('basis-[26rem]')
+    expect(movesColumn()).toHaveClass('flex-1')
+    expect(boardColumn()).toHaveClass('flex-none')
     expect(movesColumn().style.flexBasis).toBe('')
   })
 })
@@ -1235,8 +1318,14 @@ describe('the game view below md', () => {
     }))
   })
 
-  /** The tab, by the name a screen reader reads — the counts are part of it. */
-  const tab = (name: RegExp | string) => screen.getByRole('tab', { name })
+  /**
+   * The phone strip itself. `NotesTrack` has a `Book | Notes` tablist of its own inside the
+   * Notes tab, so "the Notes tab" is ambiguous unless the query is scoped to one of them.
+   */
+  const strip = () => within(screen.getByRole('tablist', { name: 'Game panels' }))
+
+  /** A tab on the phone strip, by the name a screen reader reads — counts included. */
+  const tab = (name: RegExp | string) => strip().getByRole('tab', { name })
 
   it('replaces the two sized panes with a tabbed pane', async () => {
     renderPage()
@@ -1262,18 +1351,19 @@ describe('the game view below md', () => {
     await screen.findByRole('tab', { name: 'Moves' })
 
     expect(tab('Moves')).toHaveAttribute('aria-selected', 'true')
-    // The position first, the game after: the two that can scroll off the right edge are
-    // the two nobody reaches for mid-move.
-    expect(screen.getAllByRole('tab').map((each) => each.textContent)).toEqual([
+    // Four tabs, in reading order: the moves, then the two panels about the position on the
+    // board, then the one about what you wrote. There is no Flagged tab any more — the Eval
+    // tab carries `FlaggedMoments` under the curve that explains it, and two doors to one
+    // room is one too many on a strip this narrow.
+    expect(strip().getAllByRole('tab').map((each) => each.textContent)).toEqual([
       'Moves',
-      'Eval',
+      'Eval1',
       'Engine',
-      'Flagged1',
       'Notes1',
     ])
     // One blunder and one note in the payload, reported on the strip rather than inside a
-    // panel nobody has opened yet.
-    expect(tab(/^Flagged/)).toHaveTextContent('1')
+    // panel nobody has opened yet. The flagged count rides Eval, where its list now lives.
+    expect(tab(/^Eval/)).toHaveTextContent('1')
     expect(tab(/^Notes/)).toHaveTextContent('1')
     expect(screen.getByText('e4')).toBeInTheDocument()
   })
@@ -1294,7 +1384,7 @@ describe('the game view below md', () => {
     // so "e4" being on screen says nothing about which panel is open.
     expect(screen.queryByTestId('move-list')).not.toBeInTheDocument()
 
-    await user.click(tab('Eval'))
+    await user.click(tab(/^Eval/))
     expect(screen.getByText('Evaluation')).toBeInTheDocument()
     expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('flagged-moments')).toBeInTheDocument()
@@ -1304,15 +1394,20 @@ describe('the game view below md', () => {
     expect(screen.getByTestId('board')).toBeInTheDocument()
   })
 
-  it('filters the table to the flagged moves from the strip', async () => {
+  it('reaches the flagged moves through Eval rather than a tab of their own', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('tab', { name: 'Moves' })
 
-    await user.click(tab(/^Flagged/))
-    // 1…d5 is the only flagged move; 1.e4 is `best` and drops out of the table.
-    expect(screen.getByText('d5')).toBeInTheDocument()
-    expect(screen.queryByText('exd5')).not.toBeInTheDocument()
+    // The rebuild dropped the Flagged tab: its filtered table and the Eval tab's
+    // `FlaggedMoments` were the same list of the same moves, reached two ways.
+    expect(strip().queryByRole('tab', { name: /^Flagged/ })).not.toBeInTheDocument()
+
+    await user.click(tab(/^Eval/))
+    // 1…d5 is the only flagged move; 1.e4 is `best` and is not in the list.
+    const moments = within(screen.getByTestId('flagged-moments'))
+    expect(moments.getByRole('button', { name: /d5/ })).toBeInTheDocument()
+    expect(moments.queryByRole('button', { name: /exd5/ })).not.toBeInTheDocument()
   })
 
   it('keeps PGN reachable now that the table’s own tab row is gone', async () => {
@@ -1332,7 +1427,7 @@ describe('the game view below md', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('tab', { name: 'Moves' })
-    await user.click(tab('Eval'))
+    await user.click(tab(/^Eval/))
 
     // Curve and list scroll as one column. Split into a fixed curve over a scrolling list,
     // the curve was a `flex-none` box that could not yield and the list was left with 13
@@ -1365,11 +1460,14 @@ describe('the game view below md', () => {
 
     // A quarter of a phone is ~90px and three quarters ~270; side by side, the engine's
     // variations wrapped every second ply. jsdom lays nothing out, so what is asserted is
-    // the rule: one column below `md`, and the rule between them turned on its side.
+    // the rule: one column below `md`, over the desktop's quarter/three-quarters pair.
     const split = screen.getByTestId('maia-engine-lines').parentElement
     expect(split).toHaveClass('max-md:grid-cols-1')
-    expect(split).toHaveClass('max-md:divide-y')
-    expect(split).toHaveClass('max-md:divide-x-0')
+    expect(split).toHaveClass('grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)]')
+    // Two rounded cards with a gap and no rule between them — the band draws no divider at
+    // either width, so there is nothing to turn on its side here.
+    expect(split).toHaveClass('gap-2.5')
+    expect(split!.className).not.toContain('divide-')
     // Maia first, the order the desktop reads them left to right.
     expect(split!.firstElementChild).not.toBe(screen.getByTestId('maia-engine-lines'))
   })
@@ -1435,8 +1533,16 @@ describe('GamePage notes', () => {
     updated_at: '2026-08-01T09:00:00Z',
   }
 
+  /**
+   * The Notes tab of the right column's second track. It is a `tab` in the track's own
+   * `Book | Notes` tablist now, not the move table's tab row — that row's third tab is
+   * gone, and so is the count it used to carry: the track prints "1 note" on the right of
+   * the same row instead.
+   */
   function notesTab() {
-    return screen.getByRole('button', { name: /^Notes/ })
+    return within(screen.getByRole('tablist', { name: 'Book and notes' })).getByRole('tab', {
+      name: 'Notes',
+    })
   }
 
   function noteBodies(): { url: string; body: Record<string, unknown> }[] {
@@ -1450,13 +1556,19 @@ describe('GamePage notes', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // The payload's one note sits at count 1 — the position after 1.e4.
-    expect(notesTab()).toHaveTextContent('Notes1')
+    // The payload's one note sits at count 1 — the position after 1.e4 — and the track's
+    // tab row states how many there are beside the two tabs.
     await user.click(notesTab())
+    expect(
+      within(screen.getByRole('tablist', { name: 'Book and notes' })).getByText('1 note'),
+    ).toBeInTheDocument()
+
+    // A row is where the note hangs and the note itself, clamped. Its tags are not repeated
+    // here: clicking the row loads it into the composer below, which is where they are read
+    // and edited.
     const list = within(screen.getByTestId('game-notes'))
     expect(list.getByText(/The Scandinavian invites the queen out early/)).toBeInTheDocument()
     expect(list.getByText('1.e4')).toBeInTheDocument()
-    expect(list.getByText('opening')).toBeInTheDocument()
   })
 
   it('jumps to the ply a note is about when it is clicked', async () => {
@@ -1648,7 +1760,10 @@ describe('GamePage notes', () => {
 
     await user.click(notesTab())
     const list = within(screen.getByTestId('game-notes'))
-    expect(list.getByText('variation')).toBeInTheDocument()
+    // The row labels itself with the move inside the line — 1…c6, not the game's 1…d5 —
+    // and says which of the two kinds of `1…` that is.
+    expect(list.getByTitle('On a pinned variation')).toHaveTextContent('1…c6')
+    expect(list.getByTitle('On the game')).toHaveTextContent('1.e4')
     // The game's own note leads; the variation's is the aside under it.
     const bodies = screen.getByTestId('game-notes').textContent ?? ''
     expect(bodies.indexOf('Scandinavian invites')).toBeLessThan(

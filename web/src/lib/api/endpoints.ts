@@ -53,6 +53,7 @@ import type {
   NoteScope,
   NoteUpdate,
   PositionAnalysis,
+  GameBookEntry,
   PositionOccurrence,
   ProbeRequest,
   ProbeResponse,
@@ -291,6 +292,17 @@ export const findPositions = (
   fen: string,
   query: { color?: 'white' | 'black'; limit?: number } = {},
 ) => http.get<PositionOccurrence[]>('/explorer/positions', { query: { fen, ...query } })
+
+/**
+ * One position's strip of continuations, for a board that has left the game line.
+ *
+ * A game ships the book for its own plies, so stepping through it costs no request. This is
+ * the other half: once the reader plays a move of their own — walking a book line, or just
+ * dragging a piece — the board stands somewhere that payload cannot describe. Null for the
+ * overwhelming majority of positions, which no two of the owner's games ever reached.
+ */
+export const getPositionBook = (fen: string, query: { color?: 'white' | 'black' } = {}) =>
+  http.get<GameBookEntry | null>('/explorer/book', { query: { fen, ...query } })
 
 // --- stats ----------------------------------------------------------------
 

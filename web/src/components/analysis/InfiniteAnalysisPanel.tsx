@@ -9,15 +9,14 @@ import {
   peekCaption,
   peekFen,
   type LinePreviewPrefs,
-  type RowPreview,
 } from '@/lib/board/linePreview'
-import { setLinePreviewPrefs, useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
+import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import type { HoveredLine } from '@/lib/board/useLinePreview'
 import { formatNodes, formatScore } from '@/lib/chess/evaluation'
+import { WHEEL_STEP } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 
 import { AnalysisControls } from './AnalysisControls'
-import { LinePreviewSettingsButton } from './LinePreviewSettings'
 
 // What a hovered line *is* belongs to the preview, not to the panel that reports one, so
 // the type lives beside the hook that consumes it — and is re-exported here because this
@@ -54,11 +53,10 @@ export interface InfiniteAnalysisPanelProps {
 }
 
 /**
- * Wheel travel that counts as one step along a line — `BoardPanel`'s constant and its
- * accumulation, because the two gestures land on the same page and a wheel that stepped the
- * board at one speed and a preview at another would read as two different wheels.
+ * Wheel travel that counts as one step along a line — the same threshold the board and the
+ * eval curve step the *game* by, because all three gestures land on the same page and a
+ * wheel that moved one at a different speed would read as several different wheels.
  */
-const WHEEL_STEP = 10
 
 /**
  * The id this panel gives one of its rows, and the only place it is built.
@@ -70,18 +68,6 @@ const WHEEL_STEP = 10
  */
 function lineId(multipv: number): string {
   return `live:${multipv}`
-}
-
-/** The cycle the header chip walks, in the order the design lists the modes. */
-const ROW_MODES: RowPreview[] = ['arrows', 'overlay', 'play', 'peek', 'off']
-
-/** What each mode does, for the chip's `title` — the words, not the vocabulary. */
-const ROW_SAYS: Record<RowPreview, string> = {
-  arrows: 'draws the whole line as layered arrows',
-  overlay: 'shows where the pieces end up',
-  play: 'plays the line out on the board',
-  peek: 'opens a small board beside the row',
-  off: 'draws nothing',
 }
 
 /** Whether a wheel over a row has anywhere to step: only the modes that stand on a ply. */
@@ -353,38 +339,35 @@ export function InfiniteAnalysisPanel({
           </span>
           {session ? <HostChip runner={session.runner ?? null} /> : null}
           <div className="flex-1" />
-          {onHoverLine ? (
-            <button
-              type="button"
-              onClick={() =>
-                setLinePreviewPrefs({
-                  row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
-                })
-              }
-              title={`Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`}
-              className="bb-chip flex-none px-1.5 py-px font-mono text-[0.625rem] text-dim transition-colors hover:text-ink"
-            >
-              {prefs.row}
-            </button>
-          ) : null}
-          {onHoverLine ? <LinePreviewSettingsButton /> : null}
-        </div>
+          {/*
+            Depth, nodes and speed ride on the header line rather than on a row of their own.
+            They used to need that row because the header's right end was taken by the
+            row-mode cycler and the settings gear — both of which have moved to the run
+            panel's Stockfish card, which is where the preference is now changed. What is
+            left is three short mono readouts against an engine name, so the second row was
+            spending a line's height on a gap.
 
-        <div className="mt-1 flex min-w-0 items-center gap-2 pl-3.5" data-testid="infinite-analysis-meta">
-          <div className="flex-1" />
-          {snapshot?.depth ? (
-            <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">d{snapshot.depth}</span>
-          ) : null}
-          {snapshot?.nodes ? (
-            <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
-              {formatNodes(snapshot.nodes)} nodes
-            </span>
-          ) : null}
-          {snapshot?.nps ? (
-            <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
-              {formatNps(snapshot.nps)}
-            </span>
-          ) : null}
+            `data-testid` stays on the group: it is what a test asks for when it wants to
+            know the runner's name is reported once and not twice.
+          */}
+          <div
+            className="flex min-w-0 flex-none items-center gap-2"
+            data-testid="infinite-analysis-meta"
+          >
+            {snapshot?.depth ? (
+              <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">d{snapshot.depth}</span>
+            ) : null}
+            {snapshot?.nodes ? (
+              <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+                {formatNodes(snapshot.nodes)} nodes
+              </span>
+            ) : null}
+            {snapshot?.nps ? (
+              <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+                {formatNps(snapshot.nps)}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
 

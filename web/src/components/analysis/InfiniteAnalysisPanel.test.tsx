@@ -4,11 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { StreamSessionApi, StreamSnapshot } from '@/lib/analysis'
 import type { StreamResponse } from '@/lib/api/types'
-import {
-  LINE_PREVIEW_KEY,
-  resetLinePreviewPrefs,
-  setLinePreviewPrefs,
-} from '@/lib/board/linePreviewPrefs'
+import { resetLinePreviewPrefs, setLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import type { EngineHost } from '@/lib/engines/hosts'
 
 import {
@@ -288,11 +284,13 @@ describe('InfiniteAnalysisPanel', () => {
     expect(
       within(screen.getByTestId('infinite-analysis-meta')).queryByText('Firefox on macOS'),
     ).not.toBeInTheDocument()
+    // The preview controls are not in this header any more — they live on the run panel's
+    // Stockfish card, so there is one place to change the preference rather than two.
     expect(
-      within(screen.getByTestId('infinite-analysis-header')).getByRole('button', {
+      within(screen.getByTestId('infinite-analysis-header')).queryByRole('button', {
         name: 'arrows',
       }),
-    ).toBeInTheDocument()
+    ).not.toBeInTheDocument()
   })
 
   it('offers the hovered line’s first move, and takes it back on leaving', async () => {
@@ -377,14 +375,14 @@ describe('InfiniteAnalysisPanel', () => {
     expect(token(rows[1]!, 1).className).not.toContain('text-faint-2')
   })
 
-  it('cycles the row mode from the header chip', async () => {
+  it('carries no preview controls of its own', () => {
     renderLines({ onHoverLine: vi.fn() })
 
-    await userEvent.click(screen.getByRole('button', { name: 'arrows' }))
-    expect(screen.getByRole('button', { name: 'overlay' })).toBeInTheDocument()
-    expect(JSON.parse(localStorage.getItem(LINE_PREVIEW_KEY) ?? '{}')).toMatchObject({
-      row: 'overlay',
-    })
+    // Neither the cycler nor the gear: both used to be duplicated here and on the run
+    // panel, which meant two places to change one preference. `LinePreviewRowChip`'s own
+    // test covers the cycling behaviour where it now lives.
+    expect(screen.queryByRole('button', { name: 'arrows' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /line preview/i })).not.toBeInTheDocument()
   })
 
   it('falls back to the raw UCI when the position will not replay', () => {

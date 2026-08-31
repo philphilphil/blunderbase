@@ -193,6 +193,22 @@ export function whiteWinAfter(move: MoveRow | undefined | null): number | null {
   return sideOf(move.ply) === 'white' ? move.win_after : 100 - move.win_after
 }
 
+/** The White-relative score of the position `move` produced, or null where none was stored. */
+export function whiteScoreAfter(move: MoveRow | undefined | null): Score | null {
+  if (!move) return null
+  const { eval_after_cp: cp, eval_after_mate: mate } = move
+  if ((cp === null || cp === undefined) && (mate === null || mate === undefined)) return null
+  return toWhite({ cp, mate }, sideOf(move.ply))
+}
+
+/** The same for the position it was played *from* — the curve's opening point. */
+export function whiteScoreBefore(move: MoveRow | undefined | null): Score | null {
+  if (!move) return null
+  const { eval_before_cp: cp, eval_before_mate: mate } = move
+  if ((cp === null || cp === undefined) && (mate === null || mate === undefined)) return null
+  return toWhite({ cp, mate }, sideOf(move.ply))
+}
+
 /** White's win percentage in the position `move` was played from, 0..100. */
 export function whiteWinBefore(move: MoveRow | undefined | null): number | null {
   if (!move || move.win_before === null || move.win_before === undefined) return null
@@ -284,6 +300,13 @@ export interface CurvePoint {
   /** White's win percentage, 0..100. */
   win: number
   san: string | null
+  /**
+   * The same position's evaluation, White-relative, for the hover readout. The curve is
+   * plotted from `win` — a percentage compresses a decisive advantage into something a
+   * chart can draw — but a reader hovering a point wants the number the engine actually
+   * said, which is this one.
+   */
+  score: Score | null
   /** Only set where the move that produced this point was flagged. */
   classification: Classification | null
 }
@@ -296,7 +319,13 @@ export function evalCurve(moves: MoveRow[]): CurvePoint[] {
   const points: CurvePoint[] = []
   const opening = whiteWinBefore(moves[0])
   if (opening !== null) {
-    points.push({ ply: -1, win: opening, san: null, classification: null })
+    points.push({
+      ply: -1,
+      win: opening,
+      san: null,
+      score: whiteScoreBefore(moves[0]),
+      classification: null,
+    })
   }
   for (const move of moves) {
     const win = whiteWinAfter(move)
@@ -305,6 +334,7 @@ export function evalCurve(moves: MoveRow[]): CurvePoint[] {
       ply: move.ply,
       win,
       san: move.san ?? null,
+      score: whiteScoreAfter(move),
       classification: isFlagged(move.classification) ? (move.classification ?? null) : null,
     })
   }

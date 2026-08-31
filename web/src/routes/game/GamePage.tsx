@@ -11,6 +11,7 @@ import {
   useGameLines,
   useMaiaElos,
   useNoteTags,
+  usePositionBook,
   useSaveLine,
   useSaveNote,
   useUpdateNote,
@@ -25,6 +26,7 @@ import { cn } from '@/lib/utils'
 
 import { buildAnalysisLine, withBoardMove } from './analysisLine'
 import { BoardPanel } from './components/BoardPanel'
+import type { BookMove } from './components/BookPanel'
 import { ColumnSplitter } from './components/ColumnSplitter'
 import { EvalGraph } from './components/EvalGraph'
 import { FlaggedMoments } from './components/FlaggedMoments'
@@ -39,6 +41,7 @@ import {
   type MoveTab,
 } from './components/MoveList'
 import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
+import { NotesTrack } from './components/NotesTrack'
 import {
   bestRun,
   buildGameLine,
@@ -79,29 +82,55 @@ import { useAnalysisRequest } from './useAnalysisRequest'
 import { useBoardKeys } from './useBoardKeys'
 import { useLiveMaia } from './useLiveMaia'
 
-// --- the moves column's width ---------------------------------------------
+// --- the right column's width ---------------------------------------------
 //
-// The board takes the spare width and the move table is the column that is *sized*, so the
-// width held here is the move table's. Stored in `rem`, the unit the whole page lays out
-// in: a physical pixel count would stop meaning the same column the moment the root scale
-// moved (`lib/ui/scale.ts`). Page-local state rather than a store — nothing outside this
-// page reads it, and a second tab arranging its own columns differently is not a conflict
-// to reconcile.
+// The board is flush left and takes what the right column does not, so the boundary between
+// the two is the one that trades board size against everything else — which is the whole
+// point of this screen. What is stored is the *right column's* width, in `rem`, the unit the
+// page lays out in: a physical pixel count would stop meaning the same column the moment the
+// root scale moved (`lib/ui/scale.ts`). Page-local state rather than a store — nothing
+// outside this page reads it, and a second tab arranging its columns differently is not a
+// conflict to reconcile.
+//
+// The key is still `gameMovesWidth`: it is the same boundary a reader dragged before the
+// rebuild, and a width they set then is still a width they meant. Only what stands to the
+// right of it grew from the move table alone to the move table plus everything else.
 
 export const MOVES_WIDTH_KEY = 'blunderbase.gameMovesWidth'
+
 /**
- * What the move column is worth until somebody drags it, read off what it holds rather
- * than off the window: the Maia panel's `1fr 3fr` grid wants roughly 6.5rem for the human
- * column ("d5", a percentage, the played mark) and the rest for the engine's own — a SAN
- * move, its eval chip and two or three plies of line without wrapping — and the move table
- * under it wants a move number plus two SAN cells wide enough for a glyph and an
- * annotation. 26rem, which is 499 physical pixels at the app's 120 % scale, seats both
- * comfortably and is well clear of the 280 the design set for this column; every rem past
- * it would be spent on whitespace the move table has no use for, and the board wants it.
+ * The bands, and what the right column may not go under in each.
+ *
+ * The tracks inside the column are fixed per band by CSS on the column itself — 340/300/250
+ * design pixels for the move table, the rest for the notes track — so the column's floor is
+ * that track plus the least a book row can be read in beside it (a move, a game count, a
+ * split bar and an average drop: ~180 design pixels, and more where there is room for it).
+ * Written the way everything here is: design pixels over 16 to `rem`, which the 120 % root
+ * then renders 1.2× larger. The *band* boundaries are physical pixels, because media queries
+ * do not scale with the root (`index.css`).
+ *
+ * The board's own floor only holds from `xl` up. Below it the board yields instead: at 1280
+ * physical pixels the sidebar and the right column have already spent most of the row, and a
+ * floor there would buy a horizontal scrollbar rather than a bigger board.
  */
-const DEFAULT_MOVES_REM = 26
-const BOARD_FLOOR_REM = 26.25
-const MOVES_FLOOR_REM = 20
+const BANDS = [
+  { from: 1600, right: 35.25, board: 26.25 },
+  { from: 1280, right: 31.75, board: 26.25 },
+  { from: 0, right: 26.875, board: 0 },
+] as const
+
+/** Which band the window is in, as its two floors. */
+function floors(): { right: number; board: number } {
+  const width = typeof window === 'undefined' ? 1600 : window.innerWidth
+  return BANDS.find((band) => width >= band.from) ?? BANDS[BANDS.length - 1]
+}
+
+/**
+ * The width a drag falls back to when the column cannot be measured. Nothing normally uses
+ * it — an untouched column is sized by CSS per band and a drag starts from what is on screen
+ * — so this is only the answer for a drag that begins before layout has happened.
+ */
+const DEFAULT_RIGHT_REM = 36
 
 function storage(): Storage | null {
   try {
@@ -131,7 +160,7 @@ function readMovesWidth(): number | null {
     if (!Number.isFinite(width) || width <= 0) return null
     // The ceiling needs a container to be measured against and there is none yet; the
     // floor holds on its own, and the first drag re-clamps against the real row.
-    return Math.max(width, MOVES_FLOOR_REM)
+    return Math.max(width, floors().right)
   } catch {
     // Corrupt or unreadable: the default layout rather than a throw.
     return null
@@ -283,36 +312,48 @@ function GameStudio({ gameId }: { gameId: number }) {
   // The row the two columns sit in, measured rather than remembered: a window resized
   // between two drags must not leave a stale ceiling behind.
   const columnsRef = useRef<HTMLDivElement | null>(null)
-  /** The moves column in `rem`; null is "the design's basis", which is also the reset. */
+  /** The right column itself, so a drag can start from the width it is actually drawn at. */
+  const rightRef = useRef<HTMLDivElement | null>(null)
+  /** The right column in `rem`; null is "the design's basis", which is also the reset. */
   const [movesWidth, setMovesWidth] = useState<number | null>(readMovesWidth)
   const widthRef = useRef(movesWidth)
   /** The width the drag started from — deltas are measured off it, not off each other, so
    * dragging past a floor and back does not leave the pointer and the line apart. */
-  const dragBase = useRef(DEFAULT_MOVES_REM)
+  const dragBase = useRef(DEFAULT_RIGHT_REM)
 
   /**
-   * A width the layout can actually hold: never under the move table's own floor, and never
-   * so wide that the board drops under its. A row too narrow for both floors gives the move
-   * table its floor and overflows, which is what the CSS `min-w` pair does anyway.
+   * A width the layout can actually hold: never under the right column's own floor for this
+   * band, and never so wide that the board drops under its. A row too narrow for both floors
+   * gives the right column its floor and overflows, which is what the CSS `min-w` does
+   * anyway.
    */
   const clampWidth = useCallback((width: number) => {
     const row = columnsRef.current?.getBoundingClientRect().width ?? 0
     const available = row > 0 ? row / rootPx() : Number.POSITIVE_INFINITY
-    const ceiling = Math.max(MOVES_FLOOR_REM, available - BOARD_FLOOR_REM)
-    const clamped = Math.min(Math.max(width, MOVES_FLOOR_REM), ceiling)
+    const { right, board } = floors()
+    const ceiling = Math.max(right, available - board)
+    const clamped = Math.min(Math.max(width, right), ceiling)
     // Three decimals of a `rem` is a fifth of a pixel: enough to drag smoothly, short
     // enough to read in the DOM and in storage.
     return Math.round(clamped * 1000) / 1000
   }, [])
 
+  /**
+   * Where the drag starts: the width the column is drawn at right now, measured, rather than
+   * the width state remembers. Until somebody drags it the column has no remembered width at
+   * all — its basis comes from CSS and changes with the band — and a drag that began from a
+   * number the screen does not show would jump on the first pointer move.
+   */
   const startResize = useCallback(() => {
-    dragBase.current = clampWidth(widthRef.current ?? DEFAULT_MOVES_REM)
+    const drawn = rightRef.current?.getBoundingClientRect().width ?? 0
+    const from = drawn > 0 ? drawn / rootPx() : (widthRef.current ?? DEFAULT_RIGHT_REM)
+    dragBase.current = clampWidth(from)
   }, [clampWidth])
 
   /**
    * The splitter reports raw pointer travel, rightwards positive, and the column it moves
-   * is the one on its *right*: a pointer going right is the move table getting narrower,
-   * so the delta is subtracted rather than added.
+   * is the one on its *right*: a pointer going right is the right column getting narrower
+   * (and the board bigger), so the delta is subtracted rather than added.
    */
   const resize = useCallback(
     (deltaPx: number) => {
@@ -426,6 +467,20 @@ function GameStudio({ gameId }: { gameId: number }) {
   const exploring = (analysis?.cursor ?? 0) > 0
   const boardPosition = exploring && analysis ? analysis.position : position
   const analysisPly = analysis?.ply ?? boardIndex
+
+  /*
+   * The book for a board that has left the game line.
+   *
+   * The game ships its own book with it, keyed by ply, which covers stepping through the
+   * game and costs no request — asking per ply while somebody holds an arrow key down is
+   * the shape that took the server down once already. But the moment the reader plays a
+   * move of their own, whether that is walking a book continuation or dragging a piece
+   * somewhere nobody has ever been, the board stands on a position that payload cannot
+   * describe. That is a deliberate act, one position at a time, so it is the one place a
+   * request is the right answer — and react-query keys it by the position, so walking back
+   * and forth over the same square asks once.
+   */
+  const exploredBook = usePositionBook(exploring ? (boardPosition?.fen ?? null) : null)
   /** What the hovered line draws: the transient position, its shapes, and where it stands. */
   const previewView = useLinePreview(
     boardPosition?.fen ?? null,
@@ -500,6 +555,28 @@ function GameStudio({ gameId }: { gameId: number }) {
     },
     [analysis, keepBranch],
   )
+
+  /**
+   * A continuation out of the book table, walked on the board — the same gesture as clicking
+   * an engine line's first move, and the same machinery: one move is a line of length one.
+   */
+  const playBookMove = useCallback((move: BookMove) => playLine([move.uci], 0), [playLine])
+
+  /**
+   * A book row under the pointer, shown on the board without being walked into.
+   *
+   * It goes through the page's one `preview` state, so hovering a book move and hovering an
+   * engine line cannot both be drawn at once, and the board's own preview machinery
+   * (`useLinePreview`) replays it from the position on the board. `book` is the row id the
+   * two panels' ids are namespaced against (`run:1`, `live:1`).
+   */
+  const previewBookMove = useCallback((continuation: string[] | null) => {
+    setPreview(
+      continuation && continuation.length > 0
+        ? { line: 'book', ply: continuation.length, pv: continuation }
+        : null,
+    )
+  }, [])
 
   /** A drag in the middle of a line truncates it there and continues from the board move. */
   const playMove = useCallback(
@@ -1048,10 +1125,12 @@ function GameStudio({ gameId }: { gameId: number }) {
       previewLine={previewView.line}
       previewPly={previewView.ply}
       onPlayLine={playLine}
-      // In the moves column the box is a band welded to the top of the move table, so it
-      // is bordered on the sides the column already draws. Standing on its own in the
-      // phone's single column it is a card like the others, and carries its own outline.
-      className={mobile ? 'rounded-lg border border-hairline' : 'border-b border-t-0 border-hairline'}
+      // The band paints nothing of its own any more: it is two rounded cards with a gap
+      // between them, floating on the column's ground, and all it needs from here is where
+      // to float. On the desktop that is the right column's first row, spanning both tracks
+      // with the mockup's own 12-design-pixel margin; on the phone it is one of a stack of
+      // cards, and `MobileGameView`'s pane already spaces those.
+      className={mobile ? undefined : 'col-span-2 m-3'}
     />
   )
 
@@ -1067,6 +1146,10 @@ function GameStudio({ gameId }: { gameId: number }) {
         setBranch(null)
       }}
       orientation={orientation}
+      // The two player rows flanking the board — name, rating and the material each side is
+      // up, counted off the FEN on the board rather than off the game (`lib/chess/material`).
+      // Nothing else about the game: that is the header's business.
+      game={detail.game}
       lastMove={played}
       // The marks and the engine arrow are claims about a position a run has looked
       // at; on an analysis position there is no such claim, and only Maia's own
@@ -1111,12 +1194,24 @@ function GameStudio({ gameId }: { gameId: number }) {
       cursor={cursor}
       ownerSide={detail?.game.color ?? null}
       analysisSummary={best ? analysisSummary : null}
+      // The header tallies name both players rather than saying You/Opp.: the curve is
+      // about the game, and half of it is the opponent's.
+      playerNames={{ white: detail?.game.white, black: detail?.game.black }}
       onSelectPly={selectPly}
-      // A little taller than the desktop's 6.5rem cap, since it has the width to itself —
-      // and no taller. The rest of the Eval tab goes to `FlaggedMoments`, which is the part
-      // of "the story of the game" a finger can actually hit. 8.5rem rather than 9.5 so
+      // Desktop: the right column's third row, spanning both tracks, at the mockup's own
+      // height for the card (170 design pixels, 150 in the narrow band) and its 12/10 of
+      // margin. A definite height rather than a share of the row: the row above it is the
+      // one that should take the slack, because a move table is a list and a curve is a
+      // shape — a taller curve is the same handful of turning points drawn bigger.
+      //
+      // Phone: a compact box, since the rest of the Eval tab goes to `FlaggedMoments`,
+      // which is the part of "the story of the game" a finger can actually hit. 8.5rem so
       // that at 812 a row or two of that list is on screen before anybody scrolls.
-      className={mobile ? 'h-[8.5rem] max-h-none' : 'min-w-0 flex-1 basis-1/2'}
+      className={
+        mobile
+          ? 'h-[8.5rem]'
+          : 'col-span-2 m-2.5 h-[9.375rem] xl:m-3 xl:h-[10.625rem]'
+      }
       // A drag along the curve walks the game. Only here: see `EvalGraph`'s own note.
       scrub={mobile}
     />
@@ -1136,16 +1231,42 @@ function GameStudio({ gameId }: { gameId: number }) {
       onSave={writeNote}
       onDelete={forgetNote}
       onClose={blurComposer}
-      // Pinned under the notes list in the Notes tab, at about the height of the desktop
-      // slot: tall enough for the text box and its button row, short enough to leave the
-      // list something to be a list in on a 667-tall phone.
-      className={mobile ? 'h-[6.5rem]' : 'max-h-[6.5rem] min-w-0 flex-1 basis-1/2'}
+      // No height of its own on either layout: it is handed one by the slot at the foot of
+      // `NotesTrack`, which is what guarantees the box cannot move when the tab above it
+      // changes — see that component's `COMPOSER_SLOT`.
+      className="min-w-0"
     />
   )
 
-  // The phone's strip carries the move table's three tabs plus two of its own; the other
-  // two do not mount the table at all, so anything that is not Flagged or Notes is Moves.
-  const movesTab: MoveTab = mobileTab === 'flagged' || mobileTab === 'notes' ? mobileTab : 'moves'
+  /*
+    The right column's second track: Book and Notes behind one tab row, with the composer
+    pinned *below* the pane rather than inside it.
+
+    `book` is keyed by the half-move count on the board, which is `cursor + 1` — the same
+    number the payload was built with — and it is only asked for while the board is on the
+    game: off it (`exploring`) the position is one the game never reached, so the game's own
+    map has nothing true to say about it and the Book tab drops out. A missing key is not an
+    empty state; `NotesTrack` renders no tab at all for it, which is the common case.
+  */
+  const notesTrack = (
+    <NotesTrack
+      book={exploring ? (exploredBook.data ?? null) : detail.book?.[String(boardIndex)]}
+      bookPly={analysisPly}
+      onPlayBookMove={playBookMove}
+      onPreviewBookMove={previewBookMove}
+      notes={noteList}
+      activeNoteId={editedNote?.id ?? null}
+      onSelectNote={selectNote}
+      composer={composer}
+      className={mobile ? 'flex-1' : undefined}
+    />
+  )
+
+  // The phone's strip is Moves · Eval · Engine · Notes now: Flagged has gone from it — the
+  // Eval tab already lists the curve's marks, under the curve that explains them — and Book
+  // joined Notes. Only `moves` mounts the table, so the tab it is told to draw is Moves
+  // unless something puts the strip back on a Flagged it can no longer reach itself.
+  const movesTab: MoveTab = mobileTab === 'flagged' ? 'flagged' : 'moves'
 
   const moveList = (
     <MoveList
@@ -1165,16 +1286,17 @@ function GameStudio({ gameId }: { gameId: number }) {
       onPinVariation={pinVariation}
       onUnpinVariation={unpinVariation}
       onSelectPly={selectPly}
-      notes={noteList}
       notedMoves={notedMoves}
-      onSelectNote={selectNote}
-      onAddNote={focusComposer}
-      // The phone promotes these three tabs into `MobileGameView`'s strip, so the table is
+      // The phone promotes the table's tabs into `MobileGameView`'s strip, so the table is
       // told which one to draw and its own row is switched off — that row is also where the
       // PGN affordance lives, which is why the phone header carries one.
       tab={mobile ? movesTab : undefined}
       showTabRow={!mobile}
-      className="min-h-0 flex-1"
+      // The moves/notes rule. It is the *only* line inside the right column — the engine
+      // band above draws none between its two cards and the graph below spans both tracks —
+      // which is what makes it read as the column boundary it is rather than as one of
+      // several nearly-agreeing verticals.
+      className={mobile ? 'min-h-0 flex-1' : 'min-h-0 border-r border-hairline'}
     />
   )
 
@@ -1189,7 +1311,9 @@ function GameStudio({ gameId }: { gameId: number }) {
       onPlayLine={playLine}
       previewLine={previewView.line}
       previewPly={previewView.ply}
-      className={mobile ? 'rounded-lg border border-hairline' : undefined}
+      // The column's last row, spanning both tracks. It brings its own top rule; on the
+      // phone it is a card in the Engine tab's stack instead.
+      className={mobile ? 'rounded-lg border border-hairline' : 'col-span-2'}
     />
   )
 
@@ -1227,7 +1351,7 @@ function GameStudio({ gameId }: { gameId: number }) {
           flaggedMoments={flaggedMoments}
           maiaPanel={maiaPanel}
           infinite={infinite}
-          composer={composer}
+          notesTrack={notesTrack}
         />
       </>
     )
@@ -1239,49 +1363,57 @@ function GameStudio({ gameId }: { gameId: number }) {
 
       <div ref={columnsRef} className="flex min-h-0 flex-1">
         {/*
-          Column floors are in `rem`, so at the app's scale the board never drops below
-          504 physical pixels and the move table never below 384 — both clear of the
-          420/280 the design set at 100 % for these two columns, now that there is no
-          third.
+          The board flush LEFT, as big as the height budget allows, and everything else in
+          one column to the right of it. That is the whole arrangement, and it is the owner's
+          own instruction: a centred board was proposed twice and rejected twice.
 
-          Which of the two takes the spare width is the whole point of the split. The move
-          table is a fixed thing to read — a move number and two SAN cells — and a room's
-          worth of it is whitespace, so it is the column that is *sized*: `grow-0` on
-          `movesWidth`, 26rem until somebody drags it. Everything left over is the board's
-          (`flex-1`), which is the one element on the page that is worth more the larger it
-          is. Growing sideways is not free, though: the board is square, so width is height,
-          and past a point it would push the transport row and the eval curve out of the
-          viewport — which is why `BoardPanel` caps it against `100vh` and centres what it
-          caps. The floors are unchanged.
+          Which column takes the spare width is what the split is for. The right column holds
+          things that are *read* — a move table, a book table, a note, an engine line — and
+          each of them has a width past which the extra room is whitespace, so it is the
+          column that is sized (`grow-0`, a basis per band). Everything left over is the
+          board's (`flex-1`), which is the one element on the page worth more the larger it
+          is. Growing sideways is not free: the board is square, so width is height, and past
+          a point it would push the transport row out of the viewport — which is why
+          `BoardPanel` caps itself against `100vh`.
 
-          Between those two floors the boundary is the reader's: the hairline is a
-          `ColumnSplitter`, and what it drags is `movesWidth` — held here in `rem` and
+          Between the two floors the boundary is the reader's: the hairline is a
+          `ColumnSplitter` and what it drags is `movesWidth`, held here in `rem` and
           remembered under `blunderbase.gameMovesWidth`. The splitter reports pointer travel
-          and nothing else, so the direction is decided in `resize`: rightwards is a
-          narrower move table. The floors are still the invariant. Every drag is clamped to
-          them against the row's measured width, and the `min-w` pair holds them again in
-          CSS for a width no drag produced. Until something is dragged there is no stored
-          width and the column keeps its own `basis-[26rem]`.
+          and nothing else, so the direction is decided in `resize`: rightwards is a narrower
+          right column and a bigger board. Every drag is clamped against the row's measured
+          width and this band's floors (`BANDS`), and the `min-w` classes hold the same
+          floors in CSS for a width no drag produced.
+
+          Below `xl` the board column has no floor of its own: the sidebar is still 200
+          design pixels there and the right column cannot go under a move row plus a book
+          row, so a board floor at 1024 would buy a horizontal scrollbar rather than a
+          bigger board. The board yields instead, and the two tracks survive — which is the
+          trade the design asks for (see the mockup's own note at its 768 band).
         */}
         <div
           data-testid="board-column"
           // `min-h-0` and `overflow-hidden`: the row is exactly the viewport's height and
           // the board in it is sized by its width, so a column that is allowed to grow past
-          // its box grows silently *below the fold* — which is where the eval curve and the
-          // composer's own save button used to end up. Clipped, an overrun is visible.
-          className="flex min-h-0 min-w-[26.25rem] flex-1 flex-col gap-3.5 overflow-hidden px-5 py-[1.125rem]"
+          // its box grows silently *below the fold* — which is where the transport row would
+          // end up. Clipped, an overrun is visible.
+          //
+          // Untouched, this column is exactly as wide as the board it holds — the panel's
+          // own `calc(100vh - 12.625rem)` plus the `px-5` on either side — and the right
+          // column takes everything else. That is what puts the splitter against the board's
+          // edge instead of at the end of a column padded out with slack the board declined
+          // to use, and it means every pixel the board does not want goes to the moves and
+          // the notes rather than to nothing. Drag the splitter once and the two swap roles:
+          // the right column takes the width the reader chose and this one flexes again, so
+          // an explicit choice still beats the default.
+          className={cn(
+            'flex min-h-0 min-w-0 flex-col gap-3.5 overflow-hidden px-5 py-[1.125rem]',
+            movesWidth === null
+              ? 'w-[calc(100vh-10.125rem)] max-w-full flex-none'
+              : 'flex-1 xl:min-w-[26.25rem]',
+          )}
         >
           {header}
           {board}
-          {/*
-            The composer sits to the right of the eval curve under the transport row, always: the
-            note on a position is read in the same glance as the position, and side by side
-            the pair costs no more height than the curve did alone.
-          */}
-          <div className="flex min-h-0 flex-1 gap-3.5">
-            {evalGraph}
-            {composer}
-          </div>
         </div>
 
         <ColumnSplitter
@@ -1292,29 +1424,62 @@ function GameStudio({ gameId }: { gameId: number }) {
           onReset={resetWidth}
         />
 
+        {/*
+          ONE grid, two tracks, four rows — not a stack of panels each arranging itself.
+          That is what puts the moves/notes rule and the engine band's own gap on the same
+          geometry, and it is why the column reads as a column rather than as four boxes:
+
+            row 1  the engine band, spanning both tracks (Maia 25 % / Stockfish 75 %,
+                   two cards with a gap and no rule between them)
+            row 2  the move table | the notes track, the one boundary that draws a line
+            row 3  the eval graph, spanning both tracks
+            row 4  the continuous-analysis footer, spanning both tracks
+
+          Row 2 is the only `1fr`: it is the row that should take the slack, because the move
+          table is a list and the three panels around it are fixed things.
+
+          The track widths are the design's, converted: 340/300/250 *design* pixels over 16
+          to `rem`, which the 120 % root renders as 408/360/300 physical pixels. A literal
+          `250px` track would be 208 design pixels here and a move row — number, two move
+          cells, two clocks — does not fit in it. The bands themselves are physical pixels,
+          because media queries do not scale with the root.
+
+          The two tracks never fold into one. Stacking the notes under the move table costs
+          the table the height it needs far sooner than a narrow track costs it width.
+        */}
         <div
+          ref={rightRef}
           data-testid="moves-column"
           className={cn(
-            'flex min-w-[20rem] grow-0 flex-col',
-            movesWidth === null && 'basis-[26rem]',
+            'grid min-h-0 min-w-[26.875rem] grow-0',
+            'grid-cols-[15.625rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto_auto]',
+            'xl:min-w-[31.75rem] xl:grid-cols-[18.75rem_minmax(0,1fr)]',
+            'min-[100rem]:min-w-[35.25rem] min-[100rem]:grid-cols-[21.25rem_minmax(0,1fr)]',
+            // Untouched, this column takes everything the board column does not: the board
+            // is bounded by the height left after its chrome, and whatever width that leaves
+            // belongs here rather than to empty padding. The `min-w-*` above are the floors
+            // that keep a move row and a notes track legible; below those the board gives
+            // way instead. Dragged, the reader's width wins and the board column flexes.
+            movesWidth === null ? 'flex-1' : 'grow-0',
           )}
           style={movesWidth === null ? undefined : { flexBasis: `${movesWidth}rem` }}
         >
           {maiaPanel}
           {moveList}
           {/*
+            Book and Notes behind one tab row, with the composer pinned below the pane: a
+            note is about the position on the board, so the box it is written in must not
+            move when the pane above it changes what it is showing.
+          */}
+          {notesTrack}
+          {evalGraph}
+          {/*
             The whole line, not its first move: `onHoverLine` replaces the single arrow
             `onHoverMove` drew here, and the preview it feeds is what the board shows. The
-            box above reports the same three gestures from its engine rows, into the same
-            state — the ids are what keeps the two apart.
+            engine band reports the same three gestures from its own rows, into the same
+            state — the namespaced ids are what keeps the two apart.
           */}
           {infinite}
-          {/*
-            Two panels, two different claims about the same position: the live search says
-            what an engine is finding right now, and the box at the top of the column says
-            what the stored run concluded and what a human of this rating would play. The
-            deep-analysis trigger lives in the board's transport row now, rather than here.
-          */}
         </div>
       </div>
     </>

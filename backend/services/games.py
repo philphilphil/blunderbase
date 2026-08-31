@@ -63,6 +63,16 @@ CARD_WORST_MOMENTS = 5
 # How many games a card backfill rebuilds before it commits and lets go of the write lock.
 CARD_BACKFILL_CHUNK = 200
 
+# How deep into a game its shipped book looks. `explorer.MAX_BOOK_DEPTH` gives up at 40
+# plies from the start and the deepest line two of the owner's games ever shared on a real
+# 9.5k library was ply 18, so thirty is headroom over anything a repertoire reaches while
+# still bounding what one game asks about to thirty positions.
+BOOK_MAX_PLY = 30
+
+# Continuations kept per ply. The panel that reads them is a four-column strip a few rows
+# tall; the whole tree is the explorer page's job, and it is one click away.
+BOOK_MAX_MOVES = 6
+
 
 @dataclass(slots=True)
 class GameFilters:
@@ -245,13 +255,18 @@ def get_game_detail(
     *,
     ply_range: tuple[int, int] | None = None,
     include_notes: bool = True,
+    include_book: bool = True,
 ) -> dict[str, Any] | None:
-    """One game as the coach reads it: moves, evals, Maia predictions and notes.
+    """One game as the coach reads it: moves, evals, Maia predictions, notes and book.
 
     Every ply carries the eval of the newest run that reaches it, a deep run beating a
     quick one for the plies it covers, so a deep pass over the endgame shows up as deep
     evals for the endgame and quick evals everywhere else. Maia's policy is merged the
     same way but separately, because it usually arrives from a run of its own.
+
+    `book` is the explorer's answer for the positions this game stood in, keyed by ply and
+    carried *with* the game rather than fetched as the reader steps through it — see
+    `game_book` for why that direction, and for why most games carry only a handful of keys.
     """
     game = session.get(Game, game_id)
     if game is None:
@@ -272,9 +287,76 @@ def get_game_detail(
         "moves": moves,
         "runs": [_run_summary(run) for run in runs],
     }
+    if include_book:
+        detail["book"] = game_book(session, game_id, ply_range=ply_range)
     if include_notes:
         detail["notes"] = game_notes(session, game_id)
     return detail
+
+
+def game_book(
+    session: Session, game_id: int, *, ply_range: tuple[int, int] | None = None
+) -> dict[int, dict[str, Any]]:
+    """The owner's own book along one game: ply -> the tree of the position *before* it.
+
+    Keyed by ply and shipped with the game on purpose. The alternative — a request per
+    position as the reader steps — is a fetch per keystroke, which is the exact shape that
+    took the server down once already (the stampede in `docs`' meltdown history), and it
+    would refetch the same dozen answers every time somebody walked back and forth through
+    an opening. Shipping them costs almost nothing because there are almost never many:
+    `0017_explorer_book`'s own figure is that 452k of 463k positions in a real library are
+    reached by exactly one game, and a position one game reached is not book, so a game
+    carries entries for its opening and nothing after it.
+
+    Two caps keep the work bounded whatever the game. Only plies up to `BOOK_MAX_PLY` are
+    even looked at — `explorer.book_walk` gives up at 40 plies from the start and on a real
+    library the deepest line two games ever shared was ply 18, so past thirty there is
+    nothing to find and asking is pure cost. And each entry keeps `BOOK_MAX_MOVES`
+    continuations, which is what the panel can draw; the explorer page is where the whole
+    tree lives.
+
+    The gate is `explorer.position_books`: at least two of the owner's games reached the
+    position. Everything below that produces no key at all rather than an empty one, so a
+    game whose positions are all singletons costs the three statements that establish
+    exactly that — its plies, their positions, and how many games reached them — and adds
+    nothing to the payload.
+
+    Unfiltered by colour, like the explorer's own default view: "have I been here before"
+    is a question about the owner's whole library, and the position's side to move already
+    says whose choice a continuation was.
+
+    A window narrows the book to it, one ply wider at the top end: the moves `ply_range`
+    asks for run `start`..`end`, but the board can stand on the position *after* the last
+    of them, and that position is book like any other.
+    """
+    # Imported inside the call: `services.explorer` builds its trees out of this module's
+    # outcome and summary helpers, so the two can only meet here, the way `explorer` itself
+    # reaches `services.notes`.
+    from backend.services import explorer as explorer_service
+
+    start, end = 0, BOOK_MAX_PLY
+    if ply_range is not None:
+        start = max(ply_range[0], 0)
+        end = min(max(ply_range[1], 0) + 1, BOOK_MAX_PLY)
+    if start > end:
+        return {}
+
+    rows = session.execute(
+        select(GamePosition.ply, GamePosition.position_id).where(
+            GamePosition.game_id == game_id,
+            GamePosition.ply >= start,
+            GamePosition.ply <= end,
+        )
+    ).all()
+    if not rows:
+        return {}
+
+    books = explorer_service.position_books(
+        session, [position_id for _ply, position_id in rows], limit=BOOK_MAX_MOVES
+    )
+    # A game that repeats a position gets the same entry under both plies, which is what a
+    # reader stepping through it should see: the tree belongs to the position, not the ply.
+    return {ply: books[position_id] for ply, position_id in rows if position_id in books}
 
 
 def analysis_runs(session: Session, game_id: int, done_only: bool = True) -> list[AnalysisRun]:

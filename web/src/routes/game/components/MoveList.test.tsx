@@ -456,7 +456,7 @@ describe('MoveList', () => {
   })
 
   it('draws the tab a caller names, and hides the row when the caller owns the tabs', () => {
-    // What the phone layout does: the three tabs are promoted into a strip of its own
+    // What the phone layout does: the tabs are promoted into a strip of its own
     // (`MobileGameView`), so the table is told which one to draw and its row goes.
     // The filter keeps whole move *pairs*, so the blunder goes in the second pair — with
     // it in the first, "e4" would still be on screen as the white half of a kept row.
@@ -488,4 +488,69 @@ describe('MoveList', () => {
     expect(screen.getByText('e4')).toBeInTheDocument()
   })
 
+  it('offers only Moves and Flagged — notes have a track of their own now', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')])
+    expect(screen.getByRole('button', { name: /^Moves/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Flagged/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Notes/ })).not.toBeInTheDocument()
+    // The plies count and the PGN affordance stay put beside them.
+    expect(screen.getByText('2 plies')).toBeInTheDocument()
+  })
+
+  describe('the clock column', () => {
+    // `clock` on a move is the reading *after* it; what the column shows is the mover's own
+    // previous reading, `ply - 2` — the same convention `services/stats.py` counts time
+    // trouble by. White starts on 3:00 and burns it; Black barely moves.
+    const clocked = () => [
+      move(0, 'e4', { clock: 178 }),
+      move(1, 'c5', { clock: 179 }),
+      move(2, 'Nf3', { clock: 139 }),
+      move(3, 'e6', { clock: 175 }),
+      move(4, 'd4', { clock: 19 }),
+      move(5, 'cxd4', { clock: 170 }),
+      move(6, 'Nxd4', { clock: 8 }),
+      move(7, 'g6', { clock: 166 }),
+    ]
+
+    const clocks = () =>
+      screen.getAllByTestId('move-clock').map((cell) => cell.textContent)
+
+    it('shows what the mover had left before playing, not after', () => {
+      renderList(clocked())
+      // Move 1 has no earlier reading of its own (the row does not carry the initial time),
+      // move 2 shows ply 0's 2:58 / ply 1's 2:59, move 3 shows ply 2's 2:19 / ply 3's 2:55.
+      expect(clocks()).toEqual(['', '', '2:58', '2:59', '2:19', '2:55', '0:19', '2:50'])
+    })
+
+    it('colours a reading under twenty seconds in the mistake token', () => {
+      renderList(clocked())
+      const cells = screen.getAllByTestId('move-clock')
+      // 0:19 is White's fourth move; the 2:50 beside it is not in trouble.
+      expect(cells[6]).toHaveTextContent('0:19')
+      expect(cells[6]!.className).toContain('text-mistake')
+      expect(cells[7]!.className).toContain('text-faint')
+    })
+
+    it('draws no column at all for a game played without clocks', () => {
+      renderList([move(0, 'e4'), move(1, 'd5')])
+      expect(screen.queryAllByTestId('move-clock')).toHaveLength(0)
+    })
+
+    it('keeps a reading whose own move is folded away behind the opening', () => {
+      // The reading shown against move 11 belongs to move 10, which the fold has taken off
+      // screen — it is read off every pair, not the ones left after filtering.
+      const moves = longGame().map((row, index) => ({ ...row, clock: 300 - index * 5 }))
+      renderList(moves, { collapsedThrough: 10 })
+      // Move 11's white cell: ply 20, so ply 18's reading — 300 - 18 * 5 = 210s = 3:30.
+      expect(clocks()[0]).toBe('3:30')
+    })
+  })
+
+  it('marks a noted move with the note icon rather than the old dot', () => {
+    renderList([move(0, 'e4'), move(1, 'd5')], { notedMoves: new Set([1]) })
+    const cellOf = (san: string) => screen.getByText(san).closest('button')!
+    expect(cellOf('d5')).toHaveAttribute('title', '1…d5 — noted')
+    expect(cellOf('d5').querySelector('svg')).not.toBeNull()
+    expect(cellOf('e4').querySelector('svg')).toBeNull()
+  })
 })

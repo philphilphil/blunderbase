@@ -416,6 +416,115 @@ def test_game_detail_narrows_to_a_ply_range(analysed: Library) -> None:
     assert detail["ply_range"] == [6, 8]
 
 
+def test_game_detail_ships_the_book_of_the_positions_the_library_repeats(
+    analysed: Library,
+) -> None:
+    """The book rides along with the game, keyed by the ply its position sits before.
+
+    The fixture's first game is a Ruy Lopez the library plays twice, so the first six
+    positions of it are book and everything after 3…a6 is the owner's alone.
+    """
+    session = analysed.session
+    detail = games_service.get_game_detail(session, analysed["qg000001"].id)
+    assert detail is not None
+    book = detail["book"]
+
+    assert sorted(book) == [0, 1, 2, 3, 4, 5]
+    assert book[0]["games"] == 6
+    assert book[0]["score"] == 0.75
+    assert [(move["san"], move["games"]) for move in book[0]["moves"]] == [("e4", 5), ("d4", 1)]
+    # A tie between two continuations goes to the move that sorts first, as in the explorer.
+    assert [(move["san"], move["games"]) for move in book[4]["moves"]] == [("Bb5", 2), ("Bc4", 2)]
+    # Nothing comes back empty: a key means there is something to draw under it.
+    assert all(entry["moves"] for entry in book.values())
+
+    # And it is the explorer's own answer for the same position, quantity for quantity —
+    # the two screens read one fold. Only what a per-position *page* adds is missing.
+    page = explorer.opening_explorer(session, fen=AFTER_E4_E5)["moves"]
+    assert book[2]["moves"] == [
+        {key: value for key, value in node.items() if key not in {"eco", "name", "note"}}
+        for node in page
+    ]
+    assert book[2]["moves"][0]["avg_win_loss"] is not None
+
+
+def test_the_shipped_book_stops_where_a_position_stops_repeating(library: Library) -> None:
+    """Two of the owner's games is the cut, and it is the position's count that decides."""
+    session = library.session
+    game = library["qg000001"]
+    book = games_service.game_book(session, game.id)
+
+    assert max(book) == 5
+    assert book[5]["games"] == 2
+    assert 6 not in book
+
+    # Not because the position after 3…a6 has nothing to say — it has a continuation and a
+    # game standing in it. It is left out because only one game ever stood there.
+    after_a6 = session.scalars(
+        select(GamePosition.position_id).where(
+            GamePosition.game_id == game.id, GamePosition.ply == 6
+        )
+    ).one()
+    assert [move["san"] for move in explorer.position_books(
+        session, [after_a6], min_games=1
+    )[after_a6]["moves"]] == ["Ba4"]
+    assert explorer.position_books(session, [after_a6]) == {}
+
+
+def test_a_game_nothing_else_repeats_ships_no_book_for_three_queries(session: Session) -> None:
+    """The common case, and it has to be free: one game, so every position is a singleton.
+
+    Of 463k positions in a real library 452k are reached by exactly one game, so this is
+    what most plies of most games look like. Three statements settle the whole game — the
+    plies it stood on, the positions they name, and how many games reached those — and
+    nothing folds.
+    """
+    session.add(Account(platform=Platform.LICHESS, username=OWNER, is_owner=True))
+    session.commit()
+    job = run_import(session, Source.PGN, text=TRANSPOSED_PGN, analyze=False)
+    assert job.games_imported == 1, job.errors
+    game = session.scalars(select(Game)).one()
+
+    with counting_statements(session) as statements:
+        book = games_service.game_book(session, game.id)
+
+    assert book == {}
+    assert len(statements) == 3
+    detail = games_service.get_game_detail(session, game.id)
+    assert detail is not None and detail["book"] == {}
+
+
+def test_the_shipped_book_reads_the_same_built_or_cold(
+    library: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The stored book is a cache, so the strip must not be able to tell which path answered.
+
+    Six games clear no real hotness threshold, so it is lowered to put the opening positions
+    on the built side of the cut and leave the deeper ones cold — which makes both paths,
+    and a game that runs through the two of them, part of the comparison.
+    """
+    session = library.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    cold = games_service.game_book(session, library["qg000001"].id)
+    assert cold
+
+    while explorer.rebuild_position_books(session):
+        pass
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_BUILT
+
+    assert games_service.game_book(session, library["qg000001"].id) == cold
+
+
+def test_the_shipped_book_follows_a_ply_window(analysed: Library) -> None:
+    """A windowed request carries the book of the positions that window can stand on —
+    which is one more than the moves it lists, because the board can sit after the last."""
+    detail = games_service.get_game_detail(
+        analysed.session, analysed["qg000001"].id, ply_range=(2, 4)
+    )
+    assert detail is not None
+    assert sorted(detail["book"]) == [2, 3, 4, 5]
+
+
 def test_game_detail_gathers_notes_on_the_game_and_on_its_positions(library: Library) -> None:
     session = library.session
     game = library["qg000001"]

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
 import type { ImportJob } from '@/lib/api/types'
+import { EventsProvider } from '@/lib/events/EventsProvider'
 
 import { ImportPage } from './ImportPage'
 
@@ -64,11 +65,18 @@ function urlsFor(path: string): string[] {
     .filter((url) => url.split('?')[0] === path)
 }
 
+/**
+ * `Providers` no longer carries the `/events` socket — it hangs inside `AuthGate`, so a
+ * signed-out browser never dials it. A test that mounts a page on its own is standing in
+ * for the authenticated side of that gate, so it supplies the provider the gate would.
+ */
 function renderPage(ui: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <EventsProvider>
+        <MemoryRouter>{ui}</MemoryRouter>
+      </EventsProvider>
     </Providers>,
   )
 }
