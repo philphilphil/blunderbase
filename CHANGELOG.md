@@ -4,6 +4,17 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.9.0 — 2026-08-31
+
+- Added a desktop app with native integrations
+- Changed the game screen to a bigger board with one column beside it
+- Added the opening book beside the board, per position
+- Added per-move clock times to the move list
+- Changed the opening explorer to read from a precomputed book
+- Changed the Stats page to load from a single read
+- Fixed backfill estimates stopping partway through
+- Fixed the analysis queue miscounting running against waiting
+
 ## v0.8.3 — 2026-08-30
 
 - Fixed heavy dashboard traffic starving the server during backfills
