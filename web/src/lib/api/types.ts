@@ -10,8 +10,8 @@ export type Extra = Record<string, unknown>
 
 // --- enums (backend/db/enums.py) ------------------------------------------
 
-export type Source = 'lichess' | 'chesscom' | 'pgn' | 'manual'
-export type Platform = 'lichess' | 'chesscom' | 'otb'
+export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual'
+export type Platform = 'lichess' | 'chesscom' | 'fics' | 'otb'
 export type Color = 'white' | 'black'
 export type Result = '1-0' | '0-1' | '1/2-1/2' | '*'
 export type Speed = 'bullet' | 'blitz' | 'rapid' | 'classical' | 'correspondence'
@@ -22,7 +22,7 @@ export type Classification = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blund
 export type EngineKind = 'uci' | 'maia'
 export type Outcome = 'win' | 'loss' | 'draw'
 
-export const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'pgn', 'manual']
+export const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'fics', 'pgn', 'manual']
 export const SPEEDS: readonly Speed[] = [
   'bullet',
   'blitz',

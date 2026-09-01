@@ -159,6 +159,7 @@ class ImportAdapter(Protocol):
 SOURCES: dict[str, str] = {
     Source.LICHESS: "backend.adapters.lichess:run",
     Source.CHESSCOM: "backend.adapters.chesscom:run",
+    Source.FICS: "backend.adapters.fics:run",
     Source.PGN: "backend.adapters.pgn_import:run",
 }
 

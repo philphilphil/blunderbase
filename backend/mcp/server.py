@@ -170,7 +170,7 @@ def _register_convenience(server: MCPServer, coach: Coach) -> None:
     ) -> TextContent:
         """The owner's newest games as compact cards: result, colour, opponent and
         rating, opening, the eval curve as [ply, win%] pairs, and the worst moments with
-        their classifications. `platform` is lichess, chesscom, pgn, manual or otb;
+        their classifications. `platform` is lichess, chesscom, fics, pgn, manual or otb;
         `time_control` is either a speed (blitz) or a literal clock (300+3)."""
         count = args.capped(amount, DEFAULT_GAMES, MAX_GAMES)
         speed, literal = args.time_control(time_control)
@@ -371,9 +371,9 @@ def _register_accounts(server: MCPServer, coach: Coach) -> None:
     @server.tool()
     @guarded
     def register_account(platform: str, username: str) -> TextContent:
-        """Tell the database that a username on `lichess` or `chesscom` is one the owner
-        plays under, and claim the games already stored under it. This is the fix when
-        games come back with no colour, opponent or rating: they were imported before any
+        """Tell the database that a username on `lichess`, `chesscom`, or `fics` is one
+        the owner plays under, and claim the games already stored under it. This is the fix
+        when games come back with no colour, opponent or rating: they were imported before any
         account named their owner. Safe to repeat — a game whose side is already known
         keeps it."""
         kind = args.member(Platform, platform, "platform")

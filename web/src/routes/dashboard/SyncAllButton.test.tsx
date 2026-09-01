@@ -77,15 +77,17 @@ describe('syncTargets — which accounts a press should re-sync', () => {
     expect(syncTargets([job({ id: 4, source: 'pgn', message: 'export.pgn' })])).toEqual([])
   })
 
-  it('returns one target per source, lichess first', () => {
+  it('returns one target per source in platform order', () => {
     expect(
       syncTargets([
         job({ id: 5, source: 'chesscom', message: 'phib_cc' }),
         job({ id: 6, source: 'lichess', message: 'phib' }),
+        job({ id: 7, source: 'fics', message: 'phib_fics' }),
       ]),
     ).toEqual([
       { source: 'lichess', username: 'phib' },
       { source: 'chesscom', username: 'phib_cc' },
+      { source: 'fics', username: 'phib_fics' },
     ])
   })
 })

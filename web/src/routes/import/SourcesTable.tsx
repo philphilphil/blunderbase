@@ -1,5 +1,5 @@
 /**
- * Where games come from: three rows, one per source.
+ * Where games come from: one row per source.
  *
  * This was three cards the height of dashboard tiles, and a dashboard is what they were
  * borrowed from — a shape for a screen you read, not one you press Sync on and leave. The
@@ -45,7 +45,7 @@ export function SourcesTable({
 }: {
   accounts: AccountSummary[]
   /** The newest job per source, which is what a row's "last sync" and username come from. */
-  latestOf: (source: 'lichess' | 'chesscom' | 'pgn') => ImportJob | undefined
+  latestOf: (source: 'lichess' | 'chesscom' | 'fics' | 'pgn') => ImportJob | undefined
   progress: ImportProgressState
 }) {
   const [since, setSince] = useState('')
@@ -120,6 +120,13 @@ export function SourcesTable({
             account={accounts.find((account) => account.platform === 'chesscom')}
             lastJob={latestOf('chesscom')}
             progress={progress.chesscom}
+            options={options}
+          />
+          <AccountRow
+            source="fics"
+            account={accounts.find((account) => account.platform === 'fics')}
+            lastJob={latestOf('fics')}
+            progress={progress.fics}
             options={options}
           />
           <PgnRow

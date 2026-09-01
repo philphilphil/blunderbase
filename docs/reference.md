@@ -162,7 +162,7 @@ docker compose -f docker/docker-compose.yml up -d blunderbase
 
 ## Commands
 
-`uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`,
+`uv run blunderbase …` — `serve`, `import <lichess|chesscom|fics|pgn> …`,
 `accounts <list|add|reconcile>`, `analyze` (queue a
 tier and drain it in this process), `mcp [--transport stdio|http]`, `set-password`,
 `db upgrade`, `db backup`, `db restore`, `db rebuild-cards`, `db rebuild-stats`,

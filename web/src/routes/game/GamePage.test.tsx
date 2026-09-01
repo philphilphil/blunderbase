@@ -431,6 +431,12 @@ describe('GamePage', () => {
     expect(within(black!).getByTitle('2 blunders')).toHaveTextContent(/^2$/)
     expect(within(white!).getByText('??')).toBeInTheDocument()
     expect(within(white!).getByTitle('Average centipawn loss')).toHaveTextContent(/^ACPL$/)
+    const tally = within(white!).getByTitle('0 blunders').parentElement!
+    expect(
+      Array.from(tally.children)
+        .map((cell) => cell.getAttribute('title'))
+        .filter(Boolean),
+    ).toEqual(['0 blunders', '1 inaccuracies', '1 mistakes', 'Average centipawn loss'])
     expect(summary.compareDocumentPosition(plot)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 

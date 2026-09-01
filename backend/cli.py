@@ -74,9 +74,9 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     imports.add_argument(
         "target",
         nargs="?",
-        help="the PGN file to read (pgn) or the account to sync (lichess, chesscom)",
+        help="the PGN file to read (pgn) or the account to sync (lichess, chesscom, fics)",
     )
-    imports.add_argument("--username", help="the account to sync (lichess, chesscom)")
+    imports.add_argument("--username", help="the account to sync (lichess, chesscom, fics)")
     imports.add_argument("--path", help="the PGN file to read (pgn)")
     imports.add_argument("--since", help="resume from this cursor instead of the stored one")
     imports.add_argument("--max-games", type=_positive_int, metavar="N", help="stop after N games")

@@ -28,6 +28,7 @@ from backend.services import stats as stats_service
 PLATFORM_FOR_SOURCE: dict[Source, Platform] = {
     Source.LICHESS: Platform.LICHESS,
     Source.CHESSCOM: Platform.CHESSCOM,
+    Source.FICS: Platform.FICS,
 }
 
 SOURCE_FOR_PLATFORM: dict[Platform, Source] = {

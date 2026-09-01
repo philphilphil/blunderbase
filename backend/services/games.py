@@ -38,6 +38,7 @@ OUTCOMES = (WIN, LOSS, DRAW)
 PLATFORM_FOR_SOURCE: dict[Source, Platform] = {
     Source.LICHESS: Platform.LICHESS,
     Source.CHESSCOM: Platform.CHESSCOM,
+    Source.FICS: Platform.FICS,
 }
 
 # A deep pass is the better answer wherever it reaches; a quick pass fills in the rest.

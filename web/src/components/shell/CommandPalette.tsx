@@ -107,7 +107,7 @@ const PAGES: PageRoute[] = [
   { label: 'Maia', hint: 'human levels and when they run', icon: Gauge, to: '/analysis/maia' },
   {
     label: 'Import',
-    hint: 'lichess, chess.com and PGN',
+    hint: 'lichess, chess.com, FICS and PGN',
     icon: Database,
     to: '/library/import',
   },

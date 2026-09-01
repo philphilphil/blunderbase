@@ -11,7 +11,7 @@ synchronization, and data-ownership model is defined in
 
 ```
 backend/
-  adapters/   # network- and process-facing: lichess, chesscom, pgn_import, stockfish, maia, pool
+  adapters/   # network- and process-facing: lichess, chesscom, fics, pgn_import, engines
   db/         # models, engine/session factory, Alembic wiring
   services/   # ALL business logic
   workers/    # background analysis queue
@@ -103,6 +103,7 @@ rather than to the `Engine` class, so it reaches that engine's connections and n
 SOURCES = {
     "lichess": "backend.adapters.lichess:run",
     "chesscom": "backend.adapters.chesscom:run",
+    "fics": "backend.adapters.fics:run",
     "pgn": "backend.adapters.pgn_import:run",
 }
 ```

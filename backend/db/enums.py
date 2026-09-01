@@ -12,6 +12,7 @@ class Source(StrEnum):
 
     LICHESS = "lichess"
     CHESSCOM = "chesscom"
+    FICS = "fics"
     PGN = "pgn"
     MANUAL = "manual"
 
@@ -21,6 +22,7 @@ class Platform(StrEnum):
 
     LICHESS = "lichess"
     CHESSCOM = "chesscom"
+    FICS = "fics"
     OTB = "otb"
 
 

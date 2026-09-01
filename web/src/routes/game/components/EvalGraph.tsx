@@ -292,11 +292,17 @@ export function EvalGraph({
  * already uses for it. The glyphs are what make two whole players fit on one header line;
  * the words they stand for are spelled out in the group's accessible name.
  */
-const TALLY_GLYPHS: readonly { field: 'blunder' | 'mistake' | 'inaccuracy'; plural: string }[] = [
-  { field: 'blunder', plural: 'blunders' },
-  { field: 'mistake', plural: 'mistakes' },
-  { field: 'inaccuracy', plural: 'inaccuracies' },
-]
+type TallyField = 'blunder' | 'mistake' | 'inaccuracy'
+
+const TALLY_PLURALS: Record<TallyField, string> = {
+  blunder: 'blunders',
+  mistake: 'mistakes',
+  inaccuracy: 'inaccuracies',
+}
+
+/** Spoken worst-first; visual row-major order produces the two requested columns. */
+const TALLY_A11Y: readonly TallyField[] = ['blunder', 'mistake', 'inaccuracy']
+const TALLY_LAYOUT: readonly TallyField[] = ['blunder', 'inaccuracy', 'mistake']
 
 /**
  * What the pointer is over: the move, and what the engine made of the position after it.
@@ -391,7 +397,7 @@ function PlayerTally({
   return (
     <div
       role="group"
-      aria-label={`${name}: ${TALLY_GLYPHS.map(({ field, plural }) => quantity(row[field], plural)).join(', ')}, ${acplProse}`}
+      aria-label={`${name}: ${TALLY_A11Y.map((field) => quantity(row[field], TALLY_PLURALS[field])).join(', ')}, ${acplProse}`}
       className="flex min-w-0 flex-col items-center gap-[0.15625rem] text-[0.65625rem]"
     >
       <span className="flex min-w-0 max-w-full items-center gap-1.5">
@@ -407,10 +413,10 @@ function PlayerTally({
         the one figure with no mark of its own, and it is already the compact form.
       */}
       <span className="grid grid-cols-[auto_1fr_auto_1fr] items-baseline gap-x-[0.3125rem] gap-y-[0.09375rem]">
-        {TALLY_GLYPHS.map(({ field, plural }) => (
+        {TALLY_LAYOUT.map((field) => (
           <Fragment key={field}>
             <span
-              title={quantity(row[field], plural)}
+              title={quantity(row[field], TALLY_PLURALS[field])}
               className={cn(
                 'text-right font-mono font-semibold tabular',
                 row[field] === 0 ? 'text-faint' : GLYPHS[field].textClass,

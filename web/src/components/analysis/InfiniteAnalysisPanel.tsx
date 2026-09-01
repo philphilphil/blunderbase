@@ -264,7 +264,15 @@ export function InfiniteAnalysisPanel({
     stepping.current = { hovered, prefs, onStepPreview }
   })
   const travel = useRef(0)
-  const showLines = lines.length > 0
+  // A live search reports its MultiPV ranks independently, so a fresh snapshot may carry
+  // only the first one or two. Geometry follows the user's selection, not that transient
+  // payload: every requested rank owns a slot before the engine has filled it.
+  const slotCount = stream.enabled ? stream.multipv : lines.length
+  const slots = Array.from(
+    { length: slotCount },
+    (_, index) => lines.find((line) => line.multipv === index + 1) ?? null,
+  )
+  const showLines = slots.length > 0
 
   useEffect(() => {
     const node = linesRef.current
@@ -407,23 +415,27 @@ export function InfiniteAnalysisPanel({
         </p>
       ) : null}
 
-      {phase === 'opening' || (phase === 'running' && lines.length === 0) ? (
-        // A "running" dot over an empty body reads as broken; three rows of the right
-        // height say the search has started and has not reported yet.
-        <div className="flex flex-col gap-1 px-3 pb-2.5" data-testid="infinite-analysis-pending">
-          {[0, 1, 2].map((row) => (
-            <Skeleton key={row} className="h-[1.625rem] w-full" />
-          ))}
-        </div>
-      ) : null}
-
       {showLines ? (
         <div
           ref={linesRef}
-          data-testid="infinite-analysis-lines"
+          data-testid={
+            lines.length === 0 && (phase === 'opening' || phase === 'running')
+              ? 'infinite-analysis-pending'
+              : 'infinite-analysis-lines'
+          }
           className="flex flex-col px-1.5 pb-1.5 font-mono text-[0.71875rem]"
         >
-          {lines.map((line) => {
+          {slots.map((line, index) => {
+            if (line === null) {
+              return (
+                <div
+                  key={`pending-${index + 1}`}
+                  className="flex h-[1.625rem] items-center px-1.5"
+                >
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              )
+            }
             // One replay per line, memoised on the position and the PV: the tokens, the peek
             // board and the surface's own preview all want the same walk, and a live engine
             // hands the panel a new snapshot several times a second.

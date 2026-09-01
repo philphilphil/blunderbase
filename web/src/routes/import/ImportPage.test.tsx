@@ -283,8 +283,8 @@ describe('ImportPage', () => {
     renderPage(<ImportPage />)
 
     expect(await screen.findByText('Nothing has been synced yet.')).toBeInTheDocument()
-    // Neither account is connected yet, so both buttons offer to connect rather than sync.
-    expect(screen.getAllByRole('button', { name: /Connect/ })).toHaveLength(2)
+    // No account is connected yet, so every account row offers Connect rather than Sync.
+    expect(screen.getAllByRole('button', { name: /Connect/ })).toHaveLength(3)
   })
 
   it('leaves the assistant config to its own page', async () => {
