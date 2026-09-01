@@ -40,6 +40,9 @@ export const queryKeys = {
     query,
   ],
 
+  library: (): QueryKey => ['library'],
+  backupEstimate: (): QueryKey => ['library', 'backup-estimate'],
+
   analysis: (): QueryKey => ['analysis'],
   queue: (): QueryKey => ['analysis', 'queue'],
   backfill: (tier: Tier): QueryKey => ['analysis', 'backfill', tier],

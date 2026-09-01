@@ -297,6 +297,8 @@ describe('ImportPage', () => {
 
     await screen.findByText('Sync history')
     expect(screen.queryByRole('button', { name: /Copy config/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Export PGN/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Reset imported Library/ })).not.toBeInTheDocument()
   })
 
   it('opens the per-game failures of a sync that lost games', async () => {

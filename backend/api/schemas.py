@@ -255,6 +255,20 @@ class GamesDeleted(BaseModel):
     import_jobs: int = 0
 
 
+class BackupEstimate(BaseModel):
+    """Approximate bytes in the consistent SQLite snapshot offered for download."""
+
+    estimated_bytes: int = Field(ge=0)
+
+
+class BackupPrepared(BaseModel):
+    """A verified snapshot ready for one native browser download."""
+
+    token: str
+    filename: str
+    bytes: int = Field(ge=0)
+
+
 class MoveRow(Payload):
     ply: int
     move_number: int | None = None

@@ -107,7 +107,7 @@ export function RecentGamesList() {
           className="flex-none"
           action={
             <Link
-              to="/import"
+              to="/library/import"
               className="rounded-md bg-accent-teal px-2.5 py-1 text-[0.6875rem] font-semibold text-accent-ink hover:bg-accent-hover"
             >
               Import games

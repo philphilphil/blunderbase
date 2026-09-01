@@ -12,10 +12,11 @@ from backend import __version__
 from backend.config import Settings, get_settings
 from backend.db.enums import JobStatus, Platform, Tier
 from backend.db.migrate import upgrade_to_head
-from backend.db.session import session_scope
+from backend.db.session import reset_engines, session_scope
 from backend.services import accounts as accounts_service
 from backend.services import analysis as analysis_service
 from backend.services import auth as auth_service
+from backend.services import backups as backups_service
 from backend.services import engines as engines_service
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
@@ -153,6 +154,18 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     )
     db_commands.add_parser(
         "rebuild-book", help="recompute the explorer's precomputed book over every position"
+    )
+    backup = db_commands.add_parser(
+        "backup", help="write an integrity-checked copy of the complete database"
+    )
+    backup.add_argument("output", type=Path, help="new .db file to create")
+    backup.add_argument("--force", action="store_true", help="replace an existing output file")
+    restore = db_commands.add_parser(
+        "restore", help="replace the database with an integrity-checked backup"
+    )
+    restore.add_argument("input", type=Path, help="backup .db file to restore")
+    restore.add_argument(
+        "--force", action="store_true", help="replace the configured database"
     )
 
     demo = commands.add_parser("demo", help="build an anonymous database for screenshots")
@@ -422,6 +435,36 @@ def command_set_password(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def command_db(args: argparse.Namespace, settings: Settings) -> int:
+    if args.db_command == "backup":
+        try:
+            copied = backups_service.backup_database(
+                settings.database_path, args.output, overwrite=args.force
+            )
+        except backups_service.BackupError as exc:
+            print(f"db backup: {exc}")
+            return 1
+        print(f"backup: {copied.path}")
+        print(
+            f"{copied.bytes} bytes, schema {copied.schema_revision}, sha256 {copied.sha256}"
+        )
+        return 0
+    if args.db_command == "restore":
+        # The CLI normally runs in its own process, but disposing here also makes repeated
+        # `main()` calls and embedded use stop holding the old database inode open.
+        reset_engines()
+        try:
+            copied = backups_service.restore_database(
+                args.input, settings.database_path, overwrite=args.force
+            )
+        except backups_service.BackupError as exc:
+            print(f"db restore: {exc}")
+            return 1
+        reset_engines()
+        print(f"restored: {copied.path}")
+        print(
+            f"{copied.bytes} bytes, schema {copied.schema_revision}, sha256 {copied.sha256}"
+        )
+        return 0
     if args.db_command == "upgrade":
         upgrade_to_head(settings)
         print(f"database at {settings.database_path} is at head")

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 
 from backend.api.deps import FiltersDep, SessionDep, SettingsDep, not_found, ply_range
 from backend.api.errors import ApiError
@@ -13,10 +13,28 @@ from backend.api.schemas import GameDetail, GameList, GamesDeleted, GamesWipe
 from backend.runtime import capabilities_for
 from backend.services import auth as auth_service
 from backend.services import games as games_service
+from backend.services import notes as notes_service
 
 router = APIRouter(prefix="/games", tags=["games"])
 
 MAX_PAGE = 200
+
+
+@router.get(
+    "/export",
+    summary="Export the complete game library as PGN",
+    response_class=Response,
+    responses={200: {"content": {"application/x-chess-pgn": {}}}},
+)
+def export_library(session: SessionDep) -> Response:
+    """Every game plus notes and saved lines, as a portable PGN download."""
+    return Response(
+        content=notes_service.export_library_pgn(session),
+        media_type="application/x-chess-pgn; charset=utf-8",
+        headers={
+            "content-disposition": 'attachment; filename="blunderbase-library.pgn"'
+        },
+    )
 
 
 @router.get("", response_model=GameList, summary="Search games")

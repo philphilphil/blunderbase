@@ -54,7 +54,7 @@ export function DashboardPage() {
             actions={
               <div className="flex items-center gap-2">
                 <Link
-                  to="/import"
+                  to="/library/import"
                   className="rounded-md border border-input px-2.5 py-[0.4375rem] text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
                 >
                   Import PGN

@@ -30,6 +30,9 @@ export const HelpPage = lazy(() =>
 export const ImportPage = lazy(() =>
   import('@/routes/import').then((route) => ({ default: route.ImportPage })),
 )
+export const LibraryManagePage = lazy(() =>
+  import('@/routes/import').then((route) => ({ default: route.LibraryManagePage })),
+)
 export const LivePage = lazy(() =>
   import('@/routes/live').then((route) => ({ default: route.LivePage })),
 )

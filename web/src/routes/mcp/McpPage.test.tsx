@@ -217,7 +217,7 @@ describe('McpPage', () => {
 
     expect(screen.getByRole('link', { name: 'Import some games' })).toHaveAttribute(
       'href',
-      '/import',
+      '/library/import',
     )
   })
 })

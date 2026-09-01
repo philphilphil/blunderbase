@@ -6,7 +6,6 @@ import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { useGames, useImportJobs, useProfile } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 
-import { LibraryManagement } from './LibraryManagement'
 import { SourcesTable } from './SourcesTable'
 import { SyncHistory } from './SyncHistory'
 import { useImportProgress } from './useImportProgress'
@@ -25,10 +24,9 @@ function newestFirst(jobs: ImportJob[] | undefined): ImportJob[] | undefined {
  * Import: connect an account, sync it, drop a PGN in, and read what every previous sync
  * did.
  *
- * Two tables and a strip, in the order the work happens: what games come from, what every
- * run of it did, and emptying the lot. No dedicated design turn; the table, badges and
- * chips are the ones the rest of the app uses. Assistant setup, which used to be filed
- * under the same heading, has a page of its own.
+ * Two tables in the order the work happens: what games come from, then what every run of
+ * it did. Export and reset live on Library → Manage, where those database-wide actions
+ * have a stable route and cannot be mistaken for another import source.
  */
 export function ImportPage() {
   const jobs = useImportJobs({ limit: HISTORY_LIMIT })
@@ -44,7 +42,9 @@ export function ImportPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: 'Import' }]} />
+      <SetPageChrome
+        breadcrumb={[{ label: 'Library', to: '/library' }, { label: 'Import' }]}
+      />
       <PageHeader
         title="Import"
         description={
@@ -64,8 +64,6 @@ export function ImportPage() {
       <SourcesTable accounts={accounts} latestOf={latestOf} progress={progress} />
 
       <SyncHistory jobs={history} isLoading={jobs.isPending} error={jobs.error} />
-
-      <LibraryManagement />
     </PageBody>
   )
 }

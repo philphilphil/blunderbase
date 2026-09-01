@@ -80,7 +80,7 @@ export function AppShell() {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return
       const target = event.target instanceof Element ? event.target : null
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
-      const route = event.shiftKey && event.key.toLowerCase() === 'i' ? '/import' : routes[event.key]
+      const route = event.shiftKey && event.key.toLowerCase() === 'i' ? '/library/import' : routes[event.key]
       if (!route) return
       event.preventDefault()
       navigate(route)

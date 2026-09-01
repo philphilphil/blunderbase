@@ -22,6 +22,7 @@ The rules worth knowing before reading the code:
 
 from __future__ import annotations
 
+import io
 import re
 from collections.abc import Iterable, Sequence
 from datetime import datetime
@@ -478,6 +479,35 @@ def export_notes(session: Session, notes: Sequence[Note], *, fmt: str = "md") ->
     return export_markdown(session, notes) if fmt == "md" else export_pgn(session, notes)
 
 
+def export_library_pgn(session: Session) -> str:
+    """Every stored game and portable annotation as one PGN document.
+
+    The game's stored PGN is the base, so source headers, clocks, comments and imported
+    variations survive. Blunderbase notes and saved lines are then added the same way the
+    notes-only export adds them. Position-only and free notes are appended as synthetic
+    games because otherwise a whole-library export would silently leave them behind.
+    """
+    games = list(session.scalars(select(Game).order_by(Game.played_at, Game.id)))
+    found = list(session.scalars(select(Note).order_by(Note.id)))
+    kept = list(session.scalars(select(Line).order_by(Line.game_id, Line.base_ply, Line.id)))
+    by_game, positions, free = _grouped(found)
+    annotations = {game.id: rows for game, rows in by_game}
+    lines: dict[int, list[Line]] = {}
+    for line in kept:
+        lines.setdefault(line.game_id, []).append(line)
+
+    exported = [
+        _pgn_for_library_game(
+            session, game, annotations.get(game.id, ()), lines=lines.get(game.id, ())
+        )
+        for game in games
+    ]
+    exported.extend(_pgn_for_position(note) for note in positions)
+    if free:
+        exported.append(_pgn_for_free_notes(free))
+    return _write_pgn(exported)
+
+
 def export_markdown(session: Session, notes: Sequence[Note]) -> str:
     """Notes as Markdown: one section per game, then loose positions, then free notes.
 
@@ -525,8 +555,6 @@ def export_pgn(session: Session, notes: Sequence[Note]) -> str:
     to nothing at all is a headerless game carrying only the comment — losing it on the way
     out would make an export a lossy backup, which is the one thing it must not be.
     """
-    import chess.pgn
-
     by_game, positions, free = _grouped(notes)
     games: list[chess.pgn.Game] = []
 
@@ -535,20 +563,8 @@ def export_pgn(session: Session, notes: Sequence[Note]) -> str:
     for note in positions:
         games.append(_pgn_for_position(note))
     if free:
-        loose = chess.pgn.Game()
-        loose.headers["Event"] = "Blunderbase notes"
-        loose.headers["White"] = "?"
-        loose.headers["Black"] = "?"
-        loose.headers["Result"] = "*"
-        loose.comment = "  ".join(_pgn_comment(note) for note in free)
-        games.append(loose)
-
-    # One exporter per game: a `StringExporter` accumulates, and `accept` hands back
-    # everything it has seen so far rather than only this game.
-    def written(game: chess.pgn.Game) -> str:
-        return game.accept(chess.pgn.StringExporter(headers=True, variations=True, comments=True))
-
-    return "\n\n".join(written(game) for game in games).rstrip() + "\n"
+        games.append(_pgn_for_free_notes(free))
+    return _write_pgn(games)
 
 
 # --- payloads --------------------------------------------------------------
@@ -815,7 +831,13 @@ def _san_line(base_ply: int, sans: Sequence[str]) -> str:
     return " ".join(out)
 
 
-def _pgn_for_game(session: Session, game: Game, notes: Sequence[Note]) -> Any:
+def _pgn_for_game(
+    session: Session,
+    game: Game,
+    notes: Sequence[Note],
+    *,
+    lines: Sequence[Line] | None = None,
+) -> Any:
     """One stored game with its notes as comments and its lines as variations."""
     import chess.pgn
 
@@ -833,7 +855,6 @@ def _pgn_for_game(session: Session, game: Game, notes: Sequence[Note]) -> Any:
     if game.opening_name:
         pgn_game.headers["Opening"] = game.opening_name
 
-    nodes: list[Any] = [pgn_game]
     node: Any = pgn_game
     for uci in game.moves_uci or ():
         try:
@@ -841,7 +862,39 @@ def _pgn_for_game(session: Session, game: Game, notes: Sequence[Note]) -> Any:
         except ValueError:
             break
         node = node.add_main_variation(move)
-        nodes.append(node)
+    return _annotate_pgn(session, game, notes, pgn_game, lines=lines)
+
+
+def _pgn_for_library_game(
+    session: Session, game: Game, notes: Sequence[Note], *, lines: Sequence[Line]
+) -> Any:
+    """A stored PGN with Blunderbase's annotations layered onto it.
+
+    Old or hand-built databases can contain a PGN python-chess cannot read even though
+    their normalized move lists are usable. Those fall back to the reconstruction used by
+    the notes export, so one malformed source document cannot abort a library download.
+    """
+    import chess.pgn
+
+    try:
+        parsed = chess.pgn.read_game(io.StringIO(game.pgn))
+    except Exception:
+        parsed = None
+    if parsed is None or parsed.errors:
+        return _pgn_for_game(session, game, notes, lines=lines)
+    return _annotate_pgn(session, game, notes, parsed, lines=lines)
+
+
+def _annotate_pgn(
+    session: Session,
+    game: Game,
+    notes: Sequence[Note],
+    pgn_game: Any,
+    *,
+    lines: Sequence[Line] | None = None,
+) -> Any:
+    """Add notes and kept variations to a PGN whose main line is the stored game."""
+    nodes = [pgn_game, *pgn_game.mainline()]
 
     on_lines: dict[int, list[Note]] = {}
     for note in notes:
@@ -851,13 +904,10 @@ def _pgn_for_game(session: Session, game: Game, notes: Sequence[Note]) -> Any:
         target = nodes[note.ply] if note.ply is not None and note.ply < len(nodes) else pgn_game
         target.comment = _joined(target.comment, _pgn_comment(note))
 
-    for line in get_lines(session, game.id):
+    for line in lines if lines is not None else get_lines(session, game.id):
         if line.base_ply >= len(nodes):
             continue
         branch: Any = nodes[line.base_ply]
-        # `add_variation` appends a sibling to whatever is already under the node, so the
-        # first move of the line becomes a variation of the mainline move and the rest
-        # continue under it — a real PGN variation rather than a second main line.
         variation_nodes = [branch]
         for uci in line.moves or ():
             try:
@@ -872,6 +922,32 @@ def _pgn_for_game(session: Session, game: Game, notes: Sequence[Note]) -> Any:
             target = variation_nodes[offset] if inside else variation_nodes[-1]
             target.comment = _joined(target.comment, _pgn_comment(note))
     return pgn_game
+
+
+def _pgn_for_free_notes(notes: Sequence[Note]) -> Any:
+    """Unanchored notes as a PGN entry, so a library export never drops them."""
+    import chess.pgn
+
+    loose = chess.pgn.Game()
+    loose.headers["Event"] = "Blunderbase notes"
+    loose.headers["White"] = "?"
+    loose.headers["Black"] = "?"
+    loose.headers["Result"] = "*"
+    loose.comment = "  ".join(_pgn_comment(note) for note in notes)
+    return loose
+
+
+def _write_pgn(games: Sequence[Any]) -> str:
+    """Write independent games without reusing the exporter's accumulating state."""
+    import chess.pgn
+
+    def written(game: Any) -> str:
+        exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+        return game.accept(exporter)
+
+    if not games:
+        return ""
+    return "\n\n".join(written(game) for game in games).rstrip() + "\n"
 
 
 def _pgn_for_position(note: Note) -> Any:

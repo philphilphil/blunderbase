@@ -43,6 +43,7 @@ from backend.db.models import (
 )
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
+from backend.services import backups as backups_service
 from backend.services import engines as engines_service
 from backend.services import import_service
 from backend.services import live as live_service
@@ -1392,6 +1393,62 @@ def test_notes_export_as_markdown_and_as_pgn(api: TestClient, seeded: dict[str, 
     assert "{ watch the c-file }" in pgn.text
 
     assert error_of(api.get("/notes/export", params={"format": "docx"})) == "invalid_request"
+
+
+def test_complete_library_exports_as_a_pgn_download(api: TestClient) -> None:
+    response = api.get("/games/export")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/x-chess-pgn")
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="blunderbase-library.pgn"'
+    )
+    assert response.text.count('[Event "') == 6
+    assert "Berlin endgames need work" in response.text
+
+
+def test_complete_database_download_is_a_verified_sqlite_backup(
+    api: TestClient, tmp_path: Path
+) -> None:
+    response = api.get("/library/backup")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/vnd.sqlite3")
+    assert "blunderbase-backup-" in response.headers["content-disposition"]
+    downloaded = tmp_path / "downloaded.db"
+    downloaded.write_bytes(response.content)
+    assert backups_service.verify_database(downloaded) == "0017_explorer_book"
+
+
+def test_database_backup_estimate_reports_the_snapshot_size(
+    api: TestClient, settings: Settings
+) -> None:
+    response = api.get("/library/backup/estimate")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "estimated_bytes": backups_service.estimate_database_bytes(settings.database_path)
+    }
+
+
+def test_database_backup_can_be_prepared_then_streamed(
+    api: TestClient, tmp_path: Path
+) -> None:
+    prepared = api.post("/library/backup/prepare")
+
+    assert prepared.status_code == 200
+    receipt = prepared.json()
+    assert receipt["filename"].startswith("blunderbase-backup-")
+    assert receipt["bytes"] > 0
+
+    response = api.get(f"/library/backup/prepared/{receipt['token']}")
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="{receipt["filename"]}"'
+    )
+    downloaded = tmp_path / "prepared.db"
+    downloaded.write_bytes(response.content)
+    assert backups_service.verify_database(downloaded) == "0017_explorer_book"
 
 
 def test_the_events_socket_sees_a_line_and_a_deletion(

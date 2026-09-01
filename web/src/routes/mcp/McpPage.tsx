@@ -112,7 +112,7 @@ export function McpPage() {
         </section>
 
         <p className="text-[0.6875rem] leading-[1.5] text-faint">
-          Nothing to query yet? <Link to="/import" className="text-accent-teal hover:text-accent-link">Import some games</Link> first — the
+          Nothing to query yet? <Link to="/library/import" className="text-accent-teal hover:text-accent-link">Import some games</Link> first — the
           coach only knows what the database holds.
         </p>
       </div>

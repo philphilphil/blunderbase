@@ -101,7 +101,7 @@ describe('SyncAllButton', () => {
 
   it('links to the import page when nothing has ever synced', () => {
     draw({ data: [] })
-    expect(screen.getByRole('link', { name: /connect account/i })).toHaveAttribute('href', '/import')
+    expect(screen.getByRole('link', { name: /connect account/i })).toHaveAttribute('href', '/library/import')
   })
 
   it('starts one import per previously synced account', async () => {

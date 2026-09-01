@@ -144,7 +144,7 @@ export function GamesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }]} />
+      <SetPageChrome breadcrumb={[{ label: 'Games', to: '/games' }]} />
 
       <div className="flex flex-none flex-col gap-3 border-b border-hairline px-5 pt-4 pb-3 max-md:px-3 max-md:pt-3">
         {/* Below `md` the search box takes a line of its own: at 375px it and the title
@@ -191,7 +191,7 @@ export function GamesPage() {
           ) : null}
 
           <Link
-            to="/import"
+            to="/library/import"
             className="rounded-md border border-edge-input px-2.5 py-1.5 text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
           >
             Import
@@ -266,7 +266,7 @@ function EmptyState({ active, onClear }: { active: number; onClear: () => void }
         </button>
       ) : (
         <Link
-          to="/import"
+          to="/library/import"
           className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
         >
           Go to import
