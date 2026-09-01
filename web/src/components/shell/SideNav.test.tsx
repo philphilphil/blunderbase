@@ -101,6 +101,29 @@ describe('the analysis navigation', () => {
   })
 })
 
+describe('the library navigation', () => {
+  it('keeps import and management folded away outside the Library', () => {
+    draw({ path: '/games' })
+
+    expect(screen.queryByRole('link', { name: 'Import' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Manage' })).not.toBeInTheDocument()
+  })
+
+  it('opens import and management as Library subpages', () => {
+    draw({ path: '/library/import' })
+
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '/library')
+    expect(screen.getByRole('link', { name: 'Import' })).toHaveAttribute(
+      'href',
+      '/library/import',
+    )
+    expect(screen.getByRole('link', { name: 'Manage' })).toHaveAttribute(
+      'href',
+      '/library/manage',
+    )
+  })
+})
+
 /** The same nav in the shape it takes below `md`, and the `onClose` it is handed. */
 function drawDrawer({ open = true, path = '/' }: { open?: boolean; path?: string } = {}) {
   stub('open', 0)
@@ -129,7 +152,7 @@ describe('the phone drawer', () => {
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Games' })).toHaveAttribute('href', '/games')
     expect(screen.getByRole('link', { name: 'Engines' })).toHaveAttribute('href', '/engines')
-    expect(screen.getByText('Library')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '/library')
   })
 
   it('unfolds the section it is opened in, the way the rail does', () => {

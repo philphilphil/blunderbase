@@ -223,6 +223,23 @@ export function useGame(
   })
 }
 
+/** The complete portable game library as a single PGN document. */
+export function useExportLibrary(options?: UseMutationOptions<Download, Error, void>) {
+  return useMutation({ mutationFn: () => api.exportLibrary(), ...options })
+}
+
+/** Cheap estimate for setting expectations before the native browser download begins. */
+export function useBackupEstimate() {
+  return useQuery({ queryKey: queryKeys.backupEstimate(), queryFn: api.getBackupEstimate })
+}
+
+/** Prepare the verified file; its receipt is then handed to a native browser download. */
+export function usePrepareBackup(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.prepareBackup>>, Error, void>,
+) {
+  return useMutation({ mutationFn: () => api.prepareBackup(), ...options })
+}
+
 /**
  * Empty the library after the confirmation appropriate to this runtime.
  *

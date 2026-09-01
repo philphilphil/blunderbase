@@ -2396,6 +2396,33 @@ def test_pgn_export_reads_back_as_pgn(library: Library) -> None:
     assert parsed[2].comment == "a plan for the month"
 
 
+def test_library_pgn_exports_every_game_with_original_headers_and_annotations(
+    library: Library,
+) -> None:
+    """The portable export is complete even when most games have no notes."""
+    import io
+
+    import chess.pgn
+
+    session = library.session
+    game = library["qg000001"]
+    notes.save_note(session, "the tempo goes here", ["plan"], game_id=game.id, ply=4)
+    notes.save_line(session, game.id, 3, ["d7d6", "d2d4"])
+
+    document = notes.export_library_pgn(session)
+    stream = io.StringIO(document)
+    parsed = []
+    while (entry := chess.pgn.read_game(stream)) is not None:
+        parsed.append(entry)
+
+    assert len(parsed) == len(library.by_source_id)
+    exported = next(entry for entry in parsed if entry.headers.get("Site", "").endswith("qg000001"))
+    assert exported.headers["WhiteElo"] == "1750"
+    assert any("the tempo goes here [plan]" in node.comment for node in exported.mainline())
+    branch = list(exported.mainline())[2]
+    assert [variation.san() for variation in branch.variations] == ["Nc6", "d6"]
+
+
 def test_an_unknown_export_format_is_refused(session: Session) -> None:
     with pytest.raises(ValueError, match="unknown export format"):
         notes.export_notes(session, [], fmt="docx")

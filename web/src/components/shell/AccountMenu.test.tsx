@@ -85,7 +85,7 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('menuitem', { name: /^settings$/i })).not.toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /connected accounts/i })).toHaveAttribute(
       'href',
-      '/import',
+      '/library/import',
     )
     expect(screen.getByRole('menuitem', { name: /^assistant$/i })).toHaveAttribute(
       'href',

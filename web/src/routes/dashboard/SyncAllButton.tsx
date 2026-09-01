@@ -99,7 +99,7 @@ export function SyncAllButton() {
 
   if (!jobs.isPending && targets.length === 0) {
     return (
-      <Link to="/import" className={BUTTON}>
+      <Link to="/library/import" className={BUTTON}>
         Connect account
       </Link>
     )

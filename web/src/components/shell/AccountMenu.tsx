@@ -121,7 +121,7 @@ export function AccountMenu() {
           </div>
           <div className="my-0.5 h-px bg-hairline" />
 
-          <Link to="/import" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
+          <Link to="/library/import" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <Users className="size-3.5" aria-hidden />
             Connected accounts
           </Link>

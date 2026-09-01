@@ -114,12 +114,59 @@ Everything else out of range is clamped rather than refused, so what a save answ
 what is in force. Budgets and thresholds apply to runs from then on; a game already
 analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 
+## Export, backup and restore
+
+**Library → Manage → Export PGN** downloads every stored game in one
+`blunderbase-library.pgn`. Original PGN headers, comments and variations are preserved;
+Blunderbase notes are comments and saved lines are variations. This is the portable copy
+for chess software. It is not a lossless application backup: PGN cannot carry engine
+evaluations, accounts, analysis settings or import cursors.
+
+**Library → Manage → Download backup** creates the lossless, integrity-checked SQLite
+copy. It includes games, annotations, analysis, accounts and settings, as well as
+installation-local credentials and engine configuration. Store it like a password: hashes
+and API-key hashes are not plaintext, but the file is still private. A backup may be taken
+while Blunderbase is running; SQLite's online backup API includes all committed WAL
+transactions in one consistent snapshot.
+Restoration is deliberately not available in the running web app: it replaces the database
+under the process and therefore remains an offline CLI operation.
+
+```bash
+uv run blunderbase db backup /safe/place/blunderbase-2026-09-01.db
+# ... on the replacement installation, with Blunderbase stopped:
+uv run blunderbase db restore /safe/place/blunderbase-2026-09-01.db --force
+uv run blunderbase db upgrade
+```
+
+Both commands run SQLite's full integrity check, require a Blunderbase schema revision,
+and print the byte count, revision and SHA-256. The backup and restore SHA-256 values must
+match. Restore verifies the input before touching the configured database, installs it by
+atomic rename, and refuses to replace an existing database without `--force`. Stop every
+process using that database before restore; then start Blunderbase and confirm the Library
+count. `db upgrade` is safe when restoring an older release and is a no-op at the current
+revision.
+
+For Docker, copy the verified backup out of the named volume rather than leaving the only
+copy beside the live database:
+
+```bash
+docker exec blunderbase blunderbase db backup /data/blunderbase-backup.db
+docker cp blunderbase:/data/blunderbase-backup.db ./blunderbase-backup.db
+
+docker compose -f docker/docker-compose.yml stop blunderbase
+docker cp ./blunderbase-backup.db blunderbase:/data/restore.db
+docker compose -f docker/docker-compose.yml run --rm --no-deps \
+  --entrypoint blunderbase blunderbase db restore /data/restore.db --force
+docker compose -f docker/docker-compose.yml up -d blunderbase
+```
+
 ## Commands
 
 `uv run blunderbase …` — `serve`, `import <lichess|chesscom|pgn> …`,
 `accounts <list|add|reconcile>`, `analyze` (queue a
 tier and drain it in this process), `mcp [--transport stdio|http]`, `set-password`,
-`db upgrade`, `db rebuild-cards`, `db rebuild-stats`, `db rebuild-book`, and
+`db upgrade`, `db backup`, `db restore`, `db rebuild-cards`, `db rebuild-stats`,
+`db rebuild-book`, and
 `demo create`. The
 queue is `analysis_runs` rows rather than a broker, so `blunderbase analyze` is safe to
 run while the server is up, and nothing is lost across a restart.

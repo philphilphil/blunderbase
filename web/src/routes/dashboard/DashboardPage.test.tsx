@@ -80,7 +80,7 @@ describe('RecentGamesList — component states (design 2a rail)', () => {
   it('offers the import when the database is empty', () => {
     draw({ data: { total: 0, limit: 12, offset: 0, games: [] } })
     expect(screen.getByTestId('empty')).toHaveTextContent(/no games in the database/i)
-    expect(screen.getByRole('link', { name: /import games/i })).toHaveAttribute('href', '/import')
+    expect(screen.getByRole('link', { name: /import games/i })).toHaveAttribute('href', '/library/import')
   })
 
   it('draws each game as a row with its result, opponent and worst swing', () => {

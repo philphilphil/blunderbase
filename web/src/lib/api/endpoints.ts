@@ -15,6 +15,8 @@ import type {
   BackfillCancelled,
   BackfillPreview,
   BackfillStarted,
+  BackupEstimate,
+  BackupPrepared,
   BatchAnalysisRequest,
   BatchAnalysisResponse,
   ComparisonResponse,
@@ -153,6 +155,20 @@ export const getGame = (id: number, query: GameDetailQuery = {}) =>
  */
 export const deleteAllGames = (password?: string) =>
   http.post<GamesDeleted>('/games/delete-all', { body: { password } })
+
+/** Every stored game with notes and saved lines layered onto its original PGN. */
+export const exportLibrary = () =>
+  requestDownload('/games/export', { fallbackName: 'blunderbase-library.pgn' })
+
+/** Approximate snapshot size without creating or scanning the backup. */
+export const getBackupEstimate = () => http.get<BackupEstimate>('/library/backup/estimate')
+
+/** Create and verify the snapshot while the calling screen can show preparation progress. */
+export const prepareBackup = () => http.post<BackupPrepared>('/library/backup/prepare')
+
+/** One prepared snapshot, streamed by the browser rather than buffered into a JS blob. */
+export const preparedBackupUrl = (token: string) =>
+  apiUrl(`/library/backup/prepared/${encodeURIComponent(token)}`)
 
 // --- import ---------------------------------------------------------------
 

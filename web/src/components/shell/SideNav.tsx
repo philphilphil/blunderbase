@@ -22,7 +22,7 @@
 import {
   ChartNoAxesColumn,
   Cpu,
-  Download,
+  Database,
   Gauge,
   LayoutDashboard,
   Library,
@@ -68,11 +68,10 @@ const WORKSPACE: NavItem[] = [
 ]
 
 /**
- * Where games come from, what has been run over them, and what runs it — in that order,
- * which is the order the work happens in.
+ * The data itself, what has been run over it, and what runs it — in that order.
  */
 const DATA: NavItem[] = [
-  { to: '/import', label: 'Import', icon: Download },
+  { to: '/library', label: 'Library', icon: Database },
   { to: '/analysis', label: 'Analysis', icon: Gauge },
   { to: '/engines', label: 'Engines', icon: Cpu },
 ]
@@ -85,6 +84,10 @@ const DATA: NavItem[] = [
  * Analysis" by where it sits, and costs nothing everywhere else.
  */
 const SUBPAGES: Record<string, { to: string; label: string }[]> = {
+  '/library': [
+    { to: '/library/import', label: 'Import' },
+    { to: '/library/manage', label: 'Manage' },
+  ],
   '/analysis': [
     { to: '/analysis/engine', label: 'Engine passes' },
     { to: '/analysis/maia', label: 'Maia' },
@@ -429,7 +432,7 @@ function NavFooter() {
         className="flex flex-col gap-[0.3125rem]"
         title="Every game, note and evaluation lives in a local database on this machine."
       >
-        <div className="text-[0.6875rem] text-dim">Library</div>
+        <div className="text-[0.6875rem] text-dim">Engine coverage</div>
         <div className="h-[0.1875rem] overflow-hidden rounded-sm bg-hairline">
           <div className="h-full bg-meter-2" style={{ width: `${share}%` }} />
         </div>

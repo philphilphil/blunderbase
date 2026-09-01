@@ -229,6 +229,16 @@ export interface GamesDeleted {
   import_jobs: number
 }
 
+export interface BackupEstimate {
+  estimated_bytes: number
+}
+
+export interface BackupPrepared {
+  token: string
+  filename: string
+  bytes: number
+}
+
 export interface EngineLine extends Extra {
   multipv?: number
   cp?: number | null

@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { apiUrl, ApiError, requestDownload } from './client'
-import { exportNotes, exportNotesUrl } from './endpoints'
+import { preparedBackupUrl, exportLibrary, exportNotes, exportNotesUrl } from './endpoints'
 
 function answer(body: string, headers: Record<string, string>): Response {
   return new Response(body, { status: 200, headers })
@@ -56,6 +56,30 @@ describe('requestDownload', () => {
   it('falls back to a name of its own when the answer names none', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => answer('[Event "?"]', {})))
     expect((await exportNotes('pgn')).filename).toBe('blunderbase-notes.pgn')
+  })
+
+  it('downloads the complete game library from its own endpoint', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        answer('1. e4 *', {
+          'content-type': 'application/x-chess-pgn',
+          'content-disposition': 'attachment; filename="blunderbase-library.pgn"',
+        }),
+      ),
+    )
+
+    const download = await exportLibrary()
+
+    expect(download.filename).toBe('blunderbase-library.pgn')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/games/export',
+      expect.objectContaining({ method: 'GET' }),
+    )
+  })
+
+  it('hands a prepared database backup directly to the browser', () => {
+    expect(preparedBackupUrl('one two')).toBe('/api/library/backup/prepared/one%20two')
   })
 
   it('throws the backend error rather than handing back an error page as a file', async () => {

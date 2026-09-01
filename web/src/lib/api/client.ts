@@ -208,6 +208,16 @@ export function saveDownload({ blob, filename }: Download): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
+/** Hand an already-prepared large file to the browser without buffering it in JavaScript. */
+export function saveUrlDownload(url: string, filename: string): void {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.append(link)
+  link.click()
+  link.remove()
+}
+
 export const http = {
   get: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body' | 'text'>) =>
     request<T>(path, { ...options, method: 'GET' }),

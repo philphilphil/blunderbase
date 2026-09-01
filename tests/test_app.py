@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 
 from backend.api.app import create_app
 from backend.config import Settings
@@ -66,6 +66,11 @@ def test_the_server_folds_the_stat_summaries_a_library_is_missing(settings: Sett
 
     Polled rather than waited on: the fold runs in a thread off the lifespan's own task, so
     the assertion is that it happens, not that it has happened by the time startup returns.
+
+    The poll reads the summary and the scalar in one SELECT rather than hydrating the game,
+    because `Game.stat_summary` is deferred: hydrating loads the scalars now and fetches the
+    JSON on first touch, so a fold committing between the two reads hands the poll a summary
+    beside the scalars from before it.
     """
     upgrade_to_head(settings)
     with get_sessionmaker(settings)() as session:
@@ -94,11 +99,12 @@ def test_the_server_folds_the_stat_summaries_a_library_is_missing(settings: Sett
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             with get_sessionmaker(settings)() as session:
-                folded = session.get(Game, game_id)
-                assert folded is not None
-                if folded.stat_summary is not None:
-                    assert folded.stat_summary["run_id"] == run_id
-                    assert folded.stat_owner_moves == 1
+                summary, owner_moves = session.execute(
+                    select(Game.stat_summary, Game.stat_owner_moves).where(Game.id == game_id)
+                ).one()
+                if summary is not None:
+                    assert summary["run_id"] == run_id
+                    assert owner_moves == 1
                     break
             time.sleep(0.05)
         else:

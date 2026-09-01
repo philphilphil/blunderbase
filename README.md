@@ -63,7 +63,9 @@ docker run -d --name blunderbase -p 8765:8765 -v blunderbase-data:/data \
 ```
 
 The first person to open a fresh deployment chooses the password; that password is also
-an MCP bearer token, until you mint per-client keys on Assistant. Back up the `/data` volume and you have backed up everything.
+an MCP bearer token, until you mint per-client keys on Assistant. The
+[verified backup and restore workflow](docs/reference.md#export-backup-and-restore) safely
+copies the live SQLite database, including committed WAL data.
 For TLS termination and reverse-proxy examples see [docs/deploy.md](docs/deploy.md).
 
 ## Project Structure

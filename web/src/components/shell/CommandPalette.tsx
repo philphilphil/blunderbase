@@ -15,7 +15,7 @@ import {
   Bot,
   ChartNoAxesColumn,
   Cpu,
-  Download,
+  Database,
   Gauge,
   LayoutDashboard,
   Library,
@@ -90,7 +90,12 @@ const PAGES: PageRoute[] = [
   { label: 'Stats', hint: 'reports over the library', icon: ChartNoAxesColumn, to: '/stats' },
   { label: 'Notes', hint: 'everything written down', icon: StickyNote, to: '/notes' },
   { label: 'Live', hint: 'the game being played now', icon: Radio, to: '/live' },
-  { label: 'Import', hint: 'lichess, chess.com, PGN', icon: Download, to: '/import' },
+  {
+    label: 'Library',
+    hint: 'import, export and reset',
+    icon: Database,
+    to: '/library',
+  },
   {
     label: 'Analysis',
     hint: 'coverage, backfills and what they cost',
@@ -100,6 +105,18 @@ const PAGES: PageRoute[] = [
   { label: 'Engines', hint: 'the roster and what runs what', icon: Cpu, to: '/engines' },
   { label: 'Engine passes', hint: 'budgets and move labels', icon: Gauge, to: '/analysis/engine' },
   { label: 'Maia', hint: 'human levels and when they run', icon: Gauge, to: '/analysis/maia' },
+  {
+    label: 'Import',
+    hint: 'lichess, chess.com and PGN',
+    icon: Database,
+    to: '/library/import',
+  },
+  {
+    label: 'Manage Library',
+    hint: 'export or reset',
+    icon: Database,
+    to: '/library/manage',
+  },
   { label: 'Assistant', hint: 'MCP keys and client setup', icon: Bot, to: '/assistant' },
 ]
 
