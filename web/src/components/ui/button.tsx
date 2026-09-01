@@ -5,8 +5,9 @@ import type * as React from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * The two buttons the design uses side by side ("Import PGN" / "Sync Lichess"):
- * a 1px outlined ghost at #262d36 and a filled teal at #3ecfd6 with #062a2c ink.
+ * The two buttons the app uses side by side ("Import PGN" / "Sync Lichess"):
+ * a 1px outlined ghost on `--bb-edge-input` and a filled accent on `--bb-accent`
+ * with `--bb-accent-ink` on it.
  */
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium outline-none transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-3.5",

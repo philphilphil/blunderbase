@@ -51,7 +51,7 @@ function draw({
 }
 
 describe('the rail footer', () => {
-  it('counts games with any engine analysis, whether quick or deep', () => {
+  it('asks nothing of the games endpoint for a coverage bar it no longer draws', () => {
     useEngines.mockReturnValue(pending)
     useLiveState.mockReturnValue(pending)
     useEvents.mockReturnValue({ status: 'open', reconnects: 0 })
@@ -68,8 +68,33 @@ describe('the rail footer', () => {
       </ThemeProvider>,
     )
 
-    expect(useGames).toHaveBeenCalledWith({ analyzed: true, limit: 1 })
-    expect(screen.getByText('2 of 9,553 engine analyzed')).toBeInTheDocument()
+    // The footer's "engine coverage" bar is gone: `/analysis/coverage` answers the same
+    // question properly, and the bar cost a second `useGames` on every screen in the app to
+    // say it badly. The Games row's own count is the one query that remains.
+    expect(useGames).not.toHaveBeenCalledWith({ analyzed: true, limit: 1 })
+    expect(screen.queryByText(/engine analyzed/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Engine coverage')).not.toBeInTheDocument()
+  })
+
+  it('folds the rail to icons and back, and remembers which', async () => {
+    const user = userEvent.setup()
+    draw()
+
+    expect(screen.getByRole('link', { name: 'Games' })).toHaveTextContent('Games')
+
+    await user.click(screen.getByRole('button', { name: 'Collapse the navigation' }))
+
+    // Folded, a destination is its icon and its accessible name — never nothing.
+    const games = screen.getByRole('link', { name: 'Games' })
+    expect(games).toHaveTextContent('')
+    expect(games).toHaveAttribute('title', 'Games')
+    // The group headings and the open entry's second level go with the words.
+    expect(screen.queryByText('Workspace')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Expand the navigation' }))
+
+    expect(screen.getByRole('link', { name: 'Games' })).toHaveTextContent('Games')
+    expect(screen.getByText('Workspace')).toBeInTheDocument()
   })
 
   it('prints the version Vite baked in from package.json', () => {

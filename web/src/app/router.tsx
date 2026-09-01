@@ -58,7 +58,11 @@ export const router = createBrowserRouter([
       { path: 'library/import', element: <ImportPage /> },
       { path: 'library/manage', element: <LibraryManagePage /> },
       { path: 'import', element: <Navigate to="/library/import" replace /> },
-      { path: 'analysis', element: <AnalysisPage /> },
+      // Like `library` above: the section is a heading in the rail and every page under it
+      // has a row of its own, so the parent is a redirect rather than a fourth destination
+      // that only the word "Analysis" reaches.
+      { path: 'analysis', element: <Navigate to="/analysis/coverage" replace /> },
+      { path: 'analysis/coverage', element: <AnalysisPage /> },
       { path: 'analysis/engine', element: <EnginePassesPage /> },
       { path: 'analysis/maia', element: <MaiaSettingsPage /> },
       { path: 'engines', element: <EnginesPage /> },

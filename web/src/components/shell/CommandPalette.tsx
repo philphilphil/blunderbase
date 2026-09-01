@@ -100,7 +100,7 @@ const PAGES: PageRoute[] = [
     label: 'Analysis',
     hint: 'coverage, backfills and what they cost',
     icon: Gauge,
-    to: '/analysis',
+    to: '/analysis/coverage',
   },
   { label: 'Engines', hint: 'the roster and what runs what', icon: Cpu, to: '/engines' },
   { label: 'Engine passes', hint: 'budgets and move labels', icon: Gauge, to: '/analysis/engine' },

@@ -8,6 +8,7 @@
  */
 import { useMemo, useState } from 'react'
 
+import { SectionHead } from '@/components/shell/Section'
 import { useStats } from '@/lib/api/queries'
 import { useProfile } from '@/lib/api/queries'
 import type { GameFilters, StatsBucket } from '@/lib/api/types'
@@ -112,17 +113,18 @@ export function TrendsCard({ className }: { className?: string }) {
   const dry = sentence(metrics)
 
   return (
-    <section
-      className={cn(
-        'flex flex-col gap-3 rounded-xl border border-line bg-panel p-[0.8125rem]',
-        className,
-      )}
-    >
-      <header className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <h2 className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
-            Last {WINDOW_DAYS[windowKey as Exclude<WindowKey, 'all'>]} days
-          </h2>
+    <section className={cn('flex flex-col gap-2', className)}>
+      <SectionHead
+        title={`Last ${WINDOW_DAYS[windowKey as Exclude<WindowKey, 'all'>]} days`}
+        detail={
+          <span className="font-mono text-[0.625rem] tabular text-dim-2">
+            {speed.isPending ? '…' : `${games} game${games === 1 ? '' : 's'}`} ·{' '}
+            {windowProse(windowKey, anchor)
+              .replace(/^the last \d+ days$/, 'to today')
+              .replace(/^the \d+ days /, '')}
+          </span>
+        }
+        end={
           <Segmented
             className="shrink-0"
             label="Trend window"
@@ -133,14 +135,8 @@ export function TrendsCard({ className }: { className?: string }) {
               label: WINDOW_LABELS[key],
             }))}
           />
-        </div>
-        <span className="font-mono text-[0.625rem] tabular text-dim-2">
-          {speed.isPending ? '…' : `${games} game${games === 1 ? '' : 's'}`} ·{' '}
-          {windowProse(windowKey, anchor)
-            .replace(/^the last \d+ days$/, 'to today')
-            .replace(/^the \d+ days /, '')}
-        </span>
-      </header>
+        }
+      />
 
       {speed.isError ? (
         <ErrorBlock

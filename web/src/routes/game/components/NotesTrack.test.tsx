@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { GameNote } from '../gameModel'
@@ -71,15 +72,27 @@ describe('NotesTrack', () => {
     expect(screen.getByText('9 games')).toBeInTheDocument()
   })
 
-  it('drops the Book tab entirely where no book reached this position', () => {
+  it('keeps the Book tab where no book reached this position, and opens on Notes', () => {
     renderTrack({ book: NO_BOOK })
 
-    // Not an empty Book tab and not a placeholder pane: `0017_explorer_book` counts 452k of
-    // 463k positions reached by exactly one game, so an empty state would be the norm.
-    expect(screen.queryByRole('tab', { name: 'Book' })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('tab')).toHaveLength(1)
+    // The strip never changes shape — a tab that came and went moved the Notes tab under
+    // the pointer every time the game left book. What it opens on still follows the
+    // position: 452k of the owner's 463k positions are reached by exactly one game, so
+    // opening on Book would mean opening on an empty pane nearly always.
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'false')
     expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByTestId('book-panel')).not.toBeInTheDocument()
+  })
+
+  it('shows the empty book when the reader asks for it there', async () => {
+    const user = userEvent.setup()
+    renderTrack({ book: NO_BOOK })
+
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
+
+    expect(screen.getByTestId('book-panel-empty')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('keeps the composer outside the tabs, and does not move it when they switch', () => {

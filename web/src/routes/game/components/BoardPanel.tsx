@@ -258,7 +258,7 @@ export function BoardPanel({
     <div
       ref={column}
       // The panel is the width of the board it is about, not the width of the column it
-      // stands in — `min(100%, 100vh - 12.625rem)` is the board's own cap below with the
+      // stands in — `min(100%, 100vh - 11.3125rem)` is the board's own cap below with the
       // 1.5rem the eval bar and its gap take added back to every term. So the
       // player rows end where the board ends and the transport row's `flex-1` spacer parks
       // the ply readout and the score chip against the board's right edge, instead of
@@ -267,7 +267,7 @@ export function BoardPanel({
       // width here at all: the column is the board's width already.) `GameHeaderBar` is
       // outside this panel and still spans the column, exactly as the design draws it.
       className={cn(
-        'flex flex-col gap-2 md:w-[min(100%,calc(100vh-12.625rem))]',
+        'flex flex-col gap-2 md:w-[min(100%,calc(100vh-11.3125rem))]',
         className,
       )}
     >
@@ -284,33 +284,30 @@ export function BoardPanel({
         player row and the transport row off the bottom of the window. So the board is
         capped against the viewport, the way `/live` caps its own.
 
-        This is the *rebuilt* column: the eval curve and the note composer have moved to the
-        right column, and the header has gone from four lines to one. What is left standing
-        above and below the board, in the `rem` everything here is written in:
+        The eval curve and the note composer live in the right column, and the game header
+        is now a bar across the whole workspace rather than a line inside this column — so
+        it costs the board its own height and no gap besides. What is left standing above and
+        below the board, in the `rem` everything here is written in:
 
-          2.875  the titlebar (`AppShell`/`TopBar`)
-          2.25   the board column's `py-[1.125rem]`, both ends
-          0.875  its one remaining `gap-3.5`, header → this panel
-          1.875  the `GameHeaderBar` at its declared `h-[1.875rem]` — one line, fixed, so
-                 this number cannot drift when somebody adds a fact to it
-          3      the two player rows flanking the board, `h-6` each
-          1.5    this panel's three `gap-2`s: player → board row → player → transport
-          1.75   the transport row: `text-xs` buttons at `py-[0.3125rem]`, plus their border
-          -----
-          14.125 which is `calc(100vh-14.125rem)`
-
-        (The old sum listed an eighth row for the note composer and totalled 27 while the
-        code used 20: the composer was a `basis-1/2` sibling of the curve and cost no height
-        of its own. Both are gone from this column now; the sum above is the whole of it.)
+           2.625   the titlebar (`AppShell`/`TopBar`)
+           2.6875  the `GameHeaderBar` bar at its declared `h-[2.625rem]` plus its bottom
+                   rule — one line, fixed, so this number cannot drift when somebody adds a
+                   fact to it
+           1.25    the board column's `py-2.5`, both ends
+           3       the two player rows flanking the board, `h-6` each
+           1.5     this panel's three `gap-2`s: player → board row → player → transport
+           1.75    the transport row: `text-xs` buttons at `py-[0.3125rem]`, plus their border
+          -------
+          12.8125  which is `calc(100vh-12.8125rem)`
 
         The cap is on the `Board` element, which is the grid the rank column and the file
         row live in: its height is its width less 0.125rem (a 0.875rem rail and a 0.375rem
         gap come off the squares horizontally, a 0.375rem gap and a ~0.75rem file row go on
         vertically), so the capped board is a hair *shorter* than the room reserved for it.
         Worked through at the design's own window — 1160 physical pixels tall, where 1rem is
-        19.2 — the chrome is 271.2px, the cap is 888.8px, the board draws 886.4 tall, and
-        the pair leaves 2.4px to spare. That is against 776px under the old budget: the
-        header's three lost lines and the emptied bottom strip are the whole of the gain.
+        19.2 — the chrome is 246px, the cap is 914px, and the board draws 911.6 tall, which
+        leaves the same 2.4px to spare the old budget did. The gain over that budget is the
+        header's gap and the column's tighter padding.
 
         There is deliberately no ceiling on top of that. One was tried — 48rem, on the
         reasoning that ~115px squares are as large as a board wants to be — and it was the
@@ -369,7 +366,7 @@ export function BoardPanel({
           // that has to keep a usable height of its own, so it is capped again — against a
           // different sum. What stands above and below it there, at the app's 120 % scale:
           //
-          //   2.875  the titlebar (`AppShell`/`TopBar`)
+          //   2.625  the titlebar (`AppShell`/`TopBar`)
           //   2.75   the phone header: players over result/ply/opening
           //   1      this panel's `max-md:py-2`, both ends
           //   0.5    its one `gap-2`, board row → transport — the player rows are
@@ -381,7 +378,7 @@ export function BoardPanel({
           //   2.5    the tab strip
           //   9      the floor left for the tab pane itself — about five move rows
           //   -----
-          //   23     which is `calc(100dvh-23rem)`
+          //   22.75  which is `calc(100dvh-22.75rem)`
           //
           // `dvh`, not `vh`: on iOS `vh` is the height with the address bar *hidden*, so a
           // `vh` cap over-feeds the board and eats the pane the moment the bar is showing.
@@ -392,7 +389,7 @@ export function BoardPanel({
           // binds on a short phone (at 812 the board is already full width and the `100%`
           // wins), and short phones are the un-notched ones whose insets are zero.
           className={cn(
-            'min-w-0 max-w-[min(100%,calc(100vh-14.125rem))] flex-1 max-md:max-w-[min(100%,calc(100dvh-23rem))]',
+            'min-w-0 max-w-[min(100%,calc(100vh-12.8125rem))] flex-1 max-md:max-w-[min(100%,calc(100dvh-22.75rem))]',
             previewDim && 'bb-preview-dim',
           )}
         >
@@ -419,9 +416,19 @@ export function BoardPanel({
         Two lines is what `BoardPanel`'s `100dvh` cap budgets for. "Back to game" appears
         only while a line is being walked and can push it to three; the pane below is
         `flex-1 min-h-0` and gives up the height, which is the right way round.
+
+        The row wraps at *every* width now, and every child is `flex-none`. A desktop board
+        column can be narrower than this row wants — the column yields its width to the moves
+        column's floor on a window that is tall for how wide it is — and a shrinking row spent
+        that shortfall by squeezing the four transport arrows into a sliver, which is the one
+        thing here that has to stay hittable. Wrapping, the row spends it on a second line
+        instead; and a column narrow enough to wrap is by definition one where the board is
+        limited by width rather than by the height budget, so the line it takes is height the
+        board was not going to use. Nothing wraps at a width that fits, so no ordinary window
+        sees any of this.
       */}
-      <div className="flex items-center gap-2 max-md:flex-wrap max-md:gap-1.5">
-        <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
+      <div className="flex flex-wrap items-center gap-2 max-md:gap-1.5">
+        <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
           <TransportButton label="First" disabled={cursor < 0} onClick={() => onSeek(-1)}>
             ⏮
           </TransportButton>
@@ -457,7 +464,7 @@ export function BoardPanel({
           dividers are drawn by the cell *before* each boundary, so the two sets stay
           separately bounded and the transport group's last divider is its own business.
         */}
-        <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
+        <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
           <TransportButton
             label="Previous flagged move"
             disabled={previousFlagged == null}
@@ -484,7 +491,7 @@ export function BoardPanel({
         <button
           type="button"
           onClick={onFlip}
-          className="rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
+          className="flex-none rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
         >
           ⇅ Flip
         </button>
@@ -495,7 +502,7 @@ export function BoardPanel({
           aria-pressed={hints}
           title="Engine and Maia marks on the board"
           className={cn(
-            'rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
+            'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
             hints
               ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
               : 'border-edge bg-elevated text-dim hover:text-ink',
@@ -534,7 +541,7 @@ export function BoardPanel({
             aria-pressed={noting}
             title="Write a note about this position"
             className={cn(
-              'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
+              'flex flex-none items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
               noting
                 ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
                 : 'border-edge bg-elevated text-soft hover:text-ink',
@@ -550,7 +557,7 @@ export function BoardPanel({
             type="button"
             onClick={onExitAnalysis}
             title="Leave the analysis line and go back to the game"
-            className="flex items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant max-md:py-1.5"
+            className="flex flex-none items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant max-md:py-1.5"
           >
             <Undo2 className="size-3" aria-hidden />
             Back to game
@@ -564,14 +571,18 @@ export function BoardPanel({
           onto a third line of their own, which spent a third of a `rem` of pinned height on
           two small pieces of text and took it straight out of the tab pane underneath.
         */}
-        <span className="font-mono text-[0.6875rem] tabular text-dim max-md:hidden">
-          {inLine && analysis
-            ? `analysis +${analysis.cursor}`
-            : `ply ${cursor + 1} / ${plyCount}`}
-        </span>
-        <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink max-md:hidden">
-          {formatScore(score)}
-        </span>
+        {/* One group, so a row that has to wrap never leaves the score chip stranded on a
+            line of its own: the two readouts are read together and they move together. */}
+        <div className="flex flex-none items-center gap-2 max-md:hidden">
+          <span className="font-mono text-[0.6875rem] tabular whitespace-nowrap text-dim">
+            {inLine && analysis
+              ? `analysis +${analysis.cursor}`
+              : `ply ${cursor + 1} / ${plyCount}`}
+          </span>
+          <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink">
+            {formatScore(score)}
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -727,7 +738,7 @@ function AnalysisTierButton({
           disabled={busy}
           onClick={onRequest}
           className={cn(
-            'flex items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs disabled:cursor-default max-md:py-1.5',
+            'flex flex-none items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs disabled:cursor-default max-md:py-1.5',
             error && !busy
               ? 'border-blunder/30 bg-blunder/5 text-blunder'
               : finishedRun

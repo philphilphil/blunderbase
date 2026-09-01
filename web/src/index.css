@@ -18,7 +18,15 @@
 @custom-variant dark (&:is(.dark *));
 
 /* --------------------------------------------------------------------------
- * Design tokens, lifted from docs/design/Blunderbase Game View.dc.html.
+ * Design tokens.
+ *
+ * The palette is the accepted "restrained desktop tool" direction
+ * (docs/design/prototypes/human-theme-lab.html): a neutral grey ramp rather than
+ * a blue-black one, chrome (`--bb-panel`) sitting a shade apart from the canvas
+ * (`--bb-surface`) so a toolbar, a rail and a pane title read as chrome, and a
+ * muted blue standing in for the old flagship teal — a bright accent is what made
+ * the app read as a dashboard rather than as a tool.
+ *
  * Raw palette first, semantic aliases second; only the semantic names are meant
  * to be used from components. Every colour in the app resolves through a
  * `--bb-*` name — nothing outside this file names a hex.
@@ -27,95 +35,100 @@
   color-scheme: dark;
 
   /* surfaces — darkest to lightest */
-  --bb-void: #08090b; /* app background */
-  --bb-panel: #0b0d10; /* nav, titlebar, cards */
-  --bb-surface: #0e1013; /* content canvas */
-  --bb-surface-2: #0e1114;
-  --bb-elevated: #12151a; /* chips, inputs */
-  --bb-elevated-2: #12161b; /* note cards */
-  --bb-raised: #14181d; /* hover */
-  --bb-raised-2: #14191f; /* nav active */
-  --bb-selected: #1a1f26; /* segmented-control active */
-  --bb-avatar: #1d232b;
+  --bb-void: #1d1e1f; /* app background, the ground panes sit on */
+  --bb-panel: #292a2a; /* chrome: titlebar, rail, pane titles */
+  --bb-surface: #232424; /* content canvas */
+  --bb-surface-2: #212222;
+  --bb-elevated: #303131; /* chips, inputs, buttons */
+  --bb-elevated-2: #2b2c2c; /* note cards */
+  --bb-raised: #343535; /* hover */
+  --bb-raised-2: #313232; /* nav active */
+  --bb-selected: #29445b; /* selected row / segmented-control active */
+  --bb-avatar: #3a3b3b;
 
   /* lines */
-  --bb-hairline: #1a1e24; /* chrome dividers */
-  --bb-line: #1f242b; /* card borders */
-  --bb-edge: #22272f; /* default border */
-  --bb-edge-strong: #2c333c;
-  --bb-edge-hover: #39414c;
-  --bb-edge-input: #262d36;
+  --bb-hairline: #3a3c3b; /* dividers inside a pane */
+  --bb-line: #3e4040; /* pane borders */
+  --bb-edge: #474949; /* default border */
+  --bb-edge-strong: #555756; /* the rules between panes */
+  --bb-edge-hover: #777975;
+  --bb-edge-input: #4d4f4e;
 
   /* text — most contrast to least */
-  --bb-text-bright: #fbfcfd;
-  --bb-text: #e7eaef;
-  --bb-text-2: #dfe3e8;
-  --bb-body: #c8cfd8;
-  --bb-body-2: #c1c8d1;
-  --bb-body-3: #b6bec9;
-  --bb-muted: #949ca8;
-  --bb-muted-2: #8a929d;
-  --bb-dim-3: #7d858f;
-  --bb-dim: #646c78;
-  --bb-dim-2: #5c646f;
-  --bb-faint: #4d545e;
-  --bb-faint-2: #3a4049;
+  --bb-text-bright: #f8f8f4;
+  --bb-text: #eeeeea;
+  --bb-text-2: #e6e6e1;
+  --bb-body: #d8d8d3;
+  --bb-body-2: #d0d0cb;
+  --bb-body-3: #c6c6c1;
+  --bb-muted: #b6b5b0;
+  --bb-muted-2: #aaa9a4;
+  --bb-dim-3: #a0a09a;
+  --bb-dim: #a3a29c;
+  --bb-dim-2: #9a998f;
+  --bb-faint: #8b8a82;
+  --bb-faint-2: #7c7b73;
 
   /* accent + semantics */
-  --bb-accent: #3ecfd6;
-  --bb-accent-hover: #5fdde3;
-  --bb-accent-link: #7de1e7;
-  --bb-accent-ink: #062a2c; /* text on a filled accent surface */
-  --bb-blunder: #f0524a;
-  --bb-blunder-ink: #1a0605;
-  --bb-mistake: #e0872f;
-  --bb-inaccuracy: #c9b23e;
-  --bb-good: #9ec49a;
+  --bb-accent: #83b7e3;
+  --bb-accent-hover: #9cc7ea;
+  --bb-accent-link: #a8d0ef;
+  --bb-accent-ink: #10202c; /* text on a filled accent surface */
+  --bb-blunder: #ee766e;
+  --bb-blunder-ink: #2a0f0d;
+  --bb-mistake: #dda05a;
+  --bb-inaccuracy: #cbb96a;
+  --bb-good: #78b98c;
   --bb-info: #8fb6c9;
-  --bb-brilliant: #b287ff;
-  --bb-deep: #c9b0ff;
+  --bb-brilliant: #b098d7;
+  --bb-deep: #c1adde;
   --bb-otb: #c9b89a;
 
   /* board */
-  --bb-board-light: #a7b3bb;
-  --bb-board-dark: #5c6a73;
+  --bb-board-light: #a9b2b8;
+  --bb-board-dark: #616d75;
   --bb-coord-on-light: rgb(20 24 28 / 0.55);
   --bb-coord-on-dark: rgb(251 252 253 / 0.45);
 
   /* component fills the design names once and reuses everywhere */
-  --bb-track: #1c2128; /* progress / meter troughs */
-  --bb-meter: #2f3d47; /* filled meter, quiet */
-  --bb-meter-2: #3a424b; /* filled meter, quieter still */
-  --bb-row-active: #151b22; /* the move-list pair under the cursor */
-  --bb-cell: #181d23; /* engine-panel cell */
-  --bb-cell-strong: #1e242b; /* engine-panel cell, top line */
-  --bb-eval-track: #1a1e24;
+  --bb-track: #3a3c3b; /* progress / meter troughs */
+  --bb-meter: #6b6f6d; /* filled meter, quiet */
+  --bb-meter-2: #5a5e5c; /* filled meter, quieter still */
+  --bb-row-active: #2f3030; /* the move-list pair under the cursor */
+  --bb-cell: #2b2c2c; /* engine-panel cell */
+  --bb-cell-strong: #313232; /* engine-panel cell, top line */
+  --bb-eval-track: #3a3c3b;
   /* how the two sides are drawn wherever one is shown as itself rather than as a
      surface — the eval bar, the games table's colour column. Unlike a text or a
      surface token these do *not* swap places between the themes: white is the light
      one in both, which is the whole point of them being their own names. */
-  --bb-side-white: #dfe3e8;
-  --bb-side-white-edge: #dfe3e8;
-  --bb-side-black: #20242a;
-  --bb-side-black-edge: #3a424b;
-  --bb-graph-bg: #0e1216;
-  --bb-graph-grid: #1a1f25;
-  --bb-graph-axis: #2a313a;
-  --bb-graph-tick: #454c56;
-  --bb-card-grad-a: #12181d;
-  --bb-card-grad-b: #0e1216;
-  --bb-chip-neutral: #141619;
-  --bb-chip-info: #141922;
-  --bb-chip-info-edge: #23303c;
-  --bb-chip-good: #16191a;
-  --bb-chip-good-edge: #2b3330;
-  --bb-chip-otb: #1a1816;
-  --bb-chip-otb-edge: #34302a;
-  --bb-scroll-thumb: #252b33;
-  --bb-shadow: rgb(0 0 0 / 0.9);
+  --bb-side-white: #e6e6e1;
+  --bb-side-white-edge: #b8b8b3;
+  --bb-side-black: #232424;
+  --bb-side-black-edge: #555655;
+  /* The eval plot's own ground, and only its: a mid grey the two sides are read against,
+     the way lichess draws it. It sits clear of the pane behind it (`--bb-surface`) in one
+     direction and clear of `--bb-side-black` in the other, or the black half of the curve
+     would disappear into one or the other. */
+  --bb-graph-bg: #3a3c3b;
+  --bb-graph-grid: #4e5150;
+  --bb-graph-axis: #616563;
+  --bb-graph-tick: #98978f;
+  --bb-card-grad-a: #2b2c2c;
+  --bb-card-grad-b: #262727;
+  --bb-chip-neutral: #2e2f2f;
+  --bb-chip-info: #2a3540;
+  --bb-chip-info-edge: #46586a;
+  --bb-chip-good: #2b332e;
+  --bb-chip-good-edge: #47584d;
+  --bb-chip-otb: #33302a;
+  --bb-chip-otb-edge: #575047;
+  --bb-scroll-thumb: #4a4c4b;
+  --bb-shadow: rgb(0 0 0 / 0.5);
 
-  /* radii — the design uses 4 / 5 / 6 / 8 / 9 / 12 */
-  --radius: 0.5rem;
+  /* Radii. The direction is a desktop tool, not a card deck: 3 / 4 / 5 / 6
+     design pixels, and nothing rounder than a control. */
+  --radius: 0.25rem;
 
   /* shadcn semantic layer, mapped onto the palette above */
   --background: var(--bb-void);
@@ -158,107 +171,118 @@
 /* --------------------------------------------------------------------------
  * Light theme — the same design language on a light ground, not a new one.
  * The neutral ramp is inverted by contrast rank rather than by hue, so a token
- * that was the quietest label in the dark is still the quietest label here; the
- * teal and purple keep their identity and are darkened only as far as WCAG AA
- * on `--bb-void` demands (accent 4.65:1, deep 5.01:1); blunder and mistake keep
- * their saturated hues instead, see below. Only the
- * raw palette is redefined — every alias below picks the new values up.
+ * that was the quietest label in the dark is still the quietest label here.
+ * The greys are warm-neutral rather than blue, and — as in the dark — chrome
+ * (`--bb-panel`) is a shade *darker* than the canvas it frames rather than
+ * brighter, which is what stops a toolbar or a rail reading as a floating card.
+ * The accent blue and the Maia purple are darkened until they clear WCAG AA on
+ * `--bb-surface` (accent 5.6:1, deep 5.3:1); blunder and mistake keep their
+ * saturated hues instead, see below. Only the raw palette is redefined — every
+ * alias below picks the new values up.
  * ----------------------------------------------------------------------- */
 :root.light {
   color-scheme: light;
 
-  --bb-void: #f4f6f8;
-  --bb-panel: #ffffff;
-  --bb-surface: #eef1f5;
-  --bb-surface-2: #edf0f4;
-  --bb-elevated: #e9edf2;
-  --bb-elevated-2: #f2f5f8;
-  --bb-raised: #e4e9ef;
-  --bb-raised-2: #e2e7ee;
-  --bb-selected: #d9e0e8;
-  --bb-avatar: #d3dbe4;
+  --bb-void: #e7e7e4;
+  --bb-panel: #f2f2f0;
+  --bb-surface: #fafaf8;
+  --bb-surface-2: #f7f7f5;
+  --bb-elevated: #f4f4f1;
+  --bb-elevated-2: #f7f7f5;
+  --bb-raised: #ebebe8;
+  --bb-raised-2: #e8e8e5;
+  --bb-selected: #dbe6f2;
+  --bb-avatar: #dcdcd8;
 
-  --bb-hairline: #e3e7ec;
-  --bb-line: #dce1e8;
-  --bb-edge: #d1d8e0;
-  --bb-edge-strong: #bcc5cf;
-  --bb-edge-hover: #98a2ae;
-  --bb-edge-input: #c8d0da;
+  --bb-hairline: #dcdcd8;
+  --bb-line: #d1d1cd;
+  --bb-edge: #c5c5c0;
+  --bb-edge-strong: #b6b6b1;
+  --bb-edge-hover: #91918c;
+  --bb-edge-input: #bcbcb7;
 
-  --bb-text-bright: #05070a;
-  --bb-text: #12161c;
-  --bb-text-2: #1a1f26;
-  --bb-body: #2b323b;
-  --bb-body-2: #333a44;
-  --bb-body-3: #3f4751;
-  --bb-muted: #4f5761;
-  --bb-muted-2: #565e69;
-  --bb-dim-3: #5e6671;
-  --bb-dim: #626a75;
-  --bb-dim-2: #68707b;
-  --bb-faint: #7e8792;
-  --bb-faint-2: #949da8;
+  --bb-text-bright: #101010;
+  --bb-text: #202020;
+  --bb-text-2: #2a2a29;
+  --bb-body: #3b3b39;
+  --bb-body-2: #444442;
+  --bb-body-3: #4e4e4b;
+  --bb-muted: #5c5c59;
+  --bb-muted-2: #656562;
+  --bb-dim-3: #6a6a67;
+  --bb-dim: #71716e;
+  --bb-dim-2: #787874;
+  --bb-faint: #8a8a86;
+  --bb-faint-2: #9a9a95;
 
-  --bb-accent: #0a7b82;
-  --bb-accent-hover: #086a70;
-  --bb-accent-link: #096f75;
+  --bb-accent: #245f9e;
+  --bb-accent-hover: #1d4e83;
+  --bb-accent-link: #1d4e83;
   --bb-accent-ink: #ffffff;
   /* Blunder and mistake stay the saturated red and orange of the dark theme rather than
      being darkened for AA: as marks on the board and the eval curve they are colour first,
      and a brick red and a brown were read as the wrong hues. As text they sit below 4.5:1. */
-  --bb-blunder: #e5332a;
+  --bb-blunder: #bb3e35;
   --bb-blunder-ink: #ffffff;
-  --bb-mistake: #f27a1a;
-  --bb-inaccuracy: #77650c;
-  --bb-good: #2f7343;
-  --bb-info: #33697f;
-  --bb-brilliant: #6d34d6;
-  --bb-deep: #7b4cd8;
+  --bb-mistake: #9b6819;
+  --bb-inaccuracy: #7d6a12;
+  --bb-good: #34724a;
+  --bb-info: #3a6274;
+  --bb-brilliant: #7054a5;
+  --bb-deep: #63499a;
   --bb-otb: #7a6440;
 
-  --bb-board-light: #e9edf0;
-  --bb-board-dark: #8fa0ac;
+  --bb-board-light: #d8dde0;
+  --bb-board-dark: #8f9da5;
   --bb-coord-on-light: rgb(20 24 28 / 0.5);
   --bb-coord-on-dark: rgb(255 255 255 / 0.8);
 
-  --bb-track: #dbe1e8;
-  --bb-meter: #a8b8c4;
-  --bb-meter-2: #99a3ae;
-  --bb-row-active: #e6ebf1;
-  --bb-cell: #eaeef3;
-  --bb-cell-strong: #dfe5ec;
-  --bb-eval-track: #d5dbe2;
+  --bb-track: #dededa;
+  --bb-meter: #7f8589;
+  --bb-meter-2: #949996;
+  --bb-row-active: #e9e9e5;
+  --bb-cell: #f2f2ef;
+  --bb-cell-strong: #eaeae6;
+  --bb-eval-track: #d7d7d3;
   --bb-side-white: #ffffff;
-  --bb-side-white-edge: #b0b8c2;
-  --bb-side-black: #4b545e;
-  --bb-side-black-edge: #4b545e;
-  --bb-graph-bg: #eef1f5;
-  --bb-graph-grid: #dfe4ea;
-  --bb-graph-axis: #c6ced7;
-  --bb-graph-tick: #666e79;
-  --bb-card-grad-a: #f8fafc;
-  --bb-card-grad-b: #eef2f6;
-  --bb-chip-neutral: #edeff2;
-  --bb-chip-info: #e6eef4;
-  --bb-chip-info-edge: #b9cdda;
-  --bb-chip-good: #e6f1e9;
-  --bb-chip-good-edge: #b7d2bf;
-  --bb-chip-otb: #f2ece2;
-  --bb-chip-otb-edge: #d6c9b2;
-  --bb-scroll-thumb: #c5ccd5;
-  --bb-shadow: rgb(15 23 32 / 0.22);
+  --bb-side-white-edge: #b0b0ab;
+  --bb-side-black: #3a3b3b;
+  --bb-side-black-edge: #3a3b3b;
+  --bb-graph-bg: #dcdcd8;
+  --bb-graph-grid: #c6c6c1;
+  --bb-graph-axis: #a8a8a3;
+  --bb-graph-tick: #7a7a76;
+  --bb-card-grad-a: #fafaf8;
+  --bb-card-grad-b: #f4f4f1;
+  --bb-chip-neutral: #efefec;
+  --bb-chip-info: #e7eef6;
+  --bb-chip-info-edge: #b9cde2;
+  --bb-chip-good: #e8f0ea;
+  --bb-chip-good-edge: #b6ccbc;
+  --bb-chip-otb: #f2ede4;
+  --bb-chip-otb-edge: #d6cbb4;
+  --bb-scroll-thumb: #c6c6c1;
+  --bb-shadow: rgb(30 30 28 / 0.16);
 }
 
 @theme inline {
   --font-sans: 'Geist Variable', 'Geist', ui-sans-serif, 'Helvetica Neue', Helvetica, sans-serif;
   --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
 
-  /* Radii in rem so they grow with the root scale like everything else. */
-  --radius-sm: 0.25rem; /* 4px */
-  --radius-md: 0.375rem; /* 6px */
-  --radius-lg: 0.5rem; /* 8px */
-  --radius-xl: 0.5625rem; /* 9px */
-  --radius-2xl: 0.75rem; /* 12px */
+  /*
+   * Radii in rem so they grow with the root scale like everything else.
+   *
+   * The whole scale was pulled in when the direction changed: a desktop database
+   * rounds a control, not a region. `rounded-xl`/`rounded-2xl` were the card
+   * radii and are now barely more than `rounded-md`, so the panels that still ask
+   * for them read as ruled panes rather than as floating cards without every one
+   * of them having to be rewritten.
+   */
+  --radius-sm: 0.1875rem; /* 3px */
+  --radius-md: 0.25rem; /* 4px */
+  --radius-lg: 0.25rem; /* 4px */
+  --radius-xl: 0.3125rem; /* 5px */
+  --radius-2xl: 0.375rem; /* 6px */
 
   /* surfaces */
   --color-void: var(--bb-void);
@@ -453,16 +477,42 @@
 }
 
 @layer utilities {
-  /* the panel idiom the design repeats: --bb-panel on a 1px --bb-line, 9px radius */
+  /*
+   * The panel idiom: `--bb-panel` on a 1px `--bb-line`, barely rounded. It used to
+   * be a 9px card and is now the flattest thing that still reads as a bounded
+   * region, which is what the accepted direction asks for — regions are separated
+   * by rules and by a change of surface, not by floating.
+   */
   .bb-card {
     background: var(--bb-panel);
     border: 1px solid var(--bb-line);
-    border-radius: 0.5625rem;
+    border-radius: 0.25rem;
   }
   .bb-chip {
     background: var(--bb-elevated);
     border: 1px solid var(--bb-edge);
-    border-radius: 0.375rem;
+    border-radius: 0.25rem;
+  }
+  /*
+   * A pane's title strip: the chrome band that names a region of the workspace and
+   * rules it off from its contents. 35 design pixels, so a row of them across the
+   * game screen lines up.
+   */
+  .bb-pane-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 2.1875rem;
+    flex: none;
+    padding: 0 0.625rem;
+    border-bottom: 1px solid var(--bb-line);
+    background: var(--bb-panel);
+    font-size: 0.6875rem;
+    /* The height is declared, so the row must not be allowed to wrap its way past it: a
+       strip too narrow for everything on it clips its last chip instead of becoming two
+       lines and pushing the pane's own contents down. */
+    overflow: hidden;
+    white-space: nowrap;
   }
   .tabular {
     font-variant-numeric: tabular-nums;

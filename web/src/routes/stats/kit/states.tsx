@@ -2,9 +2,9 @@
  * The card idiom the Dashboard and the Stats page are both built from, plus the three
  * states every one of them has to be able to be in (design 1c): loading, empty, failed.
  *
- * Geometry is lifted from design 2a/2d: a `#0b0d10` panel on a 1px `#1f242b` line at a
- * 9px radius, 13–14px of padding, a 12/12.5px semibold title, and a hairline-topped
- * footer for the one dry sentence each card ends on.
+ * Geometry: a `--bb-panel` pane on a 1px `--bb-line`, barely rounded, 13–14px of padding,
+ * a 12/12.5px semibold title, and a hairline-topped footer for the one dry sentence each
+ * card ends on.
  */
 import type { CSSProperties, ReactNode } from 'react'
 

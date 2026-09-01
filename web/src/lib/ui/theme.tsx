@@ -37,10 +37,14 @@ export const DEFAULT_PREFERENCE: ThemePreference = 'dark'
 
 const LIGHT_QUERY = '(prefers-color-scheme: light)'
 
-/** The `--bb-void` of each theme, for the browser-chrome `theme-color` meta. */
+/**
+ * The `--bb-panel` of each theme, for the browser-chrome `theme-color` meta: the
+ * titlebar is what runs along the top of the page, so it is the colour the browser's
+ * own chrome should continue.
+ */
 const THEME_COLOR: Record<ResolvedTheme, string> = {
-  dark: '#08090b',
-  light: '#f4f6f8',
+  dark: '#292a2a',
+  light: '#f2f2f0',
 }
 
 export function isThemePreference(value: unknown): value is ThemePreference {

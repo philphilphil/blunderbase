@@ -262,7 +262,7 @@ export function MoveList({
   return (
     <div data-testid="move-list" className={cn('flex min-h-0 flex-col', className)}>
       {showTabRow ? (
-      <div className="flex h-[2.375rem] flex-none items-stretch gap-0.5 border-b border-hairline px-3">
+      <div className="flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5">
         <Tab active={tab === 'moves'} onClick={() => setTab('moves')}>
           Moves
         </Tab>
@@ -750,9 +750,14 @@ function Tab({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center px-2.5 text-xs',
+        // The selected tab is the pane's own surface pushed up into the chrome strip, with
+        // its own sliver of that surface laid over the strip's bottom rule — so the tab and
+        // the pane under it read as one region, the way a desktop tool draws a tab. That is
+        // a stronger and quieter signal than the accent underline it replaces, and it costs
+        // the strip no colour at all.
+        'relative flex items-center px-3 text-xs transition-colors',
         active
-          ? 'font-medium text-ink shadow-[inset_0_-0.125rem_0_var(--bb-accent)]'
+          ? 'bg-surface font-medium text-ink after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-surface'
           : 'text-dim hover:text-ink',
       )}
     >

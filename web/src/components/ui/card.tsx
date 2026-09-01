@@ -2,7 +2,7 @@ import type * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-/** The panel idiom the design repeats: #0b0d10 on a 1px #1f242b line, 9px radius. */
+/** The pane idiom the app repeats: `--bb-panel` on a 1px `--bb-line`, barely rounded. */
 function Card({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div

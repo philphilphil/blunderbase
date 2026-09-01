@@ -18,7 +18,7 @@ import { TopBar } from './TopBar'
  */
 const TOAST_CLASSES = {
   toast:
-    'flex items-center gap-2.5 rounded-xl border border-edge-strong bg-elevated px-3.5 py-3 text-[0.78125rem] text-ink shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]',
+    'flex items-center gap-2.5 rounded-md border border-edge-strong bg-panel px-3.5 py-3 text-[0.78125rem] text-ink shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]',
   title: 'text-ink',
   description: 'text-dim',
   icon: 'flex-none',
@@ -31,7 +31,11 @@ const TOAST_CLASSES = {
 }
 
 /**
- * Layout 1a "Studio": a 46px titlebar over a 200px rail and the page's own canvas.
+ * Layout 1a "Studio": a 42px titlebar over a 200px rail and the page's own canvas. The
+ * titlebar and the rail are chrome (`--bb-panel`), the page is canvas (`--bb-surface`), and
+ * the boundary between the two is a rule — that pair is the whole visual grammar of the
+ * shell, and every pane inside a page repeats it.
+ *
  * Every route renders inside the `<Outlet />`, so a page never has to know about the
  * chrome — it fills the titlebar through `<SetPageChrome>` instead.
  *

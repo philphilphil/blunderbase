@@ -801,8 +801,16 @@ export function humanMoves(
   })
 }
 
-/** How many moves a comparison column lists — enough for a distribution, not a table. */
-export const COMPARE_MOVES = 3
+/**
+ * How many moves a comparison column lists: every move Maia returns, which is five.
+ *
+ * It was three, on the reasoning that a column of the engine band is narrow. That reasoning
+ * does not apply here — comparing is the one mode where the engine card stands down and the
+ * grid takes the whole band (`MaiaPanel`) — and it made the compare view show *less* per
+ * level than the single-level column beside it, which is the opposite of what opening it
+ * is for.
+ */
+export const COMPARE_MOVES = 5
 
 /** One level's column of the comparison grid. */
 export interface MaiaComparisonColumn {

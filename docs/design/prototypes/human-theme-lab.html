@@ -1,0 +1,332 @@
+<!doctype html>
+<!-- PROTOTYPE — one restrained Mac-native chess database direction. Delete or absorb after review. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blunderbase — native desktop pass</title>
+  <link rel="icon" href="../brand/favicon.png" />
+  <script>
+    (() => {
+      const queryTheme = new URLSearchParams(location.search).get('theme')
+      let savedTheme = null
+      try { savedTheme = localStorage.getItem('blunderbase-prototype-theme') } catch {}
+      const theme = ['light', 'dark'].includes(queryTheme)
+        ? queryTheme
+        : ['light', 'dark'].includes(savedTheme)
+          ? savedTheme
+          : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      document.documentElement.dataset.theme = theme
+    })()
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --chrome:#f2f2f0; --chrome2:#e7e7e4; --canvas:#fafaf8; --ink:#202020;
+      --muted:#71716e; --line:#d1d1cd; --line2:#b6b6b1; --select:#dbe6f2;
+      --link:#245f9e; --red:#bb3e35; --green:#34724a; --purple:#7054a5;
+    }
+    html[data-theme="dark"] {
+      color-scheme:dark;
+      --chrome:#292a2a; --chrome2:#1d1e1f; --canvas:#232424; --ink:#eeeeea;
+      --muted:#aaa9a4; --line:#3e4040; --line2:#555756; --select:#29445b;
+      --link:#83b7e3; --red:#ee766e; --green:#78b98c; --purple:#b098d7;
+    }
+    *{box-sizing:border-box} html,body{height:100%;margin:0}
+    body{min-width:320px;overflow:hidden;color:var(--ink);background:var(--chrome2);font:13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+    button{font:inherit} button,a{transition:background-color .12s,border-color .12s,color .12s}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--link);outline-offset:2px} a{color:var(--link);text-decoration:none} a:hover{text-decoration:underline}
+    .app{display:grid;grid-template-rows:42px 1fr;height:100%}
+
+    .toolbar{display:flex;align-items:center;gap:13px;padding:0 12px;border-bottom:1px solid var(--line2);background:var(--chrome)}
+    .brand{display:flex;align-items:center;gap:7px;font-weight:650;letter-spacing:-.01em}.brand img{width:18px;height:18px}
+    .divider{width:1px;height:19px;background:var(--line)}.crumb{color:var(--muted)}.spacer{flex:1}
+    .job{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px}.job i{width:64px;height:4px;background:#d4d4d0}.job i:before{content:"";display:block;width:74%;height:100%;background:var(--green)}
+    .tool{height:29px;min-width:31px;padding:0 8px;border:1px solid var(--line2);border-radius:4px;color:#555;background:#fafaf8}.tool:hover{border-color:#91918c;background:#fff}.theme-toggle{display:flex;align-items:center;justify-content:center;gap:6px;min-width:67px}.theme-toggle span:first-child{font-size:14px}.theme-toggle span:last-child{font-size:11px}
+
+    .workspace{display:grid;grid-template-columns:196px minmax(0,1fr);min-height:0}
+    .sidebar{display:flex;flex-direction:column;min-height:0;padding:11px 8px 9px;border-right:1px solid var(--line2);background:var(--chrome)}
+    .side-label{margin:7px 8px 4px;color:#82827e;font-size:10px;font-weight:600}
+    .nav{display:grid;gap:1px}.nav a{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:7px;min-height:29px;padding:0 8px;border-radius:4px;color:#4b4b48}.nav a:hover{background:#e8e8e5;text-decoration:none}.nav a.active{color:#1d1d1c;background:var(--select)}
+    .icon{color:#747471;text-align:center;font-size:12px}.count{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+    .side-rule{height:1px;margin:9px 8px;background:var(--line)}
+    .sources{margin-top:auto}.source{display:flex;align-items:center;gap:8px;min-height:26px;padding:0 8px;color:#555;font-size:11px}.dot{width:7px;height:7px;border-radius:50%;background:#999}.dot.live{background:var(--green)}
+    .coverage{margin:8px 8px 0;padding-top:8px;border-top:1px solid var(--line);color:var(--muted);font-size:10px}.coverage-bar{height:4px;margin:7px 0 4px;background:#d7d7d3}.coverage-bar:before{content:"";display:block;width:64%;height:100%;background:#858b8f}
+
+    .main{min-width:0;overflow:auto;background:var(--canvas)}.page{min-width:790px;max-width:1510px;margin:0 auto;padding:22px 26px 42px}
+    .page-head{display:flex;align-items:end;gap:18px;min-height:44px;margin-bottom:19px}.page-head h1{margin:0 0 2px;font-size:21px;line-height:1;letter-spacing:-.02em}.page-head p{margin:0;color:var(--muted)}
+    .actions{display:flex;gap:7px;margin-left:auto}.button{min-height:29px;padding:0 10px;border:1px solid var(--line2);border-radius:4px;color:#333;background:#f7f7f5}.button.primary{color:#fff;border-color:#4c6c56;background:#4c6c56}
+    .content{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:24px}.left,.right{min-width:0}.section{margin-bottom:24px}
+    .section-head{display:flex;align-items:baseline;gap:9px;min-height:31px;padding-bottom:7px;border-bottom:1px solid var(--line2)}.section-head h2{margin:0;font-size:14px;font-weight:650}.detail{color:var(--muted);font-size:11px}.end{margin-left:auto}
+
+    .segments{display:flex;gap:1px}.segments button{padding:2px 7px;border:0;color:var(--muted);background:transparent;font-size:11px}.segments button.active{color:var(--ink);background:var(--chrome2)}
+    .rating-summary{display:flex;align-items:baseline;gap:8px;padding-top:14px}.rating-summary strong{font-size:25px;font-weight:500;letter-spacing:-.03em}.gain{color:var(--green);font-size:11px}
+    .legend{display:flex;gap:14px;margin-left:auto;color:var(--muted);font-size:11px}.legend i{display:inline-block;width:14px;height:2px;margin:0 5px 3px 0;background:var(--link)}.legend i.purple{background:var(--purple)}
+    .chart{width:100%;height:214px;margin-top:3px}.chart .grid{stroke:#dfdfdb;stroke-width:1}.chart .axis{stroke:#bdbdb8;stroke-width:1}.chart .a{fill:none;stroke:var(--link);stroke-width:2}.chart .b{fill:none;stroke:var(--purple);stroke-width:2}.chart text{fill:#858580;font:9px -apple-system,BlinkMacSystemFont,sans-serif}
+
+    table{width:100%;border-collapse:collapse}th{height:28px;color:var(--muted);font-size:10px;font-weight:500;text-align:left}td{height:43px;border-top:1px solid #e0e0dc}tr:hover td{background:#f2f2ef}
+    .move{color:var(--red);font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace}.opponent{font-weight:500}.sub{display:block;margin-top:2px;color:var(--muted);font-size:10px}.loss{color:var(--red);font-variant-numeric:tabular-nums}.reviewed{color:var(--green)}.unreviewed{color:var(--muted)}
+
+    .recent{border-bottom:1px solid var(--line)}.game{display:grid;grid-template-columns:18px 1fr auto;gap:6px;align-items:center;min-height:43px;border-top:1px solid #e0e0dc}.game:first-child{border-top:0}
+    .result{font:650 11px ui-monospace,SFMono-Regular,Menlo,monospace}.win{color:var(--green)}.loss-result{color:var(--red)}.game-name{font-size:12px}.game-meta{display:block;color:var(--muted);font-size:10px}.game-rating{color:var(--muted);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .queue{border-bottom:1px solid var(--line)}.queue-row{padding:10px 0;border-top:1px solid #e0e0dc}.queue-row:first-child{border-top:0}.queue-line{display:flex;justify-content:space-between;gap:10px;font-size:11px}.queue-line span:last-child{color:var(--muted)}.queue-bar{height:3px;margin-top:7px;background:#dededa}.queue-bar i{display:block;height:100%;background:var(--green)}
+    .summary{display:grid;grid-template-columns:1fr auto;row-gap:11px;padding:12px 0;border-bottom:1px solid var(--line)}.summary dt{color:var(--muted)}.summary dd{margin:0;font-variant-numeric:tabular-nums}.summary .bad{color:var(--red)}
+
+    /* Game detail: board, score, and analysis are one split-view workspace. */
+    .screen{display:none}body[data-screen="overview"] .overview-screen,body[data-screen="game"] .game-screen{display:block}
+    .brand,.screen-link,.game-link{cursor:pointer}
+    .game-screen{min-width:1080px;height:100%;overflow:hidden}
+    .game-page{display:grid;grid-template-rows:68px minmax(0,1fr);height:100%}
+    .game-head{display:flex;align-items:center;gap:16px;padding:10px 17px;border-bottom:1px solid var(--line2);background:var(--canvas)}
+    .game-head-main{min-width:0}.game-head h1{overflow:hidden;margin:0 0 4px;font-size:16px;font-weight:650;line-height:1.15;text-overflow:ellipsis;white-space:nowrap}.game-head p{margin:0;color:var(--muted);font-size:11px}
+    .game-head .player{color:var(--ink);font-weight:550}.game-head .score{margin:0 4px;color:var(--muted)}
+    .tag{display:inline-block;margin-left:6px;padding:1px 5px;border:1px solid var(--line);border-radius:3px;color:var(--muted);font:10px ui-monospace,SFMono-Regular,Menlo,monospace;vertical-align:1px}
+    .tier{margin-left:auto;padding:4px 7px;border:1px solid #c7bce0;border-radius:4px;color:var(--purple);background:#f1edf8;font-size:11px;white-space:nowrap}
+    .game-columns{display:grid;grid-template-columns:minmax(510px,1.18fr) minmax(275px,.67fr) minmax(290px,.7fr);min-height:0}
+    .pane{min-width:0;min-height:0;border-right:1px solid var(--line2);background:var(--canvas)}.pane:last-child{border-right:0}
+    .pane-title{display:flex;align-items:center;gap:8px;height:35px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--chrome);font-size:11px}.pane-title strong{font-weight:650}.pane-title .end{color:var(--muted)}
+
+    .board-pane{display:grid;grid-template-rows:minmax(0,1fr) 39px 142px;overflow:hidden}
+    .board-area{display:grid;place-items:center;min-height:0;padding:14px 16px 10px}
+    .board-shell{display:flex;gap:7px;width:min(100%,630px);max-height:100%;aspect-ratio:1.035/1}
+    .evalbar{position:relative;width:16px;flex:none;overflow:hidden;border:1px solid #9b9b96;background:#393b3d}.evalbar:before{content:"";position:absolute;right:0;bottom:0;left:0;height:58%;background:#eee}.evalbar span{position:absolute;z-index:1;bottom:6px;left:50%;transform:translateX(-50%) rotate(-90deg);color:#333;font:9px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .board{position:relative;min-width:0;flex:1;aspect-ratio:1;align-self:center;border:1px solid #8f9699;background-color:#d8dde0;background-image:conic-gradient(#8f9da5 25%,#d8dde0 25% 50%,#8f9da5 50% 75%,#d8dde0 75%);background-size:25% 25%;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+    .piece{position:absolute;left:calc(var(--x)*12.5%);top:calc(var(--y)*12.5%);display:grid;place-items:center;width:12.5%;height:12.5%;font:clamp(25px,3.1vw,48px)/1 Georgia,"Times New Roman",serif;text-shadow:0 1px 0 rgba(255,255,255,.25);user-select:none}.piece.white{color:#fafafa;text-shadow:0 1px 1px #111,0 0 1px #111}.piece.black{color:#111}
+    .square-mark{position:absolute;left:calc(var(--x)*12.5%);top:calc(var(--y)*12.5%);width:12.5%;height:12.5%;box-shadow:inset 0 0 0 3px rgba(187,62,53,.8)}
+    .coord{position:absolute;color:rgba(20,20,20,.48);font:8px ui-monospace,SFMono-Regular,Menlo,monospace}.coord.file{right:2px;bottom:1px}.coord.rank{top:1px;left:2px}
+    .board-controls{display:flex;align-items:center;justify-content:center;gap:5px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--chrome)}
+    .board-controls button{min-width:31px;height:27px;border:1px solid var(--line2);border-radius:4px;color:#555;background:#fafaf8}.board-controls .ply{margin-left:8px;color:var(--muted);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .game-lower{display:grid;grid-template-columns:150px 1fr;min-height:0}.eval-summary{padding:10px;border-right:1px solid var(--line)}.eval-summary b{display:block;margin-bottom:7px;font-size:11px}.eval-row{display:flex;justify-content:space-between;margin-top:4px;color:var(--muted);font-size:10px}.eval-row .bad{color:var(--red)}
+    .mini-eval{padding:9px 10px}.mini-eval svg{width:100%;height:77px}.mini-eval .grid{stroke:#ddd;stroke-width:1}.mini-eval .curve{fill:none;stroke:#555;stroke-width:1.5}.mini-eval .blunder{fill:var(--red)}.mini-eval .cursor{stroke:var(--link);stroke-width:1;stroke-dasharray:2 2}
+
+    .notation-pane{display:grid;grid-template-rows:74px 35px minmax(0,1fr);overflow:hidden}
+    .players{padding:9px 11px;border-bottom:1px solid var(--line)}.player-row{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:7px;min-height:27px}.side-piece{width:10px;height:10px;border:1px solid #777;border-radius:50%;background:#fff}.side-piece.black{background:#333}.player-row strong{font-size:12px}.player-row span:last-child{color:var(--muted);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .tabs{display:flex;border-bottom:1px solid var(--line);background:var(--chrome)}.tabs button{padding:0 12px;border:0;border-right:1px solid var(--line);color:var(--muted);background:transparent;font-size:11px}.tabs button.active{color:var(--ink);background:var(--canvas)}.tabs .flag-count{margin-left:4px;color:var(--red)}
+    .notation{overflow:auto;padding:7px 0 16px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.notation-row{display:grid;grid-template-columns:32px 1fr 1fr;align-items:center;min-height:29px;padding:0 9px}.notation-row:hover{background:#f1f1ee}.notation-row .no{color:#999;text-align:right;padding-right:8px}.notation-move{padding:4px 6px;border-radius:3px;cursor:pointer}.notation-move.flag{color:var(--red)}.notation-move.warn{color:#9b6819}.notation-move.active{outline:1px solid #6f98b9;background:#dce9f1}.glyph{margin-left:4px;padding:1px 3px;border-radius:3px;color:#fff;background:var(--red);font:8px -apple-system,BlinkMacSystemFont,sans-serif}
+    .annotation{margin:3px 10px 6px 41px;padding:6px 8px;border-left:2px solid var(--red);color:#555;background:#f2f2ef;font:10px/1.4 -apple-system,BlinkMacSystemFont,sans-serif}.annotation b{color:var(--red);font-weight:550}
+
+    .analysis-pane{display:grid;grid-template-rows:minmax(250px,1.08fr) minmax(220px,.92fr);overflow:hidden}.engine,.notes-pane{display:grid;grid-template-rows:35px minmax(0,1fr);min-height:0}.engine{border-bottom:1px solid var(--line2)}
+    .engine-lines{overflow:auto}.engine-line{display:grid;grid-template-columns:47px 1fr;gap:7px;padding:9px 10px;border-bottom:1px solid #e1e1dd}.engine-line:hover,.engine-line.active{background:#f0f0ed}.engine-eval{font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.engine-line.active .engine-eval{color:var(--green);font-weight:650}.pv{color:#555;font:10px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}.pv b{color:var(--ink);font-weight:600}
+    .notes-body{display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0}.notes-list{overflow:auto;padding:8px 10px}.position-note{padding:8px 0;border-bottom:1px solid #e0e0dc;color:#444;font-size:11px}.position-note:first-child{padding-top:0}.position-note small{display:block;margin-top:5px;color:var(--muted);font-size:9px}.note-form{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line);background:var(--chrome)}.note-form input{min-width:0;flex:1;height:28px;padding:0 7px;border:1px solid var(--line2);border-radius:4px;background:#fff}.note-form button{height:28px;border:1px solid #4c6c56;border-radius:4px;color:#fff;background:#4c6c56}
+
+    /* Align the accepted visual direction with the real screen's current geometry. */
+    .game-columns{grid-template-columns:minmax(500px,1.16fr) minmax(290px,.67fr) minmax(245px,.56fr);grid-template-rows:184px minmax(0,1fr) 144px 41px;background:var(--chrome2)}
+    .board-pane{grid-column:1;grid-row:1/-1;grid-template-rows:27px minmax(0,1fr) 27px 39px;border-right:1px solid var(--line2);background:var(--canvas)}
+    .board-player{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:7px;padding:0 16px;color:#4a4a47;font-size:11px}.board-player.top{border-bottom:1px solid var(--line)}.board-player.bottom{border-top:1px solid var(--line)}.board-player b{font-weight:600}.board-player .material{color:var(--muted);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .board-area{padding:10px 14px}.game-lower{display:none}.notation-pane{grid-column:2;grid-row:2;grid-template-rows:35px minmax(0,1fr);border-right:1px solid var(--line2);background:var(--canvas)}.notation-pane>.players{display:none}
+    .analysis-pane{display:contents}.notes-pane{grid-column:3;grid-row:2;display:grid;border:0;background:var(--canvas)}
+    .engine{grid-column:2/4;grid-row:1;display:grid;grid-template-columns:minmax(165px,.34fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:0;padding:0;border-bottom:1px solid var(--line2);background:var(--canvas)}
+    .engine-card{display:grid;grid-template-rows:34px minmax(0,1fr);min-width:0;overflow:hidden;border:0;background:var(--canvas)}.engine-card+ .engine-card{border-left:1px solid var(--line2)}
+    .engine-card .pane-title{height:34px}.maia-body{padding:9px 10px}.maia-pick{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.maia-pick b{font-size:12px}.maia-pick span{color:var(--muted);font-size:9px}.maia-moves{display:grid;grid-template-columns:1fr auto;gap:5px 9px;font:10px ui-monospace,SFMono-Regular,Menlo,monospace}.maia-moves b{font-weight:400;text-align:right}
+    .engine-card .engine-lines{overflow:auto}.engine-card .engine-line{padding:7px 9px}.engine-card .engine-line:last-child{border-bottom:0}
+    .right-eval{grid-column:2/4;grid-row:3;display:grid;grid-template-columns:150px minmax(0,1fr);overflow:hidden;border-top:1px solid var(--line2);background:var(--canvas)}
+    .right-eval .eval-summary{padding:9px 10px;background:var(--chrome)}.right-eval .mini-eval{padding:10px 12px}.right-eval .mini-eval svg{height:81px}.eval-caption{display:flex;justify-content:space-between;margin-top:4px;color:var(--muted);font-size:9px}.eval-caption b{color:var(--ink);font-weight:550}
+    .live-footer{grid-column:2/4;grid-row:4;display:flex;align-items:center;gap:9px;padding:0 10px;border-top:1px solid var(--line2);background:var(--chrome)}.live-footer .toggle{width:28px;height:16px;padding:2px;border-radius:10px;background:#aab0b3}.live-footer .toggle:before{content:"";display:block;width:12px;height:12px;border-radius:50%;background:white}.live-footer strong{font-size:10px}.live-footer span{color:var(--muted);font-size:9px}.live-footer button{margin-left:auto;height:25px;border:1px solid var(--line2);border-radius:4px;color:#555;background:#fafaf8;font-size:10px}
+    .prototype{position:fixed;right:10px;bottom:10px;padding:5px 8px;border:1px solid #999;border-radius:4px;color:#666;background:rgba(250,250,248,.94);font-size:9px}
+
+    /* Dark mode preserves the same hierarchy: chrome, canvas, selected rows, then data. */
+    html[data-theme="dark"] .brand img{filter:invert(1) brightness(1.22)}
+    html[data-theme="dark"] .tool,html[data-theme="dark"] .button,html[data-theme="dark"] .board-controls button,html[data-theme="dark"] .live-footer button{color:#deded9;background:#343535}
+    html[data-theme="dark"] .tool:hover,html[data-theme="dark"] .button:hover,html[data-theme="dark"] .board-controls button:hover,html[data-theme="dark"] .live-footer button:hover{border-color:#777975;background:#3d3e3e}
+    html[data-theme="dark"] .button.primary,html[data-theme="dark"] .note-form button{color:white;border-color:#567e64;background:#486b55}
+    html[data-theme="dark"] .job i{background:#454746}
+    html[data-theme="dark"] .nav a{color:#c8c8c3}html[data-theme="dark"] .nav a:hover{background:#343535;text-decoration:none}html[data-theme="dark"] .nav a.active{color:#f5f5f1;background:var(--select)}
+    html[data-theme="dark"] .icon,html[data-theme="dark"] .source{color:#b4b4af}html[data-theme="dark"] .coverage-bar{background:#414342}
+    html[data-theme="dark"] .chart .grid,html[data-theme="dark"] .mini-eval .grid{stroke:#3d3f3e}html[data-theme="dark"] .chart .axis{stroke:#5a5c5a}html[data-theme="dark"] .chart text{fill:#9c9c97}
+    html[data-theme="dark"] td,html[data-theme="dark"] .game,html[data-theme="dark"] .queue-row,html[data-theme="dark"] .engine-line,html[data-theme="dark"] .position-note{border-color:#3a3c3b}html[data-theme="dark"] tr:hover td,html[data-theme="dark"] .notation-row:hover,html[data-theme="dark"] .engine-line:hover,html[data-theme="dark"] .engine-line.active{background:#2d2f2e}
+    html[data-theme="dark"] .queue-bar{background:#414342}html[data-theme="dark"] .annotation{color:#c7c7c2;background:#2e302f}
+    html[data-theme="dark"] .notation-move.warn{color:#d7a34e}html[data-theme="dark"] .notation-move.active{outline-color:#76a8cf;background:#29445b}
+    html[data-theme="dark"] .pv,html[data-theme="dark"] .position-note{color:#c8c8c3}html[data-theme="dark"] .note-form input{color:var(--ink);background:#1d1e1f}
+    html[data-theme="dark"] .tier{color:#c6adeb;border-color:#675686;background:#322b40}
+    html[data-theme="dark"] .right-eval .eval-summary{background:var(--chrome)}html[data-theme="dark"] .mini-eval .curve{stroke:#b4b4af}
+    html[data-theme="dark"] .evalbar:before{background:#d8d8d3}html[data-theme="dark"] .prototype{color:#b8b8b3;border-color:#62635f;background:rgba(35,36,36,.94)}
+
+    @media(max-width:900px){.workspace{grid-template-columns:52px minmax(0,1fr)}.sidebar{padding-inline:6px}.side-label,.side-rule,.sources,.nav a span:not(.icon),.nav .count{display:none}.nav a{grid-template-columns:1fr;place-items:center;padding:0}}
+    @media(max-width:1200px){.game-columns{grid-template-columns:minmax(480px,1.05fr) 285px 245px}.piece{font-size:34px}}
+    @media(max-width:620px){.crumb,.divider,.job span{display:none}.page{min-width:720px;padding-inline:18px}}
+  </style>
+</head>
+<body data-screen="overview">
+  <div class="app">
+    <header class="toolbar">
+      <div class="brand screen-link" data-screen="overview"><img src="../brand/logo.png" alt="" />Blunderbase</div><div class="divider"></div><span class="crumb" id="crumb">Overview</span><div class="spacer"></div>
+      <div class="job"><span>Analysing</span><i></i><b>2 / 2</b></div><button class="tool theme-toggle" id="theme-toggle" type="button"><span id="theme-icon" aria-hidden="true">☀</span><span id="theme-label">Light</span></button><button class="tool" aria-label="Search">⌘K</button><button class="tool" aria-label="Account">○</button>
+    </header>
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="side-label">Library</div>
+        <nav class="nav" aria-label="Library"><a class="active screen-link" data-screen="overview" href="#"><span class="icon">▦</span><span>Overview</span></a><a class="screen-link" data-screen="game" href="#"><span class="icon">▥</span><span>Games</span><span class="count">72</span></a><a href="#"><span class="icon">⌘</span><span>Openings</span></a><a href="#"><span class="icon">▥</span><span>Stats</span></a><a href="#"><span class="icon">□</span><span>Notes</span></a><a href="#"><span class="icon">◉</span><span>Live</span></a></nav>
+        <div class="side-rule"></div><div class="side-label">Manage</div>
+        <nav class="nav" aria-label="Manage"><a href="#"><span class="icon">↓</span><span>Import</span></a><a href="#"><span class="icon">◔</span><span>Analysis</span></a><a href="#"><span class="icon">⚙</span><span>Engines</span></a></nav>
+        <div class="sources"><div class="side-label">Engines</div><div class="source"><i class="dot"></i>Stockfish 18</div><div class="source"><i class="dot live"></i>stockfish-remote</div><div class="source"><i class="dot live"></i>Maia 2</div><div class="coverage">46 of 72 analysed deeply<div class="coverage-bar"></div>Library coverage 64%</div></div>
+      </aside>
+      <main class="main"><div class="page screen overview-screen">
+        <header class="page-head"><div><h1>Overview</h1><p>72 games in the database. 213 blunders on the record.</p></div><div class="actions"><button class="button">Import PGN</button><button class="button primary">Sync accounts</button></div></header>
+        <div class="content">
+          <div class="left">
+            <section class="section">
+              <header class="section-head"><h2>Rating</h2><span class="detail">Blitz</span><div class="segments end"><button class="active">All</button><button>1y</button><button>90d</button><button>30d</button></div></header>
+              <div class="rating-summary"><strong>1,642</strong><span class="gain">+84</span><div class="legend"><span><i></i>Lichess 1,642</span><span><i class="purple"></i>Chess.com 1,604</span></div></div>
+              <svg class="chart" viewBox="0 0 800 214" preserveAspectRatio="none" aria-label="Blitz rating over time">
+                <line class="grid" x1="35" y1="25" x2="800" y2="25"/><line class="grid" x1="35" y1="75" x2="800" y2="75"/><line class="grid" x1="35" y1="125" x2="800" y2="125"/><line class="axis" x1="35" y1="175" x2="800" y2="175"/>
+                <path class="a" d="M35 150 C62 135,84 160,112 146 S169 121,205 136 S261 118,304 112 S349 137,392 110 S451 104,484 80 S526 105,566 77 S623 70,658 55 S711 73,748 43 S780 51,800 34"/>
+                <path class="b" d="M35 157 C85 149,119 144,161 136 S240 128,282 116 S351 124,410 103 S486 93,527 82 S601 76,650 61 S726 55,800 42"/>
+                <text x="0" y="29">1650</text><text x="0" y="79">1600</text><text x="0" y="129">1550</text><text x="0" y="179">1500</text><text x="35" y="201">Mar</text><text x="180" y="201">Apr</text><text x="330" y="201">May</text><text x="480" y="201">Jun</text><text x="630" y="201">Jul</text><text x="775" y="201">Aug</text>
+              </svg>
+            </section>
+            <section class="section">
+              <header class="section-head"><h2>Worst recent moments</h2><span class="detail">by win percentage given away</span><a class="end" href="#">All blunders</a></header>
+              <table><thead><tr><th>Move</th><th>Game</th><th>Better</th><th>Loss</th><th>Review</th></tr></thead><tbody>
+                <tr><td class="move">32…Bxf7??</td><td><span class="opponent">Amira Novak</span><span class="sub">18 Aug · Rapid</span></td><td>Nc6</td><td class="loss">−61.2%</td><td class="unreviewed">Not reviewed</td></tr>
+                <tr><td class="move">44…Kxc5??</td><td><span class="opponent">Samir Khan</span><span class="sub">11 Jul · Blitz</span></td><td>a5</td><td class="loss">−46.4%</td><td class="reviewed">Note added</td></tr>
+                <tr><td class="move">21.Nd2?!</td><td><span class="opponent">Eva Santos</span><span class="sub">8 Jun · Rapid</span></td><td>Rxb2</td><td class="loss">−32.1%</td><td class="unreviewed">Not reviewed</td></tr>
+              </tbody></table>
+            </section>
+          </div>
+          <aside class="right">
+            <section class="section"><header class="section-head"><h2>Recent games</h2><a class="end" href="#">All 72</a></header><div class="recent">
+              <div class="game game-link" data-screen="game"><span class="result win">W</span><span class="game-name">Owen Clarke<span class="game-meta">Sicilian · 14 min</span></span><span class="game-rating">1595</span></div>
+              <div class="game game-link" data-screen="game"><span class="result loss-result">L</span><span class="game-name">Sofia Costa<span class="game-meta">Queen’s Gambit · 22 min</span></span><span class="game-rating">1553</span></div>
+              <div class="game game-link" data-screen="game"><span class="result win">W</span><span class="game-name">Samir Khan<span class="game-meta">Caro–Kann · 9 min</span></span><span class="game-rating">1533</span></div>
+              <div class="game game-link" data-screen="game"><span class="result win">W</span><span class="game-name">Clara Stein<span class="game-meta">English · 18 min</span></span><span class="game-rating">1672</span></div>
+              <div class="game game-link" data-screen="game"><span class="result loss-result">L</span><span class="game-name">Theo Fischer<span class="game-meta">Zukertort · 11 min</span></span><span class="game-rating">1630</span></div>
+            </div></section>
+            <section class="section"><header class="section-head"><h2>Analysis queue</h2><span class="detail end">2 running</span></header><div class="queue">
+              <div class="queue-row"><div class="queue-line"><b>stockfish-remote</b><span>83%</span></div><div class="queue-bar"><i style="width:83%"></i></div></div>
+              <div class="queue-row"><div class="queue-line"><b>Maia 1800</b><span>45 / 77 ply</span></div><div class="queue-bar"><i style="width:58%"></i></div></div>
+            </div></section>
+            <section class="section"><header class="section-head"><h2>Last 30 days</h2></header><dl class="summary"><dt>Games</dt><dd>13</dd><dt>Blunders per game</dt><dd class="bad">2.8 ↑</dd><dt>Win % given away</dt><dd class="bad">5.2 ↑</dd><dt>Score</dt><dd>54%</dd></dl></section>
+          </aside>
+        </div>
+      </div>
+
+      <div class="screen game-screen">
+        <div class="game-page">
+          <header class="game-head">
+            <div class="game-head-main">
+              <h1>Queen’s Pawn Opening · Zukertort Chigorin <span class="tag">D02</span></h1>
+              <p><span class="player">Theo Fischer</span> 1630 <span class="score">—</span> <span class="player">alex_knight</span> 1594 · Lichess · Blitz 3+2 · 1–0 · 19 Aug 2026</p>
+            </div>
+            <span class="tier">Deep · 2m nodes · MPV 4</span>
+          </header>
+
+          <div class="game-columns">
+            <section class="pane board-pane" aria-label="Board and evaluation">
+              <div class="board-player top"><i class="side-piece black"></i><b>alex_knight</b><span class="material">1594 · ♟ +1</span></div>
+              <div class="board-area">
+                <div class="board-shell">
+                  <div class="evalbar"><span>+0.42</span></div>
+                  <div class="board" aria-label="Chess position after 23 Rxc7">
+                    <span class="square-mark" style="--x:4;--y:4"></span>
+                    <span class="piece black" style="--x:2;--y:0">♚</span><span class="piece black" style="--x:3;--y:1">♛</span><span class="piece black" style="--x:3;--y:0">♜</span><span class="piece black" style="--x:4;--y:1">♜</span><span class="piece black" style="--x:3;--y:3">♞</span>
+                    <span class="piece black" style="--x:0;--y:3">♟</span><span class="piece black" style="--x:2;--y:3">♟</span><span class="piece black" style="--x:4;--y:3">♟</span><span class="piece black" style="--x:6;--y:2">♟</span><span class="piece black" style="--x:7;--y:2">♟</span>
+                    <span class="piece white" style="--x:1;--y:6">♔</span><span class="piece white" style="--x:5;--y:1">♕</span><span class="piece white" style="--x:1;--y:7">♖</span><span class="piece white" style="--x:5;--y:7">♖</span><span class="piece white" style="--x:2;--y:1">♘</span><span class="piece white" style="--x:5;--y:5">♘</span>
+                    <span class="piece white" style="--x:0;--y:6">♙</span><span class="piece white" style="--x:1;--y:5">♙</span><span class="piece white" style="--x:2;--y:6">♙</span><span class="piece white" style="--x:3;--y:4">♙</span><span class="piece white" style="--x:5;--y:6">♙</span><span class="piece white" style="--x:6;--y:6">♙</span><span class="piece white" style="--x:7;--y:5">♙</span>
+                    <span class="coord rank">8</span><span class="coord file">h</span>
+                  </div>
+                </div>
+              </div>
+              <div class="board-player bottom"><i class="side-piece"></i><b>Theo Fischer</b><span class="material">1630 · to move</span></div>
+              <div class="board-controls">
+                <button data-ply-step="first" aria-label="First move">|◀</button><button data-ply-step="-1" aria-label="Previous move">◀</button><button data-ply-step="1" aria-label="Next move">▶</button><button data-ply-step="last" aria-label="Last move">▶|</button>
+                <button aria-label="Flip board">⇅</button><button>Hints</button><span class="ply" id="ply-state">ply 45 / 77 · +0.42</span>
+              </div>
+              <div class="game-lower">
+                <div class="eval-summary"><b>Evaluation</b><div class="eval-row"><span>Inaccuracies</span><span>4 / 2</span></div><div class="eval-row"><span>Mistakes</span><span>2 / 1</span></div><div class="eval-row"><span>Blunders</span><span class="bad">4 / 3</span></div><div class="eval-row"><span>ACPL</span><span>48 / 47</span></div></div>
+                <div class="mini-eval"><svg viewBox="0 0 400 77" preserveAspectRatio="none" aria-label="Evaluation over the game"><line class="grid" x1="0" y1="38" x2="400" y2="38"/><line class="cursor" x1="235" y1="0" x2="235" y2="77"/><path class="curve" d="M0 39 C35 34,58 44,91 35 S145 27,174 32 S205 17,224 25 S252 45,278 38 S317 56,343 50 S376 64,400 18"/><circle class="blunder" cx="235" cy="44" r="4"/><circle class="blunder" cx="343" cy="50" r="4"/><circle class="blunder" cx="400" cy="18" r="4"/></svg></div>
+              </div>
+            </section>
+
+            <section class="pane notation-pane" aria-label="Game notation">
+              <div class="players"><div class="player-row"><i class="side-piece"></i><strong>Theo Fischer</strong><span>1630</span></div><div class="player-row"><i class="side-piece black"></i><strong>alex_knight</strong><span>1594</span></div></div>
+              <div class="tabs"><button class="active">Moves</button><button>Flagged <span class="flag-count">16</span></button><button>PGN</button></div>
+              <div class="notation">
+                <div class="notation-row"><span class="no">17.</span><span class="notation-move">a4</span><span class="notation-move flag">exd4 <i class="glyph">?</i></span></div>
+                <div class="notation-row"><span class="no">18.</span><span class="notation-move flag">exd4 <i class="glyph">?</i></span><span class="notation-move warn">g5 <i class="glyph">?!</i></span></div>
+                <div class="notation-row"><span class="no">19.</span><span class="notation-move">a5</span><span class="notation-move">h5</span></div>
+                <div class="notation-row"><span class="no">20.</span><span class="notation-move">b5</span><span class="notation-move">g4</span></div>
+                <div class="notation-row"><span class="no">21.</span><span class="notation-move warn">Nd2 <i class="glyph">?!</i></span><span class="notation-move flag">f5 <i class="glyph">?</i></span></div>
+                <div class="annotation">Engine line: 21…Nxd2 22.Qxd2 Qe2 23.Qxe2</div>
+                <div class="notation-row"><span class="no">22.</span><span class="notation-move">b6</span><span class="notation-move">a6</span></div>
+                <div class="notation-row"><span class="no">23.</span><span class="notation-move active flag" data-ply="45">bxc7 <i class="glyph">??</i></span><span class="notation-move">Rxc7</span></div>
+                <div class="annotation">Best was <b>c6</b>. Evaluation +2.18 → +0.42 (−15.2% win).</div>
+                <div class="notation-row"><span class="no">24.</span><span class="notation-move">Rab1</span><span class="notation-move warn">f4 <i class="glyph">?!</i></span></div>
+                <div class="notation-row"><span class="no">25.</span><span class="notation-move">Rfe1</span><span class="notation-move">Qf6</span></div>
+                <div class="notation-row"><span class="no">26.</span><span class="notation-move">Nxe4</span><span class="notation-move">dxe4</span></div>
+                <div class="notation-row"><span class="no">27.</span><span class="notation-move warn">Qxe4 <i class="glyph">?!</i></span><span class="notation-move flag">Rxd4 <i class="glyph">??</i></span></div>
+                <div class="notation-row"><span class="no">28.</span><span class="notation-move">Qe8+</span><span class="notation-move">Rd8</span></div>
+                <div class="notation-row"><span class="no">29.</span><span class="notation-move flag">Qe6+ <i class="glyph">??</i></span><span class="notation-move">Qxe6</span></div>
+                <div class="notation-row"><span class="no">30.</span><span class="notation-move">Rxe6</span><span class="notation-move">Rxc5</span></div>
+                <div class="notation-row"><span class="no">31.</span><span class="notation-move">Rf6</span><span class="notation-move">Rb5</span></div>
+              </div>
+            </section>
+
+            <aside class="pane analysis-pane" aria-label="Analysis inspector">
+              <section class="engine">
+                <div class="engine-card"><header class="pane-title"><strong>Maia</strong><span class="end">1800 ▾</span></header><div class="maia-body"><div class="maia-pick"><b>Rxc7</b><span>played move</span></div><div class="maia-moves"><span>Rxc7</span><b>31%</b><span>Nd6</span><b>22%</b><span>Rf8</span><b>14%</b></div></div></div>
+                <div class="engine-card"><header class="pane-title"><i class="dot live"></i><strong>stockfish-remote</strong><span>2m nodes</span><span class="end">MPV 4&nbsp;&nbsp; ☷ &nbsp;⚙</span></header><div class="engine-lines">
+                  <div class="engine-line active"><span class="engine-eval">+0.42</span><span class="pv"><b>23…Rxc7</b> 24.f3 Nd6 25.Rae1 Qg7 26.Re5 Kb8 27.Rxd5</span></div>
+                  <div class="engine-line"><span class="engine-eval">+1.05</span><span class="pv"><b>23…Re8</b> 24.Nxe4 fxe4 25.c6 Rxc6 26.cxb7+ Kb8</span></div>
+                  <div class="engine-line"><span class="engine-eval">+1.23</span><span class="pv"><b>23…Rf8</b> 24.f3 gxf3 25.Nxf3 Rxc7 26.Rab1 h4</span></div>
+                </div></div>
+              </section>
+              <section class="notes-pane"><header class="pane-title"><strong>Position notes</strong><span class="end">ply 45</span></header><div class="notes-body"><div class="notes-list">
+                <div class="position-note">I took on c7 because the rook looked trapped. Check whether c6 keeps the queenside closed.<small>19 Aug · linked to 23.bxc7</small></div>
+                <div class="position-note">Recurring: committing before choosing a wing in a closed centre.<small>Tag: planning · closed centre</small></div>
+              </div><form class="note-form"><input aria-label="New position note" placeholder="Add a note to this position…"/><button type="button">Add</button></form></div></section>
+            </aside>
+            <section class="right-eval" aria-label="Game evaluation">
+              <div class="eval-summary"><b>Evaluation</b><div class="eval-row"><span>Inaccuracies</span><span>4 / 2</span></div><div class="eval-row"><span>Mistakes</span><span>2 / 1</span></div><div class="eval-row"><span>Blunders</span><span class="bad">4 / 3</span></div><div class="eval-row"><span>ACPL</span><span>48 / 47</span></div></div>
+              <div class="mini-eval"><svg viewBox="0 0 400 81" preserveAspectRatio="none" aria-label="Evaluation over the game"><line class="grid" x1="0" y1="40" x2="400" y2="40"/><line class="cursor" x1="235" y1="0" x2="235" y2="81"/><path class="curve" d="M0 41 C35 36,58 46,91 37 S145 29,174 34 S205 19,224 27 S252 47,278 40 S317 58,343 52 S376 66,400 20"/><circle class="blunder" cx="235" cy="46" r="4"/><circle class="blunder" cx="343" cy="52" r="4"/><circle class="blunder" cx="400" cy="20" r="4"/></svg><div class="eval-caption"><span>17.a4</span><b>23.bxc7 · +0.42</b><span>31.Rf6</span></div></div>
+            </section>
+            <footer class="live-footer"><i class="toggle"></i><strong>Continuous analysis</strong><span>Analyse this position while the board moves.</span><button>Deep tier · 3 lines ▾</button></footer>
+          </div>
+        </div>
+      </div>
+      </main>
+    </div>
+  </div>
+  <div class="prototype">prototype · overview + game detail</div>
+  <script>
+    const params = new URLSearchParams(location.search)
+    const validScreens = ['overview', 'game']
+    const initialScreen = validScreens.includes(params.get('screen')) ? params.get('screen') : 'overview'
+    const labels = { overview: 'Overview', game: 'Games / Theo Fischer — alex_knight' }
+
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☾' : '☀'
+      document.getElementById('theme-label').textContent = theme === 'dark' ? 'Dark' : 'Light'
+      document.getElementById('theme-toggle').setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`)
+      params.set('theme', theme)
+      try { localStorage.setItem('blunderbase-prototype-theme', theme) } catch {}
+      history.replaceState(null, '', `${location.pathname}?${params}`)
+    }
+
+    function showScreen(screen) {
+      if (!validScreens.includes(screen)) return
+      document.body.dataset.screen = screen
+      document.getElementById('crumb').textContent = labels[screen]
+      document.querySelectorAll('.nav a[data-screen]').forEach((link) => link.classList.toggle('active', link.dataset.screen === screen))
+      params.set('screen', screen)
+      history.replaceState(null, '', `${location.pathname}?${params}`)
+      document.querySelector('.main').scrollTo(0, 0)
+    }
+
+    document.querySelectorAll('.screen-link, .game-link').forEach((item) => item.addEventListener('click', (event) => {
+      event.preventDefault()
+      showScreen(item.dataset.screen)
+    }))
+    document.querySelectorAll('.notation-move').forEach((move) => move.addEventListener('click', () => {
+      document.querySelectorAll('.notation-move.active').forEach((item) => item.classList.remove('active'))
+      move.classList.add('active')
+      document.getElementById('ply-state').textContent = `${move.closest('.notation-row')?.querySelector('.no')?.textContent || 'ply'} · position selected`
+    }))
+    document.querySelectorAll('[data-ply-step]').forEach((button) => button.addEventListener('click', () => {
+      document.getElementById('ply-state').textContent = button.dataset.plyStep === '-1' ? 'ply 44 / 77 · +2.18' : 'ply 46 / 77 · +0.35'
+    }))
+    document.getElementById('theme-toggle').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'))
+    setTheme(document.documentElement.dataset.theme)
+    showScreen(initialScreen)
+  </script>
+</body>
+</html>

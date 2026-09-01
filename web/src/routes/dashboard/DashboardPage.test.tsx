@@ -107,6 +107,6 @@ describe('RecentGamesList — component states (design 2a rail)', () => {
 
   it('links the whole library, counted', () => {
     draw({ data: CARDS })
-    expect(screen.getByRole('link', { name: 'all 15' })).toHaveAttribute('href', '/games')
+    expect(screen.getByRole('link', { name: 'All 15' })).toHaveAttribute('href', '/games')
   })
 })

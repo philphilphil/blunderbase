@@ -10,7 +10,7 @@
       `env(safe-area-inset-*)` padding, so nothing lands under either.
     -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#08090b" />
+    <meta name="theme-color" content="#292a2a" />
     <title>Blunderbase</title>
     <!--
       Theme bootstrap. Runs before the first paint so the stored preference — or the OS
@@ -30,7 +30,7 @@
           root.setAttribute('data-theme', pref)
           root.style.colorScheme = resolved
           var meta = document.querySelector('meta[name="theme-color"]')
-          if (meta) meta.setAttribute('content', resolved === 'light' ? '#f4f6f8' : '#08090b')
+          if (meta) meta.setAttribute('content', resolved === 'light' ? '#f2f2f0' : '#292a2a')
         } catch (error) {
           root.classList.add('dark')
         }

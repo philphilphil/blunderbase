@@ -64,11 +64,15 @@ describe('BookPanel', () => {
     expect(rows[1]!.tagName).toBe('DIV')
   })
 
-  it('renders nothing at all for a position no two games reached', () => {
-    const { container } = render(<BookPanel moves={[]} ply={4} onPlay={vi.fn()} />)
+  it('says so for a position no two games reached', () => {
+    render(<BookPanel moves={[]} ply={4} onPlay={vi.fn()} />)
 
-    // Not an empty table, not a placeholder: 452k of the owner's 463k positions are reached
-    // by one game, so an empty state here would be what the reader sees nearly always.
-    expect(container).toBeEmptyDOMElement()
+    // The Book tab is permanent now (`NotesTrack`), so this is the answer to "have I been
+    // here before?" rather than a placeholder standing in for a hidden tab. 452k of the
+    // owner's 463k positions are reached by one game, so it is also the common case.
+    expect(screen.getByTestId('book-panel-empty')).toHaveTextContent(
+      'None of your games reached this position.',
+    )
+    expect(screen.queryByTestId('book-panel')).not.toBeInTheDocument()
   })
 })

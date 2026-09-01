@@ -12,6 +12,7 @@ import type { MoveRow } from '@/lib/api/types'
 
 import {
   buildGameLine,
+  COMPARE_MOVES,
   engineLines,
   maiaComparison,
   maiaLevelFor,
@@ -53,11 +54,15 @@ const POLICY = {
     { uci: 'c7c6', san: 'c6', rank: 2, p: 0.3 },
     { uci: 'e7e6', san: 'e6', rank: 3, p: 0.2 },
   ],
+  // Six deep, so this level is the one that exercises `COMPARE_MOVES`: the grid lists five
+  // and the played move falls off the end of the list, which is what `column.played` is for.
   '2000': [
     { uci: 'c7c6', san: 'c6', rank: 1, p: 0.51 },
     { uci: 'e7e6', san: 'e6', rank: 2, p: 0.3 },
     { uci: 'g8f6', san: 'Nf6', rank: 3, p: 0.1 },
-    { uci: 'd7d5', san: 'd5', rank: 4, p: 0.04 },
+    { uci: 'b8c6', san: 'Nc6', rank: 4, p: 0.05 },
+    { uci: 'g7g6', san: 'g6', rank: 5, p: 0.03 },
+    { uci: 'd7d5', san: 'd5', rank: 6, p: 0.02 },
   ],
 }
 
@@ -203,9 +208,11 @@ describe('maiaComparison', () => {
   const lines = engineLines(line, 1, played)
   const columns = maiaComparison(maiaLevels(POLICY), lines, played)
 
-  it('is one column per level, lowest first, three moves deep', () => {
+  it('is one column per level, lowest first, capped at five moves', () => {
     expect(columns.map((column) => column.rating)).toEqual(['1100', '1700', '2000'])
-    expect(columns.every((column) => column.moves.length === 3)).toBe(true)
+    // Everything the level returned, up to `COMPARE_MOVES`: comparing is the one mode where
+    // the grid takes the whole band, so it lists as deep as the single-level column does.
+    expect(columns.map((column) => column.moves.length)).toEqual([3, 3, COMPARE_MOVES])
     expect(columns[0].moves.map((move) => move.san)).toEqual(['d5', 'a6', 'e6'])
   })
 
@@ -217,11 +224,13 @@ describe('maiaComparison', () => {
     expect(columns[2].moves[0]).toMatchObject({ san: 'c6', classification: 'best', multipv: 1 })
   })
 
-  it('keeps the played move on the column that did not rank it in its top three', () => {
-    // The whole comparison: everybody at 1100 plays it, and a 2000 barely considers it.
+  it('keeps the played move on the column that did not list it at all', () => {
+    // The whole comparison: everybody at 1100 plays it, and a 2000 barely considers it —
+    // so far down that it is off the end of the five, which is exactly when the column has
+    // to carry it separately or the grid would say a 2000 never plays it.
     expect(columns[0].moves[0]).toMatchObject({ san: 'd5', played: true, probability: 0.71 })
     expect(columns[2].moves.some((move) => move.played)).toBe(false)
-    expect(columns[2].played).toMatchObject({ san: 'd5', rank: 4, probability: 0.04 })
+    expect(columns[2].played).toMatchObject({ san: 'd5', rank: 6, probability: 0.02 })
   })
 
   it('reads a live position, where there are no engine lines to cross', () => {

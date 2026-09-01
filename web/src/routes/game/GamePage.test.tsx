@@ -1178,7 +1178,7 @@ describe('the board/moves splitter', () => {
     // is what puts the splitter against the board's edge rather than at the end of a column
     // padded out with slack. jsdom applies no CSS, so what is asserted is the class and that
     // nothing has written an inline width.
-    expect(boardColumn()).toHaveClass('w-[calc(100vh-10.125rem)]', 'flex-none')
+    expect(boardColumn()).toHaveClass('w-[calc(100vh-9.5625rem)]', 'shrink', 'grow-0')
     expect(movesColumn()).toHaveClass('flex-1')
     expect(movesColumn().style.flexBasis).toBe('')
   })
@@ -1192,7 +1192,7 @@ describe('the board/moves splitter', () => {
     // board column flexes into the remainder, so an explicit choice beats the default.
     drag(splitter, 560, 460)
     expect(boardColumn()).toHaveClass('flex-1')
-    expect(boardColumn()).not.toHaveClass('flex-none')
+    expect(boardColumn()).not.toHaveClass('grow-0')
     expect(boardColumn().style.flexBasis).toBe('')
     expect(movesColumn()).toHaveClass('grow-0')
   })
@@ -1276,7 +1276,7 @@ describe('the board/moves splitter', () => {
     // the remainder — not a stored basis.
     fireEvent.doubleClick(splitter)
     expect(movesColumn()).toHaveClass('flex-1')
-    expect(boardColumn()).toHaveClass('flex-none')
+    expect(boardColumn()).toHaveClass('shrink', 'grow-0')
     expect(movesColumn().style.flexBasis).toBe('')
     expect(storage.getItem(MOVES_WIDTH_KEY)).toBeNull()
   })
@@ -1296,7 +1296,7 @@ describe('the board/moves splitter', () => {
     await screen.findByText('Scandinavian Defense')
 
     expect(movesColumn()).toHaveClass('flex-1')
-    expect(boardColumn()).toHaveClass('flex-none')
+    expect(boardColumn()).toHaveClass('shrink', 'grow-0')
     expect(movesColumn().style.flexBasis).toBe('')
   })
 })
@@ -1470,10 +1470,14 @@ describe('the game view below md', () => {
     const split = screen.getByTestId('maia-engine-lines').parentElement
     expect(split).toHaveClass('max-md:grid-cols-1')
     expect(split).toHaveClass('grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)]')
-    // Two rounded cards with a gap and no rule between them — the band draws no divider at
-    // either width, so there is nothing to turn on its side here.
-    expect(split).toHaveClass('gap-2.5')
-    expect(split!.className).not.toContain('divide-')
+    // Two panes divided by a rule, not two cards floating with a gap: the divider is on the
+    // engine pane's left edge and turns into a top edge where the two stack.
+    expect(split!.className).not.toContain('gap-')
+    expect(screen.getByTestId('maia-engine-lines')).toHaveClass(
+      'border-l',
+      'max-md:border-t',
+      'max-md:border-l-0',
+    )
     // Maia first, the order the desktop reads them left to right.
     expect(split!.firstElementChild).not.toBe(screen.getByTestId('maia-engine-lines'))
   })
