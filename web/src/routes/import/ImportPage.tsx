@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { keepPreviousData } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -10,7 +11,8 @@ import { SourcesTable } from './SourcesTable'
 import { SyncHistory } from './SyncHistory'
 import { useImportProgress } from './useImportProgress'
 
-const HISTORY_LIMIT = 25
+/** Syncs per page of the history. One press of Sync all writes one row per account. */
+const HISTORY_PAGE = 25
 
 /** Newest first, whatever order the API happened to answer in. */
 function newestFirst(jobs: ImportJob[] | undefined): ImportJob[] | undefined {
@@ -29,16 +31,34 @@ function newestFirst(jobs: ImportJob[] | undefined): ImportJob[] | undefined {
  * have a stable route and cannot be mistaken for another import source.
  */
 export function ImportPage() {
-  const jobs = useImportJobs({ limit: HISTORY_LIMIT })
+  const [page, setPage] = useState(1)
+  // `keepPreviousData` is not decoration here: without it the page being turned to has no
+  // data for a beat, the total reads as zero, and the clamp below would send the reader
+  // straight back to page one before the request for page two had left.
+  const jobs = useImportJobs(
+    { limit: HISTORY_PAGE, offset: (page - 1) * HISTORY_PAGE },
+    { placeholderData: keepPreviousData },
+  )
+  // What the sources table needs is the newest sync of each source, which is a fact about
+  // the front of the history rather than about the page being read. Its own query, keyed
+  // identically to the first page's, so standing there is one request rather than two.
+  const latest = useImportJobs({ limit: HISTORY_PAGE, offset: 0 })
   const profile = useProfile()
   const games = useGames({ limit: 1 })
   const progress = useImportProgress()
 
-  const history = useMemo(() => newestFirst(jobs.data), [jobs.data])
+  const history = useMemo(() => newestFirst(jobs.data?.jobs), [jobs.data])
+  const front = useMemo(() => newestFirst(latest.data?.jobs), [latest.data])
   const accounts = profile.data?.accounts ?? []
   const total = games.data?.total
+  const syncs = jobs.data?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(syncs / HISTORY_PAGE))
+  // A history that shrank under the reader — a wipe takes the sync rows with it — must not
+  // leave the page past the end of it. Only once something has answered: a page count read
+  // off a history nobody has counted yet is 1, and every page but the first would bounce.
+  if (jobs.data && page > pageCount) setPage(pageCount)
 
-  const latestOf = (source: Source) => history?.find((job) => job.source === source)
+  const latestOf = (source: Source) => front?.find((job) => job.source === source)
 
   return (
     <PageBody>
@@ -63,7 +83,16 @@ export function ImportPage() {
 
       <SourcesTable accounts={accounts} latestOf={latestOf} progress={progress} />
 
-      <SyncHistory jobs={history} isLoading={jobs.isPending} error={jobs.error} />
+      <SyncHistory
+        jobs={history}
+        isLoading={jobs.isPending}
+        error={jobs.error}
+        page={page}
+        pageCount={pageCount}
+        total={syncs}
+        pageSize={HISTORY_PAGE}
+        onPageChange={setPage}
+      />
     </PageBody>
   )
 }

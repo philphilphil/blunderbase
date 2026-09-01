@@ -40,7 +40,7 @@ def test_every_prewired_source_is_a_cli_choice(settings: Settings) -> None:
     parser = build_parser(settings)
     args = parser.parse_args(["import", "lichess", "--username", "owner"])
     assert (args.command, args.source, args.username) == ("import", "lichess", "owner")
-    assert set(import_service.SOURCES) == {"lichess", "chesscom", "pgn"}
+    assert set(import_service.SOURCES) == {"lichess", "chesscom", "fics", "pgn"}
 
 
 def test_an_unregistered_source_is_refused(settings: Settings) -> None:

@@ -156,6 +156,7 @@ export function tierRank(game: GameCard): number {
 export const SOURCE_LABELS: Record<Source, string> = {
   lichess: 'Lichess',
   chesscom: 'Chess.com',
+  fics: 'FICS',
   manual: 'OTB',
   pgn: 'PGN',
 }

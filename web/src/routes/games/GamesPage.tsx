@@ -2,11 +2,13 @@
  * Design 2b — the games library.
  *
  * Edge-to-edge rather than inside `<PageBody>`: the design gives this screen its own
- * scroll region between a fixed filter bar and a fixed selection footer, which a page-level
- * scroll would fight with.
+ * scroll region between a fixed filter bar and a fixed footer, which a page-level scroll
+ * would fight with.
  *
  * Filters live in the URL (`/games?color=black&outcome=loss`), so a filtered library is a
- * link — the opening explorer and the dashboard both point into it that way.
+ * link — the opening explorer and the dashboard both point into it that way. The page and
+ * its size do not: which slice you are reading is not what a link to a filtered library is
+ * about, and the size is a preference the reader keeps (`./paging`).
  */
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -14,12 +16,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { ApiError } from '@/lib/api/client'
-import { useRequestAnalysisBatch } from '@/lib/api/queries'
+import { useDeleteGames, useRequestAnalysisBatch } from '@/lib/api/queries'
 import { cn } from '@/lib/utils'
 
+import { DeleteGamesDialog } from './components/DeleteGamesDialog'
 import { DebouncedInput, FilterBar } from './components/FilterBar'
 import { GamesTable } from './components/GamesTable'
-import { SelectionFooter } from './components/SelectionFooter'
+import { TableFooter } from './components/TableFooter'
 import {
   filterCount,
   filtersFromParams,
@@ -28,7 +31,14 @@ import {
   type LibraryFilters,
 } from './filters'
 import { formatCount } from './format'
-import { DEFAULT_SORT, isServerOrder, sortGames, type Sort } from './sorting'
+import {
+  FALLBACK_FIT_ROWS,
+  readPageSize,
+  resolvePageSize,
+  writePageSize,
+  type PageSizeChoice,
+} from './paging'
+import { DEFAULT_SORT, type Sort } from './sorting'
 import { useGameLibrary } from './useGameLibrary'
 
 export function GamesPage() {
@@ -38,15 +48,24 @@ export function GamesPage() {
   const filters = useMemo(() => filtersFromParams(params), [params])
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
   const [selected, setSelected] = useState<Set<number>>(() => new Set())
-  const [queueMessage, setQueueMessage] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [analysing, setAnalysing] = useState<Set<number>>(() => new Set())
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<PageSizeChoice>(readPageSize)
+  // How many rows the table last measured room for. Only "Fit" spends it, but it is
+  // measured either way so the option can say what choosing it would mean.
+  const [fitRows, setFitRows] = useState(FALLBACK_FIT_ROWS)
+  /** The games a confirmation is open over: a row's own, or the whole selection. */
+  const [doomed, setDoomed] = useState<number[] | null>(null)
   const lastClicked = useRef<number | null>(null)
 
-  const library = useGameLibrary(filters)
-  const rows = useMemo(() => sortGames(library.games, sort), [library.games, sort])
+  const rowsPerPage = resolvePageSize(pageSize, fitRows)
+  const library = useGameLibrary({ filters, sort, page, pageSize: rowsPerPage })
+  const rows = library.games
   // The row button queues one game through the same call: one id is a batch of one, and
-  // one path here is one receipt and one set of spinning rows.
+  // one path here is one receipt and one set of spinning rows. Deleting works the same way.
   const analysis = useRequestAnalysisBatch()
+  const deletion = useDeleteGames()
 
   const setFilters = useCallback(
     (next: LibraryFilters) => {
@@ -55,9 +74,24 @@ export function GamesPage() {
     [setParams],
   )
 
-  // A row that a filter change took off the table can no longer be acted on. The raw
-  // selection is kept (going back to the old filter brings it back) but everything the
-  // page reads goes through what is actually on screen.
+  // Anything that changes what the first page holds starts again at it: reading page 7 of
+  // one filter says nothing about where to stand in another. Adjusted during the render
+  // that notices rather than in an effect — React re-runs this render before it commits
+  // anything, so the table is never painted showing page 7 of a library that has three.
+  const queryKey = `${params.toString()}|${sort.key}|${sort.direction}|${rowsPerPage}`
+  const [lastQueryKey, setLastQueryKey] = useState(queryKey)
+  if (lastQueryKey !== queryKey) {
+    setLastQueryKey(queryKey)
+    setPage(1)
+  }
+  // The same, for a library that shrank under the reader — a delete, an import — and left
+  // the page past the end of it, which would be an empty table over a full library.
+  if (page > library.pageCount) setPage(library.pageCount)
+
+  // A row that a filter change or a page turn took off the table can no longer be acted
+  // on. The raw selection is kept (going back brings it back) but everything the page
+  // reads goes through what is actually on screen — deleting what you cannot see is
+  // exactly the thing a confirmation dialog cannot protect you from.
   const visible = useMemo(() => new Set(rows.map((game) => game.id)), [rows])
   const selectedVisible = useMemo(
     () => new Set([...selected].filter((id) => visible.has(id))),
@@ -100,7 +134,7 @@ export function GamesPage() {
     async (ids: number[], tier: 'quick' | 'deep') => {
       if (ids.length === 0) return
       setAnalysing((current) => new Set([...current, ...ids]))
-      setQueueMessage(null)
+      setMessage(null)
       // The whole selection in one call: the backend queues it in one transaction and
       // answers with what it took per game, so the receipt is that answer rather than a
       // tally kept across as many round-trips as there were rows.
@@ -123,7 +157,7 @@ export function GamesPage() {
         for (const id of ids) next.delete(id)
         return next
       })
-      setQueueMessage(
+      setMessage(
         refused === 0
           ? `${queued} ${tier} ${queued === 1 ? 'run' : 'runs'} queued`
           : `${queued} queued, ${refused} refused${reason ? ` — ${reason}` : ''}`,
@@ -132,12 +166,38 @@ export function GamesPage() {
     [analysis],
   )
 
+  // Deleting goes through the dialog, which is what `doomed` is: the ids it is open over.
+  // A failed call keeps the dialog up carrying the reason, because the one thing worse
+  // than a delete that did not happen is a delete that did not happen quietly.
+  const confirmDelete = useCallback(async () => {
+    const ids = doomed ?? []
+    if (ids.length === 0) return
+    let receipt
+    try {
+      receipt = await deletion.mutateAsync(ids)
+    } catch {
+      return
+    }
+    setDoomed(null)
+    setSelected((current) => {
+      const next = new Set(current)
+      for (const id of ids) next.delete(id)
+      return next
+    })
+    setMessage(`${receipt.games} ${receipt.games === 1 ? 'game' : 'games'} deleted`)
+  }, [deletion, doomed])
+
+  const closeDelete = useCallback(() => {
+    setDoomed(null)
+    deletion.reset()
+  }, [deletion])
+
   // The message is a receipt, not a state — it goes away on its own.
   useEffect(() => {
-    if (!queueMessage) return
-    const timer = setTimeout(() => setQueueMessage(null), 6_000)
+    if (!message) return
+    const timer = setTimeout(() => setMessage(null), 6_000)
     return () => clearTimeout(timer)
-  }, [queueMessage])
+  }, [message])
 
   const active = filterCount(filters)
   const loaded = rows.length
@@ -211,25 +271,46 @@ export function GamesPage() {
         onOpen={(id) => navigate(`/games/${id}`)}
         onAnalyse={(id) => void queueAnalysis([id], 'quick')}
         analysing={analysing}
+        onDelete={(id) => setDoomed([id])}
         status={library.status}
         error={library.error}
         onRetry={() => void library.refetch()}
-        hasNextPage={library.hasNextPage}
-        isFetchingNextPage={library.isFetchingNextPage}
-        onLoadMore={() => void library.fetchNextPage()}
+        busy={library.isPaging}
+        onCapacityChange={setFitRows}
         empty={<EmptyState active={active} onClear={() => setFilters({})} />}
       />
 
-      <SelectionFooter
+      <TableFooter
         selectedCount={selectedVisible.size}
         loadedCount={loaded}
         total={library.total}
-        sortedClientSide={!isServerOrder(sort) && library.hasNextPage}
         queueing={analysis.isPending}
+        deleting={deletion.isPending}
         onQueue={(tier) => void queueAnalysis([...selectedVisible], tier)}
+        onDelete={() => setDoomed([...selectedVisible])}
         onClearSelection={() => setSelected(new Set())}
-        message={queueMessage}
+        message={message}
+        page={page}
+        pageCount={library.pageCount}
+        onPageChange={setPage}
+        pageSize={pageSize}
+        onPageSizeChange={(size) => {
+          setPageSize(size)
+          writePageSize(size)
+        }}
+        rowsPerPage={rowsPerPage}
+        fitRows={fitRows}
       />
+
+      {doomed ? (
+        <DeleteGamesDialog
+          count={doomed.length}
+          pending={deletion.isPending}
+          error={deletion.isError ? refusalReason(deletion.error) : null}
+          onConfirm={() => void confirmDelete()}
+          onClose={closeDelete}
+        />
+      ) : null}
     </div>
   )
 }

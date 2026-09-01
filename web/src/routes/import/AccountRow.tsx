@@ -30,8 +30,8 @@ import type { SourceProgress } from './useImportProgress'
 /**
  * The username a previous sync used, if that sync got far enough to record one.
  *
- * `ImportJob.message` carries the username the adapter was given (`adapters/lichess.py`,
- * `adapters/chesscom.py`) — but a failed job overwrites it with the exception text
+ * `ImportJob.message` carries the username the account adapter was given, but a failed
+ * job overwrites it with the exception text
  * (`services/import_service.py`), so a failed sync must never seed the field or the next
  * Connect would post `AdapterError: …` as the username and fail again.
  */
@@ -40,7 +40,10 @@ function usernameOf(job: ImportJob | undefined): string | undefined {
   return job.message?.trim() || undefined
 }
 
-const COPY: Record<'lichess' | 'chesscom', { title: string; hint: string; placeholder: string }> = {
+const COPY: Record<
+  'lichess' | 'chesscom' | 'fics',
+  { title: string; hint: string; placeholder: string }
+> = {
   lichess: {
     title: 'Lichess',
     hint: 'Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes.',
@@ -51,6 +54,11 @@ const COPY: Record<'lichess' | 'chesscom', { title: string; hint: string; placeh
     hint: 'Reads the monthly archives from the last cursor, newest month last.',
     placeholder: 'chess.com username',
   },
+  fics: {
+    title: 'FICS',
+    hint: 'Reads yearly player archives from the FICS Games Database and resumes at the last date.',
+    placeholder: 'FICS username',
+  },
 }
 
 export function AccountRow({
@@ -60,7 +68,7 @@ export function AccountRow({
   progress,
   options,
 }: {
-  source: 'lichess' | 'chesscom'
+  source: 'lichess' | 'chesscom' | 'fics'
   account?: AccountSummary
   lastJob?: ImportJob
   progress?: SourceProgress
@@ -92,8 +100,11 @@ export function AccountRow({
     start.mutate({
       source: source as Source,
       body: {
+        // `all` is what every adapter takes for "ignore the stored cursor and read the
+        // archive from its first game" (`backend/adapters/__init__.py`). It beats the date,
+        // which is the other answer to the same question.
         username: name,
-        since: options.since.trim() || undefined,
+        since: options.fromTheBeginning ? 'all' : options.since.trim() || undefined,
         max_games: Number.isFinite(games) && games > 0 ? games : undefined,
         // Only ever sent to turn evaluation off; left out, the backend queues the pass.
         analyze: options.skipEvaluation ? false : undefined,

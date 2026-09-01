@@ -28,6 +28,7 @@ from backend.db.models import (
     Position,
 )
 from backend.services import engines as engines_service
+from backend.services import games as games_service
 from backend.services import import_service
 from backend.services.import_service import ImportFailure, ParsedGame
 
@@ -238,6 +239,45 @@ def test_a_rematch_with_the_same_moves_is_still_two_games(session: Session) -> N
     assert (first.created, second.created) == (True, True)
     assert first.game.dedup_hash == second.game.dedup_hash
     assert _count(session, Game) == 2
+
+
+def test_deleting_one_rematch_does_not_block_the_other(session: Session) -> None:
+    """The deletion record is matched on exactly the terms a duplicate is.
+
+    Two bullet games of one trap line share every scrap of the hash, so a record that
+    matched by hash alone would refuse the second game because the first was deleted.
+    Lichess named them separately: they are two games, and only one of them was thrown away.
+    """
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+    session.add(job)
+    session.commit()
+    played = datetime(2026, 2, 10, 18, 4, 11, tzinfo=UTC)
+
+    def rematch(source_id: str) -> ParsedGame:
+        return ParsedGame(
+            source=Source.LICHESS,
+            source_id=source_id,
+            white_name="blunderbase",
+            black_name="opponent1",
+            result=Result.WHITE_WIN,
+            pgn="from the API",
+            moves_uci=["e2e4", "e7e5"],
+            moves_san=["e4", "e5"],
+            played_at=played,
+        )
+
+    first = import_service.ingest_game(session, job, rematch("zzFirst"))
+    session.commit()
+    assert first.game is not None
+    games_service.delete_games(session, [first.game.id])
+
+    again = import_service.ingest_game(session, job, rematch("zzFirst"))
+    other = import_service.ingest_game(session, job, rematch("zzSecond"))
+    session.commit()
+
+    assert (again.blocked, again.created) == (True, False)
+    assert (other.blocked, other.created) == (False, True)
+    assert _count(session, Game) == 1
 
 
 def test_a_source_id_dedups_even_when_the_moves_differ(session: Session) -> None:

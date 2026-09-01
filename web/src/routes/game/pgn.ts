@@ -18,6 +18,7 @@ const WRAP = 80
 const SITES: Record<string, string> = {
   lichess: 'lichess.org',
   chesscom: 'chess.com',
+  fics: 'freechess.org',
 }
 
 /** `"a \"quoted\" name"` — the only two characters PGN escapes inside a tag value. */

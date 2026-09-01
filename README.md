@@ -11,7 +11,7 @@
 ---
 
 ## Features
-- Import games from lichess, chess.com and PGNs
+- Import games from Lichess, Chess.com, FICS, and PGNs
 - Analyze your games with multiple engines
 - Support for maia3 at multiple ELO's to see what humans would have played
 - Take notes on positions and variations
@@ -75,7 +75,7 @@ backend/
   api/              — FastAPI routes, auth, SPA serving
   mcp/              — MCP server (stdio + streamable HTTP)
   services/         — the only place a "blunder" or a stat is defined
-  adapters/         — Lichess, chess.com, UCI engines, Maia
+  adapters/         — Lichess, Chess.com, FICS, UCI engines, Maia
 web/                — React SPA
 tests/              — pytest
 docs/               — deploy.md, runners.md, reference.md, ARCHITECTURE.md

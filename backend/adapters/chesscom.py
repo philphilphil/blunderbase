@@ -25,7 +25,7 @@ from urllib.parse import quote
 import chess.pgn
 import httpx
 
-from backend.adapters import pgn_import
+from backend.adapters import is_full_archive, pgn_import
 from backend.db.enums import JobStatus, Platform, Result, Source, Speed
 from backend.services import accounts
 from backend.services.import_service import (
@@ -347,9 +347,16 @@ def parse_cursor(value: str | None) -> tuple[str | None, int]:
 
 
 def read_since(value: Any) -> tuple[str | None, tuple[int, int] | None]:
-    """`--since` as either a cursor to resume from or the first month to read."""
+    """`--since` as either a cursor to resume from or the first month to read.
+
+    Neither, for `all`: no cursor and no first month is every archive the account has,
+    which is what "start from the beginning" means here — the same word the other sources
+    take (`backend.adapters.FULL_ARCHIVE`).
+    """
     if isinstance(value, date):
         return None, (value.year, value.month)
+    if is_full_archive(value):
+        return None, None
     text = str(value).strip()
     if text.startswith("http"):
         return text, None

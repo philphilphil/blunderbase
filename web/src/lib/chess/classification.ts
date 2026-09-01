@@ -126,6 +126,12 @@ export const SOURCE_STYLES: Record<Source, SourceStyle> = {
     chipClass: 'bg-chip-good border-chip-good-edge text-good',
     color: 'var(--bb-good)',
   },
+  fics: {
+    label: 'FICS',
+    dotClass: 'bg-mistake',
+    chipClass: 'bg-chip-neutral border-edge-strong text-soft',
+    color: 'var(--bb-mistake)',
+  },
   manual: {
     label: 'OTB',
     dotClass: 'bg-otb',

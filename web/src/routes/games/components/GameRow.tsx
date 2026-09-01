@@ -7,6 +7,7 @@
  * conditionally rendered: every cell is in the DOM at both sizes and the breakpoint only
  * decides where it sits, so the row stays one thing to reason about — and to test.
  */
+import { X } from 'lucide-react'
 import type * as React from 'react'
 import { memo } from 'react'
 
@@ -44,6 +45,8 @@ export interface GameRowProps {
   onToggle: (id: number, event: React.MouseEvent) => void
   onOpen: (id: number) => void
   onAnalyse: (id: number) => void
+  /** Delete this one game, through the same confirmation a selection goes through. */
+  onDelete: (id: number) => void
   analysing: boolean
 }
 
@@ -53,6 +56,7 @@ export const GameRow = memo(function GameRow({
   onToggle,
   onOpen,
   onAnalyse,
+  onDelete,
   analysing,
 }: GameRowProps) {
   const tier = tierOf(game)
@@ -63,6 +67,7 @@ export const GameRow = memo(function GameRow({
     <div
       role="row"
       tabIndex={0}
+      data-games-row
       aria-selected={selected}
       onClick={() => onOpen(game.id)}
       onKeyDown={(event) => {
@@ -72,7 +77,7 @@ export const GameRow = memo(function GameRow({
         }
       }}
       className={cn(
-        'flex cursor-pointer items-center gap-2.5 border-t border-raised px-5 font-mono text-[0.71875rem] tabular outline-none',
+        'group flex cursor-pointer items-center gap-2.5 border-t border-raised px-5 font-mono text-[0.71875rem] tabular outline-none',
         ROW_HEIGHT,
         PHONE_CARD,
         'max-md:gap-x-2 max-md:gap-y-1 max-md:px-3 max-md:py-2',
@@ -174,6 +179,25 @@ export const GameRow = memo(function GameRow({
             {analysing ? 'queueing…' : 'analyse'}
           </button>
         )}
+
+        {/* Deleting one game, at the end of the row it belongs to. Kept out of the way
+            until the row is pointed at or focused, because it sits beside a click target
+            that opens the game and a permanently visible ✕ on forty rows reads as a page
+            about deleting games. It confirms first, like every other delete here — and it
+            is desktop-only: the phone card has no room for a hover affordance, and a
+            selection plus the footer's Delete is the same act with a bigger target. */}
+        <button
+          type="button"
+          aria-label={`Delete game ${game.id}`}
+          title="Delete this game"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete(game.id)
+          }}
+          className="ml-auto shrink-0 rounded-[0.1875rem] p-0.5 text-dim-2 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-blunder focus-visible:opacity-100 max-md:hidden"
+        >
+          <X className="size-3" aria-hidden />
+        </button>
       </span>
     </div>
   )

@@ -18,12 +18,13 @@ import { useImportProgress } from '@/routes/import/useImportProgress'
 import { cn } from '@/lib/utils'
 
 /** The sources a sync can be started for — `pgn` is an upload and `manual` is by hand. */
-const SYNCABLE = ['lichess', 'chesscom'] as const
+const SYNCABLE = ['lichess', 'chesscom', 'fics'] as const
 type Syncable = (typeof SYNCABLE)[number]
 
 const PLATFORM_LABEL: Record<Syncable, string> = {
   lichess: 'Lichess',
   chesscom: 'Chess.com',
+  fics: 'FICS',
 }
 
 /** Enough history to find the last good sync of each source without paging. */
@@ -74,7 +75,7 @@ export function SyncAllButton() {
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
-  const targets = syncTargets(jobs.data)
+  const targets = syncTargets(jobs.data?.jobs)
   // `/events` is the only thing that knows a sync is still walking the archive: the POST
   // has long since answered with a job id by then.
   const syncing = pending || targets.some((target) => progress[target.source]?.running === true)

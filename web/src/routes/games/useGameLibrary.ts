@@ -1,13 +1,20 @@
 /**
- * The library's data: one infinite `/games?cards=true` query.
+ * The library's data: one page of `/games?cards=true` at a time.
  *
  * `cards=true` is what makes the analysis columns possible — `analyzed`, `deep` and the
  * three worst moments come with the row, so the table never fans out into a request per
  * game. The key stays under the `['games']` prefix, which is what the `/events` socket
  * invalidates (`src/lib/events/invalidation.ts`), so an import or a finished run refreshes
  * the table with no reload.
+ *
+ * Pages rather than infinite scroll, and the order is the server's: with one page on
+ * screen at a time the controls stay where they are instead of retreating down an ever
+ * longer list, and a column header sorts the whole filtered library rather than whatever
+ * happened to be loaded. `keepPreviousData` is what makes paging feel like paging — the
+ * rows on screen stay put until the next page lands, rather than blinking through a
+ * skeleton every time.
  */
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import * as api from '@/lib/api/endpoints'
@@ -15,46 +22,50 @@ import { queryKeys } from '@/lib/api/keys'
 import type { GameCard } from '@/lib/api/types'
 
 import { toGameQuery, type LibraryFilters } from './filters'
+import type { Sort } from './sorting'
 
-export const PAGE_SIZE = 50
+/** The sizes the footer offers, beside "Fit" — as many rows as the window has room for. */
+export const PAGE_SIZES = [25, 50, 100, 200] as const
 
-export function useGameLibrary(filters: LibraryFilters) {
-  const query = useMemo(() => toGameQuery(filters), [filters])
+/** What the backend will serve in one page (`backend/api/routes/games.py: MAX_PAGE`). */
+export const MAX_PAGE_SIZE = 200
 
-  const infinite = useInfiniteQuery({
-    queryKey: [...queryKeys.gameCards(query), 'infinite'],
-    queryFn: ({ pageParam }) =>
-      api.listGameCards({ ...query, limit: PAGE_SIZE, offset: pageParam }),
-    initialPageParam: 0,
-    getNextPageParam: (last) => {
-      const loaded = last.offset + last.games.length
-      // An empty page means the end even if `total` disagrees, which it briefly can while
-      // an import is writing rows under the query.
-      return last.games.length > 0 && loaded < last.total ? loaded : undefined
-    },
+export interface LibraryQuery {
+  filters: LibraryFilters
+  sort: Sort
+  /** 1-based, the way the footer says it. */
+  page: number
+  pageSize: number
+}
+
+export function useGameLibrary({ filters, sort, page, pageSize }: LibraryQuery) {
+  const limit = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE)
+  const query = useMemo(
+    () => ({
+      ...toGameQuery(filters),
+      order: sort.key,
+      direction: sort.direction,
+      limit,
+      offset: (Math.max(page, 1) - 1) * limit,
+    }),
+    [filters, sort.key, sort.direction, limit, page],
+  )
+
+  const result = useQuery({
+    queryKey: queryKeys.gameCards(query),
+    queryFn: () => api.listGameCards(query),
+    placeholderData: keepPreviousData,
   })
 
-  // Pages are fetched at fixed offsets over a newest-first list, so a game imported while
-  // the user scrolls shifts every offset down and the next page re-serves rows already on
-  // screen. Keeping the first occurrence of each id is what stops duplicate React keys and
-  // a game appearing twice until the debounced import invalidation refetches.
-  const games = useMemo<GameCard[]>(() => {
-    const seen = new Set<number>()
-    const rows: GameCard[] = []
-    for (const page of infinite.data?.pages ?? []) {
-      for (const game of page.games) {
-        if (seen.has(game.id)) continue
-        seen.add(game.id)
-        rows.push(game)
-      }
-    }
-    return rows
-  }, [infinite.data])
-
+  const games: GameCard[] = result.data?.games ?? []
+  const total = result.data?.total ?? 0
   return {
-    ...infinite,
+    ...result,
     games,
-    /** How many games match the filters, as the last page reported it. */
-    total: infinite.data?.pages.at(-1)?.total ?? 0,
+    /** How many games match the filters, as this page reported it. */
+    total,
+    pageCount: Math.max(1, Math.ceil(total / limit)),
+    /** The rows are the previous page's while the next one is in flight. */
+    isPaging: result.isPlaceholderData && result.isFetching,
   }
 }

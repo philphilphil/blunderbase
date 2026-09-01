@@ -18,7 +18,7 @@ from fastapi import APIRouter, Query, Request, Response, status
 from backend.api.deps import BrokerDep, SessionDep, SettingsDep, not_found
 from backend.api.errors import ApiError
 from backend.api.events import EventBroker
-from backend.api.schemas import ImportJobResponse, ImportRequest, ImportStarted
+from backend.api.schemas import ImportJobList, ImportJobResponse, ImportRequest, ImportStarted
 from backend.config import Settings
 from backend.db.session import session_scope
 from backend.services import import_service
@@ -36,13 +36,25 @@ SHUTDOWN_GRACE = 10.0
 MAX_PAGE = 200
 
 
-@router.get("/jobs", response_model=list[ImportJobResponse], summary="Sync history")
+@router.get("/jobs", response_model=ImportJobList, summary="Sync history")
 def list_jobs(
     session: SessionDep,
     source: str | None = None,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 50,
-) -> list[Any]:
-    return import_service.list_jobs(session, source=source, limit=limit)
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> ImportJobList:
+    """One page of syncs, newest first, with the total the history holds."""
+    return ImportJobList(
+        jobs=[
+            ImportJobResponse.model_validate(job)
+            for job in import_service.list_jobs(
+                session, source=source, limit=limit, offset=offset
+            )
+        ],
+        total=import_service.count_jobs(session, source=source),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=ImportJobResponse, summary="One sync")

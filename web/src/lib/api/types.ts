@@ -10,8 +10,8 @@ export type Extra = Record<string, unknown>
 
 // --- enums (backend/db/enums.py) ------------------------------------------
 
-export type Source = 'lichess' | 'chesscom' | 'pgn' | 'manual'
-export type Platform = 'lichess' | 'chesscom' | 'otb'
+export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual'
+export type Platform = 'lichess' | 'chesscom' | 'fics' | 'otb'
 export type Color = 'white' | 'black'
 export type Result = '1-0' | '0-1' | '1/2-1/2' | '*'
 export type Speed = 'bullet' | 'blitz' | 'rapid' | 'classical' | 'correspondence'
@@ -22,7 +22,7 @@ export type Classification = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blund
 export type EngineKind = 'uci' | 'maia'
 export type Outcome = 'win' | 'loss' | 'draw'
 
-export const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'pgn', 'manual']
+export const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'fics', 'pgn', 'manual']
 export const SPEEDS: readonly Speed[] = [
   'bullet',
   'blitz',
@@ -227,6 +227,47 @@ export interface GamesDeleted {
   runs: number
   notes: number
   import_jobs: number
+}
+
+/**
+ * `POST /games/delete` — what one delete of a selection took. No `import_jobs`, unlike a
+ * wipe: the sync history survives, so the next sync does not fetch the deleted games back.
+ */
+export interface GamesRemoved {
+  games: number
+  runs: number
+  notes: number
+  lines: number
+  /** How many were written into the deletion record, so no import brings them back. */
+  remembered: number
+}
+
+/**
+ * `GET /library/deleted-games` — one game an import is refusing to store again.
+ *
+ * The game is gone, so every field is the snapshot taken when it went: `source` and
+ * `source_id` are what a sync is matched on, `dedup_hash` catches the same game arriving
+ * as a PGN with no ID, and the names and the date are how a person recognises the row.
+ */
+export interface DeletedGame {
+  id: number
+  source: Source
+  source_id?: string | null
+  dedup_hash: string
+  white_name: string
+  black_name: string
+  played_at?: string | null
+  deleted_at: string
+}
+
+export interface DeletedGameList {
+  games: DeletedGame[]
+  total: number
+}
+
+/** `POST /library/deleted-games/forget` — how many records went, not how many games came back. */
+export interface DeletionsForgotten {
+  forgotten: number
 }
 
 export interface BackupEstimate {
@@ -454,9 +495,24 @@ export interface ImportJob {
   games_seen: number
   games_imported: number
   games_skipped: number
+  /** Games this run left alone because they are in the deletion record. */
+  games_blocked: number
   games_failed: number
   errors: { ref?: string; error?: string }[]
   message?: string | null
+}
+
+/**
+ * `GET /import/jobs` — one page of the sync history.
+ *
+ * An object rather than a bare array: the history table pages, and a pager cannot say
+ * "page 2 of 7" without being told how many syncs there have been.
+ */
+export interface ImportJobList {
+  jobs: ImportJob[]
+  total: number
+  limit: number
+  offset: number
 }
 
 export interface ImportStarted {

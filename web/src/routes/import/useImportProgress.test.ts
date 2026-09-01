@@ -124,6 +124,7 @@ describe('history formatting', () => {
     games_seen: 0,
     games_imported: 0,
     games_skipped: 0,
+    games_blocked: 0,
     games_failed: 0,
     errors: [],
   })

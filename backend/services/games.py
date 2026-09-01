@@ -1,11 +1,23 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import ColumnElement, Delete, and_, delete, exists, func, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Delete,
+    Select,
+    UnaryExpression,
+    and_,
+    case,
+    delete,
+    exists,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
@@ -21,9 +33,11 @@ from backend.db.enums import (
 from backend.db.models import (
     Account,
     AnalysisRun,
+    DeletedGame,
     Game,
     GamePosition,
     ImportJob,
+    Line,
     MoveEval,
     Note,
 )
@@ -38,10 +52,17 @@ OUTCOMES = (WIN, LOSS, DRAW)
 PLATFORM_FOR_SOURCE: dict[Source, Platform] = {
     Source.LICHESS: Platform.LICHESS,
     Source.CHESSCOM: Platform.CHESSCOM,
+    Source.FICS: Platform.FICS,
 }
 
 # A deep pass is the better answer wherever it reaches; a quick pass fills in the rest.
 TIER_RANK: dict[Tier, int] = {Tier.QUICK: 0, Tier.DEEP: 1}
+
+# How the games table may be ordered, and the order it takes when nothing says otherwise.
+# The expressions themselves are `GAME_ORDERS`, below the helpers they are built from.
+SORT_DIRECTIONS = ("asc", "desc")
+DEFAULT_ORDER = "played_at"
+DEFAULT_DIRECTION = "desc"
 
 # Rating series are read by a chat model as often as by a chart, so they are downsampled
 # before they are handed over rather than after.
@@ -62,6 +83,11 @@ CARD_WORST_MOMENTS = 5
 
 # How many games a card backfill rebuilds before it commits and lets go of the write lock.
 CARD_BACKFILL_CHUNK = 200
+
+# How many game ids one delete statement names. SQLite compiles an `IN` list into one bound
+# parameter apiece and has a ceiling on those, so a caller with a long list is served by
+# several statements rather than by one that would not compile.
+DELETE_CHUNK = 500
 
 # How deep into a game its shipped book looks. `explorer.MAX_BOOK_DEPTH` gives up at 40
 # plies from the start and the deepest line two of the owner's games ever shared on a real
@@ -97,12 +123,93 @@ class GameFilters:
 
 
 def search_games(
-    session: Session, filters: GameFilters, limit: int = 50, offset: int = 0
+    session: Session,
+    filters: GameFilters,
+    limit: int = 50,
+    offset: int = 0,
+    order: str = DEFAULT_ORDER,
+    direction: str = DEFAULT_DIRECTION,
 ) -> list[Game]:
-    """Games matching `filters`, newest first."""
+    """Games matching `filters`, newest first unless another order is asked for."""
     statement = select(Game).where(*game_conditions(filters))
-    statement = statement.order_by(Game.played_at.desc().nulls_last(), Game.id.desc())
+    statement = statement.order_by(*order_clauses(order, direction))
     return list(session.scalars(statement.limit(limit).offset(offset)))
+
+
+def order_clauses(order: str, direction: str) -> list[UnaryExpression[Any]]:
+    """One sortable column as ORDER BY, with the tiebreak that makes paging stable.
+
+    Rows with nothing in the sorted column sink to the bottom whichever way the column
+    points: an unanalysed game is not "the least bad". `id` breaks every tie, so two games
+    with the same opponent cannot swap places between page 2 and page 3 — an order without
+    a total tiebreak is an order that shows a row twice and hides another.
+    """
+    build = GAME_ORDERS.get(order)
+    if build is None:
+        raise ValueError(f"unknown order {order!r}; known orders: {', '.join(GAME_ORDERS)}")
+    if direction not in SORT_DIRECTIONS:
+        raise ValueError(
+            f"unknown direction {direction!r}; known directions: {', '.join(SORT_DIRECTIONS)}"
+        )
+    column = build()
+    sorted_column = column.desc() if direction == "desc" else column.asc()
+    return [sorted_column.nulls_last(), Game.id.desc()]
+
+
+def _opponent_column(white: Any, black: Any) -> ColumnElement[Any]:
+    """Whichever of a pair of columns belongs to the opponent, by the owner's colour.
+
+    NULL for a game no account of theirs played in, the way `opponent_name` answers None.
+    """
+    return case(
+        (Game.owner_color == Color.WHITE, black),
+        (Game.owner_color == Color.BLACK, white),
+    )
+
+
+def _outcome_column() -> ColumnElement[Any]:
+    """The owner's result as the table shows it, falling back to the PGN result.
+
+    Built out of `outcome_condition` rather than beside it, so the order and the `outcome`
+    filter can never disagree about what a win is.
+    """
+    return func.coalesce(
+        case(
+            (outcome_condition(WIN), WIN),
+            (outcome_condition(LOSS), LOSS),
+            (outcome_condition(DRAW), DRAW),
+        ),
+        Game.result,
+    )
+
+
+def _tier_column() -> ColumnElement[Any]:
+    """Unanalysed < quick < deep, the rank the table's tier badge sorts by."""
+    return case((_has_deep_run(), 2), (_has_done_run(), 1), else_=0)
+
+
+# The orders `/games` will return, keyed the way the table's columns are named.
+#
+# Every one of them sorts on the value the cell shows rather than on a near neighbour of
+# it: `result` reads the outcome with the raw result behind it exactly as the cell falls
+# back, and `worst` reads the same stored card the `Worst` column reads rather than
+# `stat_worst_win_loss`, which is the worst *blunder* of the primary run and so a different
+# number for a game whose worst moment was a mistake. A game analysed before the card
+# column existed has no stored card to read and sorts as though it had nothing — the same
+# games `rebuild_game_cards` exists to catch up.
+GAME_ORDERS: dict[str, Callable[[], ColumnElement[Any]]] = {
+    "played_at": lambda: Game.played_at,
+    "opponent": lambda: func.lower(_opponent_column(Game.white_name, Game.black_name)),
+    "opponent_rating": lambda: _opponent_column(Game.white_rating, Game.black_rating),
+    "color": lambda: Game.owner_color,
+    "opening": lambda: func.lower(func.coalesce(Game.opening_name, Game.eco)),
+    "result": _outcome_column,
+    "time_control": lambda: func.coalesce(Game.time_control, Game.speed),
+    "ply_count": lambda: Game.ply_count,
+    "worst": lambda: Game.card["worst_moments"][0]["win_loss"].as_float(),
+    "source": lambda: Game.source,
+    "tier": _tier_column,
+}
 
 
 def count_games(session: Session, filters: GameFilters) -> int:
@@ -121,6 +228,239 @@ class Wiped:
     import_jobs: int = 0
 
 
+@dataclass(slots=True)
+class Deleted:
+    """What `delete_games` removed, in rows, and how many it wrote down as deleted."""
+
+    games: int = 0
+    runs: int = 0
+    notes: int = 0
+    lines: int = 0
+    remembered: int = 0
+
+
+def delete_games(session: Session, game_ids: Sequence[int]) -> Deleted:
+    """Delete some games and everything that only exists because of them.
+
+    The same child-first order `delete_all_games` spells out, and for the same three
+    reasons, narrowed to a set of ids: a queued run goes before the game it names, the
+    counts are what the statements actually took rather than a guess, and nothing here
+    depends on the foreign keys being enforced.
+
+    Three differences from the wipe, all deliberate. Every game deleted here leaves a
+    `deleted_games` row behind, so an import cannot store it again without the owner saying
+    so first — see `record_deletions`. The sync history stays: an owner who deleted forty
+    games did not ask for the next sync of that source to start over, and
+    `import_service.latest_cursor` is what would send it there. And the explorer's fold is
+    marked dirty for these games' positions only, which has to happen while the
+    `game_positions` rows that name them are still there to be read.
+
+    A note about a position rather than about one of these games stays, as it does in a
+    wipe. A kept line belongs to the game it branches off and goes with it; a note that
+    named that line but not the game survives with its `line_id` cleared, which is what
+    that foreign key is `SET NULL` for.
+    """
+    from backend.services import explorer as explorer_service
+
+    deleted = Deleted()
+    ids = _unique_ids(game_ids)
+    if not ids:
+        return deleted
+    for chunk in _id_chunks(ids):
+        # Only the ids that are really there, so the counts describe this call rather than
+        # what it was asked about, and so an unknown id is a no-op rather than a refusal.
+        present = list(session.scalars(select(Game.id).where(Game.id.in_(chunk))))
+        if not present:
+            continue
+        deleted.remembered += record_deletions(session, present)
+        explorer_service.mark_games_dirty(session, present)
+        of_these = select(AnalysisRun.id).where(AnalysisRun.game_id.in_(present))
+        _deleted(session, delete(MoveEval).where(MoveEval.run_id.in_(of_these)))
+        deleted.runs += _deleted(
+            session, delete(AnalysisRun).where(AnalysisRun.game_id.in_(present))
+        )
+        deleted.notes += _deleted(session, delete(Note).where(Note.game_id.in_(present)))
+        deleted.lines += _deleted(session, delete(Line).where(Line.game_id.in_(present)))
+        _deleted(session, delete(GamePosition).where(GamePosition.game_id.in_(present)))
+        deleted.games += _deleted(session, delete(Game).where(Game.id.in_(present)))
+    session.commit()
+    # A bulk delete does not tell the identity map what it took, so a caller that goes on
+    # using this Session — a CLI, a test, anything that is not one request — would keep
+    # reading the games, notes and lines it has just deleted out of memory. A request-scoped
+    # session is about to be closed and does not care either way.
+    session.expunge_all()
+    return deleted
+
+
+# --- what an import may not bring back ------------------------------------
+#
+# A deleted game leaves nothing behind for the importer's duplicate lookup to find, so
+# `deleted_games` is what stands in for it. The three functions below are the whole of it:
+# one writes the rows, one is what the importer asks, and one is the owner taking it back.
+
+
+def record_deletions(session: Session, game_ids: Sequence[int]) -> int:
+    """Write down the games about to be deleted; how many rows were added.
+
+    Uncommitted, like the rest of `delete_games`: the tombstone and the delete are one
+    change, and a reader must never find a library that has lost the game and not yet
+    remembered losing it.
+
+    A game already written down — deleted, imported again on purpose, deleted again —
+    is not written twice, so the list the owner reads is a list of games rather than a
+    list of clicks.
+    """
+    rows = session.execute(
+        select(
+            Game.source,
+            Game.source_id,
+            Game.dedup_hash,
+            Game.white_name,
+            Game.black_name,
+            Game.played_at,
+        ).where(Game.id.in_(game_ids))
+    ).all()
+    written = 0
+    for source, source_id, digest, white, black, played_at in rows:
+        if identify(session, source, source_id, digest).deleted is not None:
+            continue
+        session.add(
+            DeletedGame(
+                source=source,
+                source_id=source_id,
+                dedup_hash=digest,
+                white_name=white,
+                black_name=black,
+                played_at=played_at,
+            )
+        )
+        # Flushed as it goes, so two identical games in one selection are one row.
+        session.flush()
+        written += 1
+    return written
+
+
+@dataclass(slots=True)
+class Identity:
+    """What the library already knows about a game that is arriving.
+
+    Three answers, and exactly one of them is true of any game: it is already stored
+    (`game`), it was deleted on purpose (`deleted`), or the library has never seen it.
+    A stored game wins over a record of a deleted one — a game that is here is here,
+    whatever was once thrown away that looks like it.
+    """
+
+    game: Game | None = None
+    deleted: DeletedGame | None = None
+
+    @property
+    def known(self) -> bool:
+        return self.game is not None or self.deleted is not None
+
+
+def identify(
+    session: Session, source: Source, source_id: str | None, digest: str
+) -> Identity:
+    """Does the library know this game — as a game it has, or as one it threw away?
+
+    One function over both tables because it is one question, asked once per game arriving,
+    and because the rule that answers it is subtle enough that two copies of it would drift:
+
+    * The source's own ID is the identity where the source names one. A game *this* source
+      names differently is a different game however identical it looks — two bullet
+      rematches of the same short trap line share every scrap of the hash's material, and
+      swallowing the second would lose it for good.
+    * The content hash (moves + day + both names) is the fallback for a game that arrives
+      by a route with no ID of its own: a PGN export of an already-synced Lichess game
+      keeps all three even though its source and its source ID change. That fallback
+      deliberately does not match a row this same source named, for the reason above.
+
+    Which is why deleting a game and re-importing its PGN is refused: `deleted_games` is
+    matched on exactly the terms `games` is, so the tombstone stands in for the row that is
+    gone (`db.models.DeletedGame`).
+
+    At most two statements, and one whenever the game is already stored — which is the case
+    on every sync that re-reads an archive it has read before. The exact-ID match is
+    preferred inside the statement rather than by asking for it first.
+    """
+    stored = session.scalars(_identity_query(Game, source, source_id, digest)).first()
+    if stored is not None:
+        return Identity(game=stored)
+    gone = session.scalars(_identity_query(DeletedGame, source, source_id, digest)).first()
+    return Identity(deleted=gone)
+
+
+_IdentityTable = type[Game] | type[DeletedGame]
+
+
+def _identity_query(
+    table: _IdentityTable, source: Source, source_id: str | None, digest: str
+) -> Select[Any]:
+    """`identify`'s rule as one statement over whichever of the two tables is asked."""
+    by_hash = table.dedup_hash == digest
+    if not source_id:
+        return select(table).where(by_hash).order_by(table.id)
+    named = and_(table.source == source, table.source_id == source_id)
+    return (
+        select(table)
+        .where(or_(named, and_(by_hash, or_(table.source != source, table.source_id.is_(None)))))
+        # The row this source named is the answer whenever there is one; the hash is what
+        # the rest is ranked by, and `id` only keeps the order from being arbitrary.
+        .order_by(case((named, 0), else_=1), table.id)
+    )
+
+
+def list_deletions(
+    session: Session, limit: int = 50, offset: int = 0
+) -> tuple[list[DeletedGame], int]:
+    """The games an import is currently refusing, newest deletion first, and how many."""
+    rows = list(
+        session.scalars(
+            select(DeletedGame)
+            .order_by(DeletedGame.deleted_at.desc(), DeletedGame.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    total = int(session.scalar(select(func.count(DeletedGame.id))) or 0)
+    return rows, total
+
+
+def forget_deletions(session: Session, ids: Sequence[int] | None = None) -> int:
+    """Forget some deletions, or all of them; how many records went.
+
+    This is the undo, and it undoes nothing by itself: the game does not come back, the
+    refusal does. Whatever imports that game next — the source's next sync, a PGN dropped
+    on the page — stores it again as a new game, with no analysis and no notes, because
+    those went with the original.
+    """
+    forgotten = 0
+    if ids is None:
+        forgotten = _deleted(session, delete(DeletedGame))
+    else:
+        wanted = _unique_ids(ids)
+        if not wanted:
+            return 0
+        for chunk in _id_chunks(wanted):
+            forgotten += _deleted(session, delete(DeletedGame).where(DeletedGame.id.in_(chunk)))
+    session.commit()
+    # The bulk delete does not tell the identity map what it took, and SQLite hands the
+    # freed primary keys straight back out: a caller that goes on using this Session would
+    # otherwise find the next deletion it writes colliding with a record that is gone.
+    session.expunge_all()
+    return forgotten
+
+
+def _unique_ids(game_ids: Iterable[int]) -> list[int]:
+    """The ids asked for, once each, in the order they were given."""
+    return list(dict.fromkeys(int(game_id) for game_id in game_ids))
+
+
+def _id_chunks(ids: list[int]) -> list[list[int]]:
+    """The ids as IN-sized batches: SQLite has a ceiling on bound parameters."""
+    return [ids[start : start + DELETE_CHUNK] for start in range(0, len(ids), DELETE_CHUNK)]
+
+
 def delete_all_games(session: Session) -> Wiped:
     """Empty the library: every game, and everything that only exists because of one.
 
@@ -129,6 +469,11 @@ def delete_all_games(session: Session) -> Wiped:
     out child-first anyway. It is what makes the counts real rather than guessed, it is what
     a database whose foreign keys are not enforced needs, and it is the order that drops a
     queued run *before* its game rather than trusting a worker not to claim it in between.
+
+    Nothing here is written into `deleted_games`, unlike `delete_games`: a reset means
+    starting over, and a library's worth of tombstones would block the re-import that
+    follows it. The records an earlier delete left behind survive the wipe, though — they
+    are about games, and this is about the library.
 
     Three things deliberately survive. `positions` is the shared dictionary every game
     points into, and a position note points at it too, so it stays whether or not a game

@@ -26,6 +26,8 @@ export interface SourceProgress {
   seen: number
   imported: number
   skipped: number
+  /** Games left alone because the owner deleted them; Manage is where that is taken back. */
+  blocked: number
   failed: number
   /** The game the adapter touched last — a Lichess id, a PGN header, a chess.com URL. */
   lastRef: string | null
@@ -54,6 +56,7 @@ function blank(source: Source, jobId: number | null): SourceProgress {
     seen: 0,
     imported: 0,
     skipped: 0,
+    blocked: 0,
     failed: 0,
     lastRef: null,
     failures: [],
@@ -68,6 +71,7 @@ function counts(event: Record<string, unknown>) {
     seen: Number(event.seen ?? 0),
     imported: Number(event.imported ?? 0),
     skipped: Number(event.skipped ?? 0),
+    blocked: Number(event.blocked ?? 0),
     failed: Number(event.failed ?? 0),
   }
 }

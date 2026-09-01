@@ -401,14 +401,34 @@ describe('InfiniteAnalysisPanel', () => {
   })
 
   it('holds the rows open while the search is starting', () => {
-    render(
+    const { container } = render(
       <InfiniteAnalysisPanel
-        stream={streamApi({ enabled: true, phase: 'opening' })}
+        stream={streamApi({ enabled: true, phase: 'opening', multipv: 5 })}
         fen={SICILIAN}
       />,
     )
     expect(screen.getByTestId('infinite-analysis-pending')).toBeInTheDocument()
     expect(screen.queryAllByTestId('infinite-analysis-line')).toHaveLength(0)
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(5)
+  })
+
+  it('reserves one row for every selected line while a snapshot fills in', () => {
+    const { container } = render(
+      <InfiniteAnalysisPanel
+        stream={streamApi({
+          enabled: true,
+          phase: 'running',
+          session: SESSION,
+          snapshot: { ...SNAPSHOT, lines: [SNAPSHOT.lines[0]!] },
+          multipv: 3,
+        })}
+        fen={SICILIAN}
+        ply={3}
+      />,
+    )
+
+    expect(screen.getAllByTestId('infinite-analysis-line')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(2)
   })
 
   it('lists only the engines that can drive a board', () => {

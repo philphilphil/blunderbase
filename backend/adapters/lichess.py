@@ -22,6 +22,7 @@ import chess
 import chess.pgn
 import httpx
 
+from backend.adapters import is_full_archive
 from backend.db.enums import JobStatus, Platform, Result, Source, Speed
 from backend.services import accounts
 from backend.services.import_service import (
@@ -66,8 +67,6 @@ DRAWN_STATUSES = frozenset({"draw", "stalemate"})
 # hundred syncs of any source", which is far more than a resume ever needs.
 CURSOR_LOOKBACK = 200
 
-# `--since all` (or an empty value) means "ignore the stored cursor and walk the archive".
-FULL_ARCHIVE = frozenset({"all", "full", "archive"})
 
 
 class LichessError(RuntimeError):
@@ -425,7 +424,8 @@ def parse_since(value: str | int | datetime) -> int | None:
         moment = value
     else:
         text = str(value).strip()
-        if not text or text.casefold() in FULL_ARCHIVE:
+        # `--since all`, or an empty value: ignore the stored cursor and walk the archive.
+        if is_full_archive(text):
             return None
         if text.isdigit():
             return int(text)

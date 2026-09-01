@@ -399,6 +399,10 @@ def test_since_reads_a_month_a_date_or_a_cursor() -> None:
     assert chesscom.read_since("2026/2") == (None, (2026, 2))
     assert chesscom.read_since("2026-02-14T08:00:00") == (None, (2026, 2))
     assert chesscom.read_since(f"{FEBRUARY}|3") == (f"{FEBRUARY}|3", None)
+    # Neither a cursor nor a first month: every archive there is, which is the word every
+    # source takes for "start from the beginning" (`backend.adapters.FULL_ARCHIVE`).
+    assert chesscom.read_since("all") == (None, None)
+    assert chesscom.read_since("  ALL ") == (None, None)
     with pytest.raises(ValueError):
         chesscom.read_since("last tuesday")
 

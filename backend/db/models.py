@@ -230,12 +230,54 @@ class ImportJob(Base):
     games_seen: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     games_imported: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     games_skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Games this run found in `deleted_games` and would not store again. Its own count
+    # rather than part of `games_skipped`: "you already have this" and "you threw this
+    # away" are different facts, and only one of them has a button that changes it.
+    games_blocked: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     games_failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # One entry per game that could not be parsed or stored; a bad game never aborts a sync.
     errors: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
     message: Mapped[str | None] = mapped_column(Text)
 
     account: Mapped[Account | None] = relationship()
+
+
+class DeletedGame(Base):
+    """A game the owner deleted, remembered so that an import cannot quietly bring it back.
+
+    Deleting a game deletes the only record of it, and the importer's deduplication is a
+    lookup in `games` (`services.games.identify`) — so without this row the next sync
+    of that source stores it again as a brand-new game. That is not a corner case:
+    `adapters.chesscom` deliberately re-reads the archive month that is still being played
+    on every sync, so a game deleted today comes back on the next one.
+
+    Both identities the importer matches on are kept, because the same game arrives by more
+    than one route: `source` + `source_id` is what a sync offers, and `dedup_hash` is what
+    a PGN of that same game carries when it has no ID of its own. The names and the date
+    are a snapshot for the screen that lists these — the game is gone, so there is nothing
+    left to join to, and nobody can decide anything about a bare hash.
+
+    Nothing here is a foreign key and nothing cascades: the row outlives its game on
+    purpose. Forgetting one (`services.games.forget_deletions`) is the undo, and the next
+    import stores the game again like any other new one. A full wipe writes none of these —
+    "reset the imported library" means start over, and a library's worth of tombstones
+    would make the re-import that follows it impossible.
+    """
+
+    __tablename__ = "deleted_games"
+    __table_args__ = (
+        Index("ix_deleted_games_dedup_hash", "dedup_hash"),
+        Index("ix_deleted_games_source_source_id", "source", "source_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[Source] = mapped_column(EnumString(Source), nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(64))
+    dedup_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    white_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    black_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    played_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    deleted_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
 
 class Position(Base):

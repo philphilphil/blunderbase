@@ -40,17 +40,19 @@ import {
 import { Bar, EmptyBlock, ErrorBlock, LegendSwatch, Segmented } from '@/routes/stats/kit/states'
 
 /** Drawn in this order, so the platform colours never move between charts. */
-const PLATFORMS: Platform[] = ['lichess', 'chesscom', 'otb']
+const PLATFORMS: Platform[] = ['lichess', 'chesscom', 'fics', 'otb']
 
 const PLATFORM_COLOR: Record<Platform, string> = {
   lichess: 'var(--chart-1)',
   chesscom: 'var(--chart-2)',
+  fics: 'var(--chart-4)',
   otb: 'var(--chart-3)',
 }
 
 const PLATFORM_LABEL: Record<Platform, string> = {
   lichess: 'Lichess',
   chesscom: 'Chess.com',
+  fics: 'FICS',
   otb: 'OTB',
 }
 
