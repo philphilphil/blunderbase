@@ -10,7 +10,7 @@ from typing import Any
 
 from backend import __version__
 from backend.config import Settings, get_settings
-from backend.db.enums import JobStatus, Platform, Tier
+from backend.db.enums import EngineKind, EngineRole, JobStatus, Platform, Tier
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import reset_engines, session_scope
 from backend.services import accounts as accounts_service
@@ -51,6 +51,19 @@ def _date(value: str) -> date:
         return date.fromisoformat(value)
     except ValueError:
         raise argparse.ArgumentTypeError("expected YYYY-MM-DD") from None
+
+
+def _option(value: str) -> tuple[str, str]:
+    """`--option Threads=8`, as a pair. The engine's own declaration does the coercing.
+
+    Left as a string on purpose: `validate_options` asks the binary what type it declared
+    the option with and parses against that, so guessing here — `8` an int, `true` a bool —
+    would only be a second, worse answer to a question the engine already answers.
+    """
+    name, separator, setting = value.partition("=")
+    if not separator or not name.strip():
+        raise argparse.ArgumentTypeError("expected NAME=VALUE, e.g. Threads=8")
+    return name.strip(), setting.strip()
 
 
 def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
@@ -110,6 +123,47 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
         "revoke", help="delete a runner, its token and the engines it advertised"
     )
     revoke_runner.add_argument("name")
+
+    engines = commands.add_parser("engines", help="the engine binaries on THIS machine")
+    engine_commands = engines.add_subparsers(dest="engines_command", required=True)
+    engine_commands.add_parser("list", help="every engine row, where it lives and what it serves")
+    add_engine = engine_commands.add_parser(
+        "add", help="register a binary on this host and, optionally, give it its roles"
+    )
+    add_engine.add_argument("name")
+    add_engine.add_argument("path", help="a file, a command line with arguments, or a name on PATH")
+    add_engine.add_argument(
+        "--kind", choices=[str(kind) for kind in EngineKind], default=str(EngineKind.UCI)
+    )
+    add_engine.add_argument(
+        "--option",
+        type=_option,
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        dest="options",
+        help="a UCI option, validated against what the binary declares; repeatable",
+    )
+    add_engine.add_argument(
+        "--role",
+        choices=[str(role) for role in EngineRole],
+        action="append",
+        default=[],
+        dest="roles",
+        help="assign this engine to a role, taking it from whatever holds it; repeatable",
+    )
+    add_engine.add_argument(
+        "--replace",
+        action="store_true",
+        help="update the engine of this name instead of refusing, and enable it",
+    )
+    add_engine.add_argument(
+        "--disabled", action="store_true", help="register it without switching it on"
+    )
+    remove_engine = engine_commands.add_parser(
+        "remove", help="delete an engine row and unqueue what only it could have run"
+    )
+    remove_engine.add_argument("name")
 
     analyze = commands.add_parser("analyze", help="enqueue engine analysis and run the queue")
     analyze.add_argument(
@@ -328,6 +382,122 @@ def command_runners(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _engine_by_name(session: Any, name: str) -> Any:
+    """The engine row of this name, or None. Names are what the CLI has instead of ids."""
+    return next(
+        (
+            engine
+            for engine in engines_service.list_engines(session)
+            if engine.name == name.strip()
+        ),
+        None,
+    )
+
+
+def _print_engines(session: Any) -> None:
+    """One line per engine: what it is, where it lives, and which roles it holds."""
+    rows = engines_service.list_engines(session)
+    if not rows:
+        print("no engines yet; `blunderbase engines add sf stockfish` registers one")
+        return
+    held: dict[int, list[str]] = {}
+    for role in EngineRole:
+        engine = engines_service.engine_for_role(session, role)
+        if engine is not None:
+            held.setdefault(engine.id, []).append(str(role))
+    width = max(len(engine.name) for engine in rows)
+    host = max(len(engines_service.engine_host(session, engine)) for engine in rows)
+    for engine in rows:
+        where = engines_service.engine_host(session, engine)
+        state = "on" if engine.enabled else "off"
+        roles = ", ".join(held.get(engine.id, [])) or "no role"
+        print(
+            f"{engine.name:{width}}  {str(engine.kind):4}  {state:3}  {where:{host}}  "
+            f"{roles:11}  {engine.path}"
+        )
+
+
+def command_engines(args: argparse.Namespace, settings: Settings) -> int:
+    """Register and remove the engine binaries this host may start.
+
+    The headless half of the Engines page. `runners create` has always been able to set up
+    a machine's engines from a shell and this could not, which made a scripted dev box —
+    `make engines` — impossible without a browser. Everything here is a thin call into
+    `services/engines.py`, so the probe, the option validation and the role rules are the
+    same ones the page gets.
+
+    An engine advertised by a runner is not touched: its row is that machine's
+    advertisement, rewritten every time it connects, and the service refuses to edit it.
+    """
+    upgrade_to_head(settings)
+    with session_scope(settings) as session:
+        if args.engines_command == "list":
+            _print_engines(session)
+            return 0
+
+        existing = _engine_by_name(session, args.name)
+        if args.engines_command == "remove":
+            if existing is None:
+                print(f"engines: no engine named {args.name!r}")
+                return 1
+            _, unqueued = engines_service.delete_engine(session, existing.id)
+            print(f"engine {existing.name!r} removed; {unqueued} queued run(s) unqueued")
+            return 0
+
+        options = dict(args.options)
+        try:
+            if existing is None:
+                # `add_engine` fills every still-unassigned role this kind fits on its way
+                # out, so a first engine works without a second command.
+                engine = engines_service.add_engine(
+                    session,
+                    args.name,
+                    args.path,
+                    kind=EngineKind(args.kind),
+                    options=options,
+                    enabled=not args.disabled,
+                )
+            elif args.replace:
+                # `--replace` is what makes the command re-runnable, which is what a `make`
+                # target needs: the same line twice is the same engine, re-probed against
+                # whatever the binary says today.
+                engine = engines_service.update_engine(
+                    session,
+                    existing.id,
+                    path=args.path,
+                    kind=EngineKind(args.kind),
+                    options=options,
+                    enabled=not args.disabled,
+                )
+            else:
+                print(
+                    f"engines: an engine named {args.name!r} is already registered "
+                    f"(--replace updates it)"
+                )
+                return 1
+            for role in args.roles:
+                engines_service.set_role_engine(session, EngineRole(role), engine.id)
+        except engines_service.EngineServiceError as exc:
+            print(f"engines: {exc}")
+            return 1
+
+        # What it serves once everything is written, rather than what this invocation
+        # changed: the useful answer to "did that do what I wanted" is the state, and a
+        # `--replace` that assigns nothing still has to say which roles the engine holds.
+        held = [
+            engines_service.ROLE_LABELS[role]
+            for role in EngineRole
+            if (serving := engines_service.engine_for_role(session, role)) is not None
+            and serving.id == engine.id
+        ]
+        version = f" {engine.version}" if engine.version else ""
+        verb = "updated" if existing is not None else "registered"
+        state = "" if engine.enabled else ", switched off"
+        print(f"engine {engine.name!r}{version} {verb}: {engine.kind} at {engine.path}{state}")
+        print(f"serves {', '.join(held)}" if held else "serves no role yet")
+    return 0
+
+
 def _print_run_event(event: dict[str, Any]) -> None:
     if event["event"] == analysis_service.EVENT_RUN_PROGRESS:
         return
@@ -528,6 +698,7 @@ COMMANDS = {
     "import": command_import,
     "accounts": command_accounts,
     "runners": command_runners,
+    "engines": command_engines,
     "analyze": command_analyze,
     "mcp": command_mcp,
     "set-password": command_set_password,

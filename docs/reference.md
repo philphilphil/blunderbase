@@ -61,6 +61,53 @@ weights and is deliberately not bundled: mount it into the container and registe
 path. No Maia degrades rather than fails — you lose the human-move predictions, not the
 evaluation.
 
+The same thing from a shell, for a machine with no browser open and for scripting a dev
+box:
+
+```console
+$ blunderbase engines add sf-local stockfish --option Threads=4 --role quick --role deep
+engine 'sf-local' Stockfish 18 registered: uci at stockfish
+serves the quick tier, the deep tier
+$ blunderbase engines list
+$ blunderbase engines remove sf-local
+```
+
+`add` probes the binary exactly as the page does, so a wrong path or an option the engine
+does not declare is refused here rather than at analysis time. `--replace` updates the
+engine of that name instead of refusing, which is what makes the command safe to re-run —
+it re-probes and rewrites the row, so it is also how you follow a binary that moved.
+`--role` takes a role from whatever holds it; without it, only roles nobody has assigned
+yet are filled. An engine a *runner* advertises is refused: that row is the other machine's
+advertisement and `docs/runners.md`'s yaml is where it changes.
+
+**`make engines`** is that pair of commands for this checkout — Stockfish and Maia,
+registered as local engines on the dev database and holding the three roles. It writes
+rows, so it is a one-off per checkout rather than something `make run` needs.
+
+```console
+$ make engines
+```
+
+Neither binary has to be named. Stockfish is whatever `stockfish` reaches on `PATH`. Maia
+is looked for at `engines/maia3/bin/maia3-5m` — `engines/` at the repo root is gitignored
+and is where a downloaded engine belongs, and those are the container's own paths
+(`engines/docker/Dockerfile` builds the same `bin` and `models` under `/engines/maia3`), so
+one layout works in both places — then on `PATH`. A Maia somewhere else is named once:
+
+```console
+$ make engines MAIA=~/some/where/maia3-5m MAIA_MODELS=~/some/where/models
+```
+
+or, so it survives the next invocation, as `MAIA=` and `MAIA_MODELS=` lines in a `.env`
+beside the Makefile. That file is gitignored and read only by `make`; the backend's own
+settings are `BLUNDERBASE_*` environment variables and never come from it. Found or not,
+the run says which — a missing Maia leaves human moves unassigned and prints the two ways
+to fix it, rather than failing.
+
+`SF` and `SF_THREADS` (default 4, since the dev server is usually on the same laptop)
+override the search engine the same way. `MAIA_MODELS` becomes `--cache-dir …
+--local-files-only`, so a machine with the weights cached answers with no network.
+
 ## Opening names
 
 The explorer names a position from a vendored copy of
