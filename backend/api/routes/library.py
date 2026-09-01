@@ -1,4 +1,4 @@
-"""`/library` — lossless installation backup, beside the portable PGN export."""
+"""`/library` — the installation-wide reads and writes: backups, and the deletion record."""
 
 from __future__ import annotations
 
@@ -9,14 +9,23 @@ import tempfile
 import time
 from datetime import date
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 
-from backend.api.deps import SettingsDep
-from backend.api.schemas import BackupEstimate, BackupPrepared
+from backend.api.deps import SessionDep, SettingsDep
+from backend.api.schemas import (
+    BackupEstimate,
+    BackupPrepared,
+    DeletedGameList,
+    DeletedGameRow,
+    DeletionsForgotten,
+    ForgetDeletions,
+)
 from backend.services import backups as backups_service
+from backend.services import games as games_service
 
 router = APIRouter(prefix="/library", tags=["library"])
 
@@ -124,3 +133,42 @@ def _remove_stale_prepared(data_dir: Path) -> None:
             continue
         if stale:
             shutil.rmtree(directory, ignore_errors=True)
+
+
+# --- the games an import will not bring back ------------------------------
+
+
+@router.get(
+    "/deleted-games",
+    response_model=DeletedGameList,
+    summary="The games an import is refusing to store again",
+)
+def list_deleted_games(
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> DeletedGameList:
+    """Deleted games, newest deletion first, with how many there are in all.
+
+    Deleting a game deletes the only record of it, so these rows are what stop the next
+    sync of a source storing it again as something new — see `db.models.DeletedGame`.
+    """
+    rows, total = games_service.list_deletions(session, limit=limit, offset=offset)
+    return DeletedGameList(
+        games=[DeletedGameRow.model_validate(row) for row in rows], total=total
+    )
+
+
+@router.post(
+    "/deleted-games/forget",
+    response_model=DeletionsForgotten,
+    summary="Let an import store deleted games again",
+)
+def forget_deleted_games(session: SessionDep, body: ForgetDeletions) -> DeletionsForgotten:
+    """Forget some deletions, or all of them.
+
+    No game comes back from this call: what comes back is the ability to import one. The
+    next sync of that source, or a PGN carrying the game, stores it again as a new game —
+    without the analysis and the notes, which went with the original.
+    """
+    return DeletionsForgotten(forgotten=games_service.forget_deletions(session, body.ids))

@@ -186,6 +186,12 @@ class AppSettingsUpdate(Input):
 
 # --- games ----------------------------------------------------------------
 
+# How many games one request may name — a batch to analyse, or a selection to delete. A
+# selection is made by hand on the games page, so the ceiling is only there to keep a stray
+# client from asking for a transaction the size of the library; `blunderbase analyze` with
+# no game is what queues everything, and `POST /games/delete-all` is what empties it.
+MAX_BATCH_GAMES = 500
+
 
 class GameSummary(Payload):
     """`services.games.game_summary`: the compact game every payload embeds."""
@@ -253,6 +259,79 @@ class GamesDeleted(BaseModel):
     runs: int = 0
     notes: int = 0
     import_jobs: int = 0
+
+
+class GameDeleteRequest(Input):
+    """The games one delete takes. One game is a batch of one.
+
+    The same ceiling and the same de-duplication as a batch analysis request, for the same
+    reason: a selection is made by hand on the games page, and the cap is only there to
+    keep a stray client from asking for a transaction the size of the library. Emptying the
+    library is `POST /games/delete-all`, which asks for the password.
+    """
+
+    game_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_GAMES)
+
+    @model_validator(mode="after")
+    def _distinct_games(self) -> GameDeleteRequest:
+        self.game_ids = list(dict.fromkeys(self.game_ids))
+        return self
+
+
+class GamesRemoved(BaseModel):
+    """What one delete of a selection took.
+
+    `import_jobs` has no place here, unlike in `GamesDeleted`: the sync history survives a
+    delete of some games, so the next sync does not fetch them straight back. `lines` is the
+    kept variations off those games, which go with them, and `remembered` is how many were
+    written into `deleted_games` so no import quietly brings them back.
+    """
+
+    games: int = 0
+    runs: int = 0
+    notes: int = 0
+    lines: int = 0
+    remembered: int = 0
+
+
+class DeletedGameRow(Row):
+    """One game an import is refusing to store again, as the Manage screen lists it.
+
+    The game itself is gone, so everything here is the snapshot taken when it went: the
+    source and its ID are what a sync offers and therefore what it is matched on, and the
+    names and the date are how a person recognises which game a row is.
+    """
+
+    id: int
+    source: Source
+    source_id: str | None = None
+    dedup_hash: str
+    white_name: str
+    black_name: str
+    played_at: datetime | None = None
+    deleted_at: datetime
+
+
+class DeletedGameList(BaseModel):
+    games: list[DeletedGameRow]
+    total: int
+
+
+class ForgetDeletions(Input):
+    """Which deletions to forget. Omitting `ids` forgets every one of them.
+
+    Null rather than a separate route because "forget these three" and "forget all" are the
+    same act with a different scope, and a client that means all of them should not have to
+    page through the list to name them.
+    """
+
+    ids: list[int] | None = Field(default=None, min_length=1, max_length=MAX_BATCH_GAMES)
+
+
+class DeletionsForgotten(BaseModel):
+    """How many records went. The games do not come back; the refusal does."""
+
+    forgotten: int = 0
 
 
 class BackupEstimate(BaseModel):
@@ -426,9 +505,23 @@ class ImportJobResponse(Row):
     games_seen: int = 0
     games_imported: int = 0
     games_skipped: int = 0
+    games_blocked: int = 0
     games_failed: int = 0
     errors: list[dict[str, Any]] = Field(default_factory=list)
     message: str | None = None
+
+
+class ImportJobList(BaseModel):
+    """One page of the sync history.
+
+    An object rather than the bare array this used to be: the table under it pages, and a
+    pager cannot say "page 2 of 7" without being told how many jobs there are.
+    """
+
+    jobs: list[ImportJobResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class ImportStarted(BaseModel):
@@ -441,11 +534,6 @@ class ImportStarted(BaseModel):
 
 
 # --- analysis -------------------------------------------------------------
-
-# How many games one batch may carry. A selection is made by hand on the games page, so
-# the ceiling is only there to keep a stray client from asking for a transaction the size
-# of the library; `blunderbase analyze` with no game is what queues everything.
-MAX_BATCH_GAMES = 500
 
 
 class AnalysisRequest(Input):

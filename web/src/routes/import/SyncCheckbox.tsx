@@ -2,23 +2,22 @@ import { Check } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-const LABEL = 'Skip evaluation'
-
 /**
- * The one option every import card shares: store the games and stop there.
- *
- * Evaluation is what the rest of the app reads a game through, so the pass stays the
- * default and this is the exception — the first sync of a long archive, where a thousand
- * queued passes are better asked for a few at a time from the library afterwards.
+ * One switch in the strip above the sources table — what the next sync is told.
  *
  * The box and the label are one hit target rather than a checkbox with a label beside it:
  * nothing here is nested, and the whole control toggles.
  */
-export function SkipEvaluation({
+export function SyncCheckbox({
+  label,
+  title,
   checked,
   onChange,
   disabled,
 }: {
+  label: string
+  /** The tooltip, where what the switch does is worth a sentence the strip has no room for. */
+  title?: string
   checked: boolean
   onChange: (next: boolean) => void
   disabled?: boolean
@@ -28,7 +27,8 @@ export function SkipEvaluation({
       type="button"
       role="checkbox"
       aria-checked={checked}
-      aria-label={LABEL}
+      aria-label={label}
+      title={title}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className="group flex items-center gap-2 rounded-md text-left outline-none disabled:opacity-50"
@@ -44,7 +44,7 @@ export function SkipEvaluation({
       >
         <Check className="size-2.5" strokeWidth={3} />
       </span>
-      <span className={cn('text-[0.6875rem]', checked ? 'text-soft' : 'text-dim')}>{LABEL}</span>
+      <span className={cn('text-[0.6875rem]', checked ? 'text-soft' : 'text-dim')}>{label}</span>
     </button>
   )
 }

@@ -42,6 +42,16 @@ export const queryKeys = {
 
   library: (): QueryKey => ['library'],
   backupEstimate: (): QueryKey => ['library', 'backup-estimate'],
+  /**
+   * The deletion record. Under `['library']` because it is an installation-wide list
+   * rather than a cut of the games — and deliberately *not* under `['games']`, whose every
+   * socket event would otherwise refetch a list that only a delete or a forget can change.
+   */
+  deletedGames: (query: { limit?: number; offset?: number } = {}): QueryKey => [
+    'library',
+    'deleted-games',
+    query,
+  ],
 
   analysis: (): QueryKey => ['analysis'],
   queue: (): QueryKey => ['analysis', 'queue'],
@@ -70,7 +80,7 @@ export const queryKeys = {
   ],
 
   imports: (): QueryKey => ['import'],
-  importJobs: (query: { source?: Source; limit?: number } = {}): QueryKey => [
+  importJobs: (query: { source?: Source; limit?: number; offset?: number } = {}): QueryKey => [
     'import',
     'jobs',
     query,

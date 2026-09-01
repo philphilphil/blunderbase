@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 import chess.pgn
 import httpx
 
-from backend.adapters import pgn_import
+from backend.adapters import is_full_archive, pgn_import
 from backend.db.enums import Platform, Source
 from backend.services import accounts
 from backend.services.import_service import (
@@ -171,9 +171,9 @@ def read_cursor(value: Any) -> date:
     """A stored ISO date, with `all`/`full`/`archive` spelling the complete archive."""
     if value is None:
         return FIRST_ARCHIVE_DAY
-    text = str(value).strip().casefold()
-    if not text or text in {"all", "full", "archive"}:
+    if is_full_archive(value):
         return FIRST_ARCHIVE_DAY
+    text = str(value).strip()
     try:
         parsed = date.fromisoformat(text)
     except ValueError as exc:

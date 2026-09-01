@@ -1,5 +1,7 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
+
+import { Button } from '@/components/ui/button'
 
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,6 +15,8 @@ import {
 } from '@/components/ui/table'
 import type { ImportJob, JobStatus } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
+
+import { pageRange } from '@/routes/games/paging'
 
 import { duration, stamp } from './format'
 
@@ -46,10 +50,10 @@ function Count({ value, tone }: { value: number; tone?: string }) {
   )
 }
 
-function Failures({ job }: { job: ImportJob }) {
+function Failures({ job, columns }: { job: ImportJob; columns: number }) {
   return (
     <tr className="border-b border-hairline bg-surface-2">
-      <td colSpan={9} className="px-2.5 py-2.5">
+      <td colSpan={columns} className="px-2.5 py-2.5">
         <ul className="flex flex-col gap-1">
           {job.errors.map((failure, index) => (
             <li key={index} className="flex gap-3 font-mono text-[0.6875rem]">
@@ -67,17 +71,41 @@ function Failures({ job }: { job: ImportJob }) {
  * Every sync that has run, newest first, with the per-game failures folded under the row
  * that carries them — `ImportJob.errors` is the only place a game that did not make it in
  * is recorded.
+ *
+ * A page at a time, because this list only grows: every sync of every account writes a row,
+ * and an installation that syncs on a schedule reaches hundreds of them in a month. The
+ * pager appears only when there is a second page — one press of Sync all on a fresh
+ * install writes three rows, and a pager under three rows is furniture.
  */
 export function SyncHistory({
   jobs,
   isLoading,
   error,
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
 }: {
   jobs: ImportJob[] | undefined
   isLoading: boolean
   error: Error | null
+  /** 1-based. */
+  page: number
+  pageCount: number
+  /** How many syncs the history holds, not how many this page shows. */
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
 }) {
   const [open, setOpen] = useState<number | null>(null)
+  // The deleted column earns its width only on a library where something was deleted, and
+  // the folded-out failure row has to span whatever that leaves.
+  const anyBlocked = (jobs ?? []).some((job) => job.games_blocked > 0)
+  const columns = anyBlocked ? 10 : 9
+  // The same reading the games table's footer gives, over the same helper: which slice of
+  // the whole history this page is, counted off what actually came back.
+  const { first, last } = pageRange(page, pageSize, jobs?.length ?? 0, total)
 
   return (
     <section className="flex flex-col rounded-xl border border-line bg-panel">
@@ -85,7 +113,7 @@ export function SyncHistory({
         <span className="text-xs font-semibold text-ink">Sync history</span>
         <div className="flex-1" />
         {jobs ? (
-          <span className="font-mono text-[0.625rem] text-dim tabular">{jobs.length}</span>
+          <span className="font-mono text-[0.625rem] text-dim tabular">{total}</span>
         ) : null}
       </div>
 
@@ -118,6 +146,12 @@ export function SyncHistory({
               <TableHead className="w-16 text-right">Seen</TableHead>
               <TableHead className="w-20 text-right">Imported</TableHead>
               <TableHead className="w-20 text-right">Skipped</TableHead>
+              {/* Only when some run has one: a column of zeroes on every library that has
+                  never deleted a game is a column that only takes width from the ones
+                  people read. */}
+              {anyBlocked ? (
+                <TableHead className="w-24 text-right">Deleted</TableHead>
+              ) : null}
               <TableHead className="w-16 text-right">Failed</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
@@ -163,6 +197,11 @@ export function SyncHistory({
                   <TableCell className="text-right">
                     <Count value={job.games_skipped} tone="text-soft-2" />
                   </TableCell>
+                  {anyBlocked ? (
+                    <TableCell className="text-right">
+                      <Count value={job.games_blocked} tone="text-mistake" />
+                    </TableCell>
+                  ) : null}
                   <TableCell className="text-right">
                     <Count value={job.games_failed} tone="text-blunder" />
                   </TableCell>
@@ -183,12 +222,46 @@ export function SyncHistory({
                     </div>
                   </TableCell>
                 </TableRow>,
-                expandable && expanded ? <Failures key={`${job.id}-errors`} job={job} /> : null,
+                expandable && expanded ? <Failures key={`${job.id}-errors`} job={job} columns={columns} /> : null,
               ]
             })}
           </TableBody>
         </Table>
       )}
+
+      {pageCount > 1 ? (
+        <div className="flex items-center gap-2 border-t border-hairline px-3.5 py-2">
+          <span className="font-mono text-[0.65625rem] text-dim tabular">
+            {first}–{last} of {total}
+          </span>
+          <div className="flex-1" />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-label="Previous page"
+            className="size-7 p-0"
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+          >
+            <ChevronLeft className="size-3.5" aria-hidden />
+          </Button>
+          <span className="font-mono text-[0.65625rem] text-soft tabular" aria-live="polite">
+            {page} / {pageCount}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-label="Next page"
+            className="size-7 p-0"
+            disabled={page >= pageCount}
+            onClick={() => onPageChange(page + 1)}
+          >
+            <ChevronRight className="size-3.5" aria-hidden />
+          </Button>
+        </div>
+      ) : null}
     </section>
   )
 }

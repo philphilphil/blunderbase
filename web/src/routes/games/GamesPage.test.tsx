@@ -127,7 +127,7 @@ describe('GamesPage — queueing analysis over a selection', () => {
     draw()
     await loaded()
 
-    await user.click(screen.getByLabelText('Select every loaded game'))
+    await user.click(screen.getByLabelText('Select every game on this page'))
     await user.click(screen.getByRole('button', { name: /queue quick analysis/i }))
 
     await waitFor(() => expect(postedTo('/analysis/batch')).toHaveLength(1))
@@ -175,7 +175,7 @@ describe('GamesPage — queueing analysis over a selection', () => {
     draw()
     await loaded()
 
-    await user.click(screen.getByLabelText('Select every loaded game'))
+    await user.click(screen.getByLabelText('Select every game on this page'))
     await user.click(screen.getByRole('button', { name: /queue deep analysis/i }))
 
     expect(
@@ -195,11 +195,145 @@ describe('GamesPage — queueing analysis over a selection', () => {
     draw()
     await loaded()
 
-    await user.click(screen.getByLabelText('Select every loaded game'))
+    await user.click(screen.getByLabelText('Select every game on this page'))
     await user.click(screen.getByRole('button', { name: /queue quick analysis/i }))
 
     expect(
       await screen.findByText('0 queued, 3 refused — a batch takes at most 500 games'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('GamesPage — deleting games', () => {
+  /** `/games/delete` answers with what went; the table re-reads what is left. */
+  function stubDelete(status = 200, body: unknown = { games: 2, runs: 1, notes: 0, lines: 0 }) {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input).split('?')[0]!
+      if (path.endsWith('/api/games/delete')) return json(status, body)
+      if (path.endsWith('/api/games')) {
+        return json(200, { games: GAMES, total: GAMES.length, limit: 25, offset: 0 })
+      }
+      return json(404, { error: 'not_found', detail: `${path} ${init?.method ?? 'GET'}` })
+    })
+  }
+
+  it('sends the whole selection in one call, once it is confirmed', async () => {
+    stubDelete()
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    await user.click(screen.getByLabelText('Select game 11'))
+    await user.click(screen.getByLabelText('Select game 12'))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    // Nothing has gone yet: the dialog is the confirmation, and it names the count.
+    expect(screen.getByRole('dialog')).toHaveTextContent('Delete 2 games')
+    expect(postedTo('/games/delete')).toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: 'Delete them' }))
+
+    await waitFor(() => expect(postedTo('/games/delete')).toHaveLength(1))
+    expect(postedTo('/games/delete')[0]).toEqual({ game_ids: [11, 12] })
+    expect(await screen.findByText('2 games deleted')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('deletes one game from its own row through the same call', async () => {
+    stubDelete(200, { games: 1, runs: 0, notes: 0, lines: 0 })
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete game 13' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Delete 1 game')
+    await user.click(screen.getByRole('button', { name: 'Delete it' }))
+
+    await waitFor(() => expect(postedTo('/games/delete')).toHaveLength(1))
+    expect(postedTo('/games/delete')[0]).toEqual({ game_ids: [13] })
+    expect(await screen.findByText('1 game deleted')).toBeInTheDocument()
+  })
+
+  it('keeps the dialog up with the reason when the delete is refused', async () => {
+    stubDelete(422, { error: 'invalid_request', detail: 'a delete takes at most 500 games' })
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete game 11' }))
+    await user.click(screen.getByRole('button', { name: 'Delete it' }))
+
+    expect(await screen.findByText('a delete takes at most 500 games')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+describe('GamesPage — paging and ordering', () => {
+  /** A library of 120 games served one page at a time, honouring limit and offset. */
+  function stubPages(total = 120) {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), 'http://localhost')
+      if (!url.pathname.endsWith('/api/games')) return json(404, { error: 'not_found' })
+      const limit = Number(url.searchParams.get('limit'))
+      const offset = Number(url.searchParams.get('offset'))
+      const games = Array.from({ length: Math.max(Math.min(limit, total - offset), 0) }, (_, i) => ({
+        ...GAMES[0],
+        id: offset + i + 1,
+      }))
+      return json(200, { games, total, limit, offset })
+    })
+  }
+
+  /** The query string of the last `/games` request. */
+  function lastGamesQuery(): URLSearchParams {
+    const calls = vi.mocked(fetch).mock.calls.map(([input]) => String(input))
+    const last = calls.filter((url) => url.split('?')[0]!.endsWith('/api/games')).at(-1)!
+    return new URL(last, 'http://localhost').searchParams
+  }
+
+  it('walks the library a page at a time', async () => {
+    stubPages()
+    const user = userEvent.setup()
+    draw()
+    await screen.findByLabelText('Select game 1')
+
+    // jsdom measures nothing, so "Fit" falls back to 25 rows.
+    expect(lastGamesQuery().get('limit')).toBe('25')
+    expect(screen.getByText('1–25 of 120')).toBeInTheDocument()
+    expect(screen.getByLabelText('Previous page')).toBeDisabled()
+
+    await user.click(screen.getByLabelText('Next page'))
+
+    await screen.findByLabelText('Select game 26')
+    expect(lastGamesQuery().get('offset')).toBe('25')
+    expect(screen.getByText('26–50 of 120')).toBeInTheDocument()
+  })
+
+  it('starts again at the first page when the page size changes', async () => {
+    stubPages()
+    const user = userEvent.setup()
+    draw()
+    await screen.findByLabelText('Select game 1')
+    await user.click(screen.getByLabelText('Next page'))
+    await screen.findByLabelText('Select game 26')
+
+    await user.selectOptions(screen.getByLabelText('Rows per page'), '100')
+
+    await waitFor(() => expect(lastGamesQuery().get('limit')).toBe('100'))
+    expect(lastGamesQuery().get('offset')).toBe('0')
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+  })
+
+  it('sorts by asking the backend, not by reordering the page', async () => {
+    stubPages()
+    const user = userEvent.setup()
+    draw()
+    await screen.findByLabelText('Select game 1')
+
+    // The exact name is the column header; the filter bar's chip is "Opponent ▾".
+    await user.click(screen.getByRole('button', { name: 'Opponent' }))
+
+    await waitFor(() => expect(lastGamesQuery().get('order')).toBe('opponent'))
+    expect(lastGamesQuery().get('direction')).toBe('asc')
   })
 })

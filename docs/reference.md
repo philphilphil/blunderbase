@@ -114,6 +114,34 @@ Everything else out of range is clamped rather than refused, so what a save answ
 what is in force. Budgets and thresholds apply to runs from then on; a game already
 analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 
+## Deleting games
+
+Games go from the library screen: the ✕ at the end of a row, or a selection and **Delete**
+in the footer. A game takes its analysis, the notes written about it and the variations
+kept off it; notes about a *position* stay, and so does the sync history — the cursor is
+what stops the next sync starting over.
+
+Deleting a game deletes the only record of it, and the importer deduplicates by looking in
+the games table, so a deleted game would otherwise come straight back: chess.com re-reads
+the archive month that is still being played on every sync. Each deleted game therefore
+leaves a row in `deleted_games` — the source and its ID, plus the content hash that catches
+the same game arriving as a PGN with no ID — and any import that meets it again leaves it
+alone and counts it as **previously deleted**, apart from the games it skipped as
+duplicates.
+
+A sync normally starts where the last one stopped — Lichess and FICS resume from a stored
+cursor, chess.com re-reads the month still being played. **From the beginning**, in the
+strip above the sources table, ignores that cursor and reads the whole archive (`since=all`
+on the API and the CLI, which every account source understands). It is safe to press: games
+already in the library are skipped as duplicates, and deleted games are refused by the
+record below rather than quietly restored.
+
+**Library → Manage → Deleted games** lists those records and is the only way back:
+forgetting one lets the next import store that game again, as a new game with no analysis
+and no notes. The card is not shown until something has been deleted. Resetting the whole
+library writes no records at all — a reset means starting over, and a library of them would
+block the re-import that follows.
+
 ## Export, backup and restore
 
 **Library → Manage → Export PGN** downloads every stored game in one

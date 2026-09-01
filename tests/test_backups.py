@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 
 from backend.cli import main
 from backend.config import Settings
+from backend.db.migrate import head_revision
 from backend.db.models import Game, Note
 from backend.db.session import session_scope
 from backend.services.backups import BackupError, restore_database, verify_database
@@ -30,9 +31,9 @@ def test_cli_backup_and_restore_round_trip_the_complete_database(
 
     output = capsys.readouterr().out
     assert f"backup: {backup}" in output
-    assert "schema 0017_explorer_book" in output
+    assert f"schema {head_revision()}" in output
     assert "sha256 " in output
-    assert verify_database(backup) == "0017_explorer_book"
+    assert verify_database(backup) == head_revision()
 
     with session_scope(settings) as session:
         session.add(Note(text="written after the backup"))

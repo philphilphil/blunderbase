@@ -8,6 +8,7 @@ import { useBackupEstimate, useExportLibrary, useGames, usePrepareBackup } from 
 import type { GamesDeleted } from '@/lib/api/types'
 
 import { DeleteAllGamesDialog } from './DeleteAllGamesDialog'
+import { DeletedGamesCard } from './DeletedGamesCard'
 
 function plural(count: number, one: string, many = `${one}s`): string {
   return `${count.toLocaleString('en-US')} ${count === 1 ? one : many}`
@@ -21,10 +22,14 @@ function fileSize(bytes: number): string {
 }
 
 /**
- * Three database-wide actions, separated by what their files mean and by consequence.
- * PGN is the portable chess document; SQLite is the technical, lossless recovery copy;
- * reset is destructive and gets the only danger treatment. Keeping them in separate cards
- * prevents "backup" and "export" from reading like two spellings of the same promise.
+ * The database-wide actions, separated by what their files mean and by consequence. PGN is
+ * the portable chess document; SQLite is the technical, lossless recovery copy; reset is
+ * destructive and gets the only danger treatment. Keeping them in separate cards prevents
+ * "backup" and "export" from reading like two spellings of the same promise.
+ *
+ * The deletion record sits under them and only appears once something has been deleted —
+ * it is the undo for a delete made on the games page, and belongs with the other things
+ * that are true of the whole library rather than of one screen.
  */
 export function LibraryManagement() {
   const games = useGames({ limit: 1 })
@@ -152,6 +157,8 @@ export function LibraryManagement() {
           Reset imported Library…
         </Button>
       </section>
+      <DeletedGamesCard />
+
       {asking ? (
         <DeleteAllGamesDialog
           games={total}

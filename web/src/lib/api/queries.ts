@@ -30,6 +30,8 @@ import type {
   EngineUpdate,
   GameFilters,
   GamesDeleted,
+  DeletionsForgotten,
+  GamesRemoved,
   ImportRequest,
   LineCreate,
   McpKeyCreate,
@@ -272,6 +274,66 @@ export function useDeleteAllGames(
   })
 }
 
+/** The games an import is refusing to store again, for the Manage screen's list. */
+export function useDeletedGames(query: { limit?: number; offset?: number } = {}) {
+  return useQuery({
+    queryKey: queryKeys.deletedGames(query),
+    queryFn: () => api.listDeletedGames(query),
+  })
+}
+
+/**
+ * Forget some deletions, or all of them when called with nothing.
+ *
+ * Only the list itself is invalidated: forgetting brings no game back, so no games query,
+ * no stat and no explorer row moved. What changed is what the *next* import will do.
+ */
+export function useForgetDeletions(
+  options?: UseMutationOptions<DeletionsForgotten, Error, number[] | undefined>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (ids?: number[]) => api.forgetDeletions(ids),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.library() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * Delete one game or a selection of them.
+ *
+ * The invalidation is narrower than the wipe's but the same idea: everything that counted
+ * these games has to count again. `['import']` is not in it — the sync history survives a
+ * delete, so no job row moved.
+ */
+export function useDeleteGames(
+  options?: UseMutationOptions<GamesRemoved, Error, number[]>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (gameIds: number[]) => api.deleteGames(gameIds),
+    ...options,
+    onSuccess: (...args) => {
+      for (const queryKey of [
+        queryKeys.games(),
+        queryKeys.stats(),
+        queryKeys.analysis(),
+        queryKeys.explorer(),
+        queryKeys.notes(),
+        queryKeys.lines(),
+        // Every deleted game is written into the record the Manage screen lists.
+        queryKeys.library(),
+      ]) {
+        void client.invalidateQueries({ queryKey })
+      }
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
 // --- analysis -------------------------------------------------------------
 
 export function useQueueStatus(options?: Options<Awaited<ReturnType<typeof api.getQueue>>>) {
@@ -469,7 +531,7 @@ export function useSetQueuePaused(
 // --- import ---------------------------------------------------------------
 
 export function useImportJobs(
-  query: { source?: Source; limit?: number } = {},
+  query: { source?: Source; limit?: number; offset?: number } = {},
   options?: Options<Awaited<ReturnType<typeof api.listImportJobs>>>,
 ) {
   return useQuery({

@@ -25,7 +25,7 @@ export function JobProgress({
   className?: string
 }) {
   const { text, tone } = label(progress)
-  const settled = progress.imported + progress.skipped + progress.failed
+  const settled = progress.imported + progress.skipped + progress.blocked + progress.failed
   const bar =
     progress.status === 'failed' || progress.failed > 0
       ? 'bg-blunder'
@@ -63,6 +63,11 @@ export function JobProgress({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[0.65625rem] text-dim tabular">
         <span className="text-soft">{progress.imported} imported</span>
         <span>{progress.skipped} skipped</span>
+        {/* Only when there are any: on the ordinary sync this line is already four numbers
+            long, and a permanent "0 previously deleted" would be the loudest of them. */}
+        {progress.blocked > 0 ? (
+          <span className="text-mistake">{progress.blocked} previously deleted</span>
+        ) : null}
         <span className={progress.failed > 0 ? 'text-blunder' : undefined}>
           {progress.failed} failed
         </span>

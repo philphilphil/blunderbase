@@ -28,7 +28,7 @@ import type { AccountSummary, ImportJob } from '@/lib/api/types'
 
 import { AccountRow } from './AccountRow'
 import { PgnRow } from './PgnRow'
-import { SkipEvaluation } from './SkipEvaluation'
+import { SyncCheckbox } from './SyncCheckbox'
 import type { ImportProgressState } from './useImportProgress'
 
 /** What the strip above the table says the next import should be told. */
@@ -36,6 +36,8 @@ export interface SyncOptions {
   since: string
   maxGames: string
   skipEvaluation: boolean
+  /** Ignore the stored cursor and read the account's archive from its first game. */
+  fromTheBeginning: boolean
 }
 
 export function SourcesTable({
@@ -51,8 +53,9 @@ export function SourcesTable({
   const [since, setSince] = useState('')
   const [maxGames, setMaxGames] = useState('')
   const [skipEvaluation, setSkipEvaluation] = useState(false)
+  const [fromTheBeginning, setFromTheBeginning] = useState(false)
   const running = Object.values(progress).some((source) => source?.running)
-  const options: SyncOptions = { since, maxGames, skipEvaluation }
+  const options: SyncOptions = { since, maxGames, skipEvaluation, fromTheBeginning }
 
   return (
     <section className="flex flex-col rounded-xl border border-line bg-panel">
@@ -63,12 +66,15 @@ export function SourcesTable({
           <Label htmlFor="sync-since">Since</Label>
           {/*
             A native date input: it already yields the `YYYY-MM-DD` the adapters take, and
-            it is one keystroke or one click either way. Empty means every game there is.
+            it is one keystroke or one click either way. Empty is not "everything" — it is
+            "wherever the last sync of this account got to", which is what the box beside
+            it overrides.
           */}
           <Input
             id="sync-since"
             type="date"
             value={since}
+            disabled={fromTheBeginning}
             className="h-7 font-mono"
             onChange={(event) => setSince(event.target.value)}
           />
@@ -84,11 +90,25 @@ export function SourcesTable({
             onChange={(event) => setMaxGames(event.target.value)}
           />
         </div>
-        <SkipEvaluation
-          checked={skipEvaluation}
-          onChange={setSkipEvaluation}
-          disabled={running}
-        />
+        <div className="flex flex-col gap-1.5 self-center pt-4">
+          {/* The two are one idea apart: where a sync starts, and what it does with what it
+              finds. A date and "from the beginning" are two answers to the first question,
+              so choosing this one takes the date out of the argument. */}
+          <SyncCheckbox
+            label="From the beginning"
+            title="Ignore the stored cursor and read the whole archive. Games already in the library are skipped, and games you deleted stay deleted."
+            checked={fromTheBeginning}
+            onChange={setFromTheBeginning}
+            disabled={running}
+          />
+          <SyncCheckbox
+            label="Skip evaluation"
+            title="Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards."
+            checked={skipEvaluation}
+            onChange={setSkipEvaluation}
+            disabled={running}
+          />
+        </div>
       </div>
 
       {/*

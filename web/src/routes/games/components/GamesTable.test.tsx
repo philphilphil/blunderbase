@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { GameCard } from '@/lib/api/types'
 
@@ -38,12 +38,10 @@ function setup(over: Partial<GamesTableProps> = {}) {
     onOpen: vi.fn(),
     onAnalyse: vi.fn(),
     analysing: new Set(),
+    onDelete: vi.fn(),
     status: 'success',
     error: null,
     onRetry: vi.fn(),
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    onLoadMore: vi.fn(),
     empty: <span>Nothing matches these filters</span>,
     ...over,
   }
@@ -117,60 +115,11 @@ describe('GamesTable rows', () => {
     expect(props.onSortChange).toHaveBeenCalledWith({ key: 'played_at', direction: 'asc' })
   })
 
-  it('offers a manual load-more when there is another page', async () => {
-    const props = setup({ hasNextPage: true })
-    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
-    expect(props.onLoadMore).toHaveBeenCalledOnce()
-  })
-})
-
-/** jsdom has none, so the sentinel is driven by hand. */
-class FakeObserver {
-  static instances: FakeObserver[] = []
-  callback: IntersectionObserverCallback
-  constructor(callback: IntersectionObserverCallback) {
-    this.callback = callback
-    FakeObserver.instances.push(this)
-  }
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-  takeRecords(): IntersectionObserverEntry[] {
-    return []
-  }
-  /** The sentinel scrolling into the root margin. */
-  enter() {
-    this.callback(
-      [{ isIntersecting: true } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver,
-    )
-  }
-}
-
-describe('GamesTable infinite scroll', () => {
-  afterEach(() => {
-    FakeObserver.instances = []
-    vi.unstubAllGlobals()
-  })
-
-  function observe(over: Partial<GamesTableProps> = {}) {
-    vi.stubGlobal('IntersectionObserver', FakeObserver)
-    const props = setup({ hasNextPage: true, ...over })
-    return { props, observer: FakeObserver.instances.at(-1)! }
-  }
-
-  it('asks for the next page when the sentinel comes into view', () => {
-    const { props, observer } = observe()
-    observer.enter()
-    expect(props.onLoadMore).toHaveBeenCalledOnce()
-  })
-
-  it('does not restart a page that is already in flight', () => {
-    // `fetchNextPage` cancels and reissues the request it is already running, so scroll
-    // jitter over the sentinel would keep the next page from ever landing.
-    const { props, observer } = observe({ isFetchingNextPage: true })
-    observer.enter()
-    observer.enter()
-    expect(props.onLoadMore).not.toHaveBeenCalled()
+  it('deletes one game from its own row', async () => {
+    const props = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete game 12' }))
+    expect(props.onDelete).toHaveBeenCalledWith(12)
+    // The row's own delete must not also open the game.
+    expect(props.onOpen).not.toHaveBeenCalled()
   })
 })

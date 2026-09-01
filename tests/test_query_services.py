@@ -30,6 +30,7 @@ from backend.db.models import (
     Engine,
     Game,
     GamePosition,
+    ImportJob,
     MoveEval,
     Note,
     Position,
@@ -226,6 +227,262 @@ def test_search_paginates(library: Library) -> None:
     page = games_service.search_games(session, GameFilters(), limit=2, offset=2)
     assert [game.source_id for game in page] == ["qg000004", "qg000003"]
     assert games_service.count_games(session, GameFilters()) == 6
+
+
+def test_search_orders_by_a_named_column(library: Library) -> None:
+    """The order is over the whole filtered library, not over a page of it."""
+    session = library.session
+    by_opponent = games_service.search_games(
+        session, GameFilters(), order="opponent", direction="asc"
+    )
+    assert [game.source_id for game in by_opponent] == [
+        "qg000002",  # berlinwall
+        "qg000003",  # italianjob
+        "qg000004",  # queensgambit
+        "qg000001",  # ruyfan
+        "qg000005",  # sicilianfan — the one the owner had black in
+        "qg000006",  # slowburner
+    ]
+    # The opponent is whoever the owner was not, which is what makes the fifth game sort
+    # under "s" rather than under the owner's own name.
+    page = games_service.search_games(
+        session, GameFilters(), limit=2, offset=4, order="opponent", direction="asc"
+    )
+    assert [game.source_id for game in page] == ["qg000005", "qg000006"]
+
+
+def test_an_order_reversed_is_the_same_order_backwards(library: Library) -> None:
+    session = library.session
+    ascending = games_service.search_games(
+        session, GameFilters(), order="opponent_rating", direction="asc"
+    )
+    descending = games_service.search_games(
+        session, GameFilters(), order="opponent_rating", direction="desc"
+    )
+    assert [game.id for game in descending] == [game.id for game in reversed(ascending)]
+
+
+def test_an_unknown_order_is_a_refusal_rather_than_the_default(library: Library) -> None:
+    with pytest.raises(ValueError, match="unknown order"):
+        games_service.search_games(library.session, GameFilters(), order="favourite")
+    with pytest.raises(ValueError, match="unknown direction"):
+        games_service.search_games(library.session, GameFilters(), direction="sideways")
+
+
+def test_ordering_by_the_worst_moment_reads_the_stored_card(
+    library: Library, engine_row: Engine
+) -> None:
+    """The same number the `Worst` column shows, and an unanalysed game sinks either way."""
+    session = library.session
+    analyse(
+        session,
+        library["qg000001"],
+        [{"ply": 0, "classification": Classification.MISTAKE, "win_loss": 12.0}],
+        engine=engine_row,
+    )
+    analyse(
+        session,
+        library["qg000003"],
+        [{"ply": 0, "classification": Classification.BLUNDER, "win_loss": 44.0}],
+        engine=engine_row,
+    )
+    for game in library.all:
+        games_service.refresh_card(session, game)
+    session.commit()
+
+    worst_first = games_service.search_games(
+        session, GameFilters(), order="worst", direction="desc"
+    )
+    assert [game.source_id for game in worst_first][:2] == ["qg000003", "qg000001"]
+    # Ascending puts the smaller drop first and still leaves the four unanalysed games last:
+    # a game nobody has looked at is not "the least bad".
+    least_first = games_service.search_games(
+        session, GameFilters(), order="worst", direction="asc"
+    )
+    assert [game.source_id for game in least_first][:2] == ["qg000001", "qg000003"]
+
+
+def test_ordering_by_tier_ranks_unanalysed_below_quick_below_deep(
+    library: Library, engine_row: Engine
+) -> None:
+    session = library.session
+    analyse(session, library["qg000001"], [{"ply": 0}], engine=engine_row)
+    analyse(session, library["qg000003"], [{"ply": 0}], engine=engine_row, tier=Tier.DEEP)
+
+    best_first = games_service.search_games(session, GameFilters(), order="tier", direction="desc")
+    assert [game.source_id for game in best_first][:2] == ["qg000003", "qg000001"]
+
+
+# --------------------------------------------------------------------------- deleting games
+
+
+def test_deleting_a_game_takes_everything_that_was_only_about_it(
+    library: Library, engine_row: Engine
+) -> None:
+    session = library.session
+    doomed = library["qg000001"]
+    kept = library["qg000002"]
+    run = analyse(
+        session,
+        doomed,
+        [{"ply": 0, "classification": Classification.BLUNDER, "win_loss": 40.0}],
+        engine=engine_row,
+    )
+    analyse(
+        session,
+        kept,
+        [{"ply": 0, "classification": Classification.GOOD, "win_loss": 1.0}],
+        engine=engine_row,
+    )
+    line = notes.save_line(session, game_id=doomed.id, base_ply=2, moves=["g1f3"])
+    session.add_all(
+        [
+            Note(text="about the game", game_id=doomed.id),
+            Note(text="about the line", line_id=line.id),
+            Note(text="about the position", position_id=doomed.positions[0].position_id),
+        ]
+    )
+    session.commit()
+
+    deleted = games_service.delete_games(session, [doomed.id])
+
+    assert deleted.games == 1
+    assert deleted.runs == 1
+    assert deleted.notes == 1
+    assert deleted.lines == 1
+    assert session.get(Game, doomed.id) is None
+    assert session.get(Game, kept.id) is not None
+    assert session.scalars(select(MoveEval).where(MoveEval.run_id == run.id)).all() == []
+    gone = select(GamePosition).where(GamePosition.game_id == doomed.id)
+    assert session.scalars(gone).all() == []
+    # A note about the position outlives the game that reached it; one about the kept
+    # line survives with its anchor cleared rather than being taken by a game it never named.
+    assert sorted(note.text for note in session.scalars(select(Note))) == [
+        "about the line",
+        "about the position",
+    ]
+
+
+def test_a_deleted_game_is_written_down_so_an_import_cannot_bring_it_back(
+    library: Library, fixtures_dir: Path
+) -> None:
+    """The whole point: the delete leaves nothing for `identify` to find in `games`."""
+    session = library.session
+    doomed = library["qg000001"]
+
+    games_service.delete_games(session, [doomed.id])
+    reimport = run_import(session, Source.PGN, path=str(fixtures_dir / "query_games.pgn"))
+
+    assert reimport.games_blocked == 1
+    assert reimport.games_imported == 0
+    assert reimport.games_skipped == 5
+    assert games_service.count_games(session, GameFilters()) == 5
+    rows, total = games_service.list_deletions(session)
+    assert total == 1
+    assert (rows[0].source_id, rows[0].white_name, rows[0].black_name) == (
+        "qg000001",
+        OWNER,
+        "ruyfan",
+    )
+
+
+def test_forgetting_a_deletion_lets_the_next_import_store_the_game_again(
+    library: Library, fixtures_dir: Path
+) -> None:
+    session = library.session
+    games_service.delete_games(session, [library["qg000001"].id])
+    rows, _ = games_service.list_deletions(session)
+
+    assert games_service.forget_deletions(session, [rows[0].id]) == 1
+
+    reimport = run_import(session, Source.PGN, path=str(fixtures_dir / "query_games.pgn"))
+    assert reimport.games_blocked == 0
+    assert reimport.games_imported == 1
+    assert games_service.count_games(session, GameFilters()) == 6
+    # The game is back, but it is a new game: nothing that was about the old one survived.
+    assert games_service.list_deletions(session)[1] == 0
+
+
+def test_forgetting_every_deletion_takes_the_whole_list(library: Library) -> None:
+    session = library.session
+    games_service.delete_games(session, [library["qg000001"].id, library["qg000002"].id])
+
+    assert games_service.forget_deletions(session) == 2
+    assert games_service.list_deletions(session)[1] == 0
+
+
+def test_a_pgn_of_a_deleted_game_is_refused_by_its_hash(library: Library) -> None:
+    """A game with no source ID of its own is still the game the owner threw away."""
+    session = library.session
+    run_import(session, Source.PGN, text=TRANSPOSED_PGN, analyze=False)
+    stored = games_service.search_games(session, GameFilters(text="transposer"))
+    assert len(stored) == 1
+
+    games_service.delete_games(session, [stored[0].id])
+    again = run_import(session, Source.PGN, text=TRANSPOSED_PGN, analyze=False)
+
+    assert again.games_blocked == 1
+    assert games_service.search_games(session, GameFilters(text="transposer")) == []
+
+
+def test_deleting_the_same_game_twice_writes_one_record(
+    library: Library, fixtures_dir: Path
+) -> None:
+    session = library.session
+    games_service.delete_games(session, [library["qg000001"].id])
+    rows, _ = games_service.list_deletions(session)
+    games_service.forget_deletions(session, [rows[0].id])
+    run_import(session, Source.PGN, path=str(fixtures_dir / "query_games.pgn"))
+    stored = games_service.search_games(session, GameFilters(text="ruyfan"))
+
+    deleted = games_service.delete_games(session, [stored[0].id])
+
+    assert deleted.remembered == 1
+    assert games_service.list_deletions(session)[1] == 1
+
+
+def test_a_wipe_writes_no_deletion_records(library: Library) -> None:
+    """"Reset the library" means start over, and a wipe that blocked the re-import could not."""
+    session = library.session
+
+    games_service.delete_all_games(session)
+
+    assert games_service.list_deletions(session)[1] == 0
+
+
+def test_deleting_games_leaves_the_sync_history_alone(library: Library) -> None:
+    """Unlike a wipe: the next sync must not fetch back what the owner just deleted."""
+    session = library.session
+    before = session.scalar(select(func.count()).select_from(ImportJob))
+
+    games_service.delete_games(session, [library["qg000001"].id])
+
+    assert session.scalar(select(func.count()).select_from(ImportJob)) == before
+
+
+def test_deleting_games_sends_their_positions_back_to_the_sweep(
+    library: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = library.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    while explorer.rebuild_position_books(session):
+        pass
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_BUILT
+
+    games_service.delete_games(session, [library["qg000001"].id])
+
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_DIRTY
+    assert explorer.opening_explorer(session)["totals"]["games"] == 5
+
+
+def test_deleting_an_id_that_is_not_there_is_a_no_op(library: Library) -> None:
+    """A stale row in a browser is not a reason to refuse the rest of the selection."""
+    session = library.session
+    deleted = games_service.delete_games(session, [library["qg000001"].id, 99999])
+
+    assert deleted.games == 1
+    assert games_service.count_games(session, GameFilters()) == 5
+    assert games_service.delete_games(session, []).games == 0
 
 
 def test_filters_narrow_by_colour_speed_and_eco(library: Library) -> None:

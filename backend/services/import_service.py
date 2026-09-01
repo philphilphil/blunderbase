@@ -8,7 +8,7 @@ from datetime import datetime
 from importlib import import_module
 from typing import Any, Protocol
 
-from sqlalchemy import insert, select
+from sqlalchemy import func, insert, select
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
@@ -32,6 +32,7 @@ from backend.db.types import utcnow
 from backend.services import accounts as accounts_service
 from backend.services import analysis, engines
 from backend.services import explorer as explorer_service
+from backend.services import games as games_service
 from backend.services.accounts import AccountIndex, fold
 from backend.services.analysis import QUICK_PRIORITY  # noqa: F401  (the pipeline's own priority)
 
@@ -53,6 +54,9 @@ class ImportResult:
     seen: int = 0
     imported: int = 0
     skipped: int = 0
+    # Games this run found in `deleted_games` and left alone. Counted apart from `skipped`
+    # because the owner can change it: forgetting the deletion lets the next run store them.
+    blocked: int = 0
     failed: int = 0
     cursor: str | None = None
     # One entry per game that could not be parsed or stored: {"ref": ..., "error": ...}.
@@ -112,10 +116,16 @@ class ImportFailure:
 
 @dataclass(slots=True)
 class IngestOutcome:
-    """The stored game and whether this call is what created it."""
+    """The stored game and whether this call is what created it.
 
-    game: Game
+    `game` is None for the third answer: a game the owner deleted on purpose, which this
+    run refused to store again (`blocked`). There is no row to point at, which is the whole
+    reason `deleted_games` exists.
+    """
+
+    game: Game | None
     created: bool
+    blocked: bool = False
 
 
 # A progress subscriber: the WebSocket layer, a CLI printer, a test recorder. It is called
@@ -128,6 +138,8 @@ EVENT_IMPORT_FINISHED = "import.finished"
 
 GAME_IMPORTED = "imported"
 GAME_SKIPPED = "skipped"
+# A game that is not here because the owner deleted it, not because it is already stored.
+GAME_BLOCKED = "blocked"
 GAME_FAILED = "failed"
 
 CHESS960_VARIANTS = frozenset({"chess960", "fischerandom", "fischerrandom"})
@@ -285,14 +297,21 @@ def ingest_games(
                 _record_failure(result, item.reference, error)
                 event = _game_event(job, item.reference, GAME_FAILED, result, error=error)
             else:
-                if outcome.created:
+                if outcome.blocked:
+                    result.blocked += 1
+                    status = GAME_BLOCKED
+                elif outcome.created:
                     result.imported += 1
                     status = GAME_IMPORTED
                 else:
                     result.skipped += 1
                     status = GAME_SKIPPED
                 event = _game_event(
-                    job, item.reference, status, result, game_id=outcome.game.id
+                    job,
+                    item.reference,
+                    status,
+                    result,
+                    game_id=outcome.game.id if outcome.game is not None else None,
                 )
         _apply(job, result)
         session.commit()
@@ -318,9 +337,14 @@ def ingest_game(
         accounts = AccountIndex.load(session)
 
     digest = dedup_hash(parsed)
-    existing = find_duplicate(session, parsed.source, parsed.source_id, digest)
-    if existing is not None:
-        return IngestOutcome(game=existing, created=False)
+    # One question — "does the library know this game?" — asked once, over the games and
+    # over the record of the ones the owner deleted. Asked here rather than in the adapters
+    # so that every route in, a sync or a PGN or a paste, is answered on the same terms.
+    known = games_service.identify(session, parsed.source, parsed.source_id, digest)
+    if known.game is not None:
+        return IngestOutcome(game=known.game, created=False)
+    if known.deleted is not None:
+        return IngestOutcome(game=None, created=False, blocked=True)
 
     rows = position_rows(parsed)
     white_account, white_is_owner = accounts.match(parsed.source, parsed.white_name)
@@ -386,28 +410,6 @@ def dedup_hash(parsed: ParsedGame) -> str:
         )
     )
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
-
-
-def find_duplicate(
-    session: Session, source: Source, source_id: str | None, digest: str
-) -> Game | None:
-    """The game this one already is: same source ID, or the same moves by another route.
-
-    The hash is a fallback for games one of the two routes could not name — a PGN export
-    of an already-synced Lichess game keeps the moves, the day and the players but arrives
-    with no source ID. A game this source *has* named differently is a different game
-    however identical it looks: two bullet rematches of the same short trap line share
-    every scrap of the hash's material, and swallowing the second would lose it for good.
-    """
-    statement = select(Game).where(Game.dedup_hash == digest)
-    if source_id:
-        stored = session.scalars(
-            select(Game).where(Game.source == source, Game.source_id == source_id)
-        ).first()
-        if stored is not None:
-            return stored
-        statement = statement.where((Game.source != source) | Game.source_id.is_(None))
-    return session.scalars(statement).first()
 
 
 def position_rows(parsed: ParsedGame) -> list[tuple[str, str, Color, str | None, str | None]]:
@@ -531,12 +533,27 @@ def get_job(session: Session, job_id: int) -> ImportJob | None:
     return session.get(ImportJob, job_id)
 
 
-def list_jobs(session: Session, source: str | None = None, limit: int = 50) -> list[ImportJob]:
-    """Sync history, newest first, optionally for one source."""
+def list_jobs(
+    session: Session, source: str | None = None, limit: int = 50, offset: int = 0
+) -> list[ImportJob]:
+    """One page of the sync history, newest first, optionally for one source.
+
+    `id` breaks the tie under `created_at` for the same reason the games table's order
+    does: two jobs written in the same second must not swap places between one page and
+    the next, which is how a page shows a row twice and hides another.
+    """
     statement = select(ImportJob).order_by(ImportJob.created_at.desc(), ImportJob.id.desc())
     if source is not None:
         statement = statement.where(ImportJob.source == Source(source))
-    return list(session.scalars(statement.limit(limit)))
+    return list(session.scalars(statement.limit(limit).offset(offset)))
+
+
+def count_jobs(session: Session, source: str | None = None) -> int:
+    """How many syncs the history holds, for the pager under it."""
+    statement = select(func.count(ImportJob.id)).select_from(ImportJob)
+    if source is not None:
+        statement = statement.where(ImportJob.source == Source(source))
+    return int(session.scalar(statement) or 0)
 
 
 def latest_cursor(session: Session, source: str, account_id: int | None = None) -> str | None:
@@ -568,6 +585,7 @@ def _counts(job: ImportJob) -> dict[str, int]:
         "seen": job.games_seen,
         "imported": job.games_imported,
         "skipped": job.games_skipped,
+        "blocked": job.games_blocked,
         "failed": job.games_failed,
     }
 
@@ -596,6 +614,7 @@ def _game_event(
         "seen": result.seen,
         "imported": result.imported,
         "skipped": result.skipped,
+        "blocked": result.blocked,
         "failed": result.failed,
     }
 
@@ -604,6 +623,7 @@ def _apply(job: ImportJob, result: ImportResult) -> None:
     job.games_seen = result.seen
     job.games_imported = result.imported
     job.games_skipped = result.skipped
+    job.games_blocked = result.blocked
     job.games_failed = result.failed
     job.errors = list(result.errors)
 

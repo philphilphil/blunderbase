@@ -75,7 +75,7 @@ export function SyncAllButton() {
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
-  const targets = syncTargets(jobs.data)
+  const targets = syncTargets(jobs.data?.jobs)
   // `/events` is the only thing that knows a sync is still walking the archive: the POST
   // has long since answered with a job id by then.
   const syncing = pending || targets.some((target) => progress[target.source]?.running === true)

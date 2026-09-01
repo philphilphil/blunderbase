@@ -1,4 +1,4 @@
-"""`/games` — the games table and the flagship game view, and the one route that empties it."""
+"""`/games` — the games table, the flagship game view, and the routes that take games away."""
 
 from __future__ import annotations
 
@@ -9,7 +9,14 @@ from fastapi import APIRouter, Query, Response, status
 
 from backend.api.deps import FiltersDep, SessionDep, SettingsDep, not_found, ply_range
 from backend.api.errors import ApiError
-from backend.api.schemas import GameDetail, GameList, GamesDeleted, GamesWipe
+from backend.api.schemas import (
+    GameDeleteRequest,
+    GameDetail,
+    GameList,
+    GamesDeleted,
+    GamesRemoved,
+    GamesWipe,
+)
 from backend.runtime import capabilities_for
 from backend.services import auth as auth_service
 from backend.services import games as games_service
@@ -44,9 +51,20 @@ def list_games(
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     cards: Annotated[bool, Query(description="add the eval curve and the worst moments")] = False,
+    order: Annotated[
+        str, Query(description=f"one of: {', '.join(games_service.GAME_ORDERS)}")
+    ] = games_service.DEFAULT_ORDER,
+    direction: Annotated[str, Query(description="asc | desc")] = games_service.DEFAULT_DIRECTION,
 ) -> GameList:
-    """One page of games, newest first, with the total the filters match."""
-    found = games_service.search_games(session, filters, limit=limit, offset=offset)
+    """One page of games, newest first unless `order` says otherwise, with the total.
+
+    The order is the server's rather than the client's because a page is a page: sorting the
+    fifty rows a client happens to hold would answer a different question than the one the
+    column header asks, which is about the whole filtered library.
+    """
+    found = games_service.search_games(
+        session, filters, limit=limit, offset=offset, order=order, direction=direction
+    )
     rows = (
         games_service.game_cards(session, found)
         if cards
@@ -84,6 +102,22 @@ def delete_all_games(
             status.HTTP_401_UNAUTHORIZED, "invalid_password", "that is not the password"
         )
     return GamesDeleted(**asdict(games_service.delete_all_games(session)))
+
+
+@router.post("/delete", response_model=GamesRemoved, summary="Delete the named games")
+def delete_games(session: SessionDep, body: GameDeleteRequest) -> GamesRemoved:
+    """Delete one game or a selection of them, with everything that was only about them.
+
+    A POST for the reason `delete-all` is one: the ids travel in the body, and a body on a
+    DELETE is something clients and proxies disagree about. One id is a batch of one, so the
+    row button and the selection footer are the same call and the same receipt.
+
+    No password, unlike the wipe: this deletes what the owner picked out and can see, not
+    the library, and the page asks them to confirm the count first. An id that is not there
+    takes itself out of the request rather than the rest of the selection with it — what
+    comes back is what actually went.
+    """
+    return GamesRemoved(**asdict(games_service.delete_games(session, body.game_ids)))
 
 
 @router.get("/{game_id}", response_model=GameDetail, summary="One game with its analysis")

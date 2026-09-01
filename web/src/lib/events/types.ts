@@ -67,6 +67,8 @@ export interface ImportGameEvent extends ImportBase {
   seen: number
   imported: number
   skipped: number
+  /** Games not stored because the owner had deleted them; see `DeletedGame`. */
+  blocked: number
   failed: number
 }
 
@@ -76,6 +78,7 @@ export interface ImportFinishedEvent extends ImportBase {
   seen: number
   imported: number
   skipped: number
+  blocked: number
   failed: number
   message: string | null
   at: string

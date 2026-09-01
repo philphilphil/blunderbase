@@ -30,7 +30,7 @@ from backend.db.enums import (
     Source,
     Tier,
 )
-from backend.db.migrate import upgrade_to_head
+from backend.db.migrate import head_revision, upgrade_to_head
 from backend.db.models import (
     Account,
     AnalysisRun,
@@ -323,6 +323,123 @@ def test_a_game_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
     assert response.json() == {"error": "unknown_game", "detail": "no game with id 9999"}
 
 
+# --- /games/delete --------------------------------------------------------
+
+
+def test_deleting_a_selection_takes_those_games_and_says_what_went(api: TestClient) -> None:
+    ids = [game["id"] for game in api.get("/games").json()["games"][:2]]
+
+    response = api.post("/games/delete", json={"game_ids": ids})
+
+    assert response.status_code == 200
+    assert response.json()["games"] == 2
+    assert api.get("/games").json()["total"] == 4
+    assert api.get(f"/games/{ids[0]}").status_code == 404
+
+
+def test_deleting_the_analysed_game_takes_its_run_and_its_note(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    response = api.post("/games/delete", json={"game_ids": [seeded["game_id"]]})
+
+    assert response.json() == {
+        "games": 1,
+        "runs": 1,
+        "notes": 1,
+        "lines": 0,
+        "remembered": 1,
+    }
+    assert api.get("/notes").json() == []
+    assert api.get(f"/analysis/runs/{seeded['run_id']}").status_code == 404
+
+
+def test_deleting_no_games_is_a_refused_request(api: TestClient) -> None:
+    """An empty selection is a client bug; the wipe is a route of its own."""
+    response = api.post("/games/delete", json={"game_ids": []})
+
+    assert response.status_code == 422
+    assert api.get("/games").json()["total"] == 6
+
+
+def test_a_delete_needs_no_password_but_leaves_the_rest_of_the_library(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    before = api.get("/games").json()["games"]
+
+    api.post("/games/delete", json={"game_ids": [before[-1]["id"]]})
+
+    assert [game["id"] for game in api.get("/games").json()["games"]] == [
+        game["id"] for game in before[:-1]
+    ]
+
+
+# --- /library/deleted-games -----------------------------------------------
+
+
+def test_a_deleted_game_is_listed_so_the_owner_can_see_what_will_not_come_back(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    api.post("/games/delete", json={"game_ids": [seeded["game_id"]]})
+
+    body = api.get("/library/deleted-games").json()
+
+    assert body["total"] == 1
+    row = body["games"][0]
+    assert row["source"] == "pgn"
+    assert row["white_name"] and row["black_name"]
+    assert row["deleted_at"]
+
+
+def test_forgetting_one_deletion_takes_it_off_the_list(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    api.post("/games/delete", json={"game_ids": [seeded["game_id"]]})
+    listed = api.get("/library/deleted-games").json()["games"]
+
+    response = api.post("/library/deleted-games/forget", json={"ids": [listed[0]["id"]]})
+
+    assert response.status_code == 200
+    assert response.json() == {"forgotten": 1}
+    assert api.get("/library/deleted-games").json()["total"] == 0
+    # Forgetting brings nothing back by itself — the next import is what does that.
+    assert api.get("/games").json()["total"] == 5
+
+
+def test_forgetting_without_ids_clears_the_whole_list(api: TestClient) -> None:
+    ids = [game["id"] for game in api.get("/games").json()["games"][:2]]
+    api.post("/games/delete", json={"game_ids": ids})
+
+    assert api.post("/library/deleted-games/forget", json={}).json() == {"forgotten": 2}
+    assert api.get("/library/deleted-games").json()["total"] == 0
+
+
+def test_a_wipe_lists_no_deletions(api: TestClient) -> None:
+    api.post("/games/delete-all", json={"password": OWNER_PASSWORD})
+
+    assert api.get("/library/deleted-games").json()["total"] == 0
+
+
+# --- /games?order ---------------------------------------------------------
+
+
+def test_the_games_page_is_ordered_by_the_column_that_was_asked_for(api: TestClient) -> None:
+    ascending = api.get("/games", params={"order": "opponent", "direction": "asc"}).json()
+    descending = api.get("/games", params={"order": "opponent", "direction": "desc"}).json()
+
+    names = [game["opponent"] for game in ascending["games"]]
+    assert names == sorted(names)
+    assert [game["id"] for game in descending["games"]] == [
+        game["id"] for game in reversed(ascending["games"])
+    ]
+
+
+def test_an_order_the_backend_does_not_have_is_a_typed_refusal(api: TestClient) -> None:
+    response = api.get("/games", params={"order": "favourite"})
+
+    assert response.status_code == 422
+    assert error_of(response) == "invalid_request"
+
+
 # --- /games/delete-all ----------------------------------------------------
 
 
@@ -572,11 +689,25 @@ def test_an_unknown_source_is_a_typed_404(api: TestClient) -> None:
 
 def test_the_sync_history_lists_the_jobs_newest_first(api: TestClient) -> None:
     api.post("/import/pgn", json={"text": ONE_GAME, "wait": True})
-    jobs = api.get("/import/jobs", params={"source": "pgn"}).json()
+    body = api.get("/import/jobs", params={"source": "pgn"}).json()
+    jobs = body["jobs"]
 
     assert [job["source"] for job in jobs] == ["pgn", "pgn"]
     assert jobs[0]["id"] > jobs[1]["id"]
+    assert body["total"] == 2
     assert api.get(f"/import/jobs/{jobs[0]['id']}").json()["games_seen"] == 1
+
+
+def test_the_sync_history_pages_over_the_whole_of_it(api: TestClient) -> None:
+    api.post("/import/pgn", json={"text": ONE_GAME, "wait": True})
+
+    first = api.get("/import/jobs", params={"limit": 1}).json()
+    second = api.get("/import/jobs", params={"limit": 1, "offset": 1}).json()
+
+    assert (first["total"], second["total"]) == (2, 2)
+    assert len(first["jobs"]) == len(second["jobs"]) == 1
+    # Newest first, and the second page is the older job rather than the same one again.
+    assert first["jobs"][0]["id"] > second["jobs"][0]["id"]
 
 
 def test_an_import_job_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
@@ -1417,7 +1548,7 @@ def test_complete_database_download_is_a_verified_sqlite_backup(
     assert "blunderbase-backup-" in response.headers["content-disposition"]
     downloaded = tmp_path / "downloaded.db"
     downloaded.write_bytes(response.content)
-    assert backups_service.verify_database(downloaded) == "0017_explorer_book"
+    assert backups_service.verify_database(downloaded) == head_revision()
 
 
 def test_database_backup_estimate_reports_the_snapshot_size(
@@ -1448,7 +1579,7 @@ def test_database_backup_can_be_prepared_then_streamed(
     )
     downloaded = tmp_path / "prepared.db"
     downloaded.write_bytes(response.content)
-    assert backups_service.verify_database(downloaded) == "0017_explorer_book"
+    assert backups_service.verify_database(downloaded) == head_revision()
 
 
 def test_the_events_socket_sees_a_line_and_a_deletion(

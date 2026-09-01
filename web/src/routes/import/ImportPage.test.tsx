@@ -109,6 +109,7 @@ const JOB: ImportJob = {
   games_seen: 15,
   games_imported: 15,
   games_skipped: 0,
+  games_blocked: 0,
   games_failed: 0,
   errors: [],
   message: 'phib',
@@ -132,7 +133,7 @@ afterEach(() => {
 describe('ImportPage', () => {
   it('lists what every previous sync did', async () => {
     stubFetch({
-      '/api/import/jobs': [JOB],
+      '/api/import/jobs': { jobs: [JOB], total: 1, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
     })
@@ -146,9 +147,42 @@ describe('ImportPage', () => {
     expect(within(row).getByText('1.9s')).toBeInTheDocument()
   })
 
+  it('pages the sync history rather than growing it forever', async () => {
+    const rows = (from: number) =>
+      Array.from({ length: 25 }, (_, index) => ({ ...JOB, id: from + index }))
+    stubFetch({
+      '/api/import/jobs': { jobs: rows(100), total: 30, limit: 25, offset: 0 },
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+    })
+    renderPage(<ImportPage />)
+
+    expect(await screen.findByText('1–25 of 30')).toBeInTheDocument()
+    expect(screen.getByLabelText('Previous page')).toBeDisabled()
+
+    await userEvent.click(screen.getByLabelText('Next page'))
+
+    await waitFor(() => {
+      const asked = vi.mocked(fetch).mock.calls.map(([input]) => String(input))
+      expect(asked.some((url) => url.includes('offset=25'))).toBe(true)
+    })
+  })
+
+  it('shows no pager at all when one page is the whole history', async () => {
+    stubFetch({
+      '/api/import/jobs': { jobs: [JOB], total: 1, limit: 25, offset: 0 },
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+    })
+    renderPage(<ImportPage />)
+
+    expect(await screen.findByText('Sync history')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Next page')).not.toBeInTheDocument()
+  })
+
   it('prefills the connect form from the account the profile already knows', async () => {
     stubFetch({
-      '/api/import/jobs': [],
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
     })
@@ -163,7 +197,7 @@ describe('ImportPage', () => {
 
   it('says nothing about evaluation until a sync is asked to skip it', async () => {
     stubFetch({
-      '/api/import/jobs': [],
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
       '/api/import/lichess': { source: 'lichess', status: 'running', job_id: 9 },
@@ -192,7 +226,7 @@ describe('ImportPage', () => {
 
   it('tells a sync what the strip above the table says, not what a row does', async () => {
     stubFetch({
-      '/api/import/jobs': [],
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
       '/api/import/lichess': { source: 'lichess', status: 'running', job_id: 11 },
@@ -217,9 +251,34 @@ describe('ImportPage', () => {
     })
   })
 
+  it('starts a sync at the beginning of the archive when asked to', async () => {
+    stubFetch({
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+      '/api/import/lichess': { source: 'lichess', status: 'running', job_id: 12 },
+    })
+    renderPage(<ImportPage />)
+
+    const username = await screen.findByLabelText<HTMLInputElement>('Username', {
+      selector: '#lichess-username',
+    })
+    await waitFor(() => expect(username.value).toBe('phib'))
+    // A date and "from the beginning" answer the same question, so the box wins and the
+    // date it would have contradicted is taken out of the argument.
+    fireEvent.change(screen.getByLabelText('Since'), { target: { value: '2024-01-01' } })
+    await userEvent.click(screen.getByRole('checkbox', { name: 'From the beginning' }))
+    expect(screen.getByLabelText('Since')).toBeDisabled()
+
+    await userEvent.click(screen.getByRole('button', { name: /Sync/ }))
+
+    await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
+    expect(postedTo('/api/import/lichess')[0]).toMatchObject({ username: 'phib', since: 'all' })
+  })
+
   it('carries the same skip into the PGN upload, where it is a query flag', async () => {
     stubFetch({
-      '/api/import/jobs': [],
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
       '/api/import/pgn/upload': { source: 'pgn', status: 'running', job_id: 10 },
@@ -250,16 +309,21 @@ describe('ImportPage', () => {
     // when a sync throws, so a failed job's message is an error string, not a username —
     // seeding the field with it would post `AdapterError: …` as the username on Connect.
     stubFetch({
-      '/api/import/jobs': [
-        {
-          ...JOB,
-          status: 'failed',
-          account_id: null,
-          games_imported: 0,
-          games_seen: 0,
-          message: 'AdapterError: lichess answered 404 for user fooo',
-        },
-      ],
+      '/api/import/jobs': {
+        jobs: [
+          {
+            ...JOB,
+            status: 'failed',
+            account_id: null,
+            games_imported: 0,
+            games_seen: 0,
+            message: 'AdapterError: lichess answered 404 for user fooo',
+          },
+        ],
+        total: 1,
+        limit: 25,
+        offset: 0,
+      },
       '/api/stats/profile': { accounts: [], ratings: [], volume: {} },
       '/api/games': { games: [], total: 0, limit: 1, offset: 0 },
     })
@@ -276,7 +340,7 @@ describe('ImportPage', () => {
 
   it('says so when nothing has ever been synced', async () => {
     stubFetch({
-      '/api/import/jobs': [],
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': { accounts: [], ratings: [], volume: {} },
       '/api/games': { games: [], total: 0, limit: 1, offset: 0 },
     })
@@ -289,7 +353,7 @@ describe('ImportPage', () => {
 
   it('leaves the assistant config to its own page', async () => {
     stubFetch({
-      '/api/import/jobs': [],
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
     })
@@ -303,14 +367,19 @@ describe('ImportPage', () => {
 
   it('opens the per-game failures of a sync that lost games', async () => {
     stubFetch({
-      '/api/import/jobs': [
-        {
-          ...JOB,
-          games_imported: 14,
-          games_failed: 1,
-          errors: [{ ref: 'aBc12345', error: 'no moves in that game' }],
-        },
-      ],
+      '/api/import/jobs': {
+        jobs: [
+          {
+            ...JOB,
+            games_imported: 14,
+            games_failed: 1,
+            errors: [{ ref: 'aBc12345', error: 'no moves in that game' }],
+          },
+        ],
+        total: 1,
+        limit: 25,
+        offset: 0,
+      },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
     })
@@ -324,7 +393,7 @@ describe('ImportPage', () => {
 
   it('follows a running sync over the socket', async () => {
     stubFetch({
-      '/api/import/jobs': [],
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
       '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
     })

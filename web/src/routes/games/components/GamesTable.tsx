@@ -1,9 +1,11 @@
 /**
- * The table itself: the sticky column header, the scrolling body and the four states a
- * body can be in (loading, error, empty, rows) per design 1c.
+ * The table itself: the sticky column header, the body and the four states a body can be
+ * in (loading, error, empty, rows) per design 1c.
  *
- * The next page is fetched by an `IntersectionObserver` on a sentinel below the last row,
- * which is why the body owns the scroll container rather than the page.
+ * The body owns the scroll container rather than the page, which is what keeps the filter
+ * bar above and the footer below pinned while one page of games is read. It is also what
+ * lets the table say how many rows it has room for: `onCapacityChange` measures the
+ * container against a rendered row, and the footer's "Fit" page size is that number.
  *
  * Below `md` the rows fold into cards (`GameRow`) and the header stops being a ruler over
  * them: it wraps into a strip of sort chips, one per column the card still shows. The
@@ -32,12 +34,14 @@ export interface GamesTableProps {
   onOpen: (id: number) => void
   onAnalyse: (id: number) => void
   analysing: Set<number>
+  onDelete: (id: number) => void
   status: 'pending' | 'error' | 'success'
   error: Error | null
   onRetry: () => void
-  hasNextPage: boolean
-  isFetchingNextPage: boolean
-  onLoadMore: () => void
+  /** True while another page is in flight and these rows are the previous one's. */
+  busy?: boolean
+  /** How many rows fit in the body right now, whenever that number changes. */
+  onCapacityChange?: (rows: number) => void
   /** Rendered in place of the rows when the query succeeded with nothing in it. */
   empty: React.ReactNode
 }
@@ -52,41 +56,37 @@ export function GamesTable({
   onOpen,
   onAnalyse,
   analysing,
+  onDelete,
   status,
   error,
   onRetry,
-  hasNextPage,
-  isFetchingNextPage,
-  onLoadMore,
+  busy = false,
+  onCapacityChange,
   empty,
 }: GamesTableProps) {
-  const sentinel = useRef<HTMLDivElement>(null)
-  const loadMore = useRef(onLoadMore)
-  // The observer stays connected while a page is in flight, so the sentinel scrolling out
-  // and back in would call `fetchNextPage` again — and TanStack's default `cancelRefetch`
-  // aborts the request already running and starts it over. The guard the "Load more"
-  // button gets from being hidden, the observer has to make for itself.
-  const fetching = useRef(isFetchingNextPage)
+  const body = useRef<HTMLDivElement>(null)
+  const report = useRef(onCapacityChange)
   useEffect(() => {
-    loadMore.current = onLoadMore
-    fetching.current = isFetchingNextPage
+    report.current = onCapacityChange
   })
 
+  // What "as many rows as fit" means, measured rather than assumed: a row is 40px from
+  // `md` up and a two-line card below it, and the app's scale moves both. The skeleton
+  // rows carry the same marker, so the first measurement does not have to wait for data.
   useEffect(() => {
-    const node = sentinel.current
-    // jsdom has no IntersectionObserver; the footer's "load more" button is the fallback
-    // there and for anyone scrolling with the keyboard.
-    if (!node || !hasNextPage || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (fetching.current) return
-        if (entries.some((entry) => entry.isIntersecting)) loadMore.current()
-      },
-      { rootMargin: '400px' },
-    )
+    const node = body.current
+    if (!node || typeof ResizeObserver === 'undefined') return
+    const measure = () => {
+      const row = node.querySelector<HTMLElement>('[data-games-row]')
+      const height = row?.offsetHeight || 0
+      if (!height || !node.clientHeight) return
+      report.current?.(Math.max(1, Math.floor(node.clientHeight / height)))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
     observer.observe(node)
     return () => observer.disconnect()
-  }, [hasNextPage, games.length])
+  }, [games.length, status])
 
   const allSelected = games.length > 0 && games.every((game) => selected.has(game.id))
 
@@ -110,7 +110,7 @@ export function GamesTable({
                   type="button"
                   role="checkbox"
                   aria-checked={allSelected}
-                  aria-label="Select every loaded game"
+                  aria-label="Select every game on this page"
                   onClick={onToggleAll}
                   disabled={games.length === 0}
                   className={cn(
@@ -157,7 +157,15 @@ export function GamesTable({
         })}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div
+        ref={body}
+        className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-y-auto transition-opacity',
+          // The rows on screen belong to the page that is leaving; saying so is better
+          // than blinking through a skeleton on every click of Next.
+          busy && 'opacity-55',
+        )}
+      >
         {status === 'pending' ? (
           <LoadingRows />
         ) : status === 'error' ? (
@@ -165,30 +173,18 @@ export function GamesTable({
         ) : games.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-10 max-md:p-4">{empty}</div>
         ) : (
-          <>
-            {games.map((game) => (
-              <GameRow
-                key={game.id}
-                game={game}
-                selected={selected.has(game.id)}
-                onToggle={onToggle}
-                onOpen={onOpen}
-                onAnalyse={onAnalyse}
-                analysing={analysing.has(game.id)}
-              />
-            ))}
-            <div ref={sentinel} className="h-px flex-none" aria-hidden />
-            {isFetchingNextPage ? <LoadingRows rows={4} /> : null}
-            {hasNextPage && !isFetchingNextPage ? (
-              <button
-                type="button"
-                onClick={onLoadMore}
-                className="flex-none border-t border-raised py-3 text-[0.71875rem] text-accent-teal hover:text-accent-link"
-              >
-                Load more
-              </button>
-            ) : null}
-          </>
+          games.map((game) => (
+            <GameRow
+              key={game.id}
+              game={game}
+              selected={selected.has(game.id)}
+              onToggle={onToggle}
+              onOpen={onOpen}
+              onAnalyse={onAnalyse}
+              onDelete={onDelete}
+              analysing={analysing.has(game.id)}
+            />
+          ))
         )}
       </div>
     </div>
@@ -205,6 +201,7 @@ function LoadingRows({ rows = 14 }: { rows?: number }) {
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
+          data-games-row
           style={{ opacity: 1 - index * (0.6 / rows) }}
           className={cn(
             'flex items-center gap-2.5 border-t border-raised px-5',

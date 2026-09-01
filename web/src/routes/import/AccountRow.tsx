@@ -100,8 +100,11 @@ export function AccountRow({
     start.mutate({
       source: source as Source,
       body: {
+        // `all` is what every adapter takes for "ignore the stored cursor and read the
+        // archive from its first game" (`backend/adapters/__init__.py`). It beats the date,
+        // which is the other answer to the same question.
         username: name,
-        since: options.since.trim() || undefined,
+        since: options.fromTheBeginning ? 'all' : options.since.trim() || undefined,
         max_games: Number.isFinite(games) && games > 0 ? games : undefined,
         // Only ever sent to turn evaluation off; left out, the backend queues the pass.
         analyze: options.skipEvaluation ? false : undefined,

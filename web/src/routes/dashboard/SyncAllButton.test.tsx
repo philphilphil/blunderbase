@@ -4,7 +4,7 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ImportJob } from '@/lib/api/types'
+import type { ImportJob, ImportJobList } from '@/lib/api/types'
 
 import { SyncAllButton, syncTargets } from './SyncAllButton'
 
@@ -23,6 +23,7 @@ function job(over: Partial<ImportJob> & Pick<ImportJob, 'id' | 'source'>): Impor
     games_seen: 10,
     games_imported: 8,
     games_skipped: 2,
+    games_blocked: 0,
     games_failed: 0,
     errors: [],
     message: 'phib',
@@ -30,7 +31,12 @@ function job(over: Partial<ImportJob> & Pick<ImportJob, 'id' | 'source'>): Impor
   }
 }
 
-function jobs(state: Partial<UseQueryResult<ImportJob[], Error>>) {
+/** `/import/jobs` answers with a page of the history, not a bare array. */
+function page(rows: ImportJob[]): ImportJobList {
+  return { jobs: rows, total: rows.length, limit: 25, offset: 0 }
+}
+
+function jobs(state: Partial<UseQueryResult<ImportJobList, Error>>) {
   return {
     data: undefined,
     isPending: false,
@@ -44,7 +50,7 @@ function jobs(state: Partial<UseQueryResult<ImportJob[], Error>>) {
 const mutateAsync = vi.fn()
 
 function draw(
-  jobsState: Partial<UseQueryResult<ImportJob[], Error>>,
+  jobsState: Partial<UseQueryResult<ImportJobList, Error>>,
   progress: Record<string, unknown> = {},
 ) {
   useImportJobs.mockReturnValue(jobs(jobsState))
@@ -102,16 +108,16 @@ describe('SyncAllButton', () => {
   })
 
   it('links to the import page when nothing has ever synced', () => {
-    draw({ data: [] })
+    draw({ data: page([]) })
     expect(screen.getByRole('link', { name: /connect account/i })).toHaveAttribute('href', '/library/import')
   })
 
   it('starts one import per previously synced account', async () => {
     draw({
-      data: [
+      data: page([
         job({ id: 1, source: 'lichess', message: 'phib' }),
         job({ id: 2, source: 'chesscom', message: 'phib_cc' }),
-      ],
+      ]),
     })
 
     await userEvent.click(screen.getByRole('button', { name: /sync all/i }))
@@ -122,7 +128,7 @@ describe('SyncAllButton', () => {
   })
 
   it('reads as syncing, and refuses a second press, while /events says a job is running', () => {
-    draw({ data: [job({ id: 1, source: 'lichess', message: 'phib' })] }, { lichess: { running: true } })
+    draw({ data: page([job({ id: 1, source: 'lichess', message: 'phib' })]) }, { lichess: { running: true } })
 
     const button = screen.getByRole('button', { name: /syncing/i })
     expect(button).toBeDisabled()
@@ -131,7 +137,7 @@ describe('SyncAllButton', () => {
 
   it('shows why a sync did not start', async () => {
     mutateAsync.mockRejectedValue(new Error('lichess said no'))
-    draw({ data: [job({ id: 1, source: 'lichess', message: 'phib' })] })
+    draw({ data: page([job({ id: 1, source: 'lichess', message: 'phib' })]) })
 
     await userEvent.click(screen.getByRole('button', { name: /sync all/i }))
 

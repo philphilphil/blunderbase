@@ -33,8 +33,12 @@ import type {
   GameFilters,
   GameList,
   GamesDeleted,
+  DeletedGameList,
+  DeletionsForgotten,
+  GamesRemoved,
   Health,
   ImportJob,
+  ImportJobList,
   ImportRequest,
   ImportStarted,
   LineCreate,
@@ -129,6 +133,15 @@ export const saveAppSettings = (body: AppSettingsUpdate) =>
 export interface GameQuery extends GameFilters {
   limit?: number
   offset?: number
+  /**
+   * Which column the whole filtered library is ordered by, and which way — the table's own
+   * `SortKey` (`src/routes/games/sorting.ts`), which is deliberately the vocabulary
+   * `backend/services/games.py: GAME_ORDERS` answers to. Sorting is the server's job
+   * because a page is a page: reordering the fifty rows a client holds would answer a
+   * different question than the one the column header asks.
+   */
+  order?: string
+  direction?: 'asc' | 'desc'
 }
 
 export const listGames = (query: GameQuery = {}) =>
@@ -156,6 +169,16 @@ export const getGame = (id: number, query: GameDetailQuery = {}) =>
 export const deleteAllGames = (password?: string) =>
   http.post<GamesDeleted>('/games/delete-all', { body: { password } })
 
+/**
+ * The named games and everything that was only about them: their analysis, the notes
+ * written against them and the variations kept off them. One id is a batch of one, so a
+ * row's own delete and the selection footer's are the same call. The sync history stays —
+ * an owner who deleted a game did not ask for the next sync to fetch it back.
+ */
+export const deleteGames = (gameIds: number[]) =>
+  http.post<GamesRemoved>('/games/delete', { body: { game_ids: gameIds } })
+
+
 /** Every stored game with notes and saved lines layered onto its original PGN. */
 export const exportLibrary = () =>
   requestDownload('/games/export', { fallbackName: 'blunderbase-library.pgn' })
@@ -166,14 +189,36 @@ export const getBackupEstimate = () => http.get<BackupEstimate>('/library/backup
 /** Create and verify the snapshot while the calling screen can show preparation progress. */
 export const prepareBackup = () => http.post<BackupPrepared>('/library/backup/prepare')
 
+/**
+ * The games an import is refusing to store again, newest deletion first.
+ *
+ * Deleting a game deletes the only record of it, so these are what stop the next sync of a
+ * source bringing it back as something new (`backend/db/models.py: DeletedGame`).
+ */
+export const listDeletedGames = (query: { limit?: number; offset?: number } = {}) =>
+  http.get<DeletedGameList>('/library/deleted-games', {
+    query: query as Record<string, QueryValue>,
+  })
+
+/**
+ * Forget some deletions, or every one of them when `ids` is omitted.
+ *
+ * No game comes back from this call: what comes back is the ability to import one. The
+ * next sync of that source, or a PGN carrying the game, stores it again as a new game —
+ * without the analysis and the notes, which went with the original.
+ */
+export const forgetDeletions = (ids?: number[]) =>
+  http.post<DeletionsForgotten>('/library/deleted-games/forget', { body: { ids } })
+
 /** One prepared snapshot, streamed by the browser rather than buffered into a JS blob. */
 export const preparedBackupUrl = (token: string) =>
   apiUrl(`/library/backup/prepared/${encodeURIComponent(token)}`)
 
 // --- import ---------------------------------------------------------------
 
-export const listImportJobs = (query: { source?: Source; limit?: number } = {}) =>
-  http.get<ImportJob[]>('/import/jobs', { query })
+export const listImportJobs = (
+  query: { source?: Source; limit?: number; offset?: number } = {},
+) => http.get<ImportJobList>('/import/jobs', { query })
 
 export const getImportJob = (id: number) => http.get<ImportJob>(`/import/jobs/${id}`)
 
