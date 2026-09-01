@@ -19,6 +19,7 @@
  * forget a route.
  */
 import {
+  BookMarked,
   ChartNoAxesColumn,
   Cpu,
   Database,
@@ -73,6 +74,10 @@ const WORKSPACE: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/games', label: 'Games', icon: Library },
   { to: '/explorer', label: 'Openings', icon: Network },
+  // Next to Openings and not under it: the explorer says what the owner *has* played and
+  // the repertoire says what they *mean* to play, which is a destination of its own rather
+  // than a cut of the explorer's tree.
+  { to: '/repertoire', label: 'Repertoire', icon: BookMarked },
   { to: '/stats', label: 'Stats', icon: ChartNoAxesColumn },
   { to: '/notes', label: 'Notes', icon: StickyNote },
   { to: '/live', label: 'Live', icon: Radio },

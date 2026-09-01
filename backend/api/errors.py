@@ -24,6 +24,8 @@ from backend.services import import_service
 from backend.services import maia_live as maia_live_service
 from backend.services import mcp_keys as mcp_keys_service
 from backend.services import notes as notes_service
+from backend.services import reference as reference_service
+from backend.services import repertoire as repertoire_service
 from backend.services import runners as runners_service
 from backend.services import stats as stats_service
 from backend.services import streams as streams_service
@@ -114,6 +116,19 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     # the deployment is in, not a failure to retry.
     (maia_live_service.LivePolicyRequestError, 422, "invalid_request"),
     (maia_live_service.LiveMaiaUnavailableError, 409, "maia_unavailable"),
+    # The reference databases are somebody else's service, so their failures are about the
+    # owner's token or about Lichess itself, never about this library. 409 for both token
+    # states because there is nothing to retry until a person pastes one; 502 for the rest,
+    # because the request was fine and the upstream was not. The rate limit has a handler of
+    # its own below, so that Lichess's own `Retry-After` reaches the caller.
+    (reference_service.TokenMissingError, 409, "lichess_token_missing"),
+    (reference_service.ReferenceAuthError, 409, "lichess_token_rejected"),
+    (reference_service.ReferenceRateLimitedError, 429, "reference_rate_limited"),
+    (reference_service.ReferenceUnavailableError, 502, "reference_unavailable"),
+    (reference_service.ReferenceError, 502, "reference_unavailable"),
+    # A line that could not be played is the request being wrong, not the tree: nothing is
+    # written, so the client can fix the moves and send the same body again.
+    (repertoire_service.RepertoireError, 422, "repertoire_invalid_line"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
     (notes_service.LineNotFoundError, 404, "unknown_line"),
     (notes_service.UnknownGameError, 404, "unknown_game"),
@@ -137,6 +152,11 @@ def install_error_handlers(app: FastAPI) -> None:
     """Register one handler per known failure, plus the two catch-alls."""
     for exception, status_code, name in MAPPINGS:
         app.add_exception_handler(exception, _typed_handler(status_code, name))
+    # Registered after the loop, so it replaces the plain handler the table above installed
+    # for the same class: a limiter's answer is worth a header, and this is the one refusal
+    # from a service that carries one. The row stays in the table because that is where the
+    # status and the name of every failure are read.
+    app.add_exception_handler(reference_service.ReferenceRateLimitedError, _rate_limited_handler)
     # Starlette's, not FastAPI's: an unmatched route and a 405 are raised by the router
     # itself, and FastAPI's HTTPException is a subclass, so this catches both.
     app.add_exception_handler(StarletteHTTPException, _http_handler)
@@ -149,6 +169,15 @@ def _typed_handler(status_code: int, name: str) -> Handler:
         return error_response(status_code, name, str(exc) or name)
 
     return handle
+
+
+async def _rate_limited_handler(_request: Request, exc: Exception) -> JSONResponse:
+    """A 429 from the reference database, with the wait Lichess asked for when it named one."""
+    response = error_response(429, "reference_rate_limited", str(exc) or "reference_rate_limited")
+    seconds = getattr(exc, "retry_after", None)
+    if seconds:
+        response.headers["retry-after"] = str(int(seconds))
+    return response
 
 
 async def _http_handler(_request: Request, exc: HTTPException) -> JSONResponse:

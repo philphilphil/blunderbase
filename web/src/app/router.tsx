@@ -20,6 +20,8 @@ import {
   MaiaSettingsPage,
   McpPage,
   NotesPage,
+  ReferenceGamePage,
+  RepertoirePage,
   StatsPage,
 } from './lazyRoutes'
 
@@ -52,6 +54,10 @@ export const router = createBrowserRouter([
       { path: 'games', element: <GamesPage /> },
       { path: 'games/:id', element: <GamePage /> },
       { path: 'explorer', element: <ExplorerPage /> },
+      { path: 'repertoire', element: <RepertoirePage /> },
+      // A leaf, not a destination: it is reached from the explorer's model-game list, so
+      // it is deliberately absent from the rail and the command palette.
+      { path: 'reference/:source/:gameId', element: <ReferenceGamePage /> },
       { path: 'notes', element: <NotesPage /> },
       { path: 'stats', element: <StatsPage /> },
       { path: 'library', element: <Navigate to="/library/import" replace /> },

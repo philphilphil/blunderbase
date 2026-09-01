@@ -6,17 +6,33 @@
  * is asked about; the line itself rides in the URL, which makes any position in the tree a
  * link and makes the browser's back button walk the tree backwards for free.
  *
- * Two deliberate departures from the 2c mock:
+ * One deliberate departure from the 2c mock: the board keeps design 1a's *edge* coordinates
+ * rather than 2c's three sparse in-square corner labels. One board component serves every
+ * screen, and chessground's in-square mode (`coordinates="inside"`, design 1b) labels every
+ * file and rank rather than three corners — so 2c's treatment is not available without a
+ * third coordinate renderer, and a board that changes its coordinates per screen reads as
+ * two different boards.
  *
- * - The board keeps design 1a's *edge* coordinates rather than 2c's three sparse in-square
- *   corner labels. One board component serves every screen, and chessground's in-square
- *   mode (`coordinates="inside"`, design 1b) labels every file and rank rather than three
- *   corners — so 2c's treatment is not available without a third coordinate renderer, and
- *   a board that changes its coordinates per screen reads as two different boards.
- * - 2c's `my games / masters / both` source control is a `both / as white / as black`
- *   colour scope instead. `/explorer` aggregates the owner's own games and nothing else;
- *   there is no masters book in the backend, and a segmented control offering one would be
- *   a control that cannot be switched on.
+ * ## Three sources, and the wall between them
+ *
+ * `?source=` is 2c's `my games / masters / both` control, finally switchable: the owner's
+ * own games, Lichess's masters database, or its rated games (`/reference/*`, which proxies
+ * Lichess and stores nothing). Two rules hold the page together:
+ *
+ * - **No source is ever mixed with another.** There is no `both`. A reference count is
+ *   thousands of strangers and the owner's is a handful of their own games; added together
+ *   the second disappears, and the number that is actually about them — how *they* have
+ *   done in this line — would be diluted by a database they have never played in.
+ * - The owner-only panels are hidden rather than blanked on a reference source: the colour
+ *   scope, the book run, the line summary and the games in this line are all statements
+ *   about the owner's library, and there is no honest reference answer to any of them.
+ *   `PositionNotes` is the one thing that stays on every source, because a note is about
+ *   the position on the board and the board is the same board.
+ *
+ * The line, the scope, the source and the lichess filters all ride in the URL, so any
+ * position in any book is a link and the back button walks backwards for free. The filters
+ * and the scope are lenses (`replace: true`) — which book you are reading is not a place
+ * you went — while playing a move is history.
  */
 import type { Api } from '@lichess-org/chessground/api'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -24,7 +40,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
-import { useExplorer, usePositionOccurrences } from '@/lib/api/queries'
+import { useExplorer, usePositionOccurrences, useReferenceExplorer } from '@/lib/api/queries'
 import type { Color, ExplorerMove, ExplorerResponse } from '@/lib/api/types'
 import { isTyping } from '@/routes/game/useBoardKeys'
 import { cn } from '@/lib/utils'
@@ -32,8 +48,12 @@ import { cn } from '@/lib/utils'
 import { GamesInLine } from './components/GamesInLine'
 import { LineBreadcrumb } from './components/LineBreadcrumb'
 import { LineSummary } from './components/LineSummary'
+import { ModelGames } from './components/ModelGames'
 import { MoveTreeTable } from './components/MoveTreeTable'
 import { PositionNotes } from './components/PositionNotes'
+import { ReferenceFilters } from './components/ReferenceFilters'
+import { ReferenceMoveTable } from './components/ReferenceMoveTable'
+import { ReferenceTokenCard } from './components/ReferenceTokenCard'
 import {
   buildLine,
   formatLineParam,
@@ -43,11 +63,30 @@ import {
   withMove,
   type LinePosition,
 } from './line'
+import {
+  SOURCES,
+  SOURCE_LABELS,
+  formatCsv,
+  parseRatings,
+  parseSource,
+  parseSpeeds,
+  tokenTrouble,
+  type ExplorerSource,
+  type Speed,
+} from './reference'
 import { bookDepthLabel, commonOpening } from './stats'
 
 /** How many continuations and how many games to ask for. */
 const MOVE_LIMIT = 24
 const GAME_LIMIT = 14
+
+/**
+ * The same two numbers for a reference source, inside the backend's own caps (30 and 15).
+ * A reference position has a long tail of moves played twice in a million games, so the
+ * list is shorter than the owner's own tree rather than longer.
+ */
+const REFERENCE_MOVE_LIMIT = 20
+const REFERENCE_GAME_LIMIT = 10
 
 // `viewOnly` is one of the three keys chessground only reads at creation (`Board`'s own
 // comment), so toggling it per hover would rebuild the board on every pointer-enter and
@@ -62,6 +101,12 @@ export function ExplorerPage() {
 
   const ucis = useMemo(() => parseLineParam(params.get('line')), [params])
   const scope = (params.get('color') as Color | null) ?? undefined
+  const source = parseSource(params.get('source'))
+  const reference = source !== 'mine'
+  // Read on every source so the two are stable objects for the query key, but only sent
+  // when the lichess database is the one being asked — masters has neither.
+  const speeds = useMemo(() => parseSpeeds(params.get('speeds')), [params])
+  const ratings = useMemo(() => parseRatings(params.get('ratings')), [params])
   // `?fen=` roots the tree at a position whose move order nobody recorded — how a note
   // written about a position links back here, and how the coach can hand over a board.
   // `?line=` still walks from it, so the two compose and the breadcrumb stays honest: it
@@ -113,26 +158,60 @@ export function ExplorerPage() {
     [params, setParams],
   )
 
-  const setScope = useCallback(
-    (next: Color | undefined) => {
+  /**
+   * A lens over one param: what the page is *looking at* rather than where it went, so it
+   * replaces the history entry instead of adding one. The colour scope, the source and the
+   * two lichess filters are all this; only playing a move is history.
+   */
+  const setLens = useCallback(
+    (key: string, value: string | null) => {
       const updated = new URLSearchParams(params)
-      if (next) updated.set('color', next)
-      else updated.delete('color')
+      if (value) updated.set(key, value)
+      else updated.delete(key)
       setParams(updated, { replace: true })
     },
     [params, setParams],
   )
 
-  const tree = useExplorer({
-    fen: line.fen,
-    color: scope,
-    limit: MOVE_LIMIT,
-    // Naming only — the tree is still the one `fen` asks for. The book stops naming
-    // positions a few plies in, so the path is what lets a deep position take its name
-    // from the ancestor that has one.
-    line: formatLineParam(line.steps.map((step) => step.uci)),
-  })
-  const occurrences = usePositionOccurrences(line.fen, { color: scope, limit: GAME_LIMIT })
+  const setScope = useCallback(
+    (next: Color | undefined) => setLens('color', next ?? null),
+    [setLens],
+  )
+
+  const tree = useExplorer(
+    {
+      fen: line.fen,
+      color: scope,
+      limit: MOVE_LIMIT,
+      // Naming only — the tree is still the one `fen` asks for. The book stops naming
+      // positions a few plies in, so the path is what lets a deep position take its name
+      // from the ancestor that has one.
+      line: formatLineParam(line.steps.map((step) => step.uci)),
+    },
+    // A reference source hides everything this tree feeds, so it is not asked for. The
+    // answer stays in the cache, which is what makes switching back instant.
+    { enabled: !reference },
+  )
+  const occurrences = usePositionOccurrences(
+    line.fen,
+    { color: scope, limit: GAME_LIMIT },
+    { enabled: !reference },
+  )
+  const book = useReferenceExplorer(
+    {
+      // Never asked while the source is `mine`; a placeholder keeps the key stable rather
+      // than making the type of the query depend on which pane is showing.
+      source: reference ? source : 'masters',
+      fen: line.fen,
+      moves: REFERENCE_MOVE_LIMIT,
+      top_games: REFERENCE_GAME_LIMIT,
+      ...(source === 'lichess'
+        ? { speeds: formatCsv(speeds), ratings: formatCsv(ratings) }
+        : {}),
+    },
+    { enabled: reference },
+  )
+  const tokenReason = tokenTrouble(book.error)
 
   // chessground needs the legal destinations to accept a drag, and `Board` has no prop for
   // them — it publishes its `Api` for exactly this kind of thing. `configure` deep-merges,
@@ -186,8 +265,11 @@ export function ExplorerPage() {
   // answers where the book runs out — and it is what `openLibrary` takes its ECO from, since
   // that filter searches the tags the games actually carry.
   const tagged = useMemo(() => commonOpening(occurrences.data ?? []), [occurrences.data])
-  const booked = tree.data?.opening ?? null
-  const opening = booked ?? tagged
+  // Both books name a position, and on a reference source the name has to come from the
+  // one being read: `tree` was never asked, and the owner's own ECO tags describe games
+  // that have nothing to do with the database on screen.
+  const booked = (reference ? book.data?.opening : tree.data?.opening) ?? null
+  const opening = booked ?? (reference ? null : tagged)
   const orientation = flipped ? (scope === 'black' ? 'white' : 'black') : (scope ?? 'white')
   const totalGames = (tree.data?.totals.games as number | undefined) ?? 0
 
@@ -300,44 +382,79 @@ export function ExplorerPage() {
           */}
           <PositionNotes fen={line.fen} />
 
-          <LineSummary tree={tree.data} ply={line.ply} loading={tree.isPending} />
+          {/* The owner's results in this line — there is no reference equivalent. */}
+          {reference ? null : (
+            <LineSummary tree={tree.data} ply={line.ply} loading={tree.isPending} />
+          )}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto max-md:flex-none max-md:overflow-visible">
           <div className="flex flex-none flex-col gap-1.5">
             <div className="flex items-center gap-2.5 max-md:flex-wrap">
               <span className="text-[0.75rem] font-semibold text-ink">
-                Your move tree from here
+                {source === 'mine'
+                  ? 'Your move tree from here'
+                  : source === 'masters'
+                    ? 'What masters play from here'
+                    : 'What lichess plays from here'}
               </span>
               <div className="flex-1" />
-              <ScopeToggle scope={scope} onChange={setScope} />
+              {reference ? null : <ScopeToggle scope={scope} onChange={setScope} />}
+              <SourceToggle
+                source={source}
+                onChange={(next) => setLens('source', next === 'mine' ? null : next)}
+              />
             </div>
-            {tree.data && totalGames > 0 ? (
+            {!reference && tree.data && totalGames > 0 ? (
               <BookRun
                 tree={tree.data}
                 rootPly={line.ply}
-                onFollow={(book) => setLine([...ucis, ...book])}
+                onFollow={(bookLine) => setLine([...ucis, ...bookLine])}
                 onPreview={onPreview}
+              />
+            ) : null}
+            {source === 'lichess' ? (
+              <ReferenceFilters
+                speeds={speeds}
+                ratings={ratings}
+                onSpeeds={(next: Speed[]) => setLens('speeds', formatCsv(next))}
+                onRatings={(next: number[]) => setLens('ratings', formatCsv(next))}
               />
             ) : null}
           </div>
 
-          {tree.isError ? (
-            <div className="flex flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
-              <span className="text-[0.75rem] font-semibold text-blunder">
-                Could not read the tree
-              </span>
-              <p className="text-[0.78125rem] leading-relaxed text-soft">
-                {tree.error?.message ?? 'The backend did not answer.'}
-              </p>
-              <button
-                type="button"
-                onClick={() => void tree.refetch()}
-                className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
-              >
-                Try again
-              </button>
-            </div>
+          {reference ? (
+            tokenReason ? (
+              <ReferenceTokenCard reason={tokenReason} />
+            ) : book.isError ? (
+              <Failure
+                title="Could not read that database"
+                message={book.error?.message ?? 'Lichess did not answer.'}
+                onRetry={() => void book.refetch()}
+              />
+            ) : (
+              <>
+                <ReferenceMoveTable
+                  data={book.data}
+                  ply={line.ply}
+                  loading={book.isPending}
+                  onPlay={(move) => play(move.uci)}
+                  onPreview={onPreview}
+                />
+
+                <ModelGames
+                  source={source}
+                  games={book.data?.top_games ?? []}
+                  loading={book.isPending}
+                />
+              </>
+            )
+          ) : tree.isError ? (
+            <Failure
+              title="Could not read the tree"
+              message={tree.error?.message ?? 'The backend did not answer.'}
+              onRetry={() => void tree.refetch()}
+            />
           ) : (
             <>
               <MoveTreeTable
@@ -454,6 +571,69 @@ function BookRun({
         '.'
       )}
     </p>
+  )
+}
+
+/**
+ * Which book the right-hand pane is reading — design 2c's source control, at last with
+ * three sources to offer.
+ *
+ * It sits to the right of the colour scope rather than replacing it because the two are
+ * different questions and only one of them survives a reference source: the scope narrows
+ * the owner's own games, so it is hidden the moment the pane stops being about them.
+ * `mine` clears the param instead of writing `source=mine`, so the page's own URL stays
+ * the short one it has always been.
+ */
+function SourceToggle({
+  source,
+  onChange,
+}: {
+  source: ExplorerSource
+  onChange: (next: ExplorerSource) => void
+}) {
+  return (
+    <div className="flex overflow-hidden rounded-md border border-edge font-mono text-[0.6875rem]">
+      {SOURCES.map((option, index) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={source === option}
+          onClick={() => onChange(option)}
+          className={cn(
+            'px-2.5 py-1 transition-colors',
+            index > 0 && 'border-l border-edge',
+            source === option ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
+          )}
+        >
+          {SOURCE_LABELS[option]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** A pane that could not be read, with the one thing worth offering: ask again. */
+function Failure({
+  title,
+  message,
+  onRetry,
+}: {
+  title: string
+  message: string
+  onRetry: () => void
+}) {
+  return (
+    <div className="flex flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
+      <span className="text-[0.75rem] font-semibold text-blunder">{title}</span>
+      <p className="text-[0.78125rem] leading-relaxed text-soft">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
+      >
+        Try again
+      </button>
+    </div>
   )
 }
 

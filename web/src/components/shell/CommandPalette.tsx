@@ -12,6 +12,7 @@
  * first game. The groups are only how the flat list is printed.
  */
 import {
+  BookMarked,
   Bot,
   ChartNoAxesColumn,
   Cpu,
@@ -87,6 +88,12 @@ const PAGES: PageRoute[] = [
   { label: 'Dashboard', hint: 'the last games and what went wrong', icon: LayoutDashboard, to: '/' },
   { label: 'Games', hint: 'the library', icon: Library, to: '/games' },
   { label: 'Openings', hint: 'the explorer', icon: Network, to: '/explorer' },
+  {
+    label: 'Repertoire',
+    hint: 'what you mean to play as White and as Black',
+    icon: BookMarked,
+    to: '/repertoire',
+  },
   { label: 'Stats', hint: 'reports over the library', icon: ChartNoAxesColumn, to: '/stats' },
   { label: 'Notes', hint: 'everything written down', icon: StickyNote, to: '/notes' },
   { label: 'Live', hint: 'the game being played now', icon: Radio, to: '/live' },

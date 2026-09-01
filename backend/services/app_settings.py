@@ -43,6 +43,13 @@ They are identities, not numbers with a range, so they are outside `SETTINGS` an
 analysis form must not wipe the deployment's wiring. `services.engines` is where they mean
 something; here they are three rows and their accessors, the way `maia_elos` is.
 
+**The owner's Lichess token** — `lichess_token`, the personal API token the reference
+explorer sends to `explorer.lichess.ovh`, which no longer answers an anonymous request. A
+credential rather than a number: outside `SETTINGS` and outside `replace` for the same
+reason the engine roles are, and read straight where it is used so that pasting a new one
+takes effect on the next lookup. Nothing echoes it back — the surfaces answer whether one
+is stored, never what it is.
+
 **Whether the queue is draining at all** — `queue_paused`, the top bar's pause button.
 Not one of the fourteen and deliberately not a member of `SETTINGS`: it is a switch over
 the *queue* rather than a number with a clamp, nobody sets it from the analysis form, and
@@ -99,6 +106,11 @@ BLUNDER_THRESHOLD = "blunder_threshold"
 QUICK_ENGINE_ID = "quick_engine_id"
 DEEP_ENGINE_ID = "deep_engine_id"
 HUMAN_ENGINE_ID = "human_engine_id"
+
+# The owner's Lichess personal API token, as the reference explorer sends it. Outside
+# `SETTINGS` for the same reason the engine roles are: it is a credential, not a number
+# with a range, and there is no value between "the right token" and "no token" to clamp to.
+LICHESS_TOKEN = "lichess_token"
 
 # Whether the workers are allowed to claim. Outside `SETTINGS` and outside `replace`'s
 # whole-set rewrite on purpose: it is not a number the analysis form posts, and a key that
@@ -367,6 +379,41 @@ def set_role_engine_id(session: Session, role: EngineRole, engine_id: int | None
         row.value = int(engine_id)
     session.commit()
     return int(engine_id)
+
+
+def get_lichess_token(session: Session) -> str | None:
+    """The owner's Lichess personal API token, or None because nobody has pasted one.
+
+    Read at the moment it is needed rather than held anywhere, so a token pasted into the
+    page is in force for the next lookup and a token revoked upstream is not cached past
+    the request that discovers it. Anything in the row that is not a non-empty string is
+    read as no token at all — the same treatment a hand-edited engine id gets.
+    """
+    row = session.get(AppSetting, LICHESS_TOKEN)
+    if row is None or not isinstance(row.value, str):
+        return None
+    return row.value.strip() or None
+
+
+def set_lichess_token(session: Session, value: str | None) -> str | None:
+    """Store a token, or clear it. Returns what is stored afterwards.
+
+    An empty string clears rather than stores: a form that posts a blank box means "take
+    it away", and there is no use for a row holding nothing. Cleared, the row is deleted —
+    "the owner has not chosen" is the absence of a row here as it is everywhere else.
+    """
+    token = (value or "").strip()
+    if not token:
+        session.execute(delete(AppSetting).where(AppSetting.key == LICHESS_TOKEN))
+        session.commit()
+        return None
+    row = session.get(AppSetting, LICHESS_TOKEN)
+    if row is None:
+        session.add(AppSetting(key=LICHESS_TOKEN, value=token))
+    else:
+        row.value = token
+    session.commit()
+    return token
 
 
 def get_queue_paused(session: Session) -> bool:

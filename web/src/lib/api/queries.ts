@@ -24,6 +24,7 @@ import type {
   AppSettingsUpdate,
   AuthStatus,
   BatchAnalysisRequest,
+  Color,
   EngineCreate,
   EngineDeleteResult,
   EngineRolesUpdate,
@@ -39,6 +40,9 @@ import type {
   NoteExportFormat,
   NoteResponse,
   NoteUpdate,
+  ReferenceSource,
+  RepertoireLineCreate,
+  RepertoireMoveUpdate,
   RunnerCreate,
   RunnerUpdate,
   SampleRequest,
@@ -630,6 +634,157 @@ export function usePositionOccurrences(
     queryKey: queryKeys.explorerPositions(fen, query),
     queryFn: () => api.findPositions(fen, query),
     ...options,
+  })
+}
+
+// --- reference explorer ---------------------------------------------------
+
+/**
+ * A position in one of the outside books.
+ *
+ * `staleTime: Infinity` because the answer genuinely cannot change while the page is open:
+ * it is a summary of games played by other people, and the backend is a proxy in front of
+ * Lichess. Walking a line back and forth therefore costs one request per position visited
+ * and never a second — which also keeps the app well inside Lichess's rate limit, the one
+ * budget on this page that is not ours to spend.
+ *
+ * `enabled` is the caller's: `/explorer` turns this on only when the source control is off
+ * `mine`, so the owner's own tree costs nothing extra and no request leaves the machine
+ * until they ask an outside database a question.
+ */
+export function useReferenceExplorer(
+  query: api.ReferenceExplorerQuery,
+  options?: Options<Awaited<ReturnType<typeof api.referenceExplorer>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.referenceExplorer(query),
+    queryFn: () => api.referenceExplorer(query),
+    staleTime: Infinity,
+    ...options,
+  })
+}
+
+/** One model game, whole. Immutable upstream, so it is fetched once and kept. */
+export function useReferenceGame(
+  source: ReferenceSource,
+  gameId: string,
+  options?: Options<Awaited<ReturnType<typeof api.getReferenceGame>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.referenceGame(source, gameId),
+    queryFn: () => api.getReferenceGame(source, gameId),
+    staleTime: Infinity,
+    ...options,
+  })
+}
+
+export function useReferenceToken(
+  options?: Options<Awaited<ReturnType<typeof api.getReferenceToken>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.referenceToken(),
+    queryFn: () => api.getReferenceToken(),
+    ...options,
+  })
+}
+
+/**
+ * Store or clear the Lichess token. It invalidates the whole `['reference']` root rather
+ * than the token key alone, because the thing the owner is actually trying to fix is the
+ * explorer query that just failed for want of a token — and that query is cached forever.
+ */
+export function useSetReferenceToken(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.setReferenceToken>>,
+    Error,
+    string | null
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (token: string | null) => api.setReferenceToken(token),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.reference() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+// --- repertoire -----------------------------------------------------------
+
+/**
+ * One colour's whole tree, in one request.
+ *
+ * The whole tree rather than a strip per position: a repertoire is small — hundreds of
+ * nodes at most — the page draws all of it at once as movetext, and walking it must not
+ * cost a request per ply. Every write below invalidates the root, so the tree the board
+ * is standing in and the tree in the right-hand pane can never disagree.
+ */
+export function useRepertoire(
+  color: Color,
+  options?: Options<Awaited<ReturnType<typeof api.getRepertoire>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.repertoireTree(color),
+    queryFn: () => api.getRepertoire(color),
+    ...options,
+  })
+}
+
+export function useAddRepertoireLine(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.addRepertoireLine>>,
+    Error,
+    { color: Color; body: RepertoireLineCreate }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ color, body }: { color: Color; body: RepertoireLineCreate }) =>
+      api.addRepertoireLine(color, body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.repertoire() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * Comment a move or promote it. Invalidates the root rather than patching the node into
+ * the cached tree: a promotion renumbers every sibling, which is a change to a list this
+ * answer does not carry.
+ */
+export function useUpdateRepertoireMove(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.updateRepertoireMove>>,
+    Error,
+    { id: number; body: RepertoireMoveUpdate }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: RepertoireMoveUpdate }) =>
+      api.updateRepertoireMove(id, body),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.repertoire() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/** Delete a move and its whole subtree. The answer is a 204, so the tree is refetched. */
+export function useDeleteRepertoireMove(options?: UseMutationOptions<void, Error, number>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.deleteRepertoireMove(id),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.repertoire() })
+      options?.onSuccess?.(...args)
+    },
   })
 }
 

@@ -1,12 +1,13 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import type { GameFilters, Source, Tier } from './types'
+import type { Color, GameFilters, Source, Tier } from './types'
 import type {
   CompareQuery,
   ExplorerQuery,
   GameDetailQuery,
   GameQuery,
   NoteQuery,
+  ReferenceExplorerQuery,
   StatsDashboardQuery,
 } from './endpoints'
 
@@ -96,6 +97,37 @@ export const queryKeys = {
     fen: string,
     query: { color?: 'white' | 'black'; limit?: number } = {},
   ): QueryKey => ['explorer', 'positions', fen, query],
+
+  /**
+   * The outside books — Lichess's masters and rated databases, read through
+   * `/reference/*`. Their own root and emphatically not a corner of `['explorer']`: that
+   * prefix is invalidated by every analysis event and every note write, and none of those
+   * can change what a million strangers played in 1997. Sharing it would put a request to
+   * Lichess behind every game the owner imports.
+   */
+  reference: (): QueryKey => ['reference'],
+  referenceExplorer: (query: ReferenceExplorerQuery): QueryKey => [
+    'reference',
+    'explorer',
+    query,
+  ],
+  referenceGame: (source: string, gameId: string): QueryKey => [
+    'reference',
+    'game',
+    source,
+    gameId,
+  ],
+  /** Under the same root, so storing a token refetches the tree that failed without one. */
+  referenceToken: (): QueryKey => ['reference', 'token'],
+
+  /**
+   * The two opening repertoires. Their own root and deliberately not a corner of
+   * `['explorer']`: a repertoire is what the owner *intends* to play and changes only when
+   * they edit it, so no analysis event and no import may mark it stale — and one edit to
+   * White's tree must not refetch Black's, which is why the colour is part of the key.
+   */
+  repertoire: (): QueryKey => ['repertoire'],
+  repertoireTree: (color: Color): QueryKey => ['repertoire', 'tree', color],
 
   stats: (): QueryKey => ['stats'],
   statsDimensions: (): QueryKey => ['stats', 'dimensions'],
