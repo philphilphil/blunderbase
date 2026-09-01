@@ -7,6 +7,7 @@
 import { Link } from 'react-router-dom'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
+import { SectionHead } from '@/components/shell/Section'
 import { useGameCards } from '@/lib/api/queries'
 import type { GameCard as GameCardRow, WorstMoment } from '@/lib/api/types'
 import { formatWinLoss } from '@/lib/chess/evaluation'
@@ -51,8 +52,10 @@ function GameRow({ game }: { game: GameCardRow }) {
       to={`/games/${game.id}`}
       title={titleOf(game)}
       // A 28px line is a comfortable list row under a mouse and a cramped one under a
-      // thumb, so the phone gets a taller one.
-      className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-raised max-md:py-2.5"
+      // thumb, so the phone gets a taller one. The rule above each row but the first is
+      // what makes the list a list rather than a stack of pills: `-mt-px` collapses it into
+      // the row above so the hairlines do not double up.
+      className="-mt-px flex items-center gap-2 border-t border-hairline px-1 py-[0.4375rem] transition-colors first:mt-0 first:border-t-0 hover:bg-raised max-md:py-2.5"
     >
       <span className={cn('font-mono text-[0.6875rem] font-semibold', outcome.text)}>
         {outcome.letter}
@@ -86,14 +89,15 @@ export function RecentGamesList() {
   const games = query.data?.games ?? []
 
   return (
-    <section className="flex flex-none flex-col gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.8125rem]">
-      <header className="flex items-center gap-2">
-        <h2 className="text-xs font-semibold text-ink">Recent games</h2>
-        <div className="flex-1" />
-        <Link to="/games" className="text-[0.6875rem] text-accent-teal hover:text-accent-link">
-          {query.data ? `all ${query.data.total.toLocaleString()}` : 'all games'}
-        </Link>
-      </header>
+    <section className="flex flex-none flex-col gap-2">
+      <SectionHead
+        title="Recent games"
+        end={
+          <Link to="/games" className="text-[0.6875rem] text-accent-teal hover:text-accent-link">
+            {query.data ? `All ${query.data.total.toLocaleString()}` : 'All games'}
+          </Link>
+        }
+      />
       {query.isPending ? (
         <ListSkeleton />
       ) : query.isError ? (
@@ -117,7 +121,7 @@ export function RecentGamesList() {
           No games in the database yet. Sync an account or drop a PGN in and this fills up.
         </EmptyBlock>
       ) : (
-        <div className="flex flex-col gap-px">
+        <div className="flex flex-col border-b border-hairline">
           {games.map((game) => (
             <GameRow key={game.id} game={game} />
           ))}

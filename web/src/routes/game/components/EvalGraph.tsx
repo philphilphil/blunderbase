@@ -20,12 +20,17 @@ import {
 const AXIS = 50
 const CURVE = 'var(--bb-text-2)'
 /**
- * Flat fills, one per side, in the side tokens so the areas stay white-above / black-below
- * in both themes. White is mixed harder because the light theme's graph background is
- * itself nearly white.
+ * Flat, opaque fills, one per side: white above the axis and black below it, read against
+ * the mid-grey plot ground (`--bb-graph-bg`) — lichess's treatment, and the reason that
+ * ground is its own token rather than the pane's surface.
+ *
+ * They used to be mixed down to 55 % / 85 % against a background that was nearly the same
+ * value as the fill in each theme, which left both halves as tints of the ground and the
+ * curve doing all the work. Solid, the side that is winning is legible at a glance from
+ * across the desk, which is the whole job of this chart.
  */
-const FILL_WHITE = 'color-mix(in srgb, var(--bb-side-white) 55%, transparent)'
-const FILL_BLACK = 'color-mix(in srgb, var(--bb-side-black) 85%, transparent)'
+const FILL_WHITE = 'var(--bb-side-white)'
+const FILL_BLACK = 'var(--bb-side-black)'
 const GRAPH_BG = 'var(--bb-graph-bg)'
 /** The design marks — and its legend explains — only these two. */
 const MARKED: readonly Glyph[] = ['blunder', 'mistake']
@@ -154,7 +159,11 @@ export function EvalGraph({
   return (
     <div
       className={cn(
-        'grid min-h-0 gap-x-2.5 gap-y-[0.21875rem] rounded-lg border border-line bg-panel px-2 pb-[0.28125rem] pt-[0.34375rem]',
+        // A pane, not a card: the workspace bounds it with rules (`GamePage` draws the one
+        // above it) and it carries the padding the card's border used to imply. The plot,
+        // the tallies, the "only mine" control and every scrubbing gesture are untouched —
+        // only the frame around them changed.
+        'grid min-h-0 gap-x-3 gap-y-[0.21875rem] bg-surface px-3 pt-2 pb-1.5',
         // Wide enough, everything that is not the curve stands to its left in one column —
         // the title and its checkbox, then a player per row — and the plot takes the whole
         // height beside them. The title deliberately does NOT span: a full-width header row

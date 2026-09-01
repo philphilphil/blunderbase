@@ -8,15 +8,21 @@ import { cn } from '@/lib/utils'
 import { formatResult, formatTimeControl } from '../gameModel'
 
 /**
- * The one line above the board: what the game *is* — opening, ECO, where it came from, at
- * what time control, how it ended — and, quiet and right-aligned, what has been done to it.
+ * The bar across the top of the game screen: what the game *is* — opening, ECO, where it
+ * came from, at what time control, how it ended — and, quiet and right-aligned, what has
+ * been done to it.
  *
- * One line, and a fixed one. The players used to be a third line here and are now the rows
- * flanking the board (`BoardPanel`), because this bar is the board's height budget spent on
- * text: every line here is a line the board is not. `BoardPanel`'s budget names this
- * element's `h-[1.875rem]` by number, so the height is declared rather than emergent —
- * `overflow-hidden` and `whitespace-nowrap` mean a long opening name is truncated instead of
- * wrapping the bar to two lines behind the budget's back.
+ * It spans the whole workspace rather than sitting inside the board column, which is where
+ * it used to be. A title that starts a third of the way across the window and stops at the
+ * board's right edge does not read as the page's title, and it left the panes to the right
+ * of it with nothing above them at all. Spanning, it is the screen's own heading and the
+ * rule under it is the top edge of the pane matrix.
+ *
+ * One line, and a fixed one: `BoardPanel`'s height budget names this element's `h-[2.625rem]`
+ * by number, so the height is declared rather than emergent — `overflow-hidden` and
+ * `whitespace-nowrap` mean a long opening name is truncated instead of wrapping the bar to
+ * two lines behind the budget's back. The players are the rows flanking the board
+ * (`BoardPanel`) rather than a second line here, for the same reason.
  *
  * The date is not here: `AppShell`'s breadcrumb already carries it (`GamePage` passes it),
  * and the one thing this line cannot afford is a second copy of something.
@@ -40,7 +46,7 @@ export function GameHeaderBar({
     <div
       data-testid="game-header"
       className={cn(
-        'flex h-[1.875rem] flex-none items-center gap-2 overflow-hidden whitespace-nowrap',
+        'flex h-[2.625rem] flex-none items-center gap-2 overflow-hidden border-b border-edge-strong bg-surface px-4 whitespace-nowrap',
         className,
       )}
     >

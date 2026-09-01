@@ -20,6 +20,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
+import { SectionHead } from '@/components/shell/Section'
 import { useProfile } from '@/lib/api/queries'
 import type { Platform, RatingSeries } from '@/lib/api/types'
 import { rem, scaleMargin, scalePx } from '@/lib/ui/scale'
@@ -182,7 +183,10 @@ function SpeedGraph({
       </div>
 
       <ChartContainer config={CHART} className="aspect-auto h-[7.5rem] w-full">
-        <LineChart data={chart.rows} margin={scaleMargin({ top: 6, right: 6, bottom: 0, left: -10 })}>
+        {/* The right margin is the width of half a date label: the panel has no card padding
+            to spill the last tick into any more, so the plot has to keep that room itself or
+            "Sept 2026" is cut off by the section's edge. */}
+        <LineChart data={chart.rows} margin={scaleMargin({ top: 6, right: 26, bottom: 0, left: -10 })}>
           <CartesianGrid vertical={false} stroke="var(--bb-hairline)" />
           <XAxis
             dataKey="at"
@@ -223,7 +227,9 @@ function SpeedGraph({
               strokeWidth={scalePx(1.8)}
               // A platform that played once in the window has no line, only a point.
               dot={line.count === 1 ? { r: scalePx(2.5) } : false}
-              activeDot={{ r: scalePx(3.5), strokeWidth: scalePx(2), stroke: 'var(--bb-panel)' }}
+              // The halo is the ground the chart stands on, which is the page canvas now
+              // that the panel has no card of its own.
+              activeDot={{ r: scalePx(3.5), strokeWidth: scalePx(2), stroke: 'var(--bb-surface)' }}
               connectNulls
               isAnimationActive={false}
             />
@@ -352,25 +358,29 @@ export function RatingCard() {
   const charts = allCharts.filter((chart) => !hidden.has(chart.speed))
 
   return (
-    <section className="flex flex-none flex-col gap-3 rounded-xl border border-line bg-panel p-3.5">
+    <section className="flex flex-none flex-col gap-3">
       {/* The window buttons and the speeds menu are 240px of control between them, which is
           most of a phone's width — below `md` they wrap under the title rather than
           squeezing it. */}
-      <header className="flex items-baseline gap-2 max-md:flex-wrap max-md:gap-y-2">
-        <h2 className="text-[0.78125rem] font-semibold text-ink">Rating</h2>
-        <span className="text-[0.6875rem] text-dim-2">{windowProse(windowKey, anchor)}</span>
-        <div className="flex-1" />
-        <Segmented
-          label="Rating window"
-          value={windowKey}
-          onChange={setWindowKey}
-          options={DEFAULT_WINDOWS.map((key) => ({
-            value: key,
-            label: WINDOW_LABELS[key],
-          }))}
-        />
-        <SpeedsMenu charts={charts} allCharts={allCharts} hidden={hidden} />
-      </header>
+      <SectionHead
+        title="Rating"
+        detail={windowProse(windowKey, anchor)}
+        className="max-md:flex-wrap max-md:gap-y-2"
+        end={
+          <>
+            <Segmented
+              label="Rating window"
+              value={windowKey}
+              onChange={setWindowKey}
+              options={DEFAULT_WINDOWS.map((key) => ({
+                value: key,
+                label: WINDOW_LABELS[key],
+              }))}
+            />
+            <SpeedsMenu charts={charts} allCharts={allCharts} hidden={hidden} />
+          </>
+        }
+      />
 
       {profile.isPending ? (
         <div data-testid="loading" className="flex flex-col gap-3">

@@ -10,9 +10,8 @@
  * contents with the screen, which meant the list of cuts of the library sat under a
  * heading of its own three entries away from Games, and nothing said whose they were.
  *
- * The design's footer reads "Storage · local / 2.4 GB / 3.8 GB". Nothing in the API
- * reports disk usage, so the same three-line treatment carries numbers that are true: how
- * much of the library has had a deep pass over it.
+ * The rail folds to an icon strip and back from a control in that footer; the choice is
+ * remembered per browser. See `SideNav`.
  *
  * Below `md` there is no room for a rail beside the page, so the same list slides in over
  * it from the titlebar's hamburger — see `NavDrawer`. The two share `NavSections` rather
@@ -26,12 +25,24 @@ import {
   Gauge,
   LayoutDashboard,
   Library,
+  PanelLeftClose,
+  PanelLeftOpen,
   Radio,
   Network,
   StickyNote,
   X,
 } from 'lucide-react'
-import { Fragment, useEffect, useRef, type ComponentType, type ReactNode } from 'react'
+import {
+  createContext,
+  Fragment,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { StatusDot } from '@/components/badges/StatusDot'
@@ -82,6 +93,12 @@ const DATA: NavItem[] = [
  * A submenu pinned open is two more rows to read on every screen the owner is not
  * configuring anything on; one that unfolds on entering the section says "these belong to
  * Analysis" by where it sits, and costs nothing everywhere else.
+ *
+ * Every page under an entry is listed, including the one the entry itself used to be: both
+ * `/library` and `/analysis` redirect to their first subpage (`app/router.tsx`), so the
+ * parent is a heading and each page has a row of its own. An entry that is both a heading
+ * and a destination made "Analysis" mean two different things depending on whether you
+ * clicked the word or the row under it.
  */
 const SUBPAGES: Record<string, { to: string; label: string }[]> = {
   '/library': [
@@ -89,6 +106,7 @@ const SUBPAGES: Record<string, { to: string; label: string }[]> = {
     { to: '/library/manage', label: 'Manage' },
   ],
   '/analysis': [
+    { to: '/analysis/coverage', label: 'Coverage' },
     { to: '/analysis/engine', label: 'Engine passes' },
     { to: '/analysis/maia', label: 'Maia' },
   ],
@@ -101,12 +119,43 @@ function inSection(pathname: string, to: string): boolean {
 
 const ROWS = 4
 
+/** Where the folded/unfolded choice lives, so it survives a reload and a route change. */
+const COLLAPSED_KEY = 'blunderbase.navCollapsed'
+
+/**
+ * Whether the rail is folded to icons.
+ *
+ * Context rather than a prop threaded through six components: every row, label and fold in
+ * here has to know, and the drawer — which is never folded, because a drawer that is only
+ * icons is a worse drawer — has to be able to say so for its whole subtree at once.
+ */
+const Collapsed = createContext(false)
+const useCollapsed = () => useContext(Collapsed)
+
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A group heading. Folded, the words have nowhere to go, so the grouping is said with a
+ * rule instead — losing the heading entirely would run the two lists together.
+ */
 function SectionLabel({ children }: { children: ReactNode }) {
+  if (useCollapsed()) return <div className="mx-2 my-1.5 h-px bg-hairline" />
   return (
     <div className="px-2 pt-1.5 pb-2 text-[0.625rem] tracking-[0.12em] text-faint uppercase">
       {children}
     </div>
   )
+}
+
+/** The quiet label over a fold's contents — "Filters", "Your lines · black", "Reports". */
+function FoldLabel({ children }: { children: ReactNode }) {
+  return <div className="px-1.5 py-1 text-[0.625rem] text-faint">{children}</div>
 }
 
 function Item({
@@ -119,26 +168,31 @@ function Item({
   trailingClass?: string
 }) {
   const Icon = item.icon
+  const collapsed = useCollapsed()
   return (
     <NavLink
       to={item.to}
       end={item.end}
+      // Folded, the icon is the whole row, so the name it would have read has to be said
+      // some other way or the link has no accessible name at all.
+      aria-label={collapsed ? item.label : undefined}
+      title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-2.5 rounded-md px-2 py-[0.4375rem] text-[0.8125rem] transition-colors',
-          isActive
-            ? 'bg-raised-2 font-medium text-ink shadow-[inset_0.125rem_0_0_var(--bb-accent)]'
-            : 'text-soft hover:bg-raised hover:text-ink',
+          // The selected row is a filled row and nothing else. It used to carry an accent
+          // bar down its left edge as well, which made every rail on screen argue with the
+          // fill about which one was saying "you are here".
+          'flex items-center gap-2.5 rounded-md py-[0.4375rem] text-[0.8125rem] transition-colors',
+          collapsed ? 'justify-center px-0' : 'px-2',
+          isActive ? 'bg-selected text-ink' : 'text-soft hover:bg-raised hover:text-ink',
         )
       }
     >
       {({ isActive }) => (
         <>
-          <Icon
-            className={cn('size-3.5', isActive ? 'text-accent-teal' : 'text-faint')}
-          />
-          {item.label}
-          {trailing ? (
+          <Icon className={cn('size-3.5 flex-none', isActive ? 'text-body-3' : 'text-faint')} />
+          {collapsed ? null : item.label}
+          {trailing && !collapsed ? (
             <>
               <span className="flex-1" />
               <span className={cn('font-mono text-[0.6875rem] tabular text-dim', trailingClass)}>
@@ -169,9 +223,7 @@ function SubPages({ pages }: { pages: { to: string; label: string }[] }) {
           className={({ isActive }) =>
             cn(
               'rounded-md px-1.5 py-[0.375rem] text-[0.75rem] transition-colors',
-              isActive
-                ? 'bg-raised-2 font-medium text-ink'
-                : 'text-dim hover:bg-raised hover:text-ink',
+              isActive ? 'bg-selected text-ink' : 'text-dim hover:bg-raised hover:text-ink',
             )
           }
         >
@@ -209,7 +261,7 @@ function DotRow({
       title={title}
       className={cn(
         'flex items-center gap-1.5 rounded-md px-1.5 py-[0.375rem] text-[0.75rem] transition-colors',
-        active ? 'bg-raised text-ink' : 'text-soft hover:bg-raised hover:text-ink',
+        active ? 'bg-selected text-ink' : 'text-soft hover:bg-raised hover:text-ink',
       )}
     >
       {dotClass ? <span className={cn('size-1.5 flex-none rounded-full', dotClass)} /> : null}
@@ -299,9 +351,15 @@ function SavedFilters({ search }: { search: string }) {
   const filters = useSavedFilters()
   return (
     <>
+      {/* Named, the way "Your lines" and "Reports" are: without it the cuts read as more
+          destinations under Games rather than as one list of ways to slice the one below. */}
+      <FoldLabel>Filters</FoldLabel>
       {filters.map((filter) => (
         <SavedFilterRow key={filter.id} {...filter} search={search} />
       ))}
+      {filters.length === 0 ? (
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">No saved filters yet</div>
+      ) : null}
     </>
   )
 }
@@ -314,7 +372,7 @@ function YourLines({ search }: { search: string }) {
 
   return (
     <>
-      <div className="px-1.5 py-1 text-[0.625rem] text-faint">{`Your lines · ${scope ?? 'both colours'}`}</div>
+      <FoldLabel>{`Your lines · ${scope ?? 'both colours'}`}</FoldLabel>
       {lines.map((line) => (
         <DotRow
           key={line.eco}
@@ -404,43 +462,55 @@ function ConnectionDot() {
 }
 
 /**
- * The pinned footer, the same on every screen: the library is local, and the bar is the
- * share of it an engine pass has been over — the closest thing to "how full is this database"
- * the API can answer. The Games row already carries the library's total, so the footer no
- * longer restates it per route.
+ * The pinned footer: the window's bottom edge, where a desktop app keeps its odds and ends
+ * — the fold control, the source link, the live-connection dot and the build's version, and
+ * below `md` the theme control, which is the titlebar's from `md` up and comes back here
+ * because that is what the phone's drawer carries.
  *
- * Under it runs the window's bottom edge, where a desktop app keeps its odds and ends:
- * the theme control and the source, then the live-connection dot and the build's version.
+ * It used to lead with an "engine coverage" bar. That is gone: Analysis answers the same
+ * question properly and at length (`/analysis/coverage`), the bar cost two `useGames`
+ * queries on every screen in the app to say it badly, and a progress bar pinned under the
+ * navigation reads as the app doing something rather than as a statistic.
+ *
+ * Folded, everything made of words drops and the fold control is centred on its own: the
+ * one thing that must stay reachable is the way back out.
  */
-function NavFooter() {
-  const all = useGames({ limit: 1 })
-  const engineAnalysed = useGames({ analyzed: true, limit: 1 })
-  const total = all.data?.total
-  const analysed = engineAnalysed.data?.total
-  const share = total && analysed !== undefined ? Math.min(100, (analysed / total) * 100) : 0
+function NavFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const fold = (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={collapsed ? 'Expand the navigation' : 'Collapse the navigation'}
+      aria-expanded={!collapsed}
+      title={collapsed ? 'Expand the navigation' : 'Collapse the navigation'}
+      className="flex items-center rounded-md px-0.5 py-1 text-dim transition-colors hover:bg-raised hover:text-ink"
+    >
+      {collapsed ? (
+        <PanelLeftOpen className="size-3.5" aria-hidden />
+      ) : (
+        <PanelLeftClose className="size-3.5" aria-hidden />
+      )}
+    </button>
+  )
 
-  // en-US commas on purpose: a locale that writes thousands with a dot turns "7.708"
-  // into what looks like a decimal next to the bare "7".
-  const figure =
-    total === undefined
-      ? '—'
-      : `${(analysed ?? 0).toLocaleString('en-US')} of ${total.toLocaleString('en-US')} engine analyzed`
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-1.5 border-t border-hairline px-1 pt-2 pb-1">
+        {fold}
+        <ConnectionDot />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-[0.3125rem] border-t border-hairline px-2 pt-3 pb-1">
-      <div
-        className="flex flex-col gap-[0.3125rem]"
-        title="Every game, note and evaluation lives in a local database on this machine."
-      >
-        <div className="text-[0.6875rem] text-dim">Engine coverage</div>
-        <div className="h-[0.1875rem] overflow-hidden rounded-sm bg-hairline">
-          <div className="h-full bg-meter-2" style={{ width: `${share}%` }} />
-        </div>
-        <div className="font-mono text-[0.625rem] tabular text-dim-2">{figure}</div>
-      </div>
-
-      <div className="flex items-center gap-2 pt-1">
-        <ThemeToggle />
+    <div className="flex flex-col gap-[0.3125rem] border-t border-hairline px-2 pt-2 pb-1">
+      <div className="flex items-center gap-2">
+        {fold}
+        {/*
+          The toolbar carries the theme control at `md` and up (`TopBar`); this copy is the
+          phone's, reached through the drawer, where the titlebar has no room for it.
+        */}
+        <ThemeToggle className="md:hidden" />
         <a
           href={REPO}
           target="_blank"
@@ -475,6 +545,8 @@ function NavFooter() {
  * list, which is not a question anyone is asking while looking at a board.
  */
 function Folded({ to, pathname, search }: { to: string; pathname: string; search: string }) {
+  // Folded to icons there is no room for a second level, and no label to hang it under.
+  if (useCollapsed()) return null
   const pages = SUBPAGES[to]
   const body = pages ? (
     <SubPages pages={pages} />
@@ -498,7 +570,7 @@ function Folded({ to, pathname, search }: { to: string; pathname: string; search
  * are flex columns, which is what the `flex-1` spacer above the roster needs to push the
  * footer to the bottom.
  */
-function NavSections() {
+function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { pathname, search } = useLocation()
   const games = useGames({ limit: 1 })
   const live = useLiveState()
@@ -534,17 +606,52 @@ function NavSections() {
       {DATA.map((item) => entry(item))}
 
       <div className="flex-1" />
-      <EngineRoster />
-      <NavFooter />
+      {/* Names and status dots, so it goes with everything else made of words. */}
+      {collapsed ? null : <EngineRoster />}
+      <NavFooter collapsed={collapsed} onToggle={onToggle} />
     </>
   )
 }
 
+/**
+ * The rail, and the fold it remembers.
+ *
+ * Folded it is an icon strip: every destination keeps a row and a tooltip, and everything
+ * that is words — the group headings, the counts, the open entry's second level, the engine
+ * roster — stands down until it comes back. That is a narrower rail rather than no rail,
+ * because a rail that vanishes has to put the way back somewhere else, and there is nowhere
+ * on this window that is not already spoken for.
+ *
+ * The choice is this component's rather than the shell's: nothing above it needs to know,
+ * the page beside it is a flex sibling that simply takes the width back, and `localStorage`
+ * is what carries it across a reload.
+ */
 export function SideNav() {
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+  const toggle = useCallback(() => {
+    setCollapsed((was) => {
+      const next = !was
+      try {
+        window.localStorage.setItem(COLLAPSED_KEY, String(next))
+      } catch {
+        // Private mode: the fold simply does not survive a reload.
+      }
+      return next
+    })
+  }, [])
+
   return (
-    <nav className="flex w-50 flex-none flex-col gap-0.5 border-r border-hairline bg-panel px-2.5 py-3.5 max-md:hidden">
-      <NavSections />
-    </nav>
+    <Collapsed.Provider value={collapsed}>
+      <nav
+        aria-label="Sections"
+        className={cn(
+          'flex flex-none flex-col gap-px border-r border-edge-strong bg-panel py-2.5 max-md:hidden',
+          collapsed ? 'w-[3.25rem] px-1.5' : 'w-50 px-2',
+        )}
+      >
+        <NavSections collapsed={collapsed} onToggle={toggle} />
+      </nav>
+    </Collapsed.Provider>
   )
 }
 
@@ -601,7 +708,7 @@ export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => voi
         ref={panel}
         tabIndex={-1}
         aria-label="Sections"
-        className="relative flex h-full w-[17rem] max-w-[85vw] flex-col gap-0.5 overflow-y-auto border-r border-hairline bg-panel shadow-[0_0_2rem_var(--bb-shadow)] outline-none duration-200 animate-in slide-in-from-left pt-[max(0.875rem,env(safe-area-inset-top,0rem))] pr-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0rem))] pl-[max(0.625rem,env(safe-area-inset-left,0rem))]"
+        className="relative flex h-full w-[17rem] max-w-[85vw] flex-col gap-px overflow-y-auto border-r border-edge-strong bg-panel shadow-[0_0_2rem_var(--bb-shadow)] outline-none duration-200 animate-in slide-in-from-left pt-[max(0.875rem,env(safe-area-inset-top,0rem))] pr-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0rem))] pl-[max(0.625rem,env(safe-area-inset-left,0rem))]"
       >
         <div className="flex flex-none items-center justify-between pb-1">
           <span className="pl-2 text-[0.8125rem] font-semibold tracking-[-0.01em] text-ink">
@@ -616,7 +723,7 @@ export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => voi
             <X className="size-4" />
           </button>
         </div>
-        <NavSections />
+        <NavSections collapsed={false} onToggle={() => {}} />
       </nav>
     </div>
   )

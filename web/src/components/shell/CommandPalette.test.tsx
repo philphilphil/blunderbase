@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeProvider } from '@/lib/ui/theme'
 import { resetSavedFilters } from '@/routes/games/savedFilters'
 
 import { CommandPaletteProvider } from './CommandPalette'
@@ -49,14 +50,16 @@ function draw(data: Answer = EMPTY) {
   useChangePassword.mockReturnValue({ mutate: vi.fn(), isPending: false })
   return render(
     <TooltipProvider>
-      <MemoryRouter initialEntries={['/games']}>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/games']}>
         <PageChromeProvider>
           <CommandPaletteProvider>
             <Where />
             <TopBar onOpenNav={vi.fn()} />
           </CommandPaletteProvider>
         </PageChromeProvider>
-      </MemoryRouter>
+        </MemoryRouter>
+      </ThemeProvider>
     </TooltipProvider>,
   )
 }

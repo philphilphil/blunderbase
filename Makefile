@@ -1,4 +1,4 @@
-.PHONY: run backend web desktop install test migrate mcp mcp-http mcp-key release publish
+.PHONY: run backend web desktop install test migrate engines mcp mcp-http mcp-key release publish
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -6,6 +6,10 @@ ifeq ($(OS),Windows_NT)
 export PATH := C:\Program Files\Git\usr\bin;$(PATH)
 SHELL := sh.exe
 endif
+
+# Machine-local settings, if this checkout has any: `MAIA=…` and friends, one per line.
+# Gitignored, optional, and read before the defaults below so it can override them.
+-include .env
 
 KEY_FILE := data/mcp.key
 key = $$(cat $(KEY_FILE))
@@ -43,6 +47,45 @@ migrate:
 test:
 	uv run pytest
 	cd web && pnpm test
+
+# Point the dev database at this machine's own Stockfish and Maia, and give them the three
+# roles, so `make run` analyses with real engines instead of the WASM build a browser tab
+# carries. Local engine rows, not a runner: the binaries are on this host, so the serve
+# process can start them itself and there is no token, no yaml and no container in the way.
+#
+#   make engines
+#   make engines MAIA=~/engines/maia3/bin/maia3-5m MAIA_MODELS=~/engines/maia3/models
+#
+# Idempotent — `--replace` re-probes the binary and rewrites the row, so running it again
+# after moving or upgrading one is the whole fix.
+#
+# Neither path has to be given. `engines/` at the repo root is gitignored and is where a
+# downloaded engine belongs, so a Maia under it is found without being named — and the
+# layout is the container's own (`engines/docker/Dockerfile` builds `/engines/maia3/bin`
+# and `/engines/maia3/models`), which means the same two paths work here and in the image.
+# Failing that, PATH. Failing that, a `MAIA=` line in `.env` beside this file. The
+# `$(shell)` below runs only when this target expands it, not on every `make`.
+SF ?= stockfish
+SF_THREADS ?= 4
+MAIA ?= $(firstword $(wildcard engines/maia3/bin/maia3-5m) $(shell command -v maia3-5m 2>/dev/null))
+MAIA_MODELS ?= $(firstword $(wildcard engines/maia3/models))
+# `--local-files-only` only makes sense with a cache to read, so the two travel together;
+# without one, maia3 resolves its weights however it normally would.
+MAIA_ARGS = --use-uci-history$(if $(MAIA_MODELS), --cache-dir $(MAIA_MODELS) --local-files-only,)
+
+engines: migrate
+	uv run blunderbase engines add stockfish-local "$(SF)" \
+		--option Threads=$(SF_THREADS) --role quick --role deep --replace
+	@if [ -n "$(MAIA)" ]; then \
+		uv run blunderbase engines add maia-local "$(MAIA) $(MAIA_ARGS)" \
+			--kind maia --role human --replace; \
+	else \
+		echo "maia: no maia3-5m under engines/ or on PATH, so human moves stay unassigned."; \
+		echo "     make engines MAIA=/path/to/maia3-5m MAIA_MODELS=/path/to/models"; \
+		echo "     or put MAIA= and MAIA_MODELS= in .env beside this Makefile."; \
+	fi
+	@echo
+	@uv run blunderbase engines list
 
 # stdio transport, for local MCP clients (Claude Code / Claude Desktop)
 mcp:

@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
+import { SectionHead } from '@/components/shell/Section'
 import { useGame, useWorstMoments } from '@/lib/api/queries'
 import type { MomentResponse } from '@/lib/api/types'
 import { formatScore, formatWinLoss } from '@/lib/chess/evaluation'
@@ -81,7 +82,7 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
       // `flex-1` is what splits the row into equal thirds; stacked, it would be asking the
       // card to share out a height nobody has decided yet, so the phone drops it and the
       // card is just its own 134px tall.
-      className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.6875rem] transition-colors hover:border-edge-strong max-md:flex-none"
+      className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-md border border-line bg-panel p-[0.6875rem] transition-colors hover:border-edge-strong max-md:flex-none"
     >
       {/* A little smaller on a phone, where the card is full width but the prose beside the
           board is the half that has nowhere else to go. */}
@@ -137,7 +138,7 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
 
 function MomentSkeleton() {
   return (
-    <div className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.6875rem] max-md:flex-none">
+    <div className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-md border border-line bg-panel p-[0.6875rem] max-md:flex-none">
       <Bar className="size-28 flex-none max-md:size-24" />
       <div className="flex flex-1 flex-col gap-2">
         <Bar className="h-3.5 w-2/3" />
@@ -153,18 +154,20 @@ export function WorstMomentsRow({ className }: { className?: string }) {
   const moments = query.data ?? []
 
   return (
-    <section className={cn('flex min-h-0 flex-col gap-[0.5625rem]', className)}>
-      <div className="flex items-baseline gap-2 max-md:flex-wrap max-md:gap-y-0.5">
-        <h2 className="text-xs font-semibold text-ink">Your worst recent moments</h2>
-        <span className="text-[0.6875rem] text-dim-2">by the win percentage they gave away</span>
-        <div className="flex-1" />
-        <Link
-          to="/games?has_blunders=true"
-          className="text-[0.6875rem] text-accent-teal hover:text-accent-link"
-        >
-          all blunders
-        </Link>
-      </div>
+    <section className={cn('flex min-h-0 flex-col gap-3', className)}>
+      <SectionHead
+        title="Worst recent moments"
+        detail="by the win percentage they gave away"
+        className="max-md:flex-wrap max-md:gap-y-0.5"
+        end={
+          <Link
+            to="/games?has_blunders=true"
+            className="text-[0.6875rem] text-accent-teal hover:text-accent-link"
+          >
+            All blunders
+          </Link>
+        }
+      />
       {query.isPending ? (
         <div className="flex gap-2.5 max-md:flex-col" data-testid="loading">
           {Array.from({ length: COUNT }, (_, index) => (

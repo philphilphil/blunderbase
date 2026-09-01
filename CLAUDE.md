@@ -23,6 +23,7 @@ are the detail (see "Where things are").
 ```bash
 make install          # uv sync + pnpm install
 make run              # migrate, backend on :8765 (API + /events + /mcp), Vite on :5273
+make engines          # this machine's Stockfish/Maia as local engine rows, holding the roles
 make test             # uv run pytest + pnpm test
 uv run ruff check backend tests           # what CI lints
 cd web && pnpm lint && pnpm typecheck     # what CI checks on the frontend

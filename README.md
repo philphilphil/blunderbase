@@ -53,6 +53,7 @@ Prerequisites: Python 3.12+, uv, Node 22+, pnpm
 ```bash
 make install          # uv sync + pnpm install
 make run              # migrations, API + /mcp on :8765, Vite on :5273
+make engines          # register this machine's Stockfish (and Maia) as local engines
 ```
 
 Or as a container:

@@ -6,6 +6,36 @@ directory are local snapshots pulled 2026-08-25.
 
 ## Decisions
 
+- **Visual direction: the restrained desktop-tool pass**
+  (`prototypes/human-theme-lab.html`, accepted 2026-09-01). This supersedes the
+  palette and the panel idiom below; the *layout* decisions (1a "Studio", the
+  overview's two columns, the game screen's pane matrix) are unchanged, and the
+  prototype was drawn against the real screens' existing geometry rather than
+  proposing a new one. What changed:
+  - **Panels are panes, not cards.** A region is bounded by a rule and by a change
+    of surface, never by a floating rounded box. `--bb-panel` is *chrome* — the
+    titlebar, the rail, a pane's title strip, the workspace's footer — and sits a
+    shade apart from the canvas (`--bb-surface`) the content stands on, darker in
+    the light theme and lighter in the dark one. Boundaries between panes are
+    `--bb-edge-strong`; boundaries inside one are `--bb-hairline` or `--bb-line`.
+  - **The radius scale was pulled in** to 3/4/5/6 design pixels, so a control is
+    rounded and a region is not. The old `rounded-xl`/`rounded-2xl` card radii are
+    now barely more than `rounded-md`, which is what flattened the screens the
+    rebuild did not touch by hand.
+  - **The neutral ramp is grey, not blue-black**, and the accent is a muted blue
+    (`#83b7e3` dark, `#245f9e` light) rather than the flagship teal — a bright
+    accent is what made the app read as a dashboard. Maia keeps its purple, and
+    blunder/mistake keep their saturated hues. Token *names* are unchanged, so
+    `accent-teal` is still the accent's class; only its value moved.
+  - **The overview is sections, not cards**: a heading over a rule
+    (`components/shell/Section.tsx`), with the page's own heading and actions
+    spanning both columns above them.
+  - **The game screen is one workspace**: a full-width `GameHeaderBar`, then the
+    board flush left and a pane matrix to its right whose four title strips —
+    Maia, the engine, Moves/Flagged, Book/Notes — sit on one line. The real
+    `EvalGraph` is unchanged in behaviour; only its frame is.
+  - The three-state theme mechanism, the pre-paint bootstrap and the token layer
+    are unchanged — see "Themes" below, which still describes how it works.
 - **Layout: Option 1a "Studio"** (chosen by Phil) — four columns: paired move
   table with glyph badges · board with Maia overlay · filled eval area chart ·
   notes/MCP column with recurring-mistake cards. Option 1b is not implemented.
@@ -61,7 +91,8 @@ directory are local snapshots pulled 2026-08-25.
     use Tailwind utilities or `var(--bb-*)`; board-overlay tints are
     `color-mix(in srgb, var(--bb-accent) …%, transparent)` so chessground follows
     the theme with no second stylesheet.
-  - **Mechanism**: a resolved `dark`/`light` class plus `data-theme="<preference>"`
+  - **Mechanism** (unchanged by the 2026-09-01 direction; the hexes above are the
+    superseded ones): a resolved `dark`/`light` class plus `data-theme="<preference>"`
     on `<html>`, a three-state toggle in the titlebar, the preference in
     `localStorage` under `blunderbase.theme`, and `system` following
     `prefers-color-scheme` live. An inline script in `index.html` applies the

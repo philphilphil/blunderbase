@@ -98,7 +98,10 @@ export function ColumnSplitter({
         onResizeEnd()
       }}
     >
-      <span className="w-px flex-none bg-hairline transition-colors group-hover:bg-edge-strong" />
+      {/* At rest it is the workspace's own board/moves rule, in the weight every other
+          boundary on the screen carries; under the pointer it darkens to say it can be
+          dragged. */}
+      <span className="w-px flex-none bg-edge-strong transition-colors group-hover:bg-edge-hover" />
     </div>
   )
 }

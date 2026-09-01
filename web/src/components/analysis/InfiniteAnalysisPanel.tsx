@@ -301,7 +301,10 @@ export function InfiniteAnalysisPanel({
     return () => node.removeEventListener('wheel', onWheel)
   }, [showLines])
 
-  const shell = cn('flex flex-none flex-col border-t border-hairline bg-panel', className)
+  // The workspace's foot: chrome rather than canvas, and ruled off from the pane above it
+  // in the same weight as every other boundary on the screen — a status strip along the
+  // bottom edge of the window, the way a desktop tool parks one.
+  const shell = cn('flex flex-none flex-col border-t border-edge-strong bg-panel', className)
 
   if (phase === 'off' && !offer) {
     return (

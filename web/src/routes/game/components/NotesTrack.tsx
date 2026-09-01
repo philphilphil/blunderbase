@@ -12,17 +12,19 @@
  * happened here before, and what you wrote about it — and because they are never both
  * wanted at once: Book is an opening-phase panel and notes matter everywhere.
  *
- * BOOK IS ABSENT FAR MORE OFTEN THAN IT IS PRESENT. `0017_explorer_book`'s own figures:
- * of 463k positions in the owner's tree, 452k are reached by exactly one game and only
- * ~1.1k by ten or more. So a position with no book gets no Book *tab* — not an empty tab,
- * not a "no book data" box, not a placeholder. Nothing. Anyone tempted to "fix" this into
- * an empty state should read that ratio again: the placeholder would be what the reader saw
- * for nearly the whole of nearly every game.
+ * BOTH TABS ARE ALWAYS ON THE STRIP (owner's decision, 2026-09-01). Which one is *open*
+ * still follows the position until the reader picks one, and is their pick from then on.
  *
- * Which tab is showing is remembered as a preference rather than as the answer. Stepping
- * out of book falls back to Notes, and stepping back into book returns to Book — because
- * the reader never chose Notes there, the position did. A reader who *did* choose Notes
- * stays on Notes across both.
+ * This reverses an earlier call, and the reasoning it reversed is worth keeping because the
+ * numbers behind it have not changed. `0017_explorer_book`'s own figures: of 463k positions
+ * in the owner's tree, 452k are reached by exactly one game and only ~1.1k by ten or more.
+ * So "None of your games reached this position" is what the Book tab says for most of most
+ * games, and that was the argument for hiding the tab entirely.
+ *
+ * What outweighed it: a tab that comes and goes as the board steps is a control that moves
+ * under the pointer — the Notes tab slid sideways every time the game left book — and the
+ * emptiness is itself the answer to "have I been here before?", which vanishing cannot say.
+ * A fixed strip is worth more than a saved row.
  *
  * There is deliberately no coach card and no per-move prose here. One was built and cut.
  */
@@ -36,7 +38,8 @@ import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
 export interface NotesTrackProps {
   /**
    * The owner's own tree from the position on the board — `GameDetail.book[bookPly]`, passed
-   * straight through. Absent, or carrying no continuations, means no Book tab at all.
+   * straight through. Absent, or carrying no continuations, is the common case and the Book
+   * tab says so; see the note above.
    */
   book?: BookEntry | null
   /** The half-move count on the board: the key `book` was taken from, and the moves' label. */
@@ -68,12 +71,18 @@ export interface NotesTrackProps {
  */
 const COMPOSER_SLOT = 'h-[9rem]'
 
-/** The mockup's 38px tab strip, converted: the app runs at 120%, so lengths are `rem`. */
-const TAB_ROW =
-  'flex h-[2.375rem] flex-none items-center gap-0.5 border-b border-hairline px-2'
+/**
+ * The pane's title strip, in the same 35-design-pixel chrome band every other pane on the
+ * game screen wears — so the Maia band's headers, the move table's tabs and this row all sit
+ * on one line across the workspace.
+ */
+const TAB_ROW = 'flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5'
 
-const TAB = 'flex h-full items-center gap-1.5 px-2.5 text-xs text-dim hover:text-body-3'
-const TAB_ON = 'text-ink font-medium shadow-[inset_0_-0.125rem_0_var(--bb-accent)]'
+const TAB =
+  'relative flex h-full items-center gap-1.5 px-3 text-xs text-dim transition-colors hover:text-body-3'
+/** The selected tab is the pane's surface pushed into the strip — see `MoveList`'s `Tab`. */
+const TAB_ON =
+  'bg-surface font-medium text-ink after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-surface'
 
 export function NotesTrack({
   book,
@@ -86,12 +95,17 @@ export function NotesTrack({
   composer,
   className,
 }: NotesTrackProps) {
-  // A preference, not the answer: `active` below is what it resolves to here.
-  const [preferred, setPreferred] = useState<'book' | 'notes'>('book')
+  // Null until the reader picks one, and their pick from then on.
+  const [chosen, setChosen] = useState<'book' | 'notes' | null>(null)
 
   const moves = book?.moves ?? []
   const hasBook = moves.length > 0
-  const active = hasBook ? preferred : 'notes'
+  // Both tabs are always on the strip; which one is *open* still follows the position until
+  // somebody says otherwise. Opening on Book would mean opening on "none of your games
+  // reached this position" for most of most games (see the ratio above), and opening on
+  // Notes would bury the book for the opening, where it is the whole point. So: the
+  // position chooses until the reader does, and after that the reader's choice stands.
+  const active = chosen ?? (hasBook ? 'book' : 'notes')
   // The entry's own count, which includes games that *ended* here and so is not the sum of
   // the continuations. Falling back to that sum keeps the tab honest either way.
   const games = book?.games ?? moves.reduce((total, move) => total + (move.games ?? 0), 0)
@@ -102,33 +116,31 @@ export function NotesTrack({
       className={cn('flex min-h-0 min-w-0 flex-col', className)}
     >
       <div role="tablist" aria-label="Book and notes" className={TAB_ROW}>
-        {hasBook ? (
-          <button
-            type="button"
-            role="tab"
-            id="notes-track-tab-book"
-            aria-selected={active === 'book'}
-            aria-controls="notes-track-pane"
-            onClick={() => setPreferred('book')}
-            className={cn(TAB, active === 'book' && TAB_ON)}
-          >
-            Book
-          </button>
-        ) : null}
+        <button
+          type="button"
+          role="tab"
+          id="notes-track-tab-book"
+          aria-selected={active === 'book'}
+          aria-controls="notes-track-pane"
+          onClick={() => setChosen('book')}
+          className={cn(TAB, active === 'book' && TAB_ON)}
+        >
+          Book
+        </button>
         <button
           type="button"
           role="tab"
           id="notes-track-tab-notes"
           aria-selected={active === 'notes'}
           aria-controls="notes-track-pane"
-          onClick={() => setPreferred('notes')}
+          onClick={() => setChosen('notes')}
           className={cn(TAB, active === 'notes' && TAB_ON)}
         >
           Notes
         </button>
         <span className="flex-1" />
         {/* The count belongs to whichever pane is open, in the quietest type on the row. */}
-        <span className="font-mono text-[0.625rem] text-faint tabular">
+        <span className="flex items-center font-mono text-[0.625rem] text-faint tabular">
           {active === 'book'
             ? `${games} ${games === 1 ? 'game' : 'games'}`
             : `${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`}

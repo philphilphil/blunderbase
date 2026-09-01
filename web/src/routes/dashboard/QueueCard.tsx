@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 
 import { QueueDestinations } from '@/components/shell/QueueDestinations'
 import { QueueMeter } from '@/components/shell/QueueMeter'
+import { SectionHead } from '@/components/shell/Section'
 import { useGames, useMaiaFill, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
 import type { RunStatus } from '@/lib/api/types'
 import { TIER_STYLES } from '@/lib/chess/classification'
@@ -142,18 +143,21 @@ export function QueueCard() {
       : { label: 'idle', tone: 'text-dim-2', dot: 'bg-faint' }
 
   return (
-    <section className="flex flex-none flex-col gap-[0.6875rem] rounded-xl border border-line bg-panel p-[0.8125rem]">
-      <header className="flex items-center gap-2">
-        <h2 className="text-xs font-semibold text-ink">Analysis queue</h2>
-        <span className={cn('inline-flex items-center gap-1.5 text-[0.625rem]', state.tone)}>
-          <span className={cn('size-[0.3125rem] rounded-full', state.dot)} />
-          {state.label}
-        </span>
-        <div className="flex-1" />
-        <span className="font-mono text-[0.6875rem] tabular text-soft">
-          {running}/{outstanding}
-        </span>
-      </header>
+    <section className="flex flex-none flex-col gap-2">
+      <SectionHead
+        title="Analysis queue"
+        detail={
+          <span className={cn('inline-flex items-center gap-1.5', state.tone)}>
+            <span className={cn('size-[0.3125rem] rounded-full', state.dot)} />
+            {state.label}
+          </span>
+        }
+        end={
+          <span className="font-mono text-[0.6875rem] tabular text-soft">
+            {running}/{outstanding}
+          </span>
+        }
+      />
 
       {queue.isError ? (
         <ErrorBlock

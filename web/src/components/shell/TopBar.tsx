@@ -8,9 +8,13 @@ import { AccountMenu } from './AccountMenu'
 import { useCommandPalette } from './CommandPalette'
 import { QueueIndicator } from './QueueIndicator'
 import { usePageChrome } from './PageChrome'
+import { ThemeToggle } from './ThemeToggle'
 
 /**
- * The 46px titlebar: brand, breadcrumb, then page actions / queue / shortcut / account.
+ * The 42px titlebar: brand, breadcrumb, then page actions / queue / theme / shortcut /
+ * account. Thin, flat and identical on every screen — it is the one strip of the window
+ * that must never move, so it carries a strong bottom rule and the chrome surface rather
+ * than a hairline over the canvas.
  *
  * On a phone the row has about 375px to spend and four things that must stay reachable —
  * the way back to the rail, the queue, search and the account — so the two that repeat
@@ -30,7 +34,7 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
   const palette = useCommandPalette()
 
   return (
-    <header className="flex h-[calc(2.875rem+env(safe-area-inset-top,0rem))] flex-none items-center gap-3.5 border-b border-hairline bg-panel pt-[env(safe-area-inset-top,0rem)] pr-[max(1rem,env(safe-area-inset-right,0rem))] pl-[max(1rem,env(safe-area-inset-left,0rem))] max-md:gap-2.5">
+    <header className="flex h-[calc(2.625rem+env(safe-area-inset-top,0rem))] flex-none items-center gap-3 border-b border-edge-strong bg-panel pt-[env(safe-area-inset-top,0rem)] pr-[max(0.75rem,env(safe-area-inset-right,0rem))] pl-[max(0.75rem,env(safe-area-inset-left,0rem))] max-md:gap-2.5">
       <button
         type="button"
         onClick={onOpenNav}
@@ -88,13 +92,21 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
 
       {actions}
       <QueueIndicator />
+      {/*
+        The theme control lives on the toolbar, beside the window's other odds and ends,
+        because that is where a desktop app keeps it and where it is found without hunting.
+        Below `md` the row has no 60 pixels to spare for it, so it gives way to the copy in
+        the rail's footer — which is what the phone's drawer carries (`SideNav`'s
+        `NavFooter`). Exactly one of the two is ever visible.
+      */}
+      <ThemeToggle className="max-md:hidden" />
       {/* The chip was always a label for the shortcut; now it is also the way to press it. */}
       <button
         type="button"
         onClick={palette.open}
         aria-label="Search everything"
         title="Search everything (⌘K)"
-        className="flex flex-none items-center gap-1.5 rounded-md border border-edge px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim transition-colors hover:border-edge-hover hover:text-ink max-md:px-2"
+        className="flex flex-none items-center gap-1.5 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim transition-colors hover:border-edge-hover hover:text-ink max-md:px-2"
       >
         <Search className="size-3.5 md:hidden" aria-hidden />
         <span className="max-md:hidden">⌘K</span>

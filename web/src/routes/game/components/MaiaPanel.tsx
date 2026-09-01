@@ -258,34 +258,31 @@ export function MaiaPanel({
   return (
     <div
       className={cn(
-        // TWO CARDS WITH A GAP, never one surface split by a rule.
+        // TWO PANES DIVIDED BY A RULE, on the workspace's own canvas.
         //
-        // The band used to be a single welded box with a divider down the middle, and that
-        // divider lined up with nothing: at 25/75 it fell a long way short of the
-        // moves/notes boundary below it, and two vertical lines that nearly agree read as a
-        // mistake. Two objects sitting on the column's own ground imply no column line at
-        // all, so they can take any proportion they like — and the moves/notes rule below
-        // is then the only line in the column, agreeing with nothing because there is
-        // nothing left to agree with. Stacking Maia over the engine would have dodged the
-        // same problem by spending height this column cannot afford, and would have thrown
-        // away the side-by-side human/engine contrast the panel exists to draw.
+        // They used to be two rounded cards floating on the column's ground with a gap
+        // between them, which was the right answer while every panel on the screen was a
+        // card. It is the wrong answer now: the screen is a matrix of panes bounded by
+        // rules, and two cards floating inside one cell of it are the only things left that
+        // do not belong to the grid. So the gap becomes a rule and the cards lose their
+        // borders — the band's own bottom rule is `GamePage`'s.
         //
         // A quarter to Maia, three to the engine: Maia is single moves and a number, the
         // engine is whole variations, and an even split left the one half-empty while the
         // other wrapped. The quarter has a floor — a SAN, a percentage and a delta chip
         // side by side are about 9rem — so in a narrow column the engine's lines wrap a row
         // sooner rather than Maia's becoming ellipses. Below `md` a quarter of a phone is
-        // 90 pixels, so the split is dropped and the two cards stack, Maia first, which is
+        // 90 pixels, so the split is dropped and the two panes stack, Maia first, which is
         // the order they are read in on a desktop.
         //
-        // No fixed height any more: two cards size to their content, and the grid stretches
-        // them to the taller of the two so they still read as one band. The cap is a
-        // ceiling, not a height — a five-line multi-PV with wrapping variations must not
-        // eat the move table's room, and the card that hits it scrolls. It comes off where
-        // the cards are stacked, or it would be showing half of each.
+        // No fixed height: the panes size to their content, and the grid stretches them to
+        // the taller of the two so they still read as one band. The cap is a ceiling, not a
+        // height — a five-line multi-PV with wrapping variations must not eat the move
+        // table's room, and the pane that hits it scrolls. It comes off where the panes are
+        // stacked, or it would be showing half of each.
         //
         // `relative` is for the peek board, which hangs off the bottom edge.
-        'relative grid max-h-[18rem] min-w-0 flex-none gap-2.5 max-md:max-h-none',
+        'relative grid max-h-[18rem] min-w-0 flex-none bg-surface max-md:max-h-none',
         comparing
           ? 'grid-cols-1'
           : 'grid-cols-[minmax(9rem,1fr)_minmax(0,3fr)] max-md:grid-cols-1',
@@ -293,8 +290,15 @@ export function MaiaPanel({
       )}
       data-testid="maia-panel"
     >
-      <section className="bb-card flex min-w-0 flex-col gap-1.5 overflow-y-auto px-2.5 py-2">
-        <div className="flex flex-nowrap items-center gap-[0.4375rem] px-1">
+      {/*
+        Each pane is a chrome title strip over a scrolling body, rather than one padded box
+        with its heading as the first line inside it. The strip is the same 35 design pixels
+        as the move table's and the notes track's tab rows directly below, so the four
+        headings across the workspace sit on one line — which is what makes the panes read
+        as one instrument rather than as four boxes that happen to be adjacent.
+      */}
+      <section className="flex min-w-0 flex-col overflow-hidden">
+        <div className="bb-pane-title flex-nowrap">
           <span className="size-1.5 flex-none rounded-full bg-brilliant" />
           {/*
             The visible label is the level itself, with the picker laid over it: the
@@ -313,42 +317,47 @@ export function MaiaPanel({
           ) : null}
         </div>
 
-        {/* Switched off, the column holds its place and says nothing at all. */}
-        {!showHuman ? null : comparing ? (
-          <CompareGrid columns={comparison} onHoverMove={onHoverMove} onPlayLine={onPlayLine} />
-        ) : human.length === 0 ? (
-          <p className="px-1 py-2 text-[0.6875rem] text-dim">
-            {live?.pending ? 'Reading this position…' : '–'}
-          </p>
-        ) : (
-          // Tight rather than spaced: each row's own background is a measurement, and
-          // measurements you compare by eye belong on one stack with nothing between them.
-          <div className="flex flex-col gap-0.5">
-            {human.map((move) => (
-              <HumanRow
-                key={move.uci}
-                move={move}
-                onHoverMove={onHoverMove}
-                onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
-              />
-            ))}
-          </div>
-        )}
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-[0.4375rem] py-1.5">
+          {/* Switched off, the column holds its place and says nothing at all. */}
+          {!showHuman ? null : comparing ? (
+            <CompareGrid columns={comparison} onHoverMove={onHoverMove} onPlayLine={onPlayLine} />
+          ) : human.length === 0 ? (
+            <p className="px-1 py-1 text-[0.6875rem] text-dim">
+              {live?.pending ? 'Reading this position…' : '–'}
+            </p>
+          ) : (
+            // Tight rather than spaced: each row's own background is a measurement, and
+            // measurements you compare by eye belong on one stack with nothing between them.
+            <div className="flex flex-col gap-0.5">
+              {human.map((move) => (
+                <HumanRow
+                  key={move.uci}
+                  move={move}
+                  onHoverMove={onHoverMove}
+                  onPlay={onPlayLine ? () => onPlayLine([move.uci], 0) : undefined}
+                />
+              ))}
+            </div>
+          )}
 
-        {showHuman && live && rollout.length > 0 ? (
-          <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
-        ) : null}
+          {showHuman && live && rollout.length > 0 ? (
+            <Rollout rollout={rollout} ply={ply} onPlayLine={onPlayLine} />
+          ) : null}
+        </div>
       </section>
 
       {comparing ? null : (
-        // The wider card, and the one thing in this column that genuinely wants width: its
-        // variations wrap rather than truncate, which is what the three quarters buy.
+        // The wider pane, and the one thing in this column that genuinely wants width: its
+        // variations wrap rather than truncate, which is what the three quarters buy. The
+        // rule down its left edge is the division between the human column and the engine's;
+        // it comes off where the two stack, since a vertical rule between stacked panes
+        // divides nothing.
         <section
           ref={linesRef}
           data-testid="maia-engine-lines"
-          className="bb-card flex min-w-0 flex-col gap-1.5 overflow-y-auto px-2.5 py-2"
+          className="flex min-w-0 flex-col overflow-hidden border-l border-edge-strong max-md:border-t max-md:border-l-0"
         >
-          <div className="flex flex-wrap items-center gap-[0.4375rem] px-1">
+          <div className="bb-pane-title">
             <span
               className={cn(
                 'size-1.5 flex-none rounded-full',
@@ -384,8 +393,9 @@ export function MaiaPanel({
             {onHoverLine ? <LinePreviewSettingsButton /> : null}
           </div>
 
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[0.4375rem] py-1.5">
           {engine.length === 0 ? (
-            <p className="px-1 py-2 text-[0.6875rem] text-dim">–</p>
+            <p className="px-1 py-1 text-[0.6875rem] text-dim">–</p>
           ) : (
             <div className="flex flex-col gap-0.5">
               {engine.map((line) => {
@@ -413,6 +423,7 @@ export function MaiaPanel({
               })}
             </div>
           )}
+          </div>
         </section>
       )}
       {peek ? (

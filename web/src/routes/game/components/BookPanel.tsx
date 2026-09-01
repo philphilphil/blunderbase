@@ -18,9 +18,10 @@
  * engine panels, which are objects floating on that ground; a table you read and click
  * through is the ground.
  *
- * Rendering nothing at all for an empty position is deliberate and is the caller's decision
- * as much as this one's — see `NotesTrack`, which drops the Book tab entirely rather than
- * showing an empty one.
+ * An empty position says so rather than rendering nothing. The Book tab is always on the
+ * strip now (`NotesTrack`), so a position the library has never reached has to be a visible
+ * answer — "no games from here" is information, and a tab that appeared and disappeared as
+ * the board moved was a moving target to click at.
  */
 import { cn } from '@/lib/utils'
 import { ScoreBar } from '@/routes/explorer/components/ScoreBar'
@@ -84,7 +85,16 @@ const GRID = 'grid grid-cols-[3.625rem_2.125rem_minmax(0,1fr)_3.25rem] items-cen
 const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-[0.6875rem] tabular')
 
 export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPanelProps) {
-  if (moves.length === 0) return null
+  if (moves.length === 0) {
+    return (
+      <p
+        data-testid="book-panel-empty"
+        className={cn('px-3 py-6 text-center text-[0.71875rem] text-dim', className)}
+      >
+        None of your games reached this position.
+      </p>
+    )
+  }
 
   return (
     <div

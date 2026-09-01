@@ -1125,12 +1125,12 @@ function GameStudio({ gameId }: { gameId: number }) {
       previewLine={previewView.line}
       previewPly={previewView.ply}
       onPlayLine={playLine}
-      // The band paints nothing of its own any more: it is two rounded cards with a gap
-      // between them, floating on the column's ground, and all it needs from here is where
-      // to float. On the desktop that is the right column's first row, spanning both tracks
-      // with the mockup's own 12-design-pixel margin; on the phone it is one of a stack of
-      // cards, and `MobileGameView`'s pane already spaces those.
-      className={mobile ? undefined : 'col-span-2 m-3'}
+      // On the desktop the band is the workspace's top row: two panes side by side,
+      // separated by a rule and ruled off from the move table below, spanning both tracks
+      // and taking no margin of its own — a pane is bounded by the rules around it, not by
+      // a gap. On the phone it is one of a stack of cards, and `MobileGameView`'s pane
+      // already spaces those.
+      className={mobile ? undefined : 'col-span-2 border-b border-edge-strong'}
     />
   )
 
@@ -1198,11 +1198,12 @@ function GameStudio({ gameId }: { gameId: number }) {
       // about the game, and half of it is the opponent's.
       playerNames={{ white: detail?.game.white, black: detail?.game.black }}
       onSelectPly={selectPly}
-      // Desktop: the right column's third row, spanning both tracks, at the mockup's own
-      // height for the card (170 design pixels, 150 in the narrow band) and its 12/10 of
-      // margin. A definite height rather than a share of the row: the row above it is the
-      // one that should take the slack, because a move table is a list and a curve is a
-      // shape — a taller curve is the same handful of turning points drawn bigger.
+      // Desktop: the workspace's third row, spanning both tracks, ruled off from the panes
+      // above rather than floating between them, at the mockup's own height for the plot
+      // (170 design pixels, 150 in the narrow band) plus the padding it now carries itself.
+      // A definite height rather than a share of the row: the row above it is the one that
+      // should take the slack, because a move table is a list and a curve is a shape — a
+      // taller curve is the same handful of turning points drawn bigger.
       //
       // Phone: a compact box, since the rest of the Eval tab goes to `FlaggedMoments`,
       // which is the part of "the story of the game" a finger can actually hit. 8.5rem so
@@ -1210,7 +1211,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       className={
         mobile
           ? 'h-[8.5rem]'
-          : 'col-span-2 m-2.5 h-[9.375rem] xl:m-3 xl:h-[10.625rem]'
+          : 'col-span-2 h-[9.875rem] border-t border-edge-strong xl:h-[11.125rem]'
       }
       // A drag along the curve walks the game. Only here: see `EvalGraph`'s own note.
       scrub={mobile}
@@ -1292,11 +1293,10 @@ function GameStudio({ gameId }: { gameId: number }) {
       // PGN affordance lives, which is why the phone header carries one.
       tab={mobile ? movesTab : undefined}
       showTabRow={!mobile}
-      // The moves/notes rule. It is the *only* line inside the right column — the engine
-      // band above draws none between its two cards and the graph below spans both tracks —
-      // which is what makes it read as the column boundary it is rather than as one of
-      // several nearly-agreeing verticals.
-      className={mobile ? 'min-h-0 flex-1' : 'min-h-0 border-r border-hairline'}
+      // The moves/notes rule, in the same weight as every other boundary between panes: the
+      // workspace is a matrix of panes divided by rules, and a boundary that is quieter than
+      // its neighbours reads as an accident rather than as a division.
+      className={mobile ? 'min-h-0 flex-1' : 'min-h-0 border-r border-edge-strong'}
     />
   )
 
@@ -1311,9 +1311,10 @@ function GameStudio({ gameId }: { gameId: number }) {
       onPlayLine={playLine}
       previewLine={previewView.line}
       previewPly={previewView.ply}
-      // The column's last row, spanning both tracks. It brings its own top rule; on the
-      // phone it is a card in the Engine tab's stack instead.
-      className={mobile ? 'rounded-lg border border-hairline' : 'col-span-2'}
+      // The workspace's last row, spanning both tracks — the foot of the window, on the
+      // chrome surface, the way a desktop app parks a status strip. It brings its own top
+      // rule; on the phone it is a card in the Engine tab's stack instead.
+      className={mobile ? 'rounded-md border border-line' : 'col-span-2'}
     />
   )
 
@@ -1361,6 +1362,13 @@ function GameStudio({ gameId }: { gameId: number }) {
     <>
       {chrome}
 
+      {/*
+        The screen's own heading, across the whole workspace: what the game is, and what has
+        been done to it. Everything under it is the pane matrix, and the rule this bar draws
+        is that matrix's top edge.
+      */}
+      {header}
+
       <div ref={columnsRef} className="flex min-h-0 flex-1">
         {/*
           The board flush LEFT, as big as the height budget allows, and everything else in
@@ -1406,13 +1414,23 @@ function GameStudio({ gameId }: { gameId: number }) {
           // the right column takes the width the reader chose and this one flexes again, so
           // an explicit choice still beats the default.
           className={cn(
-            'flex min-h-0 min-w-0 flex-col gap-3.5 overflow-hidden px-5 py-[1.125rem]',
+            'flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface px-3.5 py-2.5',
             movesWidth === null
-              ? 'w-[calc(100vh-10.125rem)] max-w-full flex-none'
-              : 'flex-1 xl:min-w-[26.25rem]',
+              // `shrink grow-0` rather than `flex-none`: the width is what the board *wants*
+              // — the height budget expressed sideways — and on a window that is tall for
+              // how wide it is that is more than the row has, once the moves column's own
+              // floor is taken off. `flex-none` refused to give any of it back and the notes
+              // track was simply cut off the right edge; shrinking, the board yields exactly
+              // as it does once the splitter has been dragged.
+              //
+              // The same floors either way, and for the same reason: a board column narrower
+              // than its own transport row clips the transport row, which is the one thing in
+              // this column that is not allowed to be smaller than it is. Under the floor the
+              // window scrolls sideways instead — the trade the design already makes at 1280.
+              ? 'w-[calc(100vh-9.5625rem)] max-w-full min-w-[24.5rem] shrink grow-0 xl:min-w-[26.25rem]'
+              : 'flex-1 min-w-[24.5rem] xl:min-w-[26.25rem]',
           )}
         >
-          {header}
           {board}
         </div>
 
@@ -1453,7 +1471,13 @@ function GameStudio({ gameId }: { gameId: number }) {
           className={cn(
             'grid min-h-0 min-w-[26.875rem] grow-0',
             'grid-cols-[15.625rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto_auto]',
-            'xl:min-w-[31.75rem] xl:grid-cols-[18.75rem_minmax(0,1fr)]',
+            // The middle band starts at 1440 rather than at 1280. At exactly 1280 — a very
+            // common laptop — the rail (200), the board column's floor (420) and this
+            // column's 508 come to 1271, which fits; the 1280 band asked for 508 more than
+            // it had and the notes track was clipped off the right edge of a window that
+            // cannot scroll sideways. The bands themselves are unchanged, they just start
+            // one step later.
+            'min-[90rem]:min-w-[31.75rem] min-[90rem]:grid-cols-[18.75rem_minmax(0,1fr)]',
             'min-[100rem]:min-w-[35.25rem] min-[100rem]:grid-cols-[21.25rem_minmax(0,1fr)]',
             // Untouched, this column takes everything the board column does not: the board
             // is bounded by the height left after its chrome, and whatever width that leaves

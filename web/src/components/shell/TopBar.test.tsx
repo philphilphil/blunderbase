@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
+import { ThemeProvider } from '@/lib/ui/theme'
+
 import { CommandPaletteProvider } from './CommandPalette'
 import { PageChromeProvider, SetPageChrome } from './PageChrome'
 import { TopBar } from './TopBar'
@@ -19,14 +21,16 @@ vi.mock('./AccountMenu', () => ({
 function draw({ crumbs = false }: { crumbs?: boolean } = {}) {
   const onOpenNav = vi.fn()
   render(
-    <MemoryRouter>
-      <PageChromeProvider>
-        <CommandPaletteProvider>
-          {crumbs ? <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }]} /> : null}
-          <TopBar onOpenNav={onOpenNav} />
-        </CommandPaletteProvider>
-      </PageChromeProvider>
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter>
+        <PageChromeProvider>
+          <CommandPaletteProvider>
+            {crumbs ? <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }]} /> : null}
+            <TopBar onOpenNav={onOpenNav} />
+          </CommandPaletteProvider>
+        </PageChromeProvider>
+      </MemoryRouter>
+    </ThemeProvider>,
   )
   return onOpenNav
 }
@@ -56,6 +60,14 @@ describe('the titlebar', () => {
 
     expect(screen.getByText('Blunderbase')).toHaveClass('max-md:hidden')
     expect(screen.getByRole('link')).toHaveAttribute('href', '/')
+  })
+
+  it('carries the theme control, and hands it to the rail below md', () => {
+    draw()
+
+    // Both copies exist in the shell (the rail's is what the phone drawer carries); the
+    // titlebar's is the one that shows from `md` up, so it is the one that must say so.
+    expect(screen.getByRole('group', { name: 'Theme' })).toHaveClass('max-md:hidden')
   })
 
   it('drops the breadcrumb below md, where the page prints its own title', () => {
