@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
+import type { Whose } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
 import {
@@ -48,6 +49,16 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
     // `max-md:relative` is what a `FilterPopover` anchors its panel to on a phone; see the
     // comment there. The chips already wrap, which is all a narrow bar needs of them.
     <div className="flex flex-wrap items-center gap-[0.4375rem] max-md:relative">
+      {/* In front of the chips rather than among them, because it is not a filter that
+          narrows one cut of the library: it decides which library — the owner's own games
+          (the default, and the only ones any statistic counts), the games added from the
+          reference books, or both together. The same segmented control the explorer uses
+          for its source, since it answers the same kind of question. */}
+      <WhoseToggle
+        value={filters.whose ?? 'mine'}
+        onChange={(whose) => patch({ whose: whose === 'mine' ? undefined : whose })}
+      />
+
       {FILTER_GROUPS.map((group) => (
         <FilterPopover
           key={group}
@@ -61,6 +72,39 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
       ))}
 
       <SaveFilter filters={filters} />
+    </div>
+  )
+}
+
+const WHOSE_OPTIONS: { label: string; value: Whose; title: string }[] = [
+  { label: 'Mine', value: 'mine', title: 'Your own games — the ones every statistic counts' },
+  { label: 'Others', value: 'others', title: 'Games added from the reference books' },
+  { label: 'All', value: 'all', title: 'Both together' },
+]
+
+function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whose) => void }) {
+  return (
+    <div
+      role="group"
+      aria-label="Whose games"
+      className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.71875rem]"
+    >
+      {WHOSE_OPTIONS.map((option, index) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          title={option.title}
+          onClick={() => onChange(option.value)}
+          className={cn(
+            'px-2.5 py-1 transition-colors',
+            index > 0 && 'border-l border-edge',
+            value === option.value ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   )
 }

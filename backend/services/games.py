@@ -120,6 +120,10 @@ class GameFilters:
     analyzed: bool | None = None
     deep_analyzed: bool | None = None
     text: str | None = None
+    # Whose games: True is the owner's own (the default everywhere, which is what keeps a
+    # game added from the reference books out of every statistic without each one having
+    # to remember), False is only those, None is both.
+    mine: bool | None = True
 
 
 def search_games(
@@ -202,6 +206,12 @@ GAME_ORDERS: dict[str, Callable[[], ColumnElement[Any]]] = {
     "opponent": lambda: func.lower(_opponent_column(Game.white_name, Game.black_name)),
     "opponent_rating": lambda: _opponent_column(Game.white_rating, Game.black_rating),
     "color": lambda: Game.owner_color,
+    # The two sides as the table now shows them — a game added from the reference books
+    # has no opponent, so the library lists both players and sorts by either.
+    "white": lambda: func.lower(Game.white_name),
+    "white_rating": lambda: Game.white_rating,
+    "black": lambda: func.lower(Game.black_name),
+    "black_rating": lambda: Game.black_rating,
     "opening": lambda: func.lower(func.coalesce(Game.opening_name, Game.eco)),
     "result": _outcome_column,
     "time_control": lambda: func.coalesce(Game.time_control, Game.speed),
@@ -554,6 +564,8 @@ def game_conditions(filters: GameFilters) -> list[ColumnElement[bool]]:
         conditions.append(deep if filters.deep_analyzed else ~deep)
     if filters.text:
         conditions.append(_text_condition(filters.text))
+    if filters.mine is not None:
+        conditions.append(Game.is_owner_game.is_(filters.mine))
     return conditions
 
 
@@ -580,12 +592,14 @@ def owner_move_condition() -> ColumnElement[bool]:
     """The plies of `move_evals` that are the owner's own moves.
 
     White moves on even plies. A game whose owner is unknown contributes every ply, which
-    is the only honest answer when there is no "you" to filter by.
+    is the only honest answer when there is no "you" to filter by — unless the game is
+    known not to be theirs at all (a reference game kept for study), which contributes
+    none: there the honest answer is that nothing in it was their move.
     """
     return or_(
         and_(Game.owner_color == Color.WHITE, MoveEval.ply % 2 == 0),
         and_(Game.owner_color == Color.BLACK, MoveEval.ply % 2 == 1),
-        Game.owner_color.is_(None),
+        and_(Game.owner_color.is_(None), Game.is_owner_game.is_(True)),
     )
 
 
@@ -927,6 +941,7 @@ def game_summary(game: Game) -> dict[str, Any]:
             "source_id": game.source_id,
             "played_at": _stamp(game.played_at),
             "color": str(game.owner_color) if game.owner_color else None,
+            "is_owner_game": game.is_owner_game,
             "result": str(game.result),
             "outcome": outcome_of(game),
             "white": game.white_name,

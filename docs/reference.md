@@ -165,12 +165,16 @@ analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 
 The Explorer page reads three databases: **your own games**, and two of Lichess's — the
 **masters** archive (over-the-board games between titled players) and the **rated lichess**
-pools, narrowable by speed and rating band. The two reference sources are read-only and are
-never stored: no game is imported, and nothing they say is ever added to the numbers your
-own games give. Model games opened from them are the same — something to play through, not
-something in your library. (A note you write while walking a reference line is still your
-own note and is kept, because it is about the position rather than about their game; it
-counts towards nothing.)
+pools, narrowable by speed and rating band. Looking at the two reference sources stores
+nothing: no game is imported, and nothing they say is ever added to the numbers your own
+games give. Model games opened from them are a preview to play through — until you press
+**Add to library**. That stores the game as one you did not play: it gets the quick
+analysis pass like any import, opens in the full game view, and takes notes, but it counts
+in no statistic and is not in your opening tree. The games list shows your own games by
+default; the **Mine / Others / All** switch at the front of its filter bar shows the added
+games on their own or beside yours. (A note you write while
+walking a reference line is still your own note and is kept, because it is about the
+position rather than about their game; it counts towards nothing.)
 
 Both reference sources need a **Lichess personal API token**, because `explorer.lichess.ovh`
 stopped answering anonymous requests. Mint one at

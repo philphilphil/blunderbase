@@ -3,9 +3,9 @@
 Two things are being proved here. The first is that a database nobody here owns is read
 correctly — the parameters Lichess wants, the errors it answers with, and the fold from its
 payload into the shape every surface reads. The second is the rule the feature exists under:
-nothing from either reference database is ever written down. No test below asserts a row,
-because there is no row to assert; what they do assert is that the same lookup twice costs
-one request, which is the only memory this side of the app has.
+a lookup writes nothing down — the same lookup twice costs one request, which is the only
+memory that side of the app has — and the one thing that does write, adding a model game to
+the library, marks what it stores as not the owner's so it counts for nothing.
 
 Nothing talks to Lichess: every request is answered by respx from fixtures of the shape the
 API documents.
@@ -24,15 +24,19 @@ from fastapi.testclient import TestClient
 from mcp import Client
 from mcp.server import MCPServer
 from mcp.types import CallToolResult, TextContent
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.adapters import reference as adapter
 from backend.api.app import create_app
 from backend.config import Settings
-from backend.db.models import AppSetting
+from backend.db.enums import Color, JobStatus, Platform, Source, Speed
+from backend.db.models import Account, AppSetting, DeletedGame, Game, ImportJob
 from backend.mcp.server import build_server
 from backend.services import app_settings as app_settings_service
+from backend.services import games as games_service
 from backend.services import reference as reference_service
+from backend.services.games import GameFilters
 from tests.conftest import running_app
 
 MASTERS_URL = "https://explorer.lichess.ovh/masters"
@@ -187,8 +191,35 @@ def test_a_lichess_lookup_carries_its_speeds_ratings_and_variant() -> None:
     assert params["variant"] == "standard"
     assert params["speeds"] == "blitz,rapid"
     assert params["ratings"] == "1600,1800"
-    # The page shows the top games and nothing else, so the second list is not paid for.
-    assert params["recentGames"] == "0"
+    # Lichess keeps few top games for this database and none early on, so the recent
+    # games are asked for alongside, at the same count.
+    assert params["topGames"] == "8"
+    assert params["recentGames"] == "8"
+
+
+def test_the_rated_pools_recent_games_are_folded_in_behind_the_top_ones() -> None:
+    raw = {
+        **LICHESS_PAYLOAD,
+        "topGames": [
+            {"id": "top00001", "white": {"name": "a"}, "black": {"name": "b"}, "speed": "rapid"},
+        ],
+        "recentGames": [
+            # Already in the top list: shown once, where it ranks higher.
+            {"id": "top00001", "white": {"name": "a"}, "black": {"name": "b"}, "speed": "rapid"},
+            {"id": "rec00002", "white": {"name": "c"}, "black": {"name": "d"}, "speed": "blitz"},
+            {"white": {"name": "nameless"}},
+        ],
+    }
+
+    folded = reference_service._fold(raw, source="lichess", fen="fen")
+
+    assert [game["id"] for game in folded["top_games"]] == ["top00001", "rec00002"]
+
+
+def test_the_masters_answer_has_no_recent_games_to_fold() -> None:
+    folded = reference_service._fold(MASTERS_PAYLOAD, source="masters", fen="fen")
+
+    assert [game["id"] for game in folded["top_games"]] == ["abcd1234", "efgh5678"]
 
 
 @respx.mock
@@ -287,7 +318,9 @@ def test_a_lichess_game_export_is_public_and_asks_for_no_clocks_or_evals() -> No
 
     request = route.calls.last.request
     assert "authorization" not in request.headers
-    assert dict(request.url.params) == {"clocks": "false", "evals": "false"}
+    # The opening tags are the one thing asked for: a game added to the library is then
+    # named the way Lichess names it, like one the owner's own sync brings.
+    assert dict(request.url.params) == {"clocks": "false", "evals": "false", "opening": "true"}
 
 
 @respx.mock
@@ -683,7 +716,7 @@ async def test_the_reference_tools_are_registered_and_describe_themselves(
         listing = (await client.list_tools()).tools
     tools = {tool.name: tool for tool in listing}
 
-    for name in ("reference_explorer", "get_reference_game"):
+    for name in ("reference_explorer", "get_reference_game", "import_reference_game"):
         assert name in tools
         assert tools[name].description and len(tools[name].description) > 40
     # The coach has to be told these are not the owner's own games.
@@ -731,3 +764,166 @@ async def test_a_source_the_coach_invented_is_a_structured_error(coach: MCPServe
     payload = await failure(coach, "reference_explorer", source="chessbase")
     assert payload["error"] == "bad_argument"
     assert payload["allowed"] == ["masters", "lichess"]
+
+
+# --- adding a model game to the library ------------------------------------
+
+
+def count_games(session: Session) -> int:
+    return session.scalar(select(func.count(Game.id))) or 0
+
+
+@respx.mock
+def test_a_lichess_model_game_is_added_as_a_game_the_owner_did_not_play(
+    tokened: Session,
+) -> None:
+    respx.get(LICHESS_PGN_URL).mock(return_value=httpx.Response(200, text=LICHESS_GAME_PGN))
+
+    outcome = reference_service.import_game(tokened, source="lichess", game_id="qg000007")
+
+    assert outcome.created
+    game = outcome.game
+    assert game is not None
+    # Named after its book and by the book's id, so it is found again and keeps its link.
+    assert game.source is Source.LICHESS
+    assert game.source_id == "qg000007"
+    assert game.is_owner_game is False
+    assert game.owner_color is None
+    assert game.moves_san == ["e4", "e6"]
+    # The PGN adapter's reading of the export's headers, like any pasted PGN.
+    assert game.speed is Speed.BLITZ
+    assert game.rated is True
+    # A job of its own, finished, so the library's provenance reads the same as a sync's.
+    job = tokened.get(ImportJob, game.import_job_id)
+    assert job is not None
+    assert job.status is JobStatus.DONE
+    assert job.games_imported == 1
+
+
+@respx.mock
+def test_a_masters_game_is_named_after_its_book(tokened: Session) -> None:
+    respx.get(MASTERS_PGN_URL).mock(return_value=httpx.Response(200, text=MASTERS_GAME_PGN))
+
+    outcome = reference_service.import_game(tokened, source="masters", game_id="abcd1234")
+
+    game = outcome.game
+    assert game is not None
+    assert game.source is Source.MASTERS
+    assert game.source_id == "abcd1234"
+    assert game.white_name == "Carlsen, M."
+    assert game.is_owner_game is False
+    # The archive's PGN carries no ECO tag, so the game is named from the vendored book.
+    assert game.eco == "C00"
+    assert game.opening_name == "French Defense"
+
+
+@respx.mock
+def test_asking_for_a_model_game_twice_opens_the_same_game(tokened: Session) -> None:
+    respx.get(LICHESS_PGN_URL).mock(return_value=httpx.Response(200, text=LICHESS_GAME_PGN))
+
+    first = reference_service.import_game(tokened, source="lichess", game_id="qg000007")
+    second = reference_service.import_game(tokened, source="lichess", game_id="qg000007")
+
+    assert first.game is not None and second.game is not None
+    assert not second.created
+    assert second.game.id == first.game.id
+    assert count_games(tokened) == 1
+
+
+@respx.mock
+def test_a_deleted_model_game_can_be_asked_for_again(tokened: Session) -> None:
+    """A tombstone refuses a sync, not the owner naming the game: asking is the undo."""
+    respx.get(LICHESS_PGN_URL).mock(return_value=httpx.Response(200, text=LICHESS_GAME_PGN))
+    first = reference_service.import_game(tokened, source="lichess", game_id="qg000007")
+    assert first.game is not None
+    games_service.delete_games(tokened, [first.game.id])
+    assert tokened.scalar(select(func.count(DeletedGame.id))) == 1
+
+    again = reference_service.import_game(tokened, source="lichess", game_id="qg000007")
+
+    assert again.created
+    assert again.game is not None
+    assert count_games(tokened) == 1
+    assert tokened.scalar(select(func.count(DeletedGame.id))) == 0
+
+
+@respx.mock
+def test_the_owners_own_game_in_the_pools_is_theirs_after_all(tokened: Session) -> None:
+    """A recent game at the owner's rating band may be one of theirs: recognised, it counts."""
+    tokened.add(Account(platform=Platform.LICHESS, username="blunderbase", is_owner=True))
+    tokened.commit()
+    respx.get(LICHESS_PGN_URL).mock(return_value=httpx.Response(200, text=LICHESS_GAME_PGN))
+
+    outcome = reference_service.import_game(tokened, source="lichess", game_id="qg000007")
+
+    game = outcome.game
+    assert game is not None
+    assert game.is_owner_game is True
+    assert game.owner_color is Color.BLACK
+
+
+@respx.mock
+def test_a_reference_game_is_left_out_of_the_library_unless_asked_for(
+    tokened: Session,
+) -> None:
+    respx.get(LICHESS_PGN_URL).mock(return_value=httpx.Response(200, text=LICHESS_GAME_PGN))
+    outcome = reference_service.import_game(tokened, source="lichess", game_id="qg000007")
+    assert outcome.game is not None
+
+    # The default everywhere — the games list, every statistic — is the owner's games.
+    assert games_service.search_games(tokened, GameFilters()) == []
+    assert games_service.count_games(tokened, GameFilters()) == 0
+    assert [game.id for game in games_service.search_games(tokened, GameFilters(mine=None))] == [
+        outcome.game.id
+    ]
+    assert games_service.count_games(tokened, GameFilters(mine=False)) == 1
+
+
+@respx.mock
+def test_the_import_route_answers_with_the_library_row(api: TestClient) -> None:
+    respx.get(LICHESS_PGN_URL).mock(return_value=httpx.Response(200, text=LICHESS_GAME_PGN))
+
+    response = api.post("/reference/games/lichess/qg000007/import")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["created"] is True
+    assert body["game"]["source"] == "lichess"
+    assert body["game"]["source_id"] == "qg000007"
+    assert body["game"]["is_owner_game"] is False
+    # The list leaves it out until told otherwise, and then shows it flagged.
+    assert api.get("/games").json()["total"] == 0
+    listed = api.get("/games", params={"whose": "others"}).json()
+    assert listed["total"] == 1
+    assert listed["games"][0]["is_owner_game"] is False
+    assert api.get("/games", params={"whose": "all"}).json()["total"] == 1
+    assert api.get("/games", params={"whose": "theirs"}).status_code == 422
+    # And the game itself opens like any other.
+    assert api.get(f"/games/{body['game']['id']}").status_code == 200
+
+    again = api.post("/reference/games/lichess/qg000007/import").json()
+    assert again["created"] is False
+    assert again["game"]["id"] == body["game"]["id"]
+
+
+def test_importing_a_masters_game_needs_the_token(api: TestClient) -> None:
+    response = api.post("/reference/games/masters/abcd1234/import")
+    assert response.status_code == 409
+    assert error_of(response) == "lichess_token_missing"
+
+
+@respx.mock
+async def test_the_coach_adds_a_model_game(
+    coach: MCPServer, sessions: sessionmaker[Session]
+) -> None:
+    respx.get(LICHESS_PGN_URL).mock(return_value=httpx.Response(200, text=LICHESS_GAME_PGN))
+
+    payload = await call(coach, "import_reference_game", source="lichess", game_id="qg000007")
+
+    assert payload["created"] is True
+    assert payload["game"]["is_owner_game"] is False
+    # search_games keeps to the owner's games unless asked whose to look at.
+    assert (await call(coach, "search_games"))["total"] == 0
+    assert (await call(coach, "search_games", whose="others"))["total"] == 1
+    assert (await call(coach, "search_games", whose="all"))["total"] == 1
+    assert (await failure(coach, "search_games", whose="theirs"))["error"] == "bad_argument"

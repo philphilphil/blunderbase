@@ -201,6 +201,8 @@ class GameSummary(Payload):
     source_id: str | None = None
     played_at: datetime | None = None
     color: Color | None = None
+    # False for a game added from the reference books: kept for study, counted nowhere.
+    is_owner_game: bool = True
     result: str | None = None
     outcome: str | None = None
     white: str | None = None
@@ -1411,6 +1413,16 @@ class ReferenceGame(Payload):
     date: str | None = None
     moves: list[ReferenceGameMove] = Field(default_factory=list)
     lichess_url: str | None = None
+
+
+class ReferenceImported(Payload):
+    """A reference game now in the library: `services.reference.import_game`.
+
+    `created` is false when the library already had it — asking twice opens the same game.
+    """
+
+    game: GameSummary
+    created: bool
 
 
 class ReferenceToken(Payload):

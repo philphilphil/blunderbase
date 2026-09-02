@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -335,6 +336,15 @@ class Game(Base):
     white_account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"))
     black_account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"))
     owner_color: Mapped[Color | None] = mapped_column(EnumString(Color))
+    # Whether the owner is taken to have played this game. On for everything a sync or a
+    # PGN brings in, even when `owner_color` is still unknown — that is a game of theirs
+    # whose side has not been worked out yet. Off only for a game added from the reference
+    # books (`services.reference.import_game`) in which no owner account was recognised:
+    # a model game kept for study, analysed and annotated like any other, and left out of
+    # every statistic and the explorer's tree because none of its moves are theirs.
+    is_owner_game: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
 
     result: Mapped[Result] = mapped_column(EnumString(Result), nullable=False)
     termination: Mapped[str | None] = mapped_column(String(64))

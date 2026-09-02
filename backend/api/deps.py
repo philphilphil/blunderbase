@@ -9,7 +9,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Iterator
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, Query, Request
 from sqlalchemy.orm import Session
@@ -68,8 +68,19 @@ def game_filters(
     analyzed: Annotated[bool | None, Query(description="whether any analysis pass is done")] = None,
     deep_analyzed: bool | None = None,
     text: Annotated[str | None, Query(description="free text over names and openings")] = None,
+    whose: Annotated[
+        Literal["mine", "others", "all"],
+        Query(
+            description="mine (the default): the owner's own games; others: the games "
+            "added from the reference books; all: both"
+        ),
+    ] = "mine",
 ) -> GameFilters:
-    """The one filter vocabulary, shared by `/games` and every `/stats` dimension."""
+    """The one filter vocabulary, shared by `/games` and every `/stats` dimension.
+
+    `whose` spells the service's three-way `mine` field in words, because `mine=null` is
+    not a thing a query string can say.
+    """
     return GameFilters(
         since=since,
         until=until,
@@ -86,7 +97,12 @@ def game_filters(
         analyzed=analyzed,
         deep_analyzed=deep_analyzed,
         text=text,
+        mine=WHOSE[whose],
     )
+
+
+# The query string's word for each value of `GameFilters.mine`.
+WHOSE: dict[str, bool | None] = {"mine": True, "others": False, "all": None}
 
 
 def ply_range(start: int | None, end: int | None, *, name: str = "ply") -> tuple[int, int] | None:

@@ -437,3 +437,53 @@ def test_the_human_role_prefers_the_model_on_this_host(settings: Settings) -> No
     with engine.connect() as connection:
         ids = dict(connection.execute(text("SELECT name, id FROM engines")).all())
     assert _settings_of(engine, ("human_engine_id",)) == {"human_engine_id": ids["maia-here"]}
+
+
+def test_games_no_source_named_are_named_once_from_the_book(settings: Settings) -> None:
+    """The importer now names such games on the way in; 0021 does it once for the stored."""
+    from sqlalchemy.orm import sessionmaker
+
+    from backend.db.enums import JobStatus, Result, Source
+    from backend.db.models import ImportJob
+    from backend.services import import_service
+    from backend.services.import_service import ParsedGame
+
+    upgrade_to_head(settings)
+    engine = get_engine(settings)
+    with sessionmaker(bind=engine)() as session:
+        job = ImportJob(source=Source.PGN, status=JobStatus.RUNNING)
+        session.add(job)
+        session.commit()
+        stored = import_service.ingest_game(
+            session,
+            job,
+            ParsedGame(
+                source=Source.PGN,
+                white_name="Carlsen, M.",
+                black_name="Caruana, F.",
+                result=Result.UNKNOWN,
+                pgn="",
+                moves_uci=["e2e4", "e7e6", "d2d4", "d7d5"],
+                moves_san=["e4", "e6", "d4", "d5"],
+            ),
+            analyze=False,
+        )
+        session.commit()
+        assert stored.game is not None
+        game_id = stored.game.id
+    # As the game would have been stored before the importer named it.
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE games SET eco = NULL, opening_name = NULL WHERE id = :id"),
+            {"id": game_id},
+        )
+
+    config = alembic_config(settings)
+    command.downgrade(config, "0020_reference_games")
+    command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT eco, opening_name FROM games WHERE id = :id"), {"id": game_id}
+        ).one()
+    assert tuple(row) == ("C00", "French Defense")

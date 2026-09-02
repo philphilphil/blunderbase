@@ -6,7 +6,7 @@
  * `YYYY-MM-DD` because that is what `<input type="date">` speaks; `until` is widened to
  * the end of the day on the way to the API, so "until 6 Dec" includes the 6th.
  */
-import type { GameFilters, Outcome, Result, Source, Speed } from '@/lib/api/types'
+import type { GameFilters, Outcome, Result, Source, Speed, Whose } from '@/lib/api/types'
 import type { Color } from '@/lib/api/types'
 
 import { OUTCOME_LABELS, SOURCE_LABELS } from './format'
@@ -28,9 +28,17 @@ export interface LibraryFilters {
   analyzed?: boolean
   deep_analyzed?: boolean
   text?: string
+  /**
+   * Whose games: `others` is the ones added from the reference books, `all` is both.
+   * Absent is the default cut, the owner's own — never spelled as `mine`, because a URL
+   * should not spell the default.
+   */
+  whose?: Exclude<Whose, 'mine'>
 }
 
-const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'fics', 'pgn', 'manual']
+const WHOSE: readonly Exclude<Whose, 'mine'>[] = ['others', 'all']
+
+const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'fics', 'pgn', 'manual', 'masters']
 const COLORS: readonly Color[] = ['white', 'black']
 const RESULTS: readonly Result[] = ['1-0', '0-1', '1/2-1/2']
 const OUTCOMES: readonly Outcome[] = ['win', 'loss', 'draw']
@@ -82,6 +90,7 @@ export function filtersFromParams(params: URLSearchParams): LibraryFilters {
     analyzed: bool(params.get('analyzed')),
     deep_analyzed: bool(params.get('deep_analyzed')),
     text: text(params.get('q')),
+    whose: oneOf(params.get('whose'), WHOSE),
   })
 }
 

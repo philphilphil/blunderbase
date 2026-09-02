@@ -1,10 +1,10 @@
-"""The reference databases: Lichess's masters archive and its rated pools, read-only.
+"""The reference databases: Lichess's masters archive and its rated pools.
 
-**Nothing in this module writes the database.** That is the whole point of it. The owner's
-explorer answers from games they actually played, and a reference database answering beside
-it must never leak into that: no game is imported, no position is created, no counter moves.
-What comes back is folded into the same shape the web app and the coach already read and
-then forgotten, except for a copy in the process's own memory.
+**Reading here never writes the database.** The owner's explorer answers from games they
+actually played, and a reference database answering beside it must never leak into that:
+a lookup imports no game, creates no position, moves no counter. What comes back is folded
+into the same shape the web app and the coach already read and then forgotten, except for
+a copy in the process's own memory.
 
 That copy is the cache below. A reference lookup is a network round trip to somebody else's
 service, the answers are the same for everyone, and stepping a board through an opening asks
@@ -12,6 +12,12 @@ for a dozen positions in a row — so a bounded TTL cache is what keeps the page
 keeps Blunderbase a polite client of an API it is a guest on. It is a plain dict behind a
 lock rather than anything cleverer: one process, a few hundred entries, and a restart is
 allowed to forget all of it.
+
+The one deliberate exception is `import_game`, which is the owner asking for a model game
+by name. It goes into the library through the same path a PGN does and is analysed and
+annotated like any other game — but it arrives with `Game.is_owner_game` off, which keeps
+it out of every statistic and out of the explorer's tree. The wall between the two sides is
+kept by that flag rather than by there being no door.
 
 The token is the owner's own Lichess personal API token, read from the settings row every
 time it is needed. The explorer endpoints stopped answering anonymous requests, so without
@@ -21,15 +27,17 @@ the page can act on, not an empty tree that would read as "no games here".
 
 from __future__ import annotations
 
+import io
 import threading
 import time
 from collections import OrderedDict
 from collections.abc import Sequence
 from typing import Any
 
+import chess.pgn
 from sqlalchemy.orm import Session
 
-from backend.adapters import openings
+from backend.adapters import openings, pgn_import
 from backend.adapters import reference as adapter
 
 # Imported by name as well as through the module so that the API's error table and the
@@ -42,8 +50,10 @@ from backend.adapters.reference import (
     ReferenceUnavailableError,
     UnknownReferenceGameError,
 )
-from backend.services import app_settings
+from backend.db.enums import Source
+from backend.services import app_settings, import_service
 from backend.services.explorer import START_EPD, normalize_fen, read_fen
+from backend.services.import_service import IngestOutcome, ParsedGame, ProgressHook
 
 # The module's whole surface, the adapter's error types included.
 __all__ = [
@@ -63,6 +73,7 @@ __all__ = [
     "TokenMissingError",
     "UnknownReferenceGameError",
     "explore",
+    "import_game",
     "model_game",
 ]
 
@@ -199,6 +210,45 @@ def model_game(session: Session, *, source: str, game_id: str) -> dict[str, Any]
     return payload
 
 
+def import_game(
+    session: Session,
+    *,
+    source: str,
+    game_id: str,
+    progress: ProgressHook | None = None,
+) -> IngestOutcome:
+    """Add one reference game to the library, as a game the owner did not play.
+
+    The PGN is fetched the way `model_game` fetches it and then goes in through the PGN
+    adapter and `import_service.import_one`, so the game gets everything a pasted PGN
+    gets: positions, a job row, the quick pass, and the events that refresh the page. Two
+    things are set by hand. The source is the book it came from, with the book's own id,
+    so the game is found again by name (asking twice opens the same row) and a lichess
+    game keeps the link to its original. And `presume_owner` is off: unless an owner
+    account is recognised among the players — their own game turning up in the rated
+    pools — the game is stored with `is_owner_game` off and counts for nothing.
+    """
+    kind = _source(source)
+    ref = _game_id(game_id)
+    if kind == MASTERS:
+        pgn = adapter.masters_pgn(ref, token=_token(session))
+    else:
+        pgn = adapter.lichess_game_pgn(ref)
+    parsed = _parsed_for_library(pgn, kind, ref)
+    return import_service.import_one(session, parsed, progress=progress, presume_owner=False)
+
+
+def _parsed_for_library(pgn: str, kind: str, ref: str) -> ParsedGame:
+    """A reference game's PGN as the import pipeline wants it, named after its book."""
+    game = chess.pgn.read_game(io.StringIO(pgn))
+    if game is None or not game.headers:
+        raise ReferenceUnavailableError("the reference database did not answer with a game")
+    parsed = pgn_import.parse_game(game, ref=f"{kind}:{ref}")
+    parsed.source = Source.MASTERS if kind == MASTERS else Source.LICHESS
+    parsed.source_id = ref
+    return parsed
+
+
 def has_token(session: Session) -> bool:
     """Whether a token is stored. The token itself never leaves this module."""
     return app_settings.get_lichess_token(session) is not None
@@ -319,16 +369,30 @@ def _fold(raw: dict[str, Any], *, source: str, fen: str) -> dict[str, Any]:
             [_move(entry) for entry in raw.get("moves") or () if isinstance(entry, dict)],
             fen,
         ),
-        "top_games": [
-            game
-            for game in (
-                _top_game(entry)
-                for entry in raw.get("topGames") or ()
-                if isinstance(entry, dict)
-            )
-            if game is not None
-        ],
+        "top_games": _model_games(raw),
     }
+
+
+def _model_games(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    """The games worth showing from here: the top games first, then the recent ones.
+
+    The masters database answers with top games alone. The rated-lichess database keeps at
+    most four top games per position and none at all early in a game, so the adapter asks
+    it for its recent games too and they are folded in behind, so the list is never empty
+    where there are games. A game in both lists is shown once, where it ranks higher.
+    """
+    games: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for source in ("topGames", "recentGames"):
+        for entry in raw.get(source) or ():
+            if not isinstance(entry, dict):
+                continue
+            game = _top_game(entry)
+            if game is None or game["id"] in seen:
+                continue
+            seen.add(game["id"])
+            games.append(game)
+    return games
 
 
 def _name_continuations(moves: list[dict[str, Any]], fen: str) -> list[dict[str, Any]]:

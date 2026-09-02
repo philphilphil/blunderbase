@@ -159,6 +159,7 @@ export const SOURCE_LABELS: Record<Source, string> = {
   fics: 'FICS',
   manual: 'OTB',
   pgn: 'PGN',
+  masters: 'Masters',
 }
 
 export const OUTCOME_LABELS: Record<Outcome, string> = {

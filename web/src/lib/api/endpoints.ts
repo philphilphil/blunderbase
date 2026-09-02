@@ -70,6 +70,7 @@ import type {
   QueueStatus,
   ReferenceExplorerResponse,
   ReferenceGame,
+  ReferenceImported,
   ReferenceSource,
   ReferenceTokenStatus,
   RepertoireLineCreate,
@@ -387,7 +388,11 @@ export interface ReferenceExplorerQuery {
   ratings?: string
   /** How many continuations; the backend caps this at 30. */
   moves?: number
-  /** How many model games; the backend caps this at 15. */
+  /**
+   * How many model games; the backend caps this at 15. For the lichess source it is asked
+   * of both Lichess lists, top and recent, which are folded into one — and Lichess caps
+   * each at four, so that source answers with eight at most.
+   */
   top_games?: number
 }
 
@@ -404,6 +409,16 @@ export const referenceExplorer = (query: ReferenceExplorerQuery) =>
 /** One model game, fetched as PGN upstream and handed over as moves. */
 export const getReferenceGame = (source: ReferenceSource, gameId: string) =>
   http.get<ReferenceGame>(`/reference/games/${source}/${encodeURIComponent(gameId)}`)
+
+/**
+ * Add a reference game to the library as one the owner did not play. The one call on this
+ * side of the app that writes: the game comes back as a library row, analysed and
+ * annotated like any other from here on, and counted in nothing.
+ */
+export const importReferenceGame = (source: ReferenceSource, gameId: string) =>
+  http.post<ReferenceImported>(
+    `/reference/games/${source}/${encodeURIComponent(gameId)}/import`,
+  )
 
 /** Whether a Lichess token is stored — both explorer databases now require one. */
 export const getReferenceToken = () => http.get<ReferenceTokenStatus>('/reference/token')

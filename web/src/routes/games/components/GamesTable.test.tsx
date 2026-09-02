@@ -14,6 +14,10 @@ const GAME = {
   color: 'black',
   result: '1-0',
   outcome: 'loss',
+  white: 'chillzone',
+  black: 'phib',
+  white_rating: 1224,
+  black_rating: 1300,
   opponent: 'chillzone',
   opponent_rating: 1224,
   eco: 'B02',
@@ -87,6 +91,19 @@ describe('GamesTable rows', () => {
     expect(screen.getByText('Quick')).toBeInTheDocument()
     // The Flags cell aggregates per class: one chip carrying the glyph and the count.
     expect(screen.getByLabelText('1 blunder')).toHaveTextContent('??1')
+  })
+
+  it('names both players and sets the owner’s bold under their side', () => {
+    setup()
+    // The owner had black, so `phib` is the bold one and `chillzone` is not.
+    expect(screen.getByText('phib')).toHaveClass('font-semibold')
+    expect(screen.getByText('chillzone')).not.toHaveClass('font-semibold')
+  })
+
+  it('sets neither name bold on a game the owner did not play', () => {
+    setup({ games: [{ ...GAME, is_owner_game: false, color: null } as unknown as GameCard] })
+    expect(screen.getByText('phib')).not.toHaveClass('font-semibold')
+    expect(screen.getByText('chillzone')).not.toHaveClass('font-semibold')
   })
 
   it('opens the game on a row click and selects on the checkbox instead', async () => {

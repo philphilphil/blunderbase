@@ -1,11 +1,18 @@
 /**
- * The 13 columns of design 2b, at the widths the design draws them (emitted as `rem`).
+ * The 14 columns of the library table, at the widths design 2b draws them (emitted as
+ * `rem`), with two departures from the design.
  *
  * Two of the design's columns — per-game accuracy and ACPL — have no backend behind them:
  * `/games?cards=true` carries the eval curve and the three worst moments, not a per-game
  * accuracy aggregate, and nothing in `/stats` computes one per game either. They are
  * replaced by one honest column, `Worst` (the largest win percentage the owner gave away
  * in that game), which comes straight off `worst_moments[0]`.
+ *
+ * And the design's `Opponent`, `Elo` and `Col` are now `White`, `Elo`, `Black`, `Elo`. An
+ * opponent presumes a "you" in every game, and since the reference explorer can add other
+ * people's games to the library that is no longer so: such a row has two players and no
+ * opponent. Naming both sides reads the same for every row, and the owner's side is said
+ * by which name is set bold (`GameRow`) rather than by a disc in a column of its own.
  */
 import type * as React from 'react'
 
@@ -31,19 +38,20 @@ export interface Column {
  * a table and becomes a two-line card laid out on this grid:
  *
  * ```
- *   ┌───┬───┬──────────────┬───────┬───────┐
- *   │ ☑ │ ● │ opponent     │   Elo │   Res │   <- row 1
- *   │   ├───┴──────────────┼───────┼───────┤
- *   │   │ date             │ worst │ flags │   <- row 2
- *   └───┴──────────────────┴───────┴───────┘
+ *   ┌───┬────────────┬─────┬────────────┬─────┬───────┐
+ *   │ ☑ │ white      │ Elo │ black      │ Elo │   Res │   <- row 1
+ *   │   ├────────────┴─────┴────────────┼─────┼───────┤
+ *   │   │ date                          │worst│ flags │   <- row 2
+ *   └───┴───────────────────────────────┴─────┴───────┘
  * ```
  *
  * The opening, the clock, the move count, the source and the tier are the five that go:
  * they are the ones a phone can look up by opening the game, and dropping them is what
- * buys the opponent's name a readable width. The header drops their sort with them, so
- * what a phone can sort by is exactly what it can see.
+ * buys the two names a readable width. The header drops their sort with them, so what a
+ * phone can sort by is exactly what it can see.
  */
-export const PHONE_CARD = 'max-md:grid max-md:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto]'
+export const PHONE_CARD =
+  'max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_auto]'
 
 /**
  * One body row's height from `md` up. A class rather than the inline style it used to be:
@@ -54,27 +62,29 @@ export const PHONE_CARD = 'max-md:grid max-md:grid-cols-[auto_auto_minmax(0,1fr)
 export const ROW_HEIGHT = 'md:h-10'
 
 /**
- * The five cells of the card's first line and the three of its second, in grid terms.
+ * The six cells of the card's first line and the three of its second, in grid terms.
  * Spans are written as an end line rather than as `col-span-2` / `row-span-2`: those set
  * the `grid-column` / `grid-row` shorthand, which would throw the start line away again.
  */
 const CARD = {
   select: 'max-md:col-start-1 max-md:row-start-1 max-md:row-end-3',
-  color: 'max-md:col-start-2 max-md:row-start-1',
-  opponent: 'max-md:col-start-3 max-md:row-start-1',
-  rating: 'max-md:col-start-4 max-md:row-start-1',
-  result: 'max-md:col-start-5 max-md:row-start-1',
-  date: 'max-md:col-start-2 max-md:col-end-4 max-md:row-start-2',
-  worst: 'max-md:col-start-4 max-md:row-start-2',
-  flags: 'max-md:col-start-5 max-md:row-start-2 max-md:justify-end',
+  white: 'max-md:col-start-2 max-md:row-start-1',
+  white_rating: 'max-md:col-start-3 max-md:row-start-1',
+  black: 'max-md:col-start-4 max-md:row-start-1',
+  black_rating: 'max-md:col-start-5 max-md:row-start-1',
+  result: 'max-md:col-start-6 max-md:row-start-1',
+  date: 'max-md:col-start-2 max-md:col-end-5 max-md:row-start-2',
+  worst: 'max-md:col-start-5 max-md:row-start-2',
+  flags: 'max-md:col-start-6 max-md:row-start-2 max-md:justify-end',
 } as const
 
 export const COLUMNS: Column[] = [
   { id: 'select', label: '', width: 20, phone: CARD.select },
   { id: 'date', label: 'Date', width: 78, sort: 'played_at', mono: true, phone: CARD.date },
-  { id: 'opponent', label: 'Opponent', width: 136, sort: 'opponent', phone: CARD.opponent },
-  { id: 'rating', label: 'Elo', width: 46, align: 'right', sort: 'opponent_rating', mono: true, phone: CARD.rating },
-  { id: 'color', label: 'Col', width: 30, align: 'center', sort: 'color', phone: CARD.color },
+  { id: 'white', label: 'White', width: 118, sort: 'white', phone: CARD.white },
+  { id: 'white_rating', label: 'Elo', width: 46, align: 'right', sort: 'white_rating', mono: true, phone: CARD.white_rating },
+  { id: 'black', label: 'Black', width: 118, sort: 'black', phone: CARD.black },
+  { id: 'black_rating', label: 'Elo', width: 46, align: 'right', sort: 'black_rating', mono: true, phone: CARD.black_rating },
   { id: 'opening', label: 'Opening', width: 186, sort: 'opening', phone: null },
   { id: 'result', label: 'Res', width: 40, align: 'center', sort: 'result', phone: CARD.result },
   { id: 'time', label: 'Time', width: 70, sort: 'time_control', mono: true, phone: null },

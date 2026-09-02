@@ -58,6 +58,17 @@ def flag(value: bool | str | None, field: str) -> bool | None:
     raise CoachError(BAD_ARGUMENT, f"{field} is yes or no, not {value!r}", allowed=[True, False])
 
 
+WHOSE: dict[str, bool | None] = {"mine": True, "others": False, "all": None}
+
+
+def whose(value: str | None) -> bool | None:
+    """Whose games a search is over, as `GameFilters.mine`: mine, others, or all."""
+    text = str(value or "mine").strip().casefold() or "mine"
+    if text not in WHOSE:
+        raise CoachError(BAD_ARGUMENT, f"unknown whose {value!r}", allowed=list(WHOSE))
+    return WHOSE[text]
+
+
 def platform(value: str | None) -> Source | None:
     """A platform name as the source it imports through: "otb" is a manual entry."""
     if value is None:

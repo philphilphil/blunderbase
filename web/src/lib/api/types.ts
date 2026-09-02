@@ -10,7 +10,8 @@ export type Extra = Record<string, unknown>
 
 // --- enums (backend/db/enums.py) ------------------------------------------
 
-export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual'
+/** `masters` is a game added from the reference explorer's masters archive — never synced. */
+export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual' | 'masters'
 export type Platform = 'lichess' | 'chesscom' | 'fics' | 'otb'
 export type Color = 'white' | 'black'
 export type Result = '1-0' | '0-1' | '1/2-1/2' | '*'
@@ -22,7 +23,14 @@ export type Classification = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blund
 export type EngineKind = 'uci' | 'maia'
 export type Outcome = 'win' | 'loss' | 'draw'
 
-export const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'fics', 'pgn', 'manual']
+export const SOURCES: readonly Source[] = [
+  'lichess',
+  'chesscom',
+  'fics',
+  'pgn',
+  'manual',
+  'masters',
+]
 export const SPEEDS: readonly Speed[] = [
   'bullet',
   'blitz',
@@ -161,6 +169,11 @@ export interface GameSummary extends Extra {
   source_id?: string | null
   played_at?: string | null
   color?: Color | null
+  /**
+   * False for a game added from the reference books: somebody else's, kept for study,
+   * analysed and annotated like any other and counted in nothing. Absent means true.
+   */
+  is_owner_game?: boolean
   result?: string | null
   outcome?: string | null
   white?: string | null
@@ -468,7 +481,14 @@ export interface GameFilters {
   analyzed?: boolean
   deep_analyzed?: boolean
   text?: string
+  /**
+   * Whose games: the owner's (`mine`, the default when absent), the ones added from the
+   * reference books (`others`), or both (`all`).
+   */
+  whose?: Whose
 }
+
+export type Whose = 'mine' | 'others' | 'all'
 
 // --- import ---------------------------------------------------------------
 
@@ -978,6 +998,15 @@ export interface ReferenceGame extends Extra {
   moves: ReferenceGameMove[]
   /** Present for a lichess game, and for a masters game whose site is known. */
   lichess_url?: string | null
+}
+
+/**
+ * A reference game now in the library. `created` is false when it already was — asking
+ * twice opens the same game.
+ */
+export interface ReferenceImported extends Extra {
+  game: GameSummary
+  created: boolean
 }
 
 /** Whether a Lichess API token is stored. The token itself is never sent back. */

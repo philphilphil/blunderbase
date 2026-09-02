@@ -95,15 +95,18 @@ def lichess(
 ) -> dict[str, Any]:
     """The rated-lichess pools from one position, narrowed to speeds and rating bands.
 
-    `recentGames=0` because the page shows the top games and nothing else: recent games are
-    a second list Lichess computes and this would only pay for.
+    Both game lists are asked for. Lichess keeps at most four "top games" (its highest-rated
+    games through the position, whatever speeds and ratings were asked for) per position in
+    this database, and none at all in the first few moves of a game — so the recent games,
+    which it always has and which do honour the filters, are what keeps the list from being
+    empty. The service folds the two into one.
     """
     params: dict[str, Any] = {
         "variant": "standard",
         "fen": fen,
         "moves": moves,
         "topGames": top_games,
-        "recentGames": 0,
+        "recentGames": top_games,
     }
     if speeds:
         params["speeds"] = ",".join(speeds)
@@ -130,10 +133,12 @@ def lichess_game_pgn(game_id: str, *, client: httpx.Client | None = None) -> str
 
     Both are switched off because this is a game to play through, not to analyse: the
     reference board reads moves, and Blunderbase's own engines answer everything else.
+    The opening tags are asked for, so a game added to the library is named the way
+    Lichess names it, like one the owner's own sync brings.
     """
     return _text(
         LICHESS_PGN_URL.format(game_id=game_id),
-        {"clocks": "false", "evals": "false"},
+        {"clocks": "false", "evals": "false", "opening": "true"},
         token=None,
         client=client,
         headers=PGN_HEADERS,

@@ -7,27 +7,34 @@
  * after the move, in a game played by somebody who knew the position.
  *
  * **Nothing here is the owner's.** The game is fetched, replayed in the browser and
- * forgotten; there is no import button, no analysis, no notes, and no row in the library.
- * That is the wall issue #3 draws between the reference sources and the database, and this
- * page is the far side of it — which is also why it does not reuse `BoardPanel` and
- * `MoveList` from `/games/:id`. Those two are welded to a library game: they want an
- * evaluation per ply, classifications, a run to attach to. A model game has moves and
- * nothing else, and a stripped-down copy of a rich component reads as a broken version of
- * the game view rather than as a different thing.
+ * forgotten: no analysis, no notes, no row in the library. That is the wall issue #3 draws
+ * between the reference sources and the database, and this page is the far side of it —
+ * which is also why it does not reuse `BoardPanel` and `MoveList` from `/games/:id`. Those
+ * two are welded to a library game: they want an evaluation per ply, classifications, a
+ * run to attach to. A model game has moves and nothing else, and a stripped-down copy of a
+ * rich component reads as a broken version of the game view rather than as a different
+ * thing.
+ *
+ * The one door through the wall is "Add to library". It stores the game as one the owner
+ * did not play (`is_owner_game` off, so it counts in nothing) and goes straight to the
+ * real game view, where the quick pass is already queued and notes can be written. So
+ * this page is the preview — one click from the explorer, cheap, and read-only — and the
+ * rich view is one more click away rather than reproduced here in a reduced form.
  *
  * The board is replayed client-side from the UCI list with `routes/explorer/line.ts`, the
  * same helper the explorer and the repertoire walk with, so a cursor is just a prefix
  * length and jumping is `slice`. Keys are the explorer's: ←/→ step, guarded by `isTyping`
  * and by the modifier check that leaves ⌘← to the browser's own history.
  */
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useReferenceGame } from '@/lib/api/queries'
+import { useImportReferenceGame, useReferenceGame } from '@/lib/api/queries'
 import type { ReferenceGame, ReferenceSource } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 import { ReferenceTokenCard } from '@/routes/explorer/components/ReferenceTokenCard'
@@ -46,6 +53,19 @@ export function ReferenceGamePage() {
   const source = (parsed === 'mine' ? 'masters' : parsed) as ReferenceSource
 
   const game = useReferenceGame(source, gameId ?? '', { enabled: valid })
+
+  // The explorer position this was opened from, when `ModelGames` put it in router state;
+  // the breadcrumb goes back there rather than to the explorer's start, and so does the
+  // library game's "back to explorer" once the game is added. Anything that is not an
+  // explorer URL is ignored rather than followed.
+  const navigate = useNavigate()
+  const location = useLocation()
+  const cameFrom = (location.state as { from?: unknown } | null)?.from
+  const explorerTo =
+    typeof cameFrom === 'string' && cameFrom.startsWith('/explorer') ? cameFrom : '/explorer'
+  const add = useImportReferenceGame({
+    onSuccess: (result) => navigate(`/games/${result.game.id}`, { state: { from: explorerTo } }),
+  })
   // A masters game is fetched from the explorer host with the owner's token, so this page
   // fails the way the explorer's table does when that token is gone or refused — and a
   // "try again" button would fetch the same 409 forever. The explorer's own card is what
@@ -82,12 +102,36 @@ export function ReferenceGamePage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome
-        breadcrumb={[{ label: 'Openings', to: '/explorer' }, { label: 'Model game' }]}
+        breadcrumb={[{ label: 'Explorer', to: explorerTo }, { label: 'Model game' }]}
       />
 
       <div className="flex min-h-0 flex-1 gap-[1.125rem] overflow-hidden px-5 py-[1.125rem] max-md:flex-col max-md:gap-3 max-md:overflow-y-auto max-md:px-3 max-md:py-3">
         <div className="flex w-[31.25rem] flex-none flex-col gap-3.5 max-md:w-full">
           <GameHeader game={game.data} loading={game.isPending && valid} />
+
+          {valid && !tokenReason ? (
+            <div className="flex flex-col gap-1.5">
+              <Button
+                type="button"
+                onClick={() => gameId && add.mutate({ source, gameId })}
+                disabled={!game.data || add.isPending}
+                className="self-start"
+              >
+                <Plus aria-hidden />
+                {add.isPending ? 'Adding…' : 'Add to library'}
+              </Button>
+              {add.isError ? (
+                <p className="text-[0.71875rem] text-blunder">
+                  {add.error.message || 'The game could not be added.'}
+                </p>
+              ) : (
+                <p className="text-[0.6875rem] text-dim">
+                  Kept as somebody else's game: analysed and annotated like your own, counted
+                  in no statistic.
+                </p>
+              )}
+            </div>
+          ) : null}
 
           <Board
             fen={line.fen}

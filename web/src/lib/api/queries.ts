@@ -711,6 +711,29 @@ export function useSetReferenceToken(
   })
 }
 
+/**
+ * Add a reference game to the library. The import's own events will refresh the games
+ * list and the queue over `/events`; invalidating here as well is for the page that goes
+ * straight to the new game, which must not read a list cached from before it existed.
+ */
+export function useImportReferenceGame(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.importReferenceGame>>,
+    Error,
+    { source: ReferenceSource; gameId: string }
+  >,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ source, gameId }) => api.importReferenceGame(source, gameId),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.games() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
 // --- repertoire -----------------------------------------------------------
 
 /**

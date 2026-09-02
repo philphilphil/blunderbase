@@ -1,9 +1,11 @@
 """`/reference` — Lichess's masters and rated databases, beside the owner's own explorer.
 
 The other explorer. `/explorer` answers from games the owner played; this answers from two
-databases they have never touched, over the network, and stores none of it. The two are
-separate routers for exactly that reason: a client that mixes their numbers has to do it on
-purpose, and nothing on this side can ever add a game to the library.
+databases they have never touched, over the network, and a lookup stores none of it. The
+two are separate routers for exactly that reason: a client that mixes their numbers has to
+do it on purpose. The one door between them is the import below, and a game that goes
+through it is marked as not the owner's, so it is analysed and annotated like any other
+game and counted in nothing.
 
 `source` is a literal rather than a free string, so a typo is FastAPI's 422 before the
 service is called; `speeds` and `ratings` arrive as comma-separated lists the way the web
@@ -17,14 +19,16 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query
 
-from backend.api.deps import SessionDep
+from backend.api.deps import BrokerDep, SessionDep
 from backend.api.schemas import (
     ReferenceExplorer,
     ReferenceGame,
+    ReferenceImported,
     ReferenceToken,
     ReferenceTokenUpdate,
 )
 from backend.services import app_settings as app_settings_service
+from backend.services import games as games_service
 from backend.services import reference as reference_service
 
 router = APIRouter(prefix="/reference", tags=["reference"])
@@ -76,8 +80,26 @@ def explore(
     summary="One reference game, read-only",
 )
 def model_game(session: SessionDep, source: Source, game_id: str) -> Any:
-    """A model game to play through. It is never imported — there is no route that would."""
+    """A model game to play through. Reading it stores nothing; importing is its own call."""
     return reference_service.model_game(session, source=source, game_id=game_id)
+
+
+@router.post(
+    "/games/{source}/{game_id}/import",
+    response_model=ReferenceImported,
+    summary="Add a reference game to the library",
+)
+def import_game(session: SessionDep, broker: BrokerDep, source: Source, game_id: str) -> Any:
+    """Store the game as one the owner did not play, and answer with its library row.
+
+    Idempotent: a game already in the library is answered with, not stored twice. The
+    import's events go out over `/events` like a sync's, so the games list refreshes.
+    """
+    outcome = reference_service.import_game(
+        session, source=source, game_id=game_id, progress=broker.publish
+    )
+    assert outcome.game is not None  # a named import forgets its tombstone, so never blocked
+    return {"game": games_service.game_summary(outcome.game), "created": outcome.created}
 
 
 @router.get("/token", response_model=ReferenceToken, summary="Is a Lichess token stored")

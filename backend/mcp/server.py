@@ -92,7 +92,9 @@ The owner keeps two opening repertoires, one per colour — what they mean to pl
 they have played: read get_repertoire before recommending an opening move, and say when a
 position is outside it.
 Theory comes from reference_explorer instead — the masters and rated-lichess databases,
-everyone else's games rather than theirs. Keep the two apart when you quote numbers.
+everyone else's games rather than theirs. Keep the two apart when you quote numbers. A
+model game worth studying can be brought in with import_reference_game: it becomes a
+library game they did not play, analysed and annotatable, and still counts in nothing.
 Maia is asked at every level this deployment is configured for, so the reading is a
 comparison: get_game carries them all per ply, maia_policy asks a live position, and
 maia_fill backfills a level a game was analysed before.
@@ -260,12 +262,15 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
         text: str | None = None,
         limit: int = DEFAULT_SEARCH,
         offset: int = 0,
+        whose: str = "mine",
     ) -> TextContent:
         """Games matching any combination of filters, newest first, as compact rows.
         `outcome` is win/loss/draw from the owner's side; `result` is the PGN result
         (1-0, 0-1, 1/2-1/2). `eco` matches a code or a prefix (C6 for all of C60-C69),
         `text` searches names, openings and terminations. Dates accept an ISO date or a
-        relative window like '30d'. Follow up with get_game for the moves."""
+        relative window like '30d'. `whose` is "mine" (the owner's games, the default),
+        "others" (games added from the reference books) or "all". Follow up with get_game
+        for the moves."""
         speed, literal = args.time_control(time_control)
         filters = GameFilters(
             since=args.when(since, "since"),
@@ -283,6 +288,7 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
             analyzed=analyzed,
             deep_analyzed=deep_analyzed,
             text=text,
+            mine=args.whose(whose),
         )
         count = args.capped(limit, DEFAULT_SEARCH, MAX_SEARCH)
         start = args.offset(offset)
@@ -449,7 +455,8 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         and `ratings` like [1800,2000]). Use it for theory — what is played here, and how
         it scores — and use opening_explorer for what the owner themselves has played;
         never add the two together. Read-only: nothing here is in their library, and the
-        `top_games` entries can be opened with get_reference_game. It is served by Lichess
+        `top_games` entries can be opened with get_reference_game (for "lichess" they are
+        the highest-rated games first, then recent ones). It is served by Lichess
         and needs the owner's Lichess API token to be stored, so a `reference_token_missing`
         error means asking them to paste one under Settings, not that the position is
         unknown."""
@@ -483,12 +490,32 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         """One game from the reference database, by the id reference_explorer listed under
         `top_games`. `source` is the one it came from — "masters" or "lichess". The answer
         is the players, the result and every move in SAN and UCI: a model game to walk the
-        owner through, never one of theirs and never imported. Blunderbase's engine numbers
-        do not exist for it; queue analysis on their own games instead."""
+        owner through, not one of theirs. Reading it stores nothing and there are no engine
+        numbers for it; import_reference_game adds it to the library if they want those."""
         with coach.session() as session:
             payload = reference_service.model_game(
                 session, source=str(source or "").strip().casefold(), game_id=str(game_id)
             )
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def import_reference_game(source: str, game_id: str) -> TextContent:
+        """Add one reference game to the owner's library, by the same `source` and id
+        get_reference_game takes. It becomes a library game they did not play: the quick
+        analysis pass is queued, get_game reads it with engine numbers once done, notes
+        can be pinned to it — but it counts in no statistic and is not in opening_explorer,
+        and search_games leaves it out unless `include_reference` is set. Asking twice
+        opens the same game. Answers with the library game and whether it was new."""
+        with coach.session() as session:
+            outcome = reference_service.import_game(
+                session, source=str(source or "").strip().casefold(), game_id=str(game_id)
+            )
+            assert outcome.game is not None
+            payload = {
+                "game": games_service.game_summary(outcome.game),
+                "created": outcome.created,
+            }
         return payloads.result(payload)
 
     @server.tool(description=STATS_DESCRIPTION)

@@ -264,12 +264,19 @@ count. Book means the owner's own book — a reference database is never folded 
 the walk stops at the first move they have played in only one game.
 
 The **reference explorer** is the other database, and it is deliberately a different one.
-`services/reference.py` is a read-only proxy over Lichess's opening explorer — the masters
-archive and the rated pools — through `adapters/reference.py`, and it writes nothing: no
+`services/reference.py` is a proxy over Lichess's opening explorer — the masters archive
+and the rated pools — through `adapters/reference.py`, and a lookup writes nothing: no
 game is imported, no `positions` row is created, no counter moves. That is the whole
 separation issue #3 asked for, and it is why it is its own service and its own router
 rather than a `source=` parameter on `/explorer`: a client that mixes reference numbers into
-the owner's has to do it on purpose. What it does keep is a bounded TTL cache in the process
+the owner's has to do it on purpose. The one door is `import_game`, which stores a model
+game through the ordinary PGN path (`import_service.import_one`) with `Game.is_owner_game`
+off. That flag is what keeps the wall: `GameFilters.mine` defaults to the owner's games, so
+every statistic, the games list and the coach's searches leave such a game out without
+being told, `owner_move_condition` contributes none of its plies, and the explorer's
+per-colour book never sees it because it has no owner colour. It is still a game — analysed
+on arrival, opened at `/games/:id`, annotated — which is the point of letting it in. What
+the service does keep for lookups is a bounded TTL cache in the process
 (a dict behind a lock, masters for a day, the rated pools for six hours, a fetched game for
 a week), because a board stepped through an opening asks a dozen positions in a row and
 Blunderbase is a guest on that API. The explorer endpoints no longer answer anonymous

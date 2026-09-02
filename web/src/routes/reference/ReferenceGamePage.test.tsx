@@ -188,6 +188,46 @@ describe('ReferenceGamePage', () => {
     expect(screen.queryByText('Try again')).not.toBeInTheDocument()
   })
 
+  it('adds the game to the library and opens it there', async () => {
+    const calls: { url: string; method: string }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        calls.push({ url, method })
+        if (method === 'POST' && url.endsWith('/import')) {
+          return json({ game: { id: 42, source: 'masters', is_owner_game: false }, created: true })
+        }
+        if (url.includes('/reference/games/')) return json(GAME)
+        return json({ error: 'not_found', detail: url }, 404)
+      }),
+    )
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+    })
+    render(
+      <Providers client={client}>
+        <MemoryRouter initialEntries={['/reference/masters/abcd1234']}>
+          <Routes>
+            <Route path="/reference/:source/:gameId" element={<ReferenceGamePage />} />
+            <Route path="/games/:id" element={<div>library game</div>} />
+          </Routes>
+        </MemoryRouter>
+      </Providers>,
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to library' }))
+
+    expect(await screen.findByText('library game')).toBeInTheDocument()
+    expect(
+      calls.some(
+        (call) =>
+          call.method === 'POST' && call.url.includes('/reference/games/masters/abcd1234/import'),
+      ),
+    ).toBe(true)
+  })
+
   it('fetches nothing at all for a source that is not one of the two books', async () => {
     const seen = stubGame()
     renderPage('/reference/library/7')

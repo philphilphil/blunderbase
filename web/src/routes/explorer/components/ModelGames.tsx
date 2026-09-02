@@ -3,7 +3,10 @@
  * this line", and where the reference explorer stops being a table of numbers.
  *
  * A count says a move is played; a game shows what happens after it, which is the thing
- * actually worth taking from a masters database. Each row opens the game read-only at
+ * actually worth taking from a masters database. For the lichess source the backend folds
+ * Lichess's recent games in behind its top games: the rated database keeps at most four
+ * top games per position and none in the first few moves, so top games alone left this
+ * list empty exactly where a person starts looking. Each row opens the game read-only at
  * `/reference/:source/:id` rather than importing it: these are other people's games, and
  * nothing on this page is allowed to become a row in the owner's library.
  *
@@ -13,7 +16,7 @@
  * outcome-for-the-owner here, so it is the two players with their ratings, the result, the
  * year, and (lichess only) the time control.
  */
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ReferenceSource, ReferenceTopGame } from '@/lib/api/types'
@@ -38,13 +41,20 @@ export function ModelGames({
   loading: boolean
 }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  // Where the reader came from, so the model game and — once it is added to the library —
+  // the game page can offer the way back to this position rather than to the explorer's
+  // start. Router state rather than a query parameter: it is not part of what the game is.
+  const from = `${location.pathname}${location.search}`
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 max-md:flex-none">
       <div className="flex items-baseline gap-2">
         <span className="text-[0.75rem] font-semibold text-ink">Model games</span>
         <span className="text-[0.6875rem] text-dim">
-          {source === 'masters' ? 'from the masters database' : 'from rated lichess games'}
+          {source === 'masters'
+            ? 'from the masters database'
+            : 'top-rated and recent rated lichess games'}
         </span>
       </div>
 
@@ -64,7 +74,7 @@ export function ModelGames({
             <button
               key={game.id}
               type="button"
-              onClick={() => navigate(`/reference/${source}/${game.id}`)}
+              onClick={() => navigate(`/reference/${source}/${game.id}`, { state: { from } })}
               className="flex h-[1.8125rem] flex-none items-center gap-2.5 whitespace-nowrap rounded-[0.3125rem] px-2.5 text-left transition-colors hover:bg-elevated-2"
             >
               <span
