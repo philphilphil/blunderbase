@@ -42,6 +42,7 @@ import type {
   ImportJobList,
   ImportRequest,
   ImportStarted,
+  SyncSchedule,
   LineCreate,
   LineResponse,
   LiveState,
@@ -241,6 +242,11 @@ export const uploadPgn = (
   pgn: string,
   query: { wait?: boolean; max_games?: number; analyze?: boolean } = {},
 ) => http.post<ImportStarted>('/import/pgn/upload', { text: pgn, query })
+
+export const getSyncSchedule = () => http.get<SyncSchedule>('/import/schedule')
+
+export const putSyncSchedule = (body: SyncSchedule) =>
+  http.put<SyncSchedule>('/import/schedule', { body })
 
 // --- analysis -------------------------------------------------------------
 

@@ -97,7 +97,11 @@ export function AccountMenu() {
                   No account connected
                 </p>
                 <p className="truncate text-[0.625rem] text-dim">
-                  {capabilities.password_auth ? 'signed in as the owner' : 'local library'}
+                  {capabilities.read_only
+                    ? 'read-only demo library'
+                    : capabilities.password_auth
+                      ? 'signed in as the owner'
+                      : 'local library'}
                 </p>
               </>
             ) : (

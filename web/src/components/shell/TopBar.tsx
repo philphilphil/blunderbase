@@ -2,6 +2,8 @@ import { Menu, Search } from 'lucide-react'
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 
+import { SITE_URL } from '@/lib/links'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 
 import { AccountMenu } from './AccountMenu'
@@ -28,10 +30,17 @@ import { ThemeToggle } from './ThemeToggle'
  * those insets is 0 and the bar is the 46px × 16px it always was. The `env()` fallbacks are
  * written `0rem` rather than the usual `0px` because `lib/ui/scale.test.ts` bans a px
  * length from a Tailwind arbitrary value — at zero the two are the same length anyway.
+ *
+ * The public demo carries one more thing, right after the brand: a chip saying this is
+ * the demo and that it is read-only, linking to where a copy of one's own comes from. It
+ * is in the titlebar because that is the one strip every screen shares, and it is a link
+ * rather than a banner because a visitor who has understood it should not have to keep
+ * reading it.
  */
 export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
   const { breadcrumb, actions } = usePageChrome()
   const palette = useCommandPalette()
+  const capabilities = useRuntimeCapabilities()
 
   return (
     <header className="flex h-[calc(2.625rem+env(safe-area-inset-top,0rem))] flex-none items-center gap-3 border-b border-edge-strong bg-panel pt-[env(safe-area-inset-top,0rem)] pr-[max(0.75rem,env(safe-area-inset-right,0rem))] pl-[max(0.75rem,env(safe-area-inset-left,0rem))] max-md:gap-2.5">
@@ -58,6 +67,18 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           Blunderbase
         </span>
       </Link>
+      {capabilities.read_only ? (
+        <a
+          href={SITE_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="This is the public demo: look at everything, change nothing. Get your own Blunderbase at blunderbase.org."
+          className="flex flex-none items-center gap-1.5 rounded-md border border-chip-info-edge bg-chip-info px-2 py-[0.1875rem] text-[0.6875rem] font-medium text-info transition-colors hover:border-edge-hover hover:text-ink"
+        >
+          Demo
+          <span className="text-dim max-md:hidden">· read-only</span>
+        </a>
+      ) : null}
       <div className="h-[1.125rem] w-px bg-line max-md:hidden" />
 
       {breadcrumb.length > 0 ? (

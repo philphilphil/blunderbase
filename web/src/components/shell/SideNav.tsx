@@ -49,6 +49,7 @@ import { StatusDot } from '@/components/badges/StatusDot'
 import { useEngines, useGames, useLiveState } from '@/lib/api/queries'
 import type { Color } from '@/lib/api/types'
 import { useEvents } from '@/lib/events/EventsProvider'
+import { REPO_URL } from '@/lib/links'
 import { paramsFromFilters, toGameQuery } from '@/routes/games/filters'
 import {
   removeSavedFilter,
@@ -416,7 +417,7 @@ function Reports({ search }: { search: string }) {
   )
 }
 
-const REPO = 'https://github.com/philphilphil/blunderbase'
+const REPO = REPO_URL
 
 /**
  * The GitHub mark, drawn here rather than imported: lucide-react 1.x dropped its brand

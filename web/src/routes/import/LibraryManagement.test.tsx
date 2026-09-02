@@ -85,7 +85,7 @@ describe('LibraryManagement', () => {
     render(
       <Providers client={client}>
         <RuntimeCapabilitiesProvider
-          capabilities={{ password_auth: false, mcp: false, remote_runners: false }}
+          capabilities={{ password_auth: false, mcp: false, remote_runners: false, read_only: false }}
         >
           <LibraryManagement />
         </RuntimeCapabilitiesProvider>

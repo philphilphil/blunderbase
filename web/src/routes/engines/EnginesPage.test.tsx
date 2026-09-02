@@ -992,7 +992,7 @@ describe('EnginesPage — one page', () => {
     })
     renderPage(
       <RuntimeCapabilitiesProvider
-        capabilities={{ password_auth: false, mcp: false, remote_runners: false }}
+        capabilities={{ password_auth: false, mcp: false, remote_runners: false, read_only: false }}
       >
         <EnginesPage />
       </RuntimeCapabilitiesProvider>,

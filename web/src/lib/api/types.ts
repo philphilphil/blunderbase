@@ -61,12 +61,18 @@ export interface RuntimeCapabilities {
   password_auth: boolean
   mcp: boolean
   remote_runners: boolean
+  /**
+   * The public demo: the library cannot be changed from here, and every write answers
+   * 403 `read_only`. The shell says so up front rather than letting a visitor find out.
+   */
+  read_only: boolean
 }
 
 export const SERVER_CAPABILITIES: RuntimeCapabilities = {
   password_auth: true,
   mcp: true,
   remote_runners: true,
+  read_only: false,
 }
 
 /**
@@ -501,6 +507,14 @@ export interface ImportRequest {
   /** Left unset by default; `false` lands the games without queueing a quick pass. */
   analyze?: boolean
   wait?: boolean
+}
+
+/**
+ * `GET`/`PUT /import/schedule` — how often every connected account is synced on its own.
+ * Null is off. The number is minutes, floored at one by the backend.
+ */
+export interface SyncSchedule {
+  minutes: number | null
 }
 
 export interface ImportJob {

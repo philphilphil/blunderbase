@@ -47,6 +47,10 @@ def auth_status(
     response: Response,
 ) -> AuthStatus:
     capabilities = capabilities_for(settings)
+    if settings.demo:
+        # Everyone is signed in and nobody is asked for anything: the demo has no
+        # credential to set up and no session to hold.
+        return signed_in(session, settings)
     if not capabilities.password_auth:
         expected = settings.desktop_token.get_secret_value()
         offered = request.headers.get(DESKTOP_TOKEN_HEADER)

@@ -46,6 +46,12 @@ from backend.services.import_service import ParsedGame, ingest_game
 
 DEFAULT_GAME_COUNT = 72
 DEFAULT_FILENAME = "demo.db"
+# Where the demo's engine rows point when nobody says otherwise: nowhere. The stored
+# analysis is copied in, so a demo built for screenshots never needs to start an engine;
+# a demo that is going to be *served* wants the real thing behind its analysis board, which
+# is what `stockfish_path` is for.
+DEMO_STOCKFISH_PATH = "/demo/stockfish"
+DEMO_MAIA_PATH = "/demo/maia"
 DEMO_SEED = 0xB1D3
 DEMO_NAME = "Alex Knight"
 LICHESS_HANDLE = "alex_knight"
@@ -113,12 +119,17 @@ def create_demo_database(
     game_count: int = DEFAULT_GAME_COUNT,
     as_of: date | None = None,
     force: bool = False,
+    stockfish_path: str = DEMO_STOCKFISH_PATH,
 ) -> DemoSummary:
     """Create an anonymous demo database, returning what was written.
 
     ``source_path`` is only opened for reads. ``target_path`` must be a different file and
     must not exist unless ``force`` was explicitly requested. Selection and fake values are
     deterministic for a given source and ``as_of`` date, which keeps screenshots stable.
+
+    ``stockfish_path`` is what the demo's Stockfish row points at — a real binary on the
+    machine that will serve the demo gives its analysis board a live engine; the default
+    points nowhere and is right for screenshots.
     """
     source = source_path.expanduser().resolve()
     target = target_path.expanduser().resolve()
@@ -158,7 +169,9 @@ def create_demo_database(
                 raise DemoDataError(
                     "the source has no analyzed standard games attributed to an owner"
                 )
-            summary = _seed(source_session, target_session, candidates, target, anchor)
+            summary = _seed(
+                source_session, target_session, candidates, target, anchor, stockfish_path
+            )
             target_session.commit()
         return summary
     except Exception:
@@ -246,9 +259,10 @@ def _seed(
     candidates: list[Candidate],
     path: Path,
     anchor: date,
+    stockfish_path: str,
 ) -> DemoSummary:
     accounts = _accounts(target)
-    stockfish, maia = _engines(target)
+    stockfish, maia = _engines(target, stockfish_path)
     _settings(target, stockfish, maia)
 
     jobs = {
@@ -328,11 +342,11 @@ def _accounts(session: Session) -> AccountIndex:
     return AccountIndex.load(session)
 
 
-def _engines(session: Session) -> tuple[Engine, Engine]:
+def _engines(session: Session, stockfish_path: str) -> tuple[Engine, Engine]:
     stockfish = Engine(
         name="Stockfish 18 (demo)",
         kind=EngineKind.UCI,
-        path="/demo/stockfish",
+        path=stockfish_path,
         version="18",
         options={"Threads": 4, "Hash": 512},
         enabled=True,
@@ -340,7 +354,7 @@ def _engines(session: Session) -> tuple[Engine, Engine]:
     maia = Engine(
         name="Maia 2 (demo)",
         kind=EngineKind.MAIA,
-        path="/demo/maia",
+        path=DEMO_MAIA_PATH,
         version="2",
         options={},
         enabled=True,

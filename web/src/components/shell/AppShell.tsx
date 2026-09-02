@@ -1,7 +1,9 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Toaster } from 'sonner'
+import { toast, Toaster } from 'sonner'
 
+import { onWriteRefused } from '@/lib/api/readOnly'
+import { SITE_URL } from '@/lib/links'
 import { browserRunner } from '@/lib/runner'
 import { NativeFeedback } from '@/lib/desktop/NativeFeedback'
 import { PgnDropOverlay } from '@/lib/desktop/PgnDropOverlay'
@@ -57,6 +59,21 @@ export function AppShell() {
     if (capabilities.remote_runners) browserRunner.resume()
     else browserRunner.stop()
   }, [capabilities.remote_runners])
+
+  // The demo refusing a write is said here, once, whichever button was pressed — see
+  // `lib/api/readOnly.ts`. One toast id, so a visitor who keeps trying reads one sentence
+  // rather than a stack of them.
+  useEffect(
+    () =>
+      onWriteRefused(() =>
+        toast.info('This is the read-only demo. Nothing you do here is saved.', {
+          id: 'read-only',
+          description: 'Run your own Blunderbase to import, analyse and annotate your games.',
+          action: { label: 'Get it', onClick: () => window.open(SITE_URL, '_blank', 'noopener') },
+        }),
+      ),
+    [],
+  )
 
   const [navOpen, setNavOpen] = useState(false)
   const main = useRef<HTMLElement>(null)

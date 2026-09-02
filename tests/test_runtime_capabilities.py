@@ -1,4 +1,4 @@
-"""One build, two runtime surfaces: server and self-contained desktop."""
+"""One build, three runtime surfaces: server, self-contained desktop, and the public demo."""
 
 from __future__ import annotations
 
@@ -18,13 +18,23 @@ DESKTOP_CAPABILITIES = {
     "password_auth": False,
     "mcp": False,
     "remote_runners": False,
+    "read_only": False,
 }
+DEMO_CAPABILITIES = {**DESKTOP_CAPABILITIES, "read_only": True}
 
 
 @pytest.fixture()
 def desktop(settings: Settings) -> Iterator[TestClient]:
     settings.runtime_mode = "desktop"
     settings.desktop_token = SecretStr(TOKEN)
+    settings.analysis_workers = False
+    with TestClient(create_app(settings), base_url=API_BASE_URL) as client:
+        yield client
+
+
+@pytest.fixture()
+def demo(settings: Settings) -> Iterator[TestClient]:
+    settings.runtime_mode = "demo"
     settings.analysis_workers = False
     with TestClient(create_app(settings), base_url=API_BASE_URL) as client:
         yield client
@@ -105,3 +115,63 @@ def test_desktop_can_confirm_a_library_reset_without_a_password(desktop: TestCli
 
     assert response.status_code == 200
     assert response.json()["games"] == 0
+
+
+# --- the public demo ---------------------------------------------------------
+
+
+def test_demo_needs_no_password_and_says_it_is_read_only(demo: TestClient) -> None:
+    status = demo.get("/auth/status").json()
+
+    assert status["capabilities"] == DEMO_CAPABILITIES
+    assert status["setup_required"] is False
+    assert status["authenticated"] is True
+    assert "set-cookie" not in demo.get("/auth/status").headers
+
+
+def test_demo_answers_every_read_to_a_stranger(demo: TestClient) -> None:
+    for path in ("/games", "/stats/dimensions", "/explorer", "/notes", "/settings"):
+        assert demo.get(path).status_code == 200, path
+    assert demo.get("/api/games").status_code == 200
+    with demo.websocket_connect("/events") as socket:
+        socket.close()
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("POST", "/notes", {"text": "a stranger's note"}),
+        ("PUT", "/settings", {}),
+        ("POST", "/games/delete-all", {}),
+        ("POST", "/import/lichess", {"username": "somebody"}),
+        ("DELETE", "/engines/1", None),
+        ("PATCH", "/notes/1", {"text": "x"}),
+        ("POST", "/api/notes", {"text": "under the prefix too"}),
+    ],
+)
+def test_demo_refuses_every_write_before_a_handler_sees_it(
+    demo: TestClient, method: str, path: str, body: dict[str, object] | None
+) -> None:
+    response = demo.request(method, path, json=body)
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "read_only"
+
+
+def test_demo_still_answers_the_reads_that_are_spelled_post(demo: TestClient) -> None:
+    """The analysis board, Maia and a one-off eval touch no row — they pass the guard and
+    fail, if they fail, on the engines this deployment has rather than on the rule."""
+    for path, body in (
+        ("/maia/policy", {"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}),
+        ("/analysis/position", {"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}),
+        ("/streams", {"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}),
+    ):
+        response = demo.post(path, json=body)
+        assert response.status_code != 403, path
+        assert response.json().get("error") != "read_only", path
+
+
+def test_demo_has_no_coach_and_no_runners(demo: TestClient) -> None:
+    assert demo.get("/api/mcp-keys").status_code == 404
+    assert demo.get("/api/runners").status_code == 404
+    assert demo.post("/auth/setup", json={"password": "valid-password"}).status_code == 404

@@ -84,10 +84,12 @@ cannot leak into real stats. The command reads analyzed standard games from the 
 retains only chess facts (moves and evaluations). It rebuilds PGNs and replaces identities,
 ratings, dates, source IDs, accounts, engine configuration, Maia policies and notes.
 
-The resulting file is the seed for screenshots now and for a read-only demo deployment later.
-Read-only behavior and authentication bypass do not belong in the seed generator; they belong
-at the future demo-mode write/auth seams, so a locally served seed behaves like a normal
-deployment until that mode exists.
+The resulting file is the seed for screenshots and for the public demo. Read-only behavior
+and the open door do not belong in the seed generator; they are a runtime mode
+(`BLUNDERBASE_RUNTIME_MODE=demo`) and live at the two seams a request passes on its way in —
+the auth guard lets everyone through, and `api/readonly.py` beside it refuses every write.
+A locally served seed without that mode therefore behaves like a normal deployment, password
+and all; with it, the same file is what demo.blunderbase.org serves.
 
 WAL, `foreign_keys=ON` and a busy timeout are set by a `connect` event installed in
 `backend.db.session.create_db_engine`. They are per-connection pragmas, so they have to be

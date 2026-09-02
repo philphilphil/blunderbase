@@ -76,8 +76,9 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 | Reverse proxy / TLS in front of the container | `docs/deploy.md` |
 | Remote engine runners (yaml, container, troubleshooting) | `docs/runners.md` |
 | Design tokens, layout decisions, brand assets | `docs/design/README.md` |
-| Image, compose files, entrypoint | `docker/` |
+| Image, compose files, entrypoint (the public demo is `docker-compose.demo.yml`) | `docker/` |
 | CI and the release-to-deploy pipeline | `.github/workflows/` |
+| The landing page at blunderbase.org (static, GitHub Pages, `make site` to assemble) | `site/`, `scripts/site.sh` |
 
 ## Working here
 

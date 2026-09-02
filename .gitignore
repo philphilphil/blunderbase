@@ -28,3 +28,6 @@ coverage.json
 
 # Playwright MCP scratch output — never part of the repo.
 .playwright-mcp/
+
+# The assembled landing page (`make site`); the source is site/index.html.
+/site/dist/

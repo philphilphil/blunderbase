@@ -471,6 +471,18 @@ class AccountRegistered(BaseModel):
 # --- import ---------------------------------------------------------------
 
 
+class SyncSchedule(BaseModel):
+    """How often every connected account is synced on its own. Null: never."""
+
+    minutes: int | None
+
+
+class SyncScheduleUpdate(Input):
+    """The same, as the import page posts it: a number to switch on, null to switch off."""
+
+    minutes: int | None = Field(default=None, ge=1)
+
+
 class ImportRequest(Input):
     """The options an import adapter takes. An adapter ignores the ones it does not use."""
 

@@ -34,6 +34,7 @@ import type {
   DeletionsForgotten,
   GamesRemoved,
   ImportRequest,
+  SyncSchedule,
   LineCreate,
   McpKeyCreate,
   NoteCreate,
@@ -559,6 +560,34 @@ export function useStartImport(
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.imports() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useSyncSchedule(
+  options?: Options<Awaited<ReturnType<typeof api.getSyncSchedule>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.syncSchedule(),
+    queryFn: api.getSyncSchedule,
+    ...options,
+  })
+}
+
+/**
+ * The answer is written straight into the cache: it is what is in force, floored by the
+ * backend, and the box should show that rather than what was typed.
+ */
+export function useUpdateSyncSchedule(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.putSyncSchedule>>, Error, SyncSchedule>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: SyncSchedule) => api.putSyncSchedule(body),
+    ...options,
+    onSuccess: (...args) => {
+      client.setQueryData(queryKeys.syncSchedule(), args[0])
       options?.onSuccess?.(...args)
     },
   })

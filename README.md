@@ -8,10 +8,15 @@
   Personal chess database<br/>
 </p>
 
+<p align="center">
+  <a href="https://blunderbase.org">blunderbase.org</a> ·
+  <a href="https://demo.blunderbase.org">try the demo</a>
+</p>
+
 ---
 
 ## Features
-- Import games from Lichess, Chess.com, FICS, and PGNs
+- Import games from Lichess, Chess.com, FICS, and PGNs — by hand or every N minutes
 - Analyze your games with multiple engines
 - Support for maia3 at multiple ELO's to see what humans would have played
 - Take notes on positions and variations
@@ -79,6 +84,7 @@ backend/
   services/         — the only place a "blunder" or a stat is defined
   adapters/         — Lichess, Chess.com, FICS, UCI engines, Maia
 web/                — React SPA
+site/               — the landing page at blunderbase.org (GitHub Pages)
 tests/              — pytest
 docs/               — deploy.md, runners.md, reference.md, ARCHITECTURE.md
 ```

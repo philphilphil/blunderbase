@@ -116,6 +116,9 @@ LICHESS_TOKEN = "lichess_token"
 # whole-set rewrite on purpose: it is not a number the analysis form posts, and a key that
 # form rewrote would resume a queue the owner had paused.
 QUEUE_PAUSED = "queue_paused"
+# Minutes between scheduled syncs of every connected account; no row means never. A
+# number rather than a flag and a number because "on, but at no interval" is not a state.
+AUTO_SYNC_MINUTES = "auto_sync_minutes"
 
 ROLE_KEYS: dict[EngineRole, str] = {
     EngineRole.QUICK: QUICK_ENGINE_ID,
@@ -592,3 +595,45 @@ def _clean(setting: Setting, value: object) -> int | float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return setting.clamp(value)
+
+
+# --- the sync schedule ----------------------------------------------------
+
+
+# The floor. Every sync is at least one request to a public API per account, and the
+# archives answer nothing new inside a minute anyway; below this the box is a typo.
+MIN_AUTO_SYNC_MINUTES = 1
+
+
+def get_auto_sync_minutes(session: Session) -> int | None:
+    """Minutes between scheduled syncs, or None because the owner has not switched it on.
+
+    Anything in the row that is not a whole number at or above the floor is read as off —
+    the same treatment a hand-edited engine id gets.
+    """
+    row = session.get(AppSetting, AUTO_SYNC_MINUTES)
+    if row is None or isinstance(row.value, bool) or not isinstance(row.value, int | float):
+        return None
+    minutes = int(row.value)
+    return minutes if minutes >= MIN_AUTO_SYNC_MINUTES else None
+
+
+def set_auto_sync_minutes(session: Session, minutes: int | None) -> int | None:
+    """Schedule a sync every `minutes`, or switch it off. Returns what is in force.
+
+    Off deletes the row rather than writing a 0, the way every other write here treats
+    "the owner has not chosen". A value under the floor is pulled up to it rather than
+    refused: the box said "as often as you can", and this is that.
+    """
+    if minutes is None:
+        session.execute(delete(AppSetting).where(AppSetting.key == AUTO_SYNC_MINUTES))
+        session.commit()
+        return None
+    wanted = max(MIN_AUTO_SYNC_MINUTES, int(minutes))
+    row = session.get(AppSetting, AUTO_SYNC_MINUTES)
+    if row is None:
+        session.add(AppSetting(key=AUTO_SYNC_MINUTES, value=wanted))
+    else:
+        row.value = wanted
+    session.commit()
+    return wanted

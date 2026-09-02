@@ -143,3 +143,35 @@ def test_demo_cli_reports_the_created_library(
     assert "1 games, 1 analyzed, 0 deep, 9 notes" in printed
     assert output.is_file()
 
+
+
+def test_demo_stockfish_row_points_where_the_serving_machine_is_told(
+    settings: Settings, fixtures_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A demo built for screenshots needs no engine; one that will be served wants the
+    binary of the machine serving it behind the analysis board."""
+    _analyzed_source(settings, fixtures_dir / "query_games.pgn")
+    capsys.readouterr()
+    output = tmp_path / "served-demo.db"
+
+    assert main(
+        [
+            "demo",
+            "create",
+            "--games",
+            "1",
+            "--output",
+            str(output),
+            "--stockfish",
+            "/usr/local/bin/stockfish",
+        ]
+    ) == 0
+
+    demo_settings = Settings(
+        root=tmp_path, data_dir=tmp_path, BLUNDERBASE_DB_PATH=output, analysis_workers=False
+    )
+    with session_scope(demo_settings) as session:
+        paths = {engine.kind: engine.path for engine in session.scalars(select(Engine))}
+    assert paths[EngineKind.UCI] == "/usr/local/bin/stockfish"
+    assert paths[EngineKind.MAIA] == "/demo/maia"
+    assert "BLUNDERBASE_RUNTIME_MODE=demo" in capsys.readouterr().out

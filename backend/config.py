@@ -34,9 +34,11 @@ class Settings(BaseSettings):
     )
 
     root: Path = ROOT
-    # The same build runs as a networked server and inside the desktop shell. The mode is
-    # runtime configuration so the backend, web UI and tests all see the same capabilities.
-    runtime_mode: Literal["server", "desktop"] = "server"
+    # The same build runs as a networked server, inside the desktop shell, and as the public
+    # demo. The mode is runtime configuration so the backend, web UI and tests all see the
+    # same capabilities. `demo` opens the door to everyone and closes every write — it is
+    # for a database `blunderbase demo create` built, and nothing else should ever run in it.
+    runtime_mode: Literal["server", "desktop", "demo"] = "server"
     # A desktop launch authenticates its own webview transparently with this per-launch
     # secret. It is deliberately unrelated to the owner's persistent server password.
     desktop_token: SecretStr = SecretStr("")
@@ -80,6 +82,11 @@ class Settings(BaseSettings):
     # Remote runners. Every one of these has a default, so a deployment with no runners
     # registered behaves exactly as it did before they existed.
     #
+    # How often the scheduled sync looks at the clock. The interval itself is an app
+    # setting (`auto_sync_minutes`, off by default); this only decides how late a sync can
+    # be, so a minute is plenty and the tests shrink it.
+    auto_sync_poll_seconds: float = Field(default=60.0, gt=0)
+
     # How often the gateway pings a connected runner, and how often a polling one comes
     # back for work. Several beats fit inside `analysis.STALE_AFTER_SECONDS`.
     runner_heartbeat_seconds: float = Field(default=10.0, gt=0)
@@ -119,6 +126,11 @@ class Settings(BaseSettings):
             return fallback
         value = value.expanduser()
         return value if value.is_absolute() else (self.root / value).resolve()
+
+    @property
+    def demo(self) -> bool:
+        """Whether this is the public, read-only demo — the one mode with no door at all."""
+        return self.runtime_mode == "demo"
 
     @property
     def database_url(self) -> str:

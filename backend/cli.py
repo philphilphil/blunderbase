@@ -247,6 +247,13 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     create_demo.add_argument(
         "--force", action="store_true", help="replace an existing output database"
     )
+    create_demo.add_argument(
+        "--stockfish",
+        metavar="PATH",
+        help="what the demo's Stockfish row points at on the machine that will serve it, "
+        "so the analysis board has a live engine (the image has one at /usr/local/bin/"
+        "stockfish); defaults to a path that exists nowhere, which is fine for screenshots",
+    )
 
     return parser
 
@@ -670,8 +677,8 @@ def command_db(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def command_demo(args: argparse.Namespace, settings: Settings) -> int:
-    """Build the isolated library used for screenshots and the eventual demo mode."""
-    from backend.services.demo import DemoDataError, create_demo_database
+    """Build the isolated library used for screenshots and the public demo."""
+    from backend.services.demo import DEMO_STOCKFISH_PATH, DemoDataError, create_demo_database
 
     try:
         summary = create_demo_database(
@@ -680,6 +687,7 @@ def command_demo(args: argparse.Namespace, settings: Settings) -> int:
             game_count=args.games,
             as_of=args.as_of,
             force=args.force,
+            stockfish_path=args.stockfish or DEMO_STOCKFISH_PATH,
         )
     except DemoDataError as exc:
         print(f"demo: {exc}")
@@ -690,6 +698,7 @@ def command_demo(args: argparse.Namespace, settings: Settings) -> int:
         f"{summary.deep} deep, {summary.notes} notes"
     )
     print(f"serve it with BLUNDERBASE_DB_PATH={summary.path} blunderbase serve")
+    print("add BLUNDERBASE_RUNTIME_MODE=demo to serve it to everyone, read-only")
     return 0
 
 

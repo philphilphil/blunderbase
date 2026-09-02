@@ -1,5 +1,6 @@
 import { isSessionLoss, reportSessionLost } from '@/lib/auth/session'
 
+import { isReadOnlyRefusal, reportWriteRefused } from './readOnly'
 import type { ErrorBody } from './types'
 
 /**
@@ -114,6 +115,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     // the caller renders whatever it renders for a failure until the gate swaps it out.
     if (failure.status === 401 && isSessionLoss(failure.error)) {
       reportSessionLost(failure.error)
+    }
+    // The demo refusing a write is likewise the deployment's answer rather than this
+    // caller's: the shell says so once, and the caller still gets its error.
+    if (isReadOnlyRefusal(failure.status, failure.error)) {
+      reportWriteRefused()
     }
     throw failure
   }

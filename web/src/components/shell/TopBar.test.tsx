@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
+import { SERVER_CAPABILITIES } from '@/lib/api/types'
+import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
 import { ThemeProvider } from '@/lib/ui/theme'
 
 import { CommandPaletteProvider } from './CommandPalette'
@@ -18,18 +20,23 @@ vi.mock('./AccountMenu', () => ({
   AccountMenu: () => <div data-testid="account" />,
 }))
 
-function draw({ crumbs = false }: { crumbs?: boolean } = {}) {
+function draw({ crumbs = false, demo = false }: { crumbs?: boolean; demo?: boolean } = {}) {
   const onOpenNav = vi.fn()
+  const capabilities = demo
+    ? { ...SERVER_CAPABILITIES, password_auth: false, mcp: false, remote_runners: false, read_only: true }
+    : SERVER_CAPABILITIES
   render(
     <ThemeProvider>
-      <MemoryRouter>
-        <PageChromeProvider>
-          <CommandPaletteProvider>
-            {crumbs ? <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }]} /> : null}
-            <TopBar onOpenNav={onOpenNav} />
-          </CommandPaletteProvider>
-        </PageChromeProvider>
-      </MemoryRouter>
+      <RuntimeCapabilitiesProvider capabilities={capabilities}>
+        <MemoryRouter>
+          <PageChromeProvider>
+            <CommandPaletteProvider>
+              {crumbs ? <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }]} /> : null}
+              <TopBar onOpenNav={onOpenNav} />
+            </CommandPaletteProvider>
+          </PageChromeProvider>
+        </MemoryRouter>
+      </RuntimeCapabilitiesProvider>
     </ThemeProvider>,
   )
   return onOpenNav
@@ -74,5 +81,21 @@ describe('the titlebar', () => {
     draw({ crumbs: true })
 
     expect(screen.getByRole('link', { name: 'Library' }).parentElement).toHaveClass('max-md:hidden')
+  })
+})
+
+describe('the public demo', () => {
+  it('says so in the titlebar, and points home', () => {
+    draw({ demo: true })
+
+    const chip = screen.getByRole('link', { name: /demo/i })
+    expect(chip).toHaveAttribute('href', 'https://blunderbase.org')
+    expect(chip).toHaveTextContent(/read-only/)
+  })
+
+  it('carries no such chip on an installation of one\'s own', () => {
+    draw()
+
+    expect(screen.queryByRole('link', { name: /demo/i })).not.toBeInTheDocument()
   })
 })

@@ -24,6 +24,11 @@ which is how the UI knows to show the setup screen rather than the login one.
 Desktop mode keeps the same guard but replaces the persistent owner password with a
 per-launch token supplied by the native shell. Passwordless there means transparent
 authentication, not an unguarded loopback API.
+
+Demo mode is the one shape with no door: everyone is the owner of a library that cannot be
+changed. The guard lets every request through and `api/readonly.py` is what refuses the
+writes — two middlewares rather than one, because "who may look" and "who may touch" are
+different questions and only the demo answers both the same way.
 """
 
 from __future__ import annotations
@@ -146,6 +151,8 @@ class AuthGuard:
         an unknown cookie, no cookie, a deployment nobody has set a password on — is
         decided by the database, and only the yes is worth remembering.
         """
+        if self.settings.demo:
+            return AUTHENTICATED
         capabilities = capabilities_for(self.settings)
         if not capabilities.password_auth:
             expected = self.settings.desktop_token.get_secret_value()

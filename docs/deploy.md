@@ -191,3 +191,43 @@ the threads away with no error anywhere. The consequence of leaving it on is tha
 or the browser blocks it — the build loads none, so nothing is affected today, but a proxy
 that injects a script tag from its own domain is. Set it to `false` in either case: the
 page then works exactly as it did before, on one thread.
+
+## A public demo
+
+demo.blunderbase.org is the same image, serving a library `blunderbase demo create` built,
+to everyone, read-only. It is a second stack beside the owner's own — never the same one,
+because demo mode has no password and must never be pointed at a real library. What makes
+it safe is in `docs/reference.md` under "Signing in"; what makes it run is three things:
+
+1. **Build the library on a machine that has your real one.** The engine row it writes has
+   to point at the Stockfish of the machine that will *serve* it, or the analysis board
+   in the game view has nothing to run:
+
+   ```bash
+   uv run blunderbase demo create --games 72 --stockfish /usr/local/bin/stockfish
+   ```
+
+2. **Run the stack and put the file in its volume.** `docker/docker-compose.demo.yml` is
+   the whole configuration: `BLUNDERBASE_RUNTIME_MODE=demo`, the database at
+   `/data/demo.db`, the workers off (nothing is ever queued in a read-only library), and
+   the port on loopback for the proxy to reach.
+
+   ```bash
+   docker compose -f docker/docker-compose.demo.yml up -d
+   docker cp data/demo.db blunderbase-demo:/data/demo.db
+   docker restart blunderbase-demo
+   ```
+
+   The same two commands refresh it after a new `demo create`.
+
+3. **Give it a hostname.** One more site in the Caddyfile or nginx config above, pointing
+   at `127.0.0.1:8766` instead of `8765`; everything the three rules say applies unchanged.
+   There is no `/mcp` and no `/runner` on a demo, so a proxy that only forwards `/`, `/api`
+   and `/events` is forwarding everything there is.
+
+What a visitor can make the machine do is bounded the way it is for the owner: at most
+`BLUNDERBASE_STREAM_MAX_SESSIONS` analysis boards at once (two), each dropped
+`BLUNDERBASE_STREAM_IDLE_SECONDS` after its tab goes away, and one-off evals capped by the
+node budget the request names. Every write — a note, an import, a setting, a deletion — is
+refused at the door, so there is nothing to clean up and no reason a visitor's session
+should differ from the next one's.

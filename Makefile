@@ -1,4 +1,4 @@
-.PHONY: run backend web desktop install test migrate engines mcp mcp-http mcp-key release publish
+.PHONY: run run-demo backend web desktop install test migrate engines mcp mcp-http mcp-key release publish site
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -118,3 +118,25 @@ publish:
 # `make release v0.2.0` names the version as a goal; this swallows it so make does not go
 # looking for a rule to build it. Nothing else in here is spelled v-something.
 v%: ; @:
+
+# Assemble the landing page (site/index.html plus the screenshots and brand assets) into
+# site/dist, to open in a browser. `.github/workflows/site.yml` runs the same script to
+# publish blunderbase.org.
+site:
+	@sh scripts/site.sh
+
+# The public demo, locally: the same two processes as `run`, on a library `demo create`
+# built from this checkout's own database, with `BLUNDERBASE_RUNTIME_MODE=demo` — no
+# password, every write refused, the analysis board on this machine's Stockfish. The demo
+# database is built once and kept; delete data/demo.db to rebuild it from newer games.
+DEMO_DB := data/demo.db
+
+$(DEMO_DB): migrate
+	uv run blunderbase demo create --output $(DEMO_DB) --stockfish "$(SF)"
+
+run-demo: $(DEMO_DB)
+	@trap 'kill 0' EXIT INT TERM; \
+	BLUNDERBASE_DB_PATH=$(DEMO_DB) BLUNDERBASE_RUNTIME_MODE=demo BLUNDERBASE_ANALYSIS_WORKERS=false \
+		uv run blunderbase serve & \
+	cd web && pnpm dev & \
+	wait

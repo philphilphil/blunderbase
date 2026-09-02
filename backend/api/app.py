@@ -13,6 +13,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from backend.api.auth import install_auth
 from backend.api.errors import install_error_handlers
 from backend.api.events import EventBroker
+from backend.api.readonly import install_read_only
 from backend.api.routes import CORE_ROUTERS, MCP_ROUTERS, REMOTE_RUNNER_ROUTERS
 from backend.api.routes.imports import wait_for_imports
 from backend.api.web import install_web
@@ -24,6 +25,7 @@ from backend.services import explorer, maia_live, stats
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers
+from backend.workers.auto_sync import AutoSync
 from backend.workers.local_streams import LocalStreamBackend
 from backend.workers.runner_gateway import RunnerGateway
 from backend.workers.runner_streams import RemoteStreamBackend
@@ -80,6 +82,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     streams = _analysis_boards(settings, workers, gateway)
     app.state.streams = streams
     await streams.start()
+    # The scheduled sync is the Sync button on a clock, so it has no business in a library
+    # nothing may write to. Off by default everywhere else; the import page switches it on.
+    auto_sync = AutoSync(settings=settings, broker=events) if not capabilities.read_only else None
+    app.state.auto_sync = auto_sync
+    if auto_sync is not None:
+        await auto_sync.start()
     summaries = asyncio.create_task(_backfill_stat_summaries(settings))
     books = asyncio.create_task(_backfill_position_books(settings))
     try:
@@ -99,6 +107,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await summaries
         with suppress(asyncio.CancelledError):
             await books
+        # Before the manual syncs are waited for: nothing may start one now.
+        if auto_sync is not None:
+            await auto_sync.stop()
+        app.state.auto_sync = None
         await wait_for_imports(app.state.imports)
         # Before the gateway and the workers, in that order: an analysis board holds a slot
         # on one of them, and both have to still be there for it to give the slot back to.
@@ -270,6 +282,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.workers = None
     app.state.gateway = None
     app.state.streams = None
+    app.state.auto_sync = None
     app.state.loop = None
     app.state.mcp = None
 
@@ -301,6 +314,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # guard — the UI has to load in order to show the login screen — and so the `/api`
     # prefix has already been stripped from the paths the guard matches.
     install_auth(app, settings)
+    # The demo's second rule, in the same position for the same reason: it sees the bare
+    # paths, and it answers before a handler could have touched anything.
+    if capabilities.read_only:
+        install_read_only(app)
     app.state.web = install_web(
         app, settings.web_dist, isolate=settings.cross_origin_isolation
     )

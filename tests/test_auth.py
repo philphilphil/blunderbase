@@ -34,6 +34,7 @@ SERVER_CAPABILITIES = {
     "password_auth": True,
     "mcp": True,
     "remote_runners": True,
+    "read_only": False,
 }
 
 # Every router, by a path that answers on an empty database.

@@ -104,7 +104,7 @@ describe('AccountMenu', () => {
       json(200, {
         setup_required: false,
         authenticated: true,
-        capabilities: { password_auth: false, mcp: false, remote_runners: false },
+        capabilities: { password_auth: false, mcp: false, remote_runners: false, read_only: false },
       })
     draw()
     await openMenu()

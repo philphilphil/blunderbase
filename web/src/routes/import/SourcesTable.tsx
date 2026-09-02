@@ -27,6 +27,7 @@ import {
 import type { AccountSummary, ImportJob } from '@/lib/api/types'
 
 import { AccountRow } from './AccountRow'
+import { AutoSyncControl } from './AutoSyncControl'
 import { PgnRow } from './PgnRow'
 import { SyncCheckbox } from './SyncCheckbox'
 import type { ImportProgressState } from './useImportProgress'
@@ -156,6 +157,10 @@ export function SourcesTable({
           />
         </TableBody>
       </Table>
+
+      {/* The same rows, pressed for you on a clock — a footer, because it is about every
+          press from now on rather than the next one the strip above describes. */}
+      <AutoSyncControl />
     </section>
   )
 }

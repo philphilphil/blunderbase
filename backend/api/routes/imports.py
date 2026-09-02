@@ -18,9 +18,17 @@ from fastapi import APIRouter, Query, Request, Response, status
 from backend.api.deps import BrokerDep, SessionDep, SettingsDep, not_found
 from backend.api.errors import ApiError
 from backend.api.events import EventBroker
-from backend.api.schemas import ImportJobList, ImportJobResponse, ImportRequest, ImportStarted
+from backend.api.schemas import (
+    ImportJobList,
+    ImportJobResponse,
+    ImportRequest,
+    ImportStarted,
+    SyncSchedule,
+    SyncScheduleUpdate,
+)
 from backend.config import Settings
 from backend.db.session import session_scope
+from backend.services import app_settings as app_settings_service
 from backend.services import import_service
 from backend.services.import_service import ProgressHook
 
@@ -63,6 +71,18 @@ def get_job(session: SessionDep, job_id: int) -> Any:
     if job is None:
         raise not_found("unknown_job", f"no import job with id {job_id}")
     return job
+
+
+@router.get("/schedule", response_model=SyncSchedule, summary="How often accounts sync alone")
+def get_schedule(session: SessionDep) -> SyncSchedule:
+    return SyncSchedule(minutes=app_settings_service.get_auto_sync_minutes(session))
+
+
+@router.put("/schedule", response_model=SyncSchedule, summary="Sync every N minutes, or never")
+def put_schedule(session: SessionDep, body: SyncScheduleUpdate) -> SyncSchedule:
+    """Every connected account, from its last cursor, on this clock — the Sync button
+    pressed for you (`workers/auto_sync.py`). Answers with what is in force."""
+    return SyncSchedule(minutes=app_settings_service.set_auto_sync_minutes(session, body.minutes))
 
 
 @router.post(

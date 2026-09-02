@@ -87,6 +87,7 @@ export const queryKeys = {
     query,
   ],
   importJob: (id: number): QueryKey => ['import', 'job', id],
+  syncSchedule: (): QueryKey => ['import', 'schedule'],
 
   explorer: (): QueryKey => ['explorer'],
   explorerTree: (query: ExplorerQuery = {}): QueryKey => ['explorer', 'tree', query],

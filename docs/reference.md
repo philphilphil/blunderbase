@@ -36,6 +36,16 @@ the cost parameters kept beside it so they can be raised later. Session tokens a
 hashed too, so a copy of the database is not a way in. A password change signs every other
 browser out.
 
+**The demo has no door.** `BLUNDERBASE_RUNTIME_MODE=demo` lets everyone in as the owner
+and lets nobody change anything: the guard answers every request, and a second middleware
+(`api/readonly.py`) refuses everything but `GET`, `HEAD` and `OPTIONS` with `403
+{"error": "read_only"}` before a handler sees it. The exceptions are the three "reads
+spelled as POSTs" that touch no row — the analysis board (`/streams`), Maia's answer for a
+position and a one-off engine eval — so the game view stays alive. `/mcp` and the runner
+transport are not mounted at all. The page shows a *Demo · read-only* chip in the titlebar
+and one toast the first time a write is refused. Run it only on a database `demo create`
+built; see "A public demo" in [deploy.md](deploy.md#a-public-demo).
+
 ## Engines
 
 Engines are rows, not configuration: on **Engines**, give one a path (a file, a
@@ -138,6 +148,7 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_WEB_DIST` | `<root>/web/dist` | the built web app; a directory that is not there is simply not served |
 | `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` | `true` | serve the page with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, which is what a browser wants before it will give a tab a `SharedArrayBuffer` — and without one an engine running in the browser is single-threaded. The cost is that every **cross-origin** subresource must opt in with CORP or be blocked; the build loads none today. Turn it off for a proxy that rewrites the headers, or a page that has to load an asset from somewhere else |
 | `BLUNDERBASE_HOST` `BLUNDERBASE_PORT` | `127.0.0.1` `8765` | what `serve` binds |
+| `BLUNDERBASE_RUNTIME_MODE` | `server` | `server`, `desktop` (the native shell's, needs `BLUNDERBASE_DESKTOP_TOKEN`) or `demo` — the public, read-only demo: no password, no `/mcp`, no runners, and every write answers `403 read_only`. Only ever for a database `demo create` built |
 | `BLUNDERBASE_MCP_BEARER_KEY` | — | one more token `/mcp` accepts, beside the minted keys and the owner's password; for compose files and automation |
 | `BLUNDERBASE_ANALYSIS_CONCURRENCY` | cores − 2 | engine processes at once, across every tier |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
@@ -160,6 +171,22 @@ Unset means the default in that table, not a null.
 Everything else out of range is clamped rather than refused, so what a save answers with is
 what is in force. Budgets and thresholds apply to runs from then on; a game already
 analysed keeps the numbers it was analysed with until a fresh pass runs over it.
+
+## Syncing on a schedule
+
+The Sync button on the import page can be pressed for you: tick **Sync automatically**
+under the sources table and say every how many minutes. From then on every connected
+account on Lichess, Chess.com or FICS is read again from its last cursor once that long has
+passed since its last sync started — whatever that sync did, so a failing one is retried on
+the same clock rather than every tick. One account at a time, in the order the table lists
+them, and never while a sync of it is still running. Each run lands in the sync history like
+a manual one and shows on `/events` the same way.
+
+It is a stored setting (`GET`/`PUT /import/schedule`, `{"minutes": 30}` or `null`), read at
+every tick, so a change takes effect without a restart; `BLUNDERBASE_AUTO_SYNC_POLL_SECONDS`
+(default 60) is only how often the clock is looked at. The scheduler runs in the serve
+process, off by default and never in the demo; `blunderbase import …` from cron is the same
+thing for a deployment that would rather own the clock.
 
 ## The reference explorer and its Lichess token
 
@@ -304,11 +331,17 @@ is already known.
 `<data-dir>/demo.db`. Use `--games N` to size it, `--as-of YYYY-MM-DD` to pin the fake date
 range, `--from` or `--output` to choose either file, and `--force` to explicitly replace an
 old output. It reconstructs PGNs without comments and fabricates all identifying metadata;
-credentials and personal notes are never copied. Run the result as an ordinary deployment:
+credentials and personal notes are never copied. The engine rows it writes point nowhere,
+which is right for screenshots: the analysis is copied in, so nothing needs to run. A demo
+that is going to be *served* wants a live engine behind its analysis board — `--stockfish
+PATH` is what its Stockfish row points at on the machine that will serve it (the image has
+one at `/usr/local/bin/stockfish`). Run the result as an ordinary deployment, or as the
+public demo:
 
 ```bash
 uv run blunderbase demo create --games 72
-BLUNDERBASE_DB_PATH=data/demo.db uv run blunderbase serve
+BLUNDERBASE_DB_PATH=data/demo.db uv run blunderbase serve                              # yours, with a password
+BLUNDERBASE_DB_PATH=data/demo.db BLUNDERBASE_RUNTIME_MODE=demo uv run blunderbase serve  # everyone's, read-only
 ```
 
 ## Cutting a release

@@ -23,20 +23,38 @@ class RuntimeCapabilities(BaseModel):
     password_auth: bool
     mcp: bool
     remote_runners: bool
+    # The library cannot be changed from here: every write answers 403 `read_only`. The
+    # page uses it to say so up front rather than letting a visitor find out by trying.
+    read_only: bool
 
 
 SERVER_CAPABILITIES = RuntimeCapabilities(
     password_auth=True,
     mcp=True,
     remote_runners=True,
+    read_only=False,
 )
 DESKTOP_CAPABILITIES = RuntimeCapabilities(
     password_auth=False,
     mcp=False,
     remote_runners=False,
+    read_only=False,
+)
+# The public demo: no password because there is nothing to protect, no coach and no
+# runners because both would be a stranger's way to make the process do work, and no
+# writes because the library is the exhibit.
+DEMO_CAPABILITIES = RuntimeCapabilities(
+    password_auth=False,
+    mcp=False,
+    remote_runners=False,
+    read_only=True,
 )
 
 
 def capabilities_for(settings: Settings) -> RuntimeCapabilities:
     """Return the complete runtime contract for one process."""
-    return DESKTOP_CAPABILITIES if settings.runtime_mode == "desktop" else SERVER_CAPABILITIES
+    if settings.runtime_mode == "desktop":
+        return DESKTOP_CAPABILITIES
+    if settings.runtime_mode == "demo":
+        return DEMO_CAPABILITIES
+    return SERVER_CAPABILITIES
