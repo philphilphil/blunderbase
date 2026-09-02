@@ -1,7 +1,7 @@
 import type { DrawShape } from '@lichess-org/chessground/draw'
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { GameRunSummary, MoveRow, RunResponse } from '@/lib/api/types'
@@ -121,9 +121,37 @@ const DEEP_RUN: GameRunSummary = {
   finished_at: '2026-08-20T12:00:00Z',
 }
 
-// The arrow preferences are a module-level store over localStorage, so a test that
-// switches one off must not leak it into the next.
+/**
+ * The arrow preferences are a module-level store over localStorage, and one test below
+ * switches two of them off. Clearing the module's cache is not enough to contain that: the
+ * next read goes back to the store and finds what was written there, so every later test
+ * would draw a board with the engine and Maia arrows off — which is exactly how this file
+ * failed on CI while passing on a machine whose Node exposes no localStorage at all.
+ *
+ * So each test gets its own, following `dashboard/RatingCard.test.tsx`: a fresh store means
+ * the defaults, whatever the host provides and whatever the test before it wrote.
+ */
+function memoryStorage(): Storage {
+  const map = new Map<string, string>()
+  return {
+    get length() {
+      return map.size
+    },
+    key: (index: number) => [...map.keys()][index] ?? null,
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, String(value)),
+    removeItem: (key: string) => void map.delete(key),
+    clear: () => map.clear(),
+  }
+}
+
+beforeEach(() => {
+  vi.stubGlobal('localStorage', memoryStorage())
+  resetBoardArrowPrefs()
+})
+
 afterEach(() => {
+  vi.unstubAllGlobals()
   resetBoardArrowPrefs()
 })
 

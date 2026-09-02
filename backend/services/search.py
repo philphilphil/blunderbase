@@ -37,10 +37,9 @@ def global_search(session: Session, query: str, *, limit: int = 5) -> dict[str, 
         "games": [games_service.game_summary(game) for game in found],
         "opponents": search_opponents(session, text, limit=limit),
         "openings": search_openings(session, text, limit=limit),
-        "notes": [
-            notes_service.note_payload(note)
-            for note in notes_service.search_notes(session, query=text, limit=limit)
-        ],
+        "notes": notes_service.note_payloads(
+            session, notes_service.search_notes(session, query=text, limit=limit)
+        ),
     }
 
 

@@ -295,6 +295,16 @@ the usual way — which creates a bare `positions` row if no game of theirs ever
 That row is an anchor for a note and nothing else: the explorer's counts come through
 `game_positions`, which such a row has none of, so it moves no number the owner reads.
 
+Which is why a note payload carries its own provenance. A note pinned to a position appears
+at that position wherever it turns up — the game, the explorer, the repertoire — so the
+payload says where it was written (`move`, plus the `game` brief with `is_owner_game` on it,
+which is how a note made on a model game is told apart from one made on the owner's own) and
+how far the position reaches (`position_games`, `position_reference_games`). The reach is
+counted the way the explorer counts, over games with an `owner_color`, so the number a note
+shows and the tree the link opens are the same set of games. It is one grouped query per
+page of notes (`notes.note_payloads`), never one per note: a list endpoint that fanned out
+per row is the shape that took the server down once already.
+
 The explorer has its own written-down fold, for the same reason the games do, and one
 extra: a position is shared by every game that reached it, so the numbers change when
 *any* of them does. `position_moves` is one row per (position, owner colour, move) holding

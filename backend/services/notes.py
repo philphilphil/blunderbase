@@ -29,7 +29,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from weakref import WeakKeyDictionary
 
-from sqlalchemy import ColumnElement, select, text
+from sqlalchemy import ColumnElement, case, func, select, text
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import Session
 
@@ -130,13 +130,13 @@ def save_line(session: Session, game_id: int, base_ply: int, moves: Sequence[str
             line.moves = wanted
             line.updated_at = utcnow()
             session.commit()
-            _announce_line(EVENT_LINE_CREATED, line)
+            _announce_line(session, EVENT_LINE_CREATED, line)
             return line
 
     line = Line(game_id=game.id, base_ply=base, moves=wanted)
     session.add(line)
     session.commit()
-    _announce_line(EVENT_LINE_CREATED, line)
+    _announce_line(session, EVENT_LINE_CREATED, line)
     return line
 
 
@@ -159,7 +159,7 @@ def delete_line(session: Session, line_id: int) -> bool:
     line = session.get(Line, int(line_id))
     if line is None:
         return False
-    payload = line_payload(line)
+    payload = line_payload(session, line)
     session.delete(line)
     session.commit()
     events_service.emit(
@@ -168,7 +168,7 @@ def delete_line(session: Session, line_id: int) -> bool:
     return True
 
 
-def line_payload(line: Line, *, with_notes: bool = False) -> dict[str, Any]:
+def line_payload(session: Session, line: Line, *, with_notes: bool = False) -> dict[str, Any]:
     """One line as an API response: the moves in UCI, and the same line in SAN."""
     payload: dict[str, Any] = {
         "id": line.id,
@@ -181,7 +181,7 @@ def line_payload(line: Line, *, with_notes: bool = False) -> dict[str, Any]:
     }
     if with_notes:
         notes = sorted(line.notes, key=lambda note: (note.ply is None, note.ply or 0, note.id))
-        payload["notes"] = [note_payload(note) for note in notes]
+        payload["notes"] = note_payloads(session, notes)
     return payload
 
 
@@ -286,7 +286,7 @@ def save_note(
     )
     session.add(note)
     session.commit()
-    _announce(EVENT_NOTE_CREATED, note)
+    _announce(session, EVENT_NOTE_CREATED, note)
     return note
 
 
@@ -439,7 +439,7 @@ def update_note(
     if tags is not None:
         note.tags = normalize_tags(tags)
     session.commit()
-    _announce(EVENT_NOTE_UPDATED, note)
+    _announce(session, EVENT_NOTE_UPDATED, note)
     return note
 
 
@@ -570,40 +570,101 @@ def export_pgn(session: Session, notes: Sequence[Note]) -> str:
 # --- payloads --------------------------------------------------------------
 
 
-def note_payload(note: Note) -> dict[str, Any]:
+def note_payload(session: Session, note: Note) -> dict[str, Any]:
     """One note as an API response or an MCP tool result.
 
     Carries the anchors resolved rather than only their ids: the FEN of the position, a
     small summary of the game and the whole line, because every surface that renders a note
     needs all three and none of them should have to make three more calls for them.
+
+    Two of them are what makes a position note readable away from where it was written.
+    `move` is the move it was written on, so a note that surfaces at a position the owner
+    reached some other way can still name its origin; `position_games` and
+    `position_reference_games` are how many games in the library pass through the position,
+    which is the count behind the way back to the explorer.
     """
-    line = note.line
+    return _payload(session, note, reach_by_position(session, [note.position_id]))
+
+
+def note_payloads(session: Session, notes: Sequence[Note]) -> list[dict[str, Any]]:
+    """A page of notes, with the reach of every position counted in one query rather than
+    one per note — this is what a list endpoint calls."""
+    reach = reach_by_position(session, [note.position_id for note in notes])
+    return [_payload(session, note, reach) for note in notes]
+
+
+def reach_by_position(
+    session: Session, position_ids: Iterable[int | None]
+) -> dict[int, dict[str, int]]:
+    """How many games pass through each of a batch of positions, keyed by position id.
+
+    Two counts rather than one, because they mean different things to a note. `games` is the
+    games the owner played a side of — exactly the ones the opening explorer counts for a
+    position, so the number and the screen the button opens agree — and `reference_games` is
+    everything else through it: a model game added from the reference books, or one whose
+    side has not been worked out yet. Both are `db.models.Game`'s own distinction.
+
+    Counted over distinct games: a position repeated in one game is one game, not two.
+    """
+    wanted = {int(value) for value in position_ids if value is not None}
+    if not wanted:
+        return {}
+
+    seen = (
+        select(
+            GamePosition.position_id.label("position_id"),
+            GamePosition.game_id.label("game_id"),
+            Game.owner_color.label("owner_color"),
+        )
+        .join(Game, Game.id == GamePosition.game_id)
+        .where(GamePosition.position_id.in_(wanted))
+        .distinct()
+        .subquery()
+    )
+    owned = case((seen.c.owner_color.is_not(None), 1), else_=0)
+    rows = session.execute(
+        select(
+            seen.c.position_id,
+            func.coalesce(func.sum(owned), 0),
+            func.coalesce(func.sum(1 - owned), 0),
+        ).group_by(seen.c.position_id)
+    )
     return {
-        "id": note.id,
-        "text": note.text,
-        "tags": list(note.tags or ()),
-        "game_id": note.game_id,
-        "position_id": note.position_id,
-        "line_id": note.line_id,
-        "ply": note.ply,
-        "source": str(note.source),
-        "fen": note.position.fen if note.position is not None else None,
-        "line": line_payload(line) if line is not None else None,
-        "game": game_brief(note.game) if note.game is not None else None,
-        "created_at": note.created_at.isoformat(),
-        "updated_at": note.updated_at.isoformat(),
+        int(position_id): {"games": int(games), "reference_games": int(reference)}
+        for position_id, games, reference in rows
     }
 
 
 def game_brief(game: Game) -> dict[str, Any]:
-    """Just enough of a game to label a note with it."""
+    """Just enough of a game to label a note with it.
+
+    `is_owner_game` rides along because a note written on a model game reads differently
+    from one written on the owner's own — see `db.models.Game`.
+    """
     return {
         "id": game.id,
         "white": game.white_name,
         "black": game.black_name,
         "result": str(game.result),
         "date": _day(game.played_at) if game.played_at is not None else None,
+        "is_owner_game": game.is_owner_game,
     }
+
+
+def note_move(note: Note) -> dict[str, Any] | None:
+    """The move a note was written on, spelled the way a person writes it.
+
+    A note on a variation is labelled by the variation's own move rather than by whatever
+    the game played at that ply — the ply is shared, the move is not, which is the rule the
+    Markdown export applies too. None where there is no move to name: a note on the starting
+    position, on a game as a whole, or on a position no game of the owner's ever reached.
+    """
+    line = note.line
+    if line is not None:
+        return _line_move(line.base_ply, line_sans(line), note.ply)
+    if note.game is None:
+        return None
+    return move_context(note.game, note.ply)
 
 
 def move_context(game: Game, ply: int | None) -> dict[str, Any] | None:
@@ -618,18 +679,49 @@ def move_context(game: Game, ply: int | None) -> dict[str, Any] | None:
     sans = game.moves_san or []
     if index >= len(sans):
         return None
+    return _move_label(int(ply), sans[index])
+
+
+# --- internals -------------------------------------------------------------
+
+
+def _payload(session: Session, note: Note, reach: dict[int, dict[str, int]]) -> dict[str, Any]:
+    """The note payload proper, over reach counts somebody else has already fetched."""
+    line = note.line
+    through = reach.get(note.position_id) if note.position_id is not None else None
+    return {
+        "id": note.id,
+        "text": note.text,
+        "tags": list(note.tags or ()),
+        "game_id": note.game_id,
+        "position_id": note.position_id,
+        "line_id": note.line_id,
+        "ply": note.ply,
+        "source": str(note.source),
+        "fen": note.position.fen if note.position is not None else None,
+        "move": note_move(note),
+        "line": line_payload(session, line) if line is not None else None,
+        "game": game_brief(note.game) if note.game is not None else None,
+        "position_games": through["games"] if through else 0,
+        "position_reference_games": through["reference_games"] if through else 0,
+        "created_at": note.created_at.isoformat(),
+        "updated_at": note.updated_at.isoformat(),
+    }
+
+
+def _move_label(ply: int, san: str, *, on_line: bool = False) -> dict[str, Any]:
+    """One half-move as a label. `ply` is the count *after* it, so the move is at `ply - 1`."""
+    index = int(ply) - 1
     number = index // 2 + 1
     white = index % 2 == 0
     return {
         "ply": int(ply),
         "move_number": number,
         "color": "white" if white else "black",
-        "san": sans[index],
-        "label": f"{number}. {sans[index]}" if white else f"{number}... {sans[index]}",
+        "san": san,
+        "label": f"{number}. {san}" if white else f"{number}... {san}",
+        "on_line": on_line,
     }
-
-
-# --- internals -------------------------------------------------------------
 
 
 def _from_live(
@@ -796,15 +888,18 @@ def _markdown_note(note: Note, game: Game) -> list[str]:
     return rows
 
 
-def _line_label(base_ply: int, sans: Sequence[str], ply: int | None) -> str | None:
-    """The move inside a variation a note is filed under, spelled the way a person writes it."""
+def _line_move(base_ply: int, sans: Sequence[str], ply: int | None) -> dict[str, Any] | None:
+    """The move inside a variation a note is filed under, defaulting to the line's tip."""
     offset = (ply if ply is not None else base_ply + len(sans)) - base_ply
     if offset <= 0 or offset > len(sans):
         return None
-    index = base_ply + offset - 1
-    number = index // 2 + 1
-    san = sans[offset - 1]
-    return f"{number}. {san}" if index % 2 == 0 else f"{number}... {san}"
+    return _move_label(base_ply + offset, sans[offset - 1], on_line=True)
+
+
+def _line_label(base_ply: int, sans: Sequence[str], ply: int | None) -> str | None:
+    """The same move, spelled the way a person writes it — what the Markdown export prints."""
+    move = _line_move(base_ply, sans, ply)
+    return move["label"] if move is not None else None
 
 
 def _markdown_meta(note: Note) -> str:
@@ -1035,14 +1130,14 @@ def _played(game: Game) -> str:
     return f" ({_day(game.played_at)})" if game.played_at is not None else ""
 
 
-def _announce(event: str, note: Note) -> None:
+def _announce(session: Session, event: str, note: Note) -> None:
     """One note write on the `/events` stream, flat, the way every other event is shaped."""
-    payload = note_payload(note)
+    payload = note_payload(session, note)
     events_service.emit({"event": event, "note_id": payload.pop("id"), **payload})
 
 
-def _announce_line(event: str, line: Line) -> None:
-    payload = line_payload(line)
+def _announce_line(session: Session, event: str, line: Line) -> None:
+    payload = line_payload(session, line)
     events_service.emit({"event": event, "line_id": payload.pop("id"), **payload})
 
 

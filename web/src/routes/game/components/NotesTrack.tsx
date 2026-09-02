@@ -200,6 +200,16 @@ export function NotesTrack({
  * words of one are rarely the point. The row for the note the composer is on lights up, so
  * the list and the box under it are visibly about the same note.
  *
+ * **Not every row is this game's.** A note pinned to a position turns up under every game
+ * that reaches it, which is the point of pinning it — but an unmarked paragraph under a
+ * game the reader is working through reads as being about the moves in front of them, and
+ * for a note written on somebody else's game that is false. So those rows say where they
+ * came from, on a line of their own under the words: the game and the move it was written
+ * on, or just "not from this game" where there is no game to name — a note written against
+ * a bare position, in the explorer or by the coach.
+ * They are also the rows the composer will not rewrite (`notesModel.ownNote`), so the mark
+ * doubles as the reason the pencil does nothing for them.
+ *
  * An empty game gets one quiet line and not a dashed box: there is a composer directly
  * below saying how to fix it, and a box around "no notes yet" is furniture for a state that
  * every game starts in.
@@ -235,19 +245,49 @@ function NoteList({
             // panel said which by printing the word "variation" beside it; this row is a
             // quarter of that width, so it says it in the colour instead — the same
             // brilliant the variation's own moves are drawn in — and spells it out in the
-            // title for anyone the colour does not reach.
+            // title for anyone the colour does not reach. A note from somewhere else gets
+            // the quietest of the three: the label is still where *this* game reaches the
+            // position, which is where clicking the row goes.
             className={cn(
               'w-14 flex-none font-mono text-[0.6875rem] tabular',
-              row.onLine ? 'text-brilliant' : 'text-dim',
+              row.elsewhere ? 'text-faint' : row.onLine ? 'text-brilliant' : 'text-dim',
             )}
-            title={row.onLine ? 'On a pinned variation' : 'On the game'}
+            title={
+              row.elsewhere
+                ? 'Written elsewhere, about a position this game reached'
+                : row.onLine
+                  ? 'On a pinned variation'
+                  : 'On the game'
+            }
           >
             {/* A note that names no position is about the game entire; it still needs a
                 label, and "game" is what it is. */}
             {row.context ?? 'game'}
           </span>
-          <span className="line-clamp-2 min-w-0 flex-1 text-xs leading-[1.45] text-soft-2">
-            {row.note.text}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span
+              className={cn(
+                'line-clamp-2 text-xs leading-[1.45]',
+                row.elsewhere ? 'text-dim' : 'text-soft-2',
+              )}
+            >
+              {row.note.text}
+            </span>
+            {row.elsewhere ? (
+              <span className="truncate text-[0.625rem] text-faint">
+                {row.from ? (
+                  <>
+                    from {row.from}
+                    {row.originMove ? <span className="font-mono"> · {row.originMove}</span> : null}
+                  </>
+                ) : (
+                  // No game to name: a note written against a bare position, in the
+                  // explorer or by the coach over MCP. Which of those it was is not
+                  // something this row can know, so it says only what is certain.
+                  'not from this game'
+                )}
+              </span>
+            ) : null}
           </span>
         </button>
       ))}

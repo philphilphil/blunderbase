@@ -14,6 +14,7 @@
  * belongs.
  */
 import type { LineResponse, MoveRow, NoteSource } from '@/lib/api/types'
+import { gameLabel } from '@/routes/notes/presentation'
 
 import { plyLabel, type GameNote } from './gameModel'
 
@@ -34,6 +35,17 @@ export interface NoteRow {
   context: string | null
   /** Whether the row hangs off a variation rather than the game's own line. */
   onLine: boolean
+  /**
+   * Whether the note was written somewhere else and only *applies* here, because this game
+   * reached the position it is about. The panel has to say so — advice from another game,
+   * or from the explorer, is not advice about this one — and the composer will not rewrite
+   * it, because it belongs to whoever wrote it where they wrote it (`ownNote`).
+   */
+  elsewhere: boolean
+  /** Where it came from, when that is another game of the library's: `phib vs maia`. */
+  from: string | null
+  /** The move it was written on *there*, which is not this game's move at that ply. */
+  originMove: string | null
   source: NoteSource | null
 }
 
@@ -108,11 +120,22 @@ export function noteRows(
               anchor.index,
             )
           : null
+    // `scope: 'position'` is the backend saying this note was written somewhere else and
+    // reached us through the position (`services/games.game_notes`). Those rows carry the
+    // game they came from; a note written in the explorer on a bare position carries none,
+    // and there is nothing to name.
+    const elsewhere = note.scope === 'position'
     return {
       note,
       anchor,
       context,
       onLine: anchor.kind === 'line',
+      elsewhere,
+      from:
+        elsewhere && typeof note.game_id === 'number'
+          ? gameLabel(note.game, note.game_id)
+          : null,
+      originMove: elsewhere ? (note.move?.label ?? null) : null,
       source: note.source ?? null,
     }
   })

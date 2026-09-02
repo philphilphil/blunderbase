@@ -29,21 +29,31 @@ function note(id: number, text: string): GameNote {
   }
 }
 
+/** A row of this game's own, which is what most of them are. */
+function row(over: Partial<NoteRow> & { note: GameNote }): NoteRow {
+  return {
+    anchor: { kind: 'mainline', count: over.note.ply ?? 0 },
+    context: null,
+    onLine: false,
+    elsewhere: false,
+    from: null,
+    originMove: null,
+    source: null,
+    ...over,
+  }
+}
+
 const NOTES: NoteRow[] = [
-  {
+  row({
     note: note(1, 'Bishop has no future on this diagonal against …e6'),
     anchor: { kind: 'mainline', count: 11 },
     context: '6.Bc4',
-    onLine: false,
-    source: null,
-  },
-  {
+  }),
+  row({
     note: note(2, 'Time trouble. Stopped counting defenders again.'),
     anchor: { kind: 'mainline', count: 47 },
     context: '24.Nc4',
-    onLine: false,
-    source: null,
-  },
+  }),
 ]
 
 const composer = <div data-testid="composer-stub">composer</div>
@@ -162,6 +172,38 @@ describe('NotesTrack', () => {
 
     fireEvent.click(rows[0]!)
     expect(onSelectNote).toHaveBeenCalledWith(NOTES[0])
+  })
+
+  it('says which rows were written somewhere else, and where', () => {
+    renderTrack({
+      notes: [
+        row({
+          note: note(3, 'Kasparov spent twenty minutes on this.'),
+          context: '6.Bc4',
+          elsewhere: true,
+          from: 'Kasparov vs Karpov',
+          originMove: '6. Bg5',
+        }),
+        row({
+          note: note(4, 'The move order matters more than the moves.'),
+          context: '4…Nf6',
+          elsewhere: true,
+        }),
+        NOTES[0]!,
+      ],
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
+
+    // Named where there is a game to name — with the move it was written on *there*, which
+    // is not this game's move at the ply the row is filed under.
+    expect(screen.getByText(/from Kasparov vs Karpov/)).toBeInTheDocument()
+    expect(screen.getByText(/6\. Bg5/)).toBeInTheDocument()
+    // A note on a bare position has no game to name and claims nothing more than that.
+    expect(screen.getByText('not from this game')).toBeInTheDocument()
+    // This game's own note says nothing: it is the unmarked case, and marking it would
+    // make the mark meaningless.
+    const rows = screen.getAllByRole('button')
+    expect(rows[2]).not.toHaveTextContent(/^from /)
   })
 
   it('lights the note the composer is standing on', () => {

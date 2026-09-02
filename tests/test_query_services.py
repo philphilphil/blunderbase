@@ -2361,10 +2361,82 @@ def test_list_tags_counts_usage(session: Session) -> None:
 
 def test_note_payload_is_json_shaped(session: Session) -> None:
     note = notes.save_note(session, "payload", ["plan"])
-    payload = notes.note_payload(note)
+    payload = notes.note_payload(session, note)
     assert payload["text"] == "payload"
     assert payload["tags"] == ["plan"]
     assert isinstance(payload["created_at"], str)
+
+
+def test_a_note_carries_the_move_it_was_written_on(library: Library) -> None:
+    """The anchor a note surfacing elsewhere is read by: which move, in which game."""
+    session = library.session
+    game = library["qg000001"]  # 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7
+    note = notes.save_note(session, "why Bb5", game_id=game.id, ply=5)
+    payload = notes.note_payload(session, note)
+    assert payload["move"] == {
+        "ply": 5,
+        "move_number": 3,
+        "color": "white",
+        "san": "Bb5",
+        "label": "3. Bb5",
+        "on_line": False,
+    }
+    assert payload["game"]["is_owner_game"] is True
+
+    # A note on a variation is labelled by the variation's own move, not by whatever the
+    # game played at that ply — the ply is shared, the move is not.
+    on_line = notes.save_note(
+        session, "the other way", line={"game_id": game.id, "base_ply": 3, "moves": ["d7d6"]}
+    )
+    move = notes.note_payload(session, on_line)["move"]
+    assert (move["label"], move["on_line"]) == ("2... d6", True)
+
+    # Nothing to name at the start of the game, or for a note about a game as a whole.
+    whole = notes.save_note(session, "opening", game_id=game.id)
+    assert notes.note_payload(session, whole)["move"] is None
+
+
+def test_a_note_counts_the_games_its_position_appears_in(library: Library) -> None:
+    """The count behind the way back to the explorer, split the way the explorer is."""
+    session = library.session
+    game = library["qg000001"]
+    # After 3. Bb5: the Berlin of qg000001 and qg000002, and nothing else in the fixture.
+    note = notes.save_note(session, "the Ruy again", game_id=game.id, ply=5)
+    payload = notes.note_payload(session, note)
+    assert (payload["position_games"], payload["position_reference_games"]) == (2, 0)
+
+    # A model game reaching the same position by another move order counts apart: it is
+    # outside every statistic, and outside the tree the explorer button opens.
+    run_import(session, Source.PGN, text=TRANSPOSED_PGN, analyze=False)
+    model = games_service.search_games(session, GameFilters(text="transposer"))[0]
+    model.is_owner_game = False
+    model.owner_color = None
+    session.commit()
+
+    payload = notes.note_payload(session, note)
+    assert (payload["position_games"], payload["position_reference_games"]) == (2, 1)
+
+    # A note that names no position is not made to look like one on an empty board.
+    loose = notes.note_payload(session, notes.save_note(session, "no anchors"))
+    assert (loose["position_games"], loose["position_reference_games"]) == (0, 0)
+
+
+def test_a_page_of_notes_counts_every_position_in_one_query(library: Library) -> None:
+    """What `note_payloads` is for: a list endpoint must not fan out per note."""
+    session = library.session
+    game = library["qg000001"]
+    for ply in (2, 4, 5):
+        notes.save_note(session, f"at {ply}", game_id=game.id, ply=ply)
+    found = notes.search_notes(session, game_id=game.id)
+
+    with counting_statements(session) as statements:
+        payloads = notes.note_payloads(session, found)
+
+    assert sum(1 for statement in statements if "game_positions" in statement) == 1
+    # And the batch says what the single-note payload says, note for note.
+    assert [payload["position_games"] for payload in payloads] == [
+        notes.note_payload(session, note)["position_games"] for note in found
+    ]
 
 
 def test_deleting_a_game_takes_its_notes_with_it(library: Library) -> None:
@@ -2383,7 +2455,7 @@ def test_a_line_is_kept_with_its_moves_in_san(library: Library) -> None:
     game = library["qg000001"]
     line = notes.save_line(library.session, game.id, 3, ["d7d6", "d2d4"])
     assert (line.game_id, line.base_ply) == (game.id, 3)
-    payload = notes.line_payload(line)
+    payload = notes.line_payload(library.session, line)
     assert payload["moves"] == ["d7d6", "d2d4"]
     assert payload["sans"] == ["d6", "d4"]
 
@@ -2439,7 +2511,7 @@ def test_a_note_on_a_line_pins_it_and_lands_on_its_tip(library: Library) -> None
     assert note.ply == 5
     # A line note knows its own position, which is what makes it resurface like a FEN one.
     assert note.position_id is not None
-    payload = notes.note_payload(note)
+    payload = notes.note_payload(session, note)
     assert payload["line"]["sans"] == ["d6", "d4"]
     assert payload["game"]["white"] == "blunderbase"
 
@@ -2456,7 +2528,7 @@ def test_a_note_on_a_ply_takes_the_position_of_that_ply(library: Library) -> Non
     game = library["qg000001"]
     note = notes.save_note(session, "the tempo goes here", game_id=game.id, ply=4)
     assert note.position_id is not None
-    assert notes.note_payload(note)["fen"] is not None
+    assert notes.note_payload(session, note)["fen"] is not None
     with pytest.raises(ValueError, match="outside game"):
         notes.save_note(session, "past the end", game_id=game.id, ply=99)
 
@@ -2500,6 +2572,34 @@ def test_a_position_note_lands_on_the_ply_this_game_reached_it(session: Session)
     # And the game it was written against still reports its own ply, from the other loop.
     own = games_service.game_notes(session, long_way.id)
     assert [(row["scope"], row["ply"]) for row in own] == [("game", 9)]
+
+
+def test_a_note_from_another_game_says_which_game_and_which_move(session: Session) -> None:
+    """The panel has to be able to attribute it: unmarked, it reads as advice about *this*
+    game, and a note written on somebody else's moves is not."""
+    run_import(session, Source.PGN, text=TRANSPOSITION_PGN, analyze=False)
+    direct, long_way = session.scalars(select(Game).order_by(Game.id)).all()
+    notes.save_note(session, "the Italian bishop", game_id=long_way.id, ply=9)
+
+    row = games_service.game_notes(session, direct.id)[0]
+
+    assert row["scope"] == "position"
+    assert row["game_id"] == long_way.id
+    assert row["game"]["white"] == "blunderbase"
+    # The move it was written on *there* — 5. Bc4 of the long way round, not 3. Bc4, which
+    # is what this game played to arrive at the same board.
+    assert row["move"]["label"] == "5. Bc4"
+
+    # A note written on a bare position — in the explorer, on a board nobody had played —
+    # names no game at all, and the panel has to say "the explorer" rather than invent one.
+    notes.save_note(session, "just the shape", fen=AFTER_E4_E5)
+    loose = next(
+        found
+        for found in games_service.game_notes(session, direct.id)
+        if found["text"] == "just the shape"
+    )
+    assert loose["scope"] == "position"
+    assert "game_id" not in loose and "game" not in loose
 
 
 def test_the_game_notes_a_line_note_shows_up_in(library: Library) -> None:

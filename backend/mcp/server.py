@@ -839,7 +839,7 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                 source=NoteSource.MCP,
                 from_live=bool(from_live),
             )
-            payload = notes_service.note_payload(note)
+            payload = notes_service.note_payload(session, note)
         return payloads.result(payloads.note_row(payload))
 
     @server.tool()
@@ -854,7 +854,7 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
             raise CoachError(BAD_ARGUMENT, "a line needs at least one move in UCI")
         with coach.session() as session:
             line = notes_service.save_line(session, int(game_id), int(base_ply), wanted)
-            payload = notes_service.line_payload(line, with_notes=True)
+            payload = notes_service.line_payload(session, line, with_notes=True)
         return payloads.result(payload)
 
     @server.tool()
@@ -869,7 +869,7 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                     UNKNOWN_GAME, f"no game with id {game_id}", game_id=int(game_id)
                 )
             rows = [
-                notes_service.line_payload(line, with_notes=True)
+                notes_service.line_payload(session, line, with_notes=True)
                 for line in notes_service.get_lines(session, int(game_id))
             ]
         return payloads.result({"lines": rows, "count": len(rows)})
@@ -932,7 +932,11 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
         (all of them must match), a date window ('30d' works), a game or a position;
         newest first. `scope` narrows by what a note is attached to rather than to what:
         'game', 'position', 'line' or 'free'. With no arguments it returns the most recent
-        notes and every tag in use."""
+        notes and every tag in use. Each note says where it was written — `move` is the
+        move, `game` the game it was on, and `game.is_owner_game` false means a model game
+        the owner only studied — and how far the position reaches: `position_games` is how
+        many of their own games pass through it, `position_reference_games` how many model
+        games do."""
         position = args.fen(fen, required=False)
         count = args.capped(limit, DEFAULT_NOTES, MAX_NOTES)
         with coach.session() as session:
@@ -948,7 +952,10 @@ def _register_memory(server: MCPServer, coach: Coach) -> None:
                 line_id=int(line_id) if line_id is not None else None,
                 limit=count,
             )
-            rows = [payloads.note_row(notes_service.note_payload(note)) for note in found]
+            rows = [
+                payloads.note_row(payload)
+                for payload in notes_service.note_payloads(session, found)
+            ]
             payload = {"notes": rows, "count": len(rows)}
             if not any((query, tags, since, until, game_id, fen, scope, line_id)):
                 payload["tags"] = notes_service.list_tags(session)

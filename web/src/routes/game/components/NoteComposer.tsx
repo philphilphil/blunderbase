@@ -61,6 +61,16 @@ function sameTags(left: readonly string[], right: readonly string[]): boolean {
  * have stepped and is written as a new note there, because silently discarding what somebody
  * typed is the one failure a notes box does not get to have.
  *
+ * The counterpart of that rule is the one this box has to get right, and the source of the
+ * duplicate notes it used to write: **a note this box has already saved is not a draft.**
+ * A blur-save posts the note, the query refetches, and the note comes back as this very
+ * box's `note` prop — so what is in the box has to be recognised as its own, or it counts as
+ * unsaved text forever, follows the reader, and is written again by the next blur. Two
+ * places make that work, and both are commented where they are: `save` normalises the box
+ * to exactly what it sent and marks it saved there and then, and the fill-in below compares
+ * the trimmed text alone, because trimming and an uncommitted tag both make the round trip
+ * differ from what was typed.
+ *
  * The composer is sized by its slot rather than by its contents (the eval curve's, on the
  * game page): the text box takes what is left under the one row that must stay reachable, so
  * the tags and the save button are on screen at every height that column can be.
@@ -98,8 +108,16 @@ export function NoteComposer({
     const next = loadedFrom(note)
     // Text that matches the note now hanging here is not a draft: it is the note this box
     // just saved, come back from the server with its id. Without this the words typed into
-    // an empty box would count as unsaved forever and follow the reader to the next move.
-    const saved = text === next.text && sameTags(tags, next.tags)
+    // an empty box would count as unsaved forever, follow the reader to the next move, and
+    // be written again by the next blur — one note becoming two and then three.
+    //
+    // Compared **trimmed, and on the text alone**. What is stored is the trimmed text, so a
+    // box whose last character is the newline a bare Enter leaves does not hold the same
+    // string the server does; and a tag typed but never committed rides along with the save
+    // (see `save`) without ever entering `tags`, so the tag lists legitimately differ on the
+    // way back. Either mismatch used to read as "the reader typed something new", which is
+    // exactly the note this box had just written.
+    const saved = text.trim() === next.text.trim()
     const typed =
       !saved && text.trim().length > 0 && (text !== loaded.text || !sameTags(tags, loaded.tags))
     if (typed) {
@@ -148,7 +166,22 @@ export function NoteComposer({
     if (!ready) return
     // A tag half-typed and never committed is still a tag the reader meant.
     const all = draft.trim() ? [...tags, draft.trim()] : tags
-    onSave(text.trim(), all, editing)
+    const body = text.trim()
+    // The box becomes what was sent, before it is sent. Two reasons, and both are about the
+    // note coming back: the box then holds the same string the server will store, and the
+    // committed tag is a chip rather than a half-typed one — so nothing about this note
+    // reads as an unsaved edit a moment later, and `dirty` is honestly false until somebody
+    // types again.
+    setText(body)
+    setTags(all)
+    setDraft('')
+    // And the box counts as saved from this moment, not from whenever the refetch lands.
+    // Between the two there is a window in which `dirty` would still be true — the note has
+    // no id yet — and a reader who clicks back into the box and away again inside it would
+    // write the note a second time. The id stays whatever it was; the round trip supplies
+    // the real one, and until it does this is the text nobody has changed since.
+    setLoaded({ id: editing, text: body, tags: all })
+    onSave(body, all, editing)
   }
 
   return (

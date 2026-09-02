@@ -46,7 +46,7 @@ import { cn } from '@/lib/utils'
 import { paramsFromFilters } from '@/routes/games/filters'
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
 import { useSavedFilters } from '@/routes/games/savedFilters'
-import { noteHref, oneLine } from '@/routes/notes/grouping'
+import { noteHref, oneLine } from '@/routes/notes/presentation'
 import { REPORTS } from '@/routes/stats/reports'
 
 /** Under this the backend answers four empty groups, so the box says so itself. */

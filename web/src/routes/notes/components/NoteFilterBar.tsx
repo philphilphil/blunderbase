@@ -7,6 +7,7 @@
  * with: a note is prose, and prose is searched, not faceted.
  */
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { useNoteTags } from '@/lib/api/queries'
 import { NOTE_SCOPES } from '@/lib/api/types'
 import { DebouncedInput } from '@/routes/games/components/FilterBar'
@@ -46,9 +47,11 @@ function isoDay(offsetDays: number): string {
 export interface NoteFilterBarProps {
   filters: NoteFilters
   onChange: (next: NoteFilters) => void
+  /** The page places the bar in a row beside the view selector; this is its share of it. */
+  className?: string
 }
 
-export function NoteFilterBar({ filters, onChange }: NoteFilterBarProps) {
+export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarProps) {
   const active = filterCount(filters)
   const patch = (next: Partial<NoteFilters>) => onChange(prune({ ...filters, ...next }))
 
@@ -57,7 +60,7 @@ export function NoteFilterBar({ filters, onChange }: NoteFilterBarProps) {
     // hang off, which is the only way a 250px panel stays on a 375px screen; see
     // `FilterPopover`. The box takes the whole first line there — prose is what this
     // screen is searched by, so it is the last thing to give up width.
-    <div className="flex flex-wrap items-center gap-[0.4375rem] max-md:relative">
+    <div className={cn('flex flex-wrap items-center gap-[0.4375rem] max-md:relative', className)}>
       <DebouncedInput
         aria-label="Search the notes"
         placeholder="Search what you wrote…"
