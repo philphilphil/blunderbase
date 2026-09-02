@@ -230,7 +230,7 @@ export function RepertoirePage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome
-        breadcrumb={[{ label: 'Openings', to: '/explorer' }, { label: 'Repertoire' }]}
+        breadcrumb={[{ label: 'Explorer', to: '/explorer' }, { label: 'Repertoire' }]}
       />
 
       {/*

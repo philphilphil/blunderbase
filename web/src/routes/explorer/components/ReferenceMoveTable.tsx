@@ -42,11 +42,15 @@ function style(width: number | 'flex') {
   return width === 'flex' ? { flex: 1, minWidth: 0 } : { width, flex: 'none' as const }
 }
 
-/** The same arithmetic `MoveTreeTable` does: a cap of ten rows plus the gaps between them. */
-const ROW_HEIGHT_REM = 2.375
+/**
+ * The same arithmetic `MoveTreeTable` does: fifteen rows plus the gaps between them, and used
+ * as a height rather than a cap for the same reason — the page switches between that table
+ * and this one in place, and the two must be the same size whatever each has to show.
+ */
+const ROW_HEIGHT_REM = 1.5
 const ROW_GAP_REM = 0.125
-const VISIBLE_ROWS = 10
-const ROWS_MAX_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
+const VISIBLE_ROWS = 15
+const ROWS_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
 
 /**
  * 410px of fixed columns — the bar's among them, at the shared `SPLIT_WIDTH` — plus the
@@ -100,14 +104,15 @@ export function ReferenceMoveTable({
 
       {loading ? (
         <div
-          className={cn('flex flex-col gap-0.5', MIN_TABLE)}
+          style={{ height: ROWS_HEIGHT }}
+          className={cn('flex flex-col gap-0.5 overflow-hidden', MIN_TABLE)}
           data-testid="reference-loading"
         >
           {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
               style={{ opacity: 1 - index * 0.15 }}
-              className="flex h-[2.375rem] items-center gap-3 px-3"
+              className="flex h-[1.5rem] flex-none items-center gap-3 px-3"
             >
               {COLUMNS.map((column) => (
                 <span key={column.id} style={style(column.width)}>
@@ -118,14 +123,17 @@ export function ReferenceMoveTable({
           ))}
         </div>
       ) : moves.length === 0 ? (
-        <div className="rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-3 py-8 text-center">
+        <div
+          style={{ height: ROWS_HEIGHT }}
+          className="flex items-center justify-center rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-3 text-center"
+        >
           <p className="text-[0.78125rem] text-dim">
             No game in this database goes any further than this position.
           </p>
         </div>
       ) : (
         <div
-          style={{ maxHeight: ROWS_MAX_HEIGHT }}
+          style={{ height: ROWS_HEIGHT }}
           className={cn(
             'flex flex-col gap-0.5 overflow-y-auto font-mono text-[0.78125rem] tabular',
             MIN_TABLE,
@@ -143,7 +151,7 @@ export function ReferenceMoveTable({
                 onFocus={() => onPreview?.([move.uci])}
                 onBlur={() => onPreview?.(null)}
                 role="row"
-                className="flex h-[2.375rem] items-center gap-3 rounded-[0.4375rem] px-3 text-left transition-colors hover:bg-elevated-2"
+                className="flex h-[1.5rem] flex-none items-center gap-3 rounded-[0.4375rem] px-3 text-left transition-colors hover:bg-elevated-2"
               >
                 <span style={style(78)} className="text-[0.84375rem] text-body">
                   {plyLabel(ply)}

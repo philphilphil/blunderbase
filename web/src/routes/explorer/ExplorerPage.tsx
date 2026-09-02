@@ -289,7 +289,7 @@ export function ExplorerPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: 'Openings', to: '/explorer' }]} />
+      <SetPageChrome breadcrumb={[{ label: 'Explorer', to: '/explorer' }]} />
 
       {/*
         Below `md` the two panels become one column that scrolls as a whole: the board and

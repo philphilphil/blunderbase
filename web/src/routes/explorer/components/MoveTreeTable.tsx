@@ -39,12 +39,22 @@
  * walks the tree and nothing inside it may be a second target, so notes are written in the
  * card beside the board, where the whole text is.
  *
- * The list stops at `VISIBLE_ROWS` and scrolls inside itself. What it buys is not space but
- * a fixed place for everything under this table: without it a position with four
+ * The list is exactly `VISIBLE_ROWS` tall and scrolls inside itself. What it buys is not
+ * space but a fixed place for everything under this table: without it a position with four
  * continuations and one with twenty-four move the cards below by hundreds of pixels, and
- * walking a line is exactly the act of going between such positions. It is a maximum and
- * not a height — four continuations still draw four rows and nothing under them shifts,
- * because the rows only ever grow downwards into the scroller.
+ * walking a line is exactly the act of going between such positions. It is a height and
+ * not a maximum — four continuations draw four rows and empty space under them — because a
+ * maximum only stopped the growth: the pane still shrank on a thin position, and switching
+ * the source to a reference book with fewer rows visibly changed its size. The loading and
+ * empty states take the same height for the same reason. `ReferenceMoveTable` shares the
+ * numbers so the two sources are the same size to the pixel.
+ *
+ * Every row is `flex-none`, and that is not decoration: a flex item may shrink below its
+ * own height, so without it a position with more continuations than fit did not scroll —
+ * the rows squeezed to fit the box and quietly changed height from one position to the
+ * next. The row height itself is the dense one that squeeze produced at the start position,
+ * which read better than the design's 38px rows; the cap is fifteen of them, so the table
+ * takes about the space it did before.
  */
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ExplorerMove, ExplorerResponse } from '@/lib/api/types'
@@ -76,10 +86,10 @@ function style(width: number | 'flex') {
  * arithmetic can be done: the cap is `VISIBLE_ROWS` rows plus the gaps between them, so it
  * follows a change to either rather than being a number somebody has to remember to redo.
  */
-const ROW_HEIGHT_REM = 2.375
+const ROW_HEIGHT_REM = 1.5
 const ROW_GAP_REM = 0.125
-const VISIBLE_ROWS = 10
-const ROWS_MAX_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
+const VISIBLE_ROWS = 15
+const ROWS_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
 
 /**
  * Seven of the nine columns are fixed pixel widths — 500px of them — and the last two are
@@ -144,12 +154,16 @@ export function MoveTreeTable({
       </div>
 
       {loading ? (
-        <div className={cn('flex flex-col gap-0.5', MIN_TABLE)} data-testid="tree-loading">
+        <div
+          style={{ height: ROWS_HEIGHT }}
+          className={cn('flex flex-col gap-0.5 overflow-hidden', MIN_TABLE)}
+          data-testid="tree-loading"
+        >
           {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
               style={{ opacity: 1 - index * 0.15 }}
-              className="flex h-[2.375rem] items-center gap-3 px-3"
+              className="flex h-[1.5rem] flex-none items-center gap-3 px-3"
             >
               {COLUMNS.map((column) => (
                 <span key={column.id} style={style(column.width)}>
@@ -160,17 +174,22 @@ export function MoveTreeTable({
           ))}
         </div>
       ) : moves.length === 0 ? (
-        <div className="rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-3 py-8 text-center">
+        <div
+          style={{ height: ROWS_HEIGHT }}
+          className="flex items-center justify-center rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-3 text-center"
+        >
           <p className="text-[0.78125rem] text-dim">
             No game of yours goes any further than this position.
           </p>
         </div>
       ) : (
         <div
-          // `max-height` and never a height: fewer continuations than fit draw fewer rows.
-          // The vertical scroll is inside the horizontal one rather than beside it, so
-          // below `md` the whole table still slides sideways under its own header.
-          style={{ maxHeight: ROWS_MAX_HEIGHT }}
+          // A height, not a max-height: the pane is the same size whether the position has
+          // two continuations or twenty, and whether the source is the owner's tree or a
+          // reference book, so switching between them moves nothing on the page. The
+          // vertical scroll is inside the horizontal one rather than beside it, so below
+          // `md` the whole table still slides sideways under its own header.
+          style={{ height: ROWS_HEIGHT }}
           className={cn(
             'flex flex-col gap-0.5 overflow-y-auto font-mono text-[0.78125rem] tabular',
             MIN_TABLE,
@@ -193,7 +212,7 @@ export function MoveTreeTable({
                 onBlur={() => onPreview?.(null)}
                 role="row"
                 className={cn(
-                  'flex h-[2.375rem] items-center gap-3 rounded-[0.4375rem] px-3 text-left transition-colors',
+                  'flex h-[1.5rem] flex-none items-center gap-3 rounded-[0.4375rem] px-3 text-left transition-colors',
                   main
                     ? 'bg-accent-teal/7 shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--bb-accent)_28%,transparent)]'
                     : 'hover:bg-elevated-2',

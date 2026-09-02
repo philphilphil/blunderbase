@@ -142,4 +142,28 @@ describe('ReferenceMoveTable', () => {
     row.blur()
     expect(onPreview).toHaveBeenLastCalledWith(null)
   })
+
+  it('is the same height as the owner’s table in every state', () => {
+    // 24.25rem is fifteen rows of 1.5rem plus the fourteen gaps — `MoveTreeTable`'s number, so
+    // switching the source in place changes nothing below the table.
+    const rows = render(
+      <ReferenceMoveTable data={BOOK} ply={1} loading={false} onPlay={vi.fn()} />,
+    )
+    expect((rows.container.querySelector('.overflow-y-auto') as HTMLElement).style.height).toBe(
+      '24.25rem',
+    )
+    rows.unmount()
+
+    const loading = render(
+      <ReferenceMoveTable data={undefined} ply={1} loading onPlay={vi.fn()} />,
+    )
+    expect(loading.getByTestId('reference-loading').style.height).toBe('24.25rem')
+    loading.unmount()
+
+    const empty = render(
+      <ReferenceMoveTable data={{ ...BOOK, moves: [] }} ply={1} loading={false} onPlay={vi.fn()} />,
+    )
+    const box = empty.getByText(/No game in this database/).parentElement as HTMLElement
+    expect(box.style.height).toBe('24.25rem')
+  })
 })
