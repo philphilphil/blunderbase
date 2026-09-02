@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { NoteResponse } from '@/lib/api/types'
@@ -69,7 +70,10 @@ function draw() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <PositionNotes fen={FEN} />
+      {/* A note that came from a game links back to it, so the card needs a router. */}
+      <MemoryRouter>
+        <PositionNotes fen={FEN} />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -93,6 +97,40 @@ describe('PositionNotes', () => {
   it('invites the first note where there is nothing to show', async () => {
     draw()
     expect(await screen.findByText(/Nothing written about this position yet/)).toBeInTheDocument()
+  })
+
+  it('says which game a note came from, and links back to that move', async () => {
+    stored = [
+      note({
+        id: 3,
+        text: 'Kasparov spent twenty minutes here.',
+        game_id: 88,
+        ply: 11,
+        game: {
+          id: 88,
+          white: 'Kasparov',
+          black: 'Karpov',
+          result: '1-0',
+          is_owner_game: false,
+        },
+        move: { ply: 11, move_number: 6, color: 'white', san: 'Bg5', label: '6. Bg5' },
+      }),
+    ]
+    draw()
+
+    // A model game says so: the same sentence means something else when the moves are not
+    // the owner's — and the link opens that game at that move, not at its start.
+    const link = await screen.findByRole('link', { name: /in the model game Kasparov vs Karpov/ })
+    expect(link).toHaveAttribute('href', '/games/88?ply=11')
+    expect(link).toHaveTextContent('6. Bg5')
+  })
+
+  it('leaves a note written here with nowhere to point back to', async () => {
+    stored = [note({ id: 4, text: 'written on this card' })]
+    draw()
+
+    expect(await screen.findByText('written on this card')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
   it('saves a new note when the box loses focus, and says that it did', async () => {

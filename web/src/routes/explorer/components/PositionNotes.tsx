@@ -8,9 +8,17 @@
  * under the board rather than beside the tree because that is what it is about, and it
  * renders even with nothing to show: an empty card is the invitation to write the first one.
  *
- * Provenance stays visible. A note the coach wrote over MCP keeps the amber left edge and
- * the `note via MCP` chip; one the owner typed here carries neither, because a conclusion
- * the coach reached and a reminder they left themselves should not look identical.
+ * Provenance stays visible, and this is the card that needs it most. A note the coach wrote
+ * over MCP keeps the amber left edge and the `note via MCP` chip; one the owner typed here
+ * carries neither, because a conclusion the coach reached and a reminder they left
+ * themselves should not look identical.
+ *
+ * **A note that came from a game says which game and which move**, as a link that opens it
+ * there. Most notes here were not written here: a note pinned to a position resurfaces
+ * wherever that position does, so the same paragraph can arrive from the owner's own game
+ * last March or from a model game somebody else played — and unattributed advice about a
+ * position is advice from nobody. A note written on this card has no game and says nothing,
+ * which is correct: there is nowhere else it came from.
  *
  * **Writing is a native `<textarea>` that saves itself when it loses focus** — there is no
  * Save button, because the one failure a notes box does not get to have is losing what
@@ -40,11 +48,13 @@
  */
 import { Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { useDeleteNote, useNotes, useSaveNote, useUpdateNote } from '@/lib/api/queries'
 import type { NoteResponse } from '@/lib/api/types'
 import { MCP_SERVER_NAME, relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
+import { gameHref, gameLabel, originLabel } from '@/routes/notes/presentation'
 
 const LIMIT = 3
 
@@ -202,6 +212,10 @@ function Written({
   onDelete: () => void
 }) {
   const viaMcp = note.source === 'mcp'
+  const origin = gameHref(note)
+  const move = originLabel(note)
+  const from = typeof note.game_id === 'number' ? gameLabel(note.game, note.game_id) : null
+  const model = note.game?.is_owner_game === false
   return (
     <div
       className={cn(
@@ -212,6 +226,26 @@ function Written({
       <p className="whitespace-pre-wrap text-[0.78125rem] leading-[1.55] text-body-2">
         {note.text}
       </p>
+
+      {/*
+        Where it was written, when that was somewhere else. One line, above the chrome row,
+        because it belongs to the words rather than to the buttons — and elided rather than
+        wrapped: two usernames and a move are longer than this column at most widths.
+      */}
+      {origin ? (
+        <Link
+          to={origin}
+          title={move ? `Open ${from} at ${move}` : `Open ${from}`}
+          className="flex min-w-0 items-baseline gap-1.5 text-[0.6875rem] text-dim transition-colors hover:text-accent-teal"
+        >
+          {move ? <span className="flex-none font-mono tabular text-soft-2">{move}</span> : null}
+          <span className="truncate">
+            {model ? 'in the model game ' : 'in '}
+            {from}
+          </span>
+        </Link>
+      ) : null}
+
       <div className="flex items-center gap-2">
         {viaMcp ? (
           <span

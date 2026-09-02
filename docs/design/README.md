@@ -6,6 +6,20 @@ directory are local snapshots pulled 2026-08-25.
 
 ## Decisions
 
+- **Notes screen: a flat list, in one of two views**
+  (`prototypes/notes-screen.html`, chosen 2026-09-02). The grouping by game is gone —
+  a game is where a note was *written*, not what it is about, `/games` is already the
+  index of games, and at 1.5 notes per noted game the headings forced a row break each
+  and left the columns two-thirds empty, which is what made the screen look wrong. Time
+  orders it instead, cut into date rules that cost a line rather than a row. Two views
+  behind a segmented control at the head of the filter row: **Stream**, two notes to a row
+  with the board beside the words and every note whole, and **Sheet**, a denser grid with
+  the board on top and the text clamped. The stream's cap is on the column (46rem, about
+  ninety characters) and not on the page, so a wide monitor buys a second column rather
+  than a longer line. Both write, and the choice is a per-browser preference rather than
+  a URL parameter. The prototype's third and fourth options — a two-pane reading desk, and
+  shelves grouped by tag — are not built; the desk is the answer to a note count this
+  library does not have yet.
 - **Visual direction: the restrained desktop-tool pass**
   (`prototypes/human-theme-lab.html`, accepted 2026-09-01). This supersedes the
   palette and the panel idiom below; the *layout* decisions (1a "Studio", the

@@ -2,16 +2,34 @@
  * `/notes` — everything written down, in one place.
  *
  * The screen the coach's memory needs and the game page cannot be: notes are written
- * against a game, a variation, a bare position or nothing at all. The body is the filtered
- * list, grouped by game, with the loose notes last.
+ * against a game, a variation, a bare position or nothing at all.
+ *
+ * **The list is flat** (owner's call, 2026-09-02, after `docs/design/prototypes/notes-screen.html`).
+ * It used to be grouped by game, and that was the wrong axis three ways over: a game is
+ * where a note was *written* rather than what it is about, `/games` is already the index of
+ * games, and the notes that carry the most — the ones pinned to a position, which resurface
+ * in every game that reaches them — were swept into a leftovers bin at the bottom. It was
+ * also what made the columns look broken: a heading forces a row break, and at 1.5 notes
+ * per noted game most rows were two-thirds hole.
+ *
+ * What orders it now is time, cut by `ageBuckets` into rules that cost a line rather than a
+ * row. Nothing is re-sorted here — the API answers newest-first and the rules follow it.
+ *
+ * **Two views, and the reader picks.** *Stream* is two notes to a row, board beside the
+ * words, with the whole of every note and no clipping; *Sheet* is a denser grid of tiles,
+ * board on top, text clamped, for finding a note by seeing its position. Both are the same notes under the same filters and
+ * both can rewrite and forget one — a view you can only read from is a view you leave. Which
+ * is showing is a per-browser preference (`viewMode.ts`), not a URL parameter: it is how
+ * somebody reads, not which notes they are looking at, so a shared link arrives in the
+ * recipient's own shape.
  *
  * Filters live in the URL, like the library's, so a cut of the notes is a link — and so is
  * one note: `/notes?note=12` is where the command palette sends a note that has no game to
- * open, and the card rings itself and scrolls into view.
+ * open, and it rings itself and scrolls into view.
  */
-import { Download, FileText, Loader2, StickyNote } from 'lucide-react'
+import { Download, FileText, LayoutGrid, Loader2, Rows3, StickyNote } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
@@ -19,10 +37,11 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { saveDownload } from '@/lib/api/client'
 import { useExportNotes, useNote, useNoteTags, useNotes } from '@/lib/api/queries'
-import type { NoteExportFormat } from '@/lib/api/types'
+import type { NoteExportFormat, NoteResponse } from '@/lib/api/types'
+import { cn } from '@/lib/utils'
 
-import { NoteCard } from './components/NoteCard'
 import { NoteFilterBar } from './components/NoteFilterBar'
+import { NoteItem } from './components/NoteItem'
 import {
   filterCount,
   filtersFromParams,
@@ -31,10 +50,34 @@ import {
   toNoteQuery,
   type NoteFilters,
 } from './filters'
-import { countNotes, groupNotes } from './grouping'
+import { ageBuckets } from './presentation'
+import { setNoteView, useNoteView, type NoteView } from './viewMode'
 
 /** One page of notes. The backend caps a page at 200; this is what the screen can be read at. */
 const LIMIT = 120
+
+/**
+ * The stream: two notes to a row above `lg`, one below it.
+ *
+ * The cap is on the *column*, not on the page. 46rem is about ninety characters at the
+ * app's scale — the outside of comfortable, and enough to leave the board beside the words
+ * room to be 176px — so one column stops there and two stop at twice that plus the gap.
+ * Widening the column instead of adding a second is what produced the sentence a head-turn
+ * wide that started this rework; adding a second column spends a wide monitor without
+ * spending it on line length.
+ *
+ * `items-start` rather than stretched rows: notes are honestly different lengths, and a
+ * short one padded out to match the paragraph beside it is the dead space that made the old
+ * grid look wrong.
+ */
+const STREAM = 'grid items-start gap-2.5 max-w-[46rem] lg:max-w-[93rem] lg:grid-cols-2'
+
+/**
+ * The sheet's columns. Sized so a tile holds a board at a legible size with four or five
+ * lines of text under it, and so nothing is left alone in a row at the widths the app is
+ * actually read at.
+ */
+const SHEET = 'grid items-start gap-2.5 sm:grid-cols-2 xl:grid-cols-3 min-[110rem]:grid-cols-4'
 
 export function NotesPage() {
   const [params, setParams] = useSearchParams()
@@ -42,18 +85,17 @@ export function NotesPage() {
   const filters = useMemo(() => filtersFromParams(params), [params])
   const highlighted = Number(params.get('note')) || null
 
+  const view = useNoteView()
   const notes = useNotes(toNoteQuery(filters, LIMIT))
   const tags = useNoteTags()
-  const groups = useMemo(() => groupNotes(notes.data ?? []), [notes.data])
-  const total = countNotes(groups)
+  const rows = useMemo<NoteResponse[]>(() => notes.data ?? [], [notes.data])
+  const buckets = useMemo(() => ageBuckets(rows), [rows])
+  const total = rows.length
 
   // The note a link named may well be outside the current cut — a position note reached
   // from the palette while the list is filtered to one game. It is then shown on its own
   // above the list rather than silently not being there.
-  const listed = useMemo(
-    () => (notes.data ?? []).some((note) => note.id === highlighted),
-    [notes.data, highlighted],
-  )
+  const listed = useMemo(() => rows.some((note) => note.id === highlighted), [rows, highlighted])
   const linked = useNote(highlighted ?? 0, {
     enabled: highlighted !== null && !listed && notes.isSuccess,
   })
@@ -75,6 +117,8 @@ export function NotesPage() {
     [filters, setFilters],
   )
 
+  const list = view === 'sheet' ? SHEET : STREAM
+
   return (
     <PageBody>
       <SetPageChrome breadcrumb={[{ label: 'Notes' }]} />
@@ -93,12 +137,28 @@ export function NotesPage() {
         actions={<ExportButtons filters={filters} disabled={total === 0} />}
       />
 
-      <NoteFilterBar filters={filters} onChange={setFilters} />
+      {/*
+        The view selector leads the filter row rather than sitting in the header's actions:
+        it belongs to the list under it, not to the page's verbs. `basis-[20rem]` on the bar
+        is what makes that behave on a phone — there is no room for a 20rem filter bar beside
+        the selector on a 375px screen, so the bar takes the next line whole.
+      */}
+      <div className="flex flex-wrap items-center gap-2">
+        <ViewToggle view={view} />
+        <NoteFilterBar
+          filters={filters}
+          onChange={setFilters}
+          className="min-w-0 flex-1 basis-[20rem]"
+        />
+      </div>
 
       {notes.isPending ? (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2].map((row) => (
-            <Skeleton key={row} className="h-[6.5rem] w-full rounded-lg" />
+        <div className={list}>
+          {[0, 1, 2, 3, 4, 5].map((cell) => (
+            <Skeleton
+              key={cell}
+              className={cn('w-full rounded-lg', view === 'sheet' ? 'h-[15rem]' : 'h-[9rem]')}
+            />
           ))}
         </div>
       ) : notes.isError ? (
@@ -108,37 +168,42 @@ export function NotesPage() {
         </div>
       ) : (
         <>
+          {/*
+            The note a link named, when the filters do not show it. Drawn in whichever view
+            is open, so following a link does not also change the shape of the page.
+          */}
           {linked.data ? (
             <section className="flex flex-col gap-1.5">
-              <GroupHeading title="The note you followed" subtitle="outside the filters below" />
-              <NoteCard
-                note={linked.data}
-                highlighted
-                tagSuggestions={suggestions}
-                onTagClick={addTag}
-              />
-            </section>
-          ) : null}
-
-          {groups.length === 0 ? <Empty filtered={filterCount(filters) > 0} /> : null}
-
-          {groups.map((group) => (
-            <section key={group.key} className="flex flex-col gap-1.5">
-              <GroupHeading
-                title={group.title}
-                subtitle={group.subtitle}
-                href={group.href}
-                count={group.notes.length}
-              />
-              {group.notes.map((note) => (
-                <NoteCard
-                  key={note.id}
-                  note={note}
-                  highlighted={note.id === highlighted}
+              <DateRule label="The note you followed" note="outside the filters below" />
+              <div className={list}>
+                <NoteItem
+                  note={linked.data}
+                  layout={view}
+                  highlighted
                   tagSuggestions={suggestions}
                   onTagClick={addTag}
                 />
-              ))}
+              </div>
+            </section>
+          ) : null}
+
+          {total === 0 ? <Empty filtered={filterCount(filters) > 0} /> : null}
+
+          {buckets.map((bucket) => (
+            <section key={bucket.key} className="flex flex-col gap-1.5">
+              <DateRule label={bucket.label} count={bucket.notes.length} />
+              <div className={list}>
+                {bucket.notes.map((note) => (
+                  <NoteItem
+                    key={note.id}
+                    note={note}
+                    layout={view}
+                    highlighted={note.id === highlighted}
+                    tagSuggestions={suggestions}
+                    onTagClick={addTag}
+                  />
+                ))}
+              </div>
             </section>
           ))}
         </>
@@ -147,37 +212,66 @@ export function NotesPage() {
   )
 }
 
-function GroupHeading({
-  title,
-  subtitle,
-  href,
-  count,
-}: {
-  title: string
-  subtitle?: string | null
-  href?: string | null
-  count?: number
-}) {
+const VIEWS: { id: NoteView; label: string; icon: typeof Rows3; hint: string }[] = [
+  { id: 'stream', label: 'Stream', icon: Rows3, hint: 'One column, every note in full' },
+  { id: 'sheet', label: 'Sheet', icon: LayoutGrid, hint: 'A grid of positions, text clamped' },
+]
+
+/**
+ * Stream or sheet, as one segmented control rather than two buttons.
+ *
+ * A pair of radios in `aria` terms, because that is what it is: two mutually exclusive ways
+ * of showing one list, one of which is always on. Labels are hidden below `sm` — the icons
+ * carry it on a phone, where the row is already tight.
+ */
+function ViewToggle({ view }: { view: NoteView }) {
   return (
-    // Two long usernames and a result do not share a phone's line; the result and date go
-    // under them rather than squeezing the names into one word each.
-    <div className="flex items-baseline gap-2 pt-1 max-md:flex-wrap max-md:gap-y-0.5">
-      {href ? (
-        <Link
-          to={href}
-          className="text-[0.78125rem] font-semibold text-ink transition-colors hover:text-accent-teal"
-        >
-          {title}
-        </Link>
-      ) : (
-        <span className="text-[0.78125rem] font-semibold text-ink">{title}</span>
-      )}
-      {subtitle ? (
-        <span className="font-mono text-[0.6875rem] text-dim-2">{subtitle}</span>
-      ) : null}
-      <span className="flex-1" />
+    <div
+      role="radiogroup"
+      aria-label="How to show the notes"
+      className="flex items-center rounded-md border border-edge bg-elevated p-px"
+    >
+      {VIEWS.map((option) => {
+        const on = view === option.id
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            title={option.hint}
+            onClick={() => setNoteView(option.id)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-[0.3125rem] px-2 py-[0.1875rem] text-[0.6875rem] transition-colors',
+              on ? 'bg-raised-2 text-ink' : 'text-dim hover:text-soft',
+            )}
+          >
+            <option.icon className="size-3.5" aria-hidden />
+            <span className="max-sm:sr-only">{option.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * A date rule: the label, a hairline to the end of the row, and the count.
+ *
+ * A rule rather than a heading, and that is the whole point of it — this is what replaced
+ * the game headings. It sits on one line, spans whatever the list is, and cannot break a
+ * grid row, because it is not in the grid.
+ */
+function DateRule({ label, note, count }: { label: string; note?: string; count?: number }) {
+  return (
+    <div className="flex items-center gap-2.5 pt-1">
+      <span className="font-mono text-[0.6875rem] tracking-[0.08em] text-dim-2 uppercase">
+        {label}
+      </span>
+      {note ? <span className="text-[0.6875rem] text-faint">{note}</span> : null}
+      <span className="h-px flex-1 bg-hairline" />
       {count === undefined ? null : (
-        <span className="font-mono text-[0.625rem] tabular text-dim-2">{count}</span>
+        <span className="font-mono text-[0.625rem] tabular text-faint">{count}</span>
       )}
     </div>
   )

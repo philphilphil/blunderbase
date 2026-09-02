@@ -130,6 +130,9 @@ const DETAIL: GameDetail = {
       text: 'The Scandinavian invites the queen out early; you paid for it on move 2.',
       tags: ['opening'],
       ply: 1,
+      // Written elsewhere — it names no game — and reaching this one through the position
+      // it is about, which is what `scope: 'position'` means. The Notes panel marks such a
+      // row as somebody else's, and the composer will not rewrite it.
       scope: 'position',
       created_at: new Date(Date.now() - 2 * 24 * 3600_000).toISOString(),
       updated_at: new Date(Date.now() - 2 * 24 * 3600_000).toISOString(),
@@ -1778,7 +1781,9 @@ describe('GamePage notes', () => {
     // The row labels itself with the move inside the line — 1…c6, not the game's 1…d5 —
     // and says which of the two kinds of `1…` that is.
     expect(list.getByTitle('On a pinned variation')).toHaveTextContent('1…c6')
-    expect(list.getByTitle('On the game')).toHaveTextContent('1.e4')
+    expect(
+      list.getByTitle('Written elsewhere, about a position this game reached'),
+    ).toHaveTextContent('1.e4')
     // The game's own note leads; the variation's is the aside under it.
     const bodies = screen.getByTestId('game-notes').textContent ?? ''
     expect(bodies.indexOf('Scandinavian invites')).toBeLessThan(

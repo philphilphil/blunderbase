@@ -1334,6 +1334,24 @@ export interface NoteGameBrief extends Extra {
   result?: string | null
   /** The day it was played, `YYYY-MM-DD`, or null for a game that carries no date. */
   date?: string | null
+  /** False for a model game from the reference books — one kept for study, not played. */
+  is_owner_game?: boolean
+}
+
+/**
+ * The move a note was written on, already spelled (`services.notes.note_move`).
+ *
+ * `ply` is the half-move **count** after the move, so the move itself is at `ply - 1`;
+ * `on_line` marks a move inside a pinned variation rather than one of the game's own.
+ */
+export interface NoteMove extends Extra {
+  ply: number
+  move_number: number
+  color: Color
+  san: string
+  /** `3. Bb5` or `3... a6` — what a person writes. */
+  label: string
+  on_line?: boolean
 }
 
 /**
@@ -1386,6 +1404,15 @@ export interface NoteResponse extends Extra {
   fen?: string | null
   line?: LineResponse | null
   game?: NoteGameBrief | null
+  /**
+   * The move it was written on, so a note that resurfaces at a position reached some other
+   * way can still name where it came from. Null when there is no move to name.
+   */
+  move?: NoteMove | null
+  /** How many of the owner's games pass through this note's position. 0 when none do. */
+  position_games?: number
+  /** How many model games do — kept for study, outside the explorer's tree. */
+  position_reference_games?: number
   created_at: string
   updated_at: string
 }

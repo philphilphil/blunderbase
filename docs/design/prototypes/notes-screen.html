@@ -1,0 +1,1309 @@
+<!--
+  Design exploration for /notes, 2026-09-02. Four layouts, and the case against the
+  grouping the screen ships with today.
+
+  Written without a document shell on purpose: it is published as an Artifact, which
+  supplies <!doctype>/<head>/<body>, and it still renders correctly opened straight off
+  disk because every ground and colour below is painted explicitly.
+
+  Palette and type are the app's own (web/src/index.css, docs/design/README.md): the
+  2026-09-01 restrained-desktop direction, muted blue accent, panes rather than cards.
+  Nothing here invents a second visual language.
+-->
+<title>Notes, Four Ways</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700&display=swap">
+
+<style>
+  /* ---------------------------------------------------------------- tokens
+     Dark is the base, exactly as the app has it: web/src/index.css declares the
+     flagship palette on :root and restates it on :root.light. The three viewer
+     states are mirrored from that — bare :root is dark, an OS light preference
+     redefines the tokens unless the reader has explicitly chosen dark, and an
+     explicit light choice redefines them again so the toggle wins either way. */
+  :root {
+    color-scheme: dark;
+
+    --void: #1d1e1f;
+    --panel: #292a2a;
+    --surface: #232424;
+    --surface-2: #212222;
+    --elevated: #303131;
+    --elevated-2: #2b2c2c;
+    --raised: #343535;
+    --raised-2: #313232;
+    --selected: #29445b;
+
+    --hairline: #3a3c3b;
+    --line: #3e4040;
+    --edge: #474949;
+    --edge-strong: #555756;
+
+    --text: #eeeeea;
+    --body: #d8d8d3;
+    --body-2: #d0d0cb;
+    --muted: #b6b5b0;
+    --dim: #a3a29c;
+    --dim-2: #9a998f;
+    --faint: #8b8a82;
+    --faint-2: #7c7b73;
+
+    --accent: #83b7e3;
+    --accent-link: #a8d0ef;
+    --brilliant: #b098d7;
+    --mistake: #dda05a;
+    --good: #78b98c;
+    --blunder: #ee766e;
+
+    --board-light: #a9b2b8;
+    --board-dark: #616d75;
+    --piece-white: #f2f2ee;
+    --piece-black: #1c1d1d;
+
+    --chip-info: #2a3540;
+    --chip-info-edge: #46586a;
+    --shadow: rgb(0 0 0 / 0.5);
+
+    --sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme='dark']) {
+      color-scheme: light;
+
+      --void: #e7e7e4;
+      --panel: #f2f2f0;
+      --surface: #fafaf8;
+      --surface-2: #f7f7f5;
+      --elevated: #f4f4f1;
+      --elevated-2: #f7f7f5;
+      --raised: #ebebe8;
+      --raised-2: #e8e8e5;
+      --selected: #dbe6f2;
+
+      --hairline: #dcdcd8;
+      --line: #d1d1cd;
+      --edge: #c5c5c0;
+      --edge-strong: #b6b6b1;
+
+      --text: #202020;
+      --body: #3b3b39;
+      --body-2: #444442;
+      --muted: #5c5c59;
+      --dim: #71716e;
+      --dim-2: #787874;
+      --faint: #8a8a86;
+      --faint-2: #9a9a95;
+
+      --accent: #245f9e;
+      --accent-link: #1d4e83;
+      --brilliant: #7054a5;
+      --mistake: #9b6819;
+      --good: #34724a;
+      --blunder: #bb3e35;
+
+      --board-light: #d8dde0;
+      --board-dark: #8f9da5;
+      --piece-white: #ffffff;
+      --piece-black: #33373a;
+
+      --chip-info: #e7eef6;
+      --chip-info-edge: #b9cde2;
+      --shadow: rgb(20 20 18 / 0.12);
+    }
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+
+    --void: #e7e7e4;
+    --panel: #f2f2f0;
+    --surface: #fafaf8;
+    --surface-2: #f7f7f5;
+    --elevated: #f4f4f1;
+    --elevated-2: #f7f7f5;
+    --raised: #ebebe8;
+    --raised-2: #e8e8e5;
+    --selected: #dbe6f2;
+
+    --hairline: #dcdcd8;
+    --line: #d1d1cd;
+    --edge: #c5c5c0;
+    --edge-strong: #b6b6b1;
+
+    --text: #202020;
+    --body: #3b3b39;
+    --body-2: #444442;
+    --muted: #5c5c59;
+    --dim: #71716e;
+    --dim-2: #787874;
+    --faint: #8a8a86;
+    --faint-2: #9a9a95;
+
+    --accent: #245f9e;
+    --accent-link: #1d4e83;
+    --brilliant: #7054a5;
+    --mistake: #9b6819;
+    --good: #34724a;
+    --blunder: #bb3e35;
+
+    --board-light: #d8dde0;
+    --board-dark: #8f9da5;
+    --piece-white: #ffffff;
+    --piece-black: #33373a;
+
+    --chip-info: #e7eef6;
+    --chip-info-edge: #b9cde2;
+    --shadow: rgb(20 20 18 / 0.12);
+  }
+
+  /* ------------------------------------------------------------- document */
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--body);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: var(--accent-link); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  .page {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4.5rem;
+  }
+  @media (max-width: 40rem) { .page { padding: 2rem 1rem 4rem; gap: 3rem; } }
+
+  .prose { max-width: 38rem; }
+  .prose p { margin: 0 0 1rem; }
+  .prose p:last-child { margin-bottom: 0; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0 0 0.75rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    font-weight: 620;
+    color: var(--text);
+    text-wrap: balance;
+    margin: 0 0 1.25rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+    color: var(--text);
+    text-wrap: balance;
+    margin: 0 0 0.875rem;
+  }
+
+  h3 {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    margin: 0 0 0.5rem;
+  }
+
+  .lede { font-size: 1.0625rem; color: var(--muted); }
+
+  /* ---------------------------------------------------------- masthead bits */
+  .masthead { display: flex; flex-direction: column; gap: 2rem; }
+  .masthead-top { display: flex; align-items: flex-start; gap: 2rem; flex-wrap: wrap; }
+  .masthead-top > .prose { flex: 1 1 26rem; }
+
+  .themer {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid var(--edge);
+    border-radius: 5px;
+    padding: 1px;
+    background: var(--elevated);
+    font-size: 0.6875rem;
+  }
+  .themer button {
+    font: inherit;
+    font-family: var(--sans);
+    color: var(--dim);
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    padding: 0.25rem 0.625rem;
+    cursor: pointer;
+  }
+  .themer button[aria-pressed='true'] { background: var(--raised-2); color: var(--text); }
+
+  /* The library's real shape, which is the constraint every variant is judged against. */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid var(--edge-strong);
+    border-bottom: 1px solid var(--edge-strong);
+  }
+  @media (max-width: 46rem) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat:nth-child(odd) { border-left: 0; padding-left: 0; }
+    .stat:nth-child(n + 3) { border-top: 1px solid var(--hairline); }
+  }
+  .stat { padding: 1rem 1.25rem 1.125rem; border-left: 1px solid var(--hairline); }
+  .stat:first-child { border-left: 0; padding-left: 0; }
+  .stat b {
+    display: block;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.625rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .stat span { display: block; font-size: 0.75rem; color: var(--dim); margin-top: 0.25rem; }
+
+  .footnote { font-size: 0.8125rem; color: var(--faint); max-width: 44rem; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    color: var(--dim);
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    padding: 0 0.25em;
+  }
+
+  /* ------------------------------------------------------- the diagnosis */
+  .diagnosis { display: flex; gap: 2.5rem; flex-wrap: wrap; align-items: flex-start; }
+  .diagnosis > .prose { flex: 1 1 24rem; }
+  .schematics { display: flex; gap: 1.5rem; flex: 0 1 26rem; }
+  .schematic { flex: 1; }
+  .schematic figcaption {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--faint);
+    margin-top: 0.625rem;
+    letter-spacing: 0.02em;
+  }
+  .schematic .rows { display: flex; flex-direction: column; gap: 0.3125rem; }
+  .schematic .head { height: 6px; background: var(--edge-strong); border-radius: 2px; width: 55%; }
+  .schematic .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.3125rem; }
+  .schematic .cell { height: 22px; border-radius: 3px; background: var(--elevated); border: 1px solid var(--line); }
+  .schematic .cell.empty { background: none; border-style: dashed; border-color: var(--hairline); }
+
+  /* ---------------------------------------------------------- the variants */
+  .variant { display: flex; flex-direction: column; gap: 1.5rem; }
+  .variant-head { display: flex; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap; }
+  .variant-head .prose { flex: 1 1 26rem; }
+
+  /* The glyph is a schematic of the layout it names, not decoration: one column,
+     a split, a packed sheet, stacked shelves. */
+  .glyph {
+    flex: 0 0 auto;
+    width: 46px; height: 46px;
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    background: var(--surface);
+    padding: 5px;
+    display: grid;
+    gap: 3px;
+  }
+  .glyph i { background: var(--edge-strong); border-radius: 1px; display: block; }
+  .glyph.g-stream { grid-template-rows: repeat(3, 1fr); }
+  .glyph.g-desk { grid-template-columns: 1fr 1.7fr; }
+  .glyph.g-sheet { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .glyph.g-shelf { grid-template-rows: 1fr 1fr; gap: 5px; }
+  .glyph.g-shelf i { background: repeating-linear-gradient(90deg, var(--edge-strong) 0 8px, transparent 8px 11px); }
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem 2.5rem;
+    border-top: 1px solid var(--hairline);
+    padding-top: 1rem;
+  }
+  @media (max-width: 46rem) { .verdict { grid-template-columns: 1fr; } }
+  .verdict h3::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    vertical-align: 0.1em;
+  }
+  .verdict .holds h3::before { background: var(--good); }
+  .verdict .costs h3::before { background: var(--mistake); }
+  .verdict ul { margin: 0; padding-left: 1.125rem; }
+  .verdict li { font-size: 0.875rem; color: var(--muted); margin-bottom: 0.3125rem; }
+
+  /* ------------------------------------------------- the mockup frame + app
+     Everything inside .screen is drawn at the app's own density, so the frames
+     read as screenshots rather than as more of this document. */
+  .frame {
+    border: 1px solid var(--edge-strong);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 12px 32px -18px var(--shadow);
+  }
+  .frame-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.4375rem 0.75rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .frame-bar .dots { display: flex; gap: 5px; }
+  .frame-bar .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--edge); display: block; }
+  .frame-bar .url {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--faint);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    padding: 0.125rem 0.5rem;
+  }
+
+  .screen {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--body-2);
+    padding: 14px 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--surface);
+  }
+
+  .screen p { margin: 0; }
+  .screen-head { display: flex; align-items: flex-end; gap: 1rem; }
+  .screen-head h4 {
+    margin: 0;
+    font-size: 21px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .screen-head p { margin: 3px 0 0; font-size: 12.5px; color: var(--dim); }
+  .screen-head .spacer { flex: 1; }
+
+  .btn {
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--dim);
+    background: var(--elevated);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    padding: 3px 9px;
+  }
+  .seg { display: flex; border: 1px solid var(--edge); border-radius: 5px; background: var(--elevated); padding: 1px; }
+  .seg span { font-size: 11px; color: var(--dim); padding: 2px 8px; border-radius: 4px; }
+  .seg span.on { background: var(--raised-2); color: var(--text); }
+
+  .filters { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .field {
+    height: 25px;
+    min-width: 190px;
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    background: var(--elevated);
+    color: var(--faint);
+    font-size: 11.5px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+  }
+  .chip {
+    font-size: 11.5px;
+    color: var(--dim);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    background: var(--elevated);
+    padding: 2px 8px;
+  }
+
+  /* --------------------------------------------------------------- a note */
+  .badge {
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    padding: 0 5px;
+    color: var(--dim-2);
+    background: var(--elevated);
+    white-space: nowrap;
+  }
+  .badge.line { color: var(--brilliant); border-color: color-mix(in srgb, var(--brilliant) 45%, transparent); }
+  .badge.model { border-style: dashed; }
+  .tag {
+    font-size: 10.5px;
+    color: var(--muted);
+    background: var(--chip-info);
+    border: 1px solid var(--chip-info-edge);
+    border-radius: 3px;
+    padding: 0 5px;
+    font-family: var(--mono);
+  }
+  .meta { font-size: 11px; color: var(--faint); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .meta .mv { font-family: var(--mono); color: var(--dim-2); }
+  .meta a { color: var(--dim); text-decoration: none; border-bottom: 1px solid transparent; }
+  .meta a:hover { color: var(--accent-link); border-bottom-color: currentColor; }
+  .when { font-family: var(--mono); font-size: 10.5px; color: var(--faint-2); font-variant-numeric: tabular-nums; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    aspect-ratio: 1;
+    border-radius: 3px;
+    overflow: hidden;
+    flex: none;
+    container-type: inline-size;
+  }
+  .board div { display: grid; place-items: center; }
+  .board .lt { background: var(--board-light); }
+  .board .dk { background: var(--board-dark); }
+    /* A square is an eighth of the board, so the piece is sized against the board's own
+     width rather than against the page — one rule that holds at 54px and at 176px. */
+  .board span { font-size: 0.78em; font-size: 10.5cqw; line-height: 1; }
+  .board .w { color: var(--piece-white); text-shadow: 0 0 1px rgb(0 0 0 / 0.45); }
+  .board .b { color: var(--piece-black); }
+  .noboard {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border: 1px dashed var(--hairline);
+    border-radius: 3px;
+    color: var(--faint-2);
+    font-size: 10px;
+    text-align: center;
+    flex: none;
+  }
+
+  /* ---- variant: stream ---- */
+  .v-stream { max-width: 46rem; }
+  .v-stream .rule {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--faint-2);
+    margin-top: 4px;
+  }
+  .v-stream .rule::after { content: ''; flex: 1; height: 1px; background: var(--hairline); }
+  .v-stream .row { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--hairline); }
+  .v-stream .row:last-child { border-bottom: 0; }
+  .v-stream .board, .v-stream .noboard { width: 68px; }
+  .v-stream .body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .v-stream .text { color: var(--body-2); font-size: 13px; }
+  .v-stream .heads { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  /* ---- variant: desk ---- */
+  .v-desk { display: grid; grid-template-columns: 20rem minmax(0, 1fr); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+  @media (max-width: 52rem) { .v-desk { grid-template-columns: 1fr; } .v-desk .reader { display: none; } }
+  .v-desk .index { border-right: 1px solid var(--line); background: var(--surface-2); }
+  .v-desk .ix {
+    display: grid;
+    grid-template-columns: 3px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .v-desk .ix i { display: block; height: 15px; border-radius: 2px; background: var(--edge); }
+  .v-desk .ix.on { background: var(--selected); }
+  .v-desk .ix.on i { background: var(--accent); }
+  .v-desk .ix.pos i { background: var(--accent); }
+  .v-desk .ix.line i { background: var(--brilliant); }
+  .v-desk .ix.coach i { background: var(--mistake); }
+  .v-desk .ix p { margin: 0; font-size: 12px; color: var(--body-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v-desk .ix.on p { color: var(--text); }
+  .v-desk .reader { padding: 16px 18px; display: flex; gap: 18px; align-items: flex-start; }
+  .v-desk .reader .board { width: 176px; }
+  .v-desk .reader .col { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .v-desk .reader .text { font-size: 14px; line-height: 1.6; color: var(--body); }
+  .v-desk .prov { border-top: 1px solid var(--hairline); padding-top: 9px; display: flex; flex-direction: column; gap: 5px; }
+
+  /* ---- variant: sheet ---- */
+  .v-sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 58rem; }
+  @media (max-width: 52rem) { .v-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .v-sheet .card {
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--elevated-2);
+    padding: 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .v-sheet .card.coach { border-left: 2px solid var(--mistake); }
+  .v-sheet .text {
+    font-size: 12.5px;
+    color: var(--body-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .v-sheet .heads { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  /* ---- variant: shelf ---- */
+  .v-shelf { display: flex; flex-direction: column; gap: 16px; }
+  .shelf-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
+  .shelf-head b { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 500; }
+  .shelf-head em { font-style: normal; font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .shelf-head .line { flex: 1; height: 1px; background: var(--hairline); }
+  .strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .strip .card {
+    flex: 0 0 15rem;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--elevated-2);
+    padding: 9px;
+    display: flex;
+    gap: 9px;
+  }
+  .strip .board, .strip .noboard { width: 54px; }
+  .strip .col { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .strip .text {
+    font-size: 12px;
+    color: var(--body-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ------------------------------------------------------- recommendation */
+  .rec {
+    border: 1px solid var(--edge-strong);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 1.75rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .steps { display: grid; gap: 0.875rem; margin: 0; padding: 0; }
+  .steps > div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.875rem; align-items: baseline; }
+  .steps .n {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: 3px;
+    padding: 0 0.375rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .steps p { margin: 0; font-size: 0.9375rem; color: var(--muted); }
+  .steps b { color: var(--text); font-weight: 600; }
+
+  .keeps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.75rem; }
+  @media (max-width: 52rem) { .keeps { grid-template-columns: 1fr; } }
+  .keeps p { margin: 0; font-size: 0.875rem; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="masthead-top">
+      <div class="prose">
+        <p class="eyebrow">Blunderbase · /notes · 2 September 2026</p>
+        <h1>Notes, four ways</h1>
+        <p class="lede">
+          The screen groups notes by game. That is the wrong axis — and it is also what makes
+          the columns look broken. Here is the case against it, then four layouts that do not
+          need it, drawn with the same six notes so they can be judged against each other.
+        </p>
+      </div>
+      <div class="themer" role="group" aria-label="Theme">
+        <button type="button" data-set="dark" aria-pressed="false">Dark</button>
+        <button type="button" data-set="light" aria-pressed="false">Light</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b>9,620</b><span>games in the library</span></div>
+      <div class="stat"><b>9</b><span>notes written so far</span></div>
+      <div class="stat"><b>1.5</b><span>notes per noted game</span></div>
+      <div class="stat"><b>1 in 3</b><span>notes name no game at all</span></div>
+    </div>
+    <p class="footnote">
+      Counted from <code>data/blunderbase.db</code> today. The notes in the mockups below are
+      illustrative — the nine real ones are test rows averaging six characters — but the
+      shape they are drawn to is the shape the table actually has.
+    </p>
+  </header>
+
+  <!-- ------------------------------------------------------- the diagnosis -->
+  <section class="diagnosis">
+    <div class="prose">
+      <p class="eyebrow">Why the grouping has to go</p>
+      <h2>A game is where a note was written, not what it is about</h2>
+      <p>
+        Grouping by game turns this page into a second index of games, which
+        <code>/games</code> already is. It also puts the most reusable notes — the ones
+        pinned to a position, which resurface in every game that reaches it — into a
+        leftovers bin at the bottom called <em>Opening lines and loose notes</em>. A third
+        of all notes land there.
+      </p>
+      <p>
+        And it is the direct cause of the odd-looking columns. A heading forces a row break,
+        so a game carrying one note takes a full row and leaves the rest of it empty. At
+        1.5 notes per noted game, most rows are two-thirds hole. The columns are not the
+        problem; the headings between them are.
+      </p>
+      <p>
+        There is a quieter argument too. Nine notes against 9,620 games means this screen is
+        being designed ahead of its data. Whatever it does at ten notes it must also do at
+        five hundred, so the ordering wants to be <b>a control the reader turns</b>, not a
+        structure baked into the layout.
+      </p>
+    </div>
+
+    <div class="schematics">
+      <figure class="schematic" style="margin:0">
+        <div class="rows">
+          <div class="head"></div>
+          <div class="cells"><i class="cell"></i><i class="cell empty"></i><i class="cell empty"></i></div>
+          <div class="head" style="width:70%"></div>
+          <div class="cells"><i class="cell"></i><i class="cell"></i><i class="cell empty"></i></div>
+          <div class="head" style="width:40%"></div>
+          <div class="cells"><i class="cell"></i><i class="cell empty"></i><i class="cell empty"></i></div>
+        </div>
+        <figcaption>grouped — 4 of 9 cells carry a note</figcaption>
+      </figure>
+      <figure class="schematic" style="margin:0">
+        <div class="rows">
+          <div class="head" style="visibility:hidden"></div>
+          <div class="cells"><i class="cell"></i><i class="cell"></i><i class="cell"></i></div>
+          <div class="cells"><i class="cell"></i><i class="cell"></i><i class="cell"></i></div>
+          <div class="cells"><i class="cell"></i><i class="cell"></i><i class="cell empty"></i></div>
+        </div>
+        <figcaption>flat — 8 of 9, and one honest gap</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ variants -->
+
+  <section class="variant">
+    <div class="variant-head">
+      <div class="glyph g-stream" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="prose">
+        <p class="eyebrow">Variant one</p>
+        <h2>Stream</h2>
+        <p>
+          One column, newest first, no groups at all. Time is the only ordering that is
+          always true of a note, so it is the one the page falls back on — marked by thin
+          date rules that cost no vertical space and cannot punch holes in a layout. The
+          column is capped at a readable measure instead of spanning the monitor, and the
+          board sits at 68px, big enough to recognise a structure.
+        </p>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">blunderbase.local/notes</span>
+      </div>
+      <div class="screen">
+        <div class="screen-head">
+          <div>
+            <h4>Notes</h4>
+            <p>6 notes</p>
+          </div>
+          <span class="spacer"></span>
+          <span class="btn">Markdown</span>
+          <span class="btn">PGN</span>
+        </div>
+        <div class="filters">
+          <span class="field">Search what you wrote…</span>
+          <span class="chip">Tags</span>
+          <span class="chip">Kind</span>
+          <span class="chip">Date</span>
+          <span class="spacer" style="flex:1"></span>
+          <span class="seg"><span class="on">Newest</span><span>Opening</span><span>Tag</span></span>
+        </div>
+        <div class="v-stream" data-render="stream"></div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <div class="holds">
+        <h3>Holds up</h3>
+        <ul>
+          <li>Never ragged, at nine notes or nine hundred — there is no cell to leave empty.</li>
+          <li>Reads at one measure, so a long note and a one-liner look like the same object.</li>
+          <li>The smallest change from what ships today: delete the grouping, cap the width.</li>
+        </ul>
+      </div>
+      <div class="costs">
+        <h3>Costs</h3>
+        <ul>
+          <li>Uses the left half of a wide monitor and leaves the rest empty.</li>
+          <li>Finding a specific note is search, not browsing — nothing is clustered.</li>
+          <li>Boards stay small; you recognise a position, you do not read one.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="variant">
+    <div class="variant-head">
+      <div class="glyph g-desk" aria-hidden="true"><i></i><i></i></div>
+      <div class="prose">
+        <p class="eyebrow">Variant two</p>
+        <h2>Reading desk</h2>
+        <p>
+          Split the two jobs. The left pane is an index — one line per note, a colour stripe
+          for what kind it is, nothing else — and the right is the note itself at full size,
+          with a board you can actually read a position off and the provenance spelled out
+          underneath. Editing happens in the reading pane, where there is room for it.
+        </p>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">blunderbase.local/notes?note=4</span>
+      </div>
+      <div class="screen">
+        <div class="screen-head">
+          <div>
+            <h4>Notes</h4>
+            <p>6 notes · 2 tagged</p>
+          </div>
+          <span class="spacer"></span>
+          <span class="btn">Markdown</span>
+          <span class="btn">PGN</span>
+        </div>
+        <div class="filters">
+          <span class="field">Search what you wrote…</span>
+          <span class="chip">Tags</span>
+          <span class="chip">Kind</span>
+          <span class="spacer" style="flex:1"></span>
+          <span class="seg"><span>Stream</span><span class="on">Desk</span><span>Sheet</span></span>
+        </div>
+        <div class="v-desk" data-render="desk"></div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <div class="holds">
+        <h3>Holds up</h3>
+        <ul>
+          <li>The only variant that stays usable at several hundred notes.</li>
+          <li>The board gets to be 176px, which is where a position becomes readable.</li>
+          <li>Scanning and reading stop competing for the same pixels.</li>
+        </ul>
+      </div>
+      <div class="costs">
+        <h3>Costs</h3>
+        <ul>
+          <li>Every note is a click away; nothing is readable in passing.</li>
+          <li>At nine notes the index is nine lines and the pane is mostly empty.</li>
+          <li>The biggest build of the four, and it needs a phone story of its own.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="variant">
+    <div class="variant-head">
+      <div class="glyph g-sheet" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="prose">
+        <p class="eyebrow">Variant three</p>
+        <h2>Contact sheet</h2>
+        <p>
+          The columns kept, the headings dropped, and the board promoted to the top of the
+          card where it does the work the text cannot: you find the note about the Berlin by
+          seeing the Berlin. Cells fill in order with nothing to break the flow, so the grid
+          finally looks like a grid. Text is clamped to four lines — the card is a way in,
+          not the place you read.
+        </p>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">blunderbase.local/notes</span>
+      </div>
+      <div class="screen">
+        <div class="screen-head">
+          <div>
+            <h4>Notes</h4>
+            <p>6 notes</p>
+          </div>
+          <span class="spacer"></span>
+          <span class="btn">Markdown</span>
+          <span class="btn">PGN</span>
+        </div>
+        <div class="filters">
+          <span class="field">Search what you wrote…</span>
+          <span class="chip">Tags</span>
+          <span class="chip">Kind</span>
+          <span class="spacer" style="flex:1"></span>
+          <span class="seg"><span>Stream</span><span>Desk</span><span class="on">Sheet</span></span>
+        </div>
+        <div class="v-sheet" data-render="sheet"></div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <div class="holds">
+        <h3>Holds up</h3>
+        <ul>
+          <li>Uses the whole screen, and packs without gaps once the headings are gone.</li>
+          <li>Visual recall: the position is the index, which is how chess memory works.</li>
+          <li>Closest to what is already built — it is today's card minus the grouping.</li>
+        </ul>
+      </div>
+      <div class="costs">
+        <h3>Costs</h3>
+        <ul>
+          <li>A note with no position is a hole in the pattern, and one in six has none.</li>
+          <li>Clamping hides the end of every note longer than four lines.</li>
+          <li>Equal-sized cells imply notes are equally important. They are not.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="variant">
+    <div class="variant-head">
+      <div class="glyph g-shelf" aria-hidden="true"><i></i><i></i></div>
+      <div class="prose">
+        <p class="eyebrow">Variant four</p>
+        <h2>Shelves</h2>
+        <p>
+          Keep grouping, but on an axis that means something: the tag, which is the owner's
+          own word for what a note is about. Each shelf is a horizontal strip, so a topic
+          with one note costs one row rather than one row and two holes — the failure mode
+          that made game grouping look wrong is structurally impossible here. Untagged notes
+          get the last shelf, and it is the shelf that tells you to start tagging.
+        </p>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">blunderbase.local/notes?group=tag</span>
+      </div>
+      <div class="screen">
+        <div class="screen-head">
+          <div>
+            <h4>Notes</h4>
+            <p>6 notes across 4 topics</p>
+          </div>
+          <span class="spacer"></span>
+          <span class="btn">Markdown</span>
+          <span class="btn">PGN</span>
+        </div>
+        <div class="filters">
+          <span class="field">Search what you wrote…</span>
+          <span class="chip">Tags</span>
+          <span class="chip">Kind</span>
+          <span class="spacer" style="flex:1"></span>
+          <span class="seg"><span>Newest</span><span>Opening</span><span class="on">Tag</span></span>
+        </div>
+        <div class="v-shelf" data-render="shelf"></div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <div class="holds">
+        <h3>Holds up</h3>
+        <ul>
+          <li>Turns the page into a topic index, which is what a memory should be.</li>
+          <li>A one-note topic costs one row, so sparse data never looks broken.</li>
+          <li>Makes tagging visibly worth doing, which is how it starts happening.</li>
+        </ul>
+      </div>
+      <div class="costs">
+        <h3>Costs</h3>
+        <ul>
+          <li>One note in nine is tagged today, so five of six shelves would say "untagged".</li>
+          <li>A note with three tags appears three times, or needs a primary-tag rule.</li>
+          <li>Horizontal scrolling hides notes off the right edge of every shelf.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p class="footnote">
+        The same shelf works on <b>opening</b> instead of tag — <code>Ruy Lopez: Berlin</code>,
+        <code>Caro-Kann</code> — which needs no tagging discipline at all, because the games
+        already carry an ECO code and the explorer can name a position's opening. That is a
+        backend change rather than a layout one, which is why it is a footnote and not a
+        fifth variant.
+      </p>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------------------- what stays -->
+  <section>
+    <div class="prose">
+      <p class="eyebrow">Orthogonal to all four</p>
+      <h2>What a note carries, whichever layout wins</h2>
+    </div>
+    <div class="keeps" style="margin-top:1.25rem">
+      <div>
+        <h3>Where it came from</h3>
+        <p>
+          The move and the game it was written on, as a link that opens that game there —
+          and a mark when the game is a model game rather than one of yours. A note pinned to
+          a position turns up wherever that position does, and unattributed advice is advice
+          from nobody.
+        </p>
+      </div>
+      <div>
+        <h3>Where else it applies</h3>
+        <p>
+          How many games in the library pass through the position, linking into the explorer
+          rooted there. That count is the difference between a note about one game and a note
+          about a line you keep playing.
+        </p>
+      </div>
+      <div>
+        <h3>Who wrote it</h3>
+        <p>
+          A conclusion the coach reached over MCP and a reminder you left yourself should
+          not look identical. The amber edge stays.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------- recommendation -->
+  <section class="rec">
+    <div class="prose">
+      <p class="eyebrow">Decided · 2 September 2026</p>
+      <h2>Stream and contact sheet, behind a toggle</h2>
+      <p>
+        Picked by the owner off this page and built the same day. The stream is what the
+        screen opens in — one column, every note whole — and the sheet is a keystroke away
+        for the browsing mood. The reading desk is not built; it is the answer to a note
+        count this library does not have yet, and it can be a third option on the same
+        toggle if browsing ever stops working.
+      </p>
+      <p>
+        What both of them dropped is the grouping. Time cuts the list instead, as rules that
+        take a line rather than a row, which is what a date can do and a game heading could
+        not.
+      </p>
+    </div>
+
+    <div class="steps">
+      <div>
+        <span class="n">1</span>
+        <p><b>Delete the game grouping.</b> One flat list, newest first, with date rules. This alone fixes the columns, because it removes what was breaking them.</p>
+      </div>
+      <div>
+        <span class="n">2</span>
+        <p><b>Cap the reading measure</b> at about 46rem instead of spanning the canvas, and let the board grow to 68px. The wide screen is not an obligation.</p>
+      </div>
+      <div>
+        <span class="n">3</span>
+        <p><b>Put ordering in the filter row</b> beside the view switch — newest, by opening, by tag — so the axis is the reader's to change and no one layout has to be right for every library size.</p>
+      </div>
+      <div>
+        <span class="n">4</span>
+        <p><b>Keep the sheet as the second view</b>, un-grouped, board on top, text clamped — and let it rewrite and forget a note like the stream does, because a view you can only read from is a view you leave.</p>
+      </div>
+      <div>
+        <span class="n">5</span>
+        <p><b>Hold the desk</b> until the note count justifies it, and until there is a phone answer for a two-pane screen.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // The same six notes feed every mockup, so the variants differ only in how they are
+  // drawn. They cover each scope the app has — a game note, a pinned variation, a position
+  // note from the explorer, a model game, a coach note over MCP, and a loose one — because
+  // a layout is judged on its awkward cases, not its easy one.
+  const BERLIN = 'r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQ1RK1';
+  const CARO = 'rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR';
+  const ITALIAN = 'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2P2N2/PP1P1PPP/RNBQK2R';
+  const ENDGAME = '5rk1/pp3ppp/2p5/3r4/3P4/2P2N2/PP3PPP/4R1K1';
+  const HEDGEHOG = 'r2q1rk1/1b1nbppp/p2ppn2/1p6/3NPP2/1BN1B3/PPPQ2PP/2KR3R';
+
+  const NOTES = [
+    {
+      id: 1, kind: 'opening line', fen: BERLIN, when: '2h',
+      text: '4.O-O Nxe4 is fine for Black and I keep flinching at it. Play 5.d4 and get on with the game — the pawn comes back after 5…Nd6 6.Bxc6 dxc6 7.dxe5.',
+      tags: ['opening', 'berlin'],
+      origin: null, reach: { mine: 12, model: 3 }, source: 'web', tag: 'opening',
+    },
+    {
+      id: 2, kind: 'game', fen: ENDGAME, when: 'yesterday',
+      text: 'Stopped counting defenders again. Rxd5 only wins the pawn if the back rank is covered, and it was not. Third time this month, always under two minutes.',
+      tags: ['time-trouble'],
+      origin: { game: 'phib vs brosssmatareyes', move: '31. Rxd5', model: false },
+      reach: { mine: 1, model: 0 }, source: 'web', tag: 'time-trouble',
+    },
+    {
+      id: 3, kind: 'variation', fen: CARO, when: '3d',
+      text: 'This is the whole point of the Caro. If they take on d5 I get the structure I actually know how to play, and if they push I have c5 in one move.',
+      tags: ['caro-kann', 'opening'],
+      origin: { game: 'maia-1700 vs phib', move: '3. exd5', model: false },
+      reach: { mine: 8, model: 0 }, source: 'web', tag: 'opening',
+    },
+    {
+      id: 4, kind: 'opening line', fen: HEDGEHOG, when: '5d',
+      text: 'Kasparov sat here for twenty minutes and then played the quiet rook move. Nothing forcing at all — he just improved the worst piece and let the position ask the questions.',
+      tags: [],
+      origin: { game: 'Kasparov vs Topalov', move: '18. Rhe1', model: true },
+      reach: { mine: 2, model: 4 }, source: 'web', tag: null,
+    },
+    {
+      id: 5, kind: 'opening line', fen: ITALIAN, when: '1w',
+      text: 'Across your last 40 Italian games as White you score 61% when you castle by move 6 and 38% when you delay it past move 8. The delay is not winning you anything.',
+      tags: ['opening'],
+      origin: null, reach: { mine: 40, model: 0 }, source: 'mcp', tag: 'opening',
+    },
+    {
+      id: 6, kind: 'loose', fen: null, when: '2w',
+      text: 'No 3-minute games after 22:00. Every single one this month ended in a resignation before move 30.',
+      tags: [],
+      origin: null, reach: { mine: 0, model: 0 }, source: 'web', tag: null,
+    },
+  ];
+
+  const GLYPHS = {
+    k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
+  };
+
+  /** A FEN's board field as an 8×8 of coloured squares. Solid glyphs, tinted by side —
+      the same trick chessground uses, and the same square colours the app's board takes. */
+  function boardEl(fen, cls) {
+    const el = document.createElement('div');
+    el.className = 'board' + (cls ? ' ' + cls : '');
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', 'Chess position');
+    const ranks = fen.split(' ')[0].split('/');
+    ranks.forEach((rank, r) => {
+      let file = 0;
+      for (const ch of rank) {
+        if (ch >= '1' && ch <= '8') {
+          for (let i = 0; i < Number(ch); i += 1) {
+            el.append(square(r, file, null));
+            file += 1;
+          }
+          continue;
+        }
+        el.append(square(r, file, ch));
+        file += 1;
+      }
+    });
+    return el;
+  }
+
+  function square(rank, file, piece) {
+    const cell = document.createElement('div');
+    cell.className = (rank + file) % 2 === 0 ? 'lt' : 'dk';
+    if (piece) {
+      const glyph = document.createElement('span');
+      glyph.className = piece === piece.toUpperCase() ? 'w' : 'b';
+      glyph.textContent = GLYPHS[piece.toLowerCase()] || '';
+      cell.append(glyph);
+    }
+    return cell;
+  }
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function badges(note) {
+    const wrap = el('span', 'heads');
+    const kind = el('span', 'badge' + (note.kind === 'variation' ? ' line' : ''), note.kind);
+    wrap.append(kind);
+    if (note.origin && note.origin.model) wrap.append(el('span', 'badge model', 'model game'));
+    if (note.source === 'mcp') wrap.append(el('span', 'badge', 'via MCP'));
+    note.tags.forEach((tag) => wrap.append(el('span', 'tag', tag)));
+    return wrap;
+  }
+
+  /** The provenance line the note carries everywhere: where it was written, and how far
+      the position reaches. Both are links in the app; here they are drawn as links. */
+  function metaEl(note) {
+    const meta = el('div', 'meta');
+    if (note.origin) {
+      const from = el('a', null);
+      from.href = '#';
+      const mv = el('span', 'mv', note.origin.move);
+      from.append(document.createTextNode('written on '), mv,
+        document.createTextNode(' in ' + note.origin.game));
+      meta.append(from);
+    } else if (note.kind !== 'loose') {
+      meta.append(el('span', null, 'written in the explorer'));
+    }
+    if (note.reach.mine > 0) {
+      const reach = el('a', null, 'in ' + note.reach.mine + ' of your games'
+        + (note.reach.model ? ' and ' + note.reach.model + ' model games' : ''));
+      reach.href = '#';
+      meta.append(reach);
+    }
+    meta.append(el('span', 'when', note.when));
+    return meta;
+  }
+
+  function positionEl(note, extraClass) {
+    if (note.fen) return boardEl(note.fen, extraClass);
+    const none = el('div', 'noboard' + (extraClass ? ' ' + extraClass : ''), 'no position');
+    return none;
+  }
+
+  // ---- stream -------------------------------------------------------------
+  function renderStream(host) {
+    const buckets = [
+      { label: 'Today', ids: [1] },
+      { label: 'This week', ids: [2, 3, 4] },
+      { label: 'Earlier', ids: [5, 6] },
+    ];
+    buckets.forEach((bucket) => {
+      host.append(el('div', 'rule', bucket.label));
+      bucket.ids.forEach((id) => {
+        const note = NOTES.find((n) => n.id === id);
+        const row = el('div', 'row');
+        row.append(positionEl(note));
+        const body = el('div', 'body');
+        body.append(badges(note), el('p', 'text', note.text), metaEl(note));
+        row.append(body);
+        host.append(row);
+      });
+    });
+  }
+
+  // ---- desk ---------------------------------------------------------------
+  function renderDesk(host) {
+    const index = el('div', 'index');
+    const stripe = { 'opening line': 'pos', variation: 'line', game: '', loose: '' };
+    NOTES.forEach((note) => {
+      const row = el('div', 'ix ' + (note.source === 'mcp' ? 'coach' : stripe[note.kind] || ''));
+      if (note.id === 4) row.classList.add('on');
+      row.append(el('i'), el('p', null, note.text), el('span', 'when', note.when));
+      index.append(row);
+    });
+    const open = NOTES.find((n) => n.id === 4);
+    const reader = el('div', 'reader');
+    reader.append(positionEl(open));
+    const col = el('div', 'col');
+    col.append(badges(open));
+    const text = el('p', 'text', open.text);
+    col.append(text);
+    const prov = el('div', 'prov');
+    prov.append(metaEl(open));
+    const actions = el('div', 'meta');
+    actions.append(el('span', 'btn', 'Rewrite'), el('span', 'btn', 'Forget'));
+    prov.append(actions);
+    col.append(prov);
+    reader.append(col);
+    host.append(index, reader);
+  }
+
+  // ---- sheet --------------------------------------------------------------
+  function renderSheet(host) {
+    NOTES.forEach((note) => {
+      const card = el('div', 'card' + (note.source === 'mcp' ? ' coach' : ''));
+      card.append(positionEl(note));
+      card.append(badges(note));
+      const text = el('p', 'text', note.text);
+        card.append(text);
+      card.append(metaEl(note));
+      host.append(card);
+    });
+  }
+
+  // ---- shelves ------------------------------------------------------------
+  function renderShelf(host) {
+    const shelves = [
+      { label: 'opening', ids: [1, 3, 5] },
+      { label: 'time-trouble', ids: [2] },
+      { label: 'caro-kann', ids: [3] },
+      { label: 'untagged', ids: [4, 6] },
+    ];
+    shelves.forEach((shelf) => {
+      const block = el('div');
+      const head = el('div', 'shelf-head');
+      head.append(el('b', null, shelf.label), el('em', null, String(shelf.ids.length)), el('span', 'line'));
+      block.append(head);
+      const strip = el('div', 'strip');
+      shelf.ids.forEach((id) => {
+        const note = NOTES.find((n) => n.id === id);
+        const card = el('div', 'card');
+        card.append(positionEl(note));
+        const col = el('div', 'col');
+        const text = el('p', 'text', note.text);
+            col.append(text);
+        const when = el('div', 'meta');
+        when.append(el('span', 'when', note.when));
+        if (note.origin) when.append(el('span', 'mv', note.origin.move));
+        col.append(when);
+        card.append(col);
+        strip.append(card);
+      });
+      block.append(strip);
+      host.append(block);
+    });
+  }
+
+  const RENDERERS = { stream: renderStream, desk: renderDesk, sheet: renderSheet, shelf: renderShelf };
+  document.querySelectorAll('[data-render]').forEach((host) => {
+    RENDERERS[host.dataset.render](host);
+  });
+
+  // The page follows the viewer's theme by default; the toggle is here because a design
+  // review of a themed app has to be able to see both without leaving the page.
+  const buttons = document.querySelectorAll('.themer button');
+  function paint() {
+    const chosen = document.documentElement.getAttribute('data-theme');
+    buttons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.set === chosen));
+    });
+  }
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const chosen = document.documentElement.getAttribute('data-theme');
+      if (chosen === button.dataset.set) document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', button.dataset.set);
+      paint();
+    });
+  });
+  paint();
+</script>

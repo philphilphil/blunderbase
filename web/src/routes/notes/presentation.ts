@@ -1,10 +1,16 @@
 /**
- * How a flat page of notes becomes the notes screen: which anchor each one has, where it
- * links to, and the grouping the list is drawn in.
+ * How a note payload becomes what the screen shows: which anchor it has, what to call the
+ * move it was written on, where its two links go, and which slice of time it belongs to.
  *
  * Pure functions over `NoteResponse` — the payload already carries the position's FEN, the
  * whole variation and a summary of the game (`services/notes.py:note_payload`), so nothing
  * here fetches and everything here is testable.
+ *
+ * This module used to group the list by game as well. That went (owner's call, 2026-09-02):
+ * a game is where a note was *written*, not what it is about, `/games` is already the index
+ * of games, and at 1.5 notes per noted game the headings cost a row apiece and left the
+ * columns full of holes. What replaces it is `ageBuckets` — time is the only ordering that
+ * is always true of a note, and a date rule takes a line rather than a row.
  */
 import type { LineResponse, NoteGameBrief, NoteResponse, NoteScope } from '@/lib/api/types'
 import { moveNumberLabel } from '@/lib/chess/evaluation'
@@ -75,14 +81,57 @@ export function lineText(line: Pick<LineResponse, 'base_ply' | 'sans' | 'moves'>
  * palette needs to be able to show it at all.
  */
 export function noteHref(note: NoteResponse): string {
-  if (typeof note.game_id !== 'number') {
-    return note.fen ? `/explorer?fen=${encodeURIComponent(note.fen)}` : `/notes?note=${note.id}`
-  }
+  return gameHref(note) ?? explorerHref(note.fen) ?? `/notes?note=${note.id}`
+}
+
+/**
+ * The game the note was written on, opened at the move it was written on — and at the
+ * variation it pinned, when it pinned one. Null for a note that names no game.
+ *
+ * This is half of what a note has to say for itself once it starts resurfacing away from
+ * where it was made: the same position turns up in the explorer, in the repertoire and in
+ * somebody else's game, and "where did I write this?" is a link, not a memory.
+ */
+export function gameHref(note: NoteResponse): string | null {
+  if (typeof note.game_id !== 'number') return null
   const params = new URLSearchParams()
   if (typeof note.ply === 'number' && note.ply > 0) params.set('ply', String(note.ply))
   if (typeof note.line_id === 'number') params.set('line', String(note.line_id))
   const query = params.toString()
   return `/games/${note.game_id}${query ? `?${query}` : ''}`
+}
+
+/** The opening explorer rooted at a position: every game through it, and how they went. */
+export function explorerHref(fen: string | null | undefined): string | null {
+  return fen ? `/explorer?fen=${encodeURIComponent(fen)}` : null
+}
+
+/**
+ * What a note says about where it came from: the move it was written on, and the game.
+ *
+ * The move comes from the payload rather than from `ply` alone, because only the server
+ * knows which SAN that ply is — and on a pinned variation, that the variation's move is not
+ * the game's. `notePlyLabel` is the fallback for a note written before the field existed.
+ */
+export function originLabel(note: NoteResponse): string | null {
+  return note.move?.label ?? notePlyLabel(note.ply)
+}
+
+/**
+ * How many games in the library pass through a note's position, as one phrase.
+ *
+ * The two counts are kept apart because they answer differently: the owner's own games are
+ * what the explorer will show, and model games are kept for study and counted nowhere else.
+ * Null when nothing stored reaches the position — a note on a line only ever browsed to.
+ */
+export function reachLabel(note: NoteResponse): string | null {
+  const mine = note.position_games ?? 0
+  const model = note.position_reference_games ?? 0
+  const parts: string[] = []
+  if (mine > 0) parts.push(mine === 1 ? '1 game of yours' : `${mine} of your games`)
+  if (model > 0) parts.push(`${model} model game${model === 1 ? '' : 's'}`)
+  if (!parts.length) return null
+  return `In ${parts.join(' and ')}`
 }
 
 /** A note as one line — what the command palette's row shows. */
@@ -92,99 +141,76 @@ export function oneLine(note: NoteResponse, max = 80): string {
   return first.length > max ? `${first.slice(0, max - 1)}…` : first
 }
 
-export interface NoteGroup {
-  /** `game:12` or `loose` — the React key and the scroll anchor. */
+/** One slice of the list under one date rule. */
+export interface NoteBucket {
+  /** `today` / `week` / `2026-07` — the React key, stable across renders. */
   key: string
-  gameId: number | null
-  title: string
-  /** `1–0 · 2026-08-22`, or null when the group has nothing to add. */
-  subtitle: string | null
-  /** Where the group's heading links, or null for the loose group. */
-  href: string | null
+  /** `Today`, `This week`, `July 2026`. */
+  label: string
   notes: NoteResponse[]
 }
 
-const RESULTS: Record<string, string> = { '1-0': '1–0', '0-1': '0–1', '1/2-1/2': '½–½' }
-
-function subtitleFor(game: NoteGameBrief | null | undefined): string | null {
-  if (!game) return null
-  const parts = [
-    game.result ? (RESULTS[game.result] ?? game.result) : null,
-    game.date ?? null,
-  ].filter(Boolean)
-  return parts.length ? parts.join(' · ') : null
-}
-
-/** Newest first, and a note without a timestamp last rather than first. */
-function writtenAt(note: NoteResponse): number {
-  const value = Date.parse(note.updated_at ?? note.created_at ?? '')
-  return Number.isNaN(value) ? 0 : value
-}
-
-/**
- * In ply order inside a game, because that is the order the game was played in; a note
- * with no ply comes first (it is about the game as a whole), and ties break on the newest.
- */
-function byPly(left: NoteResponse, right: NoteResponse): number {
-  const a = typeof left.ply === 'number' ? left.ply : -1
-  const b = typeof right.ply === 'number' ? right.ply : -1
-  if (a !== b) return a - b
-  return writtenAt(right) - writtenAt(left)
-}
+const DAY = 86_400_000
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 
 /**
- * The list as the screen draws it: one group per game in ply order, then everything with
- * no game — a position note or a loose one — in a final group.
+ * The list cut into slices of time, in the order it arrived — which is newest first, by
+ * `created_at`, the same field and the same direction the API sorts by
+ * (`services/notes.search_notes`). Nothing is re-sorted here: a rule that disagreed with
+ * the order under it would be worse than no rule.
  *
- * Games are ordered by their most recently written note, so what has just been added is
- * at the top whatever ply it landed on.
+ * Today, this week and this month are relative, and everything before that falls into its
+ * own calendar month. That last part is what makes the rules survive a library with years
+ * in it: one bucket called "Earlier" holding four hundred notes says nothing, and
+ * `July 2026` is a place a reader can aim at.
+ *
+ * `created_at`, not `updated_at`: the rule says when a note was *written*, which is what a
+ * reader means by "August", and rewriting a sentence in one does not move it through time.
  */
-export function groupNotes(notes: readonly NoteResponse[]): NoteGroup[] {
-  const games = new Map<number, NoteGroup>()
-  const loose: NoteResponse[] = []
+export function ageBuckets(notes: readonly NoteResponse[], now = Date.now()): NoteBucket[] {
+  const buckets: NoteBucket[] = []
+  const midnight = new Date(now)
+  midnight.setHours(0, 0, 0, 0)
+  const startOfToday = midnight.getTime()
+  const startOfMonth = new Date(midnight.getFullYear(), midnight.getMonth(), 1).getTime()
 
   for (const note of notes) {
-    const gameId = note.game_id
-    if (typeof gameId !== 'number') {
-      loose.push(note)
-      continue
+    const written = Date.parse(note.created_at ?? '')
+    const at = Number.isNaN(written) ? 0 : written
+    let key: string
+    let label: string
+    if (at >= startOfToday) {
+      key = 'today'
+      label = 'Today'
+    } else if (at >= startOfToday - 6 * DAY) {
+      key = 'week'
+      label = 'This week'
+    } else if (at >= startOfMonth) {
+      key = 'month'
+      label = 'Earlier this month'
+    } else {
+      const day = new Date(at)
+      key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}`
+      label = `${MONTHS[day.getMonth()]} ${day.getFullYear()}`
     }
-    let group = games.get(gameId)
-    if (!group) {
-      group = {
-        key: `game:${gameId}`,
-        gameId,
-        title: gameLabel(note.game, gameId),
-        subtitle: subtitleFor(note.game),
-        href: `/games/${gameId}`,
-        notes: [],
-      }
-      games.set(gameId, group)
-    }
-    group.notes.push(note)
+    // Consecutive only: the list is already in order, so a bucket is a run of it. Reopening
+    // an earlier one would mean the notes under a rule were not the notes after it.
+    const open = buckets.at(-1)
+    if (open && open.key === key) open.notes.push(note)
+    else buckets.push({ key, label, notes: [note] })
   }
-
-  const ordered = [...games.values()].sort((left, right) => {
-    const a = Math.max(...left.notes.map(writtenAt))
-    const b = Math.max(...right.notes.map(writtenAt))
-    return b - a
-  })
-  for (const group of ordered) group.notes.sort(byPly)
-
-  if (loose.length) {
-    ordered.push({
-      key: 'loose',
-      gameId: null,
-      title: 'Opening lines and loose notes',
-      subtitle: null,
-      href: null,
-      notes: [...loose].sort((left, right) => writtenAt(right) - writtenAt(left)),
-    })
-  }
-  return ordered
-}
-
-/** How many notes a set of groups holds — the header's count, without a second pass. */
-export function countNotes(groups: readonly NoteGroup[]): number {
-  return groups.reduce((total, group) => total + group.notes.length, 0)
+  return buckets
 }
