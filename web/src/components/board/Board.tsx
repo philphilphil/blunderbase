@@ -19,6 +19,20 @@ export interface BoardArrow {
   to: string
   /** A brush name from `BOARD_BRUSHES`. Defaults to the teal engine brush. */
   color?: string
+  /**
+   * Mark this arrow as also being the move that was played — how one arrow says two things
+   * at once. The board draws one arrow per *move*, so when the move an engine recommends is
+   * also the move the game played there is nothing to draw twice, and this is what stops
+   * that economy from losing the second fact.
+   *
+   * A chalk `P` chip at the shaft's junction with the arrowhead. One letter rather than the
+   * word: a legible "played" is most of a square wide, which on a board of ~100px squares
+   * covers the piece the arrow is pointing at. The chip is in the played colour as well, so
+   * it says the same thing twice — by hue, the way the three arrows are told apart, and by
+   * the letter for anyone who has not learnt the hue yet. The settings dialog names all
+   * three.
+   */
+  played?: boolean
 }
 
 /** A square marked with a colour (the coach's highlights) or a custom CSS class. */
@@ -27,8 +41,8 @@ export interface BoardSquare {
   /** A brush name — drawn as a chessground circle. */
   color?: string
   /**
-   * A class from `index.css` instead: `bb-blunder`, `bb-mistake`, `bb-inaccuracy`,
-   * `bb-engine`, `bb-maia`. Takes precedence over `color`.
+   * A class from `index.css` instead: `bb-blunder`, `bb-mistake`, `bb-inaccuracy` — the
+   * classification outlines. Takes precedence over `color`.
    */
   className?: string
 }
@@ -89,6 +103,37 @@ export function parseLastMove(
   return [from, to]
 }
 
+/**
+ * The played-move mark: a chalk chip with a `P` in it, at the shaft's junction with the
+ * arrowhead.
+ *
+ * Drawn in the 100-unit box chessground gives a `customSvg` — one box is one square — at
+ * `r=13`, so the chip is about a quarter of a square across against the `r=20` chessground
+ * sets its own move glyphs at. Small on purpose: this is a footnote on an arrow, not a
+ * label on the square, and anything bigger sits on top of the piece the arrow is pointing
+ * at — which is what killed the pill this replaced. `r` and `font-size` are two separate
+ * literals: move one and the other has to follow, and `y` is the text *baseline*, which
+ * wants to stay near `50 + font-size × 0.36` to keep the capital centred in the disc.
+ *
+ * Chessground's own `label` would be the obvious way to draw this and cannot be: it
+ * hardcodes `white` for both the text and the ring, which on a chalk fill is invisible in
+ * the dark theme. Ours takes both colours from tokens that invert together — chalk chip,
+ * the app's own ground for the letter and the ring — so the contrast holds either way up.
+ */
+const PLAYED_MARK =
+  // 0.6 is not a taste number: it is the opacity chessground's own stylesheet puts on
+  // `.cg-shapes`, the layer every arrow and circle is drawn in. Custom SVGs live in
+  // `.cg-custom-svgs`, which has no such rule — so without this the chip rendered at full
+  // strength beside arrows at 0.57, and read as a badge stuck on top of the board rather
+  // than as part of the arrow it belongs to. Applied to the group, so the disc, its ring
+  // and the letter fade together and their contrast with each other is untouched.
+  '<g opacity="0.6">' +
+  '<circle cx="50" cy="50" r="13" fill="var(--bb-arrow-played)"' +
+  ' stroke="var(--bb-void)" stroke-width="2" stroke-opacity="0.6" />' +
+  '<text x="50" y="56.5" text-anchor="middle" font-size="18" font-weight="600"' +
+  ' font-family="ui-sans-serif, system-ui, sans-serif" fill="var(--bb-void)">P</text>' +
+  '</g>'
+
 function toShapes(
   arrows: BoardArrow[] | undefined,
   squares: BoardSquare[] | undefined,
@@ -96,7 +141,10 @@ function toShapes(
   const shapes: DrawShape[] = []
   for (const arrow of arrows ?? []) {
     if (!isSquare(arrow.from) || !isSquare(arrow.to)) continue
-    shapes.push({ orig: arrow.from, dest: arrow.to, brush: arrow.color ?? 'accent' })
+    const brush = arrow.color ?? 'accent'
+    const shape: DrawShape = { orig: arrow.from, dest: arrow.to, brush }
+    if (arrow.played) shape.customSvg = { html: PLAYED_MARK, center: 'label' }
+    shapes.push(shape)
   }
   for (const square of squares ?? []) {
     if (square.className) continue // rendered through highlight.custom instead

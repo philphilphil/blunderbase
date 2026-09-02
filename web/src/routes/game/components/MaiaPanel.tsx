@@ -1,7 +1,7 @@
 import { ChevronDown, Columns3 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { LinePreviewRowChip, LinePreviewSettingsButton } from '@/components/analysis/LinePreviewSettings'
+import { LinePreviewRowChip } from '@/components/analysis/LinePreviewSettings'
 import { MiniBoard } from '@/components/board/MiniBoard'
 import type { GameRunSummary } from '@/lib/api/types'
 import {
@@ -93,6 +93,14 @@ export interface MaiaPanelProps {
    * vanish with them.
    */
   showHuman?: boolean
+  /**
+   * The same switch for the engine column, and the reason both exist. `hints` is one
+   * gesture — "do not tell me the answer yet" — and an answer is an answer whichever
+   * engine gives it, so the two columns go quiet together. They used to disagree: the
+   * human column vanished with the hints and Stockfish's lines stayed, which read as a
+   * bug in the toggle rather than as a rule about what a hint is.
+   */
+  showEngine?: boolean
   /** The engine's ranking of the same position; empty off the game line. */
   engine: EngineLineView[]
   /** The run those lines came from, whose spend the engine column's header reports. */
@@ -174,6 +182,7 @@ export function MaiaPanel({
   onCompareChange,
   comparison = [],
   showHuman = true,
+  showEngine = true,
   engine,
   run,
   ply,
@@ -384,17 +393,18 @@ export function MaiaPanel({
               </span>
             ) : null}
             {/*
-              Both preview controls, and only here: the cycler for what hovering a line does
-              and the gear for the rest of it. The live panel used to carry a second copy of
-              each — two places to change one preference — and since the rebuild this card
-              has the width to hold the pair without crowding the engine name.
+              The one-click cycler for what hovering a line does. The gear that held the
+              rest of those settings used to sit beside it and is now under the board
+              (`components/board/BoardSettings`), where a reader actually meets it; the
+              chip stays because it belongs to the rows right below it.
             */}
             {onHoverLine ? <LinePreviewRowChip /> : null}
-            {onHoverLine ? <LinePreviewSettingsButton /> : null}
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[0.4375rem] py-1.5">
-          {engine.length === 0 ? (
+          {/* Switched off, the column holds its place and says nothing at all — the same
+              rule the human column beside it follows. */}
+          {!showEngine ? null : engine.length === 0 ? (
             <p className="px-1 py-1 text-[0.6875rem] text-dim">–</p>
           ) : (
             <div className="flex flex-col gap-0.5">

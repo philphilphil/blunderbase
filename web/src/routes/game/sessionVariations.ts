@@ -30,7 +30,14 @@ export interface KeptVariation {
 /** Enough to hold an evening's reading of one game without turning the table into a tree. */
 export const MAX_KEPT_VARIATIONS = 20
 
-const store = new Map<number, KeptVariation[]>()
+/**
+ * What a game is called in this store. A library game is its id; a reference game has no
+ * id in the library — that is the whole point of it — so it is named by its book and its
+ * id there (`masters:xyz`). Two different keys either way, which is all this store asks.
+ */
+export type GameKey = number | string
+
+const store = new Map<GameKey, KeptVariation[]>()
 const listeners = new Set<() => void>()
 let nextId = 1
 
@@ -42,7 +49,7 @@ export function isPrefix(a: readonly string[], b: readonly string[]): boolean {
   return a.length <= b.length && a.every((uci, index) => uci === b[index])
 }
 
-function read(gameId: number): KeptVariation[] {
+function read(gameId: GameKey): KeptVariation[] {
   return store.get(gameId) ?? EMPTY
 }
 
@@ -67,7 +74,7 @@ function subscribe(listener: () => void): () => void {
  * different positions are two different lines.
  */
 export function keepVariation(
-  gameId: number,
+  gameId: GameKey,
   base: number,
   moves: readonly string[],
 ): void {
@@ -105,7 +112,7 @@ export function keepVariation(
  * has no business holding a second copy of the same walk. Silent about an id it does not
  * have, so a pin that lands twice is not an error.
  */
-export function dropVariation(gameId: number, id: number): void {
+export function dropVariation(gameId: GameKey, id: number): void {
   const current = read(gameId)
   const next = current.filter((kept) => kept.id !== id)
   if (next.length === current.length) return
@@ -129,7 +136,7 @@ export interface SessionVariations {
 }
 
 /** The kept lines for one game, and the way to add to and remove from them. */
-export function useSessionVariations(gameId: number): SessionVariations {
+export function useSessionVariations(gameId: GameKey): SessionVariations {
   const snapshot = useCallback(() => read(gameId), [gameId])
   const kept = useSyncExternalStore(subscribe, snapshot, () => EMPTY)
   const keep = useCallback(

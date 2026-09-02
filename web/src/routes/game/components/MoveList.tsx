@@ -9,9 +9,18 @@ import { cn } from '@/lib/utils'
 
 import { plyLabel, type MovePair } from '../gameModel'
 
-/** The inline note design 1a puts under a flagged move: what it cost and what was better. */
+/**
+ * The inline note design 1a puts under a flagged move: what it cost and what was better.
+ *
+ * It carries the move it is about — `san`, and `ply` for the number to print in front of
+ * it. The note hangs under a *pair* row, which is two moves wide, so without naming its
+ * move a note under `12. e4 Nf6` says nothing about which of the two it is complaining
+ * about; readers took a note about White's move for one about Black's and the other way
+ * round. Now the note opens with `12… Nf6??` and there is nothing left to guess.
+ */
 export interface MoveAnnotation {
   ply: number
+  san: string | null
   classification: Classification
   before: Score | null
   after: Score | null
@@ -704,7 +713,7 @@ function PinButton({
   )
 }
 
-/** The italic aside under a flagged move: the swing it cost and the move that beat it. */
+/** The italic aside under a flagged move: which move, the swing it cost, and what beat it. */
 function Annotation({ annotation }: { annotation: MoveAnnotation }) {
   const glyph = glyphFor(annotation.classification)
   const color = glyph ? GLYPHS[glyph].color : 'var(--bb-blunder)'
@@ -712,6 +721,14 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
     <div className="flex gap-2 py-1.5 pl-[2.625rem] pr-2 font-sans text-[0.71875rem] italic leading-[1.5] text-soft-2">
       <div className="w-0.5 flex-none rounded-sm opacity-50" style={{ background: color }} />
       <div>
+        {/* Whose move this is about, first and in the move list's own mono, so the note is
+            read as belonging to one half of the pair above it rather than to the row. */}
+        {annotation.san ? (
+          <span className="font-mono not-italic" style={{ color }}>
+            {plyLabel(annotation.ply)} {annotation.san}
+            {glyph ? GLYPHS[glyph].glyph : ''}{' '}
+          </span>
+        ) : null}
         {annotation.bestSan ? (
           <>
             <span className="not-italic">Best was </span>

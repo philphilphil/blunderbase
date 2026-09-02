@@ -5,11 +5,13 @@ import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
+import { BoardSettingsButton } from '@/components/board/BoardSettings'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Color, GameRunSummary, GameSummary, MoveRow, RunResponse } from '@/lib/api/types'
 import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { materialBalance, type CapturedRole, type MaterialBalance } from '@/lib/chess/material'
+import { useBoardArrowPrefs } from '@/lib/board/arrowPrefs'
 import { useWheelStep } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 
@@ -76,6 +78,13 @@ export interface BoardPanelProps {
   plyCount: number
   hints: boolean
   onHintsChange: (hints: boolean) => void
+  /**
+   * A game that is not a row in the library — a model game out of one of the reference
+   * books. There is nothing on the server to queue a run against, so the two analysis
+   * buttons are left out rather than shown refusing; the way to get them is the chrome
+   * bar's "Add to library", which is where that decision belongs.
+   */
+  readOnly?: boolean
   onFlip: () => void
   onSeek: (cursor: number) => void
   /**
@@ -127,12 +136,16 @@ function turnOf(fen: string): Side {
  * here — the eval curve, the notes and the engine panels are all in the right column, and
  * that emptiness is what pays for the board's size (see the budget below).
  *
- * Square marks follow design 1c — the flagged move's two squares outlined in its
- * own colour, the engine's target and Maia's target as a teal and a purple mark.
+ * Square marks follow design 1c — the flagged move's two squares outlined in its own
+ * colour, and a disc on each standing arrow's target square in that arrow's own hue.
  *
- * The arrows are about the position on the board, never about the move that happens next:
- * an arrow means "this is what the engine would play here". Maia's arrow is the same claim
- * for a human of the owner's rating, and is left out when the two agree.
+ * Three standing arrows, all about the position on the board rather than about the game:
+ * what the engine plays here (blue), what a human of the chosen level plays here (purple),
+ * and what this game went on to play here (chalk, no hue). Identical geometry, so the
+ * colour is the only thing that distinguishes them — none of the three is a weaker claim
+ * than the others, and a thinner or fainter arrow would say it was. Which of them are drawn
+ * is `lib/board/arrowPrefs`; `hints` switches all three off at once along with the panels'
+ * engine and Maia columns, which is the gesture for reading a position unaided.
  */
 export function BoardPanel({
   position,
@@ -157,6 +170,7 @@ export function BoardPanel({
   plyCount,
   hints,
   onHintsChange,
+  readOnly,
   onFlip,
   onSeek,
   nextFlagged,
@@ -184,39 +198,77 @@ export function BoardPanel({
   const spinningTier: 'quick' | 'deep' =
     activeRun?.tier === 'quick' && deepRun == null ? 'quick' : 'deep'
 
+  /*
+   * The standing arrows, folded to one per *move*.
+   *
+   * Three things want to point at this position — the engine's move here, Maia's move here,
+   * and the move the game went on to play — and any two of them may name the same move.
+   * Chessground draws a second arrow on identical endpoints directly on top of the first,
+   * so two claims about one move is one arrow and something else to say the rest. The
+   * something else is a dot (`BoardArrow.played`): the arrow keeps the colour of the
+   * highest-priority claimant and carries a small mark in the played colour when the move
+   * it is already drawing is the one the game played.
+   *
+   * The priority is engine > Maia > played, and it is about which fact is least recoverable
+   * from the rest of the screen. What was played is in the move list a hand's width away;
+   * what the engine says here is not written anywhere else on the board.
+   */
+  const arrowPrefs = useBoardArrowPrefs()
+  const standing = useMemo(() => {
+    if (!hints) return []
+    const claims: { source: 'engine' | 'maia' | 'played'; uci: string }[] = []
+    if (arrowPrefs.engine && engineBest) claims.push({ source: 'engine', uci: engineBest })
+    const maiaTop = maia?.moves[0]?.uci
+    if (arrowPrefs.maia && maiaTop) claims.push({ source: 'maia', uci: maiaTop })
+    if (arrowPrefs.played && upcoming?.uci) claims.push({ source: 'played', uci: upcoming.uci })
+
+    const folded = new Map<string, { uci: string; owner: 'engine' | 'maia' | 'played'; played: boolean }>()
+    for (const claim of claims) {
+      const key = claim.uci.slice(0, 4)
+      const entry = folded.get(key)
+      if (entry) entry.played ||= claim.source === 'played'
+      else folded.set(key, { uci: claim.uci, owner: claim.source, played: claim.source === 'played' })
+    }
+    return [...folded.values()]
+  }, [arrowPrefs, engineBest, hints, maia, upcoming])
+
+  /*
+   * The only squares the board marks: the flagged move's own two, outlined in its
+   * classification's colour.
+   *
+   * The standing arrows used to put a disc on each target square as well. They no longer
+   * do — an arrow points at a square by itself, and a disc under the arrowhead only said
+   * the arrowhead's colour a second time, over the piece the arrow was pointing at.
+   *
+   * The outline is a hint like any other: it names the move that is about to be played and
+   * says it was a mistake, which is the whole of what the reader is being asked to work out
+   * for themselves while the hints are off.
+   */
   const squares = useMemo<BoardSquare[]>(() => {
-    const marks = new Map<string, string>()
-    if (hints) {
-      const maiaTop = maia?.moves[0]?.uci
-      if (maiaTop) marks.set(maiaTop.slice(2, 4), 'bb-maia')
-      if (engineBest) marks.set(engineBest.slice(2, 4), 'bb-engine')
-    }
-    const glyph = glyphFor(upcoming?.classification)
-    if (glyph && upcoming?.uci && glyph !== 'best' && glyph !== 'brilliant') {
-      marks.set(upcoming.uci.slice(0, 2), `bb-${glyph}`)
-      marks.set(upcoming.uci.slice(2, 4), `bb-${glyph}`)
-    }
-    return [...marks].map(([square, className]) => ({ square, className }))
-  }, [engineBest, hints, maia, upcoming])
+    const glyph = hints ? glyphFor(upcoming?.classification) : null
+    if (!glyph || !upcoming?.uci || glyph === 'best' || glyph === 'brilliant') return []
+    return [upcoming.uci.slice(0, 2), upcoming.uci.slice(2, 4)].map((square) => ({
+      square,
+      className: `bb-${glyph}`,
+    }))
+  }, [hints, upcoming])
 
   const arrows = useMemo<BoardArrow[]>(() => {
-    const drawn: BoardArrow[] = []
-    if (hints) {
-      if (engineBest) {
-        drawn.push({ from: engineBest.slice(0, 2), to: engineBest.slice(2, 4), color: 'accent' })
-      }
-      const maiaTop = maia?.moves[0]?.uci
-      if (maiaTop && !(engineBest && sameMove(maiaTop, engineBest))) {
-        drawn.push({ from: maiaTop.slice(0, 2), to: maiaTop.slice(2, 4), color: 'paleMaia' })
-      }
-    }
+    const drawn: BoardArrow[] = standing.map((arrow) => ({
+      from: arrow.uci.slice(0, 2),
+      to: arrow.uci.slice(2, 4),
+      color: arrow.owner === 'engine' ? 'accent' : arrow.owner,
+      // Only where the dot says something the arrow's own colour does not.
+      played: arrow.played && arrow.owner !== 'played',
+    }))
     // The hover preview is an answer to something the reader is doing right now, so it is
-    // drawn whether or not the standing hints are on — but never twice over its own arrow.
-    if (hoverMove && !(hints && engineBest && sameMove(hoverMove, engineBest))) {
+    // drawn whether or not the standing hints are on — but never twice over an arrow that
+    // is already there.
+    if (hoverMove && !standing.some((arrow) => sameMove(arrow.uci, hoverMove))) {
       drawn.push({ from: hoverMove.slice(0, 2), to: hoverMove.slice(2, 4), color: 'paleAccent' })
     }
     return drawn
-  }, [engineBest, hints, hoverMove, maia])
+  }, [hoverMove, standing])
 
   // Wheeling over the board steps the game. The gesture is `useWheelStep`'s, shared with the
   // eval curve, so the two surfaces on this page answer a wheel identically.
@@ -500,7 +552,7 @@ export function BoardPanel({
           type="button"
           onClick={() => onHintsChange(!hints)}
           aria-pressed={hints}
-          title="Engine and Maia marks on the board"
+          title="Everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
           className={cn(
             'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
             hints
@@ -511,28 +563,34 @@ export function BoardPanel({
           Hints
         </button>
 
-        {deepRun == null ? (
-          <AnalysisTierButton
-            label="Quick"
-            finishedRun={quickRun}
-            busy={analysisBusy}
-            spinning={analysisBusy && spinningTier === 'quick'}
-            activeRun={activeRun}
-            progress={progress}
-            error={error}
-            onRequest={onRequestQuick}
-          />
-        ) : null}
-        <AnalysisTierButton
-          label="Deep"
-          finishedRun={deepRun}
-          busy={analysisBusy}
-          spinning={analysisBusy && spinningTier === 'deep'}
-          activeRun={activeRun}
-          progress={progress}
-          error={error}
-          onRequest={onRequestDeep}
-        />
+        <BoardSettingsButton />
+
+        {readOnly ? null : (
+          <>
+            {deepRun == null ? (
+              <AnalysisTierButton
+                label="Quick"
+                finishedRun={quickRun}
+                busy={analysisBusy}
+                spinning={analysisBusy && spinningTier === 'quick'}
+                activeRun={activeRun}
+                progress={progress}
+                error={error}
+                onRequest={onRequestQuick}
+              />
+            ) : null}
+            <AnalysisTierButton
+              label="Deep"
+              finishedRun={deepRun}
+              busy={analysisBusy}
+              spinning={analysisBusy && spinningTier === 'deep'}
+              activeRun={activeRun}
+              progress={progress}
+              error={error}
+              onRequest={onRequestDeep}
+            />
+          </>
+        )}
 
         {onNote ? (
           <button

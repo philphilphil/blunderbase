@@ -106,7 +106,7 @@ export function GameLoadError({ error, onRetry }: { error: Error; onRetry: () =>
   const missing = error instanceof ApiError && error.status === 404
 
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-10">
+    <div data-testid="game-error" className="flex min-h-0 flex-1 items-center justify-center p-10">
       <div className="flex max-w-md flex-col items-start gap-3 rounded-xl border border-line bg-panel p-6">
         <span className="inline-flex items-center gap-2 text-[0.8125rem] font-semibold text-ink">
           <span className="size-[0.375rem] rounded-full bg-blunder" />

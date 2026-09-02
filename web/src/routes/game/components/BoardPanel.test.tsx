@@ -1,10 +1,11 @@
 import type { DrawShape } from '@lichess-org/chessground/draw'
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { GameRunSummary, MoveRow, RunResponse } from '@/lib/api/types'
+import { resetBoardArrowPrefs, setBoardArrowPrefs } from '@/lib/board/arrowPrefs'
 
 import type { MaiaLevel, PlyPosition } from '../gameModel'
 import { BoardPanel } from './BoardPanel'
@@ -21,7 +22,7 @@ vi.mock('@/components/board/Board', () => ({
     drawable,
     children,
   }: {
-    arrows?: { from: string; to: string; color?: string }[]
+    arrows?: { from: string; to: string; color?: string; played?: boolean }[]
     squares?: { square: string; className?: string }[]
     shapes?: { orig: string; dest?: string }[]
     fen: string
@@ -35,7 +36,10 @@ vi.mock('@/components/board/Board', () => ({
       data-class={className}
       data-drawable={String(!!drawable)}
       data-arrows={(arrows ?? [])
-        .map((arrow) => `${arrow.from}${arrow.to}:${arrow.color ?? 'accent'}`)
+        .map(
+          (arrow) =>
+            `${arrow.from}${arrow.to}:${arrow.color ?? 'accent'}${arrow.played ? ':played' : ''}`,
+        )
         .join(' ')}
       data-squares={(squares ?? [])
         .map((square) => `${square.square}:${square.className ?? ''}`)
@@ -117,6 +121,12 @@ const DEEP_RUN: GameRunSummary = {
   finished_at: '2026-08-20T12:00:00Z',
 }
 
+// The arrow preferences are a module-level store over localStorage, so a test that
+// switches one off must not leak it into the next.
+afterEach(() => {
+  resetBoardArrowPrefs()
+})
+
 const ACTIVE_RUN: RunResponse = {
   id: 11,
   tier: 'deep',
@@ -128,16 +138,33 @@ const ACTIVE_RUN: RunResponse = {
 }
 
 describe('BoardPanel arrows', () => {
-  it('points at the engine’s move here, not at the move about to be played', () => {
+  it('draws the engine’s move here and the move the game played, in their own colours', () => {
     renderPanel()
-    // 1…c6 is what the engine would play; 1…d5 is what happens next and is not an arrow.
-    expect(arrows()).toEqual(['c7c6:accent'])
-    expect(screen.getByTestId('board').getAttribute('data-squares')).toContain('c6:bb-engine')
+    // 1…c6 is what the engine would play here; 1…d5 is what this game played from here.
+    // Both are claims about *this* position, which is why both are arrows.
+    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:played'])
+    // No disc under either arrowhead: an arrow points at a square by itself. The only
+    // square marks left are the flagged move's own two, in its classification's colour.
+    expect(screen.getByTestId('board').getAttribute('data-squares')).toBe(
+      'd7:bb-blunder d5:bb-blunder',
+    )
   })
 
-  it('draws nothing where no run has looked at the position', () => {
+  it('says nothing about the engine where no run has looked at the position', () => {
     renderPanel({ engineBest: null })
-    expect(arrows()).toEqual([])
+    expect(arrows()).toEqual(['d7d5:played'])
+    renderPanel({ engineBest: null, upcoming: undefined })
+    expect(screen.getAllByTestId('board')[1]!.getAttribute('data-arrows')).toBe('')
+  })
+
+  it('draws only what the arrow preferences ask for', () => {
+    setBoardArrowPrefs({ played: false })
+    renderPanel({ maia: MAIA })
+    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:maia'])
+
+    setBoardArrowPrefs({ engine: false, maia: false, played: true })
+    renderPanel({ maia: MAIA })
+    expect(screen.getAllByTestId('board')[1]!.getAttribute('data-arrows')).toBe('d7d5:played')
   })
 
   it('lets the reader draw their own arrows on the game board', () => {
@@ -146,9 +173,11 @@ describe('BoardPanel arrows', () => {
     expect(screen.getByTestId('board')).toHaveAttribute('data-drawable', 'true')
   })
 
-  it('adds Maia’s prediction, and leaves it out when it is the engine’s move too', () => {
+  it('folds two claims about one move into one arrow, marked with what it also was', () => {
+    // Maia's move here is the move the game played, so one arrow in Maia's colour carries
+    // the played dot rather than a second arrow being drawn underneath the first.
     const { rerender } = renderPanel({ maia: MAIA })
-    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:paleMaia'])
+    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:maia:played'])
 
     rerender(
       <TooltipProvider delayDuration={0}>
@@ -178,7 +207,8 @@ describe('BoardPanel arrows', () => {
         />
       </TooltipProvider>,
     )
-    expect(arrows()).toEqual(['d7d5:accent'])
+    // All three now name 1…d5: one teal arrow, marked as the move that was played.
+    expect(arrows()).toEqual(['d7d5:accent:played'])
   })
 
   it('keeps the hints toggle in charge of the standing arrows', () => {
@@ -188,7 +218,7 @@ describe('BoardPanel arrows', () => {
 
   it('previews a hovered line in the pale brush, hints or no hints', () => {
     renderPanel({ hoverMove: 'g8f6' })
-    expect(arrows()).toEqual(['c7c6:accent', 'g8f6:paleAccent'])
+    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:played', 'g8f6:paleAccent'])
 
     // A preview is an answer to what the reader is doing now, so it survives hints being off.
     renderPanel({ hints: false, hoverMove: 'g8f6' })
@@ -199,7 +229,7 @@ describe('BoardPanel arrows', () => {
 
   it('does not draw the hovered line twice when it is the engine’s own move', () => {
     renderPanel({ hoverMove: 'c7c6' })
-    expect(arrows()).toEqual(['c7c6:accent'])
+    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:played'])
   })
 })
 
@@ -296,8 +326,8 @@ describe('BoardPanel line preview', () => {
   it('leaves the standing hints alone when the preview only decorates the position', () => {
     renderPanel({ previewShapes: SHAPES, maia: MAIA })
     expect(board().getAttribute('data-fen')).toBe(AFTER_E4.fen)
-    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:paleMaia'])
-    expect(board().getAttribute('data-squares')).toContain('c6:bb-engine')
+    expect(arrows()).toEqual(['c7c6:accent', 'd7d5:maia:played'])
+    expect(board().getAttribute('data-squares')).toBe('d7:bb-blunder d5:bb-blunder')
     expect(board().getAttribute('data-shapes')).toBe('g8f6')
   })
 

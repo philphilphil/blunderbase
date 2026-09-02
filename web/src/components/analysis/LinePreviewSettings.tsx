@@ -2,17 +2,17 @@
  * The engine-line-preview preferences — row-hover mode, scrub, depth, colours, playthrough
  * tempo (`lib/board/linePreview.ts`, `lib/board/linePreviewPrefs.ts`).
  *
- * A gear beside the panel rather than a card on a settings page, because these are the one
- * kind of preference you cannot judge away from the thing they change: the answer to "how
- * many plies is too many" is on the board in front of you. They are per-browser too —
- * `localStorage`, not `AppSettings`, since screen size and taste are per device — so there
- * is no draft and no Save: every control reads `useLinePreviewPrefs()` and writes straight
- * through `setLinePreviewPrefs`, so closing the dialog is all it takes to see the change.
+ * The controls live here; the dialog that holds them is `components/board/BoardSettings`,
+ * which reaches the reader through a gear under the board rather than one tucked into a
+ * panel header where nobody found it. That is the whole reason this file exports fields
+ * instead of a button: these are the one kind of preference you cannot judge away from the
+ * thing they change — the answer to "how many plies is too many" is on the board in front
+ * of you — so they belong beside the board, not on a settings page.
+ *
+ * Per-browser (`localStorage`, not `AppSettings`, since screen size and taste are per
+ * device), so there is no draft and no Save: every control reads `useLinePreviewPrefs()`
+ * and writes straight through `setLinePreviewPrefs`.
  */
-import { Settings2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
-
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import type { LinePreviewPrefs, RowPreview } from '@/lib/board/linePreview'
@@ -49,7 +49,8 @@ function Range({ id, label, value, min, max, step = 1, suffix = '', onChange }: 
   )
 }
 
-function Check({ id, label, checked, disabled, onChange }: {
+/** The one checkbox shape the board's settings dialog uses throughout. */
+export function SettingsCheck({ id, label, checked, disabled, onChange }: {
   id: string
   label: string
   checked: boolean
@@ -102,87 +103,57 @@ export function LinePreviewRowChip() {
   )
 }
 
-export function LinePreviewSettingsButton() {
-  const [open, setOpen] = useState(false)
+/**
+ * The line-preview controls, without chrome of their own — a section inside the board's
+ * settings dialog (`components/board/BoardSettings`) rather than a dialog in its own right.
+ */
+export function LinePreviewFields() {
   const prefs = useLinePreviewPrefs()
   const set = (patch: Partial<Omit<LinePreviewPrefs, 'play' | 'overlay'>>) => setLinePreviewPrefs(patch)
 
-  useEffect(() => {
-    if (!open) return
-    const key = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
-    document.addEventListener('keydown', key)
-    return () => document.removeEventListener('keydown', key)
-  }, [open])
-
   return (
-    <>
-      <button
-        type="button"
-        aria-label="Line preview settings"
-        title="Line preview settings"
-        onClick={() => setOpen(true)}
-        className="text-faint transition-colors hover:text-ink"
-      >
-        <Settings2 className="size-3.5" aria-hidden />
-      </button>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="preview-mode">Row hover</Label>
+        <select id="preview-mode" value={prefs.row} onChange={(event) => set({ row: event.target.value as RowPreview })} className={cn(SELECT, 'w-56')}>
+          {MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+        </select>
+      </div>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/75 px-6 py-[8vh]" onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="line-preview-title" className="bb-card flex w-full max-w-2xl flex-col shadow-[0_1rem_3rem_var(--bb-shadow)]">
-            <header className="flex items-start gap-3 border-b border-hairline px-4 py-3.5">
-              <div className="flex flex-1 flex-col gap-1">
-                <h2 id="line-preview-title" className="text-sm font-semibold text-ink">Line preview</h2>
-                <p className="text-[0.6875rem] text-dim">How this browser previews engine lines on the board. Changes apply immediately.</p>
-              </div>
-              <Button type="button" variant="ghost" size="icon" aria-label="Close" onClick={() => setOpen(false)}><X aria-hidden /></Button>
-            </header>
+      <div className="flex flex-wrap gap-4">
+        <SettingsCheck id="preview-scrub" label="Hover a move to show its position" checked={prefs.scrub} onChange={(scrub) => set({ scrub })} />
+        <SettingsCheck id="preview-badges" label="Move badges" checked={prefs.badges} onChange={(badges) => set({ badges })} />
+        <SettingsCheck id="preview-sides" label="Colour arrows by side" checked={prefs.bySide} onChange={(bySide) => set({ bySide })} />
+        <SettingsCheck id="preview-fade" label="Fade with depth" checked={prefs.fade} onChange={(fade) => set({ fade })} />
+      </div>
 
-            <div className="flex flex-col gap-5 px-4 py-4">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="preview-mode">Row hover</Label>
-                <select id="preview-mode" value={prefs.row} onChange={(event) => set({ row: event.target.value as RowPreview })} className={cn(SELECT, 'w-56')}>
-                  {MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
-                </select>
-              </div>
+      <div className="flex flex-wrap gap-5">
+        <Range id="preview-depth" label="Plies drawn" value={prefs.depth} min={1} max={18} onChange={(depth) => set({ depth })} />
+        {prefs.scrub ? <Range id="preview-lookahead" label="Look-ahead" value={prefs.lookahead} min={0} max={4} onChange={(lookahead) => set({ lookahead: lookahead as LinePreviewPrefs['lookahead'] })} /> : null}
+      </div>
 
-              <div className="flex flex-wrap gap-4">
-                <Check id="preview-scrub" label="Hover a move to show its position" checked={prefs.scrub} onChange={(scrub) => set({ scrub })} />
-                <Check id="preview-badges" label="Move badges" checked={prefs.badges} onChange={(badges) => set({ badges })} />
-                <Check id="preview-sides" label="Colour arrows by side" checked={prefs.bySide} onChange={(bySide) => set({ bySide })} />
-                <Check id="preview-fade" label="Fade with depth" checked={prefs.fade} onChange={(fade) => set({ fade })} />
-              </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="preview-labels">Badge label</Label>
+        <select id="preview-labels" value={prefs.labels} disabled={!prefs.badges} onChange={(event) => set({ labels: event.target.value as LinePreviewPrefs['labels'] })} className={cn(SELECT, 'w-48')}>
+          <option value="move">Move number</option>
+          <option value="ply">Ply count</option>
+        </select>
+      </div>
 
-              <div className="flex flex-wrap gap-5">
-                <Range id="preview-depth" label="Plies drawn" value={prefs.depth} min={1} max={18} onChange={(depth) => set({ depth })} />
-                {prefs.scrub ? <Range id="preview-lookahead" label="Look-ahead" value={prefs.lookahead} min={0} max={4} onChange={(lookahead) => set({ lookahead: lookahead as LinePreviewPrefs['lookahead'] })} /> : null}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="preview-labels">Badge label</Label>
-                <select id="preview-labels" value={prefs.labels} disabled={!prefs.badges} onChange={(event) => set({ labels: event.target.value as LinePreviewPrefs['labels'] })} className={cn(SELECT, 'w-48')}>
-                  <option value="move">Move number</option>
-                  <option value="ply">Ply count</option>
-                </select>
-              </div>
-
-              {prefs.row === 'play' ? (
-                <div className="flex flex-col gap-4 border-t border-hairline pt-4">
-                  <div className="flex flex-wrap gap-5">
-                    <Range id="preview-tempo" label="Tempo" value={prefs.play.tempo} min={100} max={2000} step={50} suffix=" ms" onChange={(tempo) => setLinePreviewPrefs({ play: { tempo } })} />
-                    <Range id="preview-delay" label="Start delay" value={prefs.play.delay} min={0} max={2000} step={50} suffix=" ms" onChange={(delay) => setLinePreviewPrefs({ play: { delay } })} />
-                  </div>
-                  <div className="flex flex-wrap gap-4">
-                    <Check id="preview-loop" label="Loop" checked={prefs.play.loop} onChange={(loop) => setLinePreviewPrefs({ play: { loop } })} />
-                    <Check id="preview-ahead" label="Arrow one move ahead" checked={prefs.play.ahead} onChange={(ahead) => setLinePreviewPrefs({ play: { ahead } })} />
-                  </div>
-                </div>
-              ) : null}
-
-              {prefs.row === 'overlay' ? <Check id="preview-dim" label="Dim current pieces" checked={prefs.overlay.dim} onChange={(dim) => setLinePreviewPrefs({ overlay: { dim } })} /> : null}
-            </div>
+      {prefs.row === 'play' ? (
+        <div className="flex flex-col gap-4 border-t border-hairline pt-4">
+          <div className="flex flex-wrap gap-5">
+            <Range id="preview-tempo" label="Tempo" value={prefs.play.tempo} min={100} max={2000} step={50} suffix=" ms" onChange={(tempo) => setLinePreviewPrefs({ play: { tempo } })} />
+            <Range id="preview-delay" label="Start delay" value={prefs.play.delay} min={0} max={2000} step={50} suffix=" ms" onChange={(delay) => setLinePreviewPrefs({ play: { delay } })} />
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <SettingsCheck id="preview-loop" label="Loop" checked={prefs.play.loop} onChange={(loop) => setLinePreviewPrefs({ play: { loop } })} />
+            <SettingsCheck id="preview-ahead" label="Arrow one move ahead" checked={prefs.play.ahead} onChange={(ahead) => setLinePreviewPrefs({ play: { ahead } })} />
           </div>
         </div>
       ) : null}
-    </>
+
+      {prefs.row === 'overlay' ? <SettingsCheck id="preview-dim" label="Dim current pieces" checked={prefs.overlay.dim} onChange={(dim) => setLinePreviewPrefs({ overlay: { dim } })} /> : null}
+    </div>
   )
 }

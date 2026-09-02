@@ -30,8 +30,10 @@ export interface RunProgress {
  * than replaced — it is the same one the Engines page shows for that role, and it says
  * which engine and what to do about it.
  */
-export function useAnalysisRequest(gameId: number) {
-  const runs = useRuns(gameId)
+export function useAnalysisRequest(gameId: number | null) {
+  // A reference game has no id in the library and nothing to run over, so the run list is
+  // not asked for. `useRuns` still needs *an* id for its key; nothing reads the result.
+  const runs = useRuns(gameId ?? 0, undefined, { enabled: gameId !== null })
   const analysis = useRequestAnalysis({ onError: (error) => toast.error(error.message) })
 
   /** The last `analysis.progress` frame, tagged with the run it belongs to. */
@@ -78,6 +80,7 @@ export function useAnalysisRequest(gameId: number) {
 
   const request = useCallback(
     (tier: Tier) => {
+      if (gameId === null) return
       analysis.mutate({ game_id: gameId, tier }, { onSuccess: (run) => setRequested(run) })
     },
     [analysis, gameId],

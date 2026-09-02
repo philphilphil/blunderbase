@@ -506,7 +506,9 @@ describe('GamePage', () => {
     // Maia is a panel under the engine lines now, not a card floating over the board.
     expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1500')
     expect(screen.getByTestId('board').contains(screen.getByTestId('maia-panel'))).toBe(false)
-    expect(screen.getByText('played')).toBeInTheDocument()
+    // Scoped to the panel: the board draws a "played" badge of its own on the arrow when
+    // the move the game played is also a move an engine recommends.
+    expect(within(screen.getByTestId('maia-panel')).getByText('played')).toBeInTheDocument()
   })
 
   it('tints the played engine line only where the engine flagged it', async () => {
@@ -530,9 +532,9 @@ describe('GamePage', () => {
     expect(flagged.querySelector('span')?.getAttribute('style')).toContain(
       'color-mix(in srgb, var(--bb-blunder) 13%, transparent)',
     )
-    expect(screen.getByText('played').getAttribute('style')).toContain(
-      'color-mix(in srgb, var(--bb-blunder) 35%, transparent)',
-    )
+    expect(
+      within(screen.getByTestId('maia-panel')).getByText('played').getAttribute('style'),
+    ).toContain('color-mix(in srgb, var(--bb-blunder) 35%, transparent)')
   })
 
   it('jumps the board when a move in the list is clicked', async () => {
@@ -1088,7 +1090,7 @@ describe('GamePage', () => {
     expect(await screen.findByTestId('kept-variation')).toHaveTextContent('(1…c62.d4)')
   })
 
-  it('keeps the run’s own findings when the hints are switched off', async () => {
+  it('empties both engine columns when the hints are switched off', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
@@ -1096,13 +1098,16 @@ describe('GamePage', () => {
 
     const panel = () => screen.getByTestId('maia-panel')
     expect(panel()).toHaveTextContent('Maia 1500')
+    expect(within(panel()).getByText('played')).toBeInTheDocument()
 
-    // Hints are about the human half's content — its column keeps its place, and what the
-    // engine found is not a hint.
+    // One gesture, one meaning: an answer is an answer whichever engine gives it, so the
+    // human column and Stockfish's lines go quiet together. Both panes keep their place and
+    // their header, so nothing on the page moves.
     await user.click(screen.getByRole('button', { name: 'Hints' }))
     expect(within(panel()).queryByText(/%$/)).not.toBeInTheDocument()
+    expect(within(panel()).queryByText('played')).not.toBeInTheDocument()
     expect(within(panel()).getByText('stockfish')).toBeInTheDocument()
-    expect(screen.getByText('played')).toBeInTheDocument()
+    expect(panel()).toHaveTextContent('Maia 1500')
   })
 })
 

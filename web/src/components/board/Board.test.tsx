@@ -105,8 +105,13 @@ describe('Board', () => {
   it('recolours chessground’s own brushes to the design palette', () => {
     const api = createRef<Api>()
     render(<Board ref={api} fen={START} />)
+    // The coach's four named colours come straight off the classification palette; the
+    // board's own arrows come from the quieter `--bb-arrow-*` family instead, so a calmer
+    // board never drags the app's accent down with it.
     expect(api.current?.state.drawable.brushes.red?.color).toBe('var(--bb-blunder)')
-    expect(api.current?.state.drawable.brushes.accent?.color).toBe('var(--bb-accent)')
+    expect(api.current?.state.drawable.brushes.accent?.color).toBe('var(--bb-arrow-engine)')
+    expect(api.current?.state.drawable.brushes.maia?.color).toBe('var(--bb-arrow-maia)')
+    expect(api.current?.state.drawable.brushes.played?.color).toBe('var(--bb-arrow-played)')
   })
 
   it('puts a custom highlight class on the square it names', () => {

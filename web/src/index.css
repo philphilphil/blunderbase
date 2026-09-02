@@ -84,6 +84,26 @@
   --bb-brilliant: #b098d7;
   --bb-deep: #c1adde;
   --bb-otb: #c9b89a;
+  /* board arrows — their own family, quieter than the UI colours they are drawn from.
+
+     An arrow lies on a slate board, over a piece, under a 0.6 layer opacity, and there are
+     up to three of them at once; a saturation that reads as "accent" in a button reads as
+     poster paint there. So these are the panel colours' hues at roughly two thirds of their
+     saturation, defined once here rather than tuned per brush — the whole board's arrow
+     palette moves together. They stay separate from `--bb-accent` and `--bb-brilliant`
+     because those two are the app's own accent and the brilliant-move colour, and neither
+     has any business changing because the board wanted calmer arrows.
+
+     `played` is the exception and has no hue at all: the played move is a statement of
+     fact, so it is outside both engine hues (a third blue beside the engine's would be the
+     one thing it must not read as) and outside the classification ramp (a red or a green
+     would make it a verdict). */
+  --bb-arrow-engine: #99b9d1;
+  --bb-arrow-maia: #b7a5cf;
+  --bb-arrow-played: #f1f1f1;
+  /* The line preview's black-side arrows — lavender, and deliberately not Maia's: a
+     preview is the engine talking, and must never read as a claim about a human. */
+  --bb-arrow-deep: #b6aac9;
 
   /* board */
   --bb-board-light: #a9b2b8;
@@ -233,6 +253,10 @@
   --bb-brilliant: #7054a5;
   --bb-deep: #63499a;
   --bb-otb: #7a6440;
+  --bb-arrow-engine: #3d6790;
+  --bb-arrow-maia: #79639c;
+  --bb-arrow-played: #2f2f2f;
+  --bb-arrow-deep: #6b5c8c;
 
   --bb-board-light: #d8dde0;
   --bb-board-dark: #8f9da5;
@@ -339,6 +363,9 @@
   --color-brilliant: var(--bb-brilliant);
   --color-deep: var(--bb-deep);
   --color-otb: var(--bb-otb);
+  --color-arrow-engine: var(--bb-arrow-engine);
+  --color-arrow-maia: var(--bb-arrow-maia);
+  --color-arrow-played: var(--bb-arrow-played);
   --color-board-light: var(--bb-board-light);
   --color-board-dark: var(--bb-board-dark);
 
@@ -576,20 +603,16 @@ cg-board square.bb-mistake {
 cg-board square.bb-inaccuracy {
   box-shadow: inset 0 0 0 0.15625rem color-mix(in srgb, var(--bb-inaccuracy) 85%, transparent);
 }
-cg-board square.bb-engine::after {
-  content: '';
-  position: absolute;
-  inset: 26%;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--bb-accent) 55%, transparent);
-}
-cg-board square.bb-maia::after {
-  content: '';
-  position: absolute;
-  inset: 22%;
-  border-radius: 50%;
-  border: 0.125rem solid color-mix(in srgb, var(--bb-brilliant) 70%, transparent);
-}
+/*
+ * The standing arrows mark no squares of their own.
+ *
+ * They used to put a disc on each target — a teal one for the engine, a purple ring for
+ * Maia — and once the three arrows were drawn in one geometry the discs were saying the
+ * arrowhead's colour a second time, on top of the piece already standing there. An arrow
+ * points at a square perfectly well by itself. What is left on the squares is the one thing
+ * an arrow does not say: the classification outline above, which is about the move that was
+ * played rather than about where anything points.
+ */
 
 /*
  * The line preview's "future overlay" (`lib/board/linePreview.ts`): ghost pieces where the

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LINE_PREVIEW_KEY, resetLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 
-import { LinePreviewRowChip, LinePreviewSettingsButton } from './LinePreviewSettings'
+import { LinePreviewFields, LinePreviewRowChip } from './LinePreviewSettings'
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>()
@@ -28,15 +28,13 @@ afterEach(() => {
   resetLinePreviewPrefs()
 })
 
-describe('LinePreviewSettingsButton', () => {
-  it('opens contextually and stores preview behavior in this browser', async () => {
-    render(<LinePreviewSettingsButton />)
+describe('LinePreviewFields', () => {
+  it('stores preview behaviour in this browser and reveals the mode’s own controls', async () => {
+    render(<LinePreviewFields />)
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Line preview settings' }))
+    expect(screen.queryByLabelText('Tempo')).not.toBeInTheDocument()
     await userEvent.selectOptions(screen.getByLabelText('Row hover'), 'play')
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByLabelText('Tempo')).toBeInTheDocument()
     expect(JSON.parse(window.localStorage.getItem(LINE_PREVIEW_KEY) ?? '{}')).toMatchObject({ row: 'play' })
   })

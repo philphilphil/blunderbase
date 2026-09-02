@@ -194,9 +194,13 @@ The Explorer page reads three databases: **your own games**, and two of Lichess'
 **masters** archive (over-the-board games between titled players) and the **rated lichess**
 pools, narrowable by speed and rating band. Looking at the two reference sources stores
 nothing: no game is imported, and nothing they say is ever added to the numbers your own
-games give. Model games opened from them are a preview to play through — until you press
-**Add to library**. That stores the game as one you did not play: it gets the quick
-analysis pass like any import, opens in the full game view, and takes notes, but it counts
+games give. A model game opened from them opens in the **full game view**, the same screen
+one of your own games opens in: the board with its analysis line, the move table, the live
+engine search and Maia's read of the position all work, because all of them are about the
+position rather than about a row in your database. What is missing is what needs a row —
+the stored analysis passes, notes, pinned lines — and the way to get those is **Add to
+library**, in the titlebar beside **Back to explorer**. That stores the game as one you did
+not play: it gets the quick analysis pass like any import, and takes notes, but it counts
 in no statistic and is not in your opening tree. The games list shows your own games by
 default; the **Mine / Others / All** switch at the front of its filter bar shows the added
 games on their own or beside yours. (A note you write while

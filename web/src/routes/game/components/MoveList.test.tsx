@@ -125,10 +125,11 @@ describe('MoveList', () => {
     expect(onSelectPly).toHaveBeenCalledWith(1)
   })
 
-  it('puts the inline annotation under the move it is about', () => {
+  it('puts the inline annotation under the move it is about, and names that move', () => {
     renderList([move(0, 'e4'), move(1, 'Nxe4', { classification: 'blunder' })], {
       annotation: {
         ply: 1,
+        san: 'Nxe4',
         classification: 'blunder',
         before: { cp: 18 },
         after: { cp: 296 },
@@ -139,6 +140,8 @@ describe('MoveList', () => {
     expect(screen.getByText('Rfe8')).toBeInTheDocument()
     expect(screen.getByText('−31.2%')).toBeInTheDocument()
     expect(screen.getByText('+2.96')).toBeInTheDocument()
+    // The note hangs under a two-move row, so it says which of the two it is about.
+    expect(screen.getByText(/1… Nxe4\?\?/)).toBeInTheDocument()
   })
 
   it('filters to the flagged moves on the second tab', async () => {

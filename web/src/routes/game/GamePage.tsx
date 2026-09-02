@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
+import { PageBody } from '@/components/shell/PageHeader'
 import { liveBest, liveScore, useStreamSession } from '@/lib/analysis'
 import {
   useDeleteLine,
@@ -12,17 +13,20 @@ import {
   useMaiaElos,
   useNoteTags,
   usePositionBook,
+  useReferenceGame,
   useSaveLine,
   useSaveNote,
   useUpdateNote,
 } from '@/lib/api/queries'
-import type { LineResponse, MoveRow } from '@/lib/api/types'
+import type { LineResponse, MoveRow, ReferenceSource } from '@/lib/api/types'
 import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
 import { whiteWinPercent } from '@/lib/chess/evaluation'
 import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
+import { ReferenceTokenCard } from '@/routes/explorer/components/ReferenceTokenCard'
+import { tokenTrouble } from '@/routes/explorer/reference'
 
 import { buildAnalysisLine, withBoardMove } from './analysisLine'
 import { BoardPanel } from './components/BoardPanel'
@@ -42,6 +46,7 @@ import {
 } from './components/MoveList'
 import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
 import { NotesTrack } from './components/NotesTrack'
+import { StudioActions } from './components/StudioActions'
 import {
   bestRun,
   buildGameLine,
@@ -76,6 +81,7 @@ import {
   type NoteRow,
 } from './notesModel'
 import { buildPgn } from './pgn'
+import { referenceDetail } from './referenceGame'
 import { useSessionVariations } from './sessionVariations'
 import { variationRows } from './variationRows'
 import { useAnalysisRequest } from './useAnalysisRequest'
@@ -196,8 +202,22 @@ export function GamePage() {
   }
   // Keyed on the id so navigating between games starts a fresh board rather than carrying
   // the previous game's cursor and orientation over.
-  return <GameStudio key={gameId} gameId={gameId} />
+  return <GameStudio key={gameId} game={{ kind: 'library', id: gameId }} />
 }
+
+/**
+ * Where the studio's game comes from.
+ *
+ * Two sources, one screen. A library game is a row the owner owns, with runs and notes and
+ * an id; a reference game is a model game out of the masters or lichess book, which the
+ * owner does not own and which has no row at all (`./referenceGame`). Everything the studio
+ * does that is worth doing to a game it has never analysed works off the position — the live
+ * search, Maia, the analysis board, the book — so both get the same screen rather than the
+ * second getting a cut-down copy of the first that drifts out of step with it.
+ */
+export type StudioGame =
+  | { kind: 'library'; id: number }
+  | { kind: 'reference'; source: ReferenceSource; id: string }
 
 /** A positive integer out of a query parameter, or null for anything else. */
 function intParam(raw: string | null): number | null {
@@ -206,8 +226,27 @@ function intParam(raw: string | null): number | null {
   return Number.isInteger(value) && value >= 0 ? value : null
 }
 
-function GameStudio({ gameId }: { gameId: number }) {
-  const game = useGame(gameId, { notes: true })
+export function GameStudio({ game: from }: { game: StudioGame }) {
+  /*
+   * One of the two queries runs and the other stands down, and everything below reads
+   * `query` and `detail` without caring which. A reference game has no id in the library, so
+   * `gameId` is null for one — and null is what turns off every request and every mutation
+   * that would need one. `readOnly` is the same fact stated for the UI: nothing here can be
+   * analysed, noted or pinned, because there is nothing on the server to hang any of it off.
+   */
+  const gameId = from.kind === 'library' ? from.id : null
+  const readOnly = from.kind === 'reference'
+  const library = useGame(gameId ?? 0, { notes: true }, { enabled: gameId !== null })
+  const referenceGame = useReferenceGame(
+    from.kind === 'reference' ? from.source : 'masters',
+    from.kind === 'reference' ? from.id : '',
+    { enabled: readOnly },
+  )
+  const query = readOnly ? referenceGame : library
+  const referenceDetailValue = useMemo(
+    () => (readOnly ? referenceDetail(referenceGame.data) : undefined),
+    [readOnly, referenceGame.data],
+  )
   const analysisRequest = useAnalysisRequest(gameId)
 
   /**
@@ -257,13 +296,16 @@ function GameStudio({ gameId }: { gameId: number }) {
    * left them. Held outside the component, so they survive navigating to another game and
    * back within the open app (`./sessionVariations`).
    */
-  const { kept, keep, drop } = useSessionVariations(gameId)
+  const { kept, keep, drop } = useSessionVariations(
+    gameId ?? `${from.kind === 'reference' ? from.source : ''}:${from.id}`,
+  )
   /**
    * The lines pinned to this game on the server, and the notes hanging off them. They are
    * the same rows as the session's own in the move list — only their staying power differs
    * — so they are folded together in `./variationRows` rather than drawn twice.
    */
-  const gameLines = useGameLines(gameId)
+  // Nothing pins a line to a game that is not in the library, so the request is not made.
+  const gameLines = useGameLines(gameId ?? 0, { enabled: gameId !== null })
   const saveLine = useSaveLine()
   const removeLine = useDeleteLine()
   const saveNote = useSaveNote()
@@ -374,7 +416,7 @@ function GameStudio({ gameId }: { gameId: number }) {
     writeMovesWidth(null)
   }, [])
 
-  const detail = game.data
+  const detail = readOnly ? referenceDetailValue : library.data
   const moves = useMemo<MoveRow[]>(() => detail?.moves ?? [], [detail])
   const plyCount = moves.length
 
@@ -758,7 +800,7 @@ function GameStudio({ gameId }: { gameId: number }) {
   const pinVariation = useCallback(
     (variation: MoveListVariation) => {
       const moves = [...(variation.moves ?? [])]
-      if (moves.length === 0) return
+      if (moves.length === 0 || gameId === null) return
       saveLine.mutate(
         { game_id: gameId, base_ply: variation.base, moves },
         {
@@ -772,7 +814,7 @@ function GameStudio({ gameId }: { gameId: number }) {
   )
 
   const unpinVariation = useCallback(
-    (lineId: number) => removeLine.mutate({ id: lineId, gameId }),
+    (lineId: number) => gameId !== null && removeLine.mutate({ id: lineId, gameId }),
     [gameId, removeLine],
   )
 
@@ -783,7 +825,8 @@ function GameStudio({ gameId }: { gameId: number }) {
   const target = useMemo(
     () =>
       noteTarget({
-        gameId,
+        // Only ever read where a note can actually be written, which is a library game.
+        gameId: gameId ?? 0,
         moves,
         boardIndex,
         fen: boardPosition.fen,
@@ -825,6 +868,7 @@ function GameStudio({ gameId }: { gameId: number }) {
 
   const writeNote = useCallback(
     (text: string, noteTags: string[], id: number | null) => {
+      if (gameId === null) return
       if (id !== null) {
         // A rewrite of the note that is already there: it keeps the anchor it was written
         // with — the ply, the FEN, the line it pinned — and only the words change.
@@ -874,20 +918,13 @@ function GameStudio({ gameId }: { gameId: number }) {
   const cameFrom = (location.state as { from?: unknown } | null)?.from
   const backToExplorer =
     typeof cameFrom === 'string' && cameFrom.startsWith('/explorer') ? cameFrom : null
-  // Memoised because `SetPageChrome` re-publishes whenever the node's identity changes,
-  // and this component renders on every engine tick. Up here with the other hooks, above
+  // Memoised because `SetPageChrome` re-publishes whenever the node's identity changes, and
+  // this component renders on every engine tick — see `StudioActions`, which is a component
+  // rather than a node built here for exactly that reason. Up with the other hooks, above
   // the loading and error returns below, so the hook order never depends on the data.
-  const backToExplorerLink = useMemo(
-    () =>
-      backToExplorer ? (
-        <Link
-          to={backToExplorer}
-          className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] font-semibold text-accent-teal hover:border-edge-hover hover:text-accent-link"
-        >
-          ← Back to explorer
-        </Link>
-      ) : null,
-    [backToExplorer],
+  const chromeActions = useMemo(
+    () => <StudioActions game={from} backTo={backToExplorer} />,
+    [backToExplorer, from],
   )
   const [requested] = useState(() => ({
     ply: intParam(params.get('ply')),
@@ -995,25 +1032,35 @@ function GameStudio({ gameId }: { gameId: number }) {
     [maiaLevelsHere, exploring, lines, upcoming],
   )
 
+  /**
+   * The note under the move table, and the one move it is ever about: the move the cursor
+   * is standing on.
+   *
+   * It used to prefer the *upcoming* move — the one the game plays next from here — so that
+   * `j`, which lands one ply short of a mistake, arrived with the verdict already written.
+   * That made the note ambiguous in both directions. It hung under the pair row containing a
+   * move that had not been played, which is a row below the highlighted one whenever the
+   * upcoming move is White's; and stepping onto the mistake could keep the previous note on
+   * screen when the next move was flagged too, so a note about White's move stood while the
+   * board was a move past it. One rule now: the note describes the move at the cursor, it
+   * names that move (`MoveAnnotation.san`), and standing before a mistake says nothing —
+   * which is the point of landing there.
+   */
   const annotation = useMemo<MoveAnnotation | null>(() => {
-    const focus = isFlagged(upcoming?.classification)
-      ? upcoming
-      : isFlagged(played?.classification)
-        ? played
-        : undefined
-    if (!focus?.classification) return null
-    const best = focus.best_move_uci
-      ? sanVariation(line, focus.ply, [focus.best_move_uci], 1)[0] ?? null
+    if (!isFlagged(played?.classification) || !played?.classification) return null
+    const best = played.best_move_uci
+      ? sanVariation(line, played.ply, [played.best_move_uci], 1)[0] ?? null
       : null
     return {
-      ply: focus.ply,
-      classification: focus.classification,
-      before: scoreBefore(focus),
-      after: scoreAfter(focus),
-      winLoss: focus.win_loss ?? null,
+      ply: played.ply,
+      san: played.san ?? null,
+      classification: played.classification,
+      before: scoreBefore(played),
+      after: scoreAfter(played),
+      winLoss: played.win_loss ?? null,
       bestSan: best,
     }
-  }, [line, played, upcoming])
+  }, [line, played])
 
   const finishedRuns = useMemo(() => detail?.runs ?? [], [detail])
   const best = useMemo(() => bestRun(finishedRuns), [finishedRuns])
@@ -1100,12 +1147,24 @@ function GameStudio({ gameId }: { gameId: number }) {
     !!detail,
   )
 
-  if (game.isPending) return <GameViewSkeleton />
-  if (game.isError || !detail || !position) {
+  if (query.isPending) return <GameViewSkeleton />
+  // A masters game is fetched from the explorer host with the owner's token, so this screen
+  // fails the way the explorer's table does when that token is gone or refused — and the
+  // error card's "try again" would fetch the same 409 forever. The explorer's own card is
+  // what answers it, because the thing to do about it is the same: paste a new token.
+  const tokenReason = readOnly ? tokenTrouble(query.error) : null
+  if (tokenReason) {
+    return (
+      <PageBody>
+        <ReferenceTokenCard reason={tokenReason} />
+      </PageBody>
+    )
+  }
+  if (query.isError || !detail || !position) {
     return (
       <GameLoadError
-        error={game.error ?? new Error('The game payload was empty.')}
-        onRetry={() => void game.refetch()}
+        error={query.error ?? new Error('The game payload was empty.')}
+        onRetry={() => void query.refetch()}
       />
     )
   }
@@ -1115,10 +1174,11 @@ function GameStudio({ gameId }: { gameId: number }) {
   // The box sits above the move table whether or not a deep pass has finished: the panel
   // moving as analysis lands read as a layout bug, so it keeps one place.
   //
-  // The human column beside the engine's own is what `hints` turns off; the run's own
-  // findings are not a hint and stay either way. Off the game line the human column is a
-  // live query, dropped entirely where the deployment has no Maia to ask
-  // (`live.unavailable`) rather than reporting a failure.
+  // `hints` empties both columns together — it is one gesture, "do not tell me the answer
+  // yet", and Stockfish's ranking answers the position exactly as much as Maia's does. Both
+  // panes keep their place and their header while it is off, so nothing on the page moves.
+  // Off the game line the human column is a live query, dropped entirely where the
+  // deployment has no Maia to ask (`live.unavailable`) rather than reporting a failure.
   //
   // Its engine rows are previewed by the same hook as the live panel below: one `preview`
   // state, one `useLinePreview`, and the namespaced ids (`run:1` here, `live:1` there) are
@@ -1134,6 +1194,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       onCompareChange={setMaiaCompare}
       comparison={comparison}
       showHuman={hints && !(exploring && live.unavailable)}
+      showEngine={hints}
       run={engineRun}
       // A stored run says nothing about a position it never saw: off the game line the
       // column empties rather than describing the position the reader has left.
@@ -1193,6 +1254,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       plyCount={plyCount}
       hints={hints}
       onHintsChange={setHints}
+      readOnly={readOnly}
       onFlip={() => setFlipped((value) => !value)}
       onSeek={seek}
       nextFlagged={nextFlagged}
@@ -1206,7 +1268,9 @@ function GameStudio({ gameId }: { gameId: number }) {
       error={analysisRequest.error}
       onRequestQuick={() => analysisRequest.request('quick')}
       onRequestDeep={() => analysisRequest.request('deep')}
-      onNote={focusComposer}
+      // A note hangs off a game row, so there is nothing to write one against until the
+      // model game has been added to the library.
+      onNote={readOnly ? undefined : focusComposer}
     />
   )
 
@@ -1245,6 +1309,22 @@ function GameStudio({ gameId }: { gameId: number }) {
   // the plot with a mouse, and off the move table's Flagged tab beside it.
   const flaggedMoments = <FlaggedMoments moves={moves} cursor={cursor} onSelect={seek} />
 
+  /*
+   * The composer's slot, for a game that is not in the library.
+   *
+   * `NotesTrack` reserves a fixed height for whatever it is handed, so leaving the slot
+   * empty would open a hole in the column rather than close it. What goes there is the one
+   * sentence that explains the state — and it is deliberately not a second "Add to library"
+   * button: that decision has one place, the chrome bar, and two of them would be two
+   * places to look for the same thing.
+   */
+  const referenceComposer = (
+    <div className="flex min-w-0 flex-col justify-center rounded-md border border-dashed border-edge-strong px-3 text-[0.71875rem] leading-relaxed text-dim">
+      Notes hang off a game in your library. Add this one and it can be annotated like any
+      other — counted in no statistic, since you did not play it.
+    </div>
+  )
+
   const composer = (
     <NoteComposer
       target={target}
@@ -1281,7 +1361,7 @@ function GameStudio({ gameId }: { gameId: number }) {
       notes={noteList}
       activeNoteId={editedNote?.id ?? null}
       onSelectNote={selectNote}
-      composer={composer}
+      composer={readOnly ? referenceComposer : composer}
       className={mobile ? 'flex-1' : undefined}
     />
   )
@@ -1307,8 +1387,10 @@ function GameStudio({ gameId }: { gameId: number }) {
       onSelectVariationMove={seekVariation}
       onSelectKeptMove={enterKeptVariation}
       onSelectLineMove={(lineId, index) => enterLine(lineId, index + 1)}
-      onPinVariation={pinVariation}
-      onUnpinVariation={unpinVariation}
+      // A pin is a row on the server hanging off a game row; a model game has neither, so
+      // the affordance is not offered. The lines walked here are still kept for the session.
+      onPinVariation={readOnly ? undefined : pinVariation}
+      onUnpinVariation={readOnly ? undefined : unpinVariation}
       onSelectPly={selectPly}
       notedMoves={notedMoves}
       // The phone promotes the table's tabs into `MobileGameView`'s strip, so the table is
@@ -1343,12 +1425,16 @@ function GameStudio({ gameId }: { gameId: number }) {
 
   const chrome = (
     <SetPageChrome
-      breadcrumb={[
-        { label: 'Library', to: '/games' },
-        { label: formatGameDate(detail.game.played_at), mono: true },
-        { label: players },
-      ]}
-      actions={backToExplorerLink}
+      breadcrumb={
+        readOnly
+          ? [{ label: 'Explorer', to: backToExplorer ?? '/explorer' }, { label: players }]
+          : [
+              { label: 'Library', to: '/games' },
+              { label: formatGameDate(detail.game.played_at), mono: true },
+              { label: players },
+            ]
+      }
+      actions={chromeActions}
     />
   )
 
