@@ -4,6 +4,23 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.10.0 — 2026-09-02
+
+- Added masters and Lichess reference books to the explorer (needs a Lichess API token in Settings)
+- Added putting a model game from the explorer into the library
+- Added a Mine / Others / All switch to the library
+- Added FICS imports
+- Added deleting games, one at a time or a whole selection
+- Added syncing an account from the beginning
+- Added paging to the library
+- Added exporting the whole library as annotated PGN
+- Added verified backups and restore under Library → Manage
+- Added managing engines from the command line
+- Changed the look of the app to a quieter desktop style
+- Changed the library grid to name both players
+- Changed games that arrive without an opening to be named from the book
+- Fixed the game screen clipping notes on tall, narrow windows
+
 ## v0.9.0 — 2026-08-31
 
 - Added a desktop app with native integrations
