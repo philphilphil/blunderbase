@@ -12,6 +12,7 @@ from backend.services import engines as engines_service
 from backend.services import live as live_service
 from backend.services import maia_live as maia_live_service
 from backend.services import notes as notes_service
+from backend.services import reference as reference_service
 from backend.services import stats as stats_service
 
 # The vocabulary of things that can go wrong, as the coach reads them. A code is part of
@@ -30,6 +31,14 @@ QUEUE_FULL = "queue_full"
 NOT_IMPLEMENTED = "not_implemented"
 ILLEGAL_MOVE = "illegal_move"
 NO_LIVE_POSITION = "no_live_position"
+# The reference databases are somebody else's service, so they can fail in ways nothing
+# else here can: the owner has not pasted a token, the one they pasted was refused, or
+# Lichess itself is unhappy. The first two are asked of a person, the last two are waited
+# out, and a coach that can tell them apart says the useful sentence.
+REFERENCE_TOKEN_MISSING = "reference_token_missing"
+REFERENCE_TOKEN_REJECTED = "reference_token_rejected"
+REFERENCE_RATE_LIMITED = "reference_rate_limited"
+REFERENCE_UNAVAILABLE = "reference_unavailable"
 
 
 class CoachError(Exception):
@@ -78,6 +87,10 @@ TRANSLATIONS: tuple[tuple[type[Exception], str], ...] = (
     (live_service.NoLivePositionError, NO_LIVE_POSITION),
     (live_service.LiveFenError, BAD_FEN),
     (live_service.LiveRequestError, BAD_ARGUMENT),
+    (reference_service.TokenMissingError, REFERENCE_TOKEN_MISSING),
+    (reference_service.ReferenceAuthError, REFERENCE_TOKEN_REJECTED),
+    (reference_service.ReferenceRateLimitedError, REFERENCE_RATE_LIMITED),
+    (reference_service.ReferenceError, REFERENCE_UNAVAILABLE),
     (ValueError, BAD_ARGUMENT),
     (LookupError, NOT_FOUND),
 )

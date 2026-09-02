@@ -11,6 +11,7 @@ from typing import Any, Protocol
 from sqlalchemy import func, insert, select
 from sqlalchemy.orm import Session
 
+from backend.adapters import openings
 from backend.db.enums import (
     Color,
     JobStatus,
@@ -228,17 +229,7 @@ def run_import(
     job.finished_at = utcnow()
     session.commit()
 
-    _emit(
-        progress,
-        {
-            "event": EVENT_IMPORT_FINISHED,
-            **_job_fields(job),
-            "status": str(job.status),
-            **_counts(job),
-            "message": job.message,
-            "at": _stamp(),
-        },
-    )
+    _emit(progress, _finished_event(job))
     return job
 
 
@@ -326,12 +317,18 @@ def ingest_game(
     accounts: AccountIndex | None = None,
     *,
     analyze: bool = True,
+    presume_owner: bool = True,
 ) -> IngestOutcome:
     """Store one parsed game, or report the one that is already there.
 
     Raises whatever the move list is wrong about — `ingest_games` turns that into a
     per-game error record. `analyze=False` skips the automatic quick pass; a game that was
     already stored never gets one either way, because this call did not create it.
+
+    `presume_owner` is what a sync and a PGN do: a game they bring is the owner's even when
+    neither name resolves to an account yet, and reconciliation fills the side in later.
+    A game fetched from the reference books is the opposite case — somebody else's unless
+    an owner account is recognised in it — and passes False.
     """
     if accounts is None:
         accounts = AccountIndex.load(session)
@@ -347,6 +344,15 @@ def ingest_game(
         return IngestOutcome(game=None, created=False, blocked=True)
 
     rows = position_rows(parsed)
+    # A source that names the opening itself (Lichess, chess.com) is believed as it is. One
+    # that does not — a PGN without ECO tags, a masters game — is named from the vendored
+    # book by the deepest position on the game's line the book knows, which is the same
+    # rule the explorer names positions by, so the two never disagree about a game.
+    eco, opening_name = parsed.eco, parsed.opening_name
+    if not eco and not opening_name:
+        named = openings.deepest([row[0] for row in rows])
+        if named is not None:
+            eco, opening_name = named.eco, named.name
     white_account, white_is_owner = accounts.match(parsed.source, parsed.white_name)
     black_account, black_is_owner = accounts.match(parsed.source, parsed.black_name)
     owner_color: Color | None = None
@@ -366,6 +372,7 @@ def ingest_game(
         white_account_id=white_account,
         black_account_id=black_account,
         owner_color=owner_color,
+        is_owner_game=presume_owner or owner_color is not None,
         result=parsed.result,
         termination=parsed.termination,
         variant=parsed.variant,
@@ -374,8 +381,8 @@ def ingest_game(
         time_control=parsed.time_control,
         initial_clock=parsed.initial_clock,
         increment=parsed.increment,
-        eco=parsed.eco,
-        opening_name=parsed.opening_name,
+        eco=eco,
+        opening_name=opening_name,
         played_at=parsed.played_at,
         pgn=parsed.pgn,
         moves_uci=list(parsed.moves_uci),
@@ -490,6 +497,86 @@ def store_positions(
     # had folded about it is now short by this game. Inside the transaction that stored the
     # join rows, so nothing can read a book that disagrees with them.
     explorer_service.mark_positions_dirty(session, game.id)
+
+
+def import_one(
+    session: Session,
+    parsed: ParsedGame,
+    *,
+    progress: ProgressHook | None = None,
+    presume_owner: bool = True,
+) -> IngestOutcome:
+    """Store one game the owner asked for by name, under a job of its own.
+
+    The "add this game" path, as opposed to a sync's stream: the game gets an `ImportJob`
+    row like any other so its provenance reads the same in the library, the same events go
+    out so the page refreshes the same way, and the quick pass is queued the same way.
+
+    A tombstone for this game is forgotten first. A deletion exists to stop a *sync* from
+    quietly bringing a game back; the owner naming the game and asking for it is the undo,
+    and refusing them here would leave no way to ever have it again.
+
+    A game that will not store is recorded on the job as a failure and re-raised: this is
+    one game a person is waiting on, not a stream where one bad game must not stop the rest.
+    """
+    known = games_service.identify(session, parsed.source, parsed.source_id, dedup_hash(parsed))
+    if known.deleted is not None:
+        games_service.forget_deletions(session, [known.deleted.id])
+
+    job = ImportJob(source=parsed.source, status=JobStatus.RUNNING, started_at=utcnow())
+    session.add(job)
+    session.commit()
+    _emit(progress, {"event": EVENT_IMPORT_STARTED, **_job_fields(job), "at": _stamp()})
+
+    result = ImportResult(seen=1)
+    try:
+        outcome = ingest_game(session, job, parsed, presume_owner=presume_owner)
+    except Exception as exc:
+        session.rollback()
+        error = f"{type(exc).__name__}: {exc}"
+        _record_failure(result, parsed.reference, error)
+        _apply(job, result)
+        job.status = JobStatus.FAILED
+        job.message = error
+        job.finished_at = utcnow()
+        session.commit()
+        _emit(progress, _game_event(job, parsed.reference, GAME_FAILED, result, error=error))
+        _emit(progress, _finished_event(job))
+        raise
+
+    if outcome.created:
+        result.imported = 1
+        status = GAME_IMPORTED
+    else:
+        result.skipped = 1
+        status = GAME_SKIPPED
+    _apply(job, result)
+    job.status = JobStatus.DONE
+    job.finished_at = utcnow()
+    session.commit()
+    _emit(
+        progress,
+        _game_event(
+            job,
+            parsed.reference,
+            status,
+            result,
+            game_id=outcome.game.id if outcome.game is not None else None,
+        ),
+    )
+    _emit(progress, _finished_event(job))
+    return outcome
+
+
+def _finished_event(job: ImportJob) -> dict[str, Any]:
+    return {
+        "event": EVENT_IMPORT_FINISHED,
+        **_job_fields(job),
+        "status": str(job.status),
+        **_counts(job),
+        "message": job.message,
+        "at": _stamp(),
+    }
 
 
 def enqueue_quick_analysis(session: Session, game: Game) -> AnalysisRun | None:

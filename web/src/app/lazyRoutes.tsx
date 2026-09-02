@@ -39,6 +39,12 @@ export const LivePage = lazy(() =>
 export const McpPage = lazy(() =>
   import('@/routes/mcp').then((route) => ({ default: route.McpPage })),
 )
+export const ReferenceGamePage = lazy(() =>
+  import('@/routes/reference').then((route) => ({ default: route.ReferenceGamePage })),
+)
+export const RepertoirePage = lazy(() =>
+  import('@/routes/repertoire').then((route) => ({ default: route.RepertoirePage })),
+)
 export const NotesPage = lazy(() =>
   import('@/routes/notes').then((route) => ({ default: route.NotesPage })),
 )

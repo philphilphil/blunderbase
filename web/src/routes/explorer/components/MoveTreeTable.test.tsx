@@ -182,19 +182,40 @@ describe('MoveTreeTable', () => {
     )
     // Every row is rendered — the cap scrolls, it does not fetch or draw less.
     expect(screen.getAllByRole('row')).toHaveLength(many.length + 1) // + the header
-    // Ten rows of 2.375rem and the nine 0.125rem gaps between them.
+    // Fifteen rows of 1.5rem and the fourteen 0.125rem gaps between them.
     const rows = container.querySelector('.overflow-y-auto') as HTMLElement
-    expect(rows.style.maxHeight).toBe('24.875rem')
+    expect(rows.style.height).toBe('24.25rem')
+    // The rows may not shrink to fit the box: that is what made them change height with
+    // the number of continuations instead of scrolling.
+    for (const row of Array.from(rows.children)) expect(row).toHaveClass('flex-none')
     // The header is outside the scroller, so it stays put while the rows move.
     expect(rows.textContent).not.toContain('Avg drop')
   })
 
-  it('keeps four continuations four rows tall', () => {
+  it('keeps four continuations the same height as ten', () => {
     const { container } = render(<MoveTreeTable tree={TREE} ply={1} loading={false} onPlay={vi.fn()} />)
-    // A maximum, not a height: nothing under the table is pushed down by empty space.
+    // A height, not a maximum: the pane is the same size whatever the position has to
+    // show, so walking a line or switching to a reference book moves nothing below it.
     const rows = container.querySelector('.overflow-y-auto') as HTMLElement
-    expect(rows.style.height).toBe('')
+    expect(rows.style.height).toBe('24.25rem')
     expect(rows.children).toHaveLength(TREE.moves.length)
+  })
+
+  it('gives the loading and empty states that same height', () => {
+    const loading = render(<MoveTreeTable tree={undefined} ply={1} loading onPlay={vi.fn()} />)
+    expect(loading.getByTestId('tree-loading').style.height).toBe('24.25rem')
+    loading.unmount()
+
+    const empty = render(
+      <MoveTreeTable
+        tree={{ ...TREE, moves: [] } as unknown as ExplorerResponse}
+        ply={1}
+        loading={false}
+        onPlay={vi.fn()}
+      />,
+    )
+    const box = empty.getByText(/No game of yours/).parentElement as HTMLElement
+    expect(box.style.height).toBe('24.25rem')
   })
 
   it('walks the tree when a continuation is clicked', async () => {

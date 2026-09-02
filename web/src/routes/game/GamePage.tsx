@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -866,6 +866,29 @@ function GameStudio({ gameId }: { gameId: number }) {
   // they do afterwards moves the board freely, and the URL is deliberately not rewritten to
   // follow: this page has no business owning the address bar mid-review.
   const [params] = useSearchParams()
+  // A game reached from the reference explorer — a model game just added to the library —
+  // carries the explorer position it came from in router state (`ModelGames` puts it
+  // there), and the titlebar offers the way back. Nothing else sets that state, and a
+  // stale or hand-made one that is not an explorer URL is ignored rather than trusted.
+  const location = useLocation()
+  const cameFrom = (location.state as { from?: unknown } | null)?.from
+  const backToExplorer =
+    typeof cameFrom === 'string' && cameFrom.startsWith('/explorer') ? cameFrom : null
+  // Memoised because `SetPageChrome` re-publishes whenever the node's identity changes,
+  // and this component renders on every engine tick. Up here with the other hooks, above
+  // the loading and error returns below, so the hook order never depends on the data.
+  const backToExplorerLink = useMemo(
+    () =>
+      backToExplorer ? (
+        <Link
+          to={backToExplorer}
+          className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] font-semibold text-accent-teal hover:border-edge-hover hover:text-accent-link"
+        >
+          ← Back to explorer
+        </Link>
+      ) : null,
+    [backToExplorer],
+  )
   const [requested] = useState(() => ({
     ply: intParam(params.get('ply')),
     line: intParam(params.get('line')),
@@ -1325,6 +1348,7 @@ function GameStudio({ gameId }: { gameId: number }) {
         { label: formatGameDate(detail.game.played_at), mono: true },
         { label: players },
       ]}
+      actions={backToExplorerLink}
     />
   )
 

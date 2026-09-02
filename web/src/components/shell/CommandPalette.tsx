@@ -86,7 +86,9 @@ interface PageRoute {
 const PAGES: PageRoute[] = [
   { label: 'Dashboard', hint: 'the last games and what went wrong', icon: LayoutDashboard, to: '/' },
   { label: 'Games', hint: 'the library', icon: Library, to: '/games' },
-  { label: 'Openings', hint: 'the explorer', icon: Network, to: '/explorer' },
+  { label: 'Explorer', hint: 'your games, the reference books and model games', icon: Network, to: '/explorer' },
+  // `/repertoire` is deliberately absent, as it is from the rail: routed, not yet offered
+  // (see `SideNav`).
   { label: 'Stats', hint: 'reports over the library', icon: ChartNoAxesColumn, to: '/stats' },
   { label: 'Notes', hint: 'everything written down', icon: StickyNote, to: '/notes' },
   { label: 'Live', hint: 'the game being played now', icon: Radio, to: '/live' },

@@ -37,6 +37,10 @@ const GAMES = [11, 12, 13].map(
       color: 'white',
       result: '1-0',
       outcome: 'win',
+      white: 'phib',
+      black: `opponent-${id}`,
+      white_rating: 1650,
+      black_rating: 1600,
       opponent: `opponent-${id}`,
       opponent_rating: 1600,
       eco: 'C65',
@@ -330,10 +334,10 @@ describe('GamesPage — paging and ordering', () => {
     draw()
     await screen.findByLabelText('Select game 1')
 
-    // The exact name is the column header; the filter bar's chip is "Opponent ▾".
-    await user.click(screen.getByRole('button', { name: 'Opponent' }))
+    // The exact name is the column header, so the filter chips do not match it.
+    await user.click(screen.getByRole('button', { name: 'Black' }))
 
-    await waitFor(() => expect(lastGamesQuery().get('order')).toBe('opponent'))
+    await waitFor(() => expect(lastGamesQuery().get('order')).toBe('black'))
     expect(lastGamesQuery().get('direction')).toBe('asc')
   })
 })

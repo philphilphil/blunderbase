@@ -67,7 +67,7 @@ export function LineSummary({
         </p>
       ) : (
         <>
-          <ScoreBar split={split} height="0.5rem" />
+          <ScoreBar split={split} />
           <div className="flex font-mono text-[0.6875rem] tabular text-soft-2">
             <span className="flex-1">{split.wins} W</span>
             <span className="flex-1 text-center">{split.draws} D</span>

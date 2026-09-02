@@ -10,7 +10,8 @@ export type Extra = Record<string, unknown>
 
 // --- enums (backend/db/enums.py) ------------------------------------------
 
-export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual'
+/** `masters` is a game added from the reference explorer's masters archive — never synced. */
+export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual' | 'masters'
 export type Platform = 'lichess' | 'chesscom' | 'fics' | 'otb'
 export type Color = 'white' | 'black'
 export type Result = '1-0' | '0-1' | '1/2-1/2' | '*'
@@ -22,7 +23,14 @@ export type Classification = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blund
 export type EngineKind = 'uci' | 'maia'
 export type Outcome = 'win' | 'loss' | 'draw'
 
-export const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'fics', 'pgn', 'manual']
+export const SOURCES: readonly Source[] = [
+  'lichess',
+  'chesscom',
+  'fics',
+  'pgn',
+  'manual',
+  'masters',
+]
 export const SPEEDS: readonly Speed[] = [
   'bullet',
   'blitz',
@@ -161,6 +169,11 @@ export interface GameSummary extends Extra {
   source_id?: string | null
   played_at?: string | null
   color?: Color | null
+  /**
+   * False for a game added from the reference books: somebody else's, kept for study,
+   * analysed and annotated like any other and counted in nothing. Absent means true.
+   */
+  is_owner_game?: boolean
   result?: string | null
   outcome?: string | null
   white?: string | null
@@ -468,7 +481,14 @@ export interface GameFilters {
   analyzed?: boolean
   deep_analyzed?: boolean
   text?: string
+  /**
+   * Whose games: the owner's (`mine`, the default when absent), the ones added from the
+   * reference books (`others`), or both (`all`).
+   */
+  whose?: Whose
 }
+
+export type Whose = 'mine' | 'others' | 'all'
 
 // --- import ---------------------------------------------------------------
 
@@ -879,6 +899,172 @@ export interface PositionOccurrence extends Extra {
   move_san?: string | null
   win_loss?: number | null
   classification?: Classification | null
+}
+
+// --- reference explorer ---------------------------------------------------
+
+/**
+ * The two outside books, served through `GET /reference/*` from Lichess's opening-explorer
+ * API. They are read and never stored: nothing under this heading is a row in the owner's
+ * database, and no count here is ever folded into `ExplorerResponse`, whose numbers are
+ * the owner's own games and must stay that way.
+ *
+ * The counts are games, not percentages — the frontend derives the shares — and the names
+ * are the backend's normalisation of Lichess's camelCase, so nothing in the app has to
+ * know which of `averageRating` / `averageOpponentRating` the upstream sent.
+ */
+export type ReferenceSource = 'masters' | 'lichess'
+
+/**
+ * What Lichess calls the position. Either half can be null: the backend answers with the
+ * object as soon as one of the two is known and with `null` when neither is, so a name
+ * without an ECO code (or the reverse) is a shape the page has to survive rather than a
+ * bug. Reading either one needs a fallback.
+ */
+export interface ReferenceOpening extends Extra {
+  eco: string | null
+  name: string | null
+}
+
+/** A player as a reference game names them; the rating is missing on some masters games. */
+export interface ReferencePlayer extends Extra {
+  name: string
+  rating?: number | null
+}
+
+export interface ReferenceMove extends Extra {
+  uci: string
+  san: string
+  games: number
+  /** Game counts from White's point of view — there is no owner here to score for. */
+  white: number
+  draws: number
+  black: number
+  average_rating?: number | null
+  /**
+   * What the vendored book calls the position this move reaches — the child's own name,
+   * never inherited, same rule as `ExplorerMove`. Null on most rows past the first moves.
+   */
+  eco?: string | null
+  name?: string | null
+}
+
+export interface ReferenceTotals extends Extra {
+  games: number
+  white: number
+  draws: number
+  black: number
+}
+
+/** One of the games Lichess returns for a position, enough to list it and to open it. */
+export interface ReferenceTopGame extends Extra {
+  id: string
+  white: ReferencePlayer
+  black: ReferencePlayer
+  /** Null for a draw. */
+  winner?: 'white' | 'black' | null
+  year?: number | null
+  month?: string | null
+  /** Lichess source only — a masters game has no time control worth naming. */
+  speed?: string | null
+}
+
+export interface ReferenceExplorerResponse extends Extra {
+  source: ReferenceSource
+  /** The position the answer is about, as the backend normalised it. */
+  fen: string
+  opening?: ReferenceOpening | null
+  totals: ReferenceTotals
+  moves: ReferenceMove[]
+  top_games: ReferenceTopGame[]
+}
+
+export interface ReferenceGameMove extends Extra {
+  /** 0-based and absolute, like `LineStep.ply`: ply 0 is White's first move. */
+  ply: number
+  uci: string
+  san: string
+}
+
+export interface ReferenceGame extends Extra {
+  source: ReferenceSource
+  id: string
+  white: ReferencePlayer
+  black: ReferencePlayer
+  result: string
+  event?: string | null
+  site?: string | null
+  date?: string | null
+  moves: ReferenceGameMove[]
+  /** Present for a lichess game, and for a masters game whose site is known. */
+  lichess_url?: string | null
+}
+
+/**
+ * A reference game now in the library. `created` is false when it already was — asking
+ * twice opens the same game.
+ */
+export interface ReferenceImported extends Extra {
+  game: GameSummary
+  created: boolean
+}
+
+/** Whether a Lichess API token is stored. The token itself is never sent back. */
+export interface ReferenceTokenStatus extends Extra {
+  configured: boolean
+}
+
+/** `null` or an empty string clears the stored token. */
+export interface ReferenceTokenUpdate {
+  token: string | null
+}
+
+// --- repertoire -----------------------------------------------------------
+
+/**
+ * One move of a repertoire, and everything played after it.
+ *
+ * `rank` orders siblings and `0` is the main move — the reply the owner intends to play,
+ * not merely the first one they entered — so the tree renders in movetext order without
+ * the client deciding what is main. `comment` is `""` rather than null when unset, so a
+ * textarea can be bound to it directly.
+ *
+ * `epd` is the position *after* the move. Nothing on this page reads it yet; it is on the
+ * wire because deviation comparison (#5) is a lookup by position rather than by path, and
+ * a repertoire that stores only the move order cannot answer a transposition.
+ */
+export interface RepertoireNode extends Extra {
+  id: number
+  uci: string
+  san: string
+  comment: string
+  rank: number
+  epd: string
+  /** Absent on the single node a write answers with — only the tree read nests them. */
+  children?: RepertoireNode[]
+}
+
+/** A whole colour's repertoire: the moves playable from the initial array, and their trees. */
+export interface RepertoireTree extends Extra {
+  color: Color
+  moves: RepertoireNode[]
+}
+
+/** The UCI path from the initial array, in full — the backend creates whatever is missing. */
+export interface RepertoireLineCreate {
+  ucis: string[]
+}
+
+/** How many nodes the path actually created, and the node it ends on. */
+export interface RepertoireLineCreated extends Extra {
+  created: number
+  tip: RepertoireNode
+}
+
+/** `comment: null` clears it; `promote: true` makes the move main among its siblings. */
+export interface RepertoireMoveUpdate {
+  comment?: string | null
+  promote?: boolean
 }
 
 // --- stats ----------------------------------------------------------------

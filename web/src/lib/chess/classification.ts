@@ -144,6 +144,14 @@ export const SOURCE_STYLES: Record<Source, SourceStyle> = {
     chipClass: 'bg-chip-neutral border-edge-strong text-dim',
     color: 'var(--bb-dim)',
   },
+  // A reference game from the masters archive: as quiet as a PGN, since it is one, and
+  // told apart from it by its label rather than by a colour of its own.
+  masters: {
+    label: 'Masters',
+    dotClass: 'bg-dim',
+    chipClass: 'bg-chip-neutral border-edge-strong text-soft',
+    color: 'var(--bb-dim)',
+  },
 }
 
 // --- analysis tiers (design 1c, "Analysis tiers") -------------------------

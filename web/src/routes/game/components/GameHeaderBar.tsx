@@ -71,6 +71,14 @@ export function GameHeaderBar({
       {game.rated === false ? (
         <span className="flex-none text-[0.6875rem] text-faint">casual</span>
       ) : null}
+      {game.is_owner_game === false ? (
+        <span
+          title="Added from the reference explorer. Analysed and annotated like any other game, and counted in no statistic."
+          className="flex-none rounded-sm border border-dashed border-edge-strong px-[0.3125rem] py-px text-[0.625rem] text-dim"
+        >
+          not your game
+        </span>
+      ) : null}
 
       {/* The spacer is what makes the analysis state right-aligned rather than a sixth fact
           about the game: it is about the app's work, not about the game. */}

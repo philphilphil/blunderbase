@@ -35,9 +35,12 @@ SOURCE_FOR_PLATFORM: dict[Platform, Source] = {
     platform: source for source, platform in PLATFORM_FOR_SOURCE.items()
 }
 
-# The sources whose games name no platform, and so are matched on the username alone.
+# The sources whose games name no platform, and so are matched on the username alone. The
+# masters archive is neither: nobody has an account there, so its players match no one.
 PLATFORMLESS_SOURCES: tuple[Source, ...] = tuple(
-    source for source in Source if source not in PLATFORM_FOR_SOURCE
+    source
+    for source in Source
+    if source not in PLATFORM_FOR_SOURCE and source is not Source.MASTERS
 )
 
 
@@ -67,7 +70,7 @@ class AccountIndex:
         the same person.
         """
         folded = fold(name)
-        if not folded:
+        if not folded or source is Source.MASTERS:
             return None, False
 
         platform = PLATFORM_FOR_SOURCE.get(source)
@@ -216,6 +219,9 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
                     # refolds what this cleared.
                     {
                         Game.owner_color: color,
+                        # A reference game the owner turns out to be in is theirs after
+                        # all: recognising them is exactly what the flag was waiting for.
+                        Game.is_owner_game: True,
                         Game.stat_summary: None,
                         Game.stat_owner_moves: None,
                         Game.stat_blunders: None,

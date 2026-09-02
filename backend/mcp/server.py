@@ -28,6 +28,8 @@ from backend.services import games as games_service
 from backend.services import live as live_service
 from backend.services import maia_live as maia_live_service
 from backend.services import notes as notes_service
+from backend.services import reference as reference_service
+from backend.services import repertoire as repertoire_service
 from backend.services import runners as runners_service
 from backend.services import stats as stats_service
 from backend.services.games import GameFilters
@@ -86,6 +88,13 @@ Deep analysis is queued, not immediate: request_analysis returns a run id to pol
 Write what you learn down with save_note, and open a session with search_notes; a note can
 be pinned to a variation as well as to a move (save_line, get_lines), and export_notes
 hands the memory back as one document.
+The owner keeps two opening repertoires, one per colour — what they mean to play, not what
+they have played: read get_repertoire before recommending an opening move, and say when a
+position is outside it.
+Theory comes from reference_explorer instead — the masters and rated-lichess databases,
+everyone else's games rather than theirs. Keep the two apart when you quote numbers. A
+model game worth studying can be brought in with import_reference_game: it becomes a
+library game they did not play, analysed and annotatable, and still counts in nothing.
 Maia is asked at every level this deployment is configured for, so the reading is a
 comparison: get_game carries them all per ply, maia_policy asks a live position, and
 maia_fill backfills a level a game was analysed before.
@@ -253,12 +262,15 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
         text: str | None = None,
         limit: int = DEFAULT_SEARCH,
         offset: int = 0,
+        whose: str = "mine",
     ) -> TextContent:
         """Games matching any combination of filters, newest first, as compact rows.
         `outcome` is win/loss/draw from the owner's side; `result` is the PGN result
         (1-0, 0-1, 1/2-1/2). `eco` matches a code or a prefix (C6 for all of C60-C69),
         `text` searches names, openings and terminations. Dates accept an ISO date or a
-        relative window like '30d'. Follow up with get_game for the moves."""
+        relative window like '30d'. `whose` is "mine" (the owner's games, the default),
+        "others" (games added from the reference books) or "all". Follow up with get_game
+        for the moves."""
         speed, literal = args.time_control(time_control)
         filters = GameFilters(
             since=args.when(since, "since"),
@@ -276,6 +288,7 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
             analyzed=analyzed,
             deep_analyzed=deep_analyzed,
             text=text,
+            mine=args.whose(whose),
         )
         count = args.capped(limit, DEFAULT_SEARCH, MAX_SEARCH)
         start = args.offset(offset)
@@ -426,6 +439,85 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
             )
         return payloads.result(tree)
 
+    @server.tool()
+    @guarded
+    def reference_explorer(
+        source: str,
+        fen: str | None = None,
+        speeds: list[str] | None = None,
+        ratings: list[int] | None = None,
+        limit: int = reference_service.DEFAULT_MOVES,
+        top_games: int = reference_service.DEFAULT_TOP_GAMES,
+    ) -> TextContent:
+        """The *reference* database from a position — everyone else's games, not the
+        owner's. `source` is "masters" (over-the-board games between titled players) or
+        "lichess" (the rated online pools, narrowable with `speeds` like ["blitz","rapid"]
+        and `ratings` like [1800,2000]). Use it for theory — what is played here, and how
+        it scores — and use opening_explorer for what the owner themselves has played;
+        never add the two together. Read-only: nothing here is in their library, and the
+        `top_games` entries can be opened with get_reference_game (for "lichess" they are
+        the highest-rated games first, then recent ones). It is served by Lichess
+        and needs the owner's Lichess API token to be stored, so a `reference_token_missing`
+        error means asking them to paste one under Settings, not that the position is
+        unknown."""
+        wanted = str(source or "").strip().casefold()
+        if wanted not in reference_service.SOURCES:
+            raise CoachError(
+                BAD_ARGUMENT,
+                f"unknown reference source {source!r}",
+                allowed=list(reference_service.SOURCES),
+            )
+        position = args.fen(fen, required=False)
+        with coach.session() as session:
+            payload = reference_service.explore(
+                session,
+                source=wanted,
+                fen=position,
+                speeds=args.tags(speeds),
+                ratings=args.ratings(ratings, "ratings") or (),
+                limit=args.capped(
+                    limit, reference_service.DEFAULT_MOVES, reference_service.MAX_MOVES
+                ),
+                top_games=args.capped(
+                    top_games, reference_service.DEFAULT_TOP_GAMES, reference_service.MAX_TOP_GAMES
+                ),
+            )
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def get_reference_game(source: str, game_id: str) -> TextContent:
+        """One game from the reference database, by the id reference_explorer listed under
+        `top_games`. `source` is the one it came from — "masters" or "lichess". The answer
+        is the players, the result and every move in SAN and UCI: a model game to walk the
+        owner through, not one of theirs. Reading it stores nothing and there are no engine
+        numbers for it; import_reference_game adds it to the library if they want those."""
+        with coach.session() as session:
+            payload = reference_service.model_game(
+                session, source=str(source or "").strip().casefold(), game_id=str(game_id)
+            )
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def import_reference_game(source: str, game_id: str) -> TextContent:
+        """Add one reference game to the owner's library, by the same `source` and id
+        get_reference_game takes. It becomes a library game they did not play: the quick
+        analysis pass is queued, get_game reads it with engine numbers once done, notes
+        can be pinned to it — but it counts in no statistic and is not in opening_explorer,
+        and search_games leaves it out unless `include_reference` is set. Asking twice
+        opens the same game. Answers with the library game and whether it was new."""
+        with coach.session() as session:
+            outcome = reference_service.import_game(
+                session, source=str(source or "").strip().casefold(), game_id=str(game_id)
+            )
+            assert outcome.game is not None
+            payload = {
+                "game": games_service.game_summary(outcome.game),
+                "created": outcome.created,
+            }
+        return payloads.result(payload)
+
     @server.tool(description=STATS_DESCRIPTION)
     @guarded
     def get_stats(
@@ -449,6 +541,63 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
                 until=args.when(until, "until"),
                 filters=filters,
             )
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def get_repertoire(color: str, fen: str | None = None) -> TextContent:
+        """What the owner *intends* to play as White or as Black — their prepared opening
+        tree, which is a plan and not a record of games. `color` is the side they play.
+        Each move carries its `rank` among the moves answering the same position, where
+        rank 0 is the main line and the rest are alternatives, plus the owner's own comment
+        on it. Give a `fen` to ask what the repertoire says in one position: it is matched
+        on the position itself, so a transposition finds the same preparation. Read this
+        before recommending an opening move — say what their repertoire says, or say
+        plainly that the position is outside it."""
+        side = args.color(color)
+        if side is None:
+            raise CoachError(BAD_ARGUMENT, "a color is required", allowed=["white", "black"])
+        position = args.fen(fen, required=False)
+        with coach.session() as session:
+            if position is None:
+                payload = repertoire_service.tree(session, side)
+            else:
+                found = repertoire_service.subtrees_at(session, side, position)
+                payload = {
+                    "color": str(side),
+                    "fen": position,
+                    "matches": found,
+                    "count": len(found),
+                }
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def add_repertoire_line(color: str, ucis: list[str]) -> TextContent:
+        """Add a line to one of the owner's two repertoires: `ucis` in UCI from the
+        starting position, e.g. ["e2e4","e7e5","g1f3"]. Moves already in the tree are
+        reused rather than duplicated, so extending a line means sending it whole from
+        move one. A new move goes in as an alternative below its siblings; promote it to
+        the main line from the web app. An illegal move stores nothing at all."""
+        side = args.color(color)
+        if side is None:
+            raise CoachError(BAD_ARGUMENT, "a color is required", allowed=["white", "black"])
+        wanted = args.moves(ucis)
+        if not wanted:
+            raise CoachError(BAD_ARGUMENT, "a repertoire line needs at least one move in UCI")
+        with coach.session() as session:
+            payload = repertoire_service.add_line(session, side, wanted)
+        return payloads.result(payload)
+
+    @server.tool()
+    @guarded
+    def set_repertoire_comment(move_id: int, comment: str) -> TextContent:
+        """Write the note on one repertoire move — the PGN-comment-style line the owner
+        reads when they arrive there: the plan, the trap, why this move and not the other.
+        `move_id` comes from get_repertoire. An empty comment clears the one that is
+        there."""
+        with coach.session() as session:
+            payload = repertoire_service.update_move(session, int(move_id), comment=comment)
         return payloads.result(payload)
 
 

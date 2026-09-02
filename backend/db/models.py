@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -335,6 +336,15 @@ class Game(Base):
     white_account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"))
     black_account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"))
     owner_color: Mapped[Color | None] = mapped_column(EnumString(Color))
+    # Whether the owner is taken to have played this game. On for everything a sync or a
+    # PGN brings in, even when `owner_color` is still unknown — that is a game of theirs
+    # whose side has not been worked out yet. Off only for a game added from the reference
+    # books (`services.reference.import_game`) in which no owner account was recognised:
+    # a model game kept for study, analysed and annotated like any other, and left out of
+    # every statistic and the explorer's tree because none of its moves are theirs.
+    is_owner_game: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
 
     result: Mapped[Result] = mapped_column(EnumString(Result), nullable=False)
     termination: Mapped[str | None] = mapped_column(String(64))
@@ -716,6 +726,51 @@ class Note(Base):
     game: Mapped[Game | None] = relationship()
     position: Mapped[Position | None] = relationship()
     line: Mapped[Line | None] = relationship(back_populates="notes")
+
+
+class RepertoireMove(Base):
+    """One move in one of the owner's two opening repertoires: what they intend to play.
+
+    A tree rather than a list of lines, because that is what a repertoire is: `parent_id`
+    is the move this one answers and a NULL parent is a first move from the standard start
+    position. There are exactly two trees, one per `color` — the colour the *owner* plays,
+    which is what decides whose moves are choices and whose are the ones being prepared
+    against. Nothing here is a game and nothing joins to `games`: this is what the owner
+    means to play, not what they have played, and mixing the two would make the explorer's
+    counts lie.
+
+    `rank` orders siblings and 0 is the main line, so promoting a move is a renumbering of
+    its siblings rather than a column that says "main". `epd` is the normalised position
+    *after* the move, keyed exactly as `positions.fen` is (`explorer.normalize_fen`), which
+    is what makes a repertoire lookup transposition-aware: two paths that reach the same
+    position carry the same EPD and can be found from a board without walking the tree.
+
+    `comment` is the PGN-comment-style note on the move, empty rather than NULL so a tree
+    payload never has to distinguish "no comment" from "the comment is nothing".
+
+    Deletes of a subtree are done in the service, in Python: SQLite would need the
+    self-referential cascade turned on per connection, and a repertoire is small enough
+    that collecting the descendants and deleting them by id is the honest version.
+    """
+
+    __tablename__ = "repertoire_moves"
+    __table_args__ = (
+        Index("ix_repertoire_moves_color_parent_id", "color", "parent_id"),
+        Index("ix_repertoire_moves_color_epd", "color", "epd"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    color: Mapped[Color] = mapped_column(EnumString(Color), nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("repertoire_moves.id"))
+    move_uci: Mapped[str] = mapped_column(String(UCI_LENGTH), nullable=False)
+    move_san: Mapped[str] = mapped_column(String(SAN_LENGTH), nullable=False)
+    epd: Mapped[str] = mapped_column(String(FEN_LENGTH), nullable=False)
+    comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    rank: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
 
 
 # The notes full-text index is not a table SQLAlchemy can declare, so importing it here is

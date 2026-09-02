@@ -79,6 +79,7 @@
   --bb-mistake: #dda05a;
   --bb-inaccuracy: #cbb96a;
   --bb-good: #78b98c;
+  --bb-good-ink: #10281a; /* text on a filled good surface */
   --bb-info: #8fb6c9;
   --bb-brilliant: #b098d7;
   --bb-deep: #c1adde;
@@ -227,6 +228,7 @@
   --bb-mistake: #9b6819;
   --bb-inaccuracy: #7d6a12;
   --bb-good: #34724a;
+  --bb-good-ink: #ffffff;
   --bb-info: #3a6274;
   --bb-brilliant: #7054a5;
   --bb-deep: #63499a;
@@ -332,6 +334,7 @@
   --color-mistake: var(--bb-mistake);
   --color-inaccuracy: var(--bb-inaccuracy);
   --color-good: var(--bb-good);
+  --color-good-ink: var(--bb-good-ink);
   --color-info: var(--bb-info);
   --color-brilliant: var(--bb-brilliant);
   --color-deep: var(--bb-deep);

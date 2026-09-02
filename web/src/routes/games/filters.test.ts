@@ -36,6 +36,17 @@ describe('filtersFromParams', () => {
     })
   })
 
+  it('reads whose games to show, and never the default spelled out', () => {
+    // The default cut is the owner's games and a URL does not spell the default, so the
+    // two values that change it are read and `whose=mine` is the same as saying nothing.
+    expect(filtersFromParams(new URLSearchParams('whose=others'))).toEqual({ whose: 'others' })
+    expect(filtersFromParams(new URLSearchParams('whose=all'))).toEqual({ whose: 'all' })
+    expect(filtersFromParams(new URLSearchParams('whose=mine'))).toEqual({})
+    expect(filtersFromParams(new URLSearchParams('whose=theirs'))).toEqual({})
+    expect(paramsFromFilters({ whose: 'all' }).toString()).toBe('whose=all')
+    expect(toGameQuery({ whose: 'others' })).toEqual({ whose: 'others' })
+  })
+
   it('drops values the backend would reject rather than sending them', () => {
     const params = new URLSearchParams(
       'source=fide&color=green&result=2-0&speed=hyper&since=december&has_blunders=maybe',

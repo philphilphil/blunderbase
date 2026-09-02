@@ -542,3 +542,50 @@ def test_an_unregistered_source_raises_before_a_job_is_created(session: Session)
     with pytest.raises(import_service.UnknownSourceError):
         import_service.run_import(session, "telepathy")
     assert _count(session, ImportJob) == 0
+
+
+def test_a_game_its_source_did_not_name_is_named_from_the_book(session: Session) -> None:
+    """A PGN without ECO tags — or a masters game — is named the way the explorer names
+    positions: by the deepest position on its line the vendored book knows."""
+    job = ImportJob(source=Source.PGN, status=JobStatus.RUNNING)
+    session.add(job)
+    session.commit()
+
+    outcome = import_service.ingest_game(
+        session,
+        job,
+        ParsedGame(
+            source=Source.PGN,
+            white_name="a",
+            black_name="b",
+            result=Result.UNKNOWN,
+            pgn="",
+            moves_uci=["e2e4", "e7e6", "d2d4", "d7d5"],
+            moves_san=["e4", "e6", "d4", "d5"],
+        ),
+        analyze=False,
+    )
+
+    assert outcome.game is not None
+    assert outcome.game.eco == "C00"
+    assert outcome.game.opening_name == "French Defense"
+
+    # A source that named the game is believed as it was, book or no book.
+    named = import_service.ingest_game(
+        session,
+        job,
+        ParsedGame(
+            source=Source.PGN,
+            white_name="c",
+            black_name="d",
+            result=Result.UNKNOWN,
+            pgn="",
+            moves_uci=["e2e4", "e7e6"],
+            moves_san=["e4", "e6"],
+            eco="X99",
+            opening_name="As the file says",
+        ),
+        analyze=False,
+    )
+    assert named.game is not None
+    assert (named.game.eco, named.game.opening_name) == ("X99", "As the file says")

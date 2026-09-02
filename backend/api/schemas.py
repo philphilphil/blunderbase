@@ -201,6 +201,8 @@ class GameSummary(Payload):
     source_id: str | None = None
     played_at: datetime | None = None
     color: Color | None = None
+    # False for a game added from the reference books: kept for study, counted nowhere.
+    is_owner_game: bool = True
     result: str | None = None
     outcome: str | None = None
     white: str | None = None
@@ -1315,6 +1317,184 @@ class NoteUpdate(Input):
 class TagCount(BaseModel):
     tag: str
     notes: int
+
+
+# --- reference explorer ----------------------------------------------------
+
+
+class ReferencePlayer(Payload):
+    """A side of a reference game. `?` where the PGN did not say who it was."""
+
+    name: str = "?"
+    rating: int | None = None
+
+
+class ReferenceOpening(Payload):
+    """What Lichess calls the position, when it calls it anything."""
+
+    eco: str | None = None
+    name: str | None = None
+
+
+class ReferenceTotals(Payload):
+    """The position's own record. Counts, not percentages — the page derives those."""
+
+    games: int = 0
+    white: int = 0
+    draws: int = 0
+    black: int = 0
+
+
+class ReferenceMove(Payload):
+    """One continuation in the reference database, with how the games after it went."""
+
+    uci: str = ""
+    san: str = ""
+    games: int = 0
+    white: int = 0
+    draws: int = 0
+    black: int = 0
+    # Masters answers with the players' average rating and the rated pools with the
+    # opponents'; both mean "how strong were the people who played this", and neither is
+    # always there.
+    average_rating: int | None = None
+    # What the vendored book calls the position this move reaches — the child's own name,
+    # never inherited from the parent, exactly as `ExplorerResponse.moves` reports it.
+    # Null on most rows past an opening's first few moves, because the book stops there.
+    eco: str | None = None
+    name: str | None = None
+
+
+class ReferenceTopGame(Payload):
+    """A game Lichess offers to show from this position. `winner` is null on a draw."""
+
+    id: str
+    white: ReferencePlayer = Field(default_factory=ReferencePlayer)
+    black: ReferencePlayer = Field(default_factory=ReferencePlayer)
+    winner: str | None = None
+    year: int | None = None
+    month: str | None = None
+    speed: str | None = None
+
+
+class ReferenceExplorer(Payload):
+    """One position in a reference database: `services.reference.explore`.
+
+    Deliberately the *other* explorer: nothing here is the owner's, nothing is stored, and
+    the counts never mix with the ones `/explorer` answers with.
+    """
+
+    source: str
+    fen: str
+    opening: ReferenceOpening | None = None
+    totals: ReferenceTotals = Field(default_factory=ReferenceTotals)
+    moves: list[ReferenceMove] = Field(default_factory=list)
+    top_games: list[ReferenceTopGame] = Field(default_factory=list)
+
+
+class ReferenceGameMove(Payload):
+    """One half-move of a reference game. `ply` counts from zero, as it does everywhere."""
+
+    ply: int
+    uci: str
+    san: str
+
+
+class ReferenceGame(Payload):
+    """A reference game as it is read: headers, moves, and where to see it in the original."""
+
+    source: str
+    id: str
+    white: ReferencePlayer = Field(default_factory=ReferencePlayer)
+    black: ReferencePlayer = Field(default_factory=ReferencePlayer)
+    result: str = "*"
+    event: str | None = None
+    site: str | None = None
+    date: str | None = None
+    moves: list[ReferenceGameMove] = Field(default_factory=list)
+    lichess_url: str | None = None
+
+
+class ReferenceImported(Payload):
+    """A reference game now in the library: `services.reference.import_game`.
+
+    `created` is false when the library already had it — asking twice opens the same game.
+    """
+
+    game: GameSummary
+    created: bool
+
+
+class ReferenceToken(Payload):
+    """Whether a Lichess token is stored. The token itself is never answered with."""
+
+    configured: bool = False
+
+
+class ReferenceTokenUpdate(Input):
+    """A token to store. Null or empty takes the stored one away."""
+
+    token: str | None = None
+
+
+# --- repertoire ------------------------------------------------------------
+
+
+class RepertoireMoveResponse(Payload):
+    """One move in a repertoire, on its own: `services.repertoire.move_payload`.
+
+    `rank` is the order among the moves answering the same position and 0 is the main
+    line, `epd` is the normalised position after the move (which is what makes a
+    transposition findable), and `comment` is `""` rather than null when nothing is
+    written on it. No `children`, deliberately: this is the shape used where a single node
+    is the answer — the tip a line ended on, a move that was just edited — and reporting
+    an empty list there would say something false about a node that has continuations.
+    """
+
+    id: int
+    uci: str
+    san: str
+    comment: str = ""
+    rank: int = 0
+    epd: str
+
+
+class RepertoireNode(RepertoireMoveResponse):
+    """The same move inside the tree, carrying the moves that answer it in `rank` order."""
+
+    children: list[RepertoireNode] = Field(default_factory=list)
+
+
+# The one self-referencing model here: the annotation names the class inside its own body,
+# so the schema is finished by hand once the name exists.
+RepertoireNode.model_rebuild()
+
+
+class RepertoireTree(Payload):
+    """One colour's whole repertoire. `moves` is the first moves from the start position."""
+
+    color: Color
+    moves: list[RepertoireNode] = Field(default_factory=list)
+
+
+class RepertoireLineCreate(Input):
+    """A line to add, in UCI, played from the standard start position."""
+
+    ucis: list[str] = Field(min_length=1)
+
+
+class RepertoireLineAdded(Payload):
+    """What adding a line did: how many moves were new, and where the line ends."""
+
+    created: int = 0
+    tip: RepertoireMoveResponse
+
+
+class RepertoireMoveUpdate(Input):
+    """An edit to one move. `comment: null` clears it; leaving it out leaves it alone."""
+
+    comment: str | None = None
+    promote: bool = False
 
 
 # --- runner gateway -------------------------------------------------------

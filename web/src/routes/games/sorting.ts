@@ -12,6 +12,10 @@ export type SortKey =
   | 'opponent'
   | 'opponent_rating'
   | 'color'
+  | 'white'
+  | 'white_rating'
+  | 'black'
+  | 'black_rating'
   | 'opening'
   | 'result'
   | 'time_control'
@@ -41,6 +45,10 @@ const NATURAL_DIRECTION: Record<SortKey, 'asc' | 'desc'> = {
   opponent: 'asc',
   opponent_rating: 'desc',
   color: 'asc',
+  white: 'asc',
+  white_rating: 'desc',
+  black: 'asc',
+  black_rating: 'desc',
   opening: 'asc',
   result: 'asc',
   time_control: 'asc',

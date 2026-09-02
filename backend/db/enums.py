@@ -15,6 +15,9 @@ class Source(StrEnum):
     FICS = "fics"
     PGN = "pgn"
     MANUAL = "manual"
+    # Lichess's masters archive, reached through the reference explorer. Its games are
+    # somebody else's by definition, so they arrive with `Game.is_owner_game` off.
+    MASTERS = "masters"
 
 
 class Platform(StrEnum):

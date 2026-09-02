@@ -19,6 +19,7 @@ import type {
   BackupPrepared,
   BatchAnalysisRequest,
   BatchAnalysisResponse,
+  Color,
   ComparisonResponse,
   DimensionList,
   EngineCreate,
@@ -67,6 +68,16 @@ import type {
   QueueCleared,
   QueuePaused,
   QueueStatus,
+  ReferenceExplorerResponse,
+  ReferenceGame,
+  ReferenceImported,
+  ReferenceSource,
+  ReferenceTokenStatus,
+  RepertoireLineCreate,
+  RepertoireLineCreated,
+  RepertoireMoveUpdate,
+  RepertoireNode,
+  RepertoireTree,
   RetryFailedReceipt,
   RunnerCreate,
   RunnerCreated,
@@ -364,6 +375,80 @@ export const findPositions = (
  */
 export const getPositionBook = (fen: string, query: { color?: 'white' | 'black' } = {}) =>
   http.get<GameBookEntry | null>('/explorer/book', { query: { fen, ...query } })
+
+// --- reference explorer ---------------------------------------------------
+
+export interface ReferenceExplorerQuery {
+  source: ReferenceSource
+  /** The initial array when left out. */
+  fen?: string
+  /** `blitz,rapid,classical` — lichess source only, ignored by masters. */
+  speeds?: string
+  /** `1600,1800,2000` — Lichess rating buckets, lichess source only. */
+  ratings?: string
+  /** How many continuations; the backend caps this at 30. */
+  moves?: number
+  /**
+   * How many model games; the backend caps this at 15. For the lichess source it is asked
+   * of both Lichess lists, top and recent, which are folded into one — and Lichess caps
+   * each at four, so that source answers with eight at most.
+   */
+  top_games?: number
+}
+
+/**
+ * A position in one of the outside books. The backend proxies Lichess and normalises the
+ * payload; nothing it answers with is written to the database, which is why this lives
+ * under `/reference` rather than beside `/explorer`.
+ */
+export const referenceExplorer = (query: ReferenceExplorerQuery) =>
+  http.get<ReferenceExplorerResponse>('/reference/explorer', {
+    query: query as unknown as Record<string, QueryValue>,
+  })
+
+/** One model game, fetched as PGN upstream and handed over as moves. */
+export const getReferenceGame = (source: ReferenceSource, gameId: string) =>
+  http.get<ReferenceGame>(`/reference/games/${source}/${encodeURIComponent(gameId)}`)
+
+/**
+ * Add a reference game to the library as one the owner did not play. The one call on this
+ * side of the app that writes: the game comes back as a library row, analysed and
+ * annotated like any other from here on, and counted in nothing.
+ */
+export const importReferenceGame = (source: ReferenceSource, gameId: string) =>
+  http.post<ReferenceImported>(
+    `/reference/games/${source}/${encodeURIComponent(gameId)}/import`,
+  )
+
+/** Whether a Lichess token is stored — both explorer databases now require one. */
+export const getReferenceToken = () => http.get<ReferenceTokenStatus>('/reference/token')
+
+/** Store or clear the Lichess token. The answer says only whether one is configured. */
+export const setReferenceToken = (token: string | null) =>
+  http.put<ReferenceTokenStatus>('/reference/token', { body: { token } })
+
+// --- repertoire -----------------------------------------------------------
+
+/** One whole colour's tree. There are exactly two, and neither has to be created first. */
+export const getRepertoire = (color: Color) => http.get<RepertoireTree>(`/repertoire/${color}`)
+
+/**
+ * Add a line, named by its full UCI path from the initial array.
+ *
+ * Idempotent by shape: the backend walks the path and creates only the nodes that are
+ * missing, so replaying a line already in the repertoire writes nothing and answers with
+ * the node it ends on. That is what lets the page treat walking and adding as one gesture
+ * — a move is played on the board, and whether it existed is the server's problem.
+ */
+export const addRepertoireLine = (color: Color, body: RepertoireLineCreate) =>
+  http.post<RepertoireLineCreated>(`/repertoire/${color}/line`, { body })
+
+/** Comment a move, or promote it to main. Answers with the node alone, never its subtree. */
+export const updateRepertoireMove = (id: number, body: RepertoireMoveUpdate) =>
+  http.patch<RepertoireNode>(`/repertoire/moves/${id}`, { body })
+
+/** Delete the move and everything played after it. */
+export const deleteRepertoireMove = (id: number) => http.delete<void>(`/repertoire/moves/${id}`)
 
 // --- stats ----------------------------------------------------------------
 

@@ -161,6 +161,41 @@ Everything else out of range is clamped rather than refused, so what a save answ
 what is in force. Budgets and thresholds apply to runs from then on; a game already
 analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 
+## The reference explorer and its Lichess token
+
+The Explorer page reads three databases: **your own games**, and two of Lichess's — the
+**masters** archive (over-the-board games between titled players) and the **rated lichess**
+pools, narrowable by speed and rating band. Looking at the two reference sources stores
+nothing: no game is imported, and nothing they say is ever added to the numbers your own
+games give. Model games opened from them are a preview to play through — until you press
+**Add to library**. That stores the game as one you did not play: it gets the quick
+analysis pass like any import, opens in the full game view, and takes notes, but it counts
+in no statistic and is not in your opening tree. The games list shows your own games by
+default; the **Mine / Others / All** switch at the front of its filter bar shows the added
+games on their own or beside yours. (A note you write while
+walking a reference line is still your own note and is kept, because it is about the
+position rather than about their game; it counts towards nothing.)
+
+Both reference sources need a **Lichess personal API token**, because `explorer.lichess.ovh`
+stopped answering anonymous requests. Mint one at
+<https://lichess.org/account/oauth/token> — **no scopes are
+needed**, so create it with everything unticked and give it a name you will recognise. Paste
+it into Blunderbase where the reference sources ask for it (`GET`/`PUT /api/reference/token`);
+it is kept as the `lichess_token` setting row, it is never answered back to the browser, and
+an empty box clears it. It is not the same thing as the token an import may use, and saving
+the analysis form never touches it.
+
+Without a token the two reference sources refuse rather than come back empty
+(`lichess_token_missing`), and a token Lichess no longer accepts says so as well
+(`lichess_token_rejected`) — paste a fresh one. A masters model game is served by the same
+host and needs the token too; a lichess model game comes from the public game export and
+does not. Everything else on the Explorer page, and every other part of Blunderbase, works
+exactly as before with no token at all.
+
+Answers are cached in the server process — a day for masters, six hours for the rated pools,
+a week for a fetched game — so stepping a board through an opening is one request per new
+position and a restart forgets all of it.
+
 ## Deleting games
 
 Games go from the library screen: the ✕ at the end of a row, or a selection and **Delete**

@@ -12,7 +12,6 @@ import type * as React from 'react'
 import { memo } from 'react'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
-import { SideDot } from '@/components/badges/SideDot'
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
 import type { GameCard } from '@/lib/api/types'
@@ -62,6 +61,16 @@ export const GameRow = memo(function GameRow({
   const tier = tierOf(game)
   const drop = worstDrop(game)
   const flags = flagCounts(game)
+  // The owner's side, or null: a game added from the reference books has none, and a
+  // game of theirs whose side is not yet known has none either. Their name is set bold
+  // under its column, which is how the row says which side was theirs — the same fact
+  // the old `Col` disc carried, now told by the name it belongs to.
+  const ownerSide = game.is_owner_game === false ? null : (game.color ?? null)
+  const nameClass = (side: 'white' | 'black') =>
+    cn(
+      'truncate font-sans text-[0.78125rem]',
+      ownerSide === side ? 'font-semibold text-ink' : selected ? 'text-bright' : 'text-body',
+    )
 
   return (
     <div
@@ -109,21 +118,17 @@ export const GameRow = memo(function GameRow({
 
       <span {...cell('date', 'text-body max-md:text-dim')}>{formatGameDate(game.played_at)}</span>
 
-      <span
-        {...cell(
-          'opponent',
-          cn('truncate font-sans text-[0.78125rem]', selected ? 'text-bright' : 'text-body'),
-        )}
-        title={game.opponent ?? undefined}
-      >
-        {game.opponent ?? '—'}
+      <span {...cell('white', nameClass('white'))} title={game.white ?? undefined}>
+        {game.white ?? '—'}
       </span>
 
-      <span {...cell('rating', 'text-right text-soft')}>{game.opponent_rating ?? '—'}</span>
+      <span {...cell('white_rating', 'text-right text-soft')}>{game.white_rating ?? '—'}</span>
 
-      <span {...cell('color', 'flex justify-center')}>
-        <SideDot side={game.color} />
+      <span {...cell('black', nameClass('black'))} title={game.black ?? undefined}>
+        {game.black ?? '—'}
       </span>
+
+      <span {...cell('black_rating', 'text-right text-soft')}>{game.black_rating ?? '—'}</span>
 
       <span
         {...cell('opening', 'truncate font-sans text-[0.78125rem] text-body')}

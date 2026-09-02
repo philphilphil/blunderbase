@@ -260,8 +260,38 @@ the position's join rows; the "where do I leave book" walk follows the most-play
 continuation one position at a time, and it is *positional* — every game that has ever
 stood in a position counts at that node, whether or not it was following the line at the
 previous one, which is what a book means everywhere else and what makes a transposition
-count. Book means the owner's own book — there is no reference database by design — so the
-walk stops at the first move they have played in only one game.
+count. Book means the owner's own book — a reference database is never folded into it — so
+the walk stops at the first move they have played in only one game.
+
+The **reference explorer** is the other database, and it is deliberately a different one.
+`services/reference.py` is a proxy over Lichess's opening explorer — the masters archive
+and the rated pools — through `adapters/reference.py`, and a lookup writes nothing: no
+game is imported, no `positions` row is created, no counter moves. That is the whole
+separation issue #3 asked for, and it is why it is its own service and its own router
+rather than a `source=` parameter on `/explorer`: a client that mixes reference numbers into
+the owner's has to do it on purpose. The one door is `import_game`, which stores a model
+game through the ordinary PGN path (`import_service.import_one`) with `Game.is_owner_game`
+off. That flag is what keeps the wall: `GameFilters.mine` defaults to the owner's games, so
+every statistic, the games list and the coach's searches leave such a game out without
+being told, `owner_move_condition` contributes none of its plies, and the explorer's
+per-colour book never sees it because it has no owner colour. It is still a game — analysed
+on arrival, opened at `/games/:id`, annotated — which is the point of letting it in. What
+the service does keep for lookups is a bounded TTL cache in the process
+(a dict behind a lock, masters for a day, the rated pools for six hours, a fetched game for
+a week), because a board stepped through an opening asks a dozen positions in a row and
+Blunderbase is a guest on that API. The explorer endpoints no longer answer anonymous
+requests, so every call to them carries the owner's personal Lichess token, stored as the
+`lichess_token` setting row and read where it is used — the exception is a lichess model
+game, which comes from the public export and is fetched without one. Without a token the
+service raises rather than answering an empty tree, which is a state the page can explain
+and a shrug is not.
+
+The separation is about what the reference sources contribute, not about where the owner is
+standing when they write something down. A note is still theirs, so `PositionNotes` stays on
+screen while a reference line is walked, and saving one resolves its FEN through `notes` in
+the usual way — which creates a bare `positions` row if no game of theirs ever reached it.
+That row is an anchor for a note and nothing else: the explorer's counts come through
+`game_positions`, which such a row has none of, so it moves no number the owner reads.
 
 The explorer has its own written-down fold, for the same reason the games do, and one
 extra: a position is shared by every game that reached it, so the numbers change when
@@ -277,6 +307,24 @@ reconciliation, a wipe) marks the positions it touched dirty inside its own tran
 and `explorer.rebuild_position_books` settles them a committed chunk at a time, in the
 background at boot and by hand as `blunderbase db rebuild-book`. A position the sweep has
 not reached folds live, so an un-swept library is slow rather than wrong.
+
+The **repertoires** are the one thing on this side of the codebase that describe games
+nobody has played, and they join to nothing in the library on purpose: a plan in
+`positions` would make the explorer's counts lie about what the owner has actually done.
+`repertoire_moves` is one self-referential table holding exactly two trees, keyed by the
+colour the *owner* plays; a node's `parent_id` is the move it answers and a NULL parent is
+a first move from the standard start position, so there is no root row — the start position
+is not a choice. Siblings are ordered by `rank` and rank 0 is the main line, which makes
+promoting a move a renumbering of its siblings rather than a flag two moves could both
+carry. Every node also stores the normalised EPD *after* its move, through the explorer's
+own `normalize_fen`, and that is what makes the tree transposition-aware:
+`repertoire.subtrees_at` answers "what does my repertoire say here" for a position reached
+any way at all, without walking a path to it. Adding a line replays it from `chess.Board()`
+end to end before writing anything — the replay is both the validation and where the SAN
+comes from — and reuses the moves already stored, so re-adding a line creates nothing. A
+delete takes the node's whole subtree, collected in Python rather than left to a cascade.
+The tree is read in one SELECT and assembled in memory; a repertoire is hundreds of rows,
+and the caller wants all of it.
 
 ## Testing
 

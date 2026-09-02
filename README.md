@@ -19,7 +19,8 @@
 - Full MCP support to discuss games with an AI-Agent and a shared live board
 - Local engines and stockfish wasm
 - Remote-Engine-Runner to use your company's idle inference-server-CPUs for your hobbies
-- Opening explorer with win-stats over your own games
+- Game explorer with win-stats over your own games and connected lichess database with 8 billion games
+- Add reference games to your library for analysis and notes
 - Fully self-hostable, easiest via docker
 
 <p align="center">
