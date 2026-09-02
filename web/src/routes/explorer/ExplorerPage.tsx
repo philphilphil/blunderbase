@@ -23,9 +23,11 @@
  *   thousands of strangers and the owner's is a handful of their own games; added together
  *   the second disappears, and the number that is actually about them — how *they* have
  *   done in this line — would be diluted by a database they have never played in.
- * - The owner-only panels are hidden rather than blanked on a reference source: the colour
- *   scope, the book run, the line summary and the games in this line are all statements
- *   about the owner's library, and there is no honest reference answer to any of them.
+ * - The owner-only panels are hidden rather than blanked on a reference source: the book
+ *   run, the line summary and the games in this line are all statements about the owner's
+ *   library, and there is no honest reference answer to any of them. The colour scope is
+ *   the one exception — it stays beside the source control at the head of the tree pane
+ *   and goes inert instead of vanishing, so the pane never reflows on a source switch.
  *   `PositionNotes` is the one thing that stays on every source, because a note is about
  *   the position on the board and the board is the same board.
  *
@@ -398,12 +400,20 @@ export function ExplorerPage() {
                     ? 'What masters play from here'
                     : 'What lichess plays from here'}
               </span>
-              <div className="flex-1" />
-              {reference ? null : <ScopeToggle scope={scope} onChange={setScope} />}
+            </div>
+            {/*
+              Leading the pane rather than trailing the title, because the two controls
+              decide what every number below them means — which book is open, and which of
+              the owner's colours count. The scope is a statement about the owner's games,
+              so a reference source disables it rather than hiding it: the answer is
+              "not applicable", not "gone", and the table below never jumps.
+            */}
+            <div className="flex items-center gap-2 max-md:flex-wrap">
               <SourceToggle
                 source={source}
                 onChange={(next) => setLens('source', next === 'mine' ? null : next)}
               />
+              <ScopeToggle scope={scope} onChange={setScope} disabled={reference} />
             </div>
             {!reference && tree.data && totalGames > 0 ? (
               <BookRun
@@ -575,14 +585,13 @@ function BookRun({
 }
 
 /**
- * Which book the right-hand pane is reading — design 2c's source control, at last with
- * three sources to offer.
+ * Which book the page is reading — design 2c's source control, at last with three
+ * sources to offer.
  *
- * It sits to the right of the colour scope rather than replacing it because the two are
- * different questions and only one of them survives a reference source: the scope narrows
- * the owner's own games, so it is hidden the moment the pane stops being about them.
- * `mine` clears the param instead of writing `source=mine`, so the page's own URL stays
- * the short one it has always been.
+ * It leads the tree pane, left-aligned above the table with the colour scope beside it,
+ * a step larger than an ordinary chip — it changes what every number below it means, so
+ * it has to be found before the table is read. `mine` clears the param instead of
+ * writing `source=mine`, so the page's own URL stays the short one it has always been.
  */
 function SourceToggle({
   source,
@@ -592,7 +601,7 @@ function SourceToggle({
   onChange: (next: ExplorerSource) => void
 }) {
   return (
-    <div className="flex overflow-hidden rounded-md border border-edge font-mono text-[0.6875rem]">
+    <div className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.75rem]">
       {SOURCES.map((option, index) => (
         <button
           key={option}
@@ -600,7 +609,7 @@ function SourceToggle({
           aria-pressed={source === option}
           onClick={() => onChange(option)}
           className={cn(
-            'px-2.5 py-1 transition-colors',
+            'px-3 py-1.5 transition-colors',
             index > 0 && 'border-l border-edge',
             source === option ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
           )}
@@ -637,13 +646,19 @@ function Failure({
   )
 }
 
-/** Which colour's games count — the one scope `/explorer` really takes. */
+/**
+ * Which colour's games count — the one scope `/explorer` really takes. Disabled, not
+ * hidden, on a reference source: the question only makes sense of the owner's own games,
+ * and keeping the inert control in place says so without reflowing the pane.
+ */
 function ScopeToggle({
   scope,
   onChange,
+  disabled = false,
 }: {
   scope: Color | undefined
   onChange: (next: Color | undefined) => void
+  disabled?: boolean
 }) {
   const options: { label: string; value: Color | undefined }[] = [
     { label: 'both', value: undefined },
@@ -651,17 +666,24 @@ function ScopeToggle({
     { label: 'as black', value: 'black' },
   ]
   return (
-    <div className="flex overflow-hidden rounded-md border border-edge font-mono text-[0.6875rem]">
+    <div
+      className={cn(
+        'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.75rem]',
+        disabled && 'opacity-40',
+      )}
+    >
       {options.map((option, index) => (
         <button
           key={option.label}
           type="button"
-          aria-pressed={scope === option.value}
+          aria-pressed={!disabled && scope === option.value}
+          disabled={disabled}
           onClick={() => onChange(option.value)}
           className={cn(
-            'px-2.5 py-1 transition-colors',
+            'px-3 py-1.5 transition-colors',
             index > 0 && 'border-l border-edge',
-            scope === option.value ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
+            !disabled && scope === option.value ? 'bg-selected text-ink' : 'text-dim',
+            !disabled && scope !== option.value && 'hover:text-ink',
           )}
         >
           {option.label}

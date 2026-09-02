@@ -406,9 +406,10 @@ describe('ExplorerPage sources', () => {
     expect(screen.getByText('Kasparov, G')).toBeInTheDocument()
 
     // Everything that is a statement about the owner's library is gone, not blanked: the
-    // colour scope, the games in this line, and their own tree's table.
+    // games in this line and their own tree's table. The colour scope is the exception —
+    // it stays in place beside the source control, inert.
     expect(screen.queryByText('Games in this line')).not.toBeInTheDocument()
-    expect(screen.queryByText('as white')).not.toBeInTheDocument()
+    expect(screen.getByText('as white')).toBeDisabled()
     expect(screen.queryByText('1.e4')).not.toBeInTheDocument()
     // The note on the position stays — it is about the board, not about a database.
     expect(screen.getByTestId('position-notes')).toBeInTheDocument()
