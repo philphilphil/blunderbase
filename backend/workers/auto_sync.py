@@ -42,6 +42,10 @@ class AutoSync:
         self.settings = settings
         self.broker = broker
         self._task: asyncio.Task[None] | None = None
+        # The sync a tick is waiting on right now, if any. `stop` waits for this and for
+        # nothing else: the loop task itself never ends on its own, so waiting on it would
+        # be waiting out the whole grace on every shutdown, sync or no sync.
+        self._syncing: asyncio.Future[None] | None = None
 
     @property
     def running(self) -> bool:
@@ -58,8 +62,11 @@ class AutoSync:
         if task is None or task.done():
             return
         # A sync in flight is worth a moment; a loop that is only sleeping is not.
-        with suppress(asyncio.TimeoutError):
-            await asyncio.wait_for(asyncio.shield(task), timeout=SHUTDOWN_GRACE)
+        syncing = self._syncing
+        if syncing is not None and not syncing.done():
+            # The grace running out and the sync failing are both the loop's business.
+            with suppress(Exception):
+                await asyncio.wait_for(asyncio.shield(syncing), timeout=SHUTDOWN_GRACE)
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
@@ -79,7 +86,11 @@ class AutoSync:
         due = await asyncio.to_thread(self._due)
         for item in due:
             logger.info("scheduled sync of %s %r", item.source, item.username)
-            await asyncio.to_thread(self._sync, item)
+            self._syncing = asyncio.ensure_future(asyncio.to_thread(self._sync, item))
+            try:
+                await self._syncing
+            finally:
+                self._syncing = None
         return len(due)
 
     def _due(self) -> list[DueSync]:

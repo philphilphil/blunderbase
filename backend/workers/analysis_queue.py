@@ -213,6 +213,11 @@ class AnalysisWorkers:
 
     async def _worker(self) -> None:
         while not self._stopping.is_set():
+            # Cleared before the claim rather than after: a `notify` or `stop` that lands
+            # while the claim is on its thread has to still be set when `_idle` looks, or
+            # the worker sleeps a whole poll interval on a queue that just grew — and a
+            # shutdown waits out the grace on a worker that was only dozing.
+            self._wake.clear()
             # The claim commits on a thread, so a cancellation arriving while it does
             # would lose the id of a row that is already `running`. It is written here on
             # the way out of the thread instead of returned, so there is always something
@@ -251,7 +256,6 @@ class AnalysisWorkers:
                 self._busy -= 1
 
     async def _idle(self) -> None:
-        self._wake.clear()
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(self._wake.wait(), self.poll_seconds)
 

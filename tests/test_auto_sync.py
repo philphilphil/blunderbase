@@ -7,6 +7,7 @@ tick against a fake adapter; the HTTP half is the two calls the import page make
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -24,7 +25,7 @@ from backend.db.models import Account, ImportJob
 from backend.db.session import get_sessionmaker
 from backend.services import app_settings as app_settings_service
 from backend.services import import_service
-from backend.services.auto_sync import due_syncs
+from backend.services.auto_sync import DueSync, due_syncs
 from backend.services.import_service import ImportResult
 from backend.workers.auto_sync import AutoSync
 from tests.conftest import running_app
@@ -160,6 +161,54 @@ def test_a_tick_does_nothing_while_the_schedule_is_off(
     assert asyncio.run(AutoSync(settings=settings, broker=EventBroker()).tick()) == 0
     with get_sessionmaker(settings)() as session:
         assert import_service.count_jobs(session) == 0
+
+
+async def test_stopping_an_idle_scheduler_does_not_wait_out_the_grace(
+    settings: Settings,
+) -> None:
+    """The loop only ever sleeps between ticks; shutdown must not sit through a sleep.
+
+    Every test that boots the app stops this worker, so a grace paid here is paid a few
+    hundred times a run — which is how it was found.
+    """
+    worker = AutoSync(settings=settings, broker=EventBroker())
+    await worker.start()
+    assert worker.running
+
+    started = asyncio.get_running_loop().time()
+    await worker.stop()
+    assert asyncio.get_running_loop().time() - started < 1.0
+    assert not worker.running
+
+
+async def test_stopping_mid_sync_lets_the_sync_finish(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sync that is mid-archive is worth waiting for, and it is the one thing that is."""
+    settings.auto_sync_poll_seconds = 0.01
+    release = threading.Event()
+    finished: list[str] = []
+
+    def blocked_sync(self: AutoSync, item: DueSync) -> None:
+        release.wait(5)
+        finished.append(item.username)
+
+    monkeypatch.setattr(AutoSync, "_due", lambda self: [DueSync("lichess", "phib")])
+    monkeypatch.setattr(AutoSync, "_sync", blocked_sync)
+
+    worker = AutoSync(settings=settings, broker=EventBroker())
+    await worker.start()
+    while worker._syncing is None:
+        await asyncio.sleep(0.01)
+
+    stopping = asyncio.create_task(worker.stop())
+    await asyncio.sleep(0.05)
+    assert not stopping.done() and finished == []
+
+    release.set()
+    await asyncio.wait_for(stopping, 2)
+    assert finished == ["phib"]
+    assert not worker.running
 
 
 # --- the two calls the page makes ---------------------------------------------
