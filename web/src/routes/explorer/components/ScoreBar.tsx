@@ -5,6 +5,13 @@ import { cn } from '@/lib/utils'
 import type { Split } from '../stats'
 
 /**
+ * The split column's width in both explorer tables, owned by the bar the column exists
+ * for. One number rather than one per table because the two tables sit in the same spot
+ * on the same page, and bars of two widths would make the same 60% read as two amounts.
+ */
+export const SPLIT_WIDTH = 170
+
+/**
  * The skeleton both bars share: bordered, divided, and labelled inside its own segments.
  *
  * The border and the dividers are what keep a bar legible on every panel — a fill near

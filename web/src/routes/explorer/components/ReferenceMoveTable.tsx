@@ -27,13 +27,13 @@ import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../line'
 import { formatCount, sharePercent } from '../reference'
-import { SidesBar } from './ScoreBar'
+import { SPLIT_WIDTH, SidesBar } from './ScoreBar'
 
 const COLUMNS = [
   { id: 'move', label: 'Move', width: 78 },
   { id: 'games', label: 'Games', width: 62, align: 'right' as const },
   { id: 'share', label: 'Share', width: 44, align: 'right' as const },
-  { id: 'split', label: 'White / draw / black', width: 'flex' as const },
+  { id: 'split', label: 'White / draw / black', width: SPLIT_WIDTH },
   { id: 'rating', label: 'Avg elo', width: 56, align: 'right' as const },
   { id: 'opening', label: 'Opening', width: 'flex' as const },
 ]
@@ -49,12 +49,12 @@ const VISIBLE_ROWS = 10
 const ROWS_MAX_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
 
 /**
- * 240px of fixed columns plus the gaps, the padding and a readable minimum for the two
- * flex columns — the sides bar and the opening name split what is left, so the floor has
- * to hold both. It still scrolls sideways rather than crushing the bar to a smear on a
- * phone.
+ * 410px of fixed columns — the bar's among them, at the shared `SPLIT_WIDTH` — plus the
+ * gaps, the padding and a readable minimum for the opening name: 410 + 5 gaps of 12px +
+ * 24px of padding + 8rem of text ≈ 39rem. It still scrolls sideways rather than crushing
+ * the name to nothing on a phone.
  */
-const MIN_TABLE = 'max-md:min-w-[38rem]'
+const MIN_TABLE = 'max-md:min-w-[39rem]'
 
 export function ReferenceMoveTable({
   data,
@@ -159,7 +159,7 @@ export function ReferenceMoveTable({
                 <span style={style(44)} className="text-right text-dim">
                   {share === null ? '—' : `${share}%`}
                 </span>
-                <span style={style('flex')}>
+                <span style={style(SPLIT_WIDTH)}>
                   <SidesBar
                     white={move.white}
                     draws={move.draws}

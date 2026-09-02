@@ -43,7 +43,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useExplorer, usePositionOccurrences, useReferenceExplorer } from '@/lib/api/queries'
-import type { Color, ExplorerMove, ExplorerResponse } from '@/lib/api/types'
+import type { Color, ExplorerMove } from '@/lib/api/types'
 import { isTyping } from '@/routes/game/useBoardKeys'
 import { cn } from '@/lib/utils'
 
@@ -60,7 +60,6 @@ import {
   buildLine,
   formatLineParam,
   parseLineParam,
-  plyLabel,
   truncateTo,
   withMove,
   type LinePosition,
@@ -76,7 +75,7 @@ import {
   type ExplorerSource,
   type Speed,
 } from './reference'
-import { bookDepthLabel, commonOpening } from './stats'
+import { commonOpening } from './stats'
 
 /** How many continuations and how many games to ask for. */
 const MOVE_LIMIT = 24
@@ -121,8 +120,8 @@ export function ExplorerPage() {
   // The longest line visited, so "forward" can walk back into what was just undone.
   const trail = useRef<string[]>(ucis)
 
-  // A hovered continuation — one ply from `MoveTreeTable`, the whole book run from
-  // `BookRun` — played on the board without touching the URL or the selected line, so the
+  // A hovered continuation from a table row, played on the board without touching the
+  // URL or the selected line, so the
   // back button still walks the real tree, not a preview nobody chose. Tagged with the line
   // it was hovered from and checked against the current one at render time, the same idiom
   // `useLinePreview` uses: kept rather than cleared by an effect, so a click that plays the
@@ -415,14 +414,6 @@ export function ExplorerPage() {
               />
               <ScopeToggle scope={scope} onChange={setScope} disabled={reference} />
             </div>
-            {!reference && tree.data && totalGames > 0 ? (
-              <BookRun
-                tree={tree.data}
-                rootPly={line.ply}
-                onFollow={(bookLine) => setLine([...ucis, ...bookLine])}
-                onPreview={onPreview}
-              />
-            ) : null}
             {source === 'lichess' ? (
               <ReferenceFilters
                 speeds={speeds}
@@ -486,101 +477,6 @@ export function ExplorerPage() {
         </div>
       </div>
     </div>
-  )
-}
-
-interface BookMove {
-  ply?: number
-  uci?: string
-  san?: string
-  games?: number
-}
-
-/**
- * Where the owner's preparation ends, as one line of ordinary text under the pane's header.
- *
- * It replaced an amber-edged card, and the card is the point: the two things it carried
- * that exist nowhere else are how far the book runs from the position on the board and the
- * move that leaves it, and a panel around two facts was the wrong amount of furniture for
- * them. A `book_depth` of zero renders nothing at all rather than a line announcing that
- * the owner is out of book: there is no book to describe from here, and the move table's
- * own numbers — one game, nothing evaluated — already say what little there is to say.
- *
- * `book_depth` counts plies and a book is talked about in moves, so it goes through
- * `bookDepthLabel`, which refuses to print a half-move.
- *
- * Both mentions of a real position are hoverable exactly the way a `MoveTreeTable` row is —
- * the departing move previews the book line plus that move, `Follow it` previews the whole
- * book line — because looking without going is how the rest of this page works, and they
- * mirror on focus so a keyboard reaches the same previews.
- */
-function BookRun({
-  tree,
-  rootPly,
-  onFollow,
-  onPreview,
-}: {
-  tree: ExplorerResponse
-  /** The ply the first continuation from this position occupies. */
-  rootPly: number
-  /** Replay the whole book line from here. */
-  onFollow: (ucis: string[]) => void
-  onPreview?: (continuation: string[] | null) => void
-}) {
-  const depth = tree.book_depth ?? 0
-  if (depth === 0) return null
-
-  const line = (tree.main_line ?? []) as BookMove[]
-  const leaves = (tree.leaves_book_with ?? null) as BookMove | null
-  const followable = line.slice(0, depth).map((step) => step.uci ?? '')
-  const complete = followable.every(Boolean)
-  const leavesUci = complete && leaves?.uci ? leaves.uci : null
-
-  const label = leaves?.san
-    ? `${plyLabel(rootPly + (leaves.ply ?? depth))}${leaves.san}`
-    : null
-
-  return (
-    <p className="text-[0.78125rem] leading-relaxed text-body-2">
-      Your book runs {bookDepthLabel(depth)} deep from here
-      {label ? (
-        <>
-          , leaving it at{' '}
-          {leavesUci ? (
-            <button
-              type="button"
-              onPointerEnter={() => onPreview?.([...followable, leavesUci])}
-              onPointerLeave={() => onPreview?.(null)}
-              onFocus={() => onPreview?.([...followable, leavesUci])}
-              onBlur={() => onPreview?.(null)}
-              className="font-mono text-ink underline decoration-dotted underline-offset-2 hover:text-bright"
-            >
-              {label}
-            </button>
-          ) : (
-            <span className="font-mono text-ink">{label}</span>
-          )}
-        </>
-      ) : null}
-      {complete ? (
-        <>
-          {' — '}
-          <button
-            type="button"
-            onClick={() => onFollow(followable)}
-            onPointerEnter={() => onPreview?.(followable)}
-            onPointerLeave={() => onPreview?.(null)}
-            onFocus={() => onPreview?.(followable)}
-            onBlur={() => onPreview?.(null)}
-            className="text-accent-teal hover:text-accent-link"
-          >
-            Follow it
-          </button>
-        </>
-      ) : (
-        '.'
-      )}
-    </p>
   )
 }
 

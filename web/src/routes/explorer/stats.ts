@@ -126,22 +126,6 @@ export function worstContinuation(
   )
 }
 
-/**
- * `book_depth` in moves, which is what a book is talked about in.
- *
- * The service counts plies (`services.explorer.book_walk`) and an odd count is half a move
- * deeper than the whole number it floors to. Half a move is not a thing to print and
- * rounding it up would overstate the very number this whole walk exists to keep honest, so
- * an odd depth is worded as "over N" and a single ply says so in words.
- */
-export function bookDepthLabel(plies: number): string {
-  const moves = Math.floor(plies / 2)
-  const noun = moves === 1 ? 'move' : 'moves'
-  if (plies % 2 === 0) return `${moves} ${noun}`
-  if (moves === 0) return 'a single move'
-  return `over ${moves} ${noun}`
-}
-
 /** Why the book walk stopped, in words rather than the service's own vocabulary. */
 export function bookReason(reason: string | null | undefined): string {
   switch (reason) {

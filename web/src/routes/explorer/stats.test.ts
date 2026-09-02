@@ -4,7 +4,6 @@ import type { ExplorerMove, GameSummary } from '@/lib/api/types'
 
 import {
   averageDrop,
-  bookDepthLabel,
   bookReason,
   commonOpening,
   dropTone,
@@ -114,20 +113,6 @@ describe('worstContinuation', () => {
         move({ uci: 'c7c5', avg_win_loss: 0.3, games: 4 }),
       ]),
     ).toBeNull()
-  })
-})
-
-describe('bookDepthLabel', () => {
-  it('turns a ply count into moves', () => {
-    expect(bookDepthLabel(0)).toBe('0 moves')
-    expect(bookDepthLabel(2)).toBe('1 move')
-    expect(bookDepthLabel(18)).toBe('9 moves')
-  })
-
-  it('never prints half a move, and never rounds one up', () => {
-    expect(bookDepthLabel(1)).toBe('a single move')
-    expect(bookDepthLabel(3)).toBe('over 1 move')
-    expect(bookDepthLabel(19)).toBe('over 9 moves')
   })
 })
 

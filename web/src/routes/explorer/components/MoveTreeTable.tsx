@@ -1,6 +1,8 @@
 /**
- * Design 2c's "your move tree from here": one row per continuation, with the frequency, the
- * win/draw/loss split, the score and the average win percentage the mover gave away.
+ * Design 2c's "your move tree from here": one row per continuation, with the frequency
+ * (a count and its share of the games through this position, the same pair the reference
+ * table shows), the win/draw/loss split, the score and the average win percentage the
+ * mover gave away.
  *
  * The design's `Acc` column is per-move accuracy, which no endpoint computes; it is replaced
  * by `Blunders` — how many of the games through this move had the move classified as one,
@@ -49,13 +51,15 @@ import type { ExplorerMove, ExplorerResponse } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../line'
+import { sharePercent } from '../reference'
 import { dropTone, formatAvgDrop, scorePercent, scoreTone, splitOf } from '../stats'
-import { ScoreBar } from './ScoreBar'
+import { SPLIT_WIDTH, ScoreBar } from './ScoreBar'
 
 const COLUMNS = [
   { id: 'move', label: 'Move', width: 78 },
   { id: 'games', label: 'Games', width: 46, align: 'right' as const },
-  { id: 'split', label: 'Score', width: 150 },
+  { id: 'share', label: 'Share', width: 44, align: 'right' as const },
+  { id: 'split', label: 'Score', width: SPLIT_WIDTH },
   { id: 'score', label: 'Score%', width: 52, align: 'right' as const },
   { id: 'drop', label: 'Avg drop', width: 66, align: 'right' as const },
   { id: 'blunders', label: 'Blund', width: 44, align: 'right' as const },
@@ -78,17 +82,17 @@ const VISIBLE_ROWS = 10
 const ROWS_MAX_HEIGHT = `${VISIBLE_ROWS * ROW_HEIGHT_REM + (VISIBLE_ROWS - 1) * ROW_GAP_REM}rem`
 
 /**
- * Six of the eight columns are fixed pixel widths — 436px of them — and the last two are
+ * Seven of the nine columns are fixed pixel widths — 500px of them — and the last two are
  * flexible, so below `md` the table scrolls sideways inside itself rather than shrinking.
  * Dropping columns instead would take away the numbers the screen exists to compare.
  *
  * The minimum is what the fixed columns need plus a readable share for the two flexible
  * ones, since flex alone would let `Opening` and `Note` crush each other to nothing on a
- * phone: 436px fixed + 7 gaps of 12px + 24px of padding + 2 × 8rem of text = 800px = 50rem.
+ * phone: 500px fixed + 8 gaps of 12px + 24px of padding + 2 × 8rem of text = 876px ≈ 55rem.
  * It is on the header and on the rows so the two stay in step, and the horizontal scroll is
  * on the element wrapping both, so the header travels with the rows.
  */
-const MIN_TABLE = 'max-md:min-w-[50rem]'
+const MIN_TABLE = 'max-md:min-w-[55rem]'
 
 export function MoveTreeTable({
   tree,
@@ -112,6 +116,7 @@ export function MoveTreeTable({
   onPreview?: (continuation: string[] | null) => void
 }) {
   const moves = tree?.moves ?? []
+  const total = tree?.totals?.games ?? 0
   const mainLine = tree?.main_line?.[0]?.uci
 
   return (
@@ -173,6 +178,7 @@ export function MoveTreeTable({
         >
           {moves.map((move) => {
             const split = splitOf(move)
+            const share = sharePercent(move.games, total)
             const percent = scorePercent(move.score)
             const main = move.uci === mainLine
             const note = move.note?.text ?? null
@@ -203,7 +209,10 @@ export function MoveTreeTable({
                 <span style={style(46)} className="text-right text-body">
                   {move.games}
                 </span>
-                <span style={style(150)}>
+                <span style={style(44)} className="text-right text-dim">
+                  {share === null ? '—' : `${share}%`}
+                </span>
+                <span style={style(SPLIT_WIDTH)}>
                   <ScoreBar split={split} className="w-full" />
                 </span>
                 <span style={style(52)} className={cn('text-right', scoreTone(move.score))}>
