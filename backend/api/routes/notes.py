@@ -55,7 +55,7 @@ def search_notes(
         has_position=has_position,
         limit=limit,
     )
-    return [notes_service.note_payload(note) for note in found]
+    return notes_service.note_payloads(session, found)
 
 
 @router.post(
@@ -74,7 +74,7 @@ def save_note(session: SessionDep, body: NoteCreate) -> Any:
         source=body.source,
         from_live=body.from_live,
     )
-    return notes_service.note_payload(note)
+    return notes_service.note_payload(session, note)
 
 
 @router.get("/tags", response_model=list[TagCount], summary="Every tag in use")
@@ -139,13 +139,13 @@ def get_note(session: SessionDep, note_id: int) -> Any:
     note = notes_service.get_note(session, note_id)
     if note is None:
         raise not_found("unknown_note", f"no note with id {note_id}")
-    return notes_service.note_payload(note)
+    return notes_service.note_payload(session, note)
 
 
 @router.patch("/{note_id}", response_model=NoteResponse, summary="Rewrite a note")
 def update_note(session: SessionDep, note_id: int, body: NoteUpdate) -> Any:
     note = notes_service.update_note(session, note_id, text=body.text, tags=body.tags)
-    return notes_service.note_payload(note)
+    return notes_service.note_payload(session, note)
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Forget a note")

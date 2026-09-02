@@ -18,7 +18,7 @@ from sqlalchemy import (
     or_,
     select,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.db.enums import (
     Classification,
@@ -788,7 +788,18 @@ def game_notes(session: Session, game_id: int) -> list[dict[str, Any]]:
 
     A note that names a ply or a variation carries them here too: the move list draws a
     marker where a note hangs, and it has no second call to find out where that is.
+
+    A `position` note is somebody's thinking about a board this game happened to arrive at,
+    written somewhere else — in another game, or in the explorer on a position nobody had
+    played yet. Those rows carry where they came from (`game_id`, a `game` brief and the
+    `move` it was written on) because the panel has to say so: unattributed advice appearing
+    under a game the reader is working through reads as advice about *this* game, and for a
+    note made on somebody else's moves that is simply false.
     """
+    # Imported here rather than at the top: `explorer` imports this module, and `notes`
+    # imports `explorer`, so a module-level import would close the ring.
+    from backend.services import notes as notes_service
+
     rows: list[dict[str, Any]] = []
     for note in session.scalars(select(Note).where(Note.game_id == game_id)):
         scope = "line" if note.line_id is not None else "game"
@@ -802,13 +813,21 @@ def game_notes(session: Session, game_id: int) -> list[dict[str, Any]]:
             Note.position_id.is_not(None),
             or_(Note.game_id.is_(None), Note.game_id != game_id),
         )
+        # The game each of these was written on is read for every row, so it is joined in
+        # rather than lazy-loaded one note at a time.
+        .options(joinedload(Note.game), joinedload(Note.line))
         .group_by(Note.id)
     )
     for note, reached in session.execute(attached):
         # `reached` and not `note.ply`: the query above excludes this game's own notes, so
         # the note's ply counts half-moves into *another* game and says nothing about where
         # this one arrived. Same-game notes carry their own ply, from the loop above.
-        rows.append(_note_row(note, scope="position", ply=reached))
+        row = _note_row(note, scope="position", ply=reached)
+        row["game_id"] = note.game_id
+        if note.game is not None:
+            row["game"] = notes_service.game_brief(note.game)
+            row["move"] = notes_service.note_move(note)
+        rows.append(_compact(row))
 
     rows.sort(key=lambda row: row["created_at"], reverse=True)
     return rows

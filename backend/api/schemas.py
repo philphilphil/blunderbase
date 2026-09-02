@@ -1291,6 +1291,13 @@ class NoteResponse(Payload):
     fen: str | None = None
     line: LineResponse | None = None
     game: dict[str, Any] | None = None
+    #: The move it was written on, labelled — `services.notes.note_move`. Null where there
+    #: is no move to name: the starting position, or a note about a game as a whole.
+    move: dict[str, Any] | None = None
+    #: How many of the owner's games pass through the note's position, and how many model
+    #: games do. Both 0 for a note on a position no stored game ever reached.
+    position_games: int = 0
+    position_reference_games: int = 0
     created_at: datetime
     updated_at: datetime
 

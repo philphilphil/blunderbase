@@ -33,7 +33,7 @@ def save_line(session: SessionDep, body: LineCreate) -> Any:
     stored when it answers.
     """
     line = notes_service.save_line(session, body.game_id, body.base_ply, body.moves)
-    return notes_service.line_payload(line, with_notes=True)
+    return notes_service.line_payload(session, line, with_notes=True)
 
 
 @router.get(
@@ -43,7 +43,7 @@ def save_line(session: SessionDep, body: LineCreate) -> Any:
 )
 def list_lines(session: SessionDep, game_id: int) -> list[Any]:
     return [
-        notes_service.line_payload(line, with_notes=True)
+        notes_service.line_payload(session, line, with_notes=True)
         for line in notes_service.get_lines(session, game_id)
     ]
 
