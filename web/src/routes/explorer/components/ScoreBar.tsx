@@ -1,31 +1,82 @@
-/** The win / draw / loss bar design 2c uses at two sizes: 8px in the summary, 7px in a row.
- *  Heights are `rem` so the bar grows with the app's scale. */
+/** The win / draw / loss bar and its reference twin, one skeleton at one size.
+ *  Heights are `rem` so the bars grow with the app's scale. */
 import { cn } from '@/lib/utils'
 
 import type { Split } from '../stats'
 
-export function ScoreBar({
-  split,
+/**
+ * The skeleton both bars share: bordered, divided, and labelled inside its own segments.
+ *
+ * The border and the dividers are what keep a bar legible on every panel — a fill near
+ * the panel's own luminance (white or good on light, black or blunder's ink on dark)
+ * otherwise dissolves into the row it sits in. The percentages are printed inside their
+ * segments, the way Lichess draws this bar, so the split can be *read* and not only
+ * compared; a segment too narrow to hold its number (under ~12%) stays a silent sliver
+ * rather than clipping digits, and the title still carries the exact counts.
+ */
+function LabeledBar({
+  label,
+  segments,
   className,
-  height = '0.4375rem',
+  height,
 }: {
-  split: Split
+  label: string
+  segments: { share: number; className: string }[]
   className?: string
-  height?: string
+  height: string
 }) {
-  const label = `${split.wins} wins, ${split.draws} draws, ${split.losses} losses`
   return (
     <span
       role="img"
       aria-label={label}
       title={label}
       style={{ height }}
-      className={cn('flex overflow-hidden rounded-[0.25rem] bg-raised', className)}
+      className={cn(
+        'flex overflow-hidden rounded-[0.25rem] border border-edge-strong bg-raised font-mono text-[0.625rem] tabular divide-x divide-edge-strong',
+        className,
+      )}
     >
-      <span style={{ width: `${split.winPercent}%` }} className="bg-good" />
-      <span style={{ width: `${split.drawPercent}%` }} className="bg-faint" />
-      <span style={{ width: `${split.lossPercent}%` }} className="bg-blunder" />
+      {segments.map((segment, index) => (
+        <span
+          key={index}
+          style={{ width: `${segment.share}%` }}
+          className={cn(
+            'flex items-center justify-center overflow-hidden',
+            segment.className,
+          )}
+        >
+          {segment.share >= 12 ? `${Math.round(segment.share)}%` : null}
+        </span>
+      ))}
     </span>
+  )
+}
+
+/**
+ * The owner's own results: green is "went well for you", red is "did not", exactly the
+ * judgment the reference bar below must never make. Same skeleton, so the two tables on
+ * the explorer page read as one instrument.
+ */
+export function ScoreBar({
+  split,
+  className,
+  height = '1.0625rem',
+}: {
+  split: Split
+  className?: string
+  height?: string
+}) {
+  return (
+    <LabeledBar
+      label={`${split.wins} wins, ${split.draws} draws, ${split.losses} losses`}
+      segments={[
+        { share: split.winPercent, className: 'bg-good text-good-ink' },
+        { share: split.drawPercent, className: 'bg-faint text-side-black' },
+        { share: split.lossPercent, className: 'bg-blunder text-blunder-ink' },
+      ]}
+      className={className}
+      height={height}
+    />
   )
 }
 
@@ -41,13 +92,8 @@ export function ScoreBar({
  * `side-white` / `faint` / `side-black` — the colours the eval bar and the side dots
  * already use for "White" and "Black".
  *
- * The percentages are printed inside their own segments, the way Lichess draws this bar.
- * A thin unlabelled strip failed in both themes: one of the two side colours always sits
- * near the panel it is drawn on (white-on-light, black-on-dark), so one half of every bar
- * dissolved. The text fixes that without a legend, and each number wears the *opposite*
- * side's colour — those two tokens keep their luminance across themes, so the contrast is
- * theme-proof by construction. A segment too narrow to hold its number (under ~12%) stays
- * a silent sliver rather than clipping digits; the title still carries all three counts.
+ * Each number wears the *opposite* side's colour — those two tokens keep their luminance
+ * across themes, so the contrast is theme-proof by construction.
  *
  * Counts rather than percentages in the props, because that is what the endpoint sends;
  * the shares are worked out here so no caller has to.
@@ -67,38 +113,16 @@ export function SidesBar({
 }) {
   const total = white + draws + black
   const share = (value: number) => (total > 0 ? (value / total) * 100 : 0)
-  const label = `${white} white wins, ${draws} draws, ${black} black wins`
-  const segments = [
-    { share: share(white), className: 'bg-side-white text-side-black' },
-    { share: share(draws), className: 'bg-faint text-side-black' },
-    { share: share(black), className: 'bg-side-black text-side-white' },
-  ]
   return (
-    <span
-      role="img"
-      aria-label={label}
-      title={label}
-      style={{ height }}
-      className={cn(
-        // The border and the dividers are what keep the bar legible on every panel: the
-        // black half otherwise dissolves into a dark theme and the white half into a
-        // light one the moment it touches the edge of its row.
-        'flex overflow-hidden rounded-[0.25rem] border border-edge-strong bg-raised font-mono text-[0.625rem] tabular divide-x divide-edge-strong',
-        className,
-      )}
-    >
-      {segments.map((segment, index) => (
-        <span
-          key={index}
-          style={{ width: `${segment.share}%` }}
-          className={cn(
-            'flex items-center justify-center overflow-hidden',
-            segment.className,
-          )}
-        >
-          {segment.share >= 12 ? `${Math.round(segment.share)}%` : null}
-        </span>
-      ))}
-    </span>
+    <LabeledBar
+      label={`${white} white wins, ${draws} draws, ${black} black wins`}
+      segments={[
+        { share: share(white), className: 'bg-side-white text-side-black' },
+        { share: share(draws), className: 'bg-faint text-side-black' },
+        { share: share(black), className: 'bg-side-black text-side-white' },
+      ]}
+      className={className}
+      height={height}
+    />
   )
 }
