@@ -921,6 +921,12 @@ export interface ReferenceMove extends Extra {
   draws: number
   black: number
   average_rating?: number | null
+  /**
+   * What the vendored book calls the position this move reaches — the child's own name,
+   * never inherited, same rule as `ExplorerMove`. Null on most rows past the first moves.
+   */
+  eco?: string | null
+  name?: string | null
 }
 
 export interface ReferenceTotals extends Extra {

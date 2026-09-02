@@ -29,6 +29,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from backend.adapters import openings
 from backend.adapters import reference as adapter
 
 # Imported by name as well as through the module so that the API's error table and the
@@ -42,7 +43,7 @@ from backend.adapters.reference import (
     UnknownReferenceGameError,
 )
 from backend.services import app_settings
-from backend.services.explorer import START_EPD, normalize_fen
+from backend.services.explorer import START_EPD, normalize_fen, read_fen
 
 # The module's whole surface, the adapter's error types included.
 __all__ = [
@@ -314,9 +315,10 @@ def _fold(raw: dict[str, Any], *, source: str, fen: str) -> dict[str, Any]:
             "draws": draws,
             "black": black,
         },
-        "moves": [
-            _move(entry) for entry in raw.get("moves") or () if isinstance(entry, dict)
-        ],
+        "moves": _name_continuations(
+            [_move(entry) for entry in raw.get("moves") or () if isinstance(entry, dict)],
+            fen,
+        ),
         "top_games": [
             game
             for game in (
@@ -327,6 +329,37 @@ def _fold(raw: dict[str, Any], *, source: str, fen: str) -> dict[str, Any]:
             if game is not None
         ],
     }
+
+
+def _name_continuations(moves: list[dict[str, Any]], fen: str) -> list[dict[str, Any]]:
+    """What the vendored book calls the position each move reaches, added in place.
+
+    The same rule the owner's tree follows (`explorer._annotate_continuations`): a name is
+    reported only when the child position is itself in the book, never inherited from the
+    parent, so it reads as "this move enters that opening". Upstream names only the queried
+    position; the per-move names come from the same vendored book as everywhere else, which
+    is what keeps the two tables from calling one line two things. One board, replayed move
+    by move; a move that will not parse gets no name rather than an error, and the result
+    is part of the cached fold because it is a pure function of the request.
+    """
+    try:
+        board = read_fen(fen)
+    except ValueError:
+        board = None
+    for move in moves:
+        found = None
+        if board is not None:
+            try:
+                parsed = board.parse_uci(move["uci"])
+            except ValueError:
+                parsed = None
+            if parsed is not None:
+                board.push(parsed)
+                found = openings.find(board.epd())
+                board.pop()
+        move["eco"] = found.eco if found else None
+        move["name"] = found.name if found else None
+    return moves
 
 
 def _move(entry: dict[str, Any]) -> dict[str, Any]:

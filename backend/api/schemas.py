@@ -1356,6 +1356,11 @@ class ReferenceMove(Payload):
     # opponents'; both mean "how strong were the people who played this", and neither is
     # always there.
     average_rating: int | None = None
+    # What the vendored book calls the position this move reaches — the child's own name,
+    # never inherited from the parent, exactly as `ExplorerResponse.moves` reports it.
+    # Null on most rows past an opening's first few moves, because the book stops there.
+    eco: str | None = None
+    name: str | None = None
 
 
 class ReferenceTopGame(Payload):

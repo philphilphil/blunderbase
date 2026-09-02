@@ -348,6 +348,11 @@ def test_a_masters_answer_is_folded_into_counts_and_totals(tokened: Session) -> 
     assert first["average_rating"] == 2531
     # A move Lichess sent no rating for says so rather than inventing one.
     assert payload["moves"][1]["average_rating"] is None
+    # Each continuation is named from the vendored book — the position it reaches, the
+    # same rule the owner's tree follows — not from anything upstream sent.
+    assert first["eco"] == "C00"
+    assert first["name"] == "French Defense: Normal Variation"
+    assert payload["moves"][1]["name"] == "French Defense: Knight Variation"
     assert [game["id"] for game in payload["top_games"]] == ["abcd1234", "efgh5678"]
     # Null winner is a draw, which is how Lichess says it and how the board reads it.
     assert payload["top_games"][1]["winner"] is None

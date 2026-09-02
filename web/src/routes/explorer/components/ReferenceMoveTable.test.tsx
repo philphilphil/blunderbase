@@ -20,6 +20,8 @@ const BOOK: ReferenceExplorerResponse = {
       draws: 80_000,
       black: 50_000,
       average_rating: 2489,
+      eco: 'B20',
+      name: 'Sicilian Defense',
     },
     {
       uci: 'e7e5',
@@ -61,6 +63,21 @@ describe('ReferenceMoveTable', () => {
     // 200k of the position's 400k games.
     expect(screen.getByText('50%')).toBeInTheDocument()
     expect(screen.getByText('2489')).toBeInTheDocument()
+  })
+
+  it('names the opening a move enters, and leaves unnamed moves blank', () => {
+    render(<ReferenceMoveTable data={BOOK} ply={1} loading={false} onPlay={vi.fn()} />)
+    expect(screen.getByText('Sicilian Defense')).toBeInTheDocument()
+    // e5 carries no name — the book did not name its child — and the cell stays empty.
+    const row = screen.getByText('1…e5').closest('button') as HTMLButtonElement
+    expect(row.textContent).not.toContain('Sicilian')
+  })
+
+  it('prints each side’s percentage inside its own half of the bar', () => {
+    render(<ReferenceMoveTable data={BOOK} ply={1} loading={false} onPlay={vi.fn()} />)
+    // c5: 70k / 80k / 50k of 200k games.
+    const bar = screen.getByLabelText('70000 white wins, 80000 draws, 50000 black wins')
+    expect(bar.textContent).toBe('35%40%25%')
   })
 
   it('keeps the exact count in the title, since the cell is rounded', () => {
