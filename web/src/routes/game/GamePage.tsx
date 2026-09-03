@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
+import { BOARD_SETTINGS_ID } from '@/components/board/BoardSettings'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { liveBest, liveScore, useStreamSession } from '@/lib/analysis'
@@ -27,6 +28,7 @@ import { whiteWinPercent } from '@/lib/chess/evaluation'
 import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
 import { ReferenceTokenCard } from '@/routes/explorer/components/ReferenceTokenCard'
+import { advanceTrail, useGameTrail } from '@/routes/games/gameTrail'
 import { tokenTrouble } from '@/routes/explorer/reference'
 
 import { buildAnalysisLine, withBoardMove } from './analysisLine'
@@ -41,6 +43,7 @@ import { MaiaPanel } from './components/MaiaPanel'
 import { MobileGameView, type MobileTab } from './components/MobileGameView'
 import {
   MoveList,
+  PGN_BUTTON_ID,
   type MoveAnnotation,
   type MoveListVariation,
   type MoveTab,
@@ -195,6 +198,15 @@ function writeMovesWidth(width: number | null): void {
  * therefore describes `moves[cursor + 1]`, the move about to happen, which is how a review
  * actually reads: you sit in the position and look at what is coming.
  */
+/**
+ * How long one ply of "play the game through" stands on screen.
+ *
+ * Under a second, because this is for re-watching a game already read rather than for
+ * reading one: fast enough that a twenty-move opening goes past in fifteen seconds, slow
+ * enough that a capture registers before the next move lands on it.
+ */
+const AUTOPLAY_MS = 800
+
 export function GamePage() {
   const { id } = useParams<{ id: string }>()
   const gameId = Number(id)
@@ -249,6 +261,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     [readOnly, referenceGame.data],
   )
   const analysisRequest = useAnalysisRequest(gameId)
+  const navigate = useNavigate()
 
   /**
    * Below `md` the screen is `MobileGameView` instead of the two-column studio — a pinned
@@ -267,7 +280,17 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    */
   const [mobileTab, setMobileTab] = useState<MobileTab>('moves')
 
+  /**
+   * The desktop move column's tab, held here rather than inside `MoveList` so `t` can move
+   * it. The table still owns its own where nobody passes one — the explorer's board does —
+   * and the phone's tab is `mobileTab` above, since there the strip carries four panes and
+   * not two.
+   */
+  const [columnTab, setColumnTab] = useState<MoveTab>('moves')
+
   const [cursor, setCursor] = useState(-1)
+  /** Whether the game is playing itself through, a ply at a time (Space). */
+  const [playing, setPlaying] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [hints, setHints] = useState(true)
   /** The first move of the engine line being pointed at, previewed on the board. */
@@ -556,6 +579,18 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     if (!branch || !analysis) return
     keep(analysis.base, analysis.moves)
   }, [analysis, branch, keep])
+
+  /**
+   * Leave the line for the game position it branched from — "Back to game", and Escape.
+   *
+   * One callback for both because they are one gesture: the button under the board and the
+   * key are the same request, and the line goes to the kept list either way rather than
+   * being thrown away for having been left.
+   */
+  const exitLine = useCallback(() => {
+    keepBranch()
+    setBranch(null)
+  }, [keepBranch])
 
   const seek = useCallback(
     (next: number) => {
@@ -1132,19 +1167,120 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       ? null
       : win
 
+  /**
+   * Walk the engine's own move here onto the board — ↵.
+   *
+   * The same call a click on a line's first move makes (`playLine`), reading from whichever
+   * panel is actually speaking for the position on the board: the live search while one is
+   * running on exactly this FEN, and the stored run's top line otherwise. That is the rule
+   * `boardEngineBest` already follows for the arrow, and the key must not point somewhere
+   * else than the arrow does.
+   */
+  const playEngineBest = useCallback(() => {
+    const fen = boardPosition?.fen ?? null
+    const snapshot = stream.snapshot
+    const live =
+      snapshot && fen && snapshot.fen === fen
+        ? [...snapshot.lines].sort((a, b) => a.multipv - b.multipv).map((row) => row.pv)
+        : []
+    const pv = live[0] ?? (exploring ? undefined : lines[0]?.pv)
+    if (pv && pv.length > 0) playLine(pv, 0)
+  }, [boardPosition, stream.snapshot, exploring, lines, playLine])
+
+  /*
+   * Playing the game through, a ply at a time.
+   *
+   * A `setTimeout` per ply rather than one interval: the cursor is React state, so each
+   * step re-runs this effect anyway, and a timeout that is booked *after* the last step
+   * landed cannot pile up behind a slow render the way an interval can. Stopping at the
+   * last move rather than looping — the end of the game is the end of it.
+   */
+  useEffect(() => {
+    if (!playing || cursor >= plyCount - 1) return
+    const timer = setTimeout(() => {
+      // Stopped by the step that lands on the last move rather than by the render that
+      // notices it has: the flag goes down inside the timeout, which keeps this effect from
+      // setting state as it runs and re-rendering the page for it.
+      if (cursor + 1 >= plyCount - 1) setPlaying(false)
+      seek(cursor + 1)
+    }, AUTOPLAY_MS)
+    return () => clearTimeout(timer)
+  }, [playing, cursor, plyCount, seek])
+
+  /**
+   * The run of games the library was showing when this one was opened — `[` and `]`.
+   *
+   * Null on a game reached any other way (the dashboard, a note, the palette, a link):
+   * there is no run to step along then, and inventing one out of whatever the table last
+   * held would send the reader somewhere they never asked to go.
+   */
+  const trail = useGameTrail(gameId)
+  const goToGame = useCallback(
+    (delta: number, id: number | null) => {
+      if (id === null) return
+      // The run follows the reader rather than being re-derived by the screen they land on:
+      // the next game is one further down the same ordering, and only this call knows that.
+      advanceTrail(delta, id)
+      navigate(`/games/${id}`)
+    },
+    [navigate],
+  )
+
   useBoardKeys(
     {
-      step,
-      seekStart: () => seek(-1),
-      seekEnd: () => seek(plyCount - 1),
+      // Taking hold of the cursor by hand stops the game playing itself: the two are the
+      // same control, and a reader stepping back through a move while it plays forwards
+      // would be fighting the page.
+      step: (delta) => {
+        setPlaying(false)
+        step(delta)
+      },
+      seekStart: () => {
+        setPlaying(false)
+        seek(-1)
+      },
+      seekEnd: () => {
+        setPlaying(false)
+        seek(plyCount - 1)
+      },
       // Both land one ply short of the flagged move — see the memos the buttons share.
       nextFlagged: () => {
+        setPlaying(false)
         if (nextFlagged !== null) seek(nextFlagged)
       },
       previousFlagged: () => {
+        setPlaying(false)
         if (previousFlagged !== null) seek(previousFlagged)
       },
       flip: () => setFlipped((value) => !value),
+      toggleHints: () => setHints((value) => !value),
+      // The same switch the panel's footer carries, and the same guard it draws disabled
+      // under: with nothing on the board there is nothing to search.
+      toggleEngine: boardPosition?.fen ? () => stream.setEnabled(!stream.enabled) : undefined,
+      // A note hangs off a game row, so a model game nobody has added has none to write.
+      note: readOnly ? undefined : focusComposer,
+      // Only while there is a line to leave: off one, Escape is the browser's again — and,
+      // more to the point, whatever is open on top of the page keeps it.
+      exitLine: exploring ? exitLine : undefined,
+      playBest: playEngineBest,
+      // The key presses the button that owns the panel — see `BOARD_SETTINGS_ID`.
+      boardSettings: () => document.getElementById(BOARD_SETTINGS_ID)?.click(),
+      // Both tiers are the buttons' own calls. Quick is bound even where its button is
+      // hidden (a finished deep run hides it): the button is hidden because it would add
+      // nothing, not because the pass is refused.
+      queueQuick: readOnly ? undefined : () => analysisRequest.request('quick'),
+      queueDeep: readOnly ? undefined : () => analysisRequest.request('deep'),
+      // The key presses the one PGN button on the screen rather than copying the game a
+      // second time of its own — see `PGN_BUTTON_ID`.
+      copyPgn: () => document.getElementById(PGN_BUTTON_ID)?.click(),
+      toggleMoveTab: mobile
+        ? undefined
+        : () => setColumnTab((tab) => (tab === 'moves' ? 'flagged' : 'moves')),
+      // At the end of the game there is nothing to play through, so Space starts nothing —
+      // the same as the ⏭ beside it being spent.
+      autoplay: () => setPlaying((was) => !was && cursor < plyCount - 1),
+      previousGame: trail?.previous != null ? () => goToGame(-1, trail.previous) : undefined,
+      nextGame: trail?.next != null ? () => goToGame(1, trail.next) : undefined,
     },
     !!detail,
   )
@@ -1220,17 +1356,28 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
-  const header = <GameHeaderBar game={detail.game} best={best} active={analysisRequest.activeRun} />
+  const header = (
+    <GameHeaderBar
+      game={detail.game}
+      best={best}
+      active={analysisRequest.activeRun}
+      trail={
+        trail
+          ? {
+              onPrevious: trail.previous != null ? () => goToGame(-1, trail.previous) : null,
+              onNext: trail.next != null ? () => goToGame(1, trail.next) : null,
+            }
+          : null
+      }
+    />
+  )
 
   const board = (
     <BoardPanel
       position={position}
       analysis={analysis}
       onPlayMove={playMove}
-      onExitAnalysis={() => {
-        keepBranch()
-        setBranch(null)
-      }}
+      onExitAnalysis={exitLine}
       orientation={orientation}
       // The two player rows flanking the board — name, rating and the material each side is
       // up, counted off the FEN on the board rather than off the game (`lib/chess/material`).
@@ -1262,6 +1409,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       nextFlagged={nextFlagged}
       previousFlagged={previousFlagged}
       onStep={stepFromBoard}
+      onToggleAutoplay={() => setPlaying((was) => !was)}
+      playing={playing}
       quickRun={quickRun}
       deepRun={deepRun}
       activeRun={analysisRequest.activeRun}
@@ -1402,7 +1551,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // The phone promotes the table's tabs into `MobileGameView`'s strip, so the table is
       // told which one to draw and its own row is switched off — that row is also where the
       // PGN affordance lives, which is why the phone header carries one.
-      tab={mobile ? movesTab : undefined}
+      tab={mobile ? movesTab : columnTab}
+      onTabChange={mobile ? undefined : setColumnTab}
       showTabRow={!mobile}
       // The moves/notes rule, in the same weight as every other boundary between panes: the
       // workspace is a matrix of panes divided by rules, and a boundary that is quieter than

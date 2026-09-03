@@ -17,6 +17,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { ApiError } from '@/lib/api/client'
 import { useDeleteGames, useRequestAnalysisBatch } from '@/lib/api/queries'
+import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
 import { DeleteGamesDialog } from './components/DeleteGamesDialog'
@@ -28,9 +29,11 @@ import {
   filtersFromParams,
   paramsFromFilters,
   prune,
+  toGameQuery,
   type LibraryFilters,
 } from './filters'
 import { formatCount } from './format'
+import { rememberTrail } from './gameTrail'
 import {
   FALLBACK_FIT_ROWS,
   readPageSize,
@@ -40,6 +43,15 @@ import {
 } from './paging'
 import { DEFAULT_SORT, type Sort } from './sorting'
 import { useGameLibrary } from './useGameLibrary'
+
+/**
+ * The free-text box, named so `/` can reach it.
+ *
+ * `/` to search is the idiom every list on the web has, and the alternative — reaching for
+ * the mouse to click into a box that is already on screen — is the gesture this whole
+ * screen is trying to avoid.
+ */
+const SEARCH_ID = 'games-search'
 
 export function GamesPage() {
   const navigate = useNavigate()
@@ -66,6 +78,43 @@ export function GamesPage() {
   // one path here is one receipt and one set of spinning rows. Deleting works the same way.
   const analysis = useRequestAnalysisBatch()
   const deletion = useDeleteGames()
+
+  /**
+   * Open a game, and hand the run it was opened from over with it.
+   *
+   * What goes over is the query and where in it this row sits, not the page of ids on
+   * screen: `[` and `]` then walk the whole filtered library in the table's own order
+   * rather than stopping at the end of whatever page happened to be up (`gameTrail`).
+   * Recorded on the way out rather than on every render, because "the run I was reading" is
+   * a thing the reader chose, not a thing the table happened to be showing while they typed
+   * in the filter bar.
+   */
+  const open = useCallback(
+    (id: number) => {
+      const at = rows.findIndex((game) => game.id === id)
+      if (at !== -1) {
+        rememberTrail({
+          query: { ...toGameQuery(filters), order: sort.key, direction: sort.direction },
+          offset: (Math.max(page, 1) - 1) * rowsPerPage + at,
+          gameId: id,
+        })
+      }
+      navigate(`/games/${id}`)
+    },
+    [rows, filters, sort, page, rowsPerPage, navigate],
+  )
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
+      if (isTyping(event.target)) return
+      // Or the slash lands in the box along with the intention to type in it.
+      event.preventDefault()
+      document.getElementById(SEARCH_ID)?.focus()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const setFilters = useCallback(
     (next: LibraryFilters) => {
@@ -233,6 +282,7 @@ export function GamesPage() {
           <div className="flex-1" />
 
           <DebouncedInput
+            id={SEARCH_ID}
             aria-label="Search games"
             placeholder="Opponent, ECO, PGN text…"
             value={filters.text ?? ''}
@@ -268,7 +318,7 @@ export function GamesPage() {
         selected={selectedVisible}
         onToggle={toggle}
         onToggleAll={toggleAll}
-        onOpen={(id) => navigate(`/games/${id}`)}
+        onOpen={open}
         onAnalyse={(id) => void queueAnalysis([id], 'quick')}
         analysing={analysing}
         onDelete={(id) => setDoomed([id])}

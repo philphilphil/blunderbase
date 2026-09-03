@@ -40,6 +40,7 @@ const DOM_LOGIC_TESTS = [
   'src/routes/dashboard/useRunActivity.test.ts',
   'src/routes/game/maiaPreferences.test.ts',
   'src/routes/game/sessionVariations.test.ts',
+  'src/routes/games/gameTrail.test.ts',
   'src/routes/games/paging.test.ts',
   'src/routes/games/savedFilters.test.ts',
 ]

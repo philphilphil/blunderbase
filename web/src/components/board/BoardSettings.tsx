@@ -77,6 +77,15 @@ const GRAPH_MARKS: { value: EvalGraphMarks; label: string }[] = [
   { value: 'glyphs', label: 'Glyphs' },
 ]
 
+/**
+ * The one board-settings button on the screen, named so a key can press it.
+ *
+ * `s` opens the panel by pressing this rather than by lifting the open/closed state up to
+ * the page: the button owns the panel, and a second way in would be a second thing to keep
+ * in step with it. Escape closes it, which is the panel's own business either way.
+ */
+export const BOARD_SETTINGS_ID = 'board-settings-button'
+
 export function BoardSettingsButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false)
   const arrows = useBoardArrowPrefs()
@@ -121,8 +130,9 @@ export function BoardSettingsButton({ className }: { className?: string }) {
     <>
       <button
         type="button"
+        id={BOARD_SETTINGS_ID}
         aria-label="Board settings"
-        title="Board settings — arrows, sound, the eval graph and line preview"
+        title="Board settings — arrows, sound, the eval graph and line preview (S)"
         onClick={() => setOpen(true)}
         className={cn(
           'flex-none rounded-md border border-edge bg-elevated px-2 py-[0.3125rem] text-dim transition-colors hover:text-ink max-md:py-1.5',

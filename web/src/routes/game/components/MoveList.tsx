@@ -436,6 +436,17 @@ function ClockCell({ seconds }: { seconds: number | undefined }) {
  * to the coach over MCP — starts with it on the clipboard.
  */
 /**
+ * The one PGN button on the screen, named so a key can press it.
+ *
+ * `c` copies the game, and it does it by pressing this rather than by copying the text a
+ * second time somewhere else: the button owns the clipboard call *and* the copied/failed
+ * flash that says it worked, and a second path would be a second answer to "did that
+ * work". Exactly one of these is mounted at any width — the tab row's, or the phone
+ * header's.
+ */
+export const PGN_BUTTON_ID = 'game-pgn-copy'
+
+/**
  * Copy the whole game as PGN. Exported because the tab row it normally sits in is switched
  * off below `md` (`showTabRow`), and the phone layout has to put it somewhere of its own.
  */
@@ -464,8 +475,9 @@ export function PgnButton({ pgn }: { pgn?: string }) {
   return (
     <button
       type="button"
+      id={PGN_BUTTON_ID}
       onClick={() => void copy()}
-      title="Copy this game as PGN"
+      title="Copy this game as PGN (C)"
       className={cn(
         'transition-colors',
         state === 'copied'
@@ -765,6 +777,11 @@ function Tab({
   return (
     <button
       type="button"
+      // A pressed button rather than a `role="tab"`: these two switch what the pane below
+      // filters to, and there is no tablist here for a tab to belong to. Which one is on is
+      // said out loud either way — it is drawn as chrome, and chrome is invisible to a
+      // reader who is being read to.
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
         // The selected tab is the pane's own surface pushed up into the chrome strip, with

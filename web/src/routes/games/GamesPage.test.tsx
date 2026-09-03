@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Providers } from '@/app/Providers'
 import type { BatchAnalysisResponse, GameCard } from '@/lib/api/types'
 
+import { resetTrail, useGameTrail } from './gameTrail'
 import { GamesPage } from './GamesPage'
 
 class FakeSocket {
@@ -339,5 +340,37 @@ describe('GamesPage — paging and ordering', () => {
 
     await waitFor(() => expect(lastGamesQuery().get('order')).toBe('black'))
     expect(lastGamesQuery().get('direction')).toBe('asc')
+  })
+})
+
+describe('GamesPage — the keyboard, and the run it hands on', () => {
+  it('focuses the search box on /', async () => {
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    const box = screen.getByLabelText('Search games')
+    expect(document.activeElement).not.toBe(box)
+    await user.keyboard('/')
+    expect(document.activeElement).toBe(box)
+    // And the slash does not land in the box along with the intention to type in it.
+    expect(box).toHaveValue('')
+  })
+
+  it('hands the query it was showing to the game it opens', async () => {
+    resetTrail()
+    const user = userEvent.setup()
+    draw()
+    await loaded()
+
+    await user.click(screen.getByRole('row', { name: /opponent-12/ }))
+
+    // The query and where in it that row sat — not the page of ids — so the game screen's
+    // [ and ] walk the whole filtered library rather than stopping at the end of a page.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result } = renderHook(() => useGameTrail(12), {
+      wrapper: ({ children }) => <Providers client={client}>{children}</Providers>,
+    })
+    await waitFor(() => expect(result.current).toEqual({ previous: 11, next: 13 }))
   })
 })

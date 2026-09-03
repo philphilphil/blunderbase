@@ -18,11 +18,15 @@ import { useEffect, useRef } from 'react'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import type { GameCard } from '@/lib/api/types'
+import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
 import { nextSort, type Sort } from '../sorting'
 import { cellClass, cellStyle, COLUMNS, PHONE_CARD, remWidth, ROW_HEIGHT } from './columns'
 import { GameRow } from './GameRow'
+
+/** The keys that move along the rows. Home and End reach past whatever has focus. */
+const STEP_KEYS = ['ArrowDown', 'ArrowUp', 'Home', 'End']
 
 export interface GamesTableProps {
   games: GameCard[]
@@ -89,6 +93,46 @@ export function GamesTable({
   }, [games.length, status])
 
   const allSelected = games.length > 0 && games.every((game) => selected.has(game.id))
+
+  /*
+   * Arrow keys walk the rows, which is the one thing a table of a thousand games could not
+   * do from the keyboard.
+   *
+   * It moves *focus* rather than keeping a highlight of its own: the rows are already
+   * focusable and already open on Enter, so there is no second idea of "the current row" to
+   * keep in step with the browser's, and tabbing in from the filter bar lands somewhere the
+   * arrows then continue from.
+   *
+   * On `document` rather than on the body element, because the first press has to work
+   * before anything in the table has focus — the reader arrives on the screen and presses
+   * ↓. A field takes its own arrows, and a modifier makes them the browser's (⌘↑ is the top
+   * of the document), so both are left alone.
+   */
+  useEffect(() => {
+    function walk(event: KeyboardEvent) {
+      if (!STEP_KEYS.includes(event.key)) return
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+      if (isTyping(event.target)) return
+      const node = body.current
+      if (!node) return
+      const rows = Array.from(node.querySelectorAll<HTMLElement>('[data-games-row]'))
+      if (rows.length === 0) return
+      const last = rows.length - 1
+      const here = rows.findIndex((row) => row.contains(event.target as Node))
+      // Nothing focused yet — an arrow enters the list at the end it is coming from.
+      const from = here === -1 ? (event.key === 'ArrowUp' ? rows.length : -1) : here
+      const to =
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? last
+            : Math.min(last, Math.max(0, from + (event.key === 'ArrowDown' ? 1 : -1)))
+      event.preventDefault()
+      rows[to]?.focus()
+    }
+    document.addEventListener('keydown', walk)
+    return () => document.removeEventListener('keydown', walk)
+  }, [])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" role="table" aria-label="Games">

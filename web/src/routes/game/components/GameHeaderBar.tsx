@@ -1,3 +1,5 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { RunStatusBadge, TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
 import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
@@ -26,11 +28,18 @@ import { formatResult, formatTimeControl } from '../gameModel'
  *
  * The date is not here: `AppShell`'s breadcrumb already carries it (`GamePage` passes it),
  * and the one thing this line cannot afford is a second copy of something.
+ *
+ * When the game was opened from the library, two arrows and a counter lead the line: the
+ * run the table was showing, steppable without going back to it (`gameTrail`). They are
+ * first because they are about *which* game this is, which is what the rest of the line
+ * describes — and they are simply absent on a game reached any other way, rather than
+ * present and dead.
  */
 export function GameHeaderBar({
   game,
   best,
   active,
+  trail,
   className,
 }: {
   game: GameSummary
@@ -38,6 +47,11 @@ export function GameHeaderBar({
   best: GameRunSummary | null
   /** A run that is queued or running right now, from `/analysis/runs`. */
   active: RunResponse | null
+  /** How to leave this game for the one either side of it in the run it was opened from. */
+  trail?: {
+    onPrevious: (() => void) | null
+    onNext: (() => void) | null
+  } | null
   className?: string
 }) {
   const timeControl = formatTimeControl(game)
@@ -50,6 +64,23 @@ export function GameHeaderBar({
         className,
       )}
     >
+      {trail ? (
+        // No counter beside them. The run is the whole filtered library in the table's
+        // order, not the page that happened to be up, so any number here would either be a
+        // place in a page nobody is looking at or a running total of a library — and
+        // neither is a thing the reader wanted to know. The two arrows say all there is:
+        // there is a game that way, or there is not.
+        <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
+          <StepButton
+            label="Previous game"
+            hint="["
+            onClick={trail.onPrevious}
+            icon={ChevronLeft}
+          />
+          <StepButton label="Next game" hint="]" onClick={trail.onNext} icon={ChevronRight} last />
+        </div>
+      ) : null}
+
       {/* The only element on the line allowed to shrink: everything after it is a chip or a
           handful of mono characters, and a truncated ECO or result says nothing at all. */}
       <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
@@ -100,6 +131,37 @@ export function GameHeaderBar({
         {best?.finished_at ? `analysed ${relative(best.finished_at)}` : 'never analysed'}
       </span>
     </div>
+  )
+}
+
+/** One end of the run: the same cell the board's transport is built from, at bar height. */
+function StepButton({
+  label,
+  hint,
+  onClick,
+  icon: Icon,
+  last,
+}: {
+  label: string
+  hint: string
+  onClick: (() => void) | null
+  icon: typeof ChevronLeft
+  last?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={`${label} (${hint})`}
+      disabled={!onClick}
+      onClick={() => onClick?.()}
+      className={cn(
+        'px-1.5 py-1 text-soft transition-colors hover:bg-selected hover:text-ink disabled:cursor-default disabled:text-faint-2 disabled:hover:bg-transparent',
+        !last && 'border-r border-edge',
+      )}
+    >
+      <Icon className="size-3.5" aria-hidden />
+    </button>
   )
 }
 

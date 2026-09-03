@@ -1,6 +1,16 @@
 import type { Api } from '@lichess-org/chessground/api'
 import type { DrawShape } from '@lichess-org/chessground/draw'
-import { Check, ChevronLeft, ChevronRight, Flag, Loader2, StickyNote, Undo2 } from 'lucide-react'
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Flag,
+  Loader2,
+  Pause,
+  Play,
+  StickyNote,
+  Undo2,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
@@ -90,12 +100,18 @@ export interface BoardPanelProps {
   /**
    * The cursor the next (and previous) flagged move is made *from* — one ply before the
    * mistake, which is the position worth reading — or null where there is none that way.
-   * The same jump `j`/`shift+J` make, and drawn as buttons at every width: getting to the
+   * The same jump ↑/↓ make, and drawn as buttons at every width: getting to the
    * blunder is what the page is opened for, and a keybinding with no affordance is a
    * feature only the person who wrote it knows about.
    */
   nextFlagged?: number | null
   previousFlagged?: number | null
+  /**
+   * Play the game through from where it stands, and stop it again. Left out where there is
+   * nothing to play — the explorer's stand-in board — and the cell is then not drawn.
+   */
+  onToggleAutoplay?: () => void
+  playing?: boolean
   /**
    * One move forwards or back from wherever the board stands. Inside an analysis line that
    * is a step along the line rather than along the game, which the page decides — the wheel
@@ -183,6 +199,8 @@ export function BoardPanel({
   nextFlagged,
   previousFlagged,
   onStep,
+  onToggleAutoplay,
+  playing = false,
   quickRun,
   deepRun,
   activeRun,
@@ -516,6 +534,7 @@ export function BoardPanel({
           <button
             type="button"
             onClick={onFlip}
+            title="Flip the board (F)"
             className="flex-none rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
           >
             ⇅ Flip
@@ -525,7 +544,7 @@ export function BoardPanel({
             type="button"
             onClick={() => onHintsChange(!hints)}
             aria-pressed={hints}
-            title="Everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+            title="Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
             className={cn(
               'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
               hints
@@ -575,7 +594,7 @@ export function BoardPanel({
             type="button"
             onClick={onNote}
             aria-pressed={noting}
-            title="Write a note about this position"
+            title="Write a note about this position (N)"
             className={cn(
               'flex flex-none items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
               noting
@@ -592,7 +611,7 @@ export function BoardPanel({
           <button
             type="button"
             onClick={onExitAnalysis}
-            title="Leave the analysis line and go back to the game"
+            title="Leave the analysis line and go back to the game (Esc)"
             className="flex flex-none items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant max-md:py-1.5"
           >
             <Undo2 className="size-3" aria-hidden />
@@ -626,11 +645,17 @@ export function BoardPanel({
 
         <div className="flex flex-none items-center gap-2 max-md:order-first max-md:gap-1.5">
           <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
-            <TransportButton label="First" disabled={cursor < 0} onClick={() => onSeek(-1)}>
+            <TransportButton
+              label="First"
+              hint="Home"
+              disabled={cursor < 0}
+              onClick={() => onSeek(-1)}
+            >
               ⏮
             </TransportButton>
             <TransportButton
               label="Previous"
+              hint="←"
               disabled={cursor < 0}
               onClick={() => onSeek(cursor - 1)}
             >
@@ -638,6 +663,7 @@ export function BoardPanel({
             </TransportButton>
             <TransportButton
               label="Next"
+              hint="→"
               disabled={cursor >= plyCount - 1}
               onClick={() => onSeek(cursor + 1)}
             >
@@ -645,18 +671,39 @@ export function BoardPanel({
             </TransportButton>
             <TransportButton
               label="Last"
-              last
+              hint="End"
+              last={!onToggleAutoplay}
               disabled={cursor >= plyCount - 1}
               onClick={() => onSeek(plyCount - 1)}
             >
               ⏭
             </TransportButton>
+            {/* Last in the group rather than beside ▶: the four cells before it are where
+                the hand already goes, and inserting a fifth among them would move all of
+                them for the sake of a control that is pressed once a game. */}
+            {onToggleAutoplay ? (
+              <TransportButton
+                label={playing ? 'Stop playing through' : 'Play the game through'}
+                hint="Space"
+                last
+                // Spent at the end of the game, like the ⏭ beside it: there is nothing left
+                // to play through. Disabled rather than gone, so the group keeps its shape.
+                disabled={!playing && cursor >= plyCount - 1}
+                onClick={onToggleAutoplay}
+              >
+                {playing ? (
+                  <Pause className="size-3 text-accent-teal" aria-hidden />
+                ) : (
+                  <Play className="size-3" aria-hidden />
+                )}
+              </TransportButton>
+            ) : null}
           </div>
 
           {/*
             The flagged-move jumps, as their own group beside the transport, at every width.
             They used to be `md:hidden` — drawn for the phone, which has no keys to press,
-            and left to `j`/`shift+J` on the desktop. That was a keybinding with no affordance:
+            and left to the arrows on the desktop. That was a keybinding with no affordance:
             getting to the blunder is what the page is opened for, and the only way to find out
             the jump existed was to read the shortcut sheet. Stepping ⏭ twenty times to reach
             it is not a review on a mouse either.
@@ -668,6 +715,7 @@ export function BoardPanel({
           <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
             <TransportButton
               label="Previous flagged move"
+              hint="↑"
               disabled={previousFlagged == null}
               onClick={() => previousFlagged != null && onSeek(previousFlagged)}
             >
@@ -678,6 +726,7 @@ export function BoardPanel({
             </TransportButton>
             <TransportButton
               label="Next flagged move"
+              hint="↓"
               last
               disabled={nextFlagged == null}
               onClick={() => nextFlagged != null && onSeek(nextFlagged)}
@@ -879,12 +928,16 @@ function Rule() {
 function TransportButton({
   children,
   label,
+  hint,
   disabled,
   last,
   onClick,
 }: {
   children: ReactNode
   label: string
+  /** The key that does the same thing, named in the tooltip but not in the accessible
+   * name — a screen reader is reading a button, not a shortcut sheet. */
+  hint?: string
   disabled?: boolean
   last?: boolean
   onClick: () => void
@@ -893,7 +946,7 @@ function TransportButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
+      title={hint ? `${label} (${hint})` : label}
       disabled={disabled}
       onClick={onClick}
       className={cn(

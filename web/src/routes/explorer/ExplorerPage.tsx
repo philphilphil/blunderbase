@@ -44,7 +44,7 @@ import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useExplorer, usePositionOccurrences, useReferenceExplorer } from '@/lib/api/queries'
 import type { Color, ExplorerMove } from '@/lib/api/types'
-import { isTyping } from '@/routes/game/useBoardKeys'
+import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
 import { GamesInLine } from './components/GamesInLine'

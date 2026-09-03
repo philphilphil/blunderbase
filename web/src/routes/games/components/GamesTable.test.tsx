@@ -132,6 +132,47 @@ describe('GamesTable rows', () => {
     expect(props.onSortChange).toHaveBeenCalledWith({ key: 'played_at', direction: 'asc' })
   })
 
+  it('walks the rows with the arrow keys and opens one with enter', async () => {
+    const user = userEvent.setup()
+    const props = setup({
+      games: [GAME, { ...GAME, id: 13, white: 'someone' } as GameCard],
+    })
+    const rows = () => screen.getAllByRole('row').filter((row) => row.hasAttribute('data-games-row'))
+
+    // The first press works before anything in the table has focus: the reader arrives on
+    // the screen and presses ↓.
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(rows()[0])
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(rows()[1])
+    // And never past the end.
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(rows()[1])
+
+    await user.keyboard('{Home}')
+    expect(document.activeElement).toBe(rows()[0])
+    await user.keyboard('{End}')
+    expect(document.activeElement).toBe(rows()[1])
+
+    await user.keyboard('{Enter}')
+    expect(props.onOpen).toHaveBeenCalledWith(13)
+  })
+
+  it('leaves the arrows to a field and to the browser’s own commands', async () => {
+    const user = userEvent.setup()
+    setup()
+    render(<input aria-label="Somewhere to type" />)
+
+    await user.click(screen.getByLabelText('Somewhere to type'))
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(screen.getByLabelText('Somewhere to type'))
+
+    // ⌘↓ is the bottom of the document, not the next game.
+    await user.click(document.body)
+    await user.keyboard('{Meta>}{ArrowDown}{/Meta}')
+    expect(document.activeElement).toBe(document.body)
+  })
+
   it('deletes one game from its own row', async () => {
     const props = setup()
     await userEvent.click(screen.getByRole('button', { name: 'Delete game 12' }))

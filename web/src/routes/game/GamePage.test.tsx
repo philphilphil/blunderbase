@@ -14,6 +14,7 @@ import type {
   RunnersStatus,
 } from '@/lib/api/types'
 import { EventsProvider } from '@/lib/events/EventsProvider'
+import { rememberTrail, resetTrail } from '@/routes/games/gameTrail'
 
 import { toast } from '@/lib/toast'
 import { MOBILE_QUERY } from '@/lib/ui/media'
@@ -345,6 +346,7 @@ beforeEach(() => {
   // Kept lines are session-scoped, and a test file is one session: each test starts on a
   // game nobody has read yet.
   resetSessionVariations()
+  resetTrail()
   vi.stubGlobal('WebSocket', SilentSocket)
   vi.stubGlobal('fetch', stubFetch())
 })
@@ -485,6 +487,271 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 4 / 4')).toBeInTheDocument()
   })
 
+  it('jumps between flagged moves with the up and down arrows', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Down is forwards, as it is for the wheel: the next move worth stopping at.
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+
+    // And back to it from the end of the game.
+    await user.keyboard('{End}')
+    expect(screen.getByText('ply 4 / 4')).toBeInTheDocument()
+    await user.keyboard('{ArrowUp}')
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+
+    // The ends of the game are Home and End now, which is where the arrows used to go.
+    await user.keyboard('{Home}')
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+  })
+
+  it('queues a deep pass with d and a quick one with q', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.keyboard('d')
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].body).toEqual({ game_id: 14, tier: 'deep' })
+
+    // Quick is bound even though the fixture's finished deep run hides its button: the
+    // button is hidden because the pass would add nothing, not because it is refused.
+    await user.keyboard('q')
+    await waitFor(() => expect(posted).toHaveLength(2))
+    expect(posted[1].body).toEqual({ game_id: 14, tier: 'quick' })
+  })
+
+  it('copies the PGN with c, through the button that owns the clipboard', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const copied: string[] = []
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: (text: string) => (copied.push(text), Promise.resolve()) },
+    })
+
+    await user.keyboard('c')
+    // The button's own flash is the receipt, which is the point of going through it.
+    expect(await screen.findByText('copied')).toBeInTheDocument()
+    expect(copied[0]).toContain('[White "phib"]')
+  })
+
+  it('swaps the move column between Moves and Flagged with t', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const flagged = () => screen.getByRole('button', { name: /Flagged/ })
+    expect(flagged()).toHaveAttribute('aria-pressed', 'false')
+    await user.keyboard('t')
+    expect(flagged()).toHaveAttribute('aria-pressed', 'true')
+    await user.keyboard('t')
+    expect(flagged()).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('jumps five moves at a time with shift and an arrow', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Four plies in the fixture, so a jump lands on the clamp at either end — which is the
+    // half of this worth pinning down: a jump never leaves the game.
+    await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    expect(screen.getByText('ply 4 / 4')).toBeInTheDocument()
+    await user.keyboard('{Shift>}{ArrowLeft}{/Shift}')
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+  })
+
+  it('plays the game through on space, and stops on the next key', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Real timers: the page books one 800ms timeout per ply, and a fake clock here has to
+    // be advanced past a `userEvent` that is itself waiting on one — two clocks pretending
+    // to be one. Waiting for the first step is what this is about anyway.
+    await user.keyboard(' ')
+    expect(await screen.findByText('ply 1 / 4', {}, { timeout: 3_000 })).toBeInTheDocument()
+
+    // Taking hold of the cursor stops it: the two are the same control.
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 1_200))
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+  })
+
+  it('plays the engine’s move onto the board with enter', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // The fixture's top line at the starting position is 1.e4, so ↵ walks it — which is
+    // leaving the game line, and the page says so.
+    await user.keyboard('{Enter}')
+    expect(await screen.findByText('Back to game')).toBeInTheDocument()
+  })
+
+  it('still plays it after a click has left focus on a button', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Every move in the list is a button, and clicking one leaves it focused. That must not
+    // swallow the next ↵ — it is how the shortcut came to work only sometimes.
+    // Scoped to the table: the engine panels draw their PV moves as buttons too.
+    // The name carries the classification badge's glyph too, hence the pattern.
+    const move = within(screen.getByTestId('move-list')).getByRole('button', { name: /e4/ })
+    await user.click(move)
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+    expect(document.activeElement).toBe(move)
+
+    await user.keyboard('{Enter}')
+    expect(await screen.findByText('Back to game')).toBeInTheDocument()
+  })
+
+  it('leaves enter to a button the keyboard is actually on', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Tabbed to rather than clicked, so the reader is driving from the keyboard and ↵ is
+    // that button's: the board stays on the game rather than walking the engine's line.
+    const flip = screen.getByRole('button', { name: '⇅ Flip' })
+    flip.focus()
+    await user.tab()
+    flip.focus()
+    await user.keyboard('{Enter}')
+    expect(screen.queryByText('Back to game')).not.toBeInTheDocument()
+  })
+
+  it('steps along the run the library was showing, with the brackets', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({
+        // The window the trail asks for around where the reader stands.
+        '/games?': { games: [{ id: 13 }, { id: 14 }, { id: 15 }], total: 120 },
+        '/games/15': {
+          ...DETAIL,
+          game: { ...DETAIL.game, id: 15, opening: 'Sicilian Defense' },
+        },
+      }),
+    )
+    // What the games table handed over on the way out of it: the query, and where in it.
+    rememberTrail({ query: { order: 'played_at' }, offset: 1, gameId: 14 })
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Both ends of the run are offered, and no counter beside them — the run is the whole
+    // filtered library, not the page that happened to be up.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Next game' })).toBeEnabled())
+    expect(screen.getByRole('button', { name: 'Previous game' })).toBeEnabled()
+    expect(screen.queryByText(/^\d+ \/ \d+$/)).not.toBeInTheDocument()
+
+    await user.keyboard(']')
+    expect(await screen.findByText('Sicilian Defense')).toBeInTheDocument()
+  })
+
+  it('offers no run on a game that was not opened from the library', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Reached from the dashboard, a note or a link: there is no run to step along, so
+    // nothing is drawn rather than two dead arrows.
+    expect(screen.queryByRole('button', { name: 'Next game' })).not.toBeInTheDocument()
+  })
+
+  it('opens the board settings with s, and escape closes them again', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.keyboard('s')
+    const panel = await screen.findByRole('dialog', { name: 'Board' })
+    expect(panel).toBeInTheDocument()
+
+    // Escape belongs to whatever is on top: it closes the panel and does not also throw
+    // the reader out of a line they were walking.
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Board' })).not.toBeInTheDocument()
+  })
+
+  it('flips the board with f', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // The owner had White in the fixture, so the rank strip counts down from 8.
+    const ranks = () =>
+      Array.from(screen.getByTestId('board').closest('.grid')!.querySelectorAll('span'))
+        .map((label) => label.textContent)
+        .slice(0, 8)
+    expect(ranks()[0]).toBe('8')
+
+    await user.keyboard('f')
+    expect(ranks()[0]).toBe('1')
+    await user.keyboard('f')
+    expect(ranks()[0]).toBe('8')
+  })
+
+  it('turns hints off and on with h', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const hints = screen.getByRole('button', { name: 'Hints' })
+    expect(hints).toHaveAttribute('aria-pressed', 'true')
+
+    await user.keyboard('h')
+    expect(hints).toHaveAttribute('aria-pressed', 'false')
+    await user.keyboard('h')
+    expect(hints).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('puts the cursor in the note composer with n', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.keyboard('n')
+    expect(document.activeElement).toBe(document.getElementById(COMPOSER_TEXT_ID))
+  })
+
+  it('opens and closes the live search with e', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const toggle = () =>
+      screen.getByRole('switch', { name: 'Analyse this position continuously' })
+    expect(toggle()).toHaveAttribute('aria-checked', 'false')
+
+    await user.keyboard('e')
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    expect(toggle()).toHaveAttribute('aria-checked', 'true')
+
+    // The same key is the way back out — it is one switch, not a way in.
+    await user.keyboard('e')
+    expect(toggle()).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('leaves an analysis line with escape, keeping it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.click(await screen.findByRole('row', { name: /d4/ }))
+    expect(await screen.findByText('Back to game')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByText('Back to game')).not.toBeInTheDocument()
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+  })
+
   it('steps the game with the wheel over the board', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
@@ -499,12 +766,12 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
   })
 
-  it('jumps to the position the next flagged move was made from with J', async () => {
+  it('jumps to the position the next flagged move was made from with .', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.keyboard('j')
+    await user.keyboard('.')
     // The blunder is ply 1, so the board sits after ply 0 — where the decision was made.
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
     // Maia is a panel under the engine lines now, not a card floating over the board.
@@ -528,7 +795,7 @@ describe('GamePage', () => {
 
     // The blunder on ply 1 is tinted in its own colour — mixed from the token, so it
     // survives as CSS and follows the theme.
-    await user.keyboard('j')
+    await user.keyboard('.')
     const flagged = screen.getByTestId('engine-played-line')
     expect(flagged.style.background).toBe(
       'color-mix(in srgb, var(--bb-blunder) 6%, transparent)',
@@ -832,7 +1099,7 @@ describe('GamePage', () => {
     )
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     // The game was played at 1500 and the blob still carries that band, but the pass was
     // pinned to 1700 — which is the level the panel and the board arrow speak for.
@@ -844,7 +1111,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     const panel = screen.getByTestId('maia-panel')
     // 62% of players at this level walk into the blunder — popularity beside cost is the
@@ -862,7 +1129,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     // Playing the human column's own move branches an analysis line off the game.
     await user.click(screen.getByTestId('maia-played-row'))
@@ -897,7 +1164,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     // On the game line, the bar says the stored eval after 1.e4.
     const bar = () => screen.getByRole('img', { name: /Evaluation/ })
@@ -921,7 +1188,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     await user.click(screen.getByTestId('maia-played-row'))
     const rollout = () => within(screen.getByTestId('maia-rollout'))
@@ -947,7 +1214,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
     // The position the blunder was played from: the run's line here is 1…c6 2.d4.
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     // Clicking its *first* move puts the board one move in — and keeps the second.
     const panel = () => within(screen.getByTestId('maia-panel'))
@@ -979,7 +1246,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'd4' }))
     expect(screen.getByText('analysis +2')).toBeInTheDocument()
@@ -1007,7 +1274,7 @@ describe('GamePage', () => {
     vi.stubGlobal('fetch', stubFetch({}, { maiaStatus: 409 }))
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
     // Stored data is still there — the 409 is only about positions nobody analysed.
     expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1500')
 
@@ -1030,7 +1297,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     // The run's line here is 1…c6 2.d4; clicking its first move walks into it.
     await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
@@ -1049,7 +1316,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
     await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
     await user.click(screen.getByRole('button', { name: /Back to game/ }))
 
@@ -1081,7 +1348,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     const view = renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
     await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
     await user.click(screen.getByRole('button', { name: /Back to game/ }))
     expect(screen.getByTestId('kept-variation')).toBeInTheDocument()
@@ -1098,7 +1365,7 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     const panel = () => screen.getByTestId('maia-panel')
     expect(panel()).toHaveTextContent('Maia 1500')
@@ -1615,7 +1882,7 @@ describe('GamePage notes', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
     // The board on the position 1…d5 was played from.
-    await user.keyboard('j')
+    await user.keyboard('.')
 
     await user.click(screen.getByRole('button', { name: 'Note' }))
     const composer = within(screen.getByTestId('note-composer'))
@@ -1643,7 +1910,7 @@ describe('GamePage notes', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Note' }))
@@ -1663,7 +1930,7 @@ describe('GamePage notes', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
     // Walk one move into the run's line 1…c6 2.d4.
     await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
@@ -1703,7 +1970,7 @@ describe('GamePage notes', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard('j')
+    await user.keyboard('.')
     await user.click(within(screen.getByTestId('maia-panel')).getByRole('button', { name: 'c6' }))
 
     await user.click(screen.getByRole('button', { name: 'Pin this line' }))

@@ -48,6 +48,7 @@ import {
   useUpdateRepertoireMove,
 } from '@/lib/api/queries'
 import type { Color, RepertoireNode } from '@/lib/api/types'
+import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 import { LineBreadcrumb } from '@/routes/explorer/components/LineBreadcrumb'
 import {
@@ -58,7 +59,6 @@ import {
   truncateTo,
   withMove,
 } from '@/routes/explorer/line'
-import { isTyping } from '@/routes/game/useBoardKeys'
 
 import {
   childrenAt,

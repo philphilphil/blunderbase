@@ -10,6 +10,7 @@ import { PgnDropOverlay } from '@/lib/desktop/PgnDropOverlay'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import { CommandPaletteProvider } from './CommandPalette'
+import { ShortcutsOverlayProvider } from './ShortcutsOverlay'
 import { NavDrawer, SideNav } from './SideNav'
 import { TopBar } from './TopBar'
 
@@ -42,7 +43,9 @@ const TOAST_CLASSES = {
  * chrome — it fills the titlebar through `<SetPageChrome>` instead.
  *
  * The ⌘K palette wraps the lot rather than sitting in the titlebar: the shortcut is
- * global, and the dialog has to outlive whichever route is under it.
+ * global, and the dialog has to outlive whichever route is under it. The `?` overlay is
+ * mounted inside it for the same reason — and inside rather than outside, so the list can
+ * be raised from anywhere the palette can be.
  *
  * Below `md` the rail has nowhere to stand, so it becomes a drawer over the page. Whether
  * it is up is the shell's state and not the titlebar's: the button that opens it is in the
@@ -112,45 +115,47 @@ export function AppShell() {
 
   return (
     <CommandPaletteProvider>
-      <a
-        href="#main-content"
-        className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-xs font-semibold text-accent-ink transition-transform focus:translate-y-0"
-      >
-        Skip to content
-      </a>
-      <div className="flex h-full min-h-0 flex-col bg-surface">
-        <TopBar onOpenNav={openNav} />
-        <div className="flex min-h-0 flex-1">
-          <SideNav />
-          <main
-            ref={main}
-            id="main-content"
-            tabIndex={-1}
-            className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
-          >
-            <Suspense
-              fallback={
-                <div
-                  role="status"
-                  className="flex flex-1 items-center justify-center text-xs text-dim"
-                >
-                  Loading…
-                </div>
-              }
+      <ShortcutsOverlayProvider>
+        <a
+          href="#main-content"
+          className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-xs font-semibold text-accent-ink transition-transform focus:translate-y-0"
+        >
+          Skip to content
+        </a>
+        <div className="flex h-full min-h-0 flex-col bg-surface">
+          <TopBar onOpenNav={openNav} />
+          <div className="flex min-h-0 flex-1">
+            <SideNav />
+            <main
+              ref={main}
+              id="main-content"
+              tabIndex={-1}
+              className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
             >
-              <Outlet />
-            </Suspense>
-          </main>
+              <Suspense
+                fallback={
+                  <div
+                    role="status"
+                    className="flex flex-1 items-center justify-center text-xs text-dim"
+                  >
+                    Loading…
+                  </div>
+                }
+              >
+                <Outlet />
+              </Suspense>
+            </main>
+          </div>
         </div>
-      </div>
-      <NavDrawer open={navOpen} onClose={closeNav} />
-      <PgnDropOverlay />
-      <NativeFeedback />
-      <Toaster
-        position="bottom-right"
-        gap={8}
-        toastOptions={{ unstyled: true, classNames: TOAST_CLASSES }}
-      />
+        <NavDrawer open={navOpen} onClose={closeNav} />
+        <PgnDropOverlay />
+        <NativeFeedback />
+        <Toaster
+          position="bottom-right"
+          gap={8}
+          toastOptions={{ unstyled: true, classNames: TOAST_CLASSES }}
+        />
+      </ShortcutsOverlayProvider>
     </CommandPaletteProvider>
   )
 }

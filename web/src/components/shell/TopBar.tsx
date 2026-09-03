@@ -10,11 +10,12 @@ import { AccountMenu } from './AccountMenu'
 import { useCommandPalette } from './CommandPalette'
 import { QueueIndicator } from './QueueIndicator'
 import { usePageChrome } from './PageChrome'
+import { ShortcutsButton } from './ShortcutsOverlay'
 import { ThemeToggle } from './ThemeToggle'
 
 /**
- * The 42px titlebar: brand, breadcrumb, then page actions / queue / theme / shortcut /
- * account. Thin, flat and identical on every screen — it is the one strip of the window
+ * The 42px titlebar: brand, breadcrumb, then page actions / queue / theme / search /
+ * shortcuts / account. Thin, flat and identical on every screen — it is the one strip of the window
  * that must never move, so it carries a strong bottom rule and the chrome surface rather
  * than a hairline over the canvas.
  *
@@ -132,6 +133,13 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
         <Search className="size-3.5 md:hidden" aria-hidden />
         <span className="max-md:hidden">⌘K</span>
       </button>
+      {/*
+        Beside the search chip, and the same shape, because it answers the same kind of
+        question: that one is "where is it", this one is "what can I press". Off below
+        `md` — the row has no width to spare there, and a phone has no keyboard to
+        describe.
+      */}
+      <ShortcutsButton className="max-md:hidden" />
       <AccountMenu />
     </header>
   )
