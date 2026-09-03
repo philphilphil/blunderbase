@@ -58,6 +58,8 @@ PLAYED = ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6"]
 
 # How long a test waits for something the gateway does off the back of a closed socket.
 SETTLE_SECONDS = 5.0
+# What a claim is slowed to when a test needs one still in flight when a socket goes.
+SLOW_CLAIM_SECONDS = 0.5
 
 
 @pytest.fixture()
@@ -533,6 +535,38 @@ def test_a_dropped_socket_hands_the_run_straight_back_with_its_attempt_refunded(
         again = dispatch_for(runner)
     assert again["run_id"] == run_id
     assert again["attempt_token"] != frame["attempt_token"]
+
+
+def test_a_claim_in_flight_when_the_socket_goes_does_not_take_the_run_back(
+    api: TestClient, settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The handback waits for the dispatch round on the link rather than racing it.
+
+    The round that follows a dispatch is normally over long before the socket goes, so the
+    interleaving this is about — the claim landing on the far side of the handback, taking
+    the run straight back out for a link that has gone — is one a loaded machine hits and a
+    quick one does not. Slowing the claim to the width of the whole disconnect makes it the
+    ordering every time.
+    """
+    real = analysis.claim_next_run
+
+    def slow_claim(session: Any, **kwargs: Any) -> Any:
+        time.sleep(SLOW_CLAIM_SECONDS)
+        return real(session, **kwargs)
+
+    monkeypatch.setattr(analysis, "claim_next_run", slow_claim)
+    _runner_id, token = register(settings)
+    game_id = seed_game(api)
+
+    with connect(api, token) as runner:
+        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"])
+        frame = dispatch_for(runner)
+
+    queued = wait_for(settings, run_id, RunStatus.QUEUED)
+    time.sleep(SLOW_CLAIM_SECONDS * 2)
+    settled = run_row(settings, run_id)
+    assert (settled.status, settled.attempts) == (RunStatus.QUEUED, 0)
+    assert settled.attempt_token == queued.attempt_token == frame["attempt_token"]
 
 
 def test_the_sweep_takes_a_silent_run_back_and_tells_the_runner_so(

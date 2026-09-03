@@ -75,6 +75,11 @@ WS_CLOSE_GOING_AWAY = 1001
 # The shortest gap between two dispatch rounds. A round that has to hand a run back wakes
 # the pump again through `analysis.queued`, and this is what keeps that from being a spin.
 PUMP_FLOOR_SECONDS = 0.2
+# How long a handback waits for the dispatch round on the same link to finish before it
+# goes ahead anyway. Bounded because the round it is waiting for may be stuck in a send to
+# a machine that stopped reading, and runs sitting `running` under a link that is gone are
+# worse than the untidy interleaving `_hand_back` exists to avoid.
+DETACH_SETTLE_SECONDS = 5.0
 # How many threads the gateway may do database work on at once. A Session holds a pool
 # connection for as long as it lives, so this is also the most of the pool the gateway can
 # ever be holding while the HTTP routes want the rest of it.
@@ -519,20 +524,41 @@ class RunnerGateway:
         server is cancelling, and an `await` there is not guaranteed a turn at all: awaited
         directly, the handback simply would not happen, and the runs would sit `running`
         with the row still claiming the runner is connected. Shielded, this coroutine may
-        be cancelled and the work still finishes.
+        be cancelled and the work still finishes. Nothing here may `await` before the state
+        is dropped and that task is spawned, for the same reason.
         """
         state = self._states.get(runner_id)
         if state is None or (link is not None and state.link is not link):
             return
         self._states.pop(runner_id, None)
-        if close_code is not None:
-            await state.link.close(close_code, reason)
-        held = {run.run_id: run.attempt_token for run in state.runs.values()}
         # Immediately rather than at the 60s sweep: the gateway knows this runner is gone,
         # and a backlog does not need to wait a minute to find out.
-        release = self._spawn(self._db(self._release_link, runner_id, reason, held))
+        release = self._spawn(self._hand_back(state, reason))
         logger.info("runner %r detached: %s", state.name, reason)
+        if close_code is not None:
+            await state.link.close(close_code, reason)
         await asyncio.shield(release)
+
+    async def _hand_back(self, state: RunnerState, reason: str) -> None:
+        """Give a gone link's runs back, once the dispatch round on it has finished.
+
+        The wait is the point. Dropping the state stops the *next* round, but a `pump`
+        already inside one is holding a claim on its way back from the database, and the
+        run it is about to be handed is one of these. Hand them back first and that claim
+        lands on a run that is queued again: it takes it, for a link that is gone, writing
+        a second attempt and a fresh token onto the row, and then hands it back itself
+        under the token no runner was ever told. Wait for the round instead and the claim
+        lands while these runs are still `running`, where it claims nothing and the pump
+        breaks out on its own.
+
+        `state.runs` is read on the far side of that wait, so a run the round did manage to
+        hand over is handed back here rather than left to the sweep.
+        """
+        with contextlib.suppress(TimeoutError):
+            async with asyncio.timeout(DETACH_SETTLE_SECONDS), state.lock:
+                pass
+        held = {run.run_id: run.attempt_token for run in state.runs.values()}
+        await self._db(self._release_link, state.runner_id, reason, held)
 
     # --- messages ---------------------------------------------------------
 
