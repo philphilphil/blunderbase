@@ -458,11 +458,30 @@ export function BoardPanel({
       <PlayerRow side={orientation} game={game} material={material} />
 
       {/*
+        Three groups and two rules. Left, what the board is showing: its settings, Flip,
+        Hints. Then what to do to the game: the analysis tiers, a note, leaving a line. And
+        hard right, past the spacer, where you are and how to move: the ply and score
+        readouts and then the transport and the flagged jumps. Loose in one row, a dozen
+        controls of the same weight read as a strip to be searched; grouped, the hand goes to
+        the end of the row it wants. The rules are that grouping made visible, nothing more.
+
+        The stepping controls anchor the right because that is where the hand lives while a
+        game is being read — against the moves column, beside the list they are walking, and
+        in the one corner of this row that never moves as the middle group grows and shrinks.
+        The two readouts ride with them rather than staying at the far edge: `ply 34 / 91` is
+        the answer the transport changes, and a number belongs next to the thing that sets it.
+
+        Which leaves the phone, where none of that holds. There the row sits directly under
+        the board with the thumb already on it, and what the thumb is there for is the next
+        move — so the navigation group takes `max-md:order-first` and leads. That, and the
+        rules, are the only things the two layouts disagree about; a vertical rule goes below
+        `md` because in a wrapping row it is as likely to open a line as to divide one.
+
         Below `md` this row wraps onto exactly two lines, and the split is designed rather
-        than left to chance. At 375px the transport and flagged groups come to about 296 of
-        the 356 available, so they take the first line together — the thumb line, directly
-        under the board — and Flip is the first thing that cannot follow them. The four
-        toggles and the score chip come to about 341 and make the second. The `flex-1`
+        than left to chance. At 375px the navigation group comes to about 296 of the 356
+        available, so it takes the first line — the thumb line, directly under the board —
+        and the settings group is the first thing that cannot follow it. That group, the
+        analysis buttons and Note come to about 341 and make the second. The `flex-1`
         spacer is dropped there: in a wrapping row it is a forced line break.
 
         Two lines is what `BoardPanel`'s `100dvh` cap budgets for. "Back to game" appears
@@ -477,93 +496,41 @@ export function BoardPanel({
         instead; and a column narrow enough to wrap is by definition one where the board is
         limited by width rather than by the height budget, so the line it takes is height the
         board was not going to use. Nothing wraps at a width that fits, so no ordinary window
-        sees any of this.
+        sees any of this. The groups wrap whole for the same reason: a group split over two
+        lines is worse than a group that moved.
       */}
       <div className="flex flex-wrap items-center gap-2 max-md:gap-1.5">
-        <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
-          <TransportButton label="First" disabled={cursor < 0} onClick={() => onSeek(-1)}>
-            ⏮
-          </TransportButton>
-          <TransportButton label="Previous" disabled={cursor < 0} onClick={() => onSeek(cursor - 1)}>
-            ◀
-          </TransportButton>
-          <TransportButton
-            label="Next"
-            disabled={cursor >= plyCount - 1}
-            onClick={() => onSeek(cursor + 1)}
+        <div className="flex flex-none items-center gap-2 max-md:gap-1.5">
+          <BoardSettingsButton />
+
+          <button
+            type="button"
+            onClick={onFlip}
+            className="flex-none rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
           >
-            ▶
-          </TransportButton>
-          <TransportButton
-            label="Last"
-            last
-            disabled={cursor >= plyCount - 1}
-            onClick={() => onSeek(plyCount - 1)}
+            ⇅ Flip
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onHintsChange(!hints)}
+            aria-pressed={hints}
+            title="Everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+            className={cn(
+              'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
+              hints
+                ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
+                : 'border-edge bg-elevated text-dim hover:text-ink',
+            )}
           >
-            ⏭
-          </TransportButton>
+            Hints
+          </button>
         </div>
 
-        {/*
-          The flagged-move jumps, as their own group beside the transport, at every width.
-          They used to be `md:hidden` — drawn for the phone, which has no keys to press,
-          and left to `j`/`shift+J` on the desktop. That was a keybinding with no affordance:
-          getting to the blunder is what the page is opened for, and the only way to find out
-          the jump existed was to read the shortcut sheet. Stepping ⏭ twenty times to reach
-          it is not a review on a mouse either.
-
-          A group of its own rather than two more cells in the transport group: that group's
-          dividers are drawn by the cell *before* each boundary, so the two sets stay
-          separately bounded and the transport group's last divider is its own business.
-        */}
-        <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
-          <TransportButton
-            label="Previous flagged move"
-            disabled={previousFlagged == null}
-            onClick={() => previousFlagged != null && onSeek(previousFlagged)}
-          >
-            <span className="flex items-center">
-              <ChevronLeft className="size-3.5" aria-hidden />
-              <Flag className="size-3" aria-hidden />
-            </span>
-          </TransportButton>
-          <TransportButton
-            label="Next flagged move"
-            last
-            disabled={nextFlagged == null}
-            onClick={() => nextFlagged != null && onSeek(nextFlagged)}
-          >
-            <span className="flex items-center">
-              <Flag className="size-3" aria-hidden />
-              <ChevronRight className="size-3.5" aria-hidden />
-            </span>
-          </TransportButton>
-        </div>
-
-        <button
-          type="button"
-          onClick={onFlip}
-          className="flex-none rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
-        >
-          ⇅ Flip
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onHintsChange(!hints)}
-          aria-pressed={hints}
-          title="Everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
-          className={cn(
-            'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
-            hints
-              ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-              : 'border-edge bg-elevated text-dim hover:text-ink',
-          )}
-        >
-          Hints
-        </button>
-
-        <BoardSettingsButton />
+        {/* A rule with nothing behind it divides the row from the air. The actions group can
+            be empty — a reference game has no run to queue and the explorer's stand-in board
+            takes no note — so its rule is drawn only when it separates something. */}
+        {readOnly && !onNote && !(inLine && onExitAnalysis) ? null : <Rule />}
 
         {readOnly ? null : (
           <>
@@ -640,6 +607,74 @@ export function BoardPanel({
           <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink">
             {formatScore(score)}
           </span>
+        </div>
+
+        <Rule />
+
+        <div className="flex flex-none items-center gap-2 max-md:order-first max-md:gap-1.5">
+          <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
+            <TransportButton label="First" disabled={cursor < 0} onClick={() => onSeek(-1)}>
+              ⏮
+            </TransportButton>
+            <TransportButton
+              label="Previous"
+              disabled={cursor < 0}
+              onClick={() => onSeek(cursor - 1)}
+            >
+              ◀
+            </TransportButton>
+            <TransportButton
+              label="Next"
+              disabled={cursor >= plyCount - 1}
+              onClick={() => onSeek(cursor + 1)}
+            >
+              ▶
+            </TransportButton>
+            <TransportButton
+              label="Last"
+              last
+              disabled={cursor >= plyCount - 1}
+              onClick={() => onSeek(plyCount - 1)}
+            >
+              ⏭
+            </TransportButton>
+          </div>
+
+          {/*
+            The flagged-move jumps, as their own group beside the transport, at every width.
+            They used to be `md:hidden` — drawn for the phone, which has no keys to press,
+            and left to `j`/`shift+J` on the desktop. That was a keybinding with no affordance:
+            getting to the blunder is what the page is opened for, and the only way to find out
+            the jump existed was to read the shortcut sheet. Stepping ⏭ twenty times to reach
+            it is not a review on a mouse either.
+
+            A group of its own rather than two more cells in the transport group: that group's
+            dividers are drawn by the cell *before* each boundary, so the two sets stay
+            separately bounded and the transport group's last divider is its own business.
+          */}
+          <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
+            <TransportButton
+              label="Previous flagged move"
+              disabled={previousFlagged == null}
+              onClick={() => previousFlagged != null && onSeek(previousFlagged)}
+            >
+              <span className="flex items-center">
+                <ChevronLeft className="size-3.5" aria-hidden />
+                <Flag className="size-3" aria-hidden />
+              </span>
+            </TransportButton>
+            <TransportButton
+              label="Next flagged move"
+              last
+              disabled={nextFlagged == null}
+              onClick={() => nextFlagged != null && onSeek(nextFlagged)}
+            >
+              <span className="flex items-center">
+                <Flag className="size-3" aria-hidden />
+                <ChevronRight className="size-3.5" aria-hidden />
+              </span>
+            </TransportButton>
+          </div>
         </div>
       </div>
     </div>
@@ -818,6 +853,16 @@ function AnalysisTierButton({
  * breakpoints as each other (see the flagged pair, which is a group of its own for exactly
  * that reason). Below `md` the cell grows into a thumb-sized target; it is the same button.
  */
+/**
+ * The rule between two groups of the transport row. Decoration and nothing else, so it is
+ * `aria-hidden` and carries no `role="separator"`: a screen reader walking the row wants the
+ * buttons, and a hairline that announces itself three times is noise. Gone below `md`, where
+ * the row wraps and a vertical rule is as likely to open a line as to divide one.
+ */
+function Rule() {
+  return <span aria-hidden className="h-5 w-px flex-none self-center bg-edge max-md:hidden" />
+}
+
 function TransportButton({
   children,
   label,

@@ -491,3 +491,38 @@ describe('BoardPanel quick-analysis button', () => {
     expect(onRequestQuick).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * The row's three groups. What is asserted is the grouping and the phone's order, not the
+ * pixels: `css: false` means the rule and `max-md:order-first` are classes here rather than
+ * geometry, and the grouping is the part a later edit could quietly undo.
+ */
+describe('BoardPanel transport row', () => {
+  it('keeps the settings, the navigation and the actions in three groups', () => {
+    renderPanel()
+
+    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement!
+    const row = settings.parentElement!
+    const navigation = screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!
+
+    // Flip, Hints and the gear together; the arrows and the flagged jumps together; and the
+    // analysis buttons in neither.
+    for (const name of ['Hints', 'Board settings']) {
+      expect(settings.contains(screen.getByRole('button', { name }))).toBe(true)
+    }
+    for (const name of ['Last', 'Next flagged move']) {
+      expect(navigation.contains(screen.getByRole('button', { name }))).toBe(true)
+    }
+    expect(settings.contains(screen.getByRole('button', { name: 'Deep' }))).toBe(false)
+    expect(navigation.contains(screen.getByRole('button', { name: 'Deep' }))).toBe(false)
+    expect(row.contains(screen.getByRole('button', { name: 'Deep' }))).toBe(true)
+
+    // The arrows anchor the right end of the row, last in the document — and the phone puts
+    // them back on top, because the thumb rests under the board and what it is there for is
+    // the next move.
+    const children = [...row.children]
+    expect(children.indexOf(settings)).toBe(0)
+    expect(children.indexOf(navigation)).toBe(children.length - 1)
+    expect(navigation.className).toContain('max-md:order-first')
+  })
+})

@@ -386,12 +386,13 @@ describe('GamePage', () => {
     expect(within(screen.getByTestId('maia-panel')).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('MPV 3')).toBeInTheDocument()
 
-    // The deep-analysis trigger lives in the board's transport row now, next to Flip and
-    // Hints, rather than as a card of its own further down the column.
+    // The deep-analysis trigger lives in the board's transport row now, rather than as a
+    // card of its own further down the column — in the row's third group, past the rule from
+    // the settings group Flip belongs to.
     const deepButton = screen.getByRole('button', { name: 'Deep' })
-    expect(
-      screen.getByRole('button', { name: '⇅ Flip' }).parentElement?.contains(deepButton),
-    ).toBe(true)
+    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement
+    expect(settings?.contains(deepButton)).toBe(false)
+    expect(settings?.parentElement?.contains(deepButton)).toBe(true)
   })
 
   it('puts both players’ Lichess-style totals to the left of the evaluation chart', async () => {
