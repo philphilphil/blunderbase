@@ -81,8 +81,8 @@ export interface BoardPanelProps {
   /**
    * A game that is not a row in the library — a model game out of one of the reference
    * books. There is nothing on the server to queue a run against, so the two analysis
-   * buttons are left out rather than shown refusing; the way to get them is the chrome
-   * bar's "Add to library", which is where that decision belongs.
+   * buttons are left out rather than shown refusing; the way to get them is "Add to
+   * library", which arrives in this same row through `actions`.
    */
   readOnly?: boolean
   onFlip: () => void
@@ -122,6 +122,13 @@ export interface BoardPanelProps {
   onNote?: () => void
   /** Whether the composer is open, so the button reads as the toggle it is. */
   noting?: boolean
+  /**
+   * What the studio hangs off this game beyond analysing it — "Add to library" for a model
+   * game, "Back to explorer" for anything opened from there (`StudioActions`). Rendered at
+   * the end of the actions band, so a screen that has no analysis buttons still puts them
+   * where the reader is looking, immediately after Hints.
+   */
+  actions?: ReactNode
   className?: string
 }
 
@@ -186,6 +193,7 @@ export function BoardPanel({
   onRequestDeep,
   onNote,
   noting,
+  actions,
   className,
 }: BoardPanelProps) {
   // Both analysis buttons disable together — only one run is ever live over a game — but
@@ -459,8 +467,10 @@ export function BoardPanel({
 
       {/*
         Three groups and two rules. Left, what the board is showing: its settings, Flip,
-        Hints. Then what to do to the game: the analysis tiers, a note, leaving a line. And
-        hard right, past the spacer, where you are and how to move: the ply and score
+        Hints. Then what to do to the game: the analysis tiers, a note, leaving a line, and
+        whatever the studio hangs off this particular game — adding a model game to the
+        library, going back to the explorer it was opened from. And hard right, past the
+        spacer, where you are and how to move: the ply and score
         readouts and then the transport and the flagged jumps. Loose in one row, a dozen
         controls of the same weight read as a strip to be searched; grouped, the hand goes to
         the end of the row it wants. The rules are that grouping made visible, nothing more.
@@ -528,9 +538,10 @@ export function BoardPanel({
         </div>
 
         {/* A rule with nothing behind it divides the row from the air. The actions group can
-            be empty — a reference game has no run to queue and the explorer's stand-in board
-            takes no note — so its rule is drawn only when it separates something. */}
-        {readOnly && !onNote && !(inLine && onExitAnalysis) ? null : <Rule />}
+            be empty — the explorer's stand-in board queues no run, takes no note and is not
+            a game anybody arrived at — so its rule is drawn only when it separates
+            something. */}
+        {readOnly && !onNote && !(inLine && onExitAnalysis) && !actions ? null : <Rule />}
 
         {readOnly ? null : (
           <>
@@ -588,6 +599,8 @@ export function BoardPanel({
             Back to game
           </button>
         ) : null}
+
+        {actions}
 
         <div className="flex-1 max-md:hidden" />
         {/*

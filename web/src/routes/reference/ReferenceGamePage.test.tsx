@@ -5,7 +5,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import { usePageChrome } from '@/components/shell/PageChrome'
 import type { ReferenceGame } from '@/lib/api/types'
 import { EventsProvider } from '@/lib/events/EventsProvider'
 import { resetSessionVariations } from '@/routes/game/sessionVariations'
@@ -71,15 +70,6 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-/**
- * The studio pins "Add to library" and "Back to explorer" into the titlebar through
- * `SetPageChrome`, which the shell renders. There is no shell here, so this stands in for
- * the one thing these tests need out of it.
- */
-function Titlebar() {
-  return <div data-testid="titlebar">{usePageChrome().actions}</div>
-}
-
 function renderPage(entry = '/reference/masters/abcd1234') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
@@ -88,7 +78,6 @@ function renderPage(entry = '/reference/masters/abcd1234') {
     <Providers client={client}>
       <EventsProvider>
         <MemoryRouter initialEntries={[entry]}>
-          <Titlebar />
           <Routes>
             <Route path="/reference/:source/:gameId" element={<ReferenceGamePage />} />
             <Route path="/games/:id" element={<div>library game</div>} />

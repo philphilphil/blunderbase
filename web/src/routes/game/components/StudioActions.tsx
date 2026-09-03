@@ -1,15 +1,17 @@
 /**
- * What the studio pins into the titlebar: the way back to where the game was opened from,
- * and — for a model game out of one of the reference books — the one door through the wall
- * between those books and the library.
+ * The way back to where the game was opened from, and — for a model game out of one of the
+ * reference books — the one door through the wall between those books and the library.
  *
- * A component rather than a node built inside `GamePage` for one concrete reason. The
- * titlebar is filled through `SetPageChrome`, whose effect keys off the *identity* of the
- * node it is handed; the studio re-renders on every engine tick, so a node rebuilt from a
- * react-query mutation result — which is a fresh object each render — would republish the
- * chrome on every one of those ticks, and the provider's own `setState` would feed straight
- * back into the next render. Holding the mutation in here keeps the element's identity
- * dependent only on the game and the way back, both of which are stable.
+ * These lived in the titlebar, at the far end of a strip the reader's eye never goes to
+ * while a game is being read: the whole screen below it is board and moves, and a reader
+ * three plies into a model game had no way of knowing the door was there at all. They ride
+ * in the board's control row now, as one more group in the band that says what to do to the
+ * game — beside the analysis tiers and Note, which are the same kind of decision, and within
+ * a hand's reach of the board they are about.
+ *
+ * A component rather than a node built inside `GamePage` because it holds a react-query
+ * mutation: the studio re-renders on every engine tick, and the pending and error states of
+ * "Add to library" belong to the button rather than to the page that places it.
  */
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -18,8 +20,8 @@ import { cn } from '@/lib/utils'
 
 import type { StudioGame } from '../GamePage'
 
-const LINK =
-  'rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] font-semibold text-accent-teal hover:border-edge-hover hover:text-accent-link'
+/** The board row's button metrics — shared with everything else in that band. */
+const BUTTON = 'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5'
 
 export function StudioActions({
   game,
@@ -31,12 +33,17 @@ export function StudioActions({
 }) {
   if (game.kind === 'library' && !backTo) return null
   return (
-    <div className="flex items-center gap-2">
+    // A group of its own, so the row wraps it whole rather than splitting the door from the
+    // way back — the same rule every other group in that row is built on.
+    <div className="flex flex-none items-center gap-2 max-md:gap-1.5">
       {game.kind === 'reference' ? (
         <AddToLibrary source={game.source} id={game.id} backTo={backTo} />
       ) : null}
       {backTo ? (
-        <Link to={backTo} className={LINK}>
+        <Link
+          to={backTo}
+          className={cn(BUTTON, 'border-edge bg-elevated text-soft hover:text-ink')}
+        >
           ← Back to explorer
         </Link>
       ) : null}
@@ -81,7 +88,14 @@ function AddToLibrary({
         add.error?.message ??
         'Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic.'
       }
-      className={cn(LINK, add.isError && 'border-blunder/40 text-blunder hover:text-blunder')}
+      // Teal-tinted, the row's vocabulary for the one control that is doing something rather
+      // than showing something. It is the only affirmative act on a model game's screen.
+      className={cn(
+        BUTTON,
+        add.isError
+          ? 'border-blunder/40 bg-blunder/10 text-blunder'
+          : 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal hover:border-accent-teal/50',
+      )}
     >
       {add.isPending ? 'Adding…' : add.isError ? 'Could not add — retry' : '+ Add to library'}
     </button>

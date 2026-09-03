@@ -20,8 +20,8 @@
  * forgotten: no analysis, no notes, no row in the library. That is the wall issue #3 draws
  * between the reference sources and the database, and the studio's `readOnly` is the far
  * side of it — every affordance that would write something is left out rather than shown
- * refusing. The one door through is "Add to library" in the chrome bar, which stores the
- * game as one the owner did not play and navigates to the real thing.
+ * refusing. The one door through is "Add to library" in the board's control row, which
+ * stores the game as one the owner did not play and navigates to the real thing.
  */
 import { useParams } from 'react-router-dom'
 

@@ -928,14 +928,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const cameFrom = (location.state as { from?: unknown } | null)?.from
   const backToExplorer =
     typeof cameFrom === 'string' && cameFrom.startsWith('/explorer') ? cameFrom : null
-  // Memoised because `SetPageChrome` re-publishes whenever the node's identity changes, and
-  // this component renders on every engine tick — see `StudioActions`, which is a component
-  // rather than a node built here for exactly that reason. Up with the other hooks, above
-  // the loading and error returns below, so the hook order never depends on the data.
-  const chromeActions = useMemo(
-    () => <StudioActions game={from} backTo={backToExplorer} />,
-    [backToExplorer, from],
-  )
   const [requested] = useState(() => ({
     ply: intParam(params.get('ply')),
     line: intParam(params.get('line')),
@@ -1281,6 +1273,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // A note hangs off a game row, so there is nothing to write one against until the
       // model game has been added to the library.
       onNote={readOnly ? undefined : focusComposer}
+      // "Add to library" and "Back to explorer" ride in the control row under the board
+      // rather than in the titlebar: they are decisions about the game being read, and the
+      // titlebar is the one strip on this screen nobody's eye goes to.
+      actions={<StudioActions game={from} backTo={backToExplorer} />}
     />
   )
 
@@ -1325,8 +1321,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * `NotesTrack` reserves a fixed height for whatever it is handed, so leaving the slot
    * empty would open a hole in the column rather than close it. What goes there is the one
    * sentence that explains the state — and it is deliberately not a second "Add to library"
-   * button: that decision has one place, the chrome bar, and two of them would be two
-   * places to look for the same thing.
+   * button: that decision has one place, the control row under the board, and two of them
+   * would be two places to look for the same thing.
    */
   const referenceComposer = (
     <div className="flex min-w-0 flex-col justify-center rounded-md border border-dashed border-edge-strong px-3 text-[0.71875rem] leading-relaxed text-dim">
@@ -1444,7 +1440,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
               { label: players },
             ]
       }
-      actions={chromeActions}
     />
   )
 

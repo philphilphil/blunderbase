@@ -231,8 +231,8 @@ one of your own games opens in: the board with its analysis line, the move table
 engine search and Maia's read of the position all work, because all of them are about the
 position rather than about a row in your database. What is missing is what needs a row —
 the stored analysis passes, notes, pinned lines — and the way to get those is **Add to
-library**, in the titlebar beside **Back to explorer**. That stores the game as one you did
-not play: it gets the quick analysis pass like any import, and takes notes, but it counts
+library**, in the row of controls under the board beside **Back to explorer**. That stores
+the game as one you did not play: it gets the quick analysis pass like any import, and takes notes, but it counts
 in no statistic and is not in your opening tree. The games list shows your own games by
 default; the **Mine / Others / All** switch at the front of its filter bar shows the added
 games on their own or beside yours. (A note you write while
