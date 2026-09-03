@@ -4,6 +4,30 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.11.0 — 2026-09-03
+
+- Added a public demo mode for serving a read-only library
+- Added syncing connected accounts on a schedule
+- Added stopping a running import
+- Added asking whether an imported PGN holds your own games
+- Added a sound as each move lands
+- Added an arrow for the move the game played
+- Added the move and game a note was written on
+- Added remembering which engine the analysis board was pointed at
+- Added building the macOS and Windows desktop apps in one command
+- Added a time-control filter to the Stats page
+- Changed the Stats filters to sit on the page rather than the titlebar
+- Changed the notes screen to a time-ordered stream or sheet
+- Changed model games to open in the full game screen
+- Changed Hints to one switch, with the board settings in a dialog
+- Changed the eval graph to bars, with blunder marks
+- Changed the sources screen to a box per source
+- Changed the board controls into three groups, transport on the right
+- Fixed the Stats games tile labelling every game in the window as analysed
+- Fixed a reconnecting runner being left with its engines switched off
+- Fixed the game notes composer saving the same note twice
+- Fixed workers waiting out the full shutdown grace while idle
+
 ## v0.10.0 — 2026-09-02
 
 - Added masters and Lichess reference books to the explorer (needs a Lichess API token in Settings)
