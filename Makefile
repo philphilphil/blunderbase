@@ -37,6 +37,7 @@ web:
 # NSIS installer in the `desktop-windows` workflow, because nothing cross-compiles it. The
 # workflow run is started first and collected last so it overlaps the local build instead of
 # following it. `make desktop-macos` is the same local half without GitHub in the way.
+# Both installers end up under desktop/dist — the .dmg in mac/, the .exe in windows/.
 desktop:
 	sh desktop/scripts/windows-ci.sh dispatch
 	cd desktop && pnpm build
