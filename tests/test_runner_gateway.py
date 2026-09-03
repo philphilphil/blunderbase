@@ -569,6 +569,47 @@ def test_a_claim_in_flight_when_the_socket_goes_does_not_take_the_run_back(
     assert settled.attempt_token == queued.attempt_token == frame["attempt_token"]
 
 
+def test_a_reconnect_during_the_handback_is_not_undone_by_it(
+    api: TestClient, settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A machine that comes straight back is not marked gone by the release of its old link.
+
+    The handback is two writes, the disconnection and the runs, and a runner that restarts
+    fast says hello while they are in flight. Its registration landing between them — or
+    between the last of them and its first claim — left a welcomed runner with its engines
+    switched off underneath it: nothing was ever dispatched, and the reconnect tests hung
+    on exactly that whenever CI was slow. Slowing the disconnection write to the width of
+    the reconnect makes that the ordering every time.
+    """
+    real = runners_service.mark_disconnected
+
+    def slow_disconnect(session: Any, runner_id: int, **kwargs: Any) -> None:
+        time.sleep(SLOW_CLAIM_SECONDS)
+        real(session, runner_id, **kwargs)
+
+    monkeypatch.setattr(runners_service, "mark_disconnected", slow_disconnect)
+    runner_id, token = register(settings)
+    game_id = seed_game(api)
+
+    with connect(api, token) as runner:
+        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"])
+        frame = dispatch_for(runner)
+
+    with connect(api, token) as runner:
+        again = dispatch_for(runner)
+        assert again["run_id"] == run_id
+        assert again["attempt_token"] != frame["attempt_token"]
+        # Long after the old link's release has landed, the row is still the new link's.
+        time.sleep(SLOW_CLAIM_SECONDS * 2)
+        with get_sessionmaker(settings)() as session:
+            assert runners_service.require_runner(session, runner_id).connected is True
+            enabled = session.scalars(
+                select(Engine.enabled).where(Engine.runner_id == runner_id)
+            ).all()
+            assert enabled and all(enabled)
+        assert run_row(settings, run_id).status is RunStatus.RUNNING
+
+
 def test_the_sweep_takes_a_silent_run_back_and_tells_the_runner_so(
     api: TestClient, settings: Settings
 ) -> None:

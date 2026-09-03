@@ -286,9 +286,12 @@ function toggle(on: boolean) {
 }
 
 /**
- * The engine picker's memory, preloaded. jsdom in this setup exposes no `localStorage`, so
- * the test brings its own — and hands it back, because what is *not* written to it is half
- * of what the fallback below claims.
+ * The engine picker's memory, preloaded. Every test brings its own rather than using
+ * whatever `localStorage` the environment has: what is *not* written to it is half of what
+ * the fallback below claims, and a real one outlives the test that wrote to it — the
+ * `resume(7)` a few tests up was being read back at the next mount as a pick already
+ * made, so `setEngineId(7)` there had nothing to change. (Which one the environment has
+ * depends on the Node version: jsdom's persists for the file, Node's own is not enabled.)
  */
 function rememberedEngine(id: number | null): Storage {
   const values = new Map<string, string>()
@@ -351,6 +354,7 @@ beforeEach(() => {
   patchGate = null
   patchRefusal = null
   vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket)
+  rememberedEngine(null)
   stubFetch()
 })
 

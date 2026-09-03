@@ -332,6 +332,9 @@ class RunnerGateway:
         )
         self._sessions = sessions
         self._states: dict[int, RunnerState] = {}
+        # One per runner, held across the database side of an attach and of a handback, so
+        # a link's registration and the release of the link it replaces cannot interleave.
+        self._runner_locks: dict[int, asyncio.Lock] = {}
         self._handlers: dict[str, list[Handler]] = {}
         self._tasks: list[asyncio.Task[None]] = []
         self._background: set[asyncio.Task[None]] = set()
@@ -463,25 +466,31 @@ class RunnerGateway:
             )
             self._emit_disconnected(previous, REASON_REPLACED)
 
-        registration = await self._db(
-            self._register, runner.id, ads, hello.get("slots"), hello.get("version"),
-            link.transport, bool(hello.get("browser")),
-        )
-        resumed, cancelled = await self._db(self._reconcile, reported, inherited)
-        link.runner_id = runner.id
-        link.name = registration.name
-        state = RunnerState(
-            runner_id=runner.id,
-            name=registration.name,
-            slots=registration.slots,
-            version=None if hello.get("version") is None else str(hello["version"]),
-            link=link,
-            engine_ids=registration.engine_ids,
-            engines=registration.engines,
-            reported_slots=None if hello.get("slots") is None else int(hello["slots"]),
-            runs=resumed,
-        )
-        self._states[runner.id] = state
+        # Under the runner's lock, together with installing the state: a link that dropped
+        # a moment ago may still be on its way to recording that disconnection, and that
+        # write landing between this registration and the first claim would switch the
+        # engines just registered back off — a welcomed runner nothing is ever dispatched
+        # to. `_hand_back` takes the same lock, and looks for this state on the far side.
+        async with self._runner_lock(runner.id):
+            registration = await self._db(
+                self._register, runner.id, ads, hello.get("slots"), hello.get("version"),
+                link.transport, bool(hello.get("browser")),
+            )
+            resumed, cancelled = await self._db(self._reconcile, reported, inherited)
+            link.runner_id = runner.id
+            link.name = registration.name
+            state = RunnerState(
+                runner_id=runner.id,
+                name=registration.name,
+                slots=registration.slots,
+                version=None if hello.get("version") is None else str(hello["version"]),
+                link=link,
+                engine_ids=registration.engine_ids,
+                engines=registration.engines,
+                reported_slots=None if hello.get("slots") is None else int(hello["slots"]),
+                runs=resumed,
+            )
+            self._states[runner.id] = state
         logger.info(
             "runner %r attached over %s with %s slot(s) and %s engine(s)",
             state.name,
@@ -553,12 +562,28 @@ class RunnerGateway:
 
         `state.runs` is read on the far side of that wait, so a run the round did manage to
         hand over is handed back here rather than left to the sweep.
+
+        The database side runs under the runner's lock, and whether the runner is *gone* is
+        decided there: the machine may have reconnected during the wait above — a restart,
+        a network blip — and its new link has then registered its engines and marked it
+        connected. Recording this link's disconnection on top of that would switch those
+        engines off again under a runner that is up and asking for work. So a newer link
+        means only the runs are handed back, less the ones that link said it still holds.
         """
         with contextlib.suppress(TimeoutError):
             async with asyncio.timeout(DETACH_SETTLE_SECONDS), state.lock:
                 pass
-        held = {run.run_id: run.attempt_token for run in state.runs.values()}
-        await self._db(self._release_link, state.runner_id, reason, held)
+        async with self._runner_lock(state.runner_id):
+            newer = self._states.get(state.runner_id)
+            held = {
+                run.run_id: run.attempt_token
+                for run in state.runs.values()
+                if newer is None or run.run_id not in newer.runs
+            }
+            await self._db(self._release_link, state.runner_id, reason, held, newer is None)
+
+    def _runner_lock(self, runner_id: int) -> asyncio.Lock:
+        return self._runner_locks.setdefault(runner_id, asyncio.Lock())
 
     # --- messages ---------------------------------------------------------
 
@@ -1332,11 +1357,23 @@ class RunnerGateway:
             )
         return True, None
 
-    def _release_link(self, runner_id: int, reason: str, held: Mapping[int, str]) -> None:
-        """Everything a gone link owes the database, in one unit of work."""
+    def _release_link(
+        self, runner_id: int, reason: str, held: Mapping[int, str], gone: bool
+    ) -> None:
+        """Everything a gone link owes the database.
+
+        The disconnection is recorded first. Each half commits on its own, and a run that
+        is queued again is what everything else keys off — a test polling for it, a runner
+        reconnecting the moment its socket dropped. Written in this order, by the time the
+        run is visible as queued the runner is already recorded as gone, so a registration
+        that follows it is the newer word rather than one this write comes along and
+        overrules. `gone` is false when a newer link is already up: then the row is its,
+        and only the runs are given back.
+        """
+        if gone:
+            self._disconnected(runner_id, reason)
         if held:
             self._abandon_held(held)
-        self._disconnected(runner_id, reason)
 
     def _abandon_held(self, held: Mapping[int, str]) -> None:
         """Hand runs back, but only the ones still running under the token we handed out.
