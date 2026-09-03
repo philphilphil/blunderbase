@@ -1,7 +1,7 @@
 {
   "name": "blunderbase-desktop",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.11.0",
   "scripts": {
     "build": "sh scripts/build-macos.sh",
     "build:macos": "sh scripts/build-macos.sh",
