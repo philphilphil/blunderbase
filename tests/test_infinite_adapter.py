@@ -24,6 +24,10 @@ from tests.fake_uci import STOCKFISH_OPTIONS, commands, fake_engine
 STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 # Black to move, so a score reported by the engine is Black's.
 BLACK_TO_MOVE = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+# The two ways a game ends with nothing left to search: fool's mate, and a king with no
+# move that is not check. Scrolling to the last move of a won game reaches the first.
+CHECKMATE = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
+STALEMATE = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"
 
 
 class Clock:
@@ -260,6 +264,57 @@ def test_an_engine_that_answers_and_stops_says_so(tmp_path: Path) -> None:
 
     assert finished is True
     assert seen and seen[-1].lines[0]["cp"] == 12
+
+
+@pytest.mark.parametrize("fen", [CHECKMATE, STALEMATE])
+def test_a_finished_game_is_answered_without_asking_the_engine(tmp_path: Path, fen: str) -> None:
+    """There is no search in a mate, and the answers engines give there are a minefield."""
+    log = tmp_path / "commands.log"
+    command = scripted(tmp_path, log=str(log))
+    seen: list[Snapshot] = []
+
+    with StockfishAdapter(command) as adapter:
+        finished = InfiniteSearch(adapter, interval=0.0, tick=0.01).run(
+            chess.Board(fen),
+            multipv=1,
+            on_snapshot=seen.append,
+            stop=threading.Event(),
+        )
+
+    assert finished is True
+    assert seen == [Snapshot()], "the board is told there is nothing, not left on the old picture"
+    assert commands(log, "go") == [], "a finished game never reached the engine"
+
+
+def test_a_bestmove_the_library_cannot_parse_costs_the_process_not_the_slot(
+    tmp_path: Path,
+) -> None:
+    """Leela answers a terminal position with `bestmove a1a1`, which python-chess rejects.
+
+    It rejects it without ever finishing the analysis, so the wait for the engine to go
+    quiet never returns on its own. Raising is what matters: the caller's `except` is what
+    drops the process, and a process is cheaper than a slot the pool never sees again.
+    """
+    from backend.adapters.stockfish import EngineError
+
+    command = scripted(
+        tmp_path,
+        go_default={
+            "info": ["depth 4 score cp 12 nodes 900 pv e2e4"],
+            "hold": True,
+            "bestmove": "a1a1",
+        },
+    )
+
+    with StockfishAdapter(command) as adapter:
+        driver = InfiniteSearch(adapter, interval=0.0, tick=0.01, quieten_timeout=0.5)
+        with pytest.raises(EngineError):
+            driver.run(
+                chess.Board(STARTING_FEN),
+                multipv=1,
+                on_snapshot=lambda _snapshot: None,
+                stop=_set_after(0.3),
+            )
 
 
 def test_an_engine_that_dies_mid_search_is_reported_as_an_engine_error(tmp_path: Path) -> None:

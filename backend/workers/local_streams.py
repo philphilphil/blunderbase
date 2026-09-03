@@ -131,8 +131,13 @@ class LocalStreamBackend:
             task.cancel()
         try:
             await asyncio.wait_for(asyncio.shield(task), CLOSE_TIMEOUT)
-        except TimeoutError:  # pragma: no cover - an engine that will not stop
-            logger.warning("stream %s would not let go of its engine", session_id)
+        except TimeoutError:
+            # An engine that has not answered `stop` in ten seconds is not going to.
+            # Cancelling unwinds the task through the pool, which shuts the process down —
+            # and a dead process is the only thing that frees the slot. Leaving the task
+            # running would leak a slot out of the cap the analysis workers share.
+            logger.warning("stream %s would not let go of its engine; dropping it", session_id)
+            task.cancel()
         except BaseException:
             pass
 

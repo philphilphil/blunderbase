@@ -865,7 +865,12 @@ class RunnerClient:
             try:
                 await asyncio.wait_for(asyncio.shield(task), CLOSE_TIMEOUT)
             except TimeoutError:
-                logger.warning("stream %s would not let go of its engine", session_id)
+                # An engine that has not answered `stop` in ten seconds is not going to.
+                # Cancelling unwinds the task through the pool, which shuts the process
+                # down — and a dead process is the only thing that frees the slot. Leaving
+                # the task running would leak it for the life of the runner.
+                logger.warning("stream %s would not let go of its engine; dropping it", session_id)
+                task.cancel()
             except BaseException:
                 pass
         if answer:

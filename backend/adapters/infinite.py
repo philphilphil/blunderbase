@@ -50,6 +50,10 @@ SNAPSHOT_INTERVAL = 0.5
 # How long the loop waits on the stop event when the engine has said nothing new. Short
 # enough that closing a session is instant, long enough that idling costs nothing.
 IDLE_TICK = 0.05
+# How long a stopped search is given to hand its `bestmove` back before the process is
+# written off. An engine answers a `stop` in milliseconds; one that has not answered in
+# this long never will, and a slot the pool never gets back costs more than a process.
+QUIETEN_TIMEOUT = 5.0
 
 Clock = Callable[[], float]
 
@@ -187,10 +191,12 @@ class InfiniteSearch:
         *,
         interval: float = SNAPSHOT_INTERVAL,
         tick: float = IDLE_TICK,
+        quieten_timeout: float = QUIETEN_TIMEOUT,
     ) -> None:
         self.adapter = adapter
         self.interval = interval
         self.tick = tick
+        self.quieten_timeout = quieten_timeout
 
     def run(
         self,
@@ -205,7 +211,18 @@ class InfiniteSearch:
         The engine is left idle either way: the search is stopped and waited out before
         this returns, because the next thing the caller does with that process is start
         another search on it — a restart at a new position, on the same slot.
+
+        A finished game is answered here rather than by the engine. There is nothing to
+        search, and engines disagree about how to say so: Stockfish answers
+        `bestmove (none)`, Leela answers `bestmove a1a1`, which python-chess refuses to
+        parse — and refuses without ever finishing the analysis, so the wait below would
+        never return and the slot would never come back. Scrolling to the last move of a
+        won game is the ordinary way to reach one of these positions.
         """
+        if board.is_game_over():
+            on_snapshot(Snapshot())
+            return True
+
         buffer = SnapshotBuffer(board, multipv=multipv, interval=self.interval)
         kwargs: dict[str, Any] = {"multipv": multipv} if multipv else {}
         try:
@@ -230,11 +247,15 @@ class InfiniteSearch:
         except START_ERRORS as exc:
             raise EngineError(f"infinite analysis failed: {exc}") from exc
         finally:
-            _quieten(search)
+            quiet = _quieten(search, self.quieten_timeout)
 
+        if not quiet:
+            # Reached only when the loop itself did not raise, so this is the whole story:
+            # the process is stuck and the caller's `except` is what frees the slot.
+            raise EngineError("the engine did not answer `stop`")
         if finished:
-            # It answered and stopped — a terminal position, or an engine that will not
-            # search this one. The last picture is still worth showing.
+            # It answered and stopped by itself — an engine that will not search this
+            # position. The last picture is still worth showing.
             self._offer(buffer.flush(), on_snapshot)
         return finished
 
@@ -243,14 +264,28 @@ class InfiniteSearch:
             on_snapshot(snapshot)
 
 
-def _quieten(search: Any) -> None:
-    """Stop the search and wait for the engine to answer, so the process is free again.
+def _quieten(search: Any, timeout: float) -> bool:
+    """Stop the search and wait for the engine to answer. False if it never did.
 
     Both halves are suppressed: an engine that has already died cannot be stopped and has
     no `bestmove` left to give, and the caller learns that from the exception the loop
     raised rather than from a second one thrown out of a `finally`.
+
+    The wait is bounded, and on a thread of its own because `search.wait()` has no timeout
+    to give it. There is more than one way for that call never to return — a `bestmove`
+    python-chess cannot parse leaves the analysis unfinished for good, with the engine
+    itself sitting perfectly idle — and an unbounded wait here is a pool slot nobody ever
+    gets back. Whoever is left holding the timed-out thread is the engine's shutdown: it
+    ends the moment the process does.
     """
     with contextlib.suppress(Exception):
         search.stop()
-    with contextlib.suppress(Exception):
-        search.wait()
+    answered = threading.Event()
+
+    def wait() -> None:
+        with contextlib.suppress(Exception):
+            search.wait()
+        answered.set()
+
+    threading.Thread(target=wait, name="engine-quieten", daemon=True).start()
+    return answered.wait(timeout)
