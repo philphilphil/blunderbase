@@ -1737,7 +1737,10 @@ def test_unknown_and_planned_dimensions_say_so(library: Library) -> None:
 
 def test_worst_recent_moments_rank_by_win_percentage_given_away(analysed: Library) -> None:
     moments = stats.get_worst_recent_moments(analysed.session, amount=3)
-    assert [moment["win_loss"] for moment in moments] == [55.0, 42.0, 35.0]
+    # Two games hold the owner's blunders, so three were asked for and two came back: the
+    # 35 is in the same game as the 55 and is not a second thing to work on.
+    assert [moment["win_loss"] for moment in moments] == [55.0, 42.0]
+    assert len({moment["game"]["id"] for moment in moments}) == 2
     worst = moments[0]
     assert worst["san"] == "Qb3"
     assert worst["piece"] == "queen"
@@ -2197,7 +2200,7 @@ def test_a_listing_never_reads_a_fold_and_the_ranking_reads_them_in_one_query(
     session.expunge_all()
     with counting_statements(session) as ranking:
         moments = stats.get_worst_recent_moments(session, amount=3)
-    assert [moment["win_loss"] for moment in moments] == [55.0, 42.0, 35.0]
+    assert [moment["win_loss"] for moment in moments] == [55.0, 42.0]
     assert len([statement for statement in ranking if "stat_summary" in statement]) == 1
 
 
@@ -2230,7 +2233,11 @@ def test_moments_that_gave_away_exactly_as_much_rank_the_same_way_either_side(
 ) -> None:
     """Ties are the common case, not the exotic one: every blunder into a forced mate gives
     away the same 99.88. Which of them the ranking shows has to be the same answer however
-    it was reached, and the same answer on the next refresh."""
+    it was reached, and the same answer on the next refresh.
+
+    It is also the shape the one-per-game rule exists for — a mate missed twice in a row is
+    one lesson — so four were asked for and the three games hold three.
+    """
     session = library.session
     for source_id in ("qg000001", "qg000004", "qg000006"):
         analyse(
@@ -2251,8 +2258,46 @@ def test_moments_that_gave_away_exactly_as_much_rank_the_same_way_either_side(
     assert [(moment["game"]["id"], moment["ply"]) for moment in folded] == [
         (moment["game"]["id"], moment["ply"]) for moment in scanned
     ]
-    # Oldest game first, then earliest ply, rather than whatever the scan reached first.
-    assert [moment["ply"] for moment in folded] == [0, 2, 0, 2]
+    # One per game, the earliest ply of the tie, oldest game first — rather than whatever
+    # the scan reached first.
+    assert [moment["ply"] for moment in folded] == [0, 0, 0]
+    assert len({moment["game"]["id"] for moment in folded}) == 3
+
+
+def test_a_game_offers_its_worst_moment_and_no_other_however_it_is_read(
+    library: Library, engine_row: Engine
+) -> None:
+    """A game that fell apart is one thing to work on, not four.
+
+    The scan and the folds have to agree about that, since which of them answers depends on
+    whether the library happens to be folded yet — see `_worst_moments_from_summaries`.
+    """
+    session = library.session
+    analyse(
+        session,
+        library["qg000001"],
+        [
+            {"ply": 0, "classification": Classification.BLUNDER, "win_loss": 90.0},
+            {"ply": 2, "classification": Classification.BLUNDER, "win_loss": 88.0},
+            {"ply": 4, "classification": Classification.BLUNDER, "win_loss": 40.0},
+        ],
+        engine=engine_row,
+    )
+    analyse(
+        session,
+        library["qg000004"],
+        [{"ply": 0, "classification": Classification.BLUNDER, "win_loss": 60.0}],
+        engine=engine_row,
+    )
+    scanned = stats.get_worst_recent_moments(session, amount=5)
+    assert [(moment["ply"], moment["win_loss"]) for moment in scanned] == [(0, 90.0), (0, 60.0)]
+
+    fold_every_summary(session)
+    stats.reset_stats_cache()
+    folded = stats.get_worst_recent_moments(session, amount=5)
+    assert [(moment["game"]["id"], moment["ply"]) for moment in folded] == [
+        (moment["game"]["id"], moment["ply"]) for moment in scanned
+    ]
 
 
 def test_the_backfill_folds_one_chunk_at_a_time_and_says_when_it_is_done(

@@ -400,6 +400,14 @@ def get_worst_recent_moments(
     Ranked by win percentage given away rather than by centipawns, so a swing from +8 to
     +4 does not outrank one from equal to lost.
 
+    ONE MOMENT PER GAME, and it is the worst one. A game that fell apart holds the top of
+    this ranking on its own otherwise — a missed mate in one, missed again on the next move
+    and the one after that, is three moments that give away 99.9% each and are the same
+    mistake seen three times. Whoever reads this list, the dashboard or the coach, is asking
+    what to work on next; three views of one collapse answer that once and crowd out the two
+    other games that would have answered it differently. The rest of a bad game is not lost,
+    it is one click away on the game itself.
+
     Cached like the dimensions are, and keyed on `days` rather than on the moment that
     window starts at: the start moves with every call and the ranking does not, so keying
     on the derived timestamp would be a key that never repeats.
@@ -435,6 +443,14 @@ def _worst_recent_moments(
     filters: GameFilters | None,
     classifications: Sequence[Classification],
 ) -> list[dict[str, Any]]:
+    """The ranking off the evals themselves, for a question the folds cannot answer.
+
+    One game can hold any number of the top rows, and only the first of them is kept, so
+    the number of rows to read is not the number of moments wanted. The window widens until
+    it holds `amount` distinct games or the query runs out of rows to give — normally one
+    pass, and a game that blundered its way through fifty plies costs a doubling rather
+    than a short answer.
+    """
     since = None
     if days is not None:
         since = datetime.now(UTC) - timedelta(days=days)
@@ -443,22 +459,34 @@ def _worst_recent_moments(
     conditions = [MoveEval.win_loss.is_not(None)]
     if classifications:
         conditions.append(MoveEval.classification.in_(list(classifications)))
-    rows = _eval_rows(
-        session,
-        scope,
-        extra_conditions=conditions,
-        order_by=WORST_MOMENT_ORDER,
-        limit=max(amount, 0),
-    )
-    if not rows:
+
+    wanted = max(amount, 0)
+    if wanted == 0:
+        return []
+    limit = wanted + WORST_MOMENT_GAME_MARGIN
+    while True:
+        rows = _eval_rows(
+            session,
+            scope,
+            extra_conditions=conditions,
+            order_by=WORST_MOMENT_ORDER,
+            limit=limit,
+        )
+        best = _first_per_game(rows)
+        # Enough distinct games, or there were no more rows to read: either way this is the
+        # whole answer and a wider window would return the same one.
+        if len(best) >= wanted or len(rows) < limit:
+            break
+        limit *= 2
+    if not best:
         return []
 
     stored = {
         game.id: game
-        for game in session.scalars(select(Game).where(Game.id.in_({row.game_id for row in rows})))
+        for game in session.scalars(select(Game).where(Game.id.in_({row.game_id for row in best})))
     }
     moments = []
-    for row in rows:
+    for row in best[:wanted]:
         game = stored.get(row.game_id)
         if game is None:
             continue
@@ -466,19 +494,29 @@ def _worst_recent_moments(
     return moments
 
 
+def _first_per_game(rows: Sequence[EvalRow]) -> list[EvalRow]:
+    """The first row of each game, in the order they arrived — which is the ranking's own,
+    so the row kept for a game is that game's worst moment."""
+    seen: set[int] = set()
+    kept = []
+    for row in rows:
+        if row.game_id in seen:
+            continue
+        seen.add(row.game_id)
+        kept.append(row)
+    return kept
+
+
 def _worst_moments_from_summaries(
     session: Session, days: int | None, amount: int, filters: GameFilters | None
 ) -> list[dict[str, Any]]:
     """The same ranking, off the games' own worst move rather than off every eval there is.
 
-    `stat_worst_win_loss` is the worst blunder in a game, so every blunder in that game is
-    at most that. Order the games by `(that column desc, id asc)` — the same tie-break the
-    ranking itself uses — and every game before some game g holds a moment that outranks
-    every moment of g: on a higher column outright, or on the same column and a lower game
-    id. A moment in the true top `amount` is preceded by fewer than `amount` moments, so
-    its game is preceded by fewer than `amount` games, so the first `amount` games hold the
-    whole answer. The margin past that costs a few rows and is there for the arithmetic
-    being wrong.
+    `stat_worst_win_loss` is the worst blunder in a game, which — now that a game may only
+    contribute its worst blunder — is exactly the moment this ranking would keep for it. So
+    ordering the games by `(that column desc, id asc)`, the tie-break the ranking itself
+    uses, orders the moments, and the first `amount` games hold the whole answer. The margin
+    past that costs a few rows and is there for the arithmetic being wrong.
     """
     since = None if days is None else datetime.now(UTC) - timedelta(days=days)
     scope = _scope(filters, since, None)
@@ -494,10 +532,21 @@ def _worst_moments_from_summaries(
     ranked = []
     for game in session.scalars(statement):
         summary = game.stat_summary or {}
-        for entry in summary.get("worst", ()):
-            if entry["classification"] == str(Classification.BLUNDER):
-                key = _worst_moment_key(entry["win_loss"], game.id, entry["ply"])
-                ranked.append((key, _moment_of(game, entry, summary["run_id"])))
+        blunders = [
+            entry
+            for entry in summary.get("worst", ())
+            if entry["classification"] == str(Classification.BLUNDER)
+        ]
+        if not blunders:
+            continue
+        # By the ranking's own key rather than by the order the summary happens to be
+        # stored in, so a summary written before that order was settled still ranks right.
+        entry = min(
+            blunders,
+            key=lambda row: _worst_moment_key(row["win_loss"], game.id, row["ply"]),
+        )
+        key = _worst_moment_key(entry["win_loss"], game.id, entry["ply"])
+        ranked.append((key, _moment_of(game, entry, summary["run_id"])))
     ranked.sort(key=lambda pair: pair[0])
     return [moment for _key, moment in ranked[:amount]]
 

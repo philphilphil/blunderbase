@@ -203,9 +203,11 @@ def _register_convenience(server: MCPServer, coach: Coach) -> None:
         days: int | None = None, amount: int = DEFAULT_MOMENTS
     ) -> TextContent:
         """The owner's recent blunders, ranked by the win% they gave away — "what should
-        I train?". Each carries the position, what was played, what was better, the phase
-        and the piece, and the game it happened in. `days` narrows to games played that
-        recently; `amount` caps the list. Smaller mistakes live on the game's own card."""
+        I train?". One moment per game, its worst: a game that collapsed would otherwise
+        fill the list with one mistake seen three times. Each carries the position, what was
+        played, what was better, the phase and the piece, and the game it happened in.
+        `days` narrows to games played that recently; `amount` caps the list. The rest of a
+        bad game — and every smaller mistake — is on that game's own card."""
         count = args.capped(amount, DEFAULT_MOMENTS, MAX_MOMENTS)
         window = max(1, int(days)) if days is not None else None
         with coach.session() as session:
