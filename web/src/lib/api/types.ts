@@ -18,7 +18,7 @@ export type Result = '1-0' | '0-1' | '1/2-1/2' | '*'
 export type Speed = 'bullet' | 'blitz' | 'rapid' | 'classical' | 'correspondence'
 export type Tier = 'quick' | 'deep'
 export type RunStatus = 'queued' | 'running' | 'done' | 'failed'
-export type JobStatus = 'queued' | 'running' | 'done' | 'failed'
+export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
 export type Classification = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blunder'
 export type EngineKind = 'uci' | 'maia'
 export type Outcome = 'win' | 'loss' | 'draw'
@@ -554,6 +554,18 @@ export interface ImportStarted {
   status: string
   job_id?: number | null
   job?: ImportJob | null
+}
+
+/**
+ * `POST /import/jobs/{id}/cancel` — the stop signal was taken.
+ *
+ * `status` is the row as it is at that moment, still `running`: the import ends after the
+ * game it is on, and the `import.finished` frame is what reports `cancelled`.
+ */
+export interface ImportCancelling {
+  job_id: number
+  source: string
+  status: JobStatus
 }
 
 // --- analysis -------------------------------------------------------------

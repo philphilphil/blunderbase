@@ -25,6 +25,9 @@ const STATUS: Record<JobStatus, { label: string; dot: string; text: string }> = 
   running: { label: 'Running', dot: 'bg-accent-teal', text: 'text-soft' },
   done: { label: 'Done', dot: 'bg-good', text: 'text-soft' },
   failed: { label: 'Failed', dot: 'bg-blunder', text: 'text-blunder' },
+  // Stopped on purpose, part-way: not a failure, and not a run whose cursor anything
+  // resumes from. What it stored is in the library like any other import.
+  cancelled: { label: 'Stopped', dot: 'bg-mistake', text: 'text-mistake' },
 }
 
 function StatusChip({ status }: { status: JobStatus }) {

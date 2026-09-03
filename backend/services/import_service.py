@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import threading
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -48,6 +49,14 @@ class SourceNotImplementedError(NotImplementedError):
     """The adapter is registered but has not been written yet."""
 
 
+class UnknownJobError(LookupError):
+    """No import job with that id."""
+
+
+class JobNotRunningError(RuntimeError):
+    """The job is not running, so there is nothing left to stop."""
+
+
 @dataclass(slots=True)
 class ImportResult:
     """What one adapter run did, folded back into the job row by `run_import`."""
@@ -60,6 +69,9 @@ class ImportResult:
     blocked: int = 0
     failed: int = 0
     cursor: str | None = None
+    # Set when the run stopped because it was asked to, rather than because the stream ran
+    # out. The counts are still what it managed; `run_import` marks the job cancelled.
+    cancelled: bool = False
     # One entry per game that could not be parsed or stored: {"ref": ..., "error": ...}.
     errors: list[dict[str, Any]] = field(default_factory=list)
 
@@ -199,6 +211,51 @@ def get_adapter(source: str) -> ImportAdapter:
     return adapter
 
 
+# Job ids that have been asked to stop. An import runs as a thread inside the process
+# that serves the API, so the request to stop it and the loop that reads this are always
+# the same process — a set behind a lock is the whole mechanism, and nothing is written to
+# the row, because a stop signal that outlived the process would have nothing left to stop.
+_cancelling: set[int] = set()
+_cancel_lock = threading.Lock()
+
+
+def cancel_job(session: Session, job_id: int) -> ImportJob:
+    """Ask a running import to stop, and answer with the job it signalled.
+
+    The run ends after the game it is on: a PGN of fifty thousand games is a loop over one
+    game at a time, and stopping between two of them is what keeps everything already
+    stored stored. That is also why stopping costs nothing — the next run of the same
+    source skips every game this one got in, so it picks up where this one left off.
+
+    The row still says `running` when this returns; the loop marks it cancelled when it
+    notices, and the `import.finished` frame is what says so.
+    """
+    job = get_job(session, job_id)
+    if job is None:
+        raise UnknownJobError(f"no import job with id {job_id}")
+    if job.status != JobStatus.RUNNING:
+        raise JobNotRunningError(f"import job {job_id} is {job.status} and cannot be stopped")
+    with _cancel_lock:
+        _cancelling.add(job_id)
+    return job
+
+
+def cancel_requested(job_id: int | None) -> bool:
+    """Whether this job has been asked to stop. Read once per game by `ingest_games`."""
+    if job_id is None:
+        return False
+    with _cancel_lock:
+        return job_id in _cancelling
+
+
+def _forget_cancel(job_id: int | None) -> None:
+    """Drop a finished job's signal, so a stop asked for late cannot outlive its run."""
+    if job_id is None:
+        return
+    with _cancel_lock:
+        _cancelling.discard(job_id)
+
+
 def run_import(
     session: Session, source: str, *, progress: ProgressHook | None = None, **options: Any
 ) -> ImportJob:
@@ -223,11 +280,17 @@ def run_import(
         job.message = f"{type(exc).__name__}: {exc}"
     else:
         _apply(job, result)
-        job.status = JobStatus.DONE
-        if result.cursor is not None:
+        job.status = JobStatus.CANCELLED if result.cancelled else JobStatus.DONE
+        # A cancelled run keeps no cursor. The adapters advance theirs as the stream yields,
+        # so the last thing it named is a game this run stopped short of storing; resuming
+        # from it would step over that game for good. Every reader of a cursor asks for a
+        # DONE job, so the next run starts where the last finished one did and skips its way
+        # back to here.
+        if result.cursor is not None and not result.cancelled:
             job.cursor = result.cursor
     job.finished_at = utcnow()
     session.commit()
+    _forget_cancel(job.id)
 
     _emit(progress, _finished_event(job))
     return job
@@ -277,6 +340,12 @@ def ingest_games(
 
     result = ImportResult()
     for item in games:
+        # Between two games and nowhere else: everything before this point is committed and
+        # everything after it has not started, so a stopped import is a whole prefix of the
+        # stream rather than a half-written game.
+        if cancel_requested(job.id):
+            result.cancelled = True
+            break
         result.seen += 1
         if isinstance(item, ImportFailure):
             _record_failure(result, item.ref, item.error)

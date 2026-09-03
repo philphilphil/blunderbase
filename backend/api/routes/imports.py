@@ -19,6 +19,7 @@ from backend.api.deps import BrokerDep, SessionDep, SettingsDep, not_found
 from backend.api.errors import ApiError
 from backend.api.events import EventBroker
 from backend.api.schemas import (
+    ImportCancelling,
     ImportJobList,
     ImportJobResponse,
     ImportRequest,
@@ -71,6 +72,23 @@ def get_job(session: SessionDep, job_id: int) -> Any:
     if job is None:
         raise not_found("unknown_job", f"no import job with id {job_id}")
     return job
+
+
+@router.post(
+    "/jobs/{job_id}/cancel",
+    response_model=ImportCancelling,
+    summary="Stop a running import",
+)
+def cancel_job(session: SessionDep, job_id: int) -> ImportCancelling:
+    """Stop the sync or upload this job is doing, after the game it is on.
+
+    Not a 202 and not a wait: the signal is taken here, and the run reads it between two
+    games — the point of a PGN of fifty thousand games is that stopping it half-way costs
+    nothing, because everything it stored is stored and the next run skips straight past it.
+    A job that has already finished is a 409; there is nothing left to signal.
+    """
+    job = import_service.cancel_job(session, job_id)
+    return ImportCancelling(job_id=job_id, source=str(job.source), status=job.status)
 
 
 @router.get("/schedule", response_model=SyncSchedule, summary="How often accounts sync alone")

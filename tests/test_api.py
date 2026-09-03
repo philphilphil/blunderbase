@@ -771,6 +771,23 @@ def test_an_import_job_that_is_not_there_is_a_typed_404(api: TestClient) -> None
     assert error_of(response) == "unknown_job"
 
 
+def test_stopping_an_import_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
+    response = api.post("/import/jobs/9999/cancel")
+
+    assert response.status_code == 404
+    assert error_of(response) == "unknown_job"
+
+
+def test_stopping_an_import_that_has_finished_is_a_typed_409(api: TestClient) -> None:
+    """Nothing is left to signal, and the job row already says how the run ended."""
+    started = api.post("/import/pgn", json={"text": ONE_GAME, "wait": True}).json()
+
+    response = api.post(f"/import/jobs/{started['job_id']}/cancel")
+
+    assert response.status_code == 409
+    assert error_of(response) == "job_not_running"
+
+
 def test_a_failed_adapter_is_reported_on_the_job_rather_than_as_a_500(
     api: TestClient,
 ) -> None:

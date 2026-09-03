@@ -175,7 +175,7 @@ analysed keeps the numbers it was analysed with until a fresh pass runs over it.
 ## Syncing on a schedule
 
 The Sync button on the import page can be pressed for you: tick **Sync automatically**
-under the sources table and say every how many minutes. From then on every connected
+under the sources grid and say every how many minutes. From then on every connected
 account on Lichess, Chess.com or FICS is read again from its last cursor once that long has
 passed since its last sync started — whatever that sync did, so a failing one is retried on
 the same clock rather than every tick. One account at a time, in the order the table lists
@@ -187,6 +187,20 @@ every tick, so a change takes effect without a restart; `BLUNDERBASE_AUTO_SYNC_P
 (default 60) is only how often the clock is looked at. The scheduler runs in the serve
 process, off by default and never in the demo; `blunderbase import …` from cron is the same
 thing for a deployment that would rather own the clock.
+
+## Stopping an import
+
+A sync or a PGN in flight shows its progress inside the box of the source doing it, with a
+**Stop** button beside the counts. It takes effect after the game the run is on: everything already
+imported stays, and pressing Sync or uploading the same file again picks up from there,
+because every route in deduplicates on the way (a game already in the library is *skipped*,
+not stored twice). The sync history records the run as **Stopped** rather than as a
+failure. It is worth knowing for a first sync of a long archive or a PGN of tens of
+thousands of games — there is no penalty for stopping one half-way.
+
+A stopped run keeps no cursor, so the next one starts where the last *finished* one did and
+skips forward through what has already arrived. An import started from the command line is
+stopped there, with Ctrl-C.
 
 ## Importing a PGN
 
@@ -262,7 +276,7 @@ duplicates.
 
 A sync normally starts where the last one stopped — Lichess and FICS resume from a stored
 cursor, chess.com re-reads the month still being played. **From the beginning**, in the
-strip above the sources table, ignores that cursor and reads the whole archive (`since=all`
+strip above the sources grid, ignores that cursor and reads the whole archive (`since=all`
 on the API and the CLI, which every account source understands). It is safe to press: games
 already in the library are skipped as duplicates, and deleted games are refused by the
 record below rather than quietly restored.

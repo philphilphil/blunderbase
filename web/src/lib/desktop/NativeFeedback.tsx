@@ -75,11 +75,11 @@ export function NativeFeedback() {
     updateProgress()
     if (!document.hidden) return
     const failed = finishedImport.status === 'failed'
+    const stopped = finishedImport.status === 'cancelled'
+    const counted = `${finishedImport.imported} imported, ${finishedImport.skipped} already in the Library.`
     void sendNativeNotification(
-      failed ? 'Import failed' : 'Import complete',
-      failed
-        ? finishedImport.message || 'Open Blunderbase for details.'
-        : `${finishedImport.imported} imported, ${finishedImport.skipped} already in the Library.`,
+      failed ? 'Import failed' : stopped ? 'Import stopped' : 'Import complete',
+      failed ? finishedImport.message || 'Open Blunderbase for details.' : counted,
     )
   })
   useEventListener('analysis.running', (event) => {

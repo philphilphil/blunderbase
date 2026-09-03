@@ -553,6 +553,19 @@ class ImportStarted(BaseModel):
     job: ImportJobResponse | None = None
 
 
+class ImportCancelling(BaseModel):
+    """The stop signal was taken; the run ends after the game it is on.
+
+    `status` is what the row says at this moment, which is still `running` — the loop has
+    not reached its next check yet. `import.finished` is the frame that says `cancelled`,
+    and the job row is what it was when it stopped.
+    """
+
+    job_id: int
+    source: str
+    status: JobStatus
+
+
 # --- analysis -------------------------------------------------------------
 
 

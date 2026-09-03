@@ -565,6 +565,24 @@ export function useStartImport(
   })
 }
 
+/**
+ * Stop a running import. The row is only marked when the run notices, so nothing is
+ * written into the cache here — the `import.finished` frame is what settles the screen.
+ */
+export function useCancelImport(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.cancelImportJob>>, Error, number>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (jobId: number) => api.cancelImportJob(jobId),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.imports() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
 export function useSyncSchedule(
   options?: Options<Awaited<ReturnType<typeof api.getSyncSchedule>>>,
 ) {

@@ -39,6 +39,7 @@ import type {
   GamesRemoved,
   Health,
   ImportJob,
+  ImportCancelling,
   ImportJobList,
   ImportRequest,
   ImportStarted,
@@ -236,6 +237,13 @@ export const getImportJob = (id: number) => http.get<ImportJob>(`/import/jobs/${
 
 export const startImport = (source: Source, body: ImportRequest = {}) =>
   http.post<ImportStarted>(`/import/${source}`, { body })
+
+/**
+ * Stop a running import. It ends after the game it is on, so the answer still reads
+ * `running` — the `import.finished` frame is what says `cancelled`.
+ */
+export const cancelImportJob = (id: number) =>
+  http.post<ImportCancelling>(`/import/jobs/${id}/cancel`)
 
 /**
  * The PGN itself is the request body; `wait` runs the sync inline.

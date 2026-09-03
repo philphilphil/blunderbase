@@ -689,6 +689,18 @@ with the finished job instead, which is what the PGN paths and the tests use.
 `POST /import/pgn/upload` takes the PGN as the raw request body rather than a multipart
 form, so the API needs no form-parsing dependency.
 
+**Stopping one.** `POST /import/jobs/{id}/cancel` adds the job id to a set in
+`import_service`, and `ingest_games` reads it between two games — which is the only place a
+run can stop with everything before it committed and nothing after it begun. The row is
+marked `cancelled` when the loop notices, not when the request returns, and the run keeps
+no cursor: the adapters advance theirs as their stream yields, so the last thing one named
+is a game the run stopped short of storing, and resuming from it would step over that game
+for good. Every reader of a cursor asks for a `done` job, so the next run starts where the
+last finished one did and deduplicates its way back. The set is memory in the serve
+process, because an import is a thread in that same process — a signal that outlived it
+would have nothing left to signal — which is also why a `blunderbase import` running in its
+own terminal is stopped there rather than from the page.
+
 **`/events`.** One WebSocket carrying three hooks: `analysis.subscribe` for run lifecycle,
 the `progress=` callable each import is given, and `services.events.subscribe` for what
 belongs to neither a run nor a job — `note.created` / `note.updated`, and `live.updated`.

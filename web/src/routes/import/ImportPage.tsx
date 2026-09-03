@@ -7,7 +7,7 @@ import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { useGames, useImportJobs, useProfile } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 
-import { SourcesTable } from './SourcesTable'
+import { SourcesPanel } from './SourcesPanel'
 import { SyncHistory } from './SyncHistory'
 import { useImportProgress } from './useImportProgress'
 
@@ -81,7 +81,7 @@ export function ImportPage() {
         }
       />
 
-      <SourcesTable accounts={accounts} latestOf={latestOf} progress={progress} />
+      <SourcesPanel accounts={accounts} latestOf={latestOf} progress={progress} />
 
       <SyncHistory
         jobs={history}

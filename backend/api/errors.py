@@ -83,6 +83,8 @@ STATUS_NAMES: dict[int, str] = {
 MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (import_service.SourceNotImplementedError, 501, "source_not_implemented"),
     (import_service.UnknownSourceError, 404, "unknown_source"),
+    (import_service.UnknownJobError, 404, "unknown_job"),
+    (import_service.JobNotRunningError, 409, "job_not_running"),
     (analysis_service.UnknownRunError, 404, "unknown_run"),
     (analysis_service.StaleResultError, 409, "stale_result"),
     (analysis_service.AnalysisRequestError, 422, "invalid_request"),

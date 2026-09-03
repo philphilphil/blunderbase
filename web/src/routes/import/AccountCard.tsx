@@ -1,15 +1,15 @@
 /**
- * One connected account, as a row of the sources table.
+ * One connected account, as a box in the sources grid.
  *
- * It was a card the height of a dashboard tile for a screen that is visited to press Sync
- * and leave. Everything that is true of the account all the time — who it is, how many
- * games came from it, when it last ran — is now a cell, and the username stays an editable
- * box in its own column because "connect" and "sync" are the same button pressed twice:
- * the adapters take a name and keep their own cursor.
+ * Everything that is true of the account all the time is one line — who it is, how many
+ * games came from it, when it last ran — and the username stays an editable field because
+ * "connect" and "sync" are the same button pressed twice: the adapters take a name and
+ * keep their own cursor.
  *
- * Nothing else is per-row. What a run is told — how far back, how many, whether to queue
- * an evaluation pass — is the table's, above; a row owns only its name and its button. The
- * one thing it grows is the progress of a sync in flight, under the row it is about.
+ * Nothing else is per-source. What a run is told — how far back, how many, whether to
+ * queue an evaluation pass — belongs to the strip above the grid; a box owns only its name
+ * and its button. The one thing it grows is the sync in flight, in the box that is doing
+ * it rather than in a block appended under the grid.
  */
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -18,13 +18,13 @@ import { SourceBadge } from '@/components/badges/SourceBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { TableCell, TableRow } from '@/components/ui/table'
 import { useStartImport } from '@/lib/api/queries'
 import type { AccountSummary, ImportJob, Source } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
+import { cn } from '@/lib/utils'
 
-import { JobProgress } from './JobProgress'
-import type { SyncOptions } from './SourcesTable'
+import { JobProgress, progressChrome } from './JobProgress'
+import type { SyncOptions } from './SourcesPanel'
 import type { SourceProgress } from './useImportProgress'
 
 /**
@@ -61,7 +61,7 @@ const COPY: Record<
   },
 }
 
-export function AccountRow({
+export function AccountCard({
   source,
   account,
   lastJob,
@@ -72,7 +72,7 @@ export function AccountRow({
   account?: AccountSummary
   lastJob?: ImportJob
   progress?: SourceProgress
-  /** What the table's own controls say this run should be told. */
+  /** What the strip above the grid says this run should be told. */
   options: SyncOptions
 }) {
   const copy = COPY[source]
@@ -113,70 +113,68 @@ export function AccountRow({
   }
 
   return (
-    <>
-      <TableRow data-state={progress ? 'selected' : undefined}>
-        <TableCell>
-          {/* The badge is the name; a word beside it saying the same thing is noise. */}
-          <SourceBadge source={source} title={copy.hint} />
-        </TableCell>
+    <div
+      data-source={source}
+      className={cn(
+        'flex flex-col gap-2 rounded-lg border bg-elevated-2 p-3',
+        progressChrome(progress),
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {/* The badge is the name; a word beside it saying the same thing is noise. */}
+        <SourceBadge source={source} title={copy.hint} />
+        <div className="flex-1" />
+        {/* An account nobody has connected has no count to give, and a bare em dash in a
+            box says less than the reason there is no number. */}
+        {account ? (
+          <span className="font-mono text-[0.71875rem] text-body tabular">
+            {account.games?.toLocaleString() ?? '—'}
+            <span className="ml-1 font-sans text-dim">games</span>
+          </span>
+        ) : (
+          <span className="text-[0.6875rem] text-faint">not connected</span>
+        )}
+      </div>
 
-        <TableCell>
-          <Label htmlFor={`${source}-username`} className="sr-only">
-            Username
-          </Label>
-          <Input
-            id={`${source}-username`}
-            value={username}
-            spellCheck={false}
-            autoComplete="off"
-            aria-invalid={invalid !== null}
-            placeholder={copy.placeholder}
-            className="h-7 w-full max-w-md"
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return
-              event.preventDefault()
-              if (!running) submit()
-            }}
-            onChange={(event) => {
-              edited.current = true
-              setUsername(event.target.value)
-              if (invalid) setInvalid(null)
-            }}
-          />
-          {invalid ? <p className="mt-1 text-[0.6875rem] text-blunder">{invalid}</p> : null}
-          {start.isError ? (
-            <p className="mt-1 text-[0.6875rem] text-blunder">{start.error.message}</p>
-          ) : null}
-        </TableCell>
-
-        {/* Hidden below `md` with their headers — see `SourcesTable`. */}
-        <TableCell className="text-right font-mono text-[0.71875rem] text-body tabular max-md:hidden">
-          {account?.games?.toLocaleString() ?? <span className="text-faint">—</span>}
-        </TableCell>
-
-        <TableCell className="font-mono text-[0.71875rem] text-dim tabular max-md:hidden">
-          {lastJob ? relative(lastJob.finished_at ?? lastJob.created_at) : '—'}
-        </TableCell>
-
-        <TableCell className="text-right">
-          <Button type="button" size="sm" disabled={running} onClick={submit}>
-            {running ? (
-              <Loader2 className="animate-spin" aria-hidden />
-            ) : (
-              <RefreshCw aria-hidden />
-            )}
-            {progress?.running ? 'Syncing' : account ? 'Sync' : 'Connect'}
-          </Button>
-        </TableCell>
-      </TableRow>
-
-      {progress ? (
-        <tr className="border-b border-hairline bg-surface-2">
-          <td colSpan={5} className="px-2.5 py-3">
-            <JobProgress progress={progress} />
-          </td>
-        </tr>
+      <Label htmlFor={`${source}-username`} className="sr-only">
+        Username
+      </Label>
+      <Input
+        id={`${source}-username`}
+        value={username}
+        spellCheck={false}
+        autoComplete="off"
+        aria-invalid={invalid !== null}
+        placeholder={copy.placeholder}
+        className="h-7 w-full"
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          if (!running) submit()
+        }}
+        onChange={(event) => {
+          edited.current = true
+          setUsername(event.target.value)
+          if (invalid) setInvalid(null)
+        }}
+      />
+      {invalid ? <p className="text-[0.6875rem] text-blunder">{invalid}</p> : null}
+      {start.isError ? (
+        <p className="text-[0.6875rem] text-blunder">{start.error.message}</p>
       ) : null}
-    </>
+
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[0.6875rem] text-dim tabular">
+          {lastJob ? `synced ${relative(lastJob.finished_at ?? lastJob.created_at)}` : 'never synced'}
+        </span>
+        <div className="flex-1" />
+        <Button type="button" size="sm" disabled={running} onClick={submit}>
+          {running ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
+          {progress?.running ? 'Syncing' : account ? 'Sync' : 'Connect'}
+        </Button>
+      </div>
+
+      {progress ? <JobProgress progress={progress} /> : null}
+    </div>
   )
 }

@@ -44,16 +44,18 @@ function stampOf(job: ImportJob): number {
 }
 
 /**
- * One target per source, taken from the newest job that finished cleanly.
+ * One target per source, taken from the newest job that named an account.
  *
  * A failed job overwrites `message` with the exception text
- * (`services/import_service.py`), so only a `done` job may seed a sync — otherwise the
- * next press would post `AdapterError: …` as the username and fail again.
+ * (`services/import_service.py`), so a failed job may never seed a sync — otherwise the
+ * next press would post `AdapterError: …` as the username and fail again. A job stopped
+ * part-way still carries the username it was given, and being able to press Sync all again
+ * is the whole point of having stopped it.
  */
 export function syncTargets(jobs: ImportJob[] | undefined): SyncTarget[] {
   const newest = new Map<Syncable, { at: number; username: string }>()
   for (const job of jobs ?? []) {
-    if (job.status !== 'done') continue
+    if (job.status !== 'done' && job.status !== 'cancelled') continue
     if (!(SYNCABLE as readonly string[]).includes(job.source)) continue
     const username = job.message?.trim()
     if (!username) continue

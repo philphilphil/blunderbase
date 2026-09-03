@@ -101,6 +101,10 @@ class JobStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+    # Stopped on request, part-way. What it stored is stored and deduplicated like any
+    # other import; what it had not reached is simply not here yet. Kept apart from DONE
+    # because a cursor must not be resumed from a run that did not finish its stream.
+    CANCELLED = "cancelled"
 
 
 class Classification(StrEnum):

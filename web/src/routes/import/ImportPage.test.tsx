@@ -214,7 +214,7 @@ describe('ImportPage', () => {
     await waitFor(() => expect(postedTo('/api/import/lichess')).toHaveLength(1))
     expect(postedTo('/api/import/lichess')[0]).not.toHaveProperty('analyze')
 
-    // One switch for the whole table: the answer is never different per source.
+    // One switch for the whole grid: the answer is never different per source.
     const skip = screen.getByRole('checkbox', { name: 'Skip evaluation' })
     await userEvent.click(skip)
     expect(skip).toHaveAttribute('aria-checked', 'true')
@@ -224,7 +224,7 @@ describe('ImportPage', () => {
     expect(postedTo('/api/import/lichess')[1]).toMatchObject({ username: 'phib', analyze: false })
   })
 
-  it('tells a sync what the strip above the table says, not what a row does', async () => {
+  it('tells a sync what the strip above the grid says, not what a box does', async () => {
     stubFetch({
       '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
       '/api/stats/profile': PROFILE,
@@ -374,7 +374,7 @@ describe('ImportPage', () => {
     renderPage(<ImportPage />)
 
     expect(await screen.findByText('Nothing has been synced yet.')).toBeInTheDocument()
-    // No account is connected yet, so every account row offers Connect rather than Sync.
+    // No account is connected yet, so every account box offers Connect rather than Sync.
     expect(screen.getAllByRole('button', { name: /Connect/ })).toHaveLength(3)
   })
 
@@ -461,5 +461,76 @@ describe('ImportPage', () => {
       at: '2026-08-26T00:50:25Z',
     })
     expect(await screen.findByText('Finished — 1 failed')).toBeInTheDocument()
+  })
+
+  it('keeps a running sync inside the box of the source doing it', async () => {
+    stubFetch({
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+    })
+    renderPage(<ImportPage />)
+    await screen.findByText('Sync history')
+
+    deliver({ event: 'import.started', job_id: 9, source: 'lichess', at: '2026-08-26T00:50:19Z' })
+    deliver({
+      event: 'import.game',
+      job_id: 9,
+      source: 'lichess',
+      ref: 'aBc12345',
+      status: 'imported',
+      game_id: 1,
+      error: null,
+      seen: 3,
+      imported: 3,
+      skipped: 0,
+      failed: 0,
+    })
+
+    // The progress belongs to the Lichess box — the one whose username field it is under —
+    // and to no other. That is the whole reason the sources are boxes rather than a table.
+    const lichess = document.querySelector<HTMLElement>('[data-source="lichess"]')!
+    expect(await within(lichess).findByText('3 imported')).toBeInTheDocument()
+    expect(within(lichess).getByLabelText('Username')).toHaveAttribute('id', 'lichess-username')
+
+    for (const other of ['chesscom', 'fics', 'pgn']) {
+      const box = document.querySelector<HTMLElement>(`[data-source="${other}"]`)!
+      expect(within(box).queryByText('3 imported')).not.toBeInTheDocument()
+    }
+  })
+
+  it('stops a running sync and waits for the run to say it stopped', async () => {
+    stubFetch({
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+      '/api/import/jobs/9/cancel': { job_id: 9, source: 'lichess', status: 'running' },
+    })
+    renderPage(<ImportPage />)
+    await screen.findByText('Sync history')
+
+    deliver({ event: 'import.started', job_id: 9, source: 'lichess', at: '2026-08-26T00:50:19Z' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+
+    // The run ends between two games, so the button holds "Stopping" rather than
+    // pretending the sync is over the moment the request came back.
+    expect(await screen.findByRole('button', { name: 'Stopping' })).toBeDisabled()
+    expect(urlsFor('/api/import/jobs/9/cancel')).toHaveLength(1)
+
+    deliver({
+      event: 'import.finished',
+      job_id: 9,
+      source: 'lichess',
+      status: 'cancelled',
+      seen: 2,
+      imported: 2,
+      skipped: 0,
+      failed: 0,
+      message: 'phib',
+      at: '2026-08-26T00:50:25Z',
+    })
+    expect(await screen.findByText('Stopped')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Stop/ })).not.toBeInTheDocument()
   })
 })

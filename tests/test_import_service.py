@@ -589,3 +589,107 @@ def test_a_game_its_source_did_not_name_is_named_from_the_book(session: Session)
     )
     assert named.game is not None
     assert (named.game.eco, named.game.opening_name) == ("X99", "As the file says")
+
+
+# --- stopping a run --------------------------------------------------------
+
+
+def _stop_after(session: Session, games: int) -> Any:
+    """A progress hook that asks the run to stop once it has reported `games` of them."""
+    reported: list[str] = []
+
+    def hook(event: dict[str, Any]) -> None:
+        if event["event"] != import_service.EVENT_IMPORT_GAME:
+            return
+        reported.append(event["ref"])
+        if len(reported) == games:
+            import_service.cancel_job(session, event["job_id"])
+
+    return hook
+
+
+def test_a_stopped_import_keeps_what_it_stored(session: Session, fixtures_dir: Path) -> None:
+    job = import_service.run_import(
+        session, "pgn", path=_multi_game(fixtures_dir), progress=_stop_after(session, 1)
+    )
+
+    assert job.status is JobStatus.CANCELLED
+    # The file holds four games; the run stopped between the first and the second.
+    assert (job.games_seen, job.games_imported) == (1, 1)
+    assert _count(session, Game) == 1
+    assert job.finished_at is not None
+
+
+def test_running_a_stopped_import_again_takes_the_rest(
+    session: Session, fixtures_dir: Path
+) -> None:
+    stopped = import_service.run_import(
+        session, "pgn", path=_multi_game(fixtures_dir), progress=_stop_after(session, 1)
+    )
+    again = import_service.run_import(session, "pgn", path=_multi_game(fixtures_dir))
+
+    assert stopped.status is JobStatus.CANCELLED
+    assert again.status is JobStatus.DONE
+    # The game the stopped run got in is skipped by the second, not stored twice.
+    assert (again.games_seen, again.games_imported, again.games_skipped) == (4, 2, 1)
+    assert _count(session, Game) == 3
+
+
+def test_a_stopped_run_records_no_cursor(
+    session: Session, fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cursor is what the next run resumes from, and this one did not reach its end."""
+    pgn = import_service.get_adapter("pgn")
+
+    def adapter(session: Session, job: ImportJob, **options: Any) -> Any:
+        result = pgn(session, job, **options)
+        result.cursor = "somewhere in the middle"
+        return result
+
+    monkeypatch.setattr(import_service, "get_adapter", lambda source: adapter)
+    job = import_service.run_import(
+        session, "pgn", path=_multi_game(fixtures_dir), progress=_stop_after(session, 1)
+    )
+
+    assert job.status is JobStatus.CANCELLED
+    assert job.cursor is None
+
+
+def test_a_run_that_was_not_stopped_still_records_its_cursor(
+    session: Session, fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pgn = import_service.get_adapter("pgn")
+
+    def adapter(session: Session, job: ImportJob, **options: Any) -> Any:
+        result = pgn(session, job, **options)
+        result.cursor = "the end of the file"
+        return result
+
+    monkeypatch.setattr(import_service, "get_adapter", lambda source: adapter)
+    job = import_service.run_import(session, "pgn", path=_multi_game(fixtures_dir))
+
+    assert job.status is JobStatus.DONE
+    assert job.cursor == "the end of the file"
+
+
+def test_a_finished_job_cannot_be_stopped(session: Session, fixtures_dir: Path) -> None:
+    job = import_service.run_import(session, "pgn", path=_multi_game(fixtures_dir))
+
+    with pytest.raises(import_service.JobNotRunningError):
+        import_service.cancel_job(session, job.id)
+
+
+def test_stopping_a_job_that_does_not_exist_is_refused(session: Session) -> None:
+    with pytest.raises(import_service.UnknownJobError):
+        import_service.cancel_job(session, 4321)
+
+
+def test_a_stop_asked_for_late_does_not_reach_the_next_run(
+    session: Session, fixtures_dir: Path
+) -> None:
+    """The signal is dropped when its run ends, so a stale id cannot stop a later import."""
+    stopped = import_service.run_import(
+        session, "pgn", path=_multi_game(fixtures_dir), progress=_stop_after(session, 1)
+    )
+
+    assert not import_service.cancel_requested(stopped.id)

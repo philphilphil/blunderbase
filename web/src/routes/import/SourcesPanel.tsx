@@ -1,38 +1,37 @@
 /**
- * Where games come from: one row per source.
+ * Where games come from: one box per source.
  *
- * This was three cards the height of dashboard tiles, and a dashboard is what they were
- * borrowed from — a shape for a screen you read, not one you press Sync on and leave. The
- * facts are one line each and line up down the page (who, how many, when, the button).
- * Same table as the sync history below it, which is the point: the two read as one screen
- * about imports.
+ * It was a five-column table across the page, and a table is a promise about its content
+ * that four sources do not keep — a username, a count and a date left most of every row
+ * empty, and the sync in flight had nowhere to go but a block appended underneath, which
+ * read as a second thing happening rather than as this source working. A box is the size
+ * of what it holds: the account, its count, its button, and its own progress, in the box
+ * that is doing it.
  *
- * What a run is told lives once, in the strip above the table, because none of it was ever
+ * Four across where there is room, two on a laptop, one on a phone. The column count is
+ * chosen to keep a box about the same width at every size rather than to fill the page
+ * with two very wide ones — the width a box wants is the width of a username field and a
+ * button beside it.
+ *
+ * What a run is told lives once, in the strip above the grid, because none of it was ever
  * a per-source answer: how far back to reach, how many games to stop at, and whether to
- * queue an evaluation pass behind the import. Three copies of that meant three places to
- * remember to tick before pressing a second Sync. A PGN takes none of them but the last,
- * and ignores the rest.
+ * queue an evaluation pass behind the import. Four copies of that would mean four places
+ * to remember to tick before pressing a second Sync. A PGN takes none of them but the
+ * last, and ignores the rest.
  */
 import { useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import type { AccountSummary, ImportJob } from '@/lib/api/types'
 
-import { AccountRow } from './AccountRow'
+import { AccountCard } from './AccountCard'
 import { AutoSyncControl } from './AutoSyncControl'
-import { PgnRow } from './PgnRow'
+import { PgnCard } from './PgnCard'
 import { SyncCheckbox } from './SyncCheckbox'
 import type { ImportProgressState } from './useImportProgress'
 
-/** What the strip above the table says the next import should be told. */
+/** What the strip above the grid says the next import should be told. */
 export interface SyncOptions {
   since: string
   maxGames: string
@@ -41,14 +40,14 @@ export interface SyncOptions {
   fromTheBeginning: boolean
 }
 
-export function SourcesTable({
+export function SourcesPanel({
   accounts,
   latestOf,
   progress,
 }: {
   accounts: AccountSummary[]
-  /** The newest job per source, which is what a row's "last sync" and username come from. */
-  latestOf: (source: 'lichess' | 'chesscom' | 'fics' | 'pgn') => ImportJob | undefined
+  /** The newest job per account source, which is what a box's stamp and username read. */
+  latestOf: (source: 'lichess' | 'chesscom' | 'fics') => ImportJob | undefined
   progress: ImportProgressState
 }) {
   const [since, setSince] = useState('')
@@ -112,53 +111,34 @@ export function SourcesTable({
         </div>
       </div>
 
-      {/*
-        Below `md` the two read-only columns go. What the row is *for* on a phone is the
-        username and the button beside it; the game count and the last sync are both said
-        again in the history table under this one, and keeping all five columns would put
-        the Sync button behind a sideways scroll.
-      */}
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-28">Source</TableHead>
-            <TableHead>Account</TableHead>
-            <TableHead className="w-24 text-right max-md:hidden">Games</TableHead>
-            <TableHead className="w-28 max-md:hidden">Last sync</TableHead>
-            <TableHead className="w-28" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <AccountRow
-            source="lichess"
-            account={accounts.find((account) => account.platform === 'lichess')}
-            lastJob={latestOf('lichess')}
-            progress={progress.lichess}
-            options={options}
-          />
-          <AccountRow
-            source="chesscom"
-            account={accounts.find((account) => account.platform === 'chesscom')}
-            lastJob={latestOf('chesscom')}
-            progress={progress.chesscom}
-            options={options}
-          />
-          <AccountRow
-            source="fics"
-            account={accounts.find((account) => account.platform === 'fics')}
-            lastJob={latestOf('fics')}
-            progress={progress.fics}
-            options={options}
-          />
-          <PgnRow
-            lastJob={latestOf('pgn')}
-            progress={progress.pgn}
-            skipEvaluation={skipEvaluation}
-          />
-        </TableBody>
-      </Table>
+      {/* `items-start` so a box that grows a progress block while it syncs takes the room
+          it needs instead of stretching the three beside it to match. */}
+      <div className="grid items-start gap-2.5 p-3.5 md:grid-cols-2 xl:grid-cols-4">
+        <AccountCard
+          source="lichess"
+          account={accounts.find((account) => account.platform === 'lichess')}
+          lastJob={latestOf('lichess')}
+          progress={progress.lichess}
+          options={options}
+        />
+        <AccountCard
+          source="chesscom"
+          account={accounts.find((account) => account.platform === 'chesscom')}
+          lastJob={latestOf('chesscom')}
+          progress={progress.chesscom}
+          options={options}
+        />
+        <AccountCard
+          source="fics"
+          account={accounts.find((account) => account.platform === 'fics')}
+          lastJob={latestOf('fics')}
+          progress={progress.fics}
+          options={options}
+        />
+        <PgnCard progress={progress.pgn} skipEvaluation={skipEvaluation} />
+      </div>
 
-      {/* The same rows, pressed for you on a clock — a footer, because it is about every
+      {/* The same boxes, pressed for you on a clock — a footer, because it is about every
           press from now on rather than the next one the strip above describes. */}
       <AutoSyncControl />
     </section>
