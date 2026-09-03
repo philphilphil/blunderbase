@@ -307,7 +307,16 @@ export function StatsPage() {
         <StatTile
           label="Games"
           value={speed.isPending ? '—' : formatCount(games)}
-          suffix={suffix(num(speedDelta?.total, 'games'), 'analysed', false, 0)}
+          // The number is every game in the window; the caption is how many of them an
+          // engine has been over, which is what the four tiles beside it are computed from.
+          // It read "analysed" alone, which named the big number as the analysed count and
+          // made the tile disagree with the coverage on the dashboard for no reason.
+          suffix={suffix(
+            num(speedDelta?.total, 'games'),
+            `${formatCount(analysed)} analysed`,
+            false,
+            0,
+          )}
         />
         <StatTile
           label="Score"
