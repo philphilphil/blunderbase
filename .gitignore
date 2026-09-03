@@ -21,6 +21,9 @@ coverage.json
 /.pnpm-store/
 /desktop/node_modules/
 /desktop/.pyinstaller/
+# The Windows installer downloaded from CI, and the id of the run it came from.
+/desktop/dist/
+/desktop/.windows-ci-run
 /desktop/src-tauri/binaries/
 /desktop/src-tauri/gen/
 /desktop/src-tauri/icons/

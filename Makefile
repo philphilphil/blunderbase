@@ -1,4 +1,4 @@
-.PHONY: run run-demo backend web desktop install test migrate engines mcp mcp-http mcp-key release publish site
+.PHONY: run run-demo backend web desktop desktop-macos desktop-windows install test migrate engines mcp mcp-http mcp-key release publish site
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -33,8 +33,20 @@ backend: migrate
 web:
 	cd web && pnpm dev
 
+# A full desktop build is two builds on two operating systems: the macOS bundles here, the
+# NSIS installer in the `desktop-windows` workflow, because nothing cross-compiles it. The
+# workflow run is started first and collected last so it overlaps the local build instead of
+# following it. `make desktop-macos` is the same local half without GitHub in the way.
 desktop:
+	sh desktop/scripts/windows-ci.sh dispatch
 	cd desktop && pnpm build
+	sh desktop/scripts/windows-ci.sh collect
+
+desktop-macos:
+	cd desktop && pnpm build
+
+desktop-windows:
+	sh desktop/scripts/windows-ci.sh
 
 install:
 	uv sync
