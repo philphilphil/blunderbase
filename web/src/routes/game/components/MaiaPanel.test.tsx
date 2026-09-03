@@ -131,9 +131,12 @@ describe('MaiaPanel', () => {
     const panel = screen.getByTestId('maia-panel')
     expect(panel).toHaveTextContent('Maia 1700')
     expect(panel).toHaveTextContent('stockfish')
-    // Popularity and cost, side by side — the whole point of the card.
+    // How many people play it, and the engine's verdict as a glyph. The win-percentage
+    // delta the verdict used to be spelled out as is deliberately gone: one percentage on
+    // the row, and it is the human one.
     expect(panel).toHaveTextContent('62%')
-    expect(panel).toHaveTextContent('−26.3%')
+    expect(panel).not.toHaveTextContent('26.3%')
+    expect(within(screen.getByTestId('maia-played-row')).getByText('??')).toBeInTheDocument()
     expect(within(panel).getByText('+0.40')).toBeInTheDocument()
     // The single-sentence "a 1700 plays d5 here" copy is gone.
     expect(panel).not.toHaveTextContent('plays')

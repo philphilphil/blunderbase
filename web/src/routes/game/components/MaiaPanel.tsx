@@ -1,4 +1,4 @@
-import { ChevronDown, Columns3 } from 'lucide-react'
+import { ChevronDown, Columns3, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { LinePreviewRowChip } from '@/components/analysis/LinePreviewSettings'
@@ -13,7 +13,7 @@ import {
 import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import type { HoveredLine } from '@/lib/board/useLinePreview'
 import { glyphStyle, isFlagged } from '@/lib/chess/classification'
-import { formatNodes, formatScore, formatWinLoss } from '@/lib/chess/evaluation'
+import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import {
@@ -103,6 +103,13 @@ export interface MaiaPanelProps {
   showEngine?: boolean
   /** The engine's ranking of the same position; empty off the game line. */
   engine: EngineLineView[]
+  /**
+   * Whether those rows are the run's own line seen from further along it rather than its
+   * reading of the position itself — see `GamePage`'s `alongLine`. The rows are the same
+   * shape either way; what changes is what they are a claim about, and the header says so
+   * rather than letting a walked line pass for a fresh search of this position.
+   */
+  alongLine?: boolean
   /** The run those lines came from, whose spend the engine column's header reports. */
   run?: GameRunSummary | null
   /** The ply the position sits at, for numbering a rollout. */
@@ -184,6 +191,7 @@ export function MaiaPanel({
   showHuman = true,
   showEngine = true,
   engine,
+  alongLine = false,
   run,
   ply,
   fen,
@@ -376,6 +384,18 @@ export function MaiaPanel({
             <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
               {run?.engine ?? 'No engine run'}
             </span>
+            {/* The analysis board's own purple, the colour the score chip under the board
+                takes while it is reading the same line: these rows are the tail of a line
+                the run drew, not a new opinion about the position in front of you. */}
+            {alongLine ? (
+              <span
+                data-testid="maia-engine-along-line"
+                title="The rest of the line this run gave, from where the board now stands"
+                className="flex-none rounded-sm border border-brilliant/35 bg-brilliant/10 px-[0.3125rem] py-px font-mono text-[0.625rem] text-brilliant"
+              >
+                along its line
+              </span>
+            ) : null}
             {/*
               The label is the column's category, paired with the human column's own —
               never the run's protocol kind, which lives on the engines page.
@@ -456,6 +476,29 @@ export function MaiaPanel({
 }
 
 /**
+ * The little figure after the level: this column is what PEOPLE play here.
+ *
+ * "Maia 1700" reads as an engine name to anyone who has not been told otherwise, and an
+ * engine name at the head of a list of moves means "the best moves" everywhere else in
+ * chess software — which is the opposite of what this column says. The figure is the
+ * cheapest possible correction, in the column's own purple so it belongs to the heading
+ * rather than looking like a control, and it carries the sentence in its title for anyone
+ * who hovers it.
+ */
+function HumanMark() {
+  return (
+    <span
+      role="img"
+      aria-label="human moves"
+      title="What people at this level actually play here — not the engine’s best move"
+      className="inline-flex flex-none items-center"
+    >
+      <User className="size-2.5 text-brilliant" aria-hidden />
+    </span>
+  )
+}
+
+/**
  * Who the column speaks for, and the switch that changes it.
  *
  * A native `select` laid over the label rather than beside it: the header is one line at
@@ -478,8 +521,9 @@ function LevelLabel({
   const pickable = levels.length > 1 && onSelectLevel !== undefined
   if (!pickable) {
     return (
-      <span className="flex-none whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+      <span className="inline-flex flex-none items-center gap-1 whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
         {label}
+        <HumanMark />
       </span>
     )
   }
@@ -491,8 +535,9 @@ function LevelLabel({
       data-testid="maia-level-picker"
       className="relative inline-flex flex-none items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised"
     >
-      <span className="whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
         {label}
+        <HumanMark />
       </span>
       <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
       <select
@@ -753,40 +798,44 @@ function HumanRow({
 }
 
 /**
- * What the move costs, in the engine's terms: a win-percentage delta, the `!` glyph where
- * the engine's own top line is the move being described, and a cell that keeps its width
- * and draws nothing where the engine never ranked it — deliberately blank rather than a
- * flattering or damning guess, and blank without collapsing, so the column stays a column.
+ * The engine's verdict on the move, as the one glyph the move table already uses: `!` for
+ * its own top line, `??`/`?`/`?!` for the three it flags, and nothing at all for an
+ * ordinary move.
  *
- * Below 0.05 points the number is noise, so the glyph stands in for it; that is the same
- * threshold the move list uses, which is why a `??` here and a `??` there agree.
+ * IT USED TO BE THE WIN-PERCENTAGE DELTA — `−26.3%` — with the glyph standing in only for
+ * the best move. That was a second quantity on a row whose whole subject is the *first*
+ * one: how many people play this move. The two percentages sat side by side reading as a
+ * pair, and the one that mattered was the human one; the engine's is already on the row
+ * three ways over (the SAN's colour, the row's left edge, the engine column's own eval a
+ * few pixels to the right), so what the number added was arithmetic to skip past.
+ *
+ * The glyph is drawn in a cell that shrink-wraps it inside a slot of fixed width. The slot
+ * keeps the column a column — two rows' SANs and percentages have to line up under each
+ * other — while the chip itself is only as wide as a `!`, which is what stops one
+ * character from being painted across three-quarters of an inch of tint.
  */
 function DeltaChip({ move }: { move: HumanMoveView }) {
   const verdict = glyphStyle(move.classification)
   const best = move.classification === 'best'
-  const loss = move.loss !== null && move.loss >= 0.05 ? formatWinLoss(move.loss) : null
-  const shown = best ? (verdict?.glyph ?? '!') : loss
 
   return (
-    <span
-      className={cn(
-        'w-[2.75rem] flex-none rounded-[0.1875rem] border px-1 py-px font-mono text-[0.59375rem] tabular',
-        best ? 'text-center font-bold' : 'text-right',
-        shown === null ? 'border-transparent' : verdict ? '' : 'border-line text-dim',
-      )}
-      style={
-        shown === null || !verdict
-          ? undefined
-          : best
-            ? {
-                color: verdict.color,
-                background: tint(verdict.color, 14),
-                borderColor: 'transparent',
-              }
-            : { color: verdict.color, borderColor: tint(verdict.color, 30) }
-      }
-    >
-      {shown ?? ''}
+    <span className="flex w-[1.25rem] flex-none justify-end">
+      {verdict ? (
+        <span
+          title={verdict.label}
+          className={cn(
+            'rounded-[0.1875rem] border px-[0.1875rem] py-px text-center font-mono text-[0.59375rem] font-bold',
+            best ? 'border-transparent' : '',
+          )}
+          style={
+            best
+              ? { color: verdict.color, background: tint(verdict.color, 14) }
+              : { color: verdict.color, borderColor: tint(verdict.color, 30) }
+          }
+        >
+          {verdict.glyph}
+        </span>
+      ) : null}
     </span>
   )
 }
