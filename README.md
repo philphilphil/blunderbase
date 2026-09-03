@@ -16,7 +16,7 @@
 ---
 
 ## Features
-- Import games from Lichess, Chess.com, FICS, and PGNs — by hand or every N minutes
+- Import games from Lichess, Chess.com, FICS, and PGNs
 - Analyze your games with multiple engines
 - Support for maia3 at multiple ELO's to see what humans would have played
 - Take notes on positions and variations
