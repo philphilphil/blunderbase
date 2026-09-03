@@ -518,21 +518,19 @@ function PlayerTally({
       <span className="grid grid-cols-[auto_1fr_auto_1fr] items-baseline gap-x-[0.3125rem] gap-y-[0.09375rem]">
         {TALLY_LAYOUT.map((field) => (
           <Fragment key={field}>
+            {/*
+              A zero keeps the severity's own colour. It used to grey out, on the theory
+              that nothing happened and nothing should be shouted about — but the three
+              counts are read as one row, and a greyed cell breaks the colour key the eye
+              is using to tell `??` from `?!` at a glance. What says "none" is the digit.
+            */}
             <span
               title={quantity(row[field], TALLY_PLURALS[field])}
-              className={cn(
-                'text-right font-mono font-semibold tabular',
-                row[field] === 0 ? 'text-faint' : GLYPHS[field].textClass,
-              )}
+              className={cn('text-right font-mono font-semibold tabular', GLYPHS[field].textClass)}
             >
               {row[field]}
             </span>
-            <span
-              className={cn(
-                'font-mono font-bold',
-                row[field] === 0 ? 'text-faint-2' : cn(GLYPHS[field].textClass, 'opacity-75'),
-              )}
-            >
+            <span className={cn('font-mono font-bold opacity-75', GLYPHS[field].textClass)}>
               {GLYPHS[field].glyph}
             </span>
           </Fragment>
