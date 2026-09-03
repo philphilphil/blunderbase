@@ -20,6 +20,7 @@ import {
   useUpdateNote,
 } from '@/lib/api/queries'
 import type { LineResponse, MoveRow, ReferenceSource } from '@/lib/api/types'
+import { cachedReplay } from '@/lib/board/linePreview'
 import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import { useMoveSound } from '@/lib/board/moveSound'
 import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
@@ -31,7 +32,7 @@ import { ReferenceTokenCard } from '@/routes/explorer/components/ReferenceTokenC
 import { advanceTrail, useGameTrail } from '@/routes/games/gameTrail'
 import { tokenTrouble } from '@/routes/explorer/reference'
 
-import { buildAnalysisLine, withBoardMove } from './analysisLine'
+import { buildAnalysisLine, lineStartingWith, withBoardMove } from './analysisLine'
 import { BoardPanel } from './components/BoardPanel'
 import type { BookMove } from './components/BookPanel'
 import { ColumnSplitter } from './components/ColumnSplitter'
@@ -58,6 +59,7 @@ import {
   evalAtCursor,
   evalCurve,
   formatGameDate,
+  formatVariation,
   gameAnalysisSummary,
   humanMoves,
   maiaComparison,
@@ -68,10 +70,12 @@ import {
   pairMoves,
   previousFlaggedPly,
   runFor,
+  sameMove,
   sanVariation,
   scoreAfter,
   scoreBefore,
   sortNotes,
+  type EngineLineView,
   type GameNote,
   type Side,
 } from './gameModel'
@@ -239,6 +243,24 @@ function intParam(raw: string | null): number | null {
   return Number.isInteger(value) && value >= 0 ? value : null
 }
 
+/**
+ * Whether the human column queries Maia for a position off the game line.
+ *
+ * OFF. Not because it does not work — it does — but because it made the two engines behave
+ * by different rules on the same screen: Stockfish says nothing about an analysis position
+ * until the reader switches the live search on, while Maia answered every position the
+ * board landed on, unasked. One box, two contracts, and the reader is left working out
+ * which of the two numbers in front of them was volunteered and which was requested.
+ *
+ * The open question is where a live human model belongs — under the same switch as the live
+ * search, so that "analyse this position" turns both on together, or in the live panel at
+ * the foot of the column beside the engine's own lines. Until that is settled the column is
+ * simply quiet off the game line, which is what the engine column has always done.
+ *
+ * Stored Maia on the game line is untouched: it is what the run computed, and it is free.
+ */
+const LIVE_MAIA = false
+
 export function GameStudio({ game: from }: { game: StudioGame }) {
   /*
    * One of the two queries runs and the other stands down, and everything below reads
@@ -262,6 +284,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   )
   const analysisRequest = useAnalysisRequest(gameId)
   const navigate = useNavigate()
+  // Where the reader came from: the way back to the explorer for a game opened from there
+  // (`backToExplorer`, below). The way *out* to the explorer reads only the pathname off
+  // this — see `openInExplorer`, which writes its own query.
+  const location = useLocation()
 
   /**
    * Below `md` the screen is `MobileGameView` instead of the two-column studio — a pinned
@@ -665,21 +691,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     )
   }, [])
 
-  /** A drag in the middle of a line truncates it there and continues from the board move. */
-  const playMove = useCallback(
-    (orig: string, dest: string) => {
-      if (!analysis) return
-      const next = withBoardMove(analysis, orig, dest)
-      if (!next) return
-      // The truncated tail is not lost with the drag: the line as it stood is kept.
-      keepBranch()
-      setHoverMove(null)
-      setPreview(null)
-      setBranch({ base: analysis.base, moves: next, cursor: next.length })
-    },
-    [analysis, keepBranch],
-  )
-
   /** Put the board after the `index`-th move of the line the reader is walking. */
   const seekVariation = useCallback(
     (index: number) => {
@@ -805,6 +816,50 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   )
   /** The row the board is standing in, which is the one a pin or a note would act on. */
   const walkedRow = useMemo(() => rows.find((row) => row.cursor !== null) ?? null, [rows])
+
+  /**
+   * The Book tab's arrow: this exact position, opened in `/explorer`.
+   *
+   * `?fen=` roots the explorer's tree at a position whose move order it was never told,
+   * which is precisely this case — the board may be three plies into a line nobody played.
+   * The game comes along as router state rather than as a query parameter, the same way
+   * `ModelGames` hands the explorer position to a game it opens: it is not part of which
+   * position is being read, it is where the reader came from, and the explorer offers the
+   * way back under its own board.
+   *
+   * THE WAY BACK IS BUILT, NOT COPIED. This page deliberately never rewrites its own URL as
+   * the board moves, so `location.search` is where the reader *arrived* — by now often forty
+   * plies behind them, and usually the start of the game. Handing that over would make "Back
+   * to game" mean "back to the beginning". So the address is written from where the board
+   * actually stands, in the vocabulary this page already reads on arrival: `?ply=` is a
+   * half-move count, and a pinned line adds `&line=` with the ply counted inside it.
+   *
+   * A line nobody has pinned cannot be named in a URL at all, so it returns to the game
+   * position the line hangs off — the position it would step back onto anyway.
+   */
+  const openInExplorer = useCallback(() => {
+    const fen = boardPosition?.fen
+    if (!fen) return
+    const back = new URLSearchParams()
+    if (walkedRow?.lineId != null) {
+      back.set('line', String(walkedRow.lineId))
+      back.set('ply', String(analysisPly))
+    } else {
+      back.set('ply', String(exploring && analysis ? analysis.base : boardIndex))
+    }
+    navigate(`/explorer?fen=${encodeURIComponent(fen)}`, {
+      state: { from: `${location.pathname}?${back.toString()}` },
+    })
+  }, [
+    analysis,
+    analysisPly,
+    boardIndex,
+    boardPosition,
+    exploring,
+    location.pathname,
+    navigate,
+    walkedRow,
+  ])
 
   // --- pinned lines and notes -----------------------------------------------
 
@@ -959,7 +1014,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   // carries the explorer position it came from in router state (`ModelGames` puts it
   // there), and the titlebar offers the way back. Nothing else sets that state, and a
   // stale or hand-made one that is not an explorer URL is ignored rather than trusted.
-  const location = useLocation()
   const cameFrom = (location.state as { from?: unknown } | null)?.from
   const backToExplorer =
     typeof cameFrom === 'string' && cameFrom.startsWith('/explorer') ? cameFrom : null
@@ -1041,13 +1095,19 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   // Positions on the game line are stored data, instant and free; only an analysis position
   // is worth a query.
   const live = useLiveMaia(
-    exploring ? boardPosition.fen : null,
+    LIVE_MAIA && exploring ? boardPosition.fen : null,
     elos,
     // Off the game line there is no game rating to fall back on, so the pick falls back to
     // the deployment's first level rather than to the middle of what came back.
     pick ?? targetElo,
   )
   const maia = exploring ? (live.view?.level ?? null) : stored
+  /**
+   * Whether the human column has anything to say here at all: stored data on the game line,
+   * and off it only where the live query is switched on (`LIVE_MAIA`) and the deployment has
+   * a Maia to ask. Otherwise the pane keeps its place and its header and stays quiet.
+   */
+  const humanColumn = exploring ? LIVE_MAIA && !live.unavailable : true
   const human = useMemo(
     () => humanMoves(maia, exploring ? [] : lines, exploring ? undefined : upcoming),
     [maia, exploring, lines, upcoming],
@@ -1136,56 +1196,164 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   })
 
   /**
+   * Every line on offer for the position the board is standing on, best first, in UCI.
+   *
+   * One list, because three different gestures ask the same question — ↵ plays the first of
+   * them, a drag is checked against all of them, and the arrow points along the first — and
+   * they must not disagree about who is speaking for this position. The live search wins
+   * while one is running on exactly this FEN; short of that the stored run's lines speak,
+   * and only on the game line, since that is the only position it ever looked at.
+   */
+  const boardPvs = useMemo(() => {
+    const fen = boardPosition?.fen ?? null
+    const snapshot = stream.snapshot
+    if (snapshot && fen && snapshot.fen === fen) {
+      return [...snapshot.lines].sort((a, b) => a.multipv - b.multipv).map((row) => row.pv)
+    }
+    return exploring ? [] : lines.map((row) => row.pv).filter((pv) => pv.length > 0)
+  }, [boardPosition, exploring, lines, stream.snapshot])
+
+  /**
+   * The run's own lines, re-read from a board that has walked into one of them.
+   *
+   * Walking an engine's PV used to empty the whole box: the moment the board left the game
+   * line the stored rows stopped applying, so clicking the engine's recommendation — the
+   * one move on the board the engine has an opinion about — was the gesture that took the
+   * evaluation, the arrow and the variation away at once, leaving the line visible in the
+   * move table and nowhere else.
+   *
+   * But a PV *is* the engine's claim about where the line goes and what it is worth, and it
+   * does not stop being that claim because the board has walked two plies into it. So while
+   * the moves played from the branch's root are a prefix of one of the run's lines, the box
+   * keeps that line and shortens it: the same eval, the same variation, minus the moves now
+   * behind the board. Standing a move deeper shows a move less, and stepping back up the
+   * line puts it back.
+   *
+   * A prefix, not an equality: a move that leaves every line drops the match, and the box
+   * empties as it always did — the run never looked at where the reader has gone.
+   *
+   * `cachedReplay` does the SAN, because these moves are being read from a position the
+   * game does not contain; `engineLines` can only speak for a ply of the game itself.
+   */
+  const alongLine = useMemo(() => {
+    if (!exploring || !analysis || analysis.base !== boardIndex) return null
+    const fen = boardPosition?.fen
+    if (!fen) return null
+    const walked = analysis.moves.slice(0, analysis.cursor)
+    const matches = lines.filter(
+      (row) =>
+        row.pv.length >= walked.length &&
+        walked.every((uci, index) => sameMove(uci, row.pv[index]!)),
+    )
+    const first = matches[0]
+    if (!first) return null
+    const rows = matches.map((row) => {
+      const rest = row.pv.slice(walked.length)
+      const replay = rest.length > 0 ? cachedReplay(fen, rest) : null
+      const sans = replay?.moves.map((move) => move.san) ?? []
+      return {
+        multipv: row.multipv,
+        score: row.score,
+        text: sans.length > 0 ? formatVariation(analysisPly, sans) : '',
+        sans,
+        // Truncated to what actually replayed, so a click on the last SAN can never play a
+        // move that is not there — `engineLines` holds itself to the same rule.
+        pv: rest.slice(0, sans.length),
+        firstUci: rest[0] ?? null,
+        // Neither is true of a continuation: nothing here was "played", and the verdict on
+        // the move that was belongs to the game line this branch left.
+        played: false,
+        classification: null,
+      } satisfies EngineLineView
+    })
+    return { rows, score: first.score, next: first.pv[walked.length] ?? null }
+  }, [analysis, analysisPly, boardIndex, boardPosition, exploring, lines])
+
+  /**
    * What the board actually points at: the live search's top move while one is running on
-   * the position on the board, and the stored run's otherwise.
+   * the position on the board, the next move of the line being walked while the board is
+   * inside one, and the stored run's otherwise.
    *
    * `liveBest` drops a snapshot whose FEN is not this position — the reader scrubs faster
    * than the search reopens, and a stale arrow from two plies back is worse than no live
-   * arrow at all. Off the game line the stored fallback is nothing, the same as it has
-   * always been: the run never saw that position, so only the live search can speak for it.
+   * arrow at all.
    *
    * The stored-run box (`MaiaPanel`) is deliberately not told any of this. It is that run's
    * own box and its header reports whose numbers those are.
    */
   const boardEngineBest =
-    liveBest(stream.snapshot, boardPosition?.fen ?? null) ?? (exploring ? null : engineBest)
+    liveBest(stream.snapshot, boardPosition?.fen ?? null) ??
+    (exploring ? (alongLine?.next ?? null) : engineBest)
 
   /**
    * What the eval bar and the score chip actually describe: the same rule as
    * `boardEngineBest`, because they are the same claim — a number about the position on the
    * board, not about the game. The live search wins while one is running on that exact
-   * position; short of that, `score`/`win` are the game's own stored evals, and those are
-   * only true of the game line. Off it (`exploring`) they go to null rather than keep
-   * showing the game position's number under a board that has left it — a stale claim is
-   * worse than an empty one, same as the arrow above.
+   * position; then the line being walked, where the board is inside one (`alongLine`);
+   * then `score`/`win`, the game's own stored evals, which are only true of the game line.
+   * Off all three the readouts empty rather than keep showing the game position's number
+   * under a board that has left it — a stale claim is worse than an empty one.
    */
   const boardLiveScore = liveScore(stream.snapshot, boardPosition?.fen ?? null)
-  const boardScore = boardLiveScore ?? (exploring ? null : score)
+  const boardScore = boardLiveScore ?? (exploring ? (alongLine?.score ?? null) : score)
   const boardWin = boardLiveScore
     ? whiteWinPercent(boardLiveScore)
     : exploring
-      ? null
+      ? alongLine
+        ? whiteWinPercent(alongLine.score)
+        : null
       : win
+  /** Whether that number is the line's rather than this position's own — the chip says so. */
+  const scoreAlongLine = boardLiveScore === null && exploring && alongLine !== null
 
   /**
    * Walk the engine's own move here onto the board — ↵.
    *
-   * The same call a click on a line's first move makes (`playLine`), reading from whichever
-   * panel is actually speaking for the position on the board: the live search while one is
-   * running on exactly this FEN, and the stored run's top line otherwise. That is the rule
-   * `boardEngineBest` already follows for the arrow, and the key must not point somewhere
-   * else than the arrow does.
+   * The same call a click on a line's first move makes (`playLine`), reading the panel that
+   * is actually speaking for the position on the board. That is the rule `boardEngineBest`
+   * already follows for the arrow, and the key must not point somewhere else than the arrow
+   * does — which is why both read `boardPvs`.
    */
   const playEngineBest = useCallback(() => {
-    const fen = boardPosition?.fen ?? null
-    const snapshot = stream.snapshot
-    const live =
-      snapshot && fen && snapshot.fen === fen
-        ? [...snapshot.lines].sort((a, b) => a.multipv - b.multipv).map((row) => row.pv)
-        : []
-    const pv = live[0] ?? (exploring ? undefined : lines[0]?.pv)
+    const pv = boardPvs[0]
     if (pv && pv.length > 0) playLine(pv, 0)
-  }, [boardPosition, stream.snapshot, exploring, lines, playLine])
+  }, [boardPvs, playLine])
+
+  /**
+   * A move dragged on the board.
+   *
+   * A drag that plays a move an engine line offers here IS entering that line, and is
+   * treated as one — the same call clicking the line's first move makes, so the rest of the
+   * PV comes with it and the evaluation follows the board (`alongLine`). Playing the
+   * engine's move by hand and clicking it in the panel are the same intention, and they used
+   * to have opposite consequences: the click walked into the line, the drag started a bare
+   * one-move branch that nothing had an opinion about, so the eval, the arrow and the rest of
+   * the variation all went out at once.
+   *
+   * Anything else is a line of the reader's own: the walk is truncated at the cursor and
+   * continues from the move dragged. The tail that is dropped is not lost with it — the line
+   * as it stood goes to the kept list, like every other way of leaving one.
+   *
+   * It lives down here, away from the other line-walking callbacks, because it needs the
+   * live search: which lines are on offer is `boardPvs`, and the session is opened above.
+   */
+  const playMove = useCallback(
+    (orig: string, dest: string) => {
+      if (!analysis) return
+      const next = withBoardMove(analysis, orig, dest)
+      if (!next) return
+      const offered = lineStartingWith(boardPvs, next[next.length - 1]!)
+      if (offered) {
+        playLine(offered, 0)
+        return
+      }
+      keepBranch()
+      setHoverMove(null)
+      setPreview(null)
+      setBranch({ base: analysis.base, moves: next, cursor: next.length })
+    },
+    [analysis, boardPvs, keepBranch, playLine],
+  )
 
   /*
    * Playing the game through, a ply at a time.
@@ -1331,15 +1499,20 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       compare={compare}
       onCompareChange={setMaiaCompare}
       comparison={comparison}
-      showHuman={hints && !(exploring && live.unavailable)}
+      showHuman={hints && humanColumn}
       showEngine={hints}
       run={engineRun}
-      // A stored run says nothing about a position it never saw: off the game line the
-      // column empties rather than describing the position the reader has left.
-      engine={exploring ? [] : lines}
+      // Off the game line the column is the run's own line seen from further along it
+      // (`alongLine`), or nothing at all where the board has left every line it drew.
+      engine={exploring ? (alongLine?.rows ?? []) : lines}
+      alongLine={scoreAlongLine}
       ply={analysisPly}
       fen={boardPosition.fen}
-      live={exploring ? { rollout: live.view?.rollout ?? [], pending: live.pending } : null}
+      live={
+        LIVE_MAIA && exploring
+          ? { rollout: live.view?.rollout ?? [], pending: live.pending }
+          : null
+      }
       orientation={orientation}
       onHoverMove={setHoverMove}
       onHoverLine={setPreview}
@@ -1399,6 +1572,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       maia={maia}
       win={boardWin}
       score={boardScore}
+      scoreAlongLine={scoreAlongLine}
       cursor={cursor}
       plyCount={plyCount}
       hints={hints}
@@ -1513,6 +1687,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       bookPly={analysisPly}
       onPlayBookMove={playBookMove}
       onPreviewBookMove={previewBookMove}
+      onOpenInExplorer={openInExplorer}
       notes={noteList}
       activeNoteId={editedNote?.id ?? null}
       onSelectNote={selectNote}

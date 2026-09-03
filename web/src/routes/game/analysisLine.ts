@@ -22,7 +22,7 @@ import { makeSanAndPlay } from 'chessops/san'
 import type { NormalMove, SquareName } from 'chessops/types'
 import { makeUci, parseUci } from 'chessops/util'
 
-import type { GameLine, PlyPosition } from './gameModel'
+import { sameMove, type GameLine, type PlyPosition } from './gameModel'
 
 export interface AnalysisLine {
   /** The number of game plies the line branches from — an index into `GameLine.positions`. */
@@ -122,4 +122,24 @@ export function withBoardMove(
   const move: NormalMove = promotes ? { ...plain, promotion: 'queen' } : plain
   if (!analysis.board.isLegal(move)) return null
   return [...analysis.moves.slice(0, analysis.cursor), makeUci(move)]
+}
+
+/**
+ * The line on offer here that begins with `uci`, or null when none does.
+ *
+ * A move dragged on the board is checked against this: playing a move an engine line offers
+ * from this position IS entering that line, and the page treats the drag exactly as it
+ * treats a click on the line's first move — the whole variation comes onto the board and
+ * the evaluation that goes with it stays. Without it the same move by hand produced a bare
+ * one-move branch nobody had an opinion about, which is what made the eval disappear the
+ * moment you played the engine's own recommendation.
+ *
+ * The best line wins where several start the same way, since `pvs` arrives best-first.
+ */
+export function lineStartingWith(
+  pvs: readonly (readonly string[])[],
+  uci: string,
+): string[] | null {
+  const match = pvs.find((pv) => pv.length > 0 && sameMove(pv[0]!, uci))
+  return match ? [...match] : null
 }

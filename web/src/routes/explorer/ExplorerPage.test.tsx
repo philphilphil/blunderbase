@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ComponentProps } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -74,7 +75,10 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-function renderPage(entry = '/explorer') {
+/** A string path, or a full location — how a test hands the page its router state. */
+type Entry = NonNullable<ComponentProps<typeof MemoryRouter>['initialEntries']>[number]
+
+function renderPage(entry: Entry = '/explorer') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   })
@@ -453,6 +457,50 @@ describe('ExplorerPage sources', () => {
         seen.some((url) => url.includes('/reference/explorer') && url.includes('3P4')),
       ).toBe(true),
     )
+
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('ExplorerPage way back to a game', () => {
+  function stubTree() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/explorer/positions')) return json([])
+        if (url.includes('/explorer')) return json(TREE)
+        return json({ error: 'not_found', detail: url }, 404)
+      }),
+    )
+  }
+
+  it('offers the way back to the game that opened it, and keeps it while the reader plays', async () => {
+    const user = userEvent.setup()
+    stubTree()
+
+    renderPage({ pathname: '/explorer', search: '', state: { from: '/games/7?ply=12' } })
+
+    const back = await screen.findByRole('link', { name: /Back to game/ })
+    expect(back).toHaveAttribute('href', '/games/7?ply=12')
+
+    // Playing a move writes a new history entry; the way back has to be handed over with
+    // it, or the button disappears the moment anybody uses the page.
+    await user.click(await screen.findByText('1.e4'))
+    await waitFor(() =>
+      expect(screen.getByTestId('board')).toHaveAttribute('data-fen', AFTER_E4_FEN),
+    )
+    expect(screen.getByRole('link', { name: /Back to game/ })).toBeInTheDocument()
+
+    vi.unstubAllGlobals()
+  })
+
+  it('shows no way back where nothing sent the reader here', async () => {
+    stubTree()
+    renderPage()
+
+    await screen.findByText('1.e4')
+    expect(screen.queryByRole('link', { name: /Back to game/ })).not.toBeInTheDocument()
 
     vi.unstubAllGlobals()
   })

@@ -82,6 +82,21 @@ describe('NotesTrack', () => {
     expect(screen.getByText('9 games')).toBeInTheDocument()
   })
 
+  it('offers the way out to the explorer on the Book tab, and only there', async () => {
+    const user = userEvent.setup()
+    const onOpenInExplorer = vi.fn()
+    renderTrack({ onOpenInExplorer })
+
+    await user.click(screen.getByRole('button', { name: 'Open this position in the explorer' }))
+    expect(onOpenInExplorer).toHaveBeenCalledTimes(1)
+
+    // The arrow belongs to the book, not to the row: on Notes there is nothing to open.
+    await user.click(screen.getByRole('tab', { name: 'Notes' }))
+    expect(
+      screen.queryByRole('button', { name: 'Open this position in the explorer' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('keeps the Book tab where no book reached this position, and opens on Notes', () => {
     renderTrack({ book: NO_BOOK })
 

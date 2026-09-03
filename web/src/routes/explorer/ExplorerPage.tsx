@@ -38,7 +38,7 @@
  */
 import type { Api } from '@lichess-org/chessground/api'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -99,6 +99,23 @@ const NO_DESTS: LinePosition['dests'] = new Map()
 export function ExplorerPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  /**
+   * The game whose Book tab sent the reader here, if one did (`GamePage`'s `openInExplorer`
+   * puts it in router state, the mirror of what `ModelGames` does going the other way).
+   *
+   * The explorer is a place you *arrive* at from a game — same position, more of it — and
+   * without a way back the reader has to remember which game they were reading and find it
+   * again in the library. Router state rather than a query parameter: it is not part of
+   * which position is on the board. Anything that is not a game URL is ignored rather than
+   * trusted, since state is hand-writable.
+   */
+  const location = useLocation()
+  const cameFrom = (location.state as { from?: unknown } | null)?.from
+  const backToGame =
+    typeof cameFrom === 'string' &&
+    (cameFrom.startsWith('/games/') || cameFrom.startsWith('/reference/'))
+      ? cameFrom
+      : null
 
   const ucis = useMemo(() => parseLineParam(params.get('line')), [params])
   const scope = (params.get('color') as Color | null) ?? undefined
@@ -148,15 +165,24 @@ export function ExplorerPage() {
     [ucis, preview],
   )
 
+  /**
+   * The way back, carried along by every navigation this page makes.
+   *
+   * Playing a move writes a new history entry, and router state does not survive one unless
+   * it is handed over again — so without this the "Back to game" button would vanish the
+   * moment the reader played a move, which is the first thing anybody does here.
+   */
+  const carried = useMemo(() => (backToGame ? { from: backToGame } : undefined), [backToGame])
+
   const setLine = useCallback(
     (next: readonly string[], { remember = true }: { remember?: boolean } = {}) => {
       if (remember) trail.current = [...next]
       const updated = new URLSearchParams(params)
       if (next.length === 0) updated.delete('line')
       else updated.set('line', formatLineParam(next))
-      setParams(updated)
+      setParams(updated, { state: carried })
     },
-    [params, setParams],
+    [carried, params, setParams],
   )
 
   /**
@@ -169,9 +195,9 @@ export function ExplorerPage() {
       const updated = new URLSearchParams(params)
       if (value) updated.set(key, value)
       else updated.delete(key)
-      setParams(updated, { replace: true })
+      setParams(updated, { replace: true, state: carried })
     },
-    [params, setParams],
+    [carried, params, setParams],
   )
 
   const setScope = useCallback(
@@ -368,6 +394,19 @@ export function ExplorerPage() {
               >
                 Reset
               </button>
+            ) : null}
+            {/*
+              In the board's own control row, exactly where the game screen puts "← Back to
+              explorer" for a game opened from here: the two doors between these screens are
+              one feature and they sit in the same place on both sides of it.
+            */}
+            {backToGame ? (
+              <Link
+                to={backToGame}
+                className="rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-1 text-xs text-brilliant transition-colors hover:border-brilliant/50"
+              >
+                ← Back to game
+              </Link>
             ) : null}
             <div className="flex-1" />
             <span className="font-mono text-[0.6875rem] tabular text-dim">

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { MoveRow } from '@/lib/api/types'
 
-import { buildAnalysisLine, withBoardMove } from './analysisLine'
+import { buildAnalysisLine, lineStartingWith, withBoardMove } from './analysisLine'
 import { buildGameLine } from './gameModel'
 
 function move(ply: number, san: string, uci: string): MoveRow {
@@ -123,5 +123,29 @@ describe('withBoardMove', () => {
     )!
     expect(analysis.moves).toHaveLength(0)
     expect(withBoardMove(analysis, 'c7', 'd8')).toEqual(['c7d8q'])
+  })
+})
+
+describe('lineStartingWith', () => {
+  const PVS = [
+    ['c7c6', 'd2d4', 'd7d5'],
+    ['e7e5', 'g1f3'],
+  ]
+
+  it('gives back the whole line a dragged move begins', () => {
+    // Dragging the engine's own move is entering the engine's line: the drag has to hand
+    // back the tail as well, or the board keeps the move and loses the variation.
+    expect(lineStartingWith(PVS, 'c7c6')).toEqual(['c7c6', 'd2d4', 'd7d5'])
+    expect(lineStartingWith(PVS, 'e7e5')).toEqual(['e7e5', 'g1f3'])
+  })
+
+  it('ignores the promotion suffix, and empty lines', () => {
+    expect(lineStartingWith([['c7c8q']], 'c7c8')).toEqual(['c7c8q'])
+    expect(lineStartingWith([[], ['c7c6']], 'c7c6')).toEqual(['c7c6'])
+  })
+
+  it('is null for a move no line offers — a move of the reader’s own', () => {
+    expect(lineStartingWith(PVS, 'g8f6')).toBeNull()
+    expect(lineStartingWith([], 'c7c6')).toBeNull()
   })
 })

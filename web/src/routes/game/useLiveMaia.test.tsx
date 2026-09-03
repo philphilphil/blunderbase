@@ -133,4 +133,28 @@ describe('useLiveMaia', () => {
     expect(result.current.view?.level.rating).toBe('1900')
     expect(result.current.views.map((view) => view.level.rating)).toEqual(['1100', '1900'])
   })
+
+  it('reports a deployment with no Maia as unavailable rather than as a failure', async () => {
+    // A 409 is a standing fact about the installation, not something that went wrong with
+    // this position: the caller hides the column instead of showing an error in it. Covered
+    // here rather than through the game page, which no longer asks live at all — see
+    // `GamePage`'s `LIVE_MAIA`.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: 'no_maia' }), {
+            status: 409,
+            headers: { 'content-type': 'application/json' },
+          }),
+      ),
+    )
+
+    const { result } = renderHook(() => useLiveMaia(AFTER_E4, [1700]), { wrapper: wrapper() })
+
+    await waitFor(() => expect(result.current.unavailable).toBe(true))
+    expect(result.current.views).toHaveLength(0)
+    expect(result.current.view).toBeNull()
+    expect(result.current.pending).toBe(false)
+  })
 })

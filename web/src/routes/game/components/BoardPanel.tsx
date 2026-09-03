@@ -83,6 +83,13 @@ export interface BoardPanelProps {
   maia: MaiaLevel | null
   win: number | null
   score: Score | null
+  /**
+   * Whether that score is the engine's evaluation of the LINE the board is walking rather
+   * than of this position on its own — see `GamePage`'s `walkedLine`. The number is the
+   * same claim either way, but it was made about a position further along the line, and the
+   * chip says so rather than letting a walked line look like a fresh search.
+   */
+  scoreAlongLine?: boolean
   /** `-1` for the starting position. */
   cursor: number
   plyCount: number
@@ -189,6 +196,7 @@ export function BoardPanel({
   maia,
   win,
   score,
+  scoreAlongLine,
   cursor,
   plyCount,
   hints,
@@ -636,7 +644,22 @@ export function BoardPanel({
               ? `analysis +${analysis.cursor}`
               : `ply ${cursor + 1} / ${plyCount}`}
           </span>
-          <span className="rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] tabular text-ink">
+          <span
+            title={
+              scoreAlongLine
+                ? 'The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it'
+                : undefined
+            }
+            className={cn(
+              'rounded-sm border px-1.5 py-0.5 font-mono text-[0.6875rem] tabular',
+              // The analysis board's own purple, the colour "Back to game" is drawn in a
+              // few controls to the left: the reader is inside a line, and this number
+              // belongs to the line rather than to the game.
+              scoreAlongLine
+                ? 'border-brilliant/35 bg-brilliant/10 text-brilliant'
+                : 'border-edge bg-chip-info text-ink',
+            )}
+          >
             {formatScore(score)}
           </span>
         </div>

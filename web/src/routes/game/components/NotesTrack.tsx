@@ -28,6 +28,7 @@
  *
  * There is deliberately no coach card and no per-move prose here. One was built and cut.
  */
+import { ArrowUpRight } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -45,6 +46,13 @@ export interface NotesTrackProps {
   /** The half-move count on the board: the key `book` was taken from, and the moves' label. */
   bookPly: number
   onPlayBookMove?: (move: BookMove) => void
+  /**
+   * Open the position on the board in `/explorer`, where the same tree has the whole screen
+   * — a table of continuations, the reference books beside it and the games in the line.
+   * Offered as a small arrow on the Book tab's own row; without it the row is just the
+   * count it always was.
+   */
+  onOpenInExplorer?: () => void
   /** Preview a continuation on the board without selecting it; `null` restores. */
   onPreviewBookMove?: (continuation: string[] | null) => void
 
@@ -89,6 +97,7 @@ export function NotesTrack({
   bookPly,
   onPlayBookMove,
   onPreviewBookMove,
+  onOpenInExplorer,
   notes,
   activeNoteId = null,
   onSelectNote,
@@ -145,6 +154,24 @@ export function NotesTrack({
             ? `${games} ${games === 1 ? 'game' : 'games'}`
             : `${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`}
         </span>
+        {/*
+          The way out to the full explorer, on the Book tab only: this pane is four columns
+          of a seven-column table and has no room for the reference books, the line summary
+          or the games in the line. An arrow rather than a word — the row is 35 design pixels
+          with two tabs and a count already on it — and the explorer it opens carries the way
+          back to this game, so following it is not leaving the game behind.
+        */}
+        {active === 'book' && onOpenInExplorer ? (
+          <button
+            type="button"
+            onClick={onOpenInExplorer}
+            aria-label="Open this position in the explorer"
+            title="Open this position in the explorer"
+            className="ml-1.5 flex items-center rounded-sm border border-edge bg-elevated px-1 py-px text-dim transition-colors hover:border-edge-hover hover:text-ink"
+          >
+            <ArrowUpRight className="size-3" aria-hidden />
+          </button>
+        ) : null}
       </div>
 
       {/*

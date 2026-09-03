@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
@@ -319,6 +319,18 @@ function json(body: unknown, status = 200): Response {
  * signed-out browser never dials it. A test that mounts a page on its own is standing in
  * for the authenticated side of that gate, so it supplies the provider the gate would.
  */
+/**
+ * Stands in for the explorer, and reports the address the page navigated to — the way back
+ * to the game rides in router state, which is not in the URL and cannot be read off it.
+ */
+function ExplorerStub() {
+  const location = useLocation()
+  const from = (location.state as { from?: string } | null)?.from ?? ''
+  return (
+    <div data-testid="explorer-stub" data-search={location.search} data-from={from} />
+  )
+}
+
 function renderPage(entry = '/games/14') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
@@ -329,6 +341,7 @@ function renderPage(entry = '/games/14') {
         <MemoryRouter initialEntries={[entry]}>
           <Routes>
             <Route path="/games/:id" element={<GamePage />} />
+            <Route path="/explorer" element={<ExplorerStub />} />
           </Routes>
         </MemoryRouter>
       </EventsProvider>
@@ -1125,42 +1138,56 @@ describe('GamePage', () => {
     expect(within(panel).getByRole('button', { name: 'c6' })).toBeInTheDocument()
   })
 
-  it('goes live off the game line, and walks the rollout back onto the board', async () => {
+  it('asks Maia nothing about a position off the game line', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
     await user.keyboard('.')
+    // On the game line the human column is the run's own stored answer, free and instant.
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1500')
 
-    // Playing the human column's own move branches an analysis line off the game.
     await user.click(screen.getByTestId('maia-played-row'))
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
 
-    // The affordance is immediate; the query behind it is debounced (see `useLiveMaia`),
-    // so a reader clicking through a line does not ask about every position on the way.
-    expect(screen.getByTestId('maia-live')).toBeInTheDocument()
-
+    // Off it, the column goes quiet rather than volunteering a live answer: the engine
+    // beside it says nothing about an analysis position until the reader switches the live
+    // search on, and one box must not run on two different contracts.
     await waitFor(() =>
-      expect(posted.filter((call) => call.url.includes('/maia/policy'))).toHaveLength(1),
+      expect(posted.filter((call) => call.url.includes('/maia/policy'))).toHaveLength(0),
     )
-    expect(posted.filter((call) => call.url.includes('/maia/policy'))[0].body).toMatchObject({
-      // The position after 1.e4 d5 — not the game position the line left from.
-      fen: 'rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
-      elo: 1700,
-      rollout_plies: 8,
-    })
+    expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('maia-rollout')).not.toBeInTheDocument()
 
-    // The rollout is a line to walk into: clicking its second move plays both.
-    const rollout = within(screen.getByTestId('maia-rollout'))
-    await user.click(rollout.getByRole('button', { name: 'Qxd5' }))
-    expect(screen.getByText('analysis +3')).toBeInTheDocument()
-
-    // And back to the game, where the stored data is instant and nothing is queried.
+    // The pane keeps its place and its header through all of it, and the stored answer is
+    // back the moment the board is.
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia')
     await user.click(screen.getByRole('button', { name: /Back to game/ }))
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
-    expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument()
+    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1500')
   })
 
-  it('empties the board’s eval bar once the reader steps off the game line', async () => {
+  it('opens the book position in the explorer, with the way back to where the board stands', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    // Two moves in: the position the arrow has to hand over is this one, not the game's
+    // first — and not the URL the reader arrived on, which still says nothing at all.
+    await user.keyboard('{ArrowRight}{ArrowRight}')
+    expect(screen.getByText('ply 2 / 4')).toBeInTheDocument()
+
+    // The arrow rides on the Book tab, whether or not the owner's own games reached here:
+    // the explorer also holds the reference books, which have plenty to say about a
+    // position none of your games ever visited.
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'Open this position in the explorer' }))
+
+    const stub = await screen.findByTestId('explorer-stub')
+    expect(stub.getAttribute('data-search')).toContain('fen=')
+    // `?ply=2` is what this page reads on arrival: the board comes back where it was left.
+    expect(stub).toHaveAttribute('data-from', '/games/14?ply=2')
+  })
+
+  it('keeps the eval along a line the run evaluated, and empties it off one', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
@@ -1170,43 +1197,51 @@ describe('GamePage', () => {
     const bar = () => screen.getByRole('img', { name: /Evaluation/ })
     expect(bar()).toHaveAttribute('title', expect.stringContaining('+0.40'))
 
-    // Playing the human column's own move branches an analysis line off the game.
+    // Playing the human column's own move branches an analysis line off the game — and
+    // that move is one the run evaluated, so the bar carries the run's number for it
+    // rather than emptying. The chip beside it says the figure belongs to the line.
     await user.click(screen.getByTestId('maia-played-row'))
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
+    expect(bar()).toHaveAttribute('title', expect.stringContaining('+3.00'))
 
-    // No live search is running on the analysis position, so the bar goes to "not
-    // analysed" rather than keep showing the game position's eval under a board that has
-    // left it.
+    // A move of the reader's own — a book continuation from the start, which no stored line
+    // covers. Nothing has evaluated the position on the board now, and a stale number is
+    // worse than none.
+    await user.click(screen.getByRole('button', { name: /Back to game/ }))
+    await user.click(screen.getByRole('button', { name: 'First' }))
+    await user.click(await screen.findByRole('row', { name: /d4/ }))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
     expect(bar()).toHaveAttribute('title', 'not analysed')
   })
 
-  it('keeps the analysis board walkable after a click the position cannot take', async () => {
-    // The stub answers every position with the same policy, so deep in a line some of the
-    // moves it offers are no longer legal. A click on one of those must be a no-op and
-    // nothing more: the line the board is actually standing on is what the next click
-    // extends, never the raw list an illegal move was appended to.
+  it('keeps the run’s line in the box while the board walks into it, one move shorter', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
+    // The run's line at this position is 1…c6 2.d4, at +0.40.
     await user.keyboard('.')
-
-    await user.click(screen.getByTestId('maia-played-row'))
-    const rollout = () => within(screen.getByTestId('maia-rollout'))
-    await waitFor(() => expect(rollout().getByRole('button', { name: 'Qxd5' })).toBeEnabled())
-    await user.click(rollout().getByRole('button', { name: 'Qxd5' }))
-    expect(screen.getByText('analysis +3')).toBeInTheDocument()
-
-    // exd5 belongs to the position two moves back; e4 is empty here, so the board holds.
     const panel = () => within(screen.getByTestId('maia-panel'))
-    await waitFor(() =>
-      expect(panel().getByTitle('Play exd5 on the analysis board')).toBeEnabled(),
-    )
-    await user.click(panel().getByTitle('Play exd5 on the analysis board'))
-    expect(screen.getByText('analysis +3')).toBeInTheDocument()
+    expect(panel().getByText('+0.40')).toBeInTheDocument()
 
-    // And the next legal move still plays, rather than landing behind the dead one.
-    await user.click(panel().getByTitle('Play Nc3 on the analysis board'))
-    expect(screen.getByText('analysis +4')).toBeInTheDocument()
+    await user.click(panel().getByRole('button', { name: 'c6' }))
+    expect(screen.getByText('analysis +1')).toBeInTheDocument()
+
+    // The box does not empty: it keeps the line, shortened by the move now behind the
+    // board, at the eval the run gave it — and says the rows are a continuation.
+    expect(panel().getByTestId('maia-engine-along-line')).toBeInTheDocument()
+    expect(panel().getByText('+0.40')).toBeInTheDocument()
+    expect(panel().getByRole('button', { name: 'd4' })).toBeInTheDocument()
+    expect(panel().queryByRole('button', { name: 'c6' })).not.toBeInTheDocument()
+
+    // And its last move is still a move to click: the walk continues along the line.
+    await user.click(panel().getByRole('button', { name: 'd4' }))
+    expect(screen.getByText('analysis +2')).toBeInTheDocument()
+
+    // Back on the game line the box is the run's own reading of the position again.
+    await user.click(screen.getByRole('button', { name: /Back to game/ }))
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+    expect(panel().queryByTestId('maia-engine-along-line')).not.toBeInTheDocument()
+    expect(panel().getByRole('button', { name: 'c6' })).toBeInTheDocument()
   })
 
   it('walks into a clicked engine line and keeps the rest of it to step through', async () => {
@@ -1267,30 +1302,6 @@ describe('GamePage', () => {
     // …and the game's own transport works again from there.
     await user.keyboard('{ArrowRight}')
     expect(screen.getByText('ply 2 / 4')).toBeInTheDocument()
-  })
-
-  it('empties the human column where the deployment has no Maia to ask', async () => {
-    const user = userEvent.setup()
-    vi.stubGlobal('fetch', stubFetch({}, { maiaStatus: 409 }))
-    renderPage()
-    await screen.findByText('Scandinavian Defense')
-    await user.keyboard('.')
-    // Stored data is still there — the 409 is only about positions nobody analysed.
-    expect(screen.getByTestId('maia-panel')).toHaveTextContent('Maia 1500')
-
-    await user.click(screen.getByTestId('maia-played-row'))
-    await waitFor(() =>
-      expect(posted.filter((call) => call.url.includes('/maia/policy'))).toHaveLength(1),
-    )
-    // Degrade, don't error: the human column empties but keeps its place, and the box and
-    // the analysis board stay.
-    await waitFor(() => expect(screen.queryByTestId('maia-live')).not.toBeInTheDocument())
-    const panel = screen.getByTestId('maia-panel')
-    expect(
-      within(panel).queryByText('No human model for this position.'),
-    ).not.toBeInTheDocument()
-    expect(within(panel).getByText('stockfish')).toBeInTheDocument()
-    expect(screen.getByText('analysis +1')).toBeInTheDocument()
   })
 
   it('keeps a walked line in the move list once the board has left it', async () => {
