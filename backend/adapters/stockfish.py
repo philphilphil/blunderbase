@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import shutil
 import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -270,6 +271,29 @@ def command_for(path: str | Sequence[str]) -> list[str]:
     return command
 
 
+def _path_hint(program: str, exc: BaseException) -> str:
+    """The sentence that turns "No such file or directory: 'stockfish'" into an instruction.
+
+    A bare name is looked for on `PATH`, and the `PATH` a process has is not always the one
+    the owner tested the name in — most sharply in the macOS desktop app, which is started
+    by launchd and inherits no shell profile. Saying so, and saying where the binary
+    probably is, is the difference between a dead end and a fix; a name that is not there at
+    all gets the same sentence, which is still the right advice.
+
+    Only for a bare name that was never found. A path that exists and refuses to run is a
+    different problem, and pointing at `PATH` would be a wrong answer stated confidently.
+    """
+    if not isinstance(exc, FileNotFoundError) or os.sep in program:
+        return ""
+    found = shutil.which(program)
+    if found is not None:
+        return ""
+    return (
+        f" — {program!r} is not on this process's PATH. Give the full path to the binary; "
+        f"`which {program}` in a terminal prints it."
+    )
+
+
 def quit_engine(engine: Any) -> None:
     """Stop an engine process. Closing one that is already gone is not an error."""
     try:
@@ -293,7 +317,9 @@ def open_engine(
     try:
         engine = chess.engine.SimpleEngine.popen_uci(command, timeout=timeout, **extra)
     except START_ERRORS as exc:
-        raise EngineStartError(f"could not start {shlex.join(command)}: {exc}") from exc
+        raise EngineStartError(
+            f"could not start {shlex.join(command)}: {exc}{_path_hint(command[0], exc)}"
+        ) from exc
     if options:
         try:
             engine.configure(dict(options))

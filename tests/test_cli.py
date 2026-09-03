@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import getpass
+import os
+import sys
 import tomllib
 from pathlib import Path
 
@@ -9,7 +11,14 @@ from fake_uci import STOCKFISH_OPTIONS, fake_engine_command
 from sqlalchemy import func, select
 
 import backend
-from backend.cli import _import_options, build_parser, main
+from backend.cli import (
+    COMMANDS,
+    MACOS_BINARY_DIRS,
+    _import_options,
+    build_parser,
+    main,
+    widen_path_for_desktop,
+)
 from backend.config import Settings
 from backend.db.enums import (
     Classification,
@@ -51,6 +60,45 @@ def test_an_unregistered_source_is_refused(settings: Settings) -> None:
 def test_serve_defaults_come_from_settings(settings: Settings) -> None:
     args = build_parser(settings).parse_args(["serve"])
     assert (args.host, args.port, args.reload) == (settings.host, settings.port, False)
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="the launchd PATH is a macOS problem")
+def test_the_desktop_path_gains_the_usual_mac_binary_directories() -> None:
+    """A Finder-launched app gets launchd's PATH, which no Homebrew binary is on."""
+    launchd = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"}
+
+    widened = widen_path_for_desktop(launchd).split(os.pathsep)
+
+    assert widened[:4] == ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+    assert widened[4:] == list(MACOS_BINARY_DIRS)
+    assert launchd["PATH"] == os.pathsep.join(widened)
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="the launchd PATH is a macOS problem")
+def test_a_directory_already_on_the_path_keeps_its_place() -> None:
+    """The addition is a fallback, not an opinion about a PATH somebody set."""
+    environ = {"PATH": f"/opt/homebrew/bin{os.pathsep}/usr/bin"}
+
+    widened = widen_path_for_desktop(environ).split(os.pathsep)
+
+    assert widened.count("/opt/homebrew/bin") == 1
+    assert widened[0] == "/opt/homebrew/bin"
+
+
+def test_the_path_is_only_widened_for_the_desktop_runtime(
+    monkeypatch: pytest.MonkeyPatch, settings: Settings
+) -> None:
+    """A server's PATH is deliberate; only the app launched by launchd gets the fallback."""
+    seen: list[str] = []
+    monkeypatch.setattr(
+        "backend.cli.widen_path_for_desktop", lambda *args: seen.append("widened") or ""
+    )
+    monkeypatch.setattr("backend.cli.get_settings", lambda: settings)
+    monkeypatch.setitem(COMMANDS, "serve", lambda args, settings: 0)
+
+    assert settings.runtime_mode == "server"
+    assert main(["serve"]) == 0
+    assert seen == []
 
 
 def test_version_prints_the_package_version(

@@ -121,6 +121,26 @@ def test_a_missing_binary_is_rejected(tmp_path: Path) -> None:
         probe_engine(str(tmp_path / "not-an-engine"))
 
 
+def test_a_bare_name_that_is_not_on_the_path_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The desktop app is launched by launchd and sees no shell PATH — say where to look."""
+    monkeypatch.setenv("PATH", "")
+
+    with pytest.raises(EngineStartError) as raised:
+        probe_engine("stockfish")
+
+    message = str(raised.value)
+    assert "not on this process's PATH" in message
+    assert "which stockfish" in message
+
+
+def test_a_path_that_exists_and_will_not_run_is_not_blamed_on_the_path(tmp_path: Path) -> None:
+    """A wrong answer stated confidently is worse than the bare errno it replaces."""
+    with pytest.raises(EngineStartError) as raised:
+        probe_engine(str(tmp_path / "not-an-engine"))
+
+    assert "PATH" not in str(raised.value)
+
+
 # --- stockfish analysis ---------------------------------------------------
 
 

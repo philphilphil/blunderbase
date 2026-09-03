@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import os
+import sys
 from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
@@ -726,8 +728,39 @@ COMMANDS = {
 }
 
 
+# Where a Mac keeps binaries that a shell finds and a double-clicked app does not.
+# Homebrew on Apple silicon, Homebrew on Intel (and most `make install`s), MacPorts.
+MACOS_BINARY_DIRS = ("/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin")
+
+
+def widen_path_for_desktop(environ: dict[str, str] | None = None) -> str:
+    """Add the usual macOS binary directories to `PATH`, for the desktop process only.
+
+    An app launched from Finder is started by launchd, which reads no shell profile: its
+    `PATH` is `/usr/bin:/bin:/usr/sbin:/sbin` and nothing else. So `stockfish` — sitting in
+    `/opt/homebrew/bin` like every Homebrew binary — is on the `PATH` of the terminal the
+    owner tested it in and absent from the one the app hands to `Popen`, and adding the
+    engine fails with a bare "No such file or directory" for a binary they can see.
+
+    Appended rather than prepended: these are a fallback for what launchd did not provide,
+    not a claim to know better than a `PATH` somebody set. Directories already there keep
+    their position, and the whole thing is a no-op off macOS — a Windows app inherits the
+    user's environment, and a server's `PATH` is deliberate.
+    """
+    environ = os.environ if environ is None else environ
+    if sys.platform != "darwin":
+        return environ.get("PATH", "")
+    current = [entry for entry in environ.get("PATH", "").split(os.pathsep) if entry]
+    widened = current + [entry for entry in MACOS_BINARY_DIRS if entry not in current]
+    path = os.pathsep.join(widened)
+    environ["PATH"] = path
+    return path
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     settings = get_settings()
+    if settings.runtime_mode == "desktop":
+        widen_path_for_desktop()
     args = build_parser(settings).parse_args(argv)
     return COMMANDS[args.command](args, settings)
 
