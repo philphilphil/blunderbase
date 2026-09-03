@@ -1,30 +1,52 @@
 /**
- * Design 2a, "Your worst recent moments" — three cards over `/stats/worst-moments`.
+ * Design 2a, "Your worst recent moments" — a grid of positions over `/stats/worst-moments`.
  *
  * Each card is the position the blunder was played from, the move that was played in red,
- * the eval either side of it, and the move the engine wanted, drawn as a teal arrow.
+ * what it cost, and the move the engine wanted, drawn as a teal arrow. Clicking one opens
+ * the game *on that position* (`?ply=`), not at move one: the card is a question and the
+ * game page is where it is answered.
  *
- * `MomentResponse` carries the FEN, the move and the win percentage it cost, but not the
- * evaluation before and after; that lives on the move row, so each card asks `/games/{id}`
- * for its single ply. Five small cached requests, invalidated by the same socket events as
- * everything else.
+ * A ROW OF SMALL SQUARE TILES, NOT THREE WIDE CARDS. The old row fitted three, and three is
+ * not enough to be a list of things to work on — a single bad game could fill it (the
+ * service now keeps one moment per game, which is the other half of that fix). Six tiles in
+ * the width of the old three cost no more height than they did: the shape is the board's
+ * own, so dropping the prose beside each board is what pays for twice the moments.
+ *
+ * They are deliberately small — a hundred-odd pixels, a quarter of the area a card that
+ * size would want. This is a panel on a dashboard, not the stats page: the tile has to say
+ * *which* position and roughly how bad, and anything more precise is a click away. At that
+ * size the `??` badge goes too — every moment here is a blunder, so it was a badge saying
+ * the same word six times, and the move is already drawn in the blunder's own red.
+ *
+ * WHAT "RECENT" MEANS: the last thirty days, said out loud in the heading. It used to mean
+ * "ever", which on a library with an imported archive is a dashboard permanently showing
+ * the same six moments from 2019. Where the window holds nothing — an owner who has not
+ * played in a month, or has just imported and not analysed — the card falls back to the
+ * whole library rather than showing an empty panel, and the heading says which of the two
+ * you are looking at.
+ *
+ * The number on the card is the win percentage the move gave away, which is what the
+ * ranking is by. It used to be the evaluation either side of the move, which meant a
+ * request per card for a single ply — six of them now — to show a figure the heading was
+ * not about. The eval swing is on the game page, one click away.
  */
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import { SectionHead } from '@/components/shell/Section'
-import { useGame, useWorstMoments } from '@/lib/api/queries'
+import { useWorstMoments } from '@/lib/api/queries'
 import type { MomentResponse } from '@/lib/api/types'
-import { formatScore, formatWinLoss } from '@/lib/chess/evaluation'
-import { scoreAfter, scoreBefore } from '@/routes/game/gameModel'
+import { formatWinLoss } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { Bar, EmptyBlock, ErrorBlock } from '@/routes/stats/kit/states'
 import { shortDate } from '@/routes/stats/kit/analytics'
 
-const COUNT = 3
+/** Six: one row of six tiles, in the height the old three wide cards took. */
+const COUNT = 6
+/** What "recent" means. Long enough to hold a quiet fortnight, short enough to be current. */
+const RECENT_DAYS = 30
 
 /** The side to move in a FEN is the side that played the blunder. */
 function moverOf(fen: string | null | undefined): 'white' | 'black' {
@@ -56,37 +78,28 @@ function moveLabel(moment: MomentResponse): string {
   return `${number}${suffix}${moment.san ?? ''}`
 }
 
+/** The tile's own metrics, shared with the skeleton so the grid never changes shape. */
+const CARD = 'flex flex-col gap-[0.3125rem] rounded-md border border-line bg-panel p-[0.3125rem]'
+
 function MomentCard({ moment }: { moment: MomentResponse }) {
-  // One ply of one game: the eval either side of the move the moment is about.
-  const detail = useGame(moment.game.id, {
-    ply_start: moment.ply,
-    ply_end: moment.ply,
-    notes: false,
-  })
   // Stable identities, so the board reconfigures only when the moment itself changes.
   const squares = useMemo(() => squaresOf(moment.uci), [moment.uci])
   const arrows = useMemo(() => arrowsOf(moment.best_move_uci), [moment.best_move_uci])
 
-  // The stored evals are mover-relative (`services/analysis.py: _move_row`), so they are
-  // flipped into White's frame here exactly as the game view does it — otherwise the same
-  // blunder reads "+0.85 → −2.10" on this card and "−0.85 → +2.10" on the game page.
-  const row = detail.data?.moves?.[0]
-  const beforeScore = scoreBefore(row)
-  const afterScore = scoreAfter(row)
-  const before = beforeScore ? formatScore(beforeScore) : null
-  const after = afterScore ? formatScore(afterScore) : null
-
   return (
     <Link
-      to={`/games/${moment.game.id}`}
-      // `flex-1` is what splits the row into equal thirds; stacked, it would be asking the
-      // card to share out a height nobody has decided yet, so the phone drops it and the
-      // card is just its own 134px tall.
-      className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-md border border-line bg-panel p-[0.6875rem] transition-colors hover:border-edge-strong max-md:flex-none"
+      // `?ply=` is a half-move count, and the moment's ply is the number of half-moves
+      // before the blunder — so this is exactly the position on the card, with the move
+      // that ruined it still to come.
+      to={`/games/${moment.game.id}?ply=${moment.ply}`}
+      // What a tile this size cannot spell out: the whole label, who it was against, and
+      // what the engine wanted instead — which is drawn on the board as a teal arrow.
+      title={`${moveLabel(moment)} vs ${moment.game.opponent ?? 'unknown'} — ${formatWinLoss(
+        moment.win_loss,
+      )} win chance${moment.best_move_san ? `, better: ${moment.best_move_san}` : ''}`}
+      className={cn(CARD, 'transition-colors hover:border-edge-strong')}
     >
-      {/* A little smaller on a phone, where the card is full width but the prose beside the
-          board is the half that has nowhere else to go. */}
-      <div className="w-28 flex-none overflow-hidden rounded-sm max-md:w-24">
+      <div className="overflow-hidden rounded-sm">
         {moment.fen ? (
           <Board
             fen={moment.fen}
@@ -95,41 +108,20 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
             animation={false}
             squares={squares}
             arrows={arrows}
+            className="w-full"
           />
         ) : (
           <Bar className="aspect-square w-full" />
         )}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-center gap-[0.4375rem] font-mono">
-          <span className="truncate text-[0.8125rem] font-medium text-blunder">{moveLabel(moment)}</span>
-          <ClassificationBadge classification={moment.classification} size="md" />
+      <div className="flex flex-col gap-px px-px">
+        <div className="flex items-baseline gap-1 font-mono text-[0.625rem]">
+          <span className="min-w-0 truncate font-medium text-blunder">{moveLabel(moment)}</span>
+          <span className="flex-1" />
+          <span className="flex-none tabular text-dim">{formatWinLoss(moment.win_loss)}</span>
         </div>
-        <div className="font-mono text-[0.6875rem] tabular text-soft-2">
-          {before && after ? (
-            <>
-              {before} <span className="text-faint-2">→</span> {after}
-            </>
-          ) : detail.isPending ? (
-            <span className="text-faint">…</span>
-          ) : (
-            <span title="win percentage given away">
-              {formatWinLoss(moment.win_loss)} win chance
-            </span>
-          )}
-        </div>
-        <div className="truncate text-[0.6875rem] text-dim">
-          vs {moment.game.opponent ?? 'unknown'} · {shortDate(moment.game.played_at)}
-        </div>
-        <div className="flex-1" />
-        <div className="truncate text-[0.6875rem] leading-snug text-dim-2">
-          {moment.best_move_san ? (
-            <>
-              Better: <span className="font-mono text-accent-teal">{moment.best_move_san}</span>
-            </>
-          ) : (
-            `${moment.piece ?? 'A piece'} move, ${moment.phase ?? 'unknown phase'}`
-          )}
+        <div className="truncate text-[0.5625rem] text-faint">
+          {moment.game.opponent ?? 'unknown'} · {shortDate(moment.game.played_at)}
         </div>
       </div>
     </Link>
@@ -138,26 +130,42 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
 
 function MomentSkeleton() {
   return (
-    <div className="flex h-[8.375rem] flex-1 gap-[0.6875rem] rounded-md border border-line bg-panel p-[0.6875rem] max-md:flex-none">
-      <Bar className="size-28 flex-none max-md:size-24" />
-      <div className="flex flex-1 flex-col gap-2">
-        <Bar className="h-3.5 w-2/3" />
-        <Bar className="h-2.5 w-1/2" />
-        <Bar className="h-2.5 w-3/4" />
+    <div className={CARD}>
+      <Bar className="aspect-square w-full rounded-sm" />
+      <div className="flex flex-col gap-px px-px">
+        <Bar className="h-2.5 w-2/3" />
+        <Bar className="h-2 w-1/2" />
       </div>
     </div>
   )
 }
 
+/**
+ * All six in one row, three across on a phone. The tile is ~110px wide on a laptop and ~115
+ * on a phone at three across, so the board is the same readable size on both and it is the
+ * number of columns that gives way rather than the position.
+ */
+const GRID = 'grid grid-cols-6 gap-1.5 max-md:grid-cols-3 max-md:gap-2'
+
 export function WorstMomentsRow({ className }: { className?: string }) {
-  const query = useWorstMoments({ amount: COUNT })
+  const recent = useWorstMoments({ amount: COUNT, days: RECENT_DAYS })
+  // Nothing in the window is a real answer for a library that is being read rather than
+  // played into, so the whole thing is asked for instead — and only then, which is why this
+  // is a second query rather than a wider first one.
+  const nothingRecent = recent.isSuccess && recent.data.length === 0
+  const everything = useWorstMoments({ amount: COUNT }, { enabled: nothingRecent })
+  const query = nothingRecent ? everything : recent
   const moments = query.data ?? []
 
   return (
     <section className={cn('flex min-h-0 flex-col gap-3', className)}>
       <SectionHead
         title="Worst recent moments"
-        detail="by the win percentage they gave away"
+        detail={
+          nothingRecent
+            ? `nothing in the last ${RECENT_DAYS} days — showing all time`
+            : `the last ${RECENT_DAYS} days, by the win percentage they gave away`
+        }
         className="max-md:flex-wrap max-md:gap-y-0.5"
         end={
           <Link
@@ -169,7 +177,7 @@ export function WorstMomentsRow({ className }: { className?: string }) {
         }
       />
       {query.isPending ? (
-        <div className="flex gap-2.5 max-md:flex-col" data-testid="loading">
+        <div className={GRID} data-testid="loading">
           {Array.from({ length: COUNT }, (_, index) => (
             <MomentSkeleton key={index} />
           ))}
@@ -186,10 +194,7 @@ export function WorstMomentsRow({ className }: { className?: string }) {
           or — less likely — you have not blundered.
         </EmptyBlock>
       ) : (
-        // Three across is the design; on a phone three across is three 100px cards, so
-        // they stack — a moment is a board and four lines of prose, and neither survives
-        // a third of 375px.
-        <div className="flex gap-2.5 max-md:flex-col">
+        <div className={GRID}>
           {moments.map((moment) => (
             <MomentCard key={`${moment.game.id}-${moment.ply}`} moment={moment} />
           ))}

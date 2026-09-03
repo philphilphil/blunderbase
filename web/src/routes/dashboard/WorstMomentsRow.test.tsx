@@ -3,18 +3,18 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { GameDetail, MomentResponse, MoveRow } from '@/lib/api/types'
+import type { MomentResponse } from '@/lib/api/types'
 
 import { WorstMomentsRow } from './WorstMomentsRow'
 
 const useWorstMoments = vi.hoisted(() => vi.fn())
-const useGame = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api/queries', () => ({ useWorstMoments, useGame }))
+vi.mock('@/lib/api/queries', () => ({ useWorstMoments }))
 
 function result<T>(state: Partial<UseQueryResult<T, Error>>) {
   return {
     data: undefined,
     isPending: false,
+    isSuccess: false,
     isError: false,
     error: null,
     refetch: vi.fn(),
@@ -22,9 +22,13 @@ function result<T>(state: Partial<UseQueryResult<T, Error>>) {
   }
 }
 
+/** A query that answered, with these rows. */
+function answered(data: MomentResponse[]) {
+  return result<MomentResponse[]>({ data, isSuccess: true })
+}
+
 /** A position with Black to move — the FEN a moment Black blundered in carries. */
 const BLACK_TO_MOVE = 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4'
-const WHITE_TO_MOVE = 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4'
 
 function moment(over: Partial<MomentResponse> & { game: MomentResponse['game'] }): MomentResponse {
   return {
@@ -41,92 +45,75 @@ function moment(over: Partial<MomentResponse> & { game: MomentResponse['game'] }
   }
 }
 
-/**
- * One ply of a game detail. `eval_*` are stored the way `services/analysis.py: _move_row`
- * writes them — from the point of view of the side that played the move.
- */
-function detail(row: Partial<MoveRow>): GameDetail {
-  return {
-    game: { id: 1, source: 'lichess' },
-    moves: [{ ply: 47, ...row }],
-  } as GameDetail
+function draw() {
+  render(
+    <MemoryRouter>
+      <WorstMomentsRow />
+    </MemoryRouter>,
+  )
 }
 
 describe('WorstMomentsRow — dashboard moment cards (design 2a)', () => {
-  beforeEach(() => {
-    useWorstMoments.mockReset()
-    useGame.mockReset()
-  })
+  beforeEach(() => useWorstMoments.mockReset())
 
-  it('shows placeholder cards while the row is in flight', () => {
+  it('shows placeholder cards while the grid is in flight', () => {
     useWorstMoments.mockReturnValue(result({ isPending: true }))
-    useGame.mockReturnValue(result({ isPending: true }))
-    render(
-      <MemoryRouter>
-        <WorstMomentsRow />
-      </MemoryRouter>,
-    )
+    draw()
     expect(screen.getByTestId('loading')).toBeInTheDocument()
   })
 
-  it('flips a mover-relative eval into White’s frame, as the game view does', () => {
-    // Black played the blunder at ply 47. Stored mover-relative, the move goes from
-    // "+0.85 for Black" to "−2.10 for Black"; every eval in the app is White-relative,
-    // so the card must read −0.85 → +2.10 — the same two numbers the move list shows.
+  it('asks for the last thirty days, and says so', () => {
     useWorstMoments.mockReturnValue(
-      result({ data: [moment({ game: { id: 7, source: 'lichess', opponent: 'jazzoz' } })] }),
+      answered([moment({ game: { id: 7, source: 'lichess', opponent: 'jazzoz' } })]),
     )
-    useGame.mockReturnValue(
-      result({ data: detail({ eval_before_cp: 85, eval_after_cp: -210 }) }),
-    )
+    draw()
 
-    render(
-      <MemoryRouter>
-        <WorstMomentsRow />
-      </MemoryRouter>,
+    expect(useWorstMoments).toHaveBeenCalledWith({ amount: 6, days: 30 })
+    expect(screen.getByText(/last 30 days/)).toBeInTheDocument()
+  })
+
+  it('opens the game on the position the blunder was played from, not at move one', () => {
+    useWorstMoments.mockReturnValue(
+      answered([moment({ game: { id: 7, source: 'lichess', opponent: 'jazzoz' } })]),
     )
+    draw()
+
     const card = screen.getByRole('link', { name: /jazzoz/ })
-    expect(card).toHaveTextContent('−0.85 → +2.10')
-    expect(card).not.toHaveTextContent('+0.85')
+    expect(card).toHaveAttribute('href', '/games/7?ply=47')
+    // What the ranking is by, which is what the heading promises — not the eval swing,
+    // which used to cost a request per card to show.
+    expect(card).toHaveTextContent('−44.2%')
+    expect(card).toHaveTextContent('24…Nxe4')
   })
 
-  it('leaves a White blunder’s eval alone — the mover is already White', () => {
-    useWorstMoments.mockReturnValue(
-      result({
-        data: [
-          moment({
-            game: { id: 8, source: 'lichess', opponent: 'pawnshop_hero' },
-            ply: 46,
-            fen: WHITE_TO_MOVE,
-          }),
-        ],
-      }),
-    )
-    useGame.mockReturnValue(
-      result({ data: { game: { id: 8, source: 'lichess' }, moves: [{ ply: 46, eval_before_cp: 85, eval_after_cp: -210 }] } as GameDetail }),
-    )
+  it('falls back to the whole library when the window holds nothing, and relabels', () => {
+    // The empty window is a real answer for someone reading an imported archive rather
+    // than playing into it, and an empty panel is not.
+    useWorstMoments
+      .mockReturnValueOnce(answered([]))
+      .mockReturnValueOnce(
+        answered([moment({ game: { id: 9, source: 'chesscom', opponent: 'gambiteer' } })]),
+      )
+    draw()
 
-    render(
-      <MemoryRouter>
-        <WorstMomentsRow />
-      </MemoryRouter>,
-    )
-    expect(screen.getByRole('link', { name: /pawnshop_hero/ })).toHaveTextContent(
-      '+0.85 → −2.10',
-    )
+    expect(useWorstMoments).toHaveBeenLastCalledWith({ amount: 6 }, { enabled: true })
+    expect(screen.getByText(/nothing in the last 30 days/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /gambiteer/ })).toBeInTheDocument()
   })
 
-  it('falls back to the win percentage the moment carries when the ply has no eval', () => {
+  it('leaves the second query alone while the window has something to show', () => {
     useWorstMoments.mockReturnValue(
-      result({ data: [moment({ game: { id: 9, source: 'chesscom', opponent: 'gambiteer' } })] }),
+      answered([moment({ game: { id: 7, source: 'lichess', opponent: 'jazzoz' } })]),
     )
-    useGame.mockReturnValue(result({ data: detail({}) }))
+    draw()
 
-    render(
-      <MemoryRouter>
-        <WorstMomentsRow />
-      </MemoryRouter>,
-    )
-    expect(screen.getByRole('link', { name: /gambiteer/ })).toHaveTextContent('−44.2% win chance')
+    expect(useWorstMoments).toHaveBeenLastCalledWith({ amount: 6 }, { enabled: false })
+  })
+
+  it('says so where nothing anywhere has gone wrong', () => {
+    useWorstMoments.mockReturnValue(answered([]))
+    draw()
+
+    expect(screen.getByText(/have not blundered/)).toBeInTheDocument()
   })
 })
