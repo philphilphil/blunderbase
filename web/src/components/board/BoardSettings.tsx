@@ -8,11 +8,12 @@
  * board while you change them), so they are one dialog, opened from the transport row
  * where the reader's hand already is for Flip and the step buttons.
  *
- * Three sections, in the order the reader meets them: what the board says about *this*
- * position — the standing arrows — then the shape the evaluation pane draws the game in,
- * and then what the board does when a line in a panel is pointed at. The graph joined them
- * for the same reason the other two are here: it is judged by looking at it, and the gear
- * that opens this is the nearest control to it. None of the three has a Save: every store
+ * Four sections, in the order the reader meets them: what the board says about *this*
+ * position — the standing arrows — then the click it makes as a move lands, then the shape
+ * the evaluation pane draws the game in, and then what the board does when a line in a panel
+ * is pointed at. The first two are the board itself, the last two the panels around it. The
+ * graph joined them for the same reason the others are here: it is judged by looking at it,
+ * and the gear that opens this is the nearest control to it. None of them has a Save: every store
  * writes straight through, so what is behind the dialog changes as the controls are used.
  * The dialog is deliberately not modal-looking on its left edge for that reason — it is
  * narrow and centred, and closing it is Escape, the X, or a click on the backdrop.
@@ -23,16 +24,23 @@
  * beside. That reasoning stays here in the source, where it costs the reader nothing.
  */
 import { Settings2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   LinePreviewFields,
+  Range,
   SettingsCheck,
   SETTINGS_SELECT,
 } from '@/components/analysis/LinePreviewSettings'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { setBoardArrowPrefs, useBoardArrowPrefs } from '@/lib/board/arrowPrefs'
+import { playMoveSound } from '@/lib/board/moveSound'
+import {
+  MOVE_SOUND_STEP,
+  setMoveSoundPrefs,
+  useMoveSoundPrefs,
+} from '@/lib/board/moveSoundPrefs'
 import {
   setEvalGraphPrefs,
   useEvalGraphPrefs,
@@ -72,6 +80,7 @@ const GRAPH_MARKS: { value: EvalGraphMarks; label: string }[] = [
 export function BoardSettingsButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false)
   const arrows = useBoardArrowPrefs()
+  const sound = useMoveSoundPrefs()
   const graph = useEvalGraphPrefs()
 
   useEffect(() => {
@@ -81,12 +90,39 @@ export function BoardSettingsButton({ className }: { className?: string }) {
     return () => document.removeEventListener('keydown', key)
   }, [open])
 
+  /*
+   * The volume control plays what it is setting. There is no other way to know: a number
+   * between 0 and 100 says nothing about how loud a room is, and a slider you cannot hear is
+   * one you drag, close, step a move, reopen and drag again.
+   *
+   * Trailing rather than on every step. A sweep across the track fires a change every five
+   * percent, and twenty clicks in half a second is a texture, not a level — what you want to
+   * hear is the value you *landed* on. So each change cancels the pending click and books
+   * another, which makes a slow deliberate drag click per step (every pause outlasts the
+   * wait) and a fast sweep click once, at the end. 90 ms is under the threshold where a
+   * control feels laggy and well over the length of the click itself.
+   */
+  const pending = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (pending.current !== null) clearTimeout(pending.current)
+    },
+    [],
+  )
+  const previewSound = (volume: number) => {
+    if (pending.current !== null) clearTimeout(pending.current)
+    pending.current = window.setTimeout(() => {
+      pending.current = null
+      playMoveSound('move', volume)
+    }, 90)
+  }
+
   return (
     <>
       <button
         type="button"
         aria-label="Board settings"
-        title="Board settings — arrows, the eval graph and line preview"
+        title="Board settings — arrows, sound, the eval graph and line preview"
         onClick={() => setOpen(true)}
         className={cn(
           'flex-none rounded-md border border-edge bg-elevated px-2 py-[0.3125rem] text-dim transition-colors hover:text-ink max-md:py-1.5',
@@ -150,6 +186,45 @@ export function BoardSettingsButton({ className }: { className?: string }) {
                     />
                   </div>
                 ))}
+              </div>
+            </section>
+
+            {/* Beside the arrows rather than at the end: both are what the board itself does
+                as the reader steps through the game, where the two sections below are about
+                what the panels draw. The slider is disabled rather than hidden while the
+                sound is off — a control that vanishes is a control nobody finds twice — and
+                it plays as it is dragged (see `previewSound` above), which is the only way
+                anyone has ever set a volume. */}
+            <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
+              <div className="flex flex-col gap-0.5">
+                <h3 className="text-[0.75rem] font-semibold text-ink">Sound</h3>
+                <p className="text-[0.6875rem] text-dim">A click as each move lands.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <SettingsCheck
+                  id="board-sound-enabled"
+                  label="Move sounds"
+                  checked={sound.enabled}
+                  onChange={(on) => {
+                    setMoveSoundPrefs({ enabled: on })
+                    // Ticking the box answers itself: you hear the thing you just turned on.
+                    if (on) previewSound(sound.volume)
+                  }}
+                />
+                <Range
+                  id="board-sound-volume"
+                  label="Level"
+                  value={sound.volume}
+                  min={0}
+                  max={100}
+                  step={MOVE_SOUND_STEP}
+                  suffix="%"
+                  disabled={!sound.enabled}
+                  onChange={(volume) => {
+                    setMoveSoundPrefs({ volume })
+                    previewSound(volume)
+                  }}
+                />
               </div>
             </section>
 

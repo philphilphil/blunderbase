@@ -20,6 +20,7 @@ import {
 } from '@/lib/api/queries'
 import type { LineResponse, MoveRow, ReferenceSource } from '@/lib/api/types'
 import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
+import { useMoveSound } from '@/lib/board/moveSound'
 import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
 import { whiteWinPercent } from '@/lib/chess/evaluation'
@@ -509,6 +510,15 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const exploring = (analysis?.cursor ?? 0) > 0
   const boardPosition = exploring && analysis ? analysis.position : position
   const analysisPly = analysis?.ply ?? boardIndex
+
+  // The board's click, once for the whole page: the phone layout and the desktop one are
+  // both rendered from here, and both move the same cursor. The key is the position the
+  // board stands on — a walked analysis line sounds like the game does, and a hovered engine
+  // line, which scrubs the board without moving it, deliberately does not.
+  useMoveSound(
+    exploring && analysis ? `line:${analysis.base}:${analysis.cursor}` : `game:${cursor}`,
+    exploring && analysis ? (analysis.sans[analysis.cursor - 1] ?? null) : (played?.san ?? null),
+  )
 
   /*
    * The book for a board that has left the game line.

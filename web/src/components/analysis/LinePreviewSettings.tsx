@@ -31,7 +31,8 @@ const MODES: { value: RowPreview; label: string }[] = [
   { value: 'off', label: 'Nothing' },
 ]
 
-function Range({ id, label, value, min, max, step = 1, suffix = '', onChange }: {
+/** The one slider shape the board's settings dialog uses throughout, like `SettingsCheck`. */
+export function Range({ id, label, value, min, max, step = 1, suffix = '', disabled, onChange }: {
   id: string
   label: string
   value: number
@@ -39,15 +40,16 @@ function Range({ id, label, value, min, max, step = 1, suffix = '', onChange }: 
   max: number
   step?: number
   suffix?: string
+  disabled?: boolean
   onChange: (value: number) => void
 }) {
   return (
-    <div className="flex min-w-52 flex-1 flex-col gap-1.5">
+    <div className={cn('flex min-w-52 flex-1 flex-col gap-1.5', disabled && 'opacity-50')}>
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor={id}>{label}</Label>
         <span className="font-mono text-[0.6875rem] text-dim">{value}{suffix}</span>
       </div>
-      <input id={id} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="h-1.5 w-full accent-accent-teal" />
+      <input id={id} type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} className="h-1.5 w-full accent-accent-teal" />
     </div>
   )
 }
