@@ -77,6 +77,7 @@
   --bb-blunder: #ee766e;
   --bb-blunder-ink: #2a0f0d;
   --bb-mistake: #dda05a;
+  --bb-mistake-ink: #2b1d09; /* text on a filled mistake surface — the eval graph's ? mark */
   --bb-inaccuracy: #cbb96a;
   --bb-good: #78b98c;
   --bb-good-ink: #10281a; /* text on a filled good surface */
@@ -246,6 +247,7 @@
   --bb-blunder: #bb3e35;
   --bb-blunder-ink: #ffffff;
   --bb-mistake: #9b6819;
+  --bb-mistake-ink: #ffffff;
   --bb-inaccuracy: #7d6a12;
   --bb-good: #34724a;
   --bb-good-ink: #ffffff;

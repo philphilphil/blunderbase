@@ -1,16 +1,28 @@
 import { Fragment, useMemo, useRef, useState } from 'react'
-import { Area, AreaChart, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Area,
+  AreaChart,
+  ReferenceLine,
+  Tooltip,
+  XAxis,
+  YAxis,
+  usePlotArea,
+  useXAxisScale,
+  useYAxisScale,
+} from 'recharts'
 
 import { SideDot } from '@/components/badges/SideDot'
 import type { Color } from '@/lib/api/types'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
-import { GLYPHS, glyphFor, type Glyph } from '@/lib/chess/classification'
+import { GLYPHS, glyphFor } from '@/lib/chess/classification'
 import { formatScore } from '@/lib/chess/evaluation'
 import { useWheelStep } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
+import { useEvalGraphPrefs, type EvalGraphMarks } from '@/lib/ui/evalGraphPrefs'
 import { scaleMargin, scalePx } from '@/lib/ui/scale'
 
 import {
+  barLayout,
   plyLabel,
   type CurvePoint,
   type GameAnalysisSummary,
@@ -31,9 +43,18 @@ const CURVE = 'var(--bb-text-2)'
  */
 const FILL_WHITE = 'var(--bb-side-white)'
 const FILL_BLACK = 'var(--bb-side-black)'
+/** Only the bars wear these: a rim is what keeps a black column from reading as a hole. */
+const EDGE_WHITE = 'var(--bb-side-white-edge)'
+const EDGE_BLACK = 'var(--bb-side-black-edge)'
 const GRAPH_BG = 'var(--bb-graph-bg)'
 /** The design marks — and its legend explains — only these two. */
-const MARKED: readonly Glyph[] = ['blunder', 'mistake']
+type MarkedGlyph = 'blunder' | 'mistake'
+
+/** The classification as a mark on the plot, or nothing for the plies that carry none. */
+function markFor(classification: CurvePoint['classification']): MarkedGlyph | null {
+  const glyph = glyphFor(classification)
+  return glyph === 'blunder' || glyph === 'mistake' ? glyph : null
+}
 
 const CONFIG: ChartConfig = { win: { label: 'White', color: CURVE } }
 
@@ -46,12 +67,6 @@ const CONFIG: ChartConfig = { win: { label: 'White', color: CURVE } }
 interface SeriesPoint extends CurvePoint {
   above: number
   below: number
-}
-
-interface DotProps {
-  cx?: number
-  cy?: number
-  payload?: SeriesPoint
 }
 
 function splitSeries(points: CurvePoint[]): SeriesPoint[] {
@@ -87,15 +102,78 @@ function mover(ply: number): 'white' | 'black' {
 }
 
 /**
- * The filled eval area chart from design 1a: White's win percentage against ply, filled to
- * the midline, blunders and mistakes marked where they happened, and a dashed teal cursor
- * on the ply the board is showing.
+ * The default shape: one column per ply, standing on the 50 % axis and reaching up in
+ * White's tone or down in Black's.
  *
- * Who is ahead is said by colour, not by a caption: the area above the axis is filled in
- * the white side tone and the area below in the black one, with a side dot pinned to each
- * edge of the plot as the key. A mark is a plain disc in the severity colour: whose
- * blunder it was is already told by the direction the curve jumps, so the dot does not
- * repeat it. "Only mine" hides the opponent's marks for going over one's own game.
+ * It exists because the filled curve asks the reader to remember a convention — which of
+ * three greys is the ground, and which half of the axis belongs to whom — while a column
+ * says it by pointing. Every ply also becomes its own object, which is the honest picture
+ * of what the data is: the engine's verdict after each move, not a continuous quantity.
+ *
+ * Drawn by hand off the chart's own scales rather than through `<Bar>`, because recharts
+ * sizes bars from a *category* axis and this one is numeric (ply is a number so that
+ * click-to-seek and the cursor line can position against it). `usePlotArea` and the two
+ * scale hooks are recharts 3's supported way in — the same coordinates the areas use, so
+ * the marks on top land on the bar tips without a second calculation.
+ *
+ * How wide a column is drawn at all is `barLayout`, in the model beside the curve it is
+ * drawn from: it is the one part of this with a rule rather than a shape, and a rule is
+ * worth a test.
+ */
+function PlyBars({ points, domain }: { points: CurvePoint[]; domain: [number, number] }) {
+  const plot = usePlotArea()
+  const xScale = useXAxisScale()
+  const yScale = useYAxisScale()
+  if (!plot || !xScale || !yScale) return null
+
+  const baseline = yScale(AXIS)
+  if (baseline === undefined) return null
+
+  const { width, rim } = barLayout(plot.width, domain[1] - domain[0] + 1)
+
+  return (
+    <g data-testid="evaluation-bars">
+      {points.map((point) => {
+        const x = xScale(point.ply)
+        const y = yScale(point.win)
+        if (x === undefined || y === undefined) return null
+        const white = point.win >= AXIS
+        return (
+          <rect
+            key={point.ply}
+            x={x - width / 2}
+            y={Math.min(y, baseline)}
+            width={width}
+            height={Math.max(1, Math.abs(y - baseline))}
+            rx={width >= 3 ? 1 : 0}
+            fill={white ? FILL_WHITE : FILL_BLACK}
+            stroke={rim ? (white ? EDGE_WHITE : EDGE_BLACK) : undefined}
+            strokeWidth={rim ? 0.75 : undefined}
+          />
+        )
+      })}
+    </g>
+  )
+}
+
+/**
+ * White's win percentage against ply, drawn either as a column per move or as the filled
+ * curve from design 1a, with blunders and mistakes marked where they happened and a dashed
+ * teal cursor on the ply the board is showing.
+ *
+ * Who is ahead is said by colour, not by a caption: White's tone stands above the 50 %
+ * axis and Black's below it, with a side dot pinned to each edge of the plot as the key.
+ * Which of the two shapes draws that is a per-browser preference (`lib/ui/evalGraphPrefs`,
+ * set from the gear under the board) and nothing else in here changes with it — the same
+ * data, scales, hover readout, cursor and marks either way. Bars are the default because a
+ * column that starts on the axis and reaches toward a side names that side by pointing at
+ * it, where the filled curve leaves over half the plot as a third grey belonging to nobody
+ * and asks the reader to hold the convention in their head.
+ *
+ * A mark is the move table's `??` or `?` (`CurveMarks`), a plain disc, or nothing, as the
+ * same preference says. Whose it was is already told by the direction the curve jumps, so
+ * the mark does not repeat it; "only mine" hides the opponent's marks for going over one's
+ * own game.
  *
  * The accuracy tallies ride on the header line as two per-player clusters (`PlayerTally`)
  * rather than in a grid down the plot's flank, which is what gives the curve the card's
@@ -144,6 +222,11 @@ export function EvalGraph({
     [points, plyCount],
   )
   const series = useMemo(() => splitSeries(points), [points])
+  // The shape this browser reads the balance in. Bars unless the reader asked for the
+  // curve; the split series is computed either way because it is what the tooltip and the
+  // marks index against, and it costs one pass over a list the length of a game.
+  const prefs = useEvalGraphPrefs()
+  const bars = prefs.style === 'bars'
   // Start focused on the owner's mistakes; the checkbox can still reveal both players'
   // markers without changing the two-player tallies on the header line.
   const [onlyMine, setOnlyMine] = useState(true)
@@ -261,6 +344,9 @@ export function EvalGraph({
 
               <ReferenceLine y={75} stroke="var(--bb-graph-grid)" strokeWidth={1} />
               <ReferenceLine y={25} stroke="var(--bb-graph-grid)" strokeWidth={1} />
+              {/* Between the quarter lines and the axis on purpose: the columns cover the
+                  grid the way the fills do, and the axis they stand on stays on top. */}
+              {bars ? <PlyBars points={points} domain={domain} /> : null}
               <ReferenceLine y={AXIS} stroke="var(--bb-graph-axis)" strokeWidth={1} />
               {cursor >= -1 ? (
                 <ReferenceLine
@@ -273,21 +359,29 @@ export function EvalGraph({
               ) : null}
 
               {/* The two half-fills carry no stroke of their own: clamped to the axis, their
-                  outline would run flat along it. The third series draws the curve and marks. */}
-              <Area type="linear" dataKey="above" baseValue={AXIS} stroke="none" fill={FILL_WHITE} isAnimationActive={false} dot={false} activeDot={false} />
-              <Area type="linear" dataKey="below" baseValue={AXIS} stroke="none" fill={FILL_BLACK} isAnimationActive={false} dot={false} activeDot={false} />
+                  outline would run flat along it. The third draws the curve — and in bars
+                  mode is kept, stripped of stroke and fill, purely as what the hover readout
+                  reads its payload from. */}
+              {bars ? null : (
+                <Area type="linear" dataKey="above" baseValue={AXIS} stroke="none" fill={FILL_WHITE} isAnimationActive={false} dot={false} activeDot={false} />
+              )}
+              {bars ? null : (
+                <Area type="linear" dataKey="below" baseValue={AXIS} stroke="none" fill={FILL_BLACK} isAnimationActive={false} dot={false} activeDot={false} />
+              )}
               <Area
                 type="linear"
                 dataKey="win"
                 baseValue={AXIS}
-                stroke={CURVE}
+                stroke={bars ? 'none' : CURVE}
                 strokeWidth={scalePx(1.6)}
                 strokeLinejoin="round"
                 fill="none"
                 isAnimationActive={false}
                 activeDot={false}
-                dot={(props: DotProps) => <ClassificationDot {...props} side={markedSide} />}
+                dot={false}
               />
+              {/* Last, so a mark is never under a fill or a column. */}
+              <CurveMarks points={points} side={markedSide} marks={prefs.marks} />
             </AreaChart>
           </ChartContainer>
         </div>
@@ -453,30 +547,121 @@ function PlayerTally({
 }
 
 /**
- * A blunder or mistake mark — the two the legend names; every other ply draws nothing, and
- * so does the opponent's when `side` narrows the marks to one player.
+ * The ink a filled mark carries its glyph in. Only the two marked severities need one, and
+ * both are the token the rest of the app uses for text on that colour — the pair flips with
+ * the theme, because in light mode the fill is the dark half of the pair.
  */
-/*
- * No `<title>` on the mark: the curve's own hover readout already names the move, its glyph
- * and its eval, and a native SVG tooltip on top of it would be a second box saying less, on
- * its own delay, in the browser's font. The dot is the mark; the readout is the words.
+const MARK_INK: Record<MarkedGlyph, string> = {
+  blunder: 'var(--bb-blunder-ink)',
+  mistake: 'var(--bb-mistake-ink)',
+}
+
+/**
+ * Blunders and mistakes where they happened — the two the legend names; every other ply
+ * draws nothing, and so does the opponent's when `side` narrows the marks to one player.
+ *
+ * The default mark is the move table's own `??` and `?` on a small filled tab, which is the
+ * whole argument for it: a disc says *that* something happened here and leaves the severity
+ * to a colour the reader has to have learnt, where the glyph says which it was in the
+ * vocabulary they have been clicking on all game. It is louder, so all three settings are
+ * offered — the tab, the plain disc, or a bare plot where a blunder is still visible as the
+ * jump that produced it.
+ *
+ * Drawn as a layer off the chart's scales rather than as the curve's `dot`, because a tab
+ * has to know where the walls are: it hangs outside the bar, away from the axis, and flips
+ * to the inside when the plot's edge is nearer than the tab is tall. A dot renderer is
+ * handed one point and no room to ask.
+ *
+ * No `<title>` on either shape: the plot's own hover readout already names the move, its
+ * glyph and its eval, and a native SVG tooltip on top of that would be a second box saying
+ * less, on its own delay, in the browser's font.
  */
-function ClassificationDot({ cx, cy, payload, side: only }: DotProps & { side: Color | null }) {
-  const glyph = glyphFor(payload?.classification)
-  const key = `dot-${payload?.ply ?? 'x'}`
-  if (!glyph || !MARKED.includes(glyph) || cx === undefined || cy === undefined) {
-    return <g key={key} />
-  }
-  if (only && mover(payload!.ply) !== only) return <g key={key} />
+function CurveMarks({
+  points,
+  side: only,
+  marks,
+}: {
+  points: CurvePoint[]
+  side: Color | null
+  marks: EvalGraphMarks
+}) {
+  const plot = usePlotArea()
+  const xScale = useXAxisScale()
+  const yScale = useYAxisScale()
+  if (!plot || !xScale || !yScale) return null
+
+  const height = scalePx(11)
+  const stem = scalePx(3)
+  const floor = plot.y + plot.height
+  if (marks === 'none') return null
+
   return (
-    <circle
-      key={key}
-      cx={cx}
-      cy={cy}
-      r={scalePx(3)}
-      fill={GLYPHS[glyph].color}
-      stroke={GRAPH_BG}
-      strokeWidth={scalePx(1.5)}
-    />
+    <g data-testid="evaluation-marks">
+      {points.map((point) => {
+        const glyph = markFor(point.classification)
+        if (!glyph) return null
+        if (only && mover(point.ply) !== only) return null
+        const x = xScale(point.ply)
+        const y = yScale(point.win)
+        if (x === undefined || y === undefined) return null
+        const colour = GLYPHS[glyph].color
+
+        if (marks === 'dots') {
+          return (
+            <circle
+              key={point.ply}
+              cx={x}
+              cy={y}
+              r={scalePx(3)}
+              fill={colour}
+              stroke={GRAPH_BG}
+              strokeWidth={scalePx(1.5)}
+            />
+          )
+        }
+
+        const label = GLYPHS[glyph].glyph
+        const width = scalePx(label.length > 1 ? 15 : 11)
+        // Outside the fill — up when White is ahead, down when Black is — unless that is
+        // where the plot ends, in which case it hangs the other way.
+        let top = point.win >= AXIS ? y - stem - height : y + stem
+        if (top < plot.y) top = y + stem
+        if (top + height > floor) top = y - stem - height
+        top = Math.min(Math.max(top, plot.y), floor - height)
+        // The tab stays whole at the ends of the game; the stem keeps the true ply.
+        const cx = Math.min(Math.max(x, plot.x + width / 2), plot.x + plot.width - width / 2)
+        return (
+          <g key={point.ply}>
+            <line
+              x1={x}
+              y1={y}
+              x2={x}
+              y2={top > y ? top : top + height}
+              stroke={colour}
+              strokeWidth={scalePx(1.2)}
+            />
+            <rect
+              x={cx - width / 2}
+              y={top}
+              width={width}
+              height={height}
+              rx={scalePx(3)}
+              fill={colour}
+            />
+            <text
+              x={cx}
+              y={top + height / 2}
+              textAnchor="middle"
+              dominantBaseline="central"
+              className="font-mono font-bold"
+              fontSize={scalePx(8.5)}
+              fill={MARK_INK[glyph]}
+            >
+              {label}
+            </text>
+          </g>
+        )
+      })}
+    </g>
   )
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameRunSummary, MomentResponse, MoveRow } from '@/lib/api/types'
 
 import {
+  barLayout,
   bestRun,
   buildGameLine,
   collapsedThroughMove,
@@ -505,5 +506,32 @@ describe('bestRun', () => {
 
   it('leaves a game whose only run is a fill without a pass to report', () => {
     expect(bestRun([finished({ id: 2, maia_only: true })])).toBeNull()
+  })
+})
+
+describe('barLayout', () => {
+  // A 40-move game across the desktop pane: room for a gap between the columns and a rim
+  // around each, which is what keeps a black column from reading as a hole in the ground.
+  it('gives a short game gapped, rimmed columns', () => {
+    const layout = barLayout(520, 80)
+    expect(layout.gap).toBeGreaterThan(0)
+    expect(layout.rim).toBe(true)
+    expect(layout.width).toBeCloseTo(520 / 80 - 1.1, 5)
+  })
+
+  // The phone's box on a long game. A gap here would be moiré and a rim would be the whole
+  // bar, so both go and the plot becomes the solid band it would have been anyway.
+  it('closes the gap and drops the rim once the columns are hairlines', () => {
+    const layout = barLayout(300, 200)
+    expect(layout.gap).toBe(0)
+    expect(layout.rim).toBe(false)
+    expect(layout.width).toBeCloseTo(1.5, 5)
+  })
+
+  // Before the first evaluation lands there is one point and no width to speak of; neither
+  // may produce a zero-wide rect, which draws nothing and reads as a broken plot.
+  it('never draws a column narrower than a hairline', () => {
+    expect(barLayout(0, 200).width).toBe(0.75)
+    expect(barLayout(240, 0).width).toBeGreaterThan(0)
   })
 })

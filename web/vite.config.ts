@@ -34,6 +34,7 @@ const BACKEND = 'http://127.0.0.1:8765'
  */
 const DOM_LOGIC_TESTS = [
   'src/lib/board/linePreviewPrefs.test.ts',
+  'src/lib/ui/evalGraphPrefs.test.ts',
   'src/routes/dashboard/useRunActivity.test.ts',
   'src/routes/game/maiaPreferences.test.ts',
   'src/routes/game/sessionVariations.test.ts',

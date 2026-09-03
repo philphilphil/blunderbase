@@ -18,7 +18,10 @@ import { cn } from '@/lib/utils'
 import type { LinePreviewPrefs, RowPreview } from '@/lib/board/linePreview'
 import { setLinePreviewPrefs, useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 
-const SELECT = 'h-8 rounded-md border border-input bg-elevated px-2 text-xs text-soft outline-none'
+/** The one select shape the board's settings dialog uses throughout, like `SettingsCheck`. */
+export const SETTINGS_SELECT =
+  'h-8 rounded-md border border-input bg-elevated px-2 text-xs text-soft outline-none'
+const SELECT = SETTINGS_SELECT
 
 const MODES: { value: RowPreview; label: string }[] = [
   { value: 'arrows', label: 'Layered arrows' },

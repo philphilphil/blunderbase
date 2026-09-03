@@ -341,6 +341,33 @@ export function evalCurve(moves: MoveRow[]): CurvePoint[] {
   return points
 }
 
+/** How wide one ply's column is drawn, and whether there is room to detail it. */
+export interface BarLayout {
+  /** The column itself, never below a hairline. */
+  width: number
+  /** The space left between two columns; 0 once they are too narrow to separate. */
+  gap: number
+  /** Whether the column is wide enough to carry an edge stroke and a rounded cap. */
+  rim: boolean
+}
+
+/**
+ * The eval plot's bar geometry, from the space it has and the plies it must fit.
+ *
+ * Density is the whole of it. A 40-move game across a desktop pane leaves six or seven
+ * pixels a ply and the columns want a gap, a rim and a rounded cap; a 100-move game in the
+ * phone's fixed box leaves under two, where a gap would be moiré and a rim would be the
+ * whole bar. So both are given up as the columns narrow and the plot degrades into the
+ * solid band it would otherwise have been — the same silhouette, drawn the only way that
+ * width allows.
+ */
+export function barLayout(plotWidth: number, plies: number): BarLayout {
+  const step = plotWidth / Math.max(1, plies)
+  const gap = step >= 4 ? 1.1 : step >= 2.5 ? 0.6 : 0
+  const width = Math.max(0.75, step - gap)
+  return { width, gap, rim: width >= 3.5 }
+}
+
 // --- move list ------------------------------------------------------------
 
 export interface MovePair {
