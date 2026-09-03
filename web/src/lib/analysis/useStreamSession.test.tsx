@@ -7,6 +7,7 @@ import { Providers } from '@/app/Providers'
 import type { RunnersStatus, StreamResponse, StreamSurface } from '@/lib/api/types'
 import { EventsProvider } from '@/lib/events/EventsProvider'
 
+import { STREAM_ENGINE_KEY } from './enginePreference'
 import { useStreamSession, type StreamSessionApi } from './useStreamSession'
 
 // --- the socket -----------------------------------------------------------
@@ -282,6 +283,28 @@ function renderHook(fen: string | null) {
 
 function toggle(on: boolean) {
   act(() => api!.setEnabled(on))
+}
+
+/**
+ * The engine picker's memory, preloaded. jsdom in this setup exposes no `localStorage`, so
+ * the test brings its own — and hands it back, because what is *not* written to it is half
+ * of what the fallback below claims.
+ */
+function rememberedEngine(id: number | null): Storage {
+  const values = new Map<string, string>()
+  const store: Storage = {
+    get length() {
+      return values.size
+    },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    removeItem: (key: string) => void values.delete(key),
+    setItem: (key: string, value: string) => void values.set(key, String(value)),
+  }
+  if (id !== null) store.setItem(STREAM_ENGINE_KEY, String(id))
+  vi.stubGlobal('localStorage', store)
+  return store
 }
 
 /** Long enough for a debounce that should not fire to have fired if it were going to. */
@@ -671,6 +694,42 @@ describe('useStreamSession', () => {
       '4 analysis board(s) can be open at once; close one first',
     )
     expect(api!.enabled).toBe(false)
+  })
+
+  it('opens on the engine that was picked last time', async () => {
+    rememberedEngine(7)
+    renderHook(START)
+    await screen.findByText('off')
+
+    toggle(true)
+    await waitFor(() => expect(streamCalls('POST')).toHaveLength(1))
+    expect(streamCalls('POST')[0]!.body).toMatchObject({ engine_id: 7 })
+  })
+
+  it('remembers what the picker was set to, and forgets it for the deep tier', async () => {
+    const store = rememberedEngine(null)
+    renderHook(START)
+    await screen.findByText('off')
+
+    act(() => api!.setEngineId(7))
+    expect(store.getItem(STREAM_ENGINE_KEY)).toBe('7')
+
+    act(() => api!.setEngineId(null))
+    expect(store.getItem(STREAM_ENGINE_KEY)).toBeNull()
+  })
+
+  it('falls back to the deep tier when the remembered engine is not on the roster', async () => {
+    // Engine 99 was picked on a deployment that still had it — or on a machine that has not
+    // come back. Opening on it would be answered with a refusal that flips the toggle off.
+    const store = rememberedEngine(99)
+    renderHook(START)
+    await waitFor(() => expect(api!.engineId).toBeNull())
+
+    toggle(true)
+    await waitFor(() => expect(streamCalls('POST')).toHaveLength(1))
+    expect(streamCalls('POST')[0]!.body).toMatchObject({ engine_id: null })
+    // The pick itself is left alone: the machine coming back brings it with it.
+    expect(store.getItem(STREAM_ENGINE_KEY)).toBe('99')
   })
 
   it('closes a session whose effect was torn down before the POST answered', async () => {

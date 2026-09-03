@@ -4,7 +4,9 @@
  * The lifecycle the backend defines and this hook drives:
  *
  * - **open** — `POST /streams`. Never before the user asks: `enabled` starts false, is not
- *   persisted, and a session is never opened for a board with no position on it.
+ *   persisted, and a session is never opened for a board with no position on it. *Which*
+ *   engine it opens on is remembered, though (`enginePreference.ts`) — that is a preference,
+ *   not a running search.
  * - **position change** — `PATCH /streams/{id} {fen}`, debounced. A restart on the same
  *   slot, never a teardown (`services/streams.py:restart`) — arrow-key scrubbing would
  *   otherwise be one request and one slot handover per ply.
@@ -41,6 +43,7 @@ import { engineHosts, type EngineHost } from '@/lib/engines/hosts'
 import { useEventListener, useEvents } from '@/lib/events/EventsProvider'
 import type { StreamEndedEvent, StreamSnapshotEvent } from '@/lib/events/types'
 
+import { readStreamEnginePick, writeStreamEnginePick } from './enginePreference'
 import { snapshotFrom, type StreamSnapshot } from './streamModel'
 
 export type { StreamSnapshot }
@@ -111,7 +114,10 @@ export interface StreamSessionApi {
    * `streamsReason`. From `engineHosts(useRunnersStatus().data)`.
    */
   engines: EngineHost[]
-  /** null ⇒ let the server take the deep tier's engine (the default). */
+  /**
+   * null ⇒ let the server take the deep tier's engine. Starts at whatever was picked last
+   * in this browser, which is null until something else is picked.
+   */
   engineId: number | null
   setEngineId: (id: number | null) => void
   multipv: number
@@ -142,7 +148,9 @@ export function useStreamSession({
   const [error, setError] = useState<Error | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [ended, setEnded] = useState<EndedSession | null>(null)
-  const [engineId, setEngineIdState] = useState<number | null>(null)
+  // The engine survives the route: whichever one was picked last is read back here, and
+  // the guard below drops it if this deployment no longer offers a board on it.
+  const [engineId, setEngineIdState] = useState<number | null>(readStreamEnginePick)
   const [multipv, setMultipvState] = useState(defaultMultipv)
   /** Bumped to make the open effect run again on the same inputs (a lost session). */
   const [reopen, setReopen] = useState(0)
@@ -198,7 +206,21 @@ export function useStreamSession({
     // The engine is the one thing a session cannot be patched onto, so the open effect
     // tears down and reopens — which is what changing this dependency does.
     setEngineIdState(id)
+    writeStreamEnginePick(id)
   }, [])
+
+  // A remembered engine this deployment cannot open a board on — a runner that has not come
+  // back, an engine switched off or deleted since — would open straight into the backend's
+  // refusal, which flips the toggle off again. So it falls back to the deep tier, and only
+  // while nothing is running: an engine lost *mid-search* is the offer's business, not this
+  // one's. What is stored is left alone, so the machine coming back brings the pick with it.
+  useEffect(() => {
+    if (engineId === null || enabled) return
+    // Before the roster has been read, every engine looks missing.
+    if (status.data === undefined) return
+    if (engines.some((host) => host.engineId === engineId && host.streams)) return
+    setEngineIdState(null)
+  }, [engineId, enabled, engines, status.data])
 
   const setMultipv = useCallback((lines: number) => {
     setMultipvState(Math.max(1, Math.min(5, Math.round(lines))))
@@ -463,7 +485,9 @@ export function useStreamSession({
       setEnded(null)
       setError(null)
       setNote(null)
+      // Taking the offer is a pick like any other; the next page opens on it.
       setEngineIdState(id)
+      writeStreamEnginePick(id)
       setEnabledState(true)
       // Same engine as before: the toggle going off and on again is what re-runs the open
       // effect, so nothing else is needed.

@@ -33,6 +33,7 @@ const BACKEND = 'http://127.0.0.1:8765'
  * A new one announces itself loudly, as `document is not defined`.
  */
 const DOM_LOGIC_TESTS = [
+  'src/lib/analysis/enginePreference.test.ts',
   'src/lib/board/linePreviewPrefs.test.ts',
   'src/lib/board/moveSoundPrefs.test.ts',
   'src/lib/ui/evalGraphPrefs.test.ts',
