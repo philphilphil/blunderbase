@@ -479,7 +479,11 @@ export interface GameFilters {
   eco?: string
   result?: Result
   outcome?: Outcome
-  speed?: Speed
+  /**
+   * One speed, or the set of them to count. Repeated in the query string
+   * (`speed=blitz&speed=rapid`), which is how FastAPI reads a set — see `toQuery`.
+   */
+  speed?: Speed | readonly Speed[]
   time_control?: string
   opponent?: string
   variant?: string

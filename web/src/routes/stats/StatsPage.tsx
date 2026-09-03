@@ -1,9 +1,9 @@
 /**
  * Design 2d — the aggregation dashboards.
  *
- * One filter set (window · colour) drives every card: the same `GameFilters` vocabulary
- * `/games` takes, forwarded to each `/stats/{dimension}`. The "vs previous" control turns
- * the KPI row into a comparison with the equally long window before it, over
+ * One filter set (window · colour · speed) drives every card: the same `GameFilters`
+ * vocabulary `/games` takes, forwarded to each `/stats/{dimension}`. The "vs previous"
+ * control turns the KPI row into a comparison with the equally long window before it, over
  * `/stats/compare`.
  *
  * The tile row is the design's five, at its anatomy, but two of its metrics do not exist:
@@ -14,14 +14,16 @@
  * given away` (`avg_win_loss`, the average a move costs) and `Blunder rate` (the share of
  * moves that were one). Same question — how expensive are your moves — in real units.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { FilterChip } from '@/components/ui/chip'
 import { useStatsDashboard } from '@/lib/api/queries'
-import type { Color, GameFilters, StatsBucket, StatsResponse } from '@/lib/api/types'
-import { useIsMobile } from '@/lib/ui/media'
+import { SPEEDS } from '@/lib/api/types'
+import type { Color, GameFilters, Speed, StatsBucket, StatsResponse } from '@/lib/api/types'
+import { toggleFilter } from '@/lib/filters'
 import { cn } from '@/lib/utils'
 
 import { BlundersByPhaseCard } from './cards/BlundersByPhaseCard'
@@ -58,6 +60,15 @@ interface DeltaPayload {
   total?: StatsBucket
 }
 
+/** Chip labels. "correspondence" is twice the width of the bar's other five put together. */
+const SPEED_LABELS: Record<Speed, string> = {
+  bullet: 'bullet',
+  blitz: 'blitz',
+  rapid: 'rapid',
+  classical: 'classical',
+  correspondence: 'corr.',
+}
+
 const WINDOW_DAYS: Record<WindowKey, number | undefined> = {
   '7d': 7,
   '30d': 30,
@@ -85,11 +96,17 @@ export function StatsPage() {
   const reportLabel = REPORTS.find((entry) => entry.key === report)!.label
   const [windowKey, setWindowKey] = useState<WindowKey>('90d')
   const [color, setColor] = useState<ColorChoice>('both')
+  // Every speed on is the same question as no speed filter, so that is what it is sent as:
+  // an untouched bar asks for the whole library, and a game whose speed was never parsed is
+  // counted until the moment somebody names the speeds they want.
+  const [speeds, setSpeeds] = useState<readonly Speed[]>(SPEEDS)
   const [comparing, setComparing] = useState(false)
+  const allSpeeds = speeds.length === SPEEDS.length
 
   const dashboard = useStatsDashboard({
     ...(WINDOW_DAYS[windowKey] === undefined ? {} : { days: WINDOW_DAYS[windowKey] }),
     ...(color === 'both' ? {} : { color }),
+    ...(allSpeeds ? {} : { speed: speeds }),
   })
 
   // The server finds the anchor and calculates against it in the same request. The old
@@ -97,13 +114,18 @@ export function StatsPage() {
   // the newest-game timestamp arrived.
   const anchor = useMemo(() => anchorOf(dashboard.data?.anchor ?? null), [dashboard.data?.anchor])
 
+  // `speeds` is a fresh array on every toggle, so the memo keys off its content rather than
+  // its identity — a filter object rebuilt each render is a new query key for every
+  // comparison that reads it. Empty means "all of them", which is no filter at all.
+  const speedKey = allSpeeds ? '' : speeds.join(',')
   const filters = useMemo<GameFilters>(
     () => ({
       ...(dashboard.data?.since ? { since: dashboard.data.since } : {}),
       ...(dashboard.data?.until ? { until: dashboard.data.until } : {}),
       ...(color === 'both' ? {} : { color }),
+      ...(speedKey ? { speed: speedKey.split(',') as Speed[] } : {}),
     }),
-    [dashboard.data?.since, dashboard.data?.until, color],
+    [dashboard.data?.since, dashboard.data?.until, color, speedKey],
   )
 
   const speed = dimensionQuery(dashboard, 'performance_by_speed')
@@ -145,7 +167,14 @@ export function StatsPage() {
         { dimension: 'rating_trend', data: trend.data },
       ]),
     )
-    downloadCsv(`blunderbase-stats-${windowKey}${color === 'both' ? '' : `-${color}`}.csv`, csv)
+    // The name carries every filter the rows were counted under, so two exports taken a
+    // minute apart under different filters are not the same file twice.
+    downloadCsv(
+      `blunderbase-stats-${windowKey}${color === 'both' ? '' : `-${color}`}${
+        allSpeeds ? '' : `-${speeds.join('-')}`
+      }.csv`,
+      csv,
+    )
   }
 
   /** The small mono clause under a KPI: a movement while comparing, a unit otherwise. */
@@ -160,39 +189,57 @@ export function StatsPage() {
   }
 
   /**
-   * Design 2d puts the window and colour controls in the 46px titlebar, not in the page
-   * header — they scope every card on the screen, not just the one below them. Below `md`
-   * they come back down into the page: seven buttons will not share that bar with a
-   * breadcrumb and the queue widget, and clipped into fragments they are worse than absent.
-   * They still scope everything, so moving them is the only option — dropping them is not.
+   * The filter bar: what every card on the screen is counting.
    *
-   * Rendered at one place or the other rather than both-with-one-hidden: they are a live
-   * control over the page's filters, and two of them would be two things claiming to say
-   * what the screen is showing.
+   * These lived in the 46px titlebar, on the theory that a control scoping the whole page
+   * belongs above the whole page. In practice the titlebar is chrome — a breadcrumb and the
+   * queue widget — and controls parked there are not looked at: the page under them says
+   * "90 days · both colours" in its own subtitle and nothing points at what would change
+   * it. They sit on the page now, directly under the header they qualify, the way the
+   * explorer's speed and rating chips sit under the board they filter.
+   *
+   * Three filters, two shapes. Window and colour are one-of-N, so they are segmented
+   * controls; speed is a set — "everything except bullet" is the ordinary question — so it
+   * is a row of chips, which is the same distinction the explorer draws.
    */
-  const mobile = useIsMobile()
   const scope = (
-    <>
-      <Segmented
-        label="Window"
-        value={windowKey}
-        onChange={setWindowKey}
-        options={DEFAULT_WINDOWS.map((key) => ({
-          value: key,
-          label: WINDOW_LABELS[key],
-        }))}
-      />
-      <Segmented
-        label="Colour"
-        value={color}
-        onChange={setColor}
-        options={[
-          { value: 'both', label: 'both' },
-          { value: 'white', label: 'white' },
-          { value: 'black', label: 'black' },
-        ]}
-      />
-    </>
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+      <Field label="Window">
+        <Segmented
+          label="Window"
+          value={windowKey}
+          onChange={setWindowKey}
+          options={DEFAULT_WINDOWS.map((key) => ({
+            value: key,
+            label: WINDOW_LABELS[key],
+          }))}
+        />
+      </Field>
+      <Field label="Colour">
+        <Segmented
+          label="Colour"
+          value={color}
+          onChange={setColor}
+          options={[
+            { value: 'both', label: 'both' },
+            { value: 'white', label: 'white' },
+            { value: 'black', label: 'black' },
+          ]}
+        />
+      </Field>
+      <Field label="Speed">
+        {SPEEDS.map((value) => (
+          <FilterChip
+            key={value}
+            label={SPEED_LABELS[value]}
+            name={value}
+            title={`Count ${value} games`}
+            on={speeds.includes(value)}
+            onClick={() => setSpeeds(toggleFilter(speeds, value, SPEEDS))}
+          />
+        ))}
+      </Field>
+    </div>
   )
 
   return (
@@ -203,7 +250,6 @@ export function StatsPage() {
             ? [{ label: 'Stats' }]
             : [{ label: 'Stats', to: '/stats' }, { label: reportLabel }]
         }
-        actions={mobile ? null : scope}
       />
       <PageHeader
         title="Stats"
@@ -213,7 +259,11 @@ export function StatsPage() {
             : `${formatCount(analysed)} analysed of ${formatCount(games)} games · ${windowProse(
                 windowKey,
                 anchor,
-              )} · ${color === 'both' ? 'both colours' : `as ${color}`}`
+              )} · ${color === 'both' ? 'both colours' : `as ${color}`}${
+                // The subtitle is what the page counted; a speed left out changes that and
+                // has to be said, while the untouched bar leaves the sentence as it was.
+                allSpeeds ? '' : ` · ${speeds.join(', ')} only`
+              }`
         }
         actions={
           <div className="flex items-center gap-2">
@@ -248,9 +298,7 @@ export function StatsPage() {
         }
       />
 
-      {/* Each `Segmented` names itself, so the row wrapping them needs no label of its
-          own — the two together are ~340px and take a line each on a 375px screen. */}
-      {mobile ? <div className="flex flex-wrap items-center gap-2">{scope}</div> : null}
+      {scope}
 
       {/* Five tiles across is 70px each on a phone, which fits neither a label nor a
           22px number. Below `md` they go two to a line, and the fifth — the one that
@@ -328,5 +376,28 @@ export function StatsPage() {
         {report === 'progress' ? <ProgressCard query={trend} /> : null}
       </div>
     </PageBody>
+  )
+}
+
+/**
+ * One filter in the bar: a small uppercase name and the control that answers it.
+ *
+ * The name is drawn rather than left to the control because the bar mixes shapes — two
+ * segmented controls and a row of chips — and without names a reader has to work out from
+ * the values which question each one is answering. `Segmented` carries the same string as
+ * its `aria-label`, which is the group's accessible name; this span is what makes it
+ * visible.
+ */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span
+        aria-hidden
+        className="flex-none text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase"
+      >
+        {label}
+      </span>
+      {children}
+    </div>
   )
 }

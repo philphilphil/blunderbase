@@ -490,8 +490,20 @@ def test_filters_narrow_by_colour_speed_and_eco(library: Library) -> None:
     black = games_service.search_games(session, GameFilters(color=Color.BLACK))
     assert [game.source_id for game in black] == ["qg000005"]
 
-    blitz = games_service.search_games(session, GameFilters(speed=Speed.BLITZ))
+    blitz = games_service.search_games(session, GameFilters(speeds=(Speed.BLITZ,)))
     assert {game.source_id for game in blitz} == {"qg000001", "qg000002", "qg000005"}
+
+    # Speeds are a set: naming two keeps both and leaves the bullet game out. An empty
+    # tuple is no filter rather than no games — it is what "nothing excluded" arrives as.
+    quick = games_service.search_games(session, GameFilters(speeds=(Speed.BLITZ, Speed.RAPID)))
+    assert {game.source_id for game in quick} == {
+        "qg000001",
+        "qg000002",
+        "qg000003",
+        "qg000005",
+        "qg000006",
+    }
+    assert len(games_service.search_games(session, GameFilters(speeds=()))) == 6
 
     # An ECO filter is a prefix, so "C6" is the whole Ruy Lopez range and not one code.
     ruy = games_service.search_games(session, GameFilters(eco="C6"))
@@ -1693,7 +1705,7 @@ def test_the_dashboard_matches_six_dimensions_but_reads_games_once(
 
 def test_filters_narrow_a_dimension(analysed: Library) -> None:
     payload = stats.get_stats(
-        analysed.session, "blunders_by_phase", filters=GameFilters(speed=Speed.RAPID)
+        analysed.session, "blunders_by_phase", filters=GameFilters(speeds=(Speed.RAPID,))
     )
     assert payload["total"]["moves"] == 5
     assert payload["total"]["blunder"] == 2
@@ -1861,7 +1873,7 @@ def test_different_filters_are_different_entries(
     calls = counting(monkeypatch, stats, "_eval_rows")
     everything = stats.get_stats(analysed.session, "blunders_by_phase")
     rapid = stats.get_stats(
-        analysed.session, "blunders_by_phase", filters=GameFilters(speed=Speed.RAPID)
+        analysed.session, "blunders_by_phase", filters=GameFilters(speeds=(Speed.RAPID,))
     )
     assert calls == [2]
     assert rapid["total"]["moves"] < everything["total"]["moves"]
@@ -2098,7 +2110,7 @@ def test_the_folded_and_the_scanned_answers_are_the_same_payload(
     assert stats._summaries_ready(session) is False
     narrowings = {
         "everything": {},
-        "rapid": {"filters": GameFilters(speed=Speed.RAPID)},
+        "rapid": {"filters": GameFilters(speeds=(Speed.RAPID,))},
         "since march": {"filters": GameFilters(since=datetime(2026, 3, 1, tzinfo=UTC))},
     }
     scanned = {name: every_aggregation(session, **kwargs) for name, kwargs in narrowings.items()}

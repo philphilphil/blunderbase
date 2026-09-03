@@ -95,23 +95,6 @@ export function formatCsv(values: readonly (string | number)[]): string {
   return values.join(',')
 }
 
-/**
- * A chip toggled on or off, kept in the canonical order.
- *
- * Turning the last one off is refused rather than allowed: an empty speeds or ratings list
- * asks Lichess about no games at all, and a table that answers "nothing here" because of a
- * filter the owner emptied by accident reads as a broken position rather than as a filter.
- */
-export function toggleFilter<T extends string | number>(
-  chosen: readonly T[],
-  value: T,
-  order: readonly T[],
-): T[] {
-  const on = chosen.includes(value)
-  if (on && chosen.length === 1) return [...chosen]
-  const next = on ? chosen.filter((item) => item !== value) : [...chosen, value]
-  return order.filter((item) => next.includes(item))
-}
 
 /**
  * `2.6M`, `12.4k`, `482` — the reference databases count in millions and the column is

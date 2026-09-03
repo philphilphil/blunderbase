@@ -182,9 +182,9 @@ def _register_convenience(server: MCPServer, coach: Coach) -> None:
         their classifications. `platform` is lichess, chesscom, fics, pgn, manual or otb;
         `time_control` is either a speed (blitz) or a literal clock (300+3)."""
         count = args.capped(amount, DEFAULT_GAMES, MAX_GAMES)
-        speed, literal = args.time_control(time_control)
+        speeds, literal = args.time_control(time_control)
         filters = GameFilters(
-            source=args.platform(platform), speed=speed, time_control=literal
+            source=args.platform(platform), speeds=speeds, time_control=literal
         )
         worst = max(0, min(int(worst_moments), MAX_WORST_MOMENTS))
         with coach.session() as session:
@@ -271,7 +271,7 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
         relative window like '30d'. `whose` is "mine" (the owner's games, the default),
         "others" (games added from the reference books) or "all". Follow up with get_game
         for the moves."""
-        speed, literal = args.time_control(time_control)
+        speeds, literal = args.time_control(time_control)
         filters = GameFilters(
             since=args.when(since, "since"),
             until=args.when(until, "until"),
@@ -280,7 +280,7 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
             eco=eco,
             result=args.member(Result, result, "result"),
             outcome=outcome,
-            speed=speed,
+            speeds=speeds,
             time_control=literal,
             opponent=opponent,
             variant=variant,
@@ -528,9 +528,9 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         color: str | None = None,
         time_control: str | None = None,
     ) -> TextContent:
-        speed, literal = args.time_control(time_control)
+        speeds, literal = args.time_control(time_control)
         filters = GameFilters(
-            source=args.platform(platform), color=args.color(color), speed=speed,
+            source=args.platform(platform), color=args.color(color), speeds=speeds,
             time_control=literal,
         )
         with coach.session() as session:

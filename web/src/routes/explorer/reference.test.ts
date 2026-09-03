@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_RATINGS,
   DEFAULT_SPEEDS,
-  RATINGS,
-  SPEEDS,
   formatCount,
   formatCsv,
   parseRatings,
@@ -12,7 +10,6 @@ import {
   parseSpeeds,
   resultOf,
   sharePercent,
-  toggleFilter,
 } from './reference'
 
 describe('parseSource', () => {
@@ -51,25 +48,6 @@ describe('parseRatings', () => {
   it('keeps real buckets in ascending order', () => {
     expect(parseRatings('2000,1000')).toEqual([1000, 2000])
     expect(parseRatings('2500')).toEqual([2500])
-  })
-})
-
-describe('toggleFilter', () => {
-  it('adds a chip back in the canonical order rather than at the end', () => {
-    expect(toggleFilter(['blitz', 'classical'], 'rapid', SPEEDS)).toEqual([
-      'blitz',
-      'rapid',
-      'classical',
-    ])
-  })
-
-  it('removes a chip that is on', () => {
-    expect(toggleFilter([1600, 1800, 2000], 1800, RATINGS)).toEqual([1600, 2000])
-  })
-
-  it('refuses to empty the filter — one chip left cannot be switched off', () => {
-    expect(toggleFilter(['blitz'], 'blitz', SPEEDS)).toEqual(['blitz'])
-    expect(toggleFilter([2500], 2500, RATINGS)).toEqual([2500])
   })
 })
 

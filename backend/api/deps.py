@@ -60,7 +60,10 @@ def game_filters(
     eco: Annotated[str | None, Query(description="ECO code or prefix, e.g. C6")] = None,
     result: Annotated[Result | None, Query(description="the PGN result")] = None,
     outcome: Annotated[str | None, Query(description="win | loss | draw, owner's side")] = None,
-    speed: Speed | None = None,
+    speed: Annotated[
+        list[Speed] | None,
+        Query(description="repeatable: speed=blitz&speed=rapid keeps both"),
+    ] = None,
     time_control: str | None = None,
     opponent: str | None = None,
     variant: str | None = None,
@@ -80,6 +83,9 @@ def game_filters(
 
     `whose` spells the service's three-way `mine` field in words, because `mine=null` is
     not a thing a query string can say.
+
+    `speed` repeats rather than taking a comma list, which is how FastAPI reads a set and
+    how the client already writes one; `speed=blitz` alone still means what it always did.
     """
     return GameFilters(
         since=since,
@@ -89,7 +95,7 @@ def game_filters(
         eco=eco,
         result=result,
         outcome=outcome,
-        speed=speed,
+        speeds=tuple(speed) if speed else None,
         time_control=time_control,
         opponent=opponent,
         variant=variant,

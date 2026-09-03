@@ -7,16 +7,16 @@
  * common case three interactions. Both live in the URL, so a filtered position is a link
  * (`../reference.ts` parses them), and neither can be emptied — `toggleFilter` refuses the
  * last chip, since a request with no speeds counts no games and would read as an empty
- * position rather than as an empty filter.
+ * position rather than as an empty filter. The chips themselves are `@/components/ui/chip`,
+ * shared with the Stats page's time controls.
  *
  * Masters never sees this: that database is one book with no time control and no rating
  * band to choose, and a pair of controls that do nothing is worse than no controls.
  */
-import type { ReactNode } from 'react'
+import { ChipRow, FilterChip } from '@/components/ui/chip'
+import { toggleFilter } from '@/lib/filters'
 
-import { cn } from '@/lib/utils'
-
-import { RATINGS, SPEEDS, toggleFilter, type Speed } from '../reference'
+import { RATINGS, SPEEDS, type Speed } from '../reference'
 
 export function ReferenceFilters({
   speeds,
@@ -33,7 +33,7 @@ export function ReferenceFilters({
     <div className="flex flex-col gap-1.5">
       <ChipRow label="speed">
         {SPEEDS.map((speed) => (
-          <Chip
+          <FilterChip
             key={speed}
             label={speed}
             on={speeds.includes(speed)}
@@ -43,7 +43,7 @@ export function ReferenceFilters({
       </ChipRow>
       <ChipRow label="rating">
         {RATINGS.map((rating) => (
-          <Chip
+          <FilterChip
             key={rating}
             label={rating === 2500 ? '2500+' : String(rating)}
             on={ratings.includes(rating)}
@@ -52,34 +52,5 @@ export function ReferenceFilters({
         ))}
       </ChipRow>
     </div>
-  )
-}
-
-function ChipRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="w-11 flex-none text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase">
-        {label}
-      </span>
-      {children}
-    </div>
-  )
-}
-
-function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cn(
-        'rounded-md border px-[0.4375rem] py-[0.0625rem] font-mono text-[0.6875rem] tabular transition-colors',
-        on
-          ? 'border-accent-teal/35 bg-accent-teal/10 text-accent-teal'
-          : 'border-edge text-dim hover:text-ink',
-      )}
-    >
-      {label}
-    </button>
   )
 }

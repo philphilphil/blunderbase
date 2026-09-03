@@ -112,7 +112,11 @@ class GameFilters:
     result: Result | None = None
     # The same game from the owner's side: "win" / "loss" / "draw", whichever colour.
     outcome: str | None = None
-    speed: Speed | None = None
+    # A set rather than one value: "blitz and rapid" is the ordinary question, and the
+    # Stats page asks it by leaving speeds out. An empty tuple is not a filter — it would
+    # match no game at all — and is treated as None; a game whose speed was never parsed
+    # falls outside any set, which is what naming speeds means.
+    speeds: tuple[Speed, ...] | None = None
     time_control: str | None = None
     opponent: str | None = None
     variant: str | None = None
@@ -545,8 +549,8 @@ def game_conditions(filters: GameFilters) -> list[ColumnElement[bool]]:
         conditions.append(Game.result == filters.result)
     if filters.outcome:
         conditions.append(outcome_condition(filters.outcome))
-    if filters.speed is not None:
-        conditions.append(Game.speed == filters.speed)
+    if filters.speeds:
+        conditions.append(Game.speed.in_(filters.speeds))
     if filters.time_control:
         conditions.append(Game.time_control == filters.time_control)
     if filters.variant:
@@ -837,7 +841,11 @@ def get_last_games(
     session: Session, amount: int = 5, source: Source | None = None, speed: Speed | None = None
 ) -> list[Game]:
     """The newest games, the way the coach is usually asked for them."""
-    return search_games(session, GameFilters(source=source, speed=speed), limit=max(amount, 0))
+    return search_games(
+        session,
+        GameFilters(source=source, speeds=(speed,) if speed is not None else None),
+        limit=max(amount, 0),
+    )
 
 
 def game_card(session: Session, game: Game, *, worst: int = 3) -> dict[str, Any]:

@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -145,13 +146,15 @@ describe('CSV export', () => {
 })
 
 /**
- * The window and colour controls scope every card on the page, so they have to stay
- * reachable on a phone — where the titlebar they normally live in has no room and clipped
- * them into fragments. They move into the page body instead, and the point of the branch
- * is that they *move*: two of them, one hidden, would be two controls each claiming to say
- * what the screen is showing.
+ * The filter bar scopes every card on the page, so it belongs on the page — under the
+ * header it qualifies, at every width. It used to live in the titlebar on a desktop and
+ * come down into the body on a phone; nobody looked at it up there, and a control that
+ * moves depending on the window is a control that has to be found twice.
+ *
+ * The titlebar stand-in stays, because "not in the chrome" is half of what is being
+ * asserted.
  */
-describe('StatsPage — where the scope controls live', () => {
+describe('StatsPage — the filter bar', () => {
   /** Renders whatever the page put in the titlebar, which the shell would otherwise draw. */
   function Titlebar() {
     const { actions } = usePageChrome()
@@ -203,21 +206,17 @@ describe('StatsPage — where the scope controls live', () => {
 
   afterEach(() => vi.unstubAllGlobals())
 
-  it('puts them in the titlebar on a desktop', () => {
-    stubViewport(false)
+  it.each([
+    ['a desktop', false],
+    ['a phone', true],
+  ])('draws every filter on the page and nothing in the titlebar on %s', (_name, mobile) => {
+    stubViewport(mobile)
     draw()
-    const titlebar = screen.getByTestId('titlebar')
-    expect(titlebar).toContainElement(screen.getByRole('group', { name: 'Window' }))
-    expect(titlebar).toContainElement(screen.getByRole('group', { name: 'Colour' }))
-  })
 
-  it('brings them down into the page on a phone', () => {
-    stubViewport(true)
-    draw()
-    const titlebar = screen.getByTestId('titlebar')
-    expect(titlebar).toBeEmptyDOMElement()
+    expect(screen.getByTestId('titlebar')).toBeEmptyDOMElement()
     expect(screen.getByRole('group', { name: 'Window' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Colour' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'bullet' })).toBeInTheDocument()
   })
 
   it('loads the page through one anchored dashboard query', () => {
@@ -228,4 +227,35 @@ describe('StatsPage — where the scope controls live', () => {
     expect(useProfile).not.toHaveBeenCalled()
   })
 
+  it('asks for no speeds at all until one is switched off', async () => {
+    stubViewport(false)
+    draw()
+
+    // Every chip on is the same question as no speed filter, and it is sent as none.
+    expect(useStatsDashboard).toHaveBeenCalledWith({ days: 90 })
+
+    await userEvent.click(screen.getByRole('button', { name: 'bullet' }))
+
+    expect(useStatsDashboard).toHaveBeenLastCalledWith({
+      days: 90,
+      speed: ['blitz', 'rapid', 'classical', 'correspondence'],
+    })
+    expect(screen.getByRole('button', { name: 'bullet' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+
+  it('refuses to leave the bar with no speed on it', async () => {
+    stubViewport(false)
+    draw()
+
+    for (const speed of ['bullet', 'blitz', 'rapid', 'classical', 'correspondence']) {
+      await userEvent.click(screen.getByRole('button', { name: speed }))
+    }
+
+    // The last chip cannot be switched off: an empty set counts no games, and a page
+    // answering "nothing here" because of it reads as broken rather than as filtered.
+    expect(useStatsDashboard).toHaveBeenLastCalledWith({ days: 90, speed: ['correspondence'] })
+  })
 })

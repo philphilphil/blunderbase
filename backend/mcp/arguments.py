@@ -88,11 +88,12 @@ def platform(value: str | None) -> Source | None:
         ) from None
 
 
-def time_control(value: str | None) -> tuple[Speed | None, str | None]:
+def time_control(value: str | None) -> tuple[tuple[Speed, ...] | None, str | None]:
     """A time control as either a speed ("blitz") or a literal clock ("300+3").
 
     Both are how the owner names one, and the same argument accepts either rather than
-    making the model pick the field the database happens to store it in.
+    making the model pick the field the database happens to store it in. The speed comes
+    back as the one-element set `GameFilters.speeds` takes, since the coach names one.
     """
     if value is None:
         return None, None
@@ -100,7 +101,7 @@ def time_control(value: str | None) -> tuple[Speed | None, str | None]:
     if not text:
         return None, None
     try:
-        return Speed(text.casefold()), None
+        return (Speed(text.casefold()),), None
     except ValueError:
         return None, text
 

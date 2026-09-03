@@ -1252,6 +1252,19 @@ def test_the_dashboard_returns_every_dimension_over_one_anchored_window(
     assert body["dimensions"]["blunders_by_phase"]["total"]["blunder"] == 1
 
 
+def test_the_speed_filter_repeats_to_name_a_set(api: TestClient) -> None:
+    """`speed=blitz&speed=rapid` is how the Stats page leaves a time control out."""
+    body = api.get("/stats/dashboard", params=[("speed", "blitz"), ("speed", "rapid")]).json()
+    speed = body["dimensions"]["performance_by_speed"]
+
+    assert speed["total"]["games"] == 5
+    assert {bucket["key"] for bucket in speed["buckets"]} == {"blitz", "rapid"}
+    # One value on its own still reads the way it always did.
+    assert api.get("/stats/dashboard", params={"speed": "bullet"}).json()["dimensions"][
+        "performance_by_speed"
+    ]["total"]["games"] == 1
+
+
 def test_two_periods_can_be_compared(api: TestClient) -> None:
     body = api.get(
         "/stats/compare",
