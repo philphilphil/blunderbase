@@ -288,7 +288,7 @@ describe('InfiniteAnalysisPanel', () => {
     // Stockfish card, so there is one place to change the preference rather than two.
     expect(
       within(screen.getByTestId('infinite-analysis-header')).queryByRole('button', {
-        name: 'arrows',
+        name: /line preview/i,
       }),
     ).not.toBeInTheDocument()
   })
@@ -381,7 +381,6 @@ describe('InfiniteAnalysisPanel', () => {
     // Neither the cycler nor the gear: both used to be duplicated here and on the run
     // panel, which meant two places to change one preference. `LinePreviewRowChip`'s own
     // test covers the cycling behaviour where it now lives.
-    expect(screen.queryByRole('button', { name: 'arrows' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /line preview/i })).not.toBeInTheDocument()
   })
 

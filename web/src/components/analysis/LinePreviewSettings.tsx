@@ -13,6 +13,8 @@
  * device), so there is no draft and no Save: every control reads `useLinePreviewPrefs()`
  * and writes straight through `setLinePreviewPrefs`.
  */
+import { Eye, EyeOff } from 'lucide-react'
+
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import type { LinePreviewPrefs, RowPreview } from '@/lib/board/linePreview'
@@ -89,20 +91,37 @@ const ROW_SAYS: Record<RowPreview, string> = {
  * live panel each grew their own copy of the same control. Now the run panel's Stockfish
  * card carries the pair and the live panel carries neither; there is one place to change
  * the setting and one place to look for it.
+ *
+ * DRESSED AS A CONTROL, NOT AS A READOUT. It sits in a header row whose other chips — `d20`,
+ * `1.4M nodes`, `MPV 5` — are all facts about the run, and in their vocabulary (a bordered
+ * mono chip) it read as a fourth fact rather than as the one thing on the row that can be
+ * clicked. The eye says what the setting is about, and the tint says it is on: teal while
+ * hovering a line draws something, quiet and struck through while it draws nothing — the
+ * same on/off vocabulary the compare toggle in the pane beside it uses.
  */
 export function LinePreviewRowChip() {
   const prefs = useLinePreviewPrefs()
+  const on = prefs.row !== 'off'
+  const Icon = on ? Eye : EyeOff
+  const says = `Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`
   return (
     <button
       type="button"
+      aria-label={`Line preview: ${prefs.row}`}
       onClick={() =>
         setLinePreviewPrefs({
           row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
         })
       }
-      title={`Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`}
-      className="bb-chip flex-none px-1.5 py-px font-mono text-[0.625rem] text-dim transition-colors hover:text-ink"
+      title={says}
+      className={cn(
+        'inline-flex flex-none items-center gap-1 rounded-sm border px-1 py-px font-mono text-[0.625rem] transition-colors',
+        on
+          ? 'border-accent-teal/35 bg-accent-teal/10 text-accent-teal hover:border-accent-teal/60'
+          : 'border-edge text-dim hover:border-edge-hover hover:text-soft',
+      )}
     >
+      <Icon className="size-2.5 flex-none" aria-hidden />
       {prefs.row}
     </button>
   )

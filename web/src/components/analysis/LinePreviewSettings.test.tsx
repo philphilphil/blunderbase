@@ -44,8 +44,8 @@ describe('LinePreviewRowChip', () => {
   it('cycles what hovering a line does, and remembers it', async () => {
     render(<LinePreviewRowChip />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'arrows' }))
-    expect(screen.getByRole('button', { name: 'overlay' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Line preview: arrows' }))
+    expect(screen.getByRole('button', { name: 'Line preview: overlay' })).toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem(LINE_PREVIEW_KEY) ?? '{}')).toMatchObject({
       row: 'overlay',
     })
