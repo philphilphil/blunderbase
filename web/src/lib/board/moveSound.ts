@@ -5,8 +5,16 @@
  * forty lines of Web Audio — and generating it costs nothing at build time, nothing at load
  * time, and settles the licensing question that comes with any sample set worth shipping.
  * It also lets the four sounds be relatives of one another by construction: capture is the
- * move click brighter and harder, castling is the same click twice, check is the click with
- * a small bell over it. A reader learns three variations of one sound rather than four.
+ * move click struck harder and cut short, castling is the same click twice, check is the
+ * click with two notes over it. A reader learns three variations of one sound rather than
+ * four.
+ *
+ * Capture and check were both re-cut after listening to them side by side. Capture used to
+ * hold a wide band of noise at 2.6 kHz for a tenth of a second, which is a hiss where a
+ * piece meeting a piece is an edge — so the band is tighter, the level is up and the whole
+ * thing is over in 30 ms. Check used to be a single 1046 Hz triangle, which is the sound a
+ * notification makes; it is two short notes now, a fifth apart and 75 ms apart, because two
+ * notes read as a phrase where one reads as an alert.
  *
  * The kind is read off SAN, not off the board. `Nxe5+` says everything needed and is already
  * in hand at both call sites — the game's move rows and the analysis line's `sans` — where
@@ -42,8 +50,11 @@ export function moveSoundKind(san: string | null | undefined): MoveSoundKind | n
  * bottom half falling off a cliff. Squaring puts the audible range across the whole travel,
  * which is what makes the middle of the slider sound like the middle.
  *
- * The voices below are scaled so the loudest of them — a capture — peaks just under 1 at
- * full travel, and the master gain never has to be trimmed to keep the sum from clipping.
+ * The voices below are scaled so nothing clips at full travel, and the master gain never
+ * has to be trimmed. Their levels add up past 1 on paper — a capture is 0.8 of noise over
+ * 0.3 of sine — but they never meet there: the noise is at its level the instant it starts
+ * and the sine takes 4 ms to ramp up to its own, by which time a 30 ms burst has decayed to
+ * a third of what it was. The loudest sample any of them produces is the first one.
  */
 function gainFor(volume: number): number {
   const fraction = Math.min(100, Math.max(0, volume)) / 100
@@ -143,22 +154,30 @@ function body(
   osc.stop(at + decay + 0.02)
 }
 
-/** Check's marker: one quiet triangle note over the click, high enough to sit above it. */
-function bell(ctx: AudioContext, out: GainNode, at: number): void {
+/** One short note over the click — check's marker, and the only pitch in the whole file. */
+function tone(
+  ctx: AudioContext,
+  out: GainNode,
+  at: number,
+  { level, freq, decay }: { level: number; freq: number; decay: number },
+): void {
   const osc = ctx.createOscillator()
-  osc.type = 'triangle'
-  osc.frequency.setValueAtTime(1046, at)
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(freq, at)
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(0.0001, at)
-  gain.gain.linearRampToValueAtTime(0.14, at + 0.006)
-  gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.18)
+  // 6 ms of attack rather than none: a sine switched on at full level clicks, and there is
+  // already a click underneath this one.
+  gain.gain.linearRampToValueAtTime(level, at + 0.006)
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + decay)
   osc.connect(gain).connect(out)
   osc.start(at)
-  osc.stop(at + 0.2)
+  osc.stop(at + decay + 0.02)
 }
 
 const PIECE = { level: 0.5, cutoff: 1500, q: 1.1, decay: 0.055 }
-const HARD = { level: 0.7, cutoff: 2600, q: 0.7, decay: 0.1 }
+/** A capture: the same wood, hit harder and let go three times sooner. */
+const CLACK = { level: 0.8, cutoff: 1900, q: 1.6, decay: 0.03 }
 
 /**
  * Play one move sound now. Silent where there is no audio, where the last sound was inside
@@ -178,8 +197,8 @@ export function playMoveSound(kind: MoveSoundKind, volume: number): void {
   try {
     switch (kind) {
       case 'capture':
-        click(ctx, master, at, HARD)
-        body(ctx, master, at, { level: 0.25, from: 150, decay: 0.11 })
+        click(ctx, master, at, CLACK)
+        body(ctx, master, at, { level: 0.3, from: 160, decay: 0.09 })
         break
       case 'castle':
         // Two men, a beat apart: the rook lands after the king, as it does on a real set.
@@ -189,9 +208,12 @@ export function playMoveSound(kind: MoveSoundKind, volume: number): void {
         body(ctx, master, at + 0.075, { level: 0.2, from: 190, decay: 0.07 })
         break
       case 'check':
+        // The move, then G5 and D6 over the top of it: the piece has landed and something
+        // about the position is being said, in that order.
         click(ctx, master, at, PIECE)
         body(ctx, master, at, { level: 0.22, from: 190, decay: 0.08 })
-        bell(ctx, master, at)
+        tone(ctx, master, at + 0.02, { level: 0.09, freq: 784, decay: 0.07 })
+        tone(ctx, master, at + 0.095, { level: 0.085, freq: 1175, decay: 0.1 })
         break
       default:
         click(ctx, master, at, PIECE)
