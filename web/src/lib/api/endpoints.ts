@@ -237,10 +237,15 @@ export const getImportJob = (id: number) => http.get<ImportJob>(`/import/jobs/${
 export const startImport = (source: Source, body: ImportRequest = {}) =>
   http.post<ImportStarted>(`/import/${source}`, { body })
 
-/** The PGN itself is the request body; `wait` runs the sync inline. */
+/**
+ * The PGN itself is the request body; `wait` runs the sync inline.
+ *
+ * `mine: false` stores the file as somebody else's games — analysable and annotatable,
+ * counted in no statistic. Left out, the upload is the owner's own games.
+ */
 export const uploadPgn = (
   pgn: string,
-  query: { wait?: boolean; max_games?: number; analyze?: boolean } = {},
+  query: { wait?: boolean; max_games?: number; analyze?: boolean; mine?: boolean } = {},
 ) => http.post<ImportStarted>('/import/pgn/upload', { text: pgn, query })
 
 export const getSyncSchedule = () => http.get<SyncSchedule>('/import/schedule')

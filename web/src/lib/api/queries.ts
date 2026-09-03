@@ -597,7 +597,7 @@ export function useUploadPgn(
   options?: UseMutationOptions<
     Awaited<ReturnType<typeof api.uploadPgn>>,
     Error,
-    { pgn: string; wait?: boolean; max_games?: number; analyze?: boolean }
+    { pgn: string; wait?: boolean; max_games?: number; analyze?: boolean; mine?: boolean }
   >,
 ) {
   const client = useQueryClient()
@@ -610,6 +610,7 @@ export function useUploadPgn(
       wait?: boolean
       max_games?: number
       analyze?: boolean
+      mine?: boolean
     }) => api.uploadPgn(pgn, query),
     ...options,
     onSuccess: (...args) => {

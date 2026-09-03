@@ -6,10 +6,15 @@
  * the drop target: a dashed panel the size of a card bought nothing a highlighted row does
  * not, and the pointer is already over the row it means. Of the table's three controls it
  * reads only the last: a PGN is a file, not a cursor with a date and a cap.
+ *
+ * The one control it has of its own is whose games the file holds (`WhoseGamesToggle`).
+ * That is a per-upload answer and belongs beside the file it is about, not in the strip
+ * above, which every source reads.
  */
 import { FileUp, Loader2, Upload, X } from 'lucide-react'
 import { useRef, useState, type DragEvent } from 'react'
 
+import { WhoseGamesToggle } from '@/components/import/WhoseGamesToggle'
 import { Button } from '@/components/ui/button'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { useUploadPgn } from '@/lib/api/queries'
@@ -40,6 +45,7 @@ export function PgnRow({
   skipEvaluation: boolean
 }) {
   const [files, setFiles] = useState<File[]>([])
+  const [mine, setMine] = useState(true)
   const [over, setOver] = useState(false)
   const [readError, setReadError] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -72,7 +78,12 @@ export function PgnRow({
         return
       }
       // `analyze` only ever travels to turn evaluation off; left out, the upload is queued.
-      upload.mutate({ pgn, analyze: skipEvaluation ? false : undefined })
+      // `mine` reads the same way: absent means the owner's own games, as it always did.
+      upload.mutate({
+        pgn,
+        analyze: skipEvaluation ? false : undefined,
+        mine: mine ? undefined : false,
+      })
     } catch (error) {
       setReadError(error instanceof Error ? error.message : 'the file could not be read')
     }
@@ -100,7 +111,7 @@ export function PgnRow({
 
         {/* Table cells never wrap; this one holds a sentence, and on a phone it has to. */}
         <TableCell className="max-md:whitespace-normal">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {files.length > 0 ? (
               <>
                 <span className="max-w-56 truncate font-mono text-[0.6875rem] text-soft">
@@ -128,6 +139,13 @@ export function PgnRow({
                 Choose a file, or drop one on this row
               </button>
             )}
+            {/* Always shown, not only once a file is picked: it is the question the upload
+                would otherwise answer silently, and the answer is worth reading before the
+                file is chosen as well as after. */}
+            <span className="text-faint-2" aria-hidden>
+              ·
+            </span>
+            <WhoseGamesToggle mine={mine} onChange={setMine} disabled={busy} />
           </div>
           <input
             ref={input}

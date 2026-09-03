@@ -256,6 +256,7 @@ def ingest_games(
     progress: ProgressHook | None = None,
     accounts: AccountIndex | None = None,
     analyze: bool = True,
+    presume_owner: bool = True,
 ) -> ImportResult:
     """Store a stream of parsed games under one job: dedup, positions, quick-tier run.
 
@@ -265,7 +266,8 @@ def ingest_games(
     visible to anything reading the row.
 
     `analyze=False` stores the games and stops there — no quick pass is queued, and the
-    owner asks for one later over the games they care about.
+    owner asks for one later over the games they care about. `presume_owner=False` says the
+    stream is somebody else's games — see `ingest_game`.
     """
     if job.id is None:
         session.add(job)
@@ -281,7 +283,9 @@ def ingest_games(
             event = _game_event(job, item.ref, GAME_FAILED, result, error=item.error)
         else:
             try:
-                outcome = ingest_game(session, job, item, accounts, analyze=analyze)
+                outcome = ingest_game(
+                    session, job, item, accounts, analyze=analyze, presume_owner=presume_owner
+                )
             except Exception as exc:
                 session.rollback()
                 error = f"{type(exc).__name__}: {exc}"
@@ -325,10 +329,11 @@ def ingest_game(
     per-game error record. `analyze=False` skips the automatic quick pass; a game that was
     already stored never gets one either way, because this call did not create it.
 
-    `presume_owner` is what a sync and a PGN do: a game they bring is the owner's even when
-    neither name resolves to an account yet, and reconciliation fills the side in later.
-    A game fetched from the reference books is the opposite case — somebody else's unless
-    an owner account is recognised in it — and passes False.
+    `presume_owner` is what a sync does: a game it brings is the owner's even when neither
+    name resolves to an account yet, and reconciliation fills the side in later. A game
+    fetched from the reference books is the opposite case — somebody else's unless an owner
+    account is recognised in it — and passes False. A PGN upload is the one route that can
+    be either, so the person uploading it says which.
     """
     if accounts is None:
         accounts = AccountIndex.load(session)

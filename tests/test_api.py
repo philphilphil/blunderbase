@@ -65,6 +65,16 @@ ONE_GAME = """[Event "Casual Blitz game"]
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 1-0
 """
+# A game with no owner in it, for the uploads that say whose games a file holds: neither
+# name resolves to an account, so the answer given is the only thing deciding.
+STRANGERS_GAME = """[Event "Leipzig"]
+[Date "1894.01.02"]
+[White "Tarrasch"]
+[Black "Lasker"]
+[Result "0-1"]
+
+1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 0-1
+"""
 # Two more against the one opponent the fixture only has a single game with, so the
 # search box has an opponent worth grouping: with the fixture's loss that is 1½/3.
 TWO_MORE_BERLINS = """[Event "Rated Blitz game"]
@@ -669,6 +679,50 @@ def test_an_upload_can_skip_evaluation_too(api: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["job"]["games_imported"] == 1
     assert api.get("/analysis/queue").json()["queued"] == 0
+
+
+def test_an_upload_can_say_the_games_are_not_the_owners(api: TestClient) -> None:
+    """The one question a file cannot answer for itself. `mine=false` stores the games for
+    study — analysable and annotatable — outside every statistic the owner's games feed."""
+    response = api.post(
+        "/import/pgn/upload?wait=true&mine=false",
+        content=STRANGERS_GAME.encode("utf-8"),
+        headers={"content-type": "application/x-chess-pgn"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["job"]["games_imported"] == 1
+    assert api.get("/games", params={"text": "tarrasch"}).json()["total"] == 0
+    others = api.get("/games", params={"text": "tarrasch", "whose": "others"}).json()
+    assert others["total"] == 1
+    assert others["games"][0]["is_owner_game"] is False
+
+
+def test_an_upload_that_says_nothing_is_the_owners_own_games(api: TestClient) -> None:
+    response = api.post(
+        "/import/pgn/upload?wait=true",
+        content=STRANGERS_GAME.encode("utf-8"),
+        headers={"content-type": "application/x-chess-pgn"},
+    )
+
+    assert response.status_code == 200
+    assert api.get("/games", params={"text": "tarrasch"}).json()["total"] == 1
+
+
+def test_a_not_mine_upload_still_claims_a_game_the_owner_is_in(api: TestClient) -> None:
+    """`mine=false` is a presumption, not an override: a name that resolves to an owner
+    account is the owner, whatever the file was said to be, exactly as it is for a game
+    added from the reference books."""
+    response = api.post(
+        "/import/pgn/upload?wait=true&mine=false",
+        content=ONE_GAME.encode("utf-8"),
+        headers={"content-type": "application/x-chess-pgn"},
+    )
+
+    assert response.status_code == 200
+    mine = api.get("/games", params={"text": "newcomer"}).json()
+    assert mine["total"] == 1
+    assert mine["games"][0]["is_owner_game"] is True
 
 
 def test_an_empty_upload_is_refused_before_a_job_row_is_written(api: TestClient) -> None:

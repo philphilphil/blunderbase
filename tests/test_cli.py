@@ -192,6 +192,11 @@ def test_the_bare_positional_is_the_source_s_one_argument(settings: Settings) ->
     assert _import_options(parser.parse_args(["import", "pgn", "--path", "a.pgn"])) == {
         "path": "a.pgn"
     }
+    # A store_true flag is always "given"; only the answer that is not the default travels.
+    assert _import_options(parser.parse_args(["import", "pgn", "a.pgn", "--not-mine"])) == {
+        "path": "a.pgn",
+        "mine": False,
+    }
 
 
 def test_importing_a_pgn_runs_end_to_end_against_a_real_database(

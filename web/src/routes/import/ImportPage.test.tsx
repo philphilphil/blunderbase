@@ -304,6 +304,33 @@ describe('ImportPage', () => {
     expect(urlsFor('/api/import/pgn/upload')[1]).toContain('analyze=false')
   })
 
+  it('asks whose games the PGN holds and only says so when they are not the owner’s', async () => {
+    stubFetch({
+      '/api/import/jobs': { jobs: [], total: 0, limit: 25, offset: 0 },
+      '/api/stats/profile': PROFILE,
+      '/api/games': { games: [], total: 15, limit: 1, offset: 0 },
+      '/api/import/pgn/upload': { source: 'pgn', status: 'running', job_id: 10 },
+    })
+    renderPage(<ImportPage />)
+    await screen.findByText('Sync history')
+
+    const file = new File(['[Event "Casual"]\n\n1. e4 e5 *\n'], 'kasparov.pgn', {
+      type: 'text/plain',
+    })
+    await userEvent.upload(screen.getByTestId('pgn-file-input'), file)
+
+    // Mine is the default, and the default travels as nothing at all.
+    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
+    await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(1))
+    expect(urlsFor('/api/import/pgn/upload')[0]).not.toContain('mine')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Not mine' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
+
+    await waitFor(() => expect(urlsFor('/api/import/pgn/upload')).toHaveLength(2))
+    expect(urlsFor('/api/import/pgn/upload')[1]).toContain('mine=false')
+  })
+
   it('never seeds the username from a failed sync, whose message is the exception', async () => {
     // `services/import_service.py` overwrites the job's message with the exception text
     // when a sync throws, so a failed job's message is an error string, not a username —

@@ -188,6 +188,24 @@ every tick, so a change takes effect without a restart; `BLUNDERBASE_AUTO_SYNC_P
 process, off by default and never in the demo; `blunderbase import …` from cron is the same
 thing for a deployment that would rather own the clock.
 
+## Importing a PGN
+
+A sync knows whose games it brought — they are the account's. A file does not, and it is as
+likely to be a master collection or a friend's export as it is to be your own archive. So
+the PGN row asks: **Mine** or **Not mine**, beside the file it is about. Dropping a PGN
+anywhere else in the app asks the same question in a dialog before it imports.
+
+**Not mine** stores the games with `is_owner_game` off, which is what a game added from the
+reference explorer already is: analysed, annotated and searchable like any other game, and
+counted in no statistic — the games list finds them under **Others**, and the game screen
+marks them *not your game*. It is a presumption rather than an override, so a game one of
+your accounts is actually playing in is claimed as yours whatever the file was said to be.
+
+On the API it is `mine` — `POST /import/pgn/upload?mine=false`, or `{"mine": false}` on
+`POST /import/pgn`; on the CLI it is `blunderbase import pgn game.pgn --not-mine`. Left
+out, an import is your own games, which is what every PGN imported before the flag existed
+was taken to be.
+
 ## The reference explorer and its Lichess token
 
 The Explorer page reads three databases: **your own games**, and two of Lichess's — the

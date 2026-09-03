@@ -59,11 +59,18 @@ def run(
     max_games: int | None = None,
     progress: ProgressHook | None = None,
     analyze: bool = True,
+    mine: bool = True,
     **options: Any,
 ) -> ImportResult:
     """Read one PGN file (or one uploaded blob) and hand every game to the pipeline.
 
     `analyze=False` lands the games without queueing the automatic quick pass.
+
+    `mine=False` is a file of somebody else's games — a master collection, a friend's
+    export, an opening survey. They land like any other game and can be analysed and
+    annotated, but they are not the owner's and no statistic counts them. The default is
+    True because the common PGN is an export of one's own archive, and because that is
+    what every PGN imported before this flag existed was taken to be.
     """
     if text is not None:
         return ingest_games(
@@ -72,6 +79,7 @@ def run(
             parse_stream(io.StringIO(text), limit=max_games),
             progress=progress,
             analyze=analyze,
+            presume_owner=mine,
         )
     if not path:
         raise ValueError("a pgn import needs either a file path or the file's text")
@@ -86,6 +94,7 @@ def run(
             parse_stream(stream, limit=max_games),
             progress=progress,
             analyze=analyze,
+            presume_owner=mine,
         )
 
 

@@ -494,16 +494,22 @@ class ImportRequest(Input):
     analyze: bool = Field(
         default=True, description="queue a quick pass over each game as it lands"
     )
+    mine: bool = Field(
+        default=True,
+        description="the games are the owner's own; false stores them as somebody else's "
+        "(`pgn` only — a sync's games are the account's by definition)",
+    )
     wait: bool = Field(default=False, description="run the sync inline and return the finished job")
 
     def options(self) -> dict[str, Any]:
         """Only the flags that were given, so an adapter sees its own defaults."""
         given = self.model_dump(exclude={"wait"}, exclude_none=True)
-        # `analyze` is a plain bool, so it is never "not given" the way the rest are: it
-        # travels only when it is switched off, which leaves every adapter's own default —
-        # evaluate — the one that decides, exactly as it did before the flag existed.
-        if given.get("analyze") is not False:
-            given.pop("analyze", None)
+        # `analyze` and `mine` are plain bools, so they are never "not given" the way the
+        # rest are: each travels only when it is switched off, which leaves every adapter's
+        # own default in charge, exactly as it was before the flag existed.
+        for flag in ("analyze", "mine"):
+            if given.get(flag) is not False:
+                given.pop(flag, None)
         return {key: value for key, value in given.items() if value != ""}
 
 

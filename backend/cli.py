@@ -93,6 +93,12 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     imports.add_argument("--path", help="the PGN file to read (pgn)")
     imports.add_argument("--since", help="resume from this cursor instead of the stored one")
     imports.add_argument("--max-games", type=_positive_int, metavar="N", help="stop after N games")
+    imports.add_argument(
+        "--not-mine",
+        action="store_true",
+        help="the PGN holds somebody else's games (pgn): store them for study, count them "
+        "in no statistic",
+    )
 
     accounts = commands.add_parser("accounts", help="the usernames that make a game yours")
     account_commands = accounts.add_subparsers(dest="accounts_command", required=True)
@@ -268,6 +274,10 @@ def _import_options(args: argparse.Namespace) -> dict[str, Any]:
     options = {name: getattr(args, name) for name in names if getattr(args, name) is not None}
     if args.target is not None:
         options.setdefault("path" if args.source == "pgn" else "username", args.target)
+    # A store_true flag is always "given", so it travels only when it is set — otherwise
+    # every import would be telling the adapter something it did not ask about.
+    if args.not_mine:
+        options["mine"] = False
     return options
 
 
