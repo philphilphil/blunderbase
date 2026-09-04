@@ -78,6 +78,11 @@ struct GameDetailView: View {
             .background(Theme.void)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
+            // The tab bar goes away in here. The board and the panes are already trading one
+            // column of height, and Games / Notes / Settings are not something anyone
+            // switches to mid-game; the back button is the way out, and the bar comes back
+            // with the list it belongs to.
+            .toolbar(.hidden, for: .tabBar)
             .task {
                 Haptics.prepare()
                 if let url = session.serverURL {
