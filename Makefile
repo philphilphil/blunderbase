@@ -1,4 +1,4 @@
-.PHONY: run run-demo backend web desktop desktop-macos desktop-windows install test migrate engines mcp mcp-http mcp-key release publish site
+.PHONY: run run-demo backend web desktop desktop-macos desktop-windows ios ios-test install test migrate engines mcp mcp-http mcp-key release publish site
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -48,6 +48,17 @@ desktop-macos:
 
 desktop-windows:
 	sh desktop/scripts/windows-ci.sh
+
+# The iOS Companion. Its .xcodeproj is generated from ios/project.yml and not checked in,
+# so every entry point regenerates it first. macOS only, and it needs Xcode and xcodegen.
+IOS_SIM ?= iPhone 17 Pro
+
+ios:
+	cd ios && xcodegen generate && open Blunderbase.xcodeproj
+
+ios-test:
+	cd ios && xcodegen generate
+	cd ios && xcodebuild -scheme Blunderbase -destination 'platform=iOS Simulator,name=$(IOS_SIM)' test
 
 install:
 	uv sync

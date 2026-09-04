@@ -1,0 +1,68 @@
+name: Blunderbase
+options:
+  bundleIdPrefix: org.blunderbase
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: none
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  Blunderbase:
+    type: application
+    platform: iOS
+    sources:
+      - path: Blunderbase
+    info:
+      path: Blunderbase/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Blunderbase
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIUserInterfaceStyle: Dark
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.blunderbase.companion
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  BlunderbaseTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: BlunderbaseTests
+    dependencies:
+      - target: Blunderbase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.blunderbase.companion.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Blunderbase:
+    build:
+      targets:
+        Blunderbase: all
+        BlunderbaseTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - BlunderbaseTests
