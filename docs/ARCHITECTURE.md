@@ -700,9 +700,11 @@ form, so the API needs no form-parsing dependency.
 `import_service`, and `ingest_games` reads it between two games — which is the only place a
 run can stop with everything before it committed and nothing after it begun. The row is
 marked `cancelled` when the loop notices, not when the request returns, and the run keeps
-no cursor: the adapters advance theirs as their stream yields, so the last thing one named
-is a game the run stopped short of storing, and resuming from it would step over that game
-for good. Every reader of a cursor asks for a `done` job, so the next run starts where the
+no cursor: an adapter that advances its own as the stream yields has named a game the run
+stopped short of storing, and resuming from it would step over that game for good. Lichess
+is the one that does not — `ingest_games` calls its `settled` hook per item, so its cursor
+only ever names a game the database answered for, and a game a held write lock kept out
+leaves the cursor behind it rather than losing the game to the next `since`. Every reader of a cursor asks for a `done` job, so the next run starts where the
 last finished one did and deduplicates its way back. The set is memory in the serve
 process, because an import is a thread in that same process — a signal that outlived it
 would have nothing left to signal — which is also why a `blunderbase import` running in its

@@ -43,14 +43,12 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
 from backend.db.enums import RunStatus
 from backend.db.models import Engine
-from backend.db.session import get_sessionmaker
+from backend.db.session import database_backpressure, get_sessionmaker
 from backend.services import analysis
 from backend.services import engines as engines_service
 
@@ -376,7 +374,7 @@ class AnalysisWorkers:
             try:
                 result = await loop.run_in_executor(executor, fn, *args)
             except Exception as exc:
-                if not _database_backpressure(exc):
+                if not database_backpressure(exc):
                     raise
                 if not waiting:
                     logger.warning(
@@ -523,16 +521,6 @@ def _stderr_of(adapter: Any) -> str | None:
 def _message(exc: BaseException) -> str:
     text = str(exc).strip()
     return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
-
-
-def _database_backpressure(exc: BaseException) -> bool:
-    """Whether retrying the same transaction later is the correct response."""
-    if isinstance(exc, PoolTimeoutError):
-        return True
-    if not isinstance(exc, OperationalError):
-        return False
-    message = str(exc).lower()
-    return "database is locked" in message or "database is busy" in message
 
 
 async def drain(

@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
@@ -34,6 +36,23 @@ POOL_TIMEOUT_SECONDS = 5
 
 SQLITE_PREFIX = "sqlite+pysqlite:///"
 BUSY_TIMEOUT_MS = 5000
+
+
+def database_backpressure(exc: BaseException) -> bool:
+    """Whether retrying the same transaction later is the correct response.
+
+    Lives here rather than with either caller because both the analysis workers and the
+    import pipeline have to tell "the one writer is busy" apart from "this work is wrong",
+    and a second copy of the answer is how the two drift. A full pool and SQLite's
+    busy/locked answer are the whole list: a missing table or an invalid statement is a bug
+    and must reach the caller on the first try.
+    """
+    if isinstance(exc, PoolTimeoutError):
+        return True
+    if not isinstance(exc, OperationalError):
+        return False
+    message = str(exc).lower()
+    return "database is locked" in message or "database is busy" in message
 
 
 def sqlite_path(url: str) -> Path | None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -9,11 +10,13 @@ import httpx
 import pytest
 import respx
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from backend.adapters import lichess, pgn_import
 from backend.db.enums import EngineKind, JobStatus, Platform, Result, Source, Speed
 from backend.db.models import Account, AnalysisRun, Engine, Game, ImportJob
+from backend.services import import_service
 from backend.services.import_service import ImportFailure, ParsedGame, run_import
 
 EXPORT = "https://lichess.org/api/games/user/ExamplePlayer"
@@ -45,6 +48,22 @@ def records(archive: str) -> list[dict[str, Any]]:
 
 def ndjson(*payloads: dict[str, Any]) -> str:
     return "".join(f"{json.dumps(payload)}\n" for payload in payloads)
+
+
+def _stamped(
+    records: list[dict[str, Any]],
+    source_id: str,
+    created_at: int,
+    source: str = "zzDanish",
+) -> dict[str, Any]:
+    """One fixture game re-dated, so a test can say where in the stream it sits."""
+    record = next(entry for entry in records if entry["id"] == source)
+    return {**record, "id": source_id, "createdAt": created_at, "lastMoveAt": created_at}
+
+
+def _locked() -> OperationalError:
+    """What SQLAlchemy raises while another writer holds SQLite's single write lock."""
+    return OperationalError("INSERT INTO games", {}, sqlite3.OperationalError("database is locked"))
 
 
 def sync(session: Session, player: str = PLAYER, **options: Any) -> ImportJob:
@@ -243,6 +262,58 @@ def test_speed_and_rated_filters_are_left_to_lichess(session: Session, archive: 
     assert params["rated"] == "true"
     # The endpoint ignores a filter it does not know, so what came back is filtered again.
     assert job.games_seen == 6
+
+
+@respx.mock
+def test_a_game_the_database_would_not_take_keeps_the_cursor_behind_it(
+    session: Session, records: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cursor is what the next sync asks Lichess for, so it may only pass a game the
+    library has answered for. A write lock held past the retries is not an answer: leaving
+    the cursor behind that game costs the next sync a duplicate it skips, while moving it
+    past would mean only a `since=all` resync ever asked for the game again."""
+    early = _stamped(records, "zzEarly", 1786000000000)
+    late = _stamped(records, "zzLate", 1786000009000)
+    route = respx.get(EXPORT).mock(return_value=httpx.Response(200, text=ndjson(early, late)))
+    stored = import_service.ingest_game
+
+    def busy(session_: Session, job_: Any, parsed: ParsedGame, *args: Any, **options: Any) -> Any:
+        if parsed.source_id == "zzLate":
+            raise _locked()
+        return stored(session_, job_, parsed, *args, **options)
+
+    monkeypatch.setattr(import_service, "ingest_game", busy)
+
+    job = sync(session)
+
+    assert job.status is JobStatus.DONE
+    assert (job.games_imported, job.games_failed) == (1, 1)
+    assert "database is locked" in job.errors[0]["error"]
+    assert job.cursor == "1786000000000", "the cursor stopped at the game before the busy one"
+
+    monkeypatch.undo()
+    again = sync(session)
+
+    assert route.calls[1].request.url.params["since"] == "1786000000000"
+    assert (again.games_imported, again.games_skipped) == (1, 1)
+    assert [game.source_id for game in games(session)] == ["zzEarly", "zzLate"]
+
+
+@respx.mock
+def test_a_game_refused_for_its_content_lets_the_cursor_past(
+    session: Session, records: list[dict[str, Any]]
+) -> None:
+    """A crazyhouse game is not coming in on any sync. The cursor moves over it, so it is
+    reported once instead of being re-fetched and re-failed for ever."""
+    playable = _stamped(records, "zzEarly", 1786000000000)
+    crazyhouse = _stamped(records, "zzLast", 1786000009000, source="zzFiltered")
+    respx.get(EXPORT).mock(return_value=httpx.Response(200, text=ndjson(playable, crazyhouse)))
+
+    job = sync(session)
+
+    assert job.games_failed == 1
+    assert job.errors[0]["ref"] == "lichess:zzLast"
+    assert job.cursor == "1786000009000"
 
 
 @respx.mock

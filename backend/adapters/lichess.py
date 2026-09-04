@@ -83,19 +83,24 @@ class RateLimitedError(LichessError):
 
 @dataclass(slots=True)
 class Cursor:
-    """Where the next sync starts: the newest `createdAt` this one was handed.
+    """Where the next sync starts: the newest `createdAt` this one settled.
 
-    It advances over every game the stream produced, imported or not, so a game that
-    cannot be stored is reported once rather than on every sync. It never moves backwards,
-    and an empty sync hands back the stamp it started from, so the newest job always
-    carries the newest cursor.
+    `ingest_games` advances it, not the stream. It moves over every game that got an
+    answer — stored, already known, or refused for what it contained, so a crazyhouse game
+    is reported once rather than on every sync — and stops at the first game the database
+    was too busy to take, because a stamp past that game would never ask for it again and
+    only a `since=all` resync would ever find it missing. It never moves backwards, and an
+    empty sync hands back the stamp it started from, so the newest job always carries the
+    newest cursor.
     """
 
     latest: int = 0
 
-    def observe(self, created_at: int | None) -> None:
-        if created_at:
-            self.latest = max(self.latest, created_at)
+    def settled(self, item: ParsedGame | ImportFailure) -> None:
+        """Move over one item the storing side has answered for."""
+        marker = item.cursor
+        if marker and marker.isdigit():
+            self.latest = max(self.latest, int(marker))
 
     @property
     def value(self) -> str | None:
@@ -151,9 +156,16 @@ def run(
             token=token,
             sleep=sleep,
         )
-        games = parse_stream(lines, cursor=cursor, speeds=speeds)
+        games = parse_stream(lines, speeds=speeds)
         result = ingest_games(
-            session, job, games, progress=progress, accounts=index, analyze=analyze
+            session,
+            job,
+            games,
+            progress=progress,
+            accounts=index,
+            analyze=analyze,
+            settled=cursor.settled,
+            sleep=sleep,
         )
     finally:
         if owned:
@@ -238,13 +250,16 @@ def retry_delay(headers: httpx.Headers) -> float:
 def parse_stream(
     lines: Iterable[str],
     *,
-    cursor: Cursor | None = None,
     speeds: Collection[str] | None = None,
 ) -> Iterator[ParsedGame | ImportFailure]:
     """Every game an export stream holds; one `ImportFailure` per game that could not be read.
 
     A line that is not JSON is a line, not the end of the stream: the export is one object
     per line and the next one is unaffected.
+
+    Every item carries the `createdAt` it was exported under as its cursor. That is a stamp
+    the storing side may resume past *once it has settled this game*, and not before, which
+    is why it travels with the game instead of being written into a cursor here.
     """
     for index, line in enumerate(lines, start=1):
         try:
@@ -256,19 +271,18 @@ def parse_stream(
             yield ImportFailure(ref=f"line {index}", error="not a lichess game object")
             continue
 
-        if cursor is not None:
-            cursor.observe(_created_at(payload))
+        marker = _marker(payload)
         ref = f"{Source.LICHESS}:{payload['id']}"
         if speeds and payload.get("speed") not in speeds:
             continue
         variant = _variant(payload)
         if variant not in SUPPORTED_VARIANTS:
-            yield ImportFailure(ref=ref, error=f"unsupported variant {variant!r}")
+            yield ImportFailure(ref=ref, error=f"unsupported variant {variant!r}", cursor=marker)
             continue
         try:
             yield parse_game(payload, variant=variant)
         except Exception as exc:
-            yield ImportFailure(ref=ref, error=f"{type(exc).__name__}: {exc}")
+            yield ImportFailure(ref=ref, error=f"{type(exc).__name__}: {exc}", cursor=marker)
 
 
 def parse_game(payload: dict[str, Any], *, variant: str | None = None) -> ParsedGame:
@@ -353,6 +367,7 @@ def parse_game(payload: dict[str, Any], *, variant: str | None = None) -> Parsed
         moves_san=moves_san,
         clocks=clocks,
         initial_fen=initial_fen,
+        cursor=_marker(payload),
     )
 
 
@@ -496,6 +511,12 @@ def _clocks(raw: Any, ply_count: int) -> list[float | None] | None:
     ]
     clocks.extend([None] * (ply_count - len(clocks)))
     return clocks if any(seconds is not None for seconds in clocks) else None
+
+
+def _marker(payload: dict[str, Any]) -> str | None:
+    """This game's place in the export: the stamp a later sync's `since` would name."""
+    stamp = _created_at(payload)
+    return str(stamp) if stamp else None
 
 
 def _created_at(payload: dict[str, Any]) -> int | None:

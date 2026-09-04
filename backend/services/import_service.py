@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import threading
+import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -30,6 +31,7 @@ from backend.db.models import (
     ImportJob,
     Position,
 )
+from backend.db.session import database_backpressure
 from backend.db.types import utcnow
 from backend.services import accounts as accounts_service
 from backend.services import analysis, engines
@@ -109,6 +111,10 @@ class ParsedGame:
     initial_fen: str | None = None
     # How this game is named in an error record or a progress event.
     ref: str | None = None
+    # Where this game sits in the source's stream, for a source that can resume from a
+    # point. `ingest_games` hands it to the run's cursor once this game has settled — see
+    # the `settled` hook there. None for a source with no resumable stream (a PGN upload).
+    cursor: str | None = None
 
     @property
     def reference(self) -> str:
@@ -121,10 +127,16 @@ class ParsedGame:
 
 @dataclass(slots=True)
 class ImportFailure:
-    """A game an adapter could not parse. Yielded in place of a `ParsedGame`."""
+    """A game an adapter could not parse. Yielded in place of a `ParsedGame`.
+
+    This is a failure of the game's *content* — an unreadable payload, a variant the
+    pipeline cannot replay — so it carries a cursor like any other item: re-fetching it
+    every sync would only fail it again.
+    """
 
     ref: str
     error: str
+    cursor: str | None = None
 
 
 @dataclass(slots=True)
@@ -160,6 +172,20 @@ CHESS960_VARIANTS = frozenset({"chess960", "fischerandom", "fischerrandom"})
 # SQLite's default parameter limit is the tighter of the two back ends; a game never has
 # this many distinct positions, but a lookup is chunked rather than assumed to be small.
 LOOKUP_CHUNK = 400
+
+# SQLite has one writer, and something else can hold it past the connection's busy timeout:
+# the explorer's book sweep, a library-wide enqueue, a second sync. That is backpressure,
+# not a game this pipeline cannot store, so the game's transaction is tried again on its own
+# clock instead of being written off. Bounded, because a sync is somebody waiting: a game
+# that never gets in is recorded as a failure, and the run's cursor is left behind it so the
+# next sync asks for it again.
+DB_RETRY_ATTEMPTS = 6
+DB_RETRY_INITIAL_SECONDS = 0.05
+DB_RETRY_MAX_SECONDS = 1.0
+
+# Told which item has settled, in stream order, so the adapter's cursor advances over games
+# the database has actually answered for rather than over games it was merely handed.
+SettledHook = Callable[[ParsedGame | ImportFailure], None]
 
 
 class ImportAdapter(Protocol):
@@ -320,6 +346,8 @@ def ingest_games(
     accounts: AccountIndex | None = None,
     analyze: bool = True,
     presume_owner: bool = True,
+    settled: SettledHook | None = None,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> ImportResult:
     """Store a stream of parsed games under one job: dedup, positions, quick-tier run.
 
@@ -328,9 +356,17 @@ def ingest_games(
     written back to the job after each one, which is what makes a long sync's progress
     visible to anything reading the row.
 
+    `settled` is how an adapter that resumes from a cursor learns what it may resume past.
+    It is called once per item, in stream order, for everything that reached a verdict —
+    stored, already known, deleted on purpose, or refused for what it contained — and stops
+    being called for good at the first game the *database* would not take. A cursor that
+    moved over such a game would never ask for it again, and only a full resync would ever
+    notice; a cursor left behind it costs the next sync a handful of duplicates it skips.
+
     `analyze=False` stores the games and stops there — no quick pass is queued, and the
     owner asks for one later over the games they care about. `presume_owner=False` says the
-    stream is somebody else's games — see `ingest_game`.
+    stream is somebody else's games — see `ingest_game`. `sleep` is what the retries wait
+    with, injected so a test can fake the clock.
     """
     if job.id is None:
         session.add(job)
@@ -339,6 +375,10 @@ def ingest_games(
         accounts = AccountIndex.load(session)
 
     result = ImportResult()
+    # Whether the stream is still settling: it stops at the first game the database could
+    # not take, and never starts again, because every later game in the stream sits after
+    # that one and resuming from any of them would step over it.
+    settling = True
     for item in games:
         # Between two games and nowhere else: everything before this point is committed and
         # everything after it has not started, so a stopped import is a whole prefix of the
@@ -352,12 +392,19 @@ def ingest_games(
             event = _game_event(job, item.ref, GAME_FAILED, result, error=item.error)
         else:
             try:
-                outcome = ingest_game(
-                    session, job, item, accounts, analyze=analyze, presume_owner=presume_owner
+                outcome = _ingest_with_retries(
+                    session,
+                    job,
+                    item,
+                    accounts,
+                    analyze=analyze,
+                    presume_owner=presume_owner,
+                    sleep=sleep,
                 )
             except Exception as exc:
-                session.rollback()
                 error = f"{type(exc).__name__}: {exc}"
+                if database_backpressure(exc):
+                    settling = False
                 _record_failure(result, item.reference, error)
                 event = _game_event(job, item.reference, GAME_FAILED, result, error=error)
             else:
@@ -379,8 +426,48 @@ def ingest_games(
                 )
         _apply(job, result)
         session.commit()
+        if settled is not None and settling:
+            settled(item)
         _emit(progress, event)
     return result
+
+
+def _ingest_with_retries(
+    session: Session,
+    job: ImportJob,
+    parsed: ParsedGame,
+    accounts: AccountIndex,
+    *,
+    analyze: bool,
+    presume_owner: bool,
+    sleep: Callable[[float], None],
+) -> IngestOutcome:
+    """`ingest_game`, tried again while it is the database that is failing, not the game.
+
+    Everything else — an illegal move, a payload the schema refuses — raises on the first
+    try, exactly as before, because trying it again would only fail it again.
+    """
+    delay = DB_RETRY_INITIAL_SECONDS
+    attempt = 1
+    while True:
+        try:
+            return ingest_game(
+                session, job, parsed, accounts, analyze=analyze, presume_owner=presume_owner
+            )
+        except Exception as exc:
+            session.rollback()
+            if attempt >= DB_RETRY_ATTEMPTS or not database_backpressure(exc):
+                raise
+            logger.warning(
+                "the database was busy storing %s; trying again (%d of %d): %s",
+                parsed.reference,
+                attempt,
+                DB_RETRY_ATTEMPTS,
+                exc,
+            )
+            sleep(delay)
+            delay = min(DB_RETRY_MAX_SECONDS, delay * 2)
+            attempt += 1
 
 
 def ingest_game(

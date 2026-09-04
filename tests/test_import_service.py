@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
@@ -80,6 +82,24 @@ def _owner(session: Session, platform: Platform = Platform.LICHESS) -> Account:
     session.add(account)
     session.commit()
     return account
+
+
+def _playable(source_id: str = "zzBusy") -> ParsedGame:
+    return ParsedGame(
+        source=Source.LICHESS,
+        source_id=source_id,
+        white_name="blunderbase",
+        black_name="opponent1",
+        result=Result.WHITE_WIN,
+        pgn="from the API",
+        moves_uci=["e2e4", "e7e5"],
+        moves_san=["e4", "e5"],
+    )
+
+
+def _locked() -> OperationalError:
+    """What SQLAlchemy raises while another writer holds SQLite's single write lock."""
+    return OperationalError("INSERT INTO games", {}, sqlite3.OperationalError("database is locked"))
 
 
 def test_a_pgn_file_imports_every_readable_game(session: Session, fixtures_dir: Path) -> None:
@@ -495,6 +515,86 @@ def test_an_adapter_failure_item_lands_in_the_errors(session: Session) -> None:
 
     assert result.failed == 1
     assert job.errors == [{"ref": "game 7", "error": "nope"}]
+
+
+def test_a_game_the_database_was_busy_for_is_stored_when_the_lock_clears(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SQLite has one writer, and a sweep or a second sync can hold it past the busy
+    timeout. That is backpressure, not a game the library cannot have."""
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+    session.add(job)
+    session.commit()
+    stored = import_service.ingest_game
+    attempts = 0
+
+    def busy_once(*args: Any, **options: Any) -> import_service.IngestOutcome:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise _locked()
+        return stored(*args, **options)
+
+    monkeypatch.setattr(import_service, "ingest_game", busy_once)
+    waited: list[float] = []
+
+    result = import_service.ingest_games(session, job, [_playable()], sleep=waited.append)
+
+    assert attempts == 2
+    assert (result.imported, result.failed) == (1, 0)
+    assert result.errors == []
+    assert _count(session, Game) == 1
+    assert waited == [import_service.DB_RETRY_INITIAL_SECONDS]
+
+
+def test_a_game_the_database_never_took_is_still_recorded_as_a_failure(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The retries are bounded: somebody is waiting on a sync, and a game that never gets
+    in is reported rather than retried for ever. The cursor is what keeps it findable."""
+    job = ImportJob(source=Source.LICHESS, status=JobStatus.RUNNING)
+    session.add(job)
+    session.commit()
+    attempts = 0
+
+    def always_busy(*args: Any, **options: Any) -> import_service.IngestOutcome:
+        nonlocal attempts
+        attempts += 1
+        raise _locked()
+
+    monkeypatch.setattr(import_service, "ingest_game", always_busy)
+    waited: list[float] = []
+
+    result = import_service.ingest_games(session, job, [_playable()], sleep=waited.append)
+
+    assert attempts == import_service.DB_RETRY_ATTEMPTS
+    assert (result.imported, result.failed) == (0, 1)
+    assert "database is locked" in result.errors[0]["error"]
+    assert _count(session, Game) == 0
+    assert waited == sorted(waited) and len(waited) == import_service.DB_RETRY_ATTEMPTS - 1
+    assert max(waited) <= import_service.DB_RETRY_MAX_SECONDS
+
+
+def test_a_game_the_pipeline_cannot_replay_is_never_tried_again(session: Session) -> None:
+    """An illegal move list is wrong however long the database is left alone."""
+    job = ImportJob(source=Source.PGN, status=JobStatus.RUNNING)
+    session.add(job)
+    session.commit()
+    broken = ParsedGame(
+        source=Source.PGN,
+        white_name="a",
+        black_name="b",
+        result=Result.UNKNOWN,
+        pgn="",
+        moves_uci=["e2e4", "e2e4"],
+        moves_san=["e4", "e4"],
+    )
+    waited: list[float] = []
+
+    result = import_service.ingest_games(session, job, [broken], sleep=waited.append)
+
+    assert result.failed == 1
+    assert waited == []
 
 
 def test_chess960_replays_from_its_own_start_position(
