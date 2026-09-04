@@ -954,7 +954,11 @@ def primary_runs(game_id: int | None = None) -> Any:
     A run over a ply range is deliberately excluded — a deep pass over the endgame would
     otherwise shadow the quick pass for the plies it covers and leave the game's numbers
     half from one engine budget and half from another. Maia runs are excluded too: they
-    predict a human move, they do not judge one.
+    predict a human move, they do not judge one. That is two conditions and not one, because
+    a Maia pass wears the engine it was queued under: a `maia_only` fill runs on the quick
+    tier's Stockfish row, so only the flag says it stored policies and no evaluations. Were
+    it allowed to become primary, filling in a level would silently empty out every number
+    folded from the search that came before it.
 
     `game_id` narrows the same definition to one game, which is what turns a fold of one
     game's summary from a grouped pass over every run in the library into an index lookup.
@@ -971,6 +975,7 @@ def primary_runs(game_id: int | None = None) -> Any:
             AnalysisRun.game_id.is_not(None),
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
+            AnalysisRun.maia_only.is_(False),
             or_(Engine.id.is_(None), Engine.kind == EngineKind.UCI),
             *conditions,
         )

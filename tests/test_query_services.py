@@ -115,6 +115,7 @@ def analyse(
     ply_start: int | None = None,
     ply_end: int | None = None,
     created_at: datetime | None = None,
+    maia_only: bool = False,
 ) -> AnalysisRun:
     """Hand-write one finished run over a game, the way a worker eventually will."""
     run = AnalysisRun(
@@ -124,6 +125,7 @@ def analyse(
         status=status,
         ply_start=ply_start,
         ply_end=ply_end,
+        maia_only=maia_only,
         finished_at=datetime.now(UTC),
     )
     if created_at is not None:
@@ -2298,6 +2300,79 @@ def test_a_game_offers_its_worst_moment_and_no_other_however_it_is_read(
     assert [(moment["game"]["id"], moment["ply"]) for moment in folded] == [
         (moment["game"]["id"], moment["ply"]) for moment in scanned
     ]
+
+
+def test_a_maia_fill_never_becomes_the_run_a_game_is_read_from(
+    analysed: Library, engine_row: Engine
+) -> None:
+    """A fill pass is queued under the quick tier's Stockfish row, so its engine says
+    nothing about what it stored: rows with a policy and no evaluation. Let one be the
+    game's primary run and adding a Maia level to an analysed game would refold it off
+    those rows, and a game with two blunders would quietly become a game with none."""
+    session = analysed.session
+    fold_every_summary(session)
+    stats.reset_stats_cache()
+    game = session.get(Game, analysed["qg000006"].id)
+    assert game is not None
+    searched = stats.primary_run_id(session, game.id)
+    before = stats.get_stats(session, "blunders_by_phase")
+
+    analyse(
+        session,
+        game,
+        [{"ply": ply, "maia_policy": {"1700": {"g1h2": 0.42}}} for ply in (20, 24, 26, 28, 30)],
+        engine=engine_row,
+        maia_only=True,
+    )
+    # What `analysis._refresh_game_rollups` does inside the commit that finishes the fill.
+    stats.refresh_game_stats(session, game)
+    session.commit()
+    stats.reset_stats_cache()
+
+    assert stats.primary_run_id(session, game.id) == searched
+    assert game.stat_owner_moves == 5
+    assert game.stat_blunders == 2
+    assert game.stat_worst_win_loss == 55.0
+    assert game.stat_summary is not None
+    assert game.stat_summary["run_id"] == searched
+    assert game.stat_summary["evaluated"] == 5
+    assert stats.get_stats(session, "blunders_by_phase") == before
+
+
+def test_a_summary_folded_off_a_fill_pass_is_swept_up_and_refolded(
+    analysed: Library, engine_row: Engine
+) -> None:
+    """A library folded while a fill pass could be primary heals itself, without a script:
+    the summary names a run that is no longer the game's, which is the one thing
+    `_stale_summary_ids` looks for, so the backfill the server idles on refolds it."""
+    session = analysed.session
+    fold_every_summary(session)
+    game = session.get(Game, analysed["qg000006"].id)
+    assert game is not None
+    fill = analyse(
+        session,
+        game,
+        [{"ply": ply, "maia_policy": {"1700": {"g1h2": 0.42}}} for ply in (20, 24, 26, 28, 30)],
+        engine=engine_row,
+        maia_only=True,
+    )
+    # The state the old subquery left behind: a summary folded off the fill's policy rows.
+    game.stat_summary = stats._summarise(game, fill.id, [])
+    game.stat_owner_moves = 0
+    game.stat_blunders = 0
+    game.stat_worst_win_loss = None
+    session.commit()
+    stats.reset_stats_cache()
+
+    assert stats._summaries_ready(session) is False
+    assert stats.rebuild_stat_summaries(session) == 1
+    refolded = session.get(Game, analysed["qg000006"].id)
+    assert refolded is not None
+    assert refolded.stat_summary is not None
+    assert refolded.stat_summary["run_id"] == stats.primary_run_id(session, refolded.id)
+    assert refolded.stat_owner_moves == 5
+    assert refolded.stat_blunders == 2
+    assert refolded.stat_worst_win_loss == 55.0
 
 
 def test_the_backfill_folds_one_chunk_at_a_time_and_says_when_it_is_done(
