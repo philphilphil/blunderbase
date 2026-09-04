@@ -375,9 +375,15 @@ def get_run_evals(
 
 
 @router.post("/position", response_model=PositionAnalysis, summary="Evaluate one position now")
-def analyze_position(session: SessionDep, body: PositionAnalysisRequest) -> Any:
-    """A bounded synchronous eval for a "what if" line, on its own short-lived process."""
-    return analysis_service.analyze_position(session, body.fen, body.nodes)
+def analyze_position(
+    session: SessionDep, settings: SettingsDep, body: PositionAnalysisRequest
+) -> Any:
+    """A bounded synchronous eval for a "what if" line, on its own short-lived process.
+
+    The deployment has the last word on the budget: `body.nodes` is what was asked for, and
+    the demo answers a stranger, so the service clamps it and caps how many run at once.
+    """
+    return analysis_service.analyze_position(session, body.fen, body.nodes, settings=settings)
 
 
 def _queue(

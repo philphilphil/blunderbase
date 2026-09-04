@@ -87,6 +87,9 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (import_service.JobNotRunningError, 409, "job_not_running"),
     (analysis_service.UnknownRunError, 404, "unknown_run"),
     (analysis_service.StaleResultError, 409, "stale_result"),
+    # 409, the way a full analysis board is: the slots are taken right now, and the caller
+    # is being asked to come back rather than being told they asked too often.
+    (analysis_service.PositionBusyError, 409, "position_busy"),
     (analysis_service.AnalysisRequestError, 422, "invalid_request"),
     (analysis_service.AnalysisError, 500, "analysis_failed"),
     (engines_service.UnknownEngineError, 404, "unknown_engine"),

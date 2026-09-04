@@ -14,7 +14,8 @@ stream lives in memory and dies with its listener — and a demo whose analysis 
 would be a demo of the one screen the product is about, with its most interesting pane
 blank. Whether they answer at all depends on what engines the demo deployment has; the
 capacity they can be made to spend is bounded by `stream_max_sessions` and the pool the
-way it is for the owner.
+way it is for the owner, and the one-off eval — which starts a process outside the pool —
+by `POSITION_SLOTS` plus, in demo mode alone, `DEMO_POSITION_NODES` (`services/analysis.py`).
 
 `/auth/*` is let through for a different reason: its writes are already 404
 `capability_unavailable` without a password in the picture (`routes/auth.py`), and a 404

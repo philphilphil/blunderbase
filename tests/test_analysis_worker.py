@@ -11,16 +11,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
 import pytest
-from fake_uci import MAIA_OPTIONS, STOCKFISH_OPTIONS, fake_engine_command
+from fake_uci import MAIA_OPTIONS, STOCKFISH_OPTIONS, commands, fake_engine_command
 from sqlalchemy import Engine as SaEngine
 from sqlalchemy import event, select
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.adapters import stockfish
 from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.base import Base
 from backend.db.enums import Classification, EngineKind, EngineRole, Platform, RunStatus, Tier
@@ -1078,6 +1080,84 @@ def test_a_bad_fen_never_reaches_an_engine(db: sessionmaker[Session], tmp_path: 
 
     with db() as session, pytest.raises(analysis.AnalysisRequestError):
         analysis.analyze_position(session, "banana", 1000)
+
+
+def test_the_demo_clamps_what_one_position_may_be_asked_to_cost(
+    db: sessionmaker[Session], tmp_path: Path
+) -> None:
+    """On the demo the caller names the budget and the deployment names the ceiling: the
+    route answers a stranger with no password, and 50M nodes on four threads is a machine."""
+    log = tmp_path / "demo-commands.jsonl"
+    _register(db, tmp_path, go_default=QUICK_REPLIES[0], log=str(log))
+    demo = Settings(root=tmp_path, runtime_mode="demo")
+
+    with db() as session:
+        analysis.analyze_position(session, START_FEN, 50_000_000, settings=demo)
+
+    assert commands(log, "go nodes") == [f"go nodes {analysis.DEMO_POSITION_NODES}"]
+
+
+def test_an_owner_spends_the_budget_they_asked_for(
+    db: sessionmaker[Session], tmp_path: Path, settings: Settings
+) -> None:
+    """The clamp is the demo's, not the product's — this is the owner's own CPU."""
+    log = tmp_path / "owner-commands.jsonl"
+    _register(db, tmp_path, go_default=QUICK_REPLIES[0], log=str(log))
+
+    with db() as session:
+        analysis.analyze_position(session, START_FEN, 50_000_000, settings=settings)
+
+    assert commands(log, "go nodes") == ["go nodes 50000000"]
+
+
+def test_only_so_many_positions_are_evaluated_at_once(
+    db: sessionmaker[Session], tmp_path: Path
+) -> None:
+    """The one-off eval runs outside the pool's cap, so it carries one of its own: past it
+    a caller is refused now rather than lent another process."""
+    _register(db, tmp_path, go_default=QUICK_REPLIES[0])
+
+    with ExitStack() as held:
+        for _ in range(analysis.POSITION_SLOTS):
+            held.enter_context(analysis.position_slot())
+        with db() as session, pytest.raises(analysis.PositionBusyError):
+            analysis.analyze_position(session, START_FEN, 1000)
+
+    # The slots go back when their holders leave, so the next caller is answered.
+    with db() as session:
+        assert analysis.analyze_position(session, START_FEN, 1000)["cp"] == 100
+
+
+def test_a_position_holds_its_slot_for_as_long_as_the_engine_lives(
+    db: sessionmaker[Session], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What is bounded is live processes, so the slot is held across the search rather than
+    taken and handed back before the engine starts."""
+    _register(db, tmp_path, go_default=QUICK_REPLIES[0])
+    free_during_search: list[bool] = []
+
+    class Watching(stockfish.StockfishAdapter):
+        def analyse(self, *args: Any, **kwargs: Any) -> Any:
+            free_during_search.append(_a_slot_is_free())
+            return super().analyse(*args, **kwargs)
+
+    monkeypatch.setattr(stockfish, "StockfishAdapter", Watching)
+
+    with ExitStack() as held:
+        for _ in range(analysis.POSITION_SLOTS - 1):
+            held.enter_context(analysis.position_slot())
+        with db() as session:
+            analysis.analyze_position(session, START_FEN, 1000)
+
+    assert free_during_search == [False], "the last slot was not held by the eval using it"
+
+
+def _a_slot_is_free() -> bool:
+    try:
+        with analysis.position_slot():
+            return True
+    except analysis.PositionBusyError:
+        return False
 
 
 def test_the_test_database_is_real_sqlite(db: sessionmaker[Session]) -> None:

@@ -35,6 +35,7 @@ import secrets
 import threading
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
@@ -125,6 +126,10 @@ class AnalysisRequestError(AnalysisError, ValueError):
 
 class UnknownRunError(AnalysisError, LookupError):
     """No run with that id."""
+
+
+class PositionBusyError(AnalysisError):
+    """Every one-off eval slot this process allows at once is already in use."""
 
 
 class StaleResultError(AnalysisError):
@@ -2458,7 +2463,48 @@ def get_worst_moments(
     return list(session.scalars(statement))
 
 
-def analyze_position(session: Session, fen: str, budget_nodes: int) -> dict[str, Any]:
+# A one-off eval starts a process outside the pool's cap, from a request thread, and on
+# the public demo the route that reaches it answers a stranger with no password at all
+# (`api/readonly.py`). So it carries its own two bounds.
+#
+# How many may run at once. A person asks for one position at a time — a board, or a coach
+# mid-turn — so two is already a race between two tabs, and past that a caller is told to
+# come back rather than being lent another four-thread process. Applied in every mode: the
+# owner is the one who would never hit it, which is exactly why it costs them nothing.
+POSITION_SLOTS = 2
+# What one of them may spend, on the demo only. Five times the 200_000 an unspecified
+# request asks for, so a deliberate deeper look still answers, but roughly a second of one
+# process rather than the half-minute of four threads the API's 50M ceiling would buy. An
+# owner's own instance keeps that ceiling; it is their own CPU.
+DEMO_POSITION_NODES = 1_000_000
+
+# Bounded, so a release that was never acquired is a bug that shows up here rather than as
+# a slot count that grows.
+_FREE_POSITION_SLOTS = threading.BoundedSemaphore(POSITION_SLOTS)
+
+
+@contextmanager
+def position_slot() -> Iterator[None]:
+    """Hold one of the concurrent one-off evals, or refuse now rather than queue."""
+    if not _FREE_POSITION_SLOTS.acquire(blocking=False):
+        raise PositionBusyError(
+            f"{POSITION_SLOTS} positions can be evaluated at once; try again in a moment"
+        )
+    try:
+        yield
+    finally:
+        _FREE_POSITION_SLOTS.release()
+
+
+def position_budget(budget_nodes: int, settings: Settings) -> int:
+    """The node budget this deployment will actually spend on one position."""
+    nodes = max(1, int(budget_nodes))
+    return min(nodes, DEMO_POSITION_NODES) if settings.demo else nodes
+
+
+def analyze_position(
+    session: Session, fen: str, budget_nodes: int, *, settings: Settings | None = None
+) -> dict[str, Any]:
     """A synchronous, bounded-budget eval for a mid-conversation "what if" line.
 
     Starts its own short-lived process rather than borrowing a warm one: this is called
@@ -2466,7 +2512,8 @@ def analyze_position(session: Session, fen: str, budget_nodes: int) -> dict[str,
 
     That process starts here, which is why the engine is resolved `local_only`: a runner
     carries whole runs, not single positions, and its engine's path means nothing on this
-    machine.
+    machine. It is also why the caller's budget is not the engine's: see `position_slot`
+    and `position_budget` for the two bounds that stand in for the pool's cap.
     """
     import chess
     import chess.engine
@@ -2474,6 +2521,7 @@ def analyze_position(session: Session, fen: str, budget_nodes: int) -> dict[str,
     from backend.adapters.stockfish import EngineError, StockfishAdapter
     from backend.services.explorer import read_fen
 
+    resolved = settings or get_settings()
     engine = engines_service.require_engine_for_tier(session, Tier.QUICK, local_only=True)
     text = (fen or "").strip()
     try:
@@ -2496,11 +2544,13 @@ def analyze_position(session: Session, fen: str, budget_nodes: int) -> dict[str,
             "lines": [],
         }
 
+    nodes = position_budget(budget_nodes, resolved)
     try:
-        with StockfishAdapter(engine.path, options=engine.options or {}) as adapter:
-            result = adapter.analyse(
-                board, chess.engine.Limit(nodes=max(1, int(budget_nodes))), multipv=1
-            )
+        with (
+            position_slot(),
+            StockfishAdapter(engine.path, options=engine.options or {}) as adapter,
+        ):
+            result = adapter.analyse(board, chess.engine.Limit(nodes=nodes), multipv=1)
     except EngineError as exc:
         raise AnalysisError(f"{engine.name} could not analyse the position: {exc}") from exc
 
