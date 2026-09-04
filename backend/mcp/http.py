@@ -44,7 +44,10 @@ class BearerGuard:
     minted on the Assistant page, else the owner's password, checked against the same hash
     the web session is. The environment key is one more accepted token rather than the
     only one, so a deployment that pins one for automation can still hand a coach a key it
-    can revoke on its own.
+    can revoke on its own. Only the password fall-through is rate limited, on a budget
+    belonging to this door and never to the owner's browser login — see
+    `services.auth._password_opens_bearer`, which is where a stranger reaching this
+    unauthenticated path stops being able to cost the owner anything.
 
     It sits outside the MCP app so an unauthenticated caller never reaches the protocol at
     all — not even to be told which tools exist. Lifespan and any other scope pass through

@@ -382,6 +382,31 @@ def test_the_transport_refuses_everyone_before_first_run_setup(settings: Setting
     assert "serverInfo" not in guessed.text
 
 
+def test_guessing_at_mcp_does_not_lock_the_owner_out_of_the_browser(
+    settings: Settings,
+) -> None:
+    """`/mcp` is unauthenticated by design — the bearer check is its authentication — so a
+    stranger reaching it must not be able to spend the login's lockout on the owner."""
+    upgrade_to_head(settings)
+    with get_sessionmaker(settings)() as session:
+        auth_service.set_password(session, PASSWORD)
+    settings.analysis_workers = False
+    app = create_app(settings)
+
+    with TestClient(app, base_url=BASE_URL) as client:
+        for guess in range(auth_service.LOCKOUT_THRESHOLD * 3):
+            refused = client.post(
+                "/mcp",
+                json=INITIALIZE,
+                headers={**MCP_HEADERS, "authorization": f"Bearer nearly-{guess}"},
+            )
+            assert refused.status_code == 401
+
+        signed_in = client.post("/auth/login", json={"password": PASSWORD})
+
+    assert signed_in.status_code == 200
+
+
 def test_a_password_set_through_the_ui_reaches_mcp_without_a_restart(
     settings: Settings,
 ) -> None:

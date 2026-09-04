@@ -26,6 +26,7 @@ from backend.db.session import get_engine, get_sessionmaker
 from backend.db.types import utcnow
 from backend.services import app_settings as app_settings_service
 from backend.services import auth as auth_service
+from backend.services import mcp_keys as mcp_keys_service
 from tests.conftest import OWNER_PASSWORD, running_app
 
 PASSWORD = "correct-horse-battery"
@@ -160,7 +161,7 @@ def test_the_backoff_doubles_and_stops_at_the_cap() -> None:
     threshold = auth_service.LOCKOUT_THRESHOLD
     assert auth_service._backoff(threshold) == auth_service.LOCKOUT_BASE
     assert auth_service._backoff(threshold + 1) == auth_service.LOCKOUT_BASE * 2
-    # Capped, so a stranger hammering `/mcp` cannot lock the owner out indefinitely.
+    # Capped, so a run of wrong passwords slows the login down rather than ending it.
     assert auth_service._backoff(threshold + 40) == auth_service.LOCKOUT_MAX
 
 
@@ -187,6 +188,73 @@ def test_the_door_opens_again_when_the_backoff_has_run_out(session: Session) -> 
     session.commit()
 
     assert auth_service.verify_password(session, PASSWORD) is True
+
+
+# --- the bearer door -------------------------------------------------------
+
+
+def test_a_stranger_at_the_mcp_door_cannot_lock_the_owner_out(session: Session) -> None:
+    """The two limiters are deliberately separate: `/mcp` is unauthenticated by design, so
+    guessing bearer tokens there must not cost the owner their own browser."""
+    auth_service.set_password(session, PASSWORD)
+
+    for _ in range(auth_service.LOCKOUT_THRESHOLD * 3):
+        assert auth_service.verify_bearer(session, OTHER) is False
+
+    credential = session.scalars(select(Credential)).one()
+    assert credential.failed_attempts == 0
+    assert credential.locked_until is None
+    assert auth_service.verify_password(session, PASSWORD) is True
+
+
+def test_the_bearer_door_stops_deriving_once_its_window_is_spent(session: Session) -> None:
+    """Guessing the password over `/mcp` is bounded on the door, not on the token: what
+    runs out is how often anybody at all may have a password derived for them."""
+    auth_service.set_password(session, PASSWORD)
+
+    for guess in range(auth_service.BEARER_ATTEMPT_LIMIT):
+        assert auth_service.verify_bearer(session, f"{OTHER}-{guess}") is False
+
+    # Every token now, the right one included: the refusal is in front of the derivation.
+    assert auth_service.verify_bearer(session, PASSWORD) is False
+    # And it is still the owner's own browser login that has cost nothing.
+    assert auth_service.verify_password(session, PASSWORD) is True
+
+
+def test_the_bearer_doors_window_rolls_rather_than_renewing(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bug this replaced: a lockout every further failure renewed. A rolling window
+    forgets, so guessing that stops leaves nothing behind."""
+    auth_service.set_password(session, PASSWORD)
+    for guess in range(auth_service.BEARER_ATTEMPT_LIMIT):
+        assert auth_service.verify_bearer(session, f"{OTHER}-{guess}") is False
+    assert auth_service.verify_bearer(session, PASSWORD) is False
+
+    monkeypatch.setattr(auth_service, "BEARER_ATTEMPT_WINDOW", timedelta(0))
+
+    assert auth_service.verify_bearer(session, PASSWORD) is True
+
+
+def test_a_matching_key_costs_nothing_at_either_door(session: Session) -> None:
+    auth_service.set_password(session, PASSWORD)
+    _key, token = mcp_keys_service.create_key(session, "laptop")
+
+    for _ in range(auth_service.BEARER_ATTEMPT_LIMIT * 2):
+        assert auth_service.verify_bearer(session, token) is True
+
+    assert auth_service.verify_bearer(session, PASSWORD) is True
+    assert auth_service.verify_password(session, PASSWORD) is True
+
+
+def test_a_password_change_forgets_the_guesses_at_the_old_one(session: Session) -> None:
+    auth_service.set_password(session, PASSWORD)
+    for guess in range(auth_service.BEARER_ATTEMPT_LIMIT):
+        assert auth_service.verify_bearer(session, f"{OTHER}-{guess}") is False
+
+    auth_service.reset_password(session, OTHER)
+
+    assert auth_service.verify_bearer(session, OTHER) is True
 
 
 # --- sessions --------------------------------------------------------------

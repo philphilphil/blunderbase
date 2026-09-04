@@ -25,7 +25,11 @@ coaches. The list shows when each key was last used, so a forgotten one is easy 
 token, not a replacement — it is how automation and the compose files keep working while
 everything else changes), then a stored key, then the password. `/mcp` is always mounted
 and answers 401 to everyone until one of the three exists — so a password chosen in the
-browser reaches the coach immediately, with no restart.
+browser reaches the coach immediately, with no restart. Only the password is rate limited
+there, and on a budget of `/mcp`'s own — ten wrong passwords a minute, and then no
+password is checked at all until that minute has rolled past. Guessing at `/mcp` therefore
+never costs the browser login its lockout, and a minted key is never slowed down by
+somebody else's guesses.
 
 ```bash
 uv run blunderbase set-password    # bootstrap or reset headless; asked twice, never echoed
