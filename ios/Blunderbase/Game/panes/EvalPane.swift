@@ -138,6 +138,12 @@ struct EvalPane: View {
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
         }
         .chartYScale(domain: 0...100)
+        // The x axis is the game's length, not the curve's. Left to itself the chart picks a
+        // "nice" upper bound past the last point, and the plot ends short of the right edge
+        // by whatever the rounding added — a game of 41 moves drawn as if it had 45. The
+        // domain is fixed to the move count so the last move sits on the edge, and so the
+        // cursor rule and a tap on the plot map to the same ply the curve does.
+        .chartXScale(domain: 0...max(store.moves.count, 1))
         .chartYAxis {
             AxisMarks(values: [0, 50, 100]) {
                 AxisValueLabel()

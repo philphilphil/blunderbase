@@ -52,14 +52,27 @@ struct ConnectView: View {
         }
     }
 
-    /// Type rather than the app icon: `Image("AppIcon")` does not resolve at runtime — an
-    /// app icon is not a fetchable asset — and a symbol plus the name is honest at every
-    /// text size without shipping a second copy of the mark.
+    /// The mark, then the name.
+    ///
+    /// `Image("AppIcon")` does not resolve at runtime — an app icon is not a fetchable asset
+    /// — so the same artwork ships once more as the `Logo` imageset. It is the icon's
+    /// artwork rather than the bare pawn from `docs/design/brand/logo.png` on purpose: the
+    /// pawn is black on transparent and vanishes on the dark ground, while the icon carries
+    /// its own off-white tile and reads on either theme. Drawn at icon proportions, with the
+    /// continuous corner the home screen gives it, so it is recognisably the thing the
+    /// reader just tapped.
     private var mark: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "checkerboard.rectangle")
-                .font(.system(size: 34, weight: .light))
-                .foregroundStyle(Theme.accent)
+        VStack(spacing: 12) {
+            Image("Logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 0.5)
+                )
+                .accessibilityHidden(true)
             Text("Blunderbase")
                 .font(Theme.Font.text(22, weight: .semibold))
                 .foregroundStyle(Theme.textBright)

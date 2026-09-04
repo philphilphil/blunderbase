@@ -450,14 +450,25 @@ final class GameStore {
     /// board can stand on the position *after* the last move, which is a position like any
     /// other and has a book like any other.
     ///
-    /// Nil on a variation, for the same reason everything else the server said is withheld
-    /// there: the board is on a position no game of the owner's ever reached, so "you have
-    /// been here before" would be a claim about somewhere else. Nil is also the common
+    /// On a variation it is the book of the position the variation *left the game from*,
+    /// the same anchoring as `engineLines` and for the same reason: the rows are what the
+    /// reader tapped to get here, and a pane that went blank the moment one was tapped would
+    /// be answering the tap with nothing. The book of the new position itself is not known —
+    /// the game only ships entries for its own positions — so the pane says which row is on
+    /// the board rather than pretending the board is still on the game. Nil is the common
     /// answer on the game itself — a book needs two of the owner's games through the same
     /// position, and nearly every position in a library is reached by exactly one.
     var bookHere: BookEntry? {
-        guard !isInLine else { return nil }
-        return detail?.book?[cursor]
+        detail?.book?[isInLine ? lineBase : cursor]
+    }
+
+    /// The game's own move out of the position `bookHere` describes — `positionMove` on the
+    /// game, and on a variation the move the game went on with from where the line left.
+    /// What the pane marks "played", so the mark stays on the right row along a line.
+    var bookMove: MoveRow? {
+        let count = isInLine ? lineBase : cursor
+        guard count >= 0, count < moves.count else { return nil }
+        return moves[count]
     }
 
     /// Whether this game carries a book anywhere along it.

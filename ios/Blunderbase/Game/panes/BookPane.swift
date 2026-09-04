@@ -16,10 +16,13 @@ import SwiftUI
 /// screen this narrow: a continuation with a fine score that gives away four points a game
 /// is the row worth stopping on.
 ///
-/// A tap plays the move onto the board, exactly as a Maia row does — one move a tap, so the
-/// reader walks into the line rather than being dropped at the end of it. Playing one puts
-/// the board on a variation, where there is no book, and the pane says so rather than
-/// showing the position it came from.
+/// A tap plays the move onto the board, one move a tap. The move this game went on with
+/// simply steps the game forward, so the book at the next position takes over and the
+/// reader can walk the opening row by row. Any other move opens a variation — and the pane
+/// keeps showing the book it came from, with that row marked as the one on the board,
+/// because the rows are what was just tapped and a pane that went blank in answer would
+/// be no answer. What it cannot show is the book of the new position: the game only
+/// ships entries for its own positions, and saying so is more honest than an empty box.
 struct BookPane: View {
     @Bindable var store: GameStore
 
@@ -30,6 +33,9 @@ struct BookPane: View {
                     header(entry)
                     ForEach(moves) { move in
                         row(move)
+                    }
+                    if store.isInLine {
+                        lineNote
                     }
                 }
             } else {
@@ -42,17 +48,26 @@ struct BookPane: View {
     ///
     /// Three different absences, and only one of them is about this position. A game with no
     /// book at all is the library saying it has not seen this opening twice yet, which is a
-    /// fact about the library and worth explaining once; a variation is off the game
-    /// entirely; and a position the owner has reached only in this game is the ordinary
-    /// case, which needs one line and no explanation.
+    /// fact about the library and worth explaining once; a variation left from a position
+    /// that had no book has none to keep showing; and a position the owner has reached only
+    /// in this game is the ordinary case, which needs one line and no explanation.
     private var emptyText: String {
         if !store.hasBook {
             return "No opening book yet: it needs two games through the same position."
         }
         if store.isInLine {
-            return "This position is off the game, so there is no book for it."
+            return "The line left the game at a position you have not been in before."
         }
         return "You have not been here in another game."
+    }
+
+    /// Under the rows while a variation is open: which position the book above belongs to.
+    private var lineNote: some View {
+        Text("The book of the position the line left from. Your other games from here are in the explorer.")
+            .font(Theme.Font.text(11))
+            .foregroundStyle(Theme.faint)
+            .padding(.horizontal, Theme.Metrics.gutter)
+            .padding(.vertical, 8)
     }
 
     private func empty(_ text: String) -> some View {
@@ -107,10 +122,19 @@ struct BookPane: View {
     /// pane marks it — bolder, and labelled — so the row that says "this is the habit"
     /// stands out from the rows that say "this is the alternative you have also tried".
     private func row(_ move: BookMove) -> some View {
-        let wasPlayed = move.uci != nil && move.uci == store.positionMove?.uci
+        let wasPlayed = move.uci != nil && move.uci == store.bookMove?.uci
+        let onBoard = move.uci.map { store.progress(along: [$0]) == 1 } ?? false
         let split = Format.split(wins: move.wins, draws: move.draws, losses: move.losses)
         return Button {
-            if let uci = move.uci { store.play(uci: uci) }
+            guard let uci = move.uci else { return }
+            if wasPlayed {
+                // The game's own move: go on with the game rather than opening a line that
+                // is the game in disguise, so the next position's book takes over.
+                if store.isInLine { store.exitLine() }
+                store.step(1)
+            } else {
+                store.step(along: [uci])
+            }
         } label: {
             HStack(spacing: 6) {
                 Text(san(move))
@@ -140,26 +164,27 @@ struct BookPane: View {
                 // number columns to its left, and a label that appears on one row in five
                 // would shunt them sideways on exactly that row — which is the row the
                 // reader is comparing the others against.
-                Text(wasPlayed ? "played" : "")
+                Text(onBoard ? "on board" : (wasPlayed ? "played" : ""))
                     .font(Theme.Font.text(10))
-                    .foregroundStyle(Theme.faint)
-                    .frame(width: 36, alignment: .trailing)
+                    .foregroundStyle(onBoard ? Theme.accent : Theme.faint)
+                    .frame(width: 44, alignment: .trailing)
             }
             .lineLimit(1)
             .padding(.horizontal, Theme.Metrics.gutter)
             .frame(height: 32)
             .contentShape(Rectangle())
+            .background(onBoard ? Theme.rowActive : .clear)
         }
         .buttonStyle(.plain)
     }
 
     /// The server sends SAN alongside the UCI and that is used when it is there. When it is
-    /// not, the notation is derived against the board — which is the position this entry
-    /// belongs to, since a book is only ever shown on the game and never on a variation.
+    /// not, the notation is derived against the position the entry belongs to — the game
+    /// position the book is anchored on, which on a variation is not the board.
     private func san(_ move: BookMove) -> String {
         if let san = move.san { return san }
         guard let uci = move.uci else { return Format.absent }
-        return SAN.san(forUCI: uci, fen: store.snapshot.fen) ?? uci
+        return SAN.san(forUCI: uci, fen: store.lineStartFEN) ?? uci
     }
 }
 
