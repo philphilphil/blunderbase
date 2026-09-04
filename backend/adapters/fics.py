@@ -84,14 +84,38 @@ class FicsUnavailableError(FicsArchiveError):
 
 @dataclass(slots=True)
 class SyncState:
-    """Progress through the export range, shared with the lazy game iterator."""
+    """Progress through the export range, shared with the lazy game iterator.
+
+    `ingest_games` moves this along, not the stream: the date advances over games the
+    database has answered for, and stops at the first one it was too busy to take. A scan
+    that ends short of its own stream is not a complete one however far it fetched, so the
+    cursor falls back to the last settled day rather than jumping to the end of the range —
+    a day the next sync re-reads, where the games it already has dedup away and the one it
+    lost does not.
+    """
 
     reached: date
     exhausted: bool = False
+    # Yielded by the stream, and answered for by the storing side. Equal only when every
+    # game the scan produced got as far as a verdict.
+    produced: int = 0
+    answered: int = 0
 
-    def observe(self, item: ParsedGame | ImportFailure) -> None:
-        if isinstance(item, ParsedGame) and item.played_at is not None:
-            self.reached = max(self.reached, item.played_at.date())
+    def settled(self, item: ParsedGame | ImportFailure) -> None:
+        """Move over one item the storing side has answered for."""
+        self.answered += 1
+        marker = item.cursor
+        if not marker:
+            return
+        try:
+            self.reached = max(self.reached, date.fromisoformat(marker))
+        except ValueError:
+            return
+
+    @property
+    def complete(self) -> bool:
+        """Whether the whole range was fetched *and* every game of it settled."""
+        return self.exhausted and self.answered == self.produced
 
 
 @dataclass(slots=True)
@@ -156,14 +180,17 @@ def run(
             progress=progress,
             accounts=index,
             analyze=analyze,
+            settled=state.settled,
+            sleep=sleep,
         )
     finally:
         if owned:
             http.close()
 
-    # A complete scan reached "now", even when the player had no games. A limited scan
-    # only advances to its last game so that an unconsumed part of the archive is revisited.
-    result.cursor = (end if state.exhausted else state.reached).isoformat()
+    # A complete scan reached "now", even when the player had no games. A limited one — cut
+    # short by `max_games`, or by a game the database would not take — only advances to its
+    # last settled day, so that the part of the archive it never got through is revisited.
+    result.cursor = (end if state.complete else state.reached).isoformat()
     return result
 
 
@@ -193,9 +220,8 @@ def stream_games(
     sleep: Callable[[float], None] = time.sleep,
 ) -> Iterator[ParsedGame | ImportFailure]:
     """Yield the selected player's exports oldest first, one broken game as one failure."""
-    reached = state if state is not None else SyncState(start)
+    scan = state if state is not None else SyncState(start)
     exports = ExportState()
-    produced = 0
     for year in range(start.year, end.year + 1):
         range_start = max(start, date(year, 1, 1))
         archive = fetch_year(
@@ -214,18 +240,22 @@ def stream_games(
         items = list(parse_archive(archive))
         items.sort(key=_chronological_key)
         for item in items:
-            if max_games is not None and produced >= max_games:
+            if max_games is not None and scan.produced >= max_games:
                 return
             if isinstance(item, ParsedGame) and item.played_at is not None:
                 played = item.played_at.date()
                 if played < start or played > end:
                     continue
-            produced += 1
-            reached.observe(item)
+                # The day this game was played is what a resume asks for; `stream_games`
+                # filters on `played < start`, so the day itself is re-read rather than
+                # stepped over. A game the archive gave no date carries no marker and so
+                # moves the cursor nowhere, which is the honest answer for it.
+                item.cursor = played.isoformat()
+            scan.produced += 1
             yield item
         if exports.bulk_unavailable:
             break
-    reached.exhausted = True
+    scan.exhausted = True
 
 
 def fetch_year(

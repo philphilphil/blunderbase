@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import sqlite3
 import zipfile
 from collections.abc import Callable
 from datetime import date
@@ -10,6 +11,7 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from backend.adapters import fics
@@ -39,11 +41,49 @@ PGN = """[Event "FICS rated blitz game"]
 """
 
 
+# The same export with a second, older game in it, so a scan has a day to stop on that is
+# neither where it started nor the day it ran.
+EARLY_PGN = """[Event "FICS rated blitz game"]
+[Site "FICS freechess.org"]
+[FICSGamesDBGameNo "740792993"]
+[White "ExamplePlayer"]
+[Black "Allnovice"]
+[WhiteElo "1550"]
+[BlackElo "1470"]
+[TimeControl "360+0"]
+[Date "2026.08.20"]
+[Time "11:00:00"]
+[ECO "A00"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 1-0
+"""
+
+CRAZYHOUSE_PGN = """[Event "FICS rated crazyhouse game"]
+[Site "FICS freechess.org"]
+[FICSGamesDBGameNo "740792995"]
+[White "ExamplePlayer"]
+[Black "Allnovice"]
+[TimeControl "360+0"]
+[Date "2026.08.31"]
+[Time "18:00:00"]
+[Variant "Crazyhouse"]
+[Result "1-0"]
+
+1. e4 e5 1-0
+"""
+
+
 def zipped(text: str = PGN) -> bytes:
     target = io.BytesIO()
     with zipfile.ZipFile(target, "w") as archive:
         archive.writestr("games.pgn", text)
     return target.getvalue()
+
+
+def archive_of(*games: str) -> bytes:
+    """One export holding these games, blank-line separated the way a PGN file is."""
+    return zipped("\n".join(games))
 
 
 class FakeDatabase:
@@ -318,3 +358,67 @@ def test_individual_games_are_saved_when_search_archive_generation_fails(
         ("POST", fics.SEARCH_URL),
         ("GET", game_url),
     ]
+
+
+def _locked() -> OperationalError:
+    """What SQLAlchemy raises while another writer holds SQLite's single write lock."""
+    return OperationalError("INSERT INTO games", {}, sqlite3.OperationalError("database is locked"))
+
+
+def test_a_game_the_database_would_not_take_keeps_the_cursor_behind_it(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A FICS cursor is a day, and a complete scan normally hands back the day it ran on
+    rather than the day of its last game. That shortcut may only be taken when the whole
+    range settled: a write lock held past the retries is not an answer, and a cursor on
+    today would step over the lost game's whole year."""
+    database = FakeDatabase(
+        lambda _: httpx.Response(
+            200,
+            content=archive_of(EARLY_PGN, PGN),
+            headers={"content-type": "application/zip"},
+        )
+    )
+    stored = import_service.ingest_game
+
+    def busy(session_: Session, job_: Any, parsed: Any, *args: Any, **options: Any) -> Any:
+        if parsed.source_id == "740792994":
+            raise _locked()
+        return stored(session_, job_, parsed, *args, **options)
+
+    monkeypatch.setattr(import_service, "ingest_game", busy)
+
+    job = sync(session, database, since="2026-01-01")
+
+    assert job.status is JobStatus.DONE
+    assert (job.games_imported, job.games_failed) == (1, 1)
+    assert "database is locked" in job.errors[0]["error"]
+    assert job.cursor == "2026-08-20", "the cursor stopped at the day before the busy game"
+
+    monkeypatch.undo()
+    again = sync(session, database)
+
+    assert (again.games_imported, again.games_skipped) == (1, 1)
+    assert sorted(game.source_id or "" for game in session.scalars(select(Game))) == [
+        "740792993",
+        "740792994",
+    ]
+
+
+def test_a_game_refused_for_its_content_lets_the_cursor_past(session: Session) -> None:
+    """A variant the pipeline cannot replay is not coming in on any sync. It settles like
+    any other item, so the scan still counts as complete and the cursor reaches today —
+    the game is reported once instead of holding the account's cursor back for ever."""
+    database = FakeDatabase(
+        lambda _: httpx.Response(
+            200,
+            content=archive_of(EARLY_PGN, CRAZYHOUSE_PGN),
+            headers={"content-type": "application/zip"},
+        )
+    )
+
+    job = sync(session, database, since="2026-01-01")
+
+    assert (job.games_imported, job.games_failed) == (1, 1)
+    assert "crazyhouse" in job.errors[0]["error"]
+    assert job.cursor == "2026-08-31"
