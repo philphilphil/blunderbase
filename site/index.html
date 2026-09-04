@@ -3,20 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blunderbase — your games, every blunder, one library</title>
-<meta name="description" content="A free, open-source personal chess database. Imports your games from Lichess, Chess.com and FICS, runs Stockfish and Maia over every one, and lets an AI coach read the same library. Self-hosted in one container.">
+<title>Blunderbase — personal chess database</title>
+<meta name="description" content="A free, open-source personal chess database. Imports your games from Lichess, Chess.com, FICS and PGN, analyses every one with Stockfish and Maia, and lets an AI coach read the same library. Desktop app, Docker image, iOS companion.">
 <meta property="og:title" content="Blunderbase">
-<meta property="og:description" content="A personal chess database that analyses every game you play. Free, open source, self-hosted.">
-<meta property="og:image" content="https://blunderbase.org/assets/game.png">
+<meta property="og:description" content="A personal chess database that analyses every game you play. Free, open source, runs on your own machine.">
+<meta property="og:image" content="https://blunderbase.org/assets/game-dark.png">
 <meta property="og:url" content="https://blunderbase.org/">
 <meta name="theme-color" content="#1d1e1f">
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<script>
+  // Before first paint, so the page never flashes the other theme: the remembered choice
+  // wins, the OS decides otherwise. Everything else about the theme is in the script at
+  // the end of the body.
+  (function () {
+    var choice = null;
+    try { choice = localStorage.getItem('bb-theme'); } catch (e) {}
+    var light = choice ? choice === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
+    document.documentElement.classList.toggle('light', light);
+  })();
+</script>
 <style>
   /*
    * The same palette the app ships (web/src/index.css): a grey ramp, chrome a shade apart
-   * from the canvas, a muted blue for the accent. Dark is the flagship look; light follows
-   * the OS. Everything below resolves through these names.
+   * from the canvas, a muted blue for the accent. Dark is the flagship look and the
+   * default; `:root.light` is the other theme, set before first paint by the script in
+   * this head from a remembered choice or, failing that, the OS. The screenshots follow:
+   * every `img.themed` names a file per theme and the script at the end picks one.
    */
   :root {
     color-scheme: dark;
@@ -43,8 +56,7 @@
     --shadow: rgb(0 0 0 / 0.5);
     --logo-filter: invert(1) hue-rotate(180deg);
   }
-  @media (prefers-color-scheme: light) {
-    :root {
+  :root.light {
       color-scheme: light;
       --void: #f4f6f8;
       --panel: #e9ecef;
@@ -68,11 +80,10 @@
       --maia: #6b4cb8;
       --shadow: rgb(20 24 28 / 0.18);
       --logo-filter: none;
-    }
   }
 
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   body {
     margin: 0;
     background: var(--void);
@@ -82,8 +93,9 @@
   }
   a { color: var(--accent); text-decoration: none; }
   a:hover { color: var(--accent-hover); }
-  code, pre, .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  img { max-width: 100%; display: block; }
+  code, pre { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  img { max-width: 100%; height: auto; display: block; }
+  svg { flex: none; }
 
   .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
 
@@ -96,21 +108,30 @@
   header .wrap { display: flex; align-items: center; gap: 0.75rem; height: 2.75rem; }
   .brand { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-weight: 600; font-size: 0.9375rem; }
   .brand img { width: 1.25rem; height: 1.25rem; filter: var(--logo-filter); }
-  nav { margin-left: auto; display: flex; gap: 0.25rem; }
-  nav a {
-    color: var(--dim); font-size: 0.8125rem; padding: 0.3rem 0.6rem; border-radius: 0.25rem;
-  }
+  nav { margin-left: auto; display: flex; gap: 0.25rem; align-items: center; }
+  nav a { color: var(--dim); font-size: 0.8125rem; padding: 0.3rem 0.6rem; border-radius: 0.25rem; display: inline-flex; align-items: center; gap: 0.375rem; }
   nav a:hover { color: var(--text); background: var(--raised); }
+  nav svg { width: 1rem; height: 1rem; }
+  /* the theme switch: an icon button in the nav's idiom, sun in the dark, moon in the light */
+  #theme {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.75rem; height: 1.75rem; margin-left: 0.25rem; padding: 0; border: 0; border-radius: 0.25rem;
+    background: transparent; color: var(--dim); cursor: pointer;
+  }
+  #theme:hover { color: var(--text); background: var(--raised); }
+  #theme .moon, :root.light #theme .sun { display: none; }
+  :root.light #theme .moon { display: block; }
 
-  /* ---- hero -------------------------------------------------------------------- */
-  .hero { padding: 4.5rem 0 2.5rem; }
+  /* ---- hero: centred, the way a product page reads, over the desktop screenshot --- */
+  .hero { padding: 5rem 0 3rem; text-align: center; }
+  .hero img.mark { width: 5rem; height: 5rem; margin: 0 auto 1.5rem; filter: var(--logo-filter); }
   .hero h1 {
-    margin: 0 0 1rem; max-width: 30ch;
-    font-size: clamp(2rem, 5vw, 3.125rem); line-height: 1.08; letter-spacing: -0.03em;
+    margin: 0 auto 1rem; max-width: 20ch;
+    font-size: clamp(2.125rem, 6vw, 3.5rem); line-height: 1.05; letter-spacing: -0.03em;
     color: var(--text); font-weight: 650;
   }
-  .hero p.lede { margin: 0 0 1.75rem; max-width: 56ch; font-size: 1.125rem; color: var(--muted); }
-  .cta { display: flex; flex-wrap: wrap; gap: 0.625rem; align-items: center; }
+  .hero p.lede { margin: 0 auto 1.75rem; max-width: 52ch; font-size: 1.125rem; color: var(--muted); }
+  .cta { display: flex; flex-wrap: wrap; gap: 0.625rem; align-items: center; justify-content: center; }
   .btn {
     display: inline-flex; align-items: center; gap: 0.5rem;
     padding: 0.625rem 1rem; border-radius: 0.3125rem; font-weight: 550; font-size: 0.9375rem;
@@ -121,9 +142,9 @@
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
   .btn svg { width: 1rem; height: 1rem; }
-  .facts { margin: 1.25rem 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; font-size: 0.8125rem; color: var(--dim); }
-  .facts li::before { content: "·"; margin-right: 0.5rem; color: var(--faint); }
-  .facts li:first-child::before { content: none; }
+  .platforms { margin: 1rem 0 0; font-size: 0.8125rem; color: var(--dim); }
+  .platforms span::after { content: "·"; margin: 0 0.5rem; color: var(--faint); }
+  .platforms span:last-child::after { content: none; }
 
   /* ---- screenshots are panes: a rule and a change of surface, never a floating card */
   figure { margin: 0; }
@@ -133,21 +154,72 @@
   }
   .shot img { width: 100%; }
   figcaption { margin-top: 0.625rem; font-size: 0.8125rem; color: var(--dim); }
-  .hero-shot { margin: 3rem 0 0; }
+  /* every frame is a button that opens the lightbox; the frame's own look is unchanged */
+  button.shot, button.phone { display: block; padding: 0; font: inherit; cursor: zoom-in; }
+  button.shot { width: 100%; }
+  button.phone { flex: none; }
+  button.shot:focus-visible, button.phone:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- the lightbox: a native dialog, so Esc, focus and the backdrop come for free ---- */
+  #lightbox { border: 0; padding: 0; background: transparent; max-width: none; max-height: none; width: 100vw; height: 100vh; color: var(--body); }
+  #lightbox::backdrop { background: var(--void); opacity: 0.94; }
+  #lightbox .frame { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 4rem 3.5rem; gap: 0.75rem; }
+  #lightbox img { max-width: 100%; max-height: calc(100vh - 8rem); width: auto; height: auto; object-fit: contain; border: 1px solid var(--edge-strong); border-radius: 0.375rem; background: var(--surface); box-shadow: 0 2rem 4rem -2rem var(--shadow); }
+  #lightbox .cap { font-size: 0.8125rem; color: var(--dim); text-align: center; max-width: 60ch; }
+  #lightbox .cap b { color: var(--muted); font-weight: 500; margin-right: 0.5rem; }
+  #lightbox .nav {
+    position: fixed; top: 50%; transform: translateY(-50%); width: 2.5rem; height: 2.5rem;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+    border: 1px solid var(--edge-strong); border-radius: 0.3125rem; background: var(--elevated); color: var(--text); cursor: pointer;
+  }
+  #lightbox .nav:hover { background: var(--raised); border-color: var(--edge-hover); }
+  #lightbox .nav svg { width: 1.125rem; height: 1.125rem; }
+  #lightbox .prev { left: 0.75rem; } #lightbox .next { right: 0.75rem; }
+  #lightbox .close { top: 0.75rem; right: 0.75rem; transform: none; }
+  body:has(#lightbox[open]) { overflow: hidden; }
+  @media (max-width: 40rem) {
+    #lightbox .frame { padding: 3.5rem 0.75rem 3rem; }
+    #lightbox .nav { top: auto; bottom: 0.75rem; transform: none; }
+    #lightbox .close { top: 0.75rem; bottom: auto; }
+  }
+  .hero-shot { margin: 0; }
+  .hero-shot figcaption { text-align: center; }
 
   /* ---- sections: a heading over a rule, the way the app's overview is built ------ */
-  section { padding: 3.5rem 0 0; }
+  section { padding: 4rem 0 0; }
   section h2 {
     margin: 0 0 1.5rem; padding-bottom: 0.625rem; border-bottom: 1px solid var(--edge-strong);
     font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim);
   }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1.75rem 2.5rem; }
-  .grid h3 { margin: 0 0 0.375rem; font-size: 1rem; font-weight: 600; color: var(--text); }
-  .grid p { margin: 0; color: var(--muted); font-size: 0.9375rem; }
-  .grid .k { color: var(--accent); }
-  .grid .m { color: var(--maia); }
-  .grid .b { color: var(--blunder); }
-  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1.5rem; }
+  .lead { margin: -0.5rem 0 1.75rem; max-width: 60ch; color: var(--muted); font-size: 0.9375rem; }
+
+  /* the three pillars under the hero */
+  .pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1.5rem; }
+  .pillar { padding: 1.25rem 1.25rem 1.375rem; background: var(--surface); border: 1px solid var(--edge); border-radius: 0.375rem; }
+  .pillar svg { width: 1.5rem; height: 1.5rem; color: var(--accent); margin-bottom: 0.75rem; }
+  .pillar svg.m { color: var(--maia); }
+  .pillar svg.b { color: var(--blunder); }
+  .pillar h3 { margin: 0 0 0.375rem; font-size: 1.0625rem; font-weight: 600; color: var(--text); }
+  .pillar p { margin: 0; color: var(--muted); font-size: 0.9375rem; }
+  .pillar .note { margin-top: 0.625rem; font-size: 0.8125rem; color: var(--dim); }
+  section > .fine { margin: 1.25rem 0 0; font-size: 0.8125rem; color: var(--dim); max-width: 72ch; }
+
+  /* the phone row: the companion beside the words about it */
+  .phone-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2.5rem; align-items: center; }
+  .phones { display: flex; gap: 1rem; justify-content: center; }
+  .phone { width: clamp(7.5rem, 16vw, 11.5rem); border-radius: 1.25rem; border: 1px solid var(--edge-strong); overflow: hidden; background: var(--surface); box-shadow: 0 1.5rem 3rem -1.5rem var(--shadow); }
+  .phone img { width: 100%; }
+  .phone-row p { margin: 0 0 0.875rem; color: var(--muted); font-size: 0.9375rem; max-width: 46ch; }
+  @media (max-width: 44rem) { .phone-row { grid-template-columns: 1fr; } .phones { order: 2; } }
+
+  /* the feature list, two columns of checks, in the README's words */
+  .features { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 0.125rem 2.5rem; }
+  .features li { display: flex; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid var(--hairline); color: var(--body); font-size: 0.9375rem; }
+  .features svg { width: 1.125rem; height: 1.125rem; color: var(--good); margin-top: 0.15rem; }
+
+  /* four screens, two by two: wide enough to read, and no orphan on the last row */
+  .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem 1.5rem; }
+  @media (max-width: 40rem) { .two { grid-template-columns: 1fr; } }
 
   pre {
     margin: 0; padding: 1rem 1.125rem; overflow-x: auto;
@@ -155,7 +227,11 @@
     font-size: 0.8125rem; line-height: 1.6; color: var(--text);
   }
   pre .c { color: var(--faint); }
-  .run p { margin: 0.875rem 0 0; color: var(--muted); font-size: 0.9375rem; max-width: 64ch; }
+  .run .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1.5rem 2.5rem; }
+  .run h3 { margin: 0 0 0.5rem; font-size: 1rem; font-weight: 600; color: var(--text); }
+  .run p { margin: 0.875rem 0 0; color: var(--muted); font-size: 0.9375rem; max-width: 60ch; }
+  .run .dl-row { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+  .run .fine { font-size: 0.8125rem; color: var(--dim); }
 
   .roadmap { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.5rem 2rem; color: var(--muted); font-size: 0.9375rem; }
   .roadmap li { padding: 0.5rem 0; border-bottom: 1px solid var(--hairline); }
@@ -174,123 +250,176 @@
   <div class="wrap">
     <a class="brand" href="/"><img src="assets/logo.png" alt="">Blunderbase</a>
     <nav>
-      <a href="https://demo.blunderbase.org">Demo</a>
       <a href="https://github.com/philphilphil/blunderbase/blob/main/docs/reference.md">Docs</a>
-      <a href="https://github.com/philphilphil/blunderbase">GitHub</a>
+      <a href="https://demo.blunderbase.org">Demo</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/philphilphil/blunderbase" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+        GitHub
+      </a>
+      <button id="theme" type="button" aria-label="Switch theme" title="Switch theme">
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
     </nav>
   </div>
 </header>
 
 <main class="wrap">
   <div class="hero">
-    <h1>Every game you play, analysed. Every blunder, remembered.</h1>
+    <img class="mark" src="assets/logo.png" alt="">
+    <h1>Personal chess database</h1>
     <p class="lede">
-      Blunderbase is a personal chess database. It pulls in your games from Lichess, Chess.com
-      and FICS, runs Stockfish and Maia over each one as it arrives, and keeps the lot in a library
-      you own — with an AI coach that reads the same library you do.
+      Blunderbase imports your games, runs Stockfish and Maia over every one of them, and
+      keeps notes, stats and an opening explorer on top. Free, open source, runs on your own
+      machine.
     </p>
     <div class="cta">
-      <a class="btn primary" href="https://demo.blunderbase.org">
-        Open the demo
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      <a class="btn primary" id="dl" href="#download">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 11l6 6 6-6M4 21h16"/></svg>
+        <span>Download</span>
       </a>
-      <a class="btn" href="https://github.com/philphilphil/blunderbase">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-        View on GitHub
-      </a>
+      <a class="btn" href="https://demo.blunderbase.org">Try the demo</a>
+      <a class="btn" href="https://github.com/philphilphil/blunderbase">View on GitHub</a>
     </div>
-    <ul class="facts">
-      <li>Free and open source, MIT</li>
-      <li>Self-hosted in one container</li>
-      <li>One owner, one password, your data on your disk</li>
-    </ul>
+    <p class="platforms"><span>macOS</span><span>Windows</span><span>Docker</span><span>iOS companion</span></p>
   </div>
 
   <figure class="hero-shot">
-    <div class="shot"><img src="assets/game.png" alt="The game view: the board with a Maia overlay, the engine's lines, the move list with blunder badges, and the eval graph." width="1600" height="1000"></div>
-    <figcaption>The game view. Stockfish says what was best; Maia says what a player at your rating would actually have played.</figcaption>
+    <button type="button" class="shot"><img class="themed" data-dark="assets/game-dark.png" data-light="assets/game-light.png" alt="The game screen: the board with the engine's line drawn on it, Maia's move probabilities, Stockfish's lines, the move list with blunder badges, and the eval graph." width="3840" height="2160"></button>
+    <figcaption>The game screen. Stockfish's lines drawn on the board, Maia's guesses beside them, the eval graph underneath.</figcaption>
   </figure>
 
   <section id="what">
     <h2>What it does</h2>
-    <div class="grid">
-      <div>
-        <h3>Imports itself</h3>
-        <p>Connect a Lichess, Chess.com or FICS account and sync it with one press, or on a schedule you set. PGNs drop in too.</p>
+    <div class="pillars">
+      <div class="pillar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
+        <h3>Game analysis</h3>
+        <p>Stockfish grades every move. Maia, trained on human games, says what players at several ratings would have played instead. Blunders are marked in the move list and on the eval graph, and the engine lines are drawn on the board.</p>
       </div>
-      <div>
-        <h3>Two engines, <span class="k">two</span> <span class="m">opinions</span></h3>
-        <p>Stockfish grades every move. Maia, the human-move model, shows what players at 1100 to 2000 would have done instead — so a "blunder" is measured against people, not just against perfection.</p>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+        <h3>Personal database</h3>
+        <p>Your games from Lichess, Chess.com, FICS and PGN files in one library, synced on a schedule. Notes on positions and variations, an explorer with win stats over your own games, and reference games you add to study.</p>
       </div>
-      <div>
-        <h3>A coach that reads your library</h3>
-        <p>An MCP server is built in. Point Claude or any MCP client at it and talk through a game on a live board the browser and the coach share.</p>
-      </div>
-      <div>
-        <h3>Your own opening book</h3>
-        <p>An explorer with win rates over your own games, side by side with the Lichess database, and reference games you can add to the library to study.</p>
-      </div>
-      <div>
-        <h3>Notes, lines, a repertoire</h3>
-        <p>Annotate positions, save variations, and keep the lines you actually play. Everything searchable.</p>
-      </div>
-      <div>
-        <h3>Engines wherever they are</h3>
-        <p>Stockfish on the server, in the browser as WebAssembly, or on a remote runner — your idle office machine, say. The queue does not care which.</p>
-      </div>
-      <div>
-        <h3>Stats that <span class="b">name the habit</span></h3>
-        <p>Blunder rate by opening, by time control, by phase of the game, by clock. Recurring mistakes, so you can stop making them.</p>
-      </div>
-      <div>
-        <h3>One file, yours</h3>
-        <p>The library is a single SQLite file. Verified backups, a full export, and nothing phoning home.</p>
+      <div class="pillar">
+        <svg class="m" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H8l-5 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>
+        <h3>AI coach</h3>
+        <p>An MCP server is built in. Connect Claude or any other MCP client, ask about last week's games, and it reads the same engine numbers and notes you do, on a live board you both see.</p>
+        <p class="note">Server and Docker installs only. The desktop app has no MCP server yet.</p>
       </div>
     </div>
+    <p class="fine">
+      Analysis needs an engine. The Docker image ships Stockfish. The desktop app uses a Stockfish on your machine,
+      the browser's WebAssembly build, or a remote runner. Maia is a separate download in every case, and
+      without it the human-move overlay stays empty.
+    </p>
+  </section>
+
+  <section id="phone">
+    <h2>On your phone</h2>
+    <div class="phone-row">
+      <div>
+        <p>The iOS companion connects to a Blunderbase you host. Games list, game screen with the eval graph and the moves, notes, and live engine analysis that runs on the server rather than the phone, so the numbers match what the browser shows.</p>
+        <p>Not on the App Store yet. It is in TestFlight: <a href="https://github.com/philphilphil/blunderbase/issues">open an issue on GitHub</a> and ask for an invite. Android is on the roadmap.</p>
+      </div>
+      <div class="phones">
+        <button type="button" class="phone"><img class="themed" data-dark="assets/ios-games-dark.png" data-light="assets/ios-games-light.png" alt="The companion's games list on an iPhone, with filters and a blunder sparkline per game." width="1206" height="2622" loading="lazy"></button>
+        <button type="button" class="phone"><img class="themed" data-dark="assets/ios-game-dark.png" data-light="assets/ios-game-light.png" alt="The companion's game screen on an iPhone: the board with the engine's line drawn on it, the move list below." width="1206" height="2622" loading="lazy"></button>
+        <button type="button" class="phone"><img class="themed" data-dark="assets/ios-eval-dark.png" data-light="assets/ios-eval-light.png" alt="The same game screen on the Eval tab: the eval graph under the board, with the blunders marked." width="1206" height="2622" loading="lazy"></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2>Features</h2>
+    <ul class="features">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Import games from Lichess, Chess.com, FICS and PGN files</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Analyse your games with multiple engines</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Maia at multiple ELOs, to see what humans would have played</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Notes on positions and variations</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Engine lines drawn on the board, not just listed</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Full MCP support: discuss games with an AI agent on a shared live board</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Local engines, and Stockfish as WebAssembly in the browser</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Remote engine runner: use your company's idle inference-server CPUs for your hobby</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Game explorer with win stats over your own games, next to the Lichess database and its 8 billion games</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Reference games added to your library for analysis and notes</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Stats by opening, colour, time control and phase of the game</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Fully self-hostable, easiest via Docker. One SQLite file, verified backups, PGN export</li>
+    </ul>
   </section>
 
   <section id="screens">
     <h2>Around the library</h2>
     <div class="two">
       <figure>
-        <div class="shot"><img src="assets/dashboard.png" alt="The overview: recent games, the analysis queue, and what the engines found this week." loading="lazy" width="1600" height="1000"></div>
-        <figcaption>The overview, as games come in and the engines get to them.</figcaption>
+        <button type="button" class="shot"><img class="themed" data-dark="assets/dashboard-dark.png" data-light="assets/dashboard-light.png" alt="The overview: rating over time per platform, recent games, the worst moments of the last thirty days, the analysis queue." loading="lazy" width="3840" height="2160"></button>
+        <figcaption>The overview: rating, recent games, and the worst moments of the last thirty days.</figcaption>
       </figure>
       <figure>
-        <div class="shot"><img src="assets/stats.png" alt="Statistics: win rate and blunder rate broken down by opening, colour, and time control." loading="lazy" width="1600" height="1000"></div>
-        <figcaption>Stats, cut by whatever you want to know about your play.</figcaption>
+        <button type="button" class="shot"><img class="themed" data-dark="assets/explorer-dark.png" data-light="assets/explorer-light.png" alt="The explorer: a position on the board, the moves played from it with win rates over your own games, and the games that reached it." loading="lazy" width="3840" height="2160"></button>
+        <figcaption>The explorer. Your own move tree with win rates, next to the masters and Lichess books.</figcaption>
+      </figure>
+      <figure>
+        <button type="button" class="shot"><img class="themed" data-dark="assets/stats-dark.png" data-light="assets/stats-light.png" alt="Stats: blunders by game phase, performance by time control, eval loss by clock remaining, and progress over time." loading="lazy" width="3840" height="2160"></button>
+        <figcaption>Stats. Blunders by phase, by time control, by how much clock was left.</figcaption>
+      </figure>
+      <figure>
+        <button type="button" class="shot"><img class="themed" data-dark="assets/games-dark.png" data-light="assets/games-light.png" alt="The games list, filtered, with opening, result, rating change and blunder count per game." loading="lazy" width="3840" height="2160"></button>
+        <figcaption>The library, with filters that stack and the blunder count on every row.</figcaption>
       </figure>
     </div>
   </section>
 
-  <section id="run" class="run">
-    <h2>Run it yourself</h2>
-<pre><span class="c"># One container. Your library lives in the volume.</span>
+  <section id="download" class="run">
+    <h2>Get it</h2>
+    <div class="two">
+      <div>
+        <h3>Desktop</h3>
+        <p style="margin-top:0">A single app for macOS and Windows with the backend inside. No terminal, no container, no account. Your library lives in the normal application-data folder. Point it at a Stockfish on your machine, or let the browser's WebAssembly build do the work.</p>
+        <p class="dl-row">
+          <a class="btn" href="https://github.com/philphilphil/blunderbase/releases/latest/download/Blunderbase-macOS-arm64.dmg" download>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.6-1-2.6-3.8zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.9-1 2.9 1.1.1 2.1-.5 2.8-1.3z"/></svg>
+            macOS (Apple silicon)
+          </a>
+          <a class="btn" href="https://github.com/philphilphil/blunderbase/releases/latest/download/Blunderbase-Windows-x64-setup.exe" download>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zm8.5-1.2L21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zm8.5 0H21V21l-9.5-1.3z"/></svg>
+            Windows (x64)
+          </a>
+        </p>
+        <p class="fine">Unsigned builds for now: macOS asks you to allow the app in System Settings, Windows shows a SmartScreen notice. Intel Macs and Linux are on the roadmap.</p>
+      </div>
+      <div>
+        <h3>Docker</h3>
+<pre><span class="c"># A sample compose file: one service, one volume.</span>
+curl -O https://blunderbase.org/docker-compose.yml
+docker compose up -d
+<span class="c"># Or without compose:</span>
 docker run -d --name blunderbase -p 8765:8765 \
   -v blunderbase-data:/data \
   ghcr.io/philphilphil/blunderbase:latest</pre>
-    <p>
-      Open it in a browser, choose a password, connect an account. That password is also the
-      coach's key. Stockfish ships in the image; TLS, reverse proxies, remote engine runners and
-      the CLI are in the <a href="https://github.com/philphilphil/blunderbase/blob/main/docs/reference.md">docs</a>.
-    </p>
+        <p>Open it in a browser, choose a password, connect an account. That password is also the coach's key. TLS, reverse proxies, remote engine runners and the CLI are in the <a href="https://github.com/philphilphil/blunderbase/blob/main/docs/reference.md">docs</a>.</p>
+      </div>
+    </div>
   </section>
 
   <section id="roadmap">
-    <h2>Where it is going</h2>
+    <h2>Roadmap</h2>
     <ul class="roadmap">
-      <li>Desktop app for Linux, macOS and Windows</li>
-      <li>Mobile companion for iOS and Android</li>
-      <li>Sync between your installations</li>
-      <li>Several engines on the same game, for the engine nerds</li>
-      <li>Puzzles cut from your own games</li>
+      <li>Desktop app for Linux</li>
+      <li>Companion app for Android</li>
+      <li>Sync service to keep several Blunderbases in step</li>
+      <li>Multi-engine analysis on the same game, for the engine nerds</li>
+      <li>Puzzles out of your own games</li>
+      <li>Import other people's games for study</li>
     </ul>
   </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>Blunderbase is MIT-licensed. The demo is a read-only library of anonymised games.</span>
+    <span>MIT licensed. The demo is a read-only library of anonymised games.</span>
     <span class="spacer"></span>
     <a href="https://github.com/philphilphil/blunderbase">GitHub</a>
     <a href="https://github.com/philphilphil/blunderbase/blob/main/CHANGELOG.md">Changelog</a>
@@ -298,5 +427,104 @@ docker run -d --name blunderbase -p 8765:8765 \
   </div>
 </footer>
 
+<dialog id="lightbox" aria-label="Screenshot">
+  <div class="frame">
+    <img alt="">
+    <p class="cap"></p>
+  </div>
+  <button type="button" class="nav prev" aria-label="Previous screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <button type="button" class="nav next" aria-label="Next screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+  <button type="button" class="nav close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</dialog>
+
+<script>
+  // The lightbox. Every screenshot on the page is one sequence, in page order; arrows
+  // and the keyboard walk it and wrap around. It shows whatever file the thumbnail is
+  // showing, so a theme switch while it is open changes the picture too (see `apply`).
+  (function () {
+    var box = document.getElementById('lightbox');
+    var view = box.querySelector('img'), cap = box.querySelector('.cap');
+    var frames = Array.prototype.slice.call(document.querySelectorAll('button.shot, button.phone'));
+    var at = -1;
+    function caption(frame) {
+      var fig = frame.closest('figure');
+      var text = fig && fig.querySelector('figcaption') ? fig.querySelector('figcaption').textContent : frame.querySelector('img').alt;
+      return text;
+    }
+    function show(i) {
+      at = (i + frames.length) % frames.length;
+      var img = frames[at].querySelector('img');
+      view.src = img.getAttribute('src');
+      view.alt = img.alt;
+      cap.innerHTML = '';
+      var n = document.createElement('b'); n.textContent = (at + 1) + ' / ' + frames.length;
+      cap.appendChild(n); cap.appendChild(document.createTextNode(caption(frames[at])));
+    }
+    window.refreshLightbox = function () { if (box.open && at >= 0) show(at); };
+    frames.forEach(function (frame, i) {
+      frame.addEventListener('click', function () { show(i); box.showModal(); });
+    });
+    box.querySelector('.prev').addEventListener('click', function () { show(at - 1); });
+    box.querySelector('.next').addEventListener('click', function () { show(at + 1); });
+    box.querySelector('.close').addEventListener('click', function () { box.close(); });
+    box.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft') { show(at - 1); e.preventDefault(); }
+      else if (e.key === 'ArrowRight') { show(at + 1); e.preventDefault(); }
+    });
+    // A click on the backdrop, or anywhere that is not the picture or a button, closes.
+    box.addEventListener('click', function (e) {
+      if (e.target === box || e.target.classList.contains('frame') || e.target === cap) box.close();
+    });
+  })();
+</script>
+
+<script>
+  // The theme. The class is already set (see the head); this swaps the screenshots to the
+  // matching set, wires the switch, remembers a choice, and follows the OS until one is
+  // made. A screenshot names both files and carries no `src` of its own, so a theme only
+  // ever loads its own set.
+  (function () {
+    var root = document.documentElement;
+    var themeColor = document.querySelector('meta[name="theme-color"]');
+    function apply() {
+      var light = root.classList.contains('light');
+      var shots = document.querySelectorAll('img.themed');
+      for (var i = 0; i < shots.length; i++) {
+        var want = shots[i].getAttribute(light ? 'data-light' : 'data-dark');
+        if (shots[i].getAttribute('src') !== want) shots[i].setAttribute('src', want);
+      }
+      if (themeColor) themeColor.setAttribute('content', light ? '#f4f6f8' : '#1d1e1f');
+      if (window.refreshLightbox) window.refreshLightbox();
+    }
+    apply();
+    document.getElementById('theme').addEventListener('click', function () {
+      var light = root.classList.toggle('light');
+      try { localStorage.setItem('bb-theme', light ? 'light' : 'dark'); } catch (e) {}
+      apply();
+    });
+    matchMedia('(prefers-color-scheme: light)').addEventListener('change', function (e) {
+      var choice = null;
+      try { choice = localStorage.getItem('bb-theme'); } catch (err) {}
+      if (choice) return;
+      root.classList.toggle('light', e.matches);
+      apply();
+    });
+  })();
+
+  // The big button downloads the installer for the machine it is pressed on, straight
+  // from the release asset (the /latest/download/ URL redirects to the file, no GitHub
+  // page in between). Anything else, Linux and phones included, goes to the list below.
+  (function () {
+    var a = document.getElementById('dl'), ua = navigator.userAgent;
+    var base = 'https://github.com/philphilphil/blunderbase/releases/latest/download/';
+    if (/Mac/.test(ua) && !/iPhone|iPad/.test(ua)) {
+      a.href = base + 'Blunderbase-macOS-arm64.dmg'; a.setAttribute('download', '');
+      a.lastElementChild.textContent = 'Download for macOS';
+    } else if (/Windows/.test(ua)) {
+      a.href = base + 'Blunderbase-Windows-x64-setup.exe'; a.setAttribute('download', '');
+      a.lastElementChild.textContent = 'Download for Windows';
+    }
+  })();
+</script>
 </body>
 </html>

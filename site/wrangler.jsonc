@@ -1,0 +1,19 @@
+{
+  // blunderbase.org is a Cloudflare Worker that serves nothing but static assets: the
+  // directory `scripts/site.sh` assembles. There is no script, so there is no ASSETS
+  // binding either. Both hostnames are Custom Domains, which means the zone has to be on
+  // Cloudflare; the DNS records are created by the deploy.
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "blunderbase-site",
+  "compatibility_date": "2026-09-04",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "blunderbase.org", "custom_domain": true },
+    { "pattern": "www.blunderbase.org", "custom_domain": true }
+  ]
+}

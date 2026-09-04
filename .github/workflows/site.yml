@@ -1,10 +1,10 @@
 name: site
 
-# blunderbase.org is a static page on GitHub Pages, assembled from `site/` and the
-# screenshots by `scripts/site.sh`. Pushing a change to any of those publishes it; nothing
-# here touches the image or the running deployment. One-time setup, in the repository's
-# settings: Pages → Source → "GitHub Actions", and a custom domain of `blunderbase.org`
-# (the `CNAME` file in the artifact is what keeps it after a deploy).
+# blunderbase.org is a static-assets Worker on Cloudflare, assembled from `site/` and the
+# screenshots by `scripts/site.sh` and pushed with wrangler. A push that touches any of
+# those publishes it; nothing here touches the image or the running deployment. One-time
+# setup: an API token with "Workers Scripts: Edit" (and "Zone: DNS: Edit" for the custom
+# domains) as the CLOUDFLARE_API_TOKEN secret, the account id as CLOUDFLARE_ACCOUNT_ID.
 on:
   push:
     branches: [main]
@@ -18,25 +18,20 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: site
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: sh scripts/site.sh _site
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - run: sh scripts/site.sh
+      - uses: cloudflare/wrangler-action@v3
         with:
-          path: _site
-      - uses: actions/deploy-pages@v4
-        id: deploy
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site

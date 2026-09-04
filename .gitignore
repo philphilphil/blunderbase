@@ -34,3 +34,6 @@ coverage.json
 
 # The assembled landing page (`make site`); the source is site/index.html.
 /site/dist/
+
+# wrangler state from `npx wrangler dev` in site/
+/site/.wrangler/

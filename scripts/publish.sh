@@ -36,6 +36,36 @@ changelog_section() {
 	' CHANGELOG.md
 }
 
+# The desktop installers `make desktop` left under desktop/dist go up with the release,
+# under names that do not carry the version: blunderbase.org links
+# releases/latest/download/<name>, which redirects straight to the file, and that link
+# only stays good if every release ships the same names. The versioned file name is
+# checked against the tag so a stale build from the last release cannot ride along.
+mac_asset=Blunderbase-macOS-arm64.dmg
+win_asset=Blunderbase-Windows-x64-setup.exe
+
+find_installer() {
+	set -- "desktop/dist/$1/Blunderbase_${version}_$2"
+	[ -f "$1" ] && echo "$1"
+}
+
+find_installers() {
+	mac=$(find_installer mac aarch64.dmg || true)
+	win=$(find_installer windows x64-setup.exe || true)
+	if [ -z "$mac" ] || [ -z "$win" ]; then
+		[ -n "${BB_SKIP_DESKTOP:-}" ] || die "desktop/dist has no $version installers for both platforms — run \`make desktop\` first, or BB_SKIP_DESKTOP=1 to release without them (the site's download buttons will 404)"
+	fi
+}
+
+upload_installers() {
+	[ -n "$mac$win" ] || return 0
+	stage=$(mktemp -d)
+	[ -z "$mac" ] || cp "$mac" "$stage/$mac_asset"
+	[ -z "$win" ] || cp "$win" "$stage/$win_asset"
+	gh release upload "$tag" "$stage"/*
+	rm -rf "$stage"
+}
+
 [ -z "$(git status --porcelain)" ] || die "the working tree is dirty; commit or stash first"
 
 branch=$(git rev-parse --abbrev-ref HEAD)
@@ -49,6 +79,7 @@ case "$tag" in
 "*) die "HEAD carries more than one version tag: $(echo "$tag" | tr '\n' ' ')" ;;
 esac
 version="${tag#v}"
+find_installers
 
 notes=$(changelog_section "$tag")
 [ -n "$notes" ] || die "CHANGELOG.md has no '## $tag' section — write the notes first"
@@ -65,6 +96,8 @@ if [ -n "${BB_DRY:-}" ]; then
 	echo "  git push origin main --follow-tags"
 	echo "  wait for this commit's main CI to pass"
 	echo "  gh release create $tag --title \"Blunderbase $tag\" $prerelease --notes-file -"
+	[ -z "$mac" ] || echo "  gh release upload $tag $mac  (as $mac_asset)"
+	[ -z "$win" ] || echo "  gh release upload $tag $win  (as $win_asset)"
 	echo "  notes:"
 	echo "$notes" | sed 's/^/    /'
 	exit 0
@@ -91,6 +124,7 @@ gh run watch "$run_id" --exit-status || die "main CI failed; the release was not
 # shellcheck disable=SC2086  # $prerelease is a flag or nothing, and must not be quoted.
 printf '%s\n' "$notes" |
 	gh release create "$tag" --title "Blunderbase $tag" $prerelease --notes-file -
+upload_installers
 
 echo "publish: $tag released. The release builds the image and Komodo pulls it — watch it with"
 echo "  gh run watch \$(gh run list --workflow=release --limit=1 --json databaseId --jq '.[0].databaseId')"

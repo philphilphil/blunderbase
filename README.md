@@ -29,9 +29,22 @@
 - Fully self-hostable, easiest via docker
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="Dashboard" />
-  <img src="docs/screenshots/game.png" alt="Game view" />
-  <img src="docs/screenshots/stats.png" alt="Stats" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/game-dark.png">
+    <img src="docs/screenshots/game-light.png" alt="Game view" />
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png">
+    <img src="docs/screenshots/dashboard-light.png" alt="Dashboard" />
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/explorer-dark.png">
+    <img src="docs/screenshots/explorer-light.png" alt="Explorer" />
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/stats-dark.png">
+    <img src="docs/screenshots/stats-light.png" alt="Stats" />
+  </picture>
 </p>
 
 ## Roadmap
