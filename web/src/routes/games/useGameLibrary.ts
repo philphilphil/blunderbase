@@ -24,9 +24,6 @@ import type { GameCard } from '@/lib/api/types'
 import { toGameQuery, type LibraryFilters } from './filters'
 import type { Sort } from './sorting'
 
-/** The sizes the footer offers, beside "Fit" — as many rows as the window has room for. */
-export const PAGE_SIZES = [25, 50, 100, 200] as const
-
 /** What the backend will serve in one page (`backend/api/routes/games.py: MAX_PAGE`). */
 export const MAX_PAGE_SIZE = 200
 

@@ -96,10 +96,6 @@ ERROR_UNKNOWN_MESSAGE = "unknown_message"
 ERROR_BAD_PAYLOAD = "bad_payload"
 ERROR_UNKNOWN_RUN = "unknown_run"
 ERROR_STALE_RESULT = "stale_result"
-ERROR_UNKNOWN_ENGINE = "unknown_engine"
-ERROR_DUPLICATE_ENGINE = "duplicate_engine"
-ERROR_SLOTS_EXHAUSTED = "slots_exhausted"
-ERROR_STREAM_UNAVAILABLE = "stream_unavailable"
 
 # WebSocket close codes. The 4000 range is the application's own, and these follow
 # `api/auth.py`'s `WS_CLOSE_UNAUTHORIZED = 4401`: the HTTP status a refusal would have
@@ -118,9 +114,8 @@ CLOSE_REASONS: dict[int, str] = {
     WS_CLOSE_RATE_LIMITED: ERROR_RATE_LIMITED,
 }
 
-# Why a stream ended, and why a run was taken away from the runner holding it.
+# Why a stream ended, in the words the server relays; the browser runner mirrors these.
 STREAM_REASONS = ("closed", "replaced", "idle", "engine_failed", "runner_gone")
-CANCEL_REASONS = ("requeued", "revoked", "preempted", "stolen")
 
 ENGINE_KINDS = tuple(kind.value for kind in EngineKind)
 TIERS = tuple(tier.value for tier in Tier)

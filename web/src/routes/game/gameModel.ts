@@ -965,15 +965,6 @@ export function recurringMistake(
 
 // --- notes ----------------------------------------------------------------
 
-/** The accent a note card is drawn with: the move it is about, or its own tag. */
-export function noteAccent(note: GameNote, moves: MoveRow[]): Classification | 'pattern' | null {
-  const tags = note.tags ?? []
-  if (tags.some((tag) => /^(pattern|recurring|drill)$/i.test(tag))) return 'pattern'
-  if (note.ply === null || note.ply === undefined) return null
-  const move = moves.find((row) => row.ply === note.ply)
-  return isFlagged(move?.classification) ? (move?.classification ?? null) : null
-}
-
 /** Notes newest first, the order `game_notes` already returns them in — made explicit. */
 export function sortNotes(notes: GameNote[]): GameNote[] {
   return [...notes].sort(

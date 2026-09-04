@@ -1,5 +1,5 @@
 import { createContext, useContext, useId, useMemo, type ComponentProps, type ReactNode } from 'react'
-import { Legend, ResponsiveContainer, Tooltip } from 'recharts'
+import { ResponsiveContainer, Tooltip } from 'recharts'
 
 import { cn } from '@/lib/utils'
 
@@ -74,7 +74,6 @@ function ChartStyle({ id, config }: { id: string; config: ChartConfig }) {
 }
 
 export const ChartTooltip = Tooltip
-export const ChartLegend = Legend
 
 interface TooltipItem {
   name?: string | number
@@ -142,34 +141,6 @@ export function ChartTooltipContent({
           )
         })}
       </div>
-    </div>
-  )
-}
-
-export function ChartLegendContent({
-  payload,
-  className,
-}: {
-  payload?: { value?: string; dataKey?: string | number; color?: string }[]
-  className?: string
-}) {
-  const { config } = useChart()
-  if (!payload?.length) return null
-  return (
-    <div className={cn('flex flex-wrap items-center justify-center gap-3 pt-2', className)}>
-      {payload.map((item, index) => {
-        const key = String(item.dataKey ?? item.value ?? index)
-        const entry = config[key]
-        return (
-          <div key={key} className="flex items-center gap-1.5 text-[0.6875rem] text-soft">
-            <span
-              className="size-2 rounded-[0.125rem]"
-              style={{ background: entry?.color ?? item.color ?? 'var(--bb-accent)' }}
-            />
-            {entry?.label ?? item.value ?? key}
-          </div>
-        )
-      })}
     </div>
   )
 }

@@ -39,10 +39,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 logger = logging.getLogger(__name__)
 
-# The frames a runner sends about a session. None of them has a built-in handler in the
-# gateway, so a registered one is the only one they reach.
-HANDLED = (protocol.STREAM_STARTED, protocol.STREAM_SNAPSHOT, protocol.STREAM_CLOSED)
-
 
 @dataclass(slots=True)
 class _Held:

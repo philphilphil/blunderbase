@@ -250,11 +250,3 @@ export function useMoveSound(key: string, san: string | null | undefined): void 
     playMoveSound(kind, prefs.volume)
   }, [key, san])
 }
-
-/** Test seam: drop the context and the throttle, so the next play starts from nothing. */
-export function resetMoveSound(): void {
-  context = null
-  master = null
-  noise = null
-  lastPlayed = -Infinity
-}

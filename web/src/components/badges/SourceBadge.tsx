@@ -33,17 +33,3 @@ export function SourceBadge({
     </span>
   )
 }
-
-/** The dashed "nothing has arrived yet" chip. */
-export function PendingBadge({ className, children = 'Import pending' }: { className?: string; children?: string }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-sm border border-dashed border-edge-strong bg-chip-neutral px-2 py-[0.1875rem] text-[0.71875rem] text-dim',
-        className,
-      )}
-    >
-      {children}
-    </span>
-  )
-}

@@ -33,7 +33,6 @@ import chess.pgn
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "backend" / "data" / "openings.tsv"
 
-UPSTREAM = "https://github.com/lichess-org/chess-openings"
 # The commit the vendored table was taken from (2026-08-04).
 UPSTREAM_REF = "4b8622759e7ae6f93f011cc6c83a3823401ab45e"
 RAW = "https://raw.githubusercontent.com/lichess-org/chess-openings"

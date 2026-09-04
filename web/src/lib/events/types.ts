@@ -306,10 +306,6 @@ export interface UnknownEvent {
 
 export type AnyEvent = BlunderbaseEvent | UnknownEvent
 
-export function isEventName(value: string): value is EventName {
-  return (EVENT_NAMES as readonly string[]).includes(value)
-}
-
 /** Parse one socket frame. Returns null for anything that is not a shaped event. */
 export function parseEvent(raw: string): AnyEvent | null {
   let parsed: unknown

@@ -382,20 +382,6 @@ def announce(row: Mapping[str, Any]) -> None:
     )
 
 
-def updated_event(runner: Runner, live: dict[str, Any] | None = None) -> dict[str, Any]:
-    """A state change worth telling the UI about — never a heartbeat, never a snapshot."""
-    live = live or {}
-    return {
-        "event": EVENT_RUNNER_UPDATED,
-        "runner_id": runner.id,
-        "name": runner.name,
-        "slots": runner.slots,
-        "connected": runner.connected,
-        "busy": int(live.get("busy", 0)),
-        "streams": int(live.get("streams", 0)),
-        "free_slots": int(live.get("free_slots", 0)),
-        "at": utcnow().isoformat(),
-    }
 
 
 # --- reading ---------------------------------------------------------------

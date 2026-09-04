@@ -97,13 +97,6 @@ export function isFlagged(classification: Classification | null | undefined): bo
   )
 }
 
-/** The colour a classification paints with on the eval graph and the board overlay. */
-export function classificationColor(
-  classification: Classification | null | undefined,
-): string | null {
-  return glyphStyle(classification)?.color ?? null
-}
-
 // --- source badges (design 1c, "Source badges") ---------------------------
 
 export interface SourceStyle {

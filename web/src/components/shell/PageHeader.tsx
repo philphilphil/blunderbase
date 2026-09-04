@@ -69,12 +69,3 @@ export const PageBody = forwardRef<HTMLDivElement, { children: ReactNode; classN
     )
   },
 )
-
-/** What a route renders before the screen behind it is built. */
-export function Placeholder({ note }: { note: string }) {
-  return (
-    <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-edge-strong bg-panel/60 p-10 text-center">
-      <p className="max-w-md text-[0.78125rem] leading-relaxed text-dim">{note}</p>
-    </div>
-  )
-}

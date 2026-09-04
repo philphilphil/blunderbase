@@ -45,7 +45,6 @@ from backend.services.accounts import AccountIndex
 from backend.services.import_service import ParsedGame, ingest_game
 
 DEFAULT_GAME_COUNT = 72
-DEFAULT_FILENAME = "demo.db"
 # Where the demo's engine rows point when nobody says otherwise: nowhere. The stored
 # analysis is copied in, so a demo built for screenshots never needs to start an engine;
 # a demo that is going to be *served* wants the real thing behind its analysis board, which

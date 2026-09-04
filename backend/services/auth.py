@@ -314,14 +314,6 @@ def revoke_session(session: Session, token: str | None) -> bool:
     return bool(removed)
 
 
-def revoke_all_sessions(session: Session) -> int:
-    """Sign every browser out, this one included. How many were open."""
-    removed = session.execute(delete(AuthSession)).rowcount
-    session.commit()
-    forget_valid_tokens()
-    return int(removed)
-
-
 def prune_sessions(session: Session, *, now: datetime | None = None) -> int:
     """Drop the sessions that have run out. How many were dropped."""
     removed = session.execute(

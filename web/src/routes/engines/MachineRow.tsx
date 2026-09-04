@@ -55,17 +55,6 @@ export function MachineDot({ tone }: { tone: MachineTone }) {
   return <StatusDot tone={STATUS_TONE[tone]} />
 }
 
-export function MachineHeaderRow() {
-  return (
-    <div className="flex items-center gap-3 px-3 py-2 text-[0.625rem] tracking-[0.06em] text-faint uppercase">
-      <span className="min-w-0 flex-1">Machine</span>
-      <span className={MACHINE_COL.type}>Type</span>
-      <span className={MACHINE_COL.slots}>Slots</span>
-      <span className={MACHINE_COL.engines}>Engines</span>
-    </div>
-  )
-}
-
 export function MachineRow({
   tone,
   name,

@@ -110,7 +110,6 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (runners_service.RunnerLockedOutError, 429, "locked_out"),
     (runners_service.RunnerAuthError, 401, "unauthorized"),
     (runners_service.RunnerValidationError, 422, "invalid_runner"),
-    (mcp_keys_service.UnknownMcpKeyError, 404, "unknown_mcp_key"),
     (mcp_keys_service.DuplicateMcpKeyError, 409, "duplicate_mcp_key"),
     (mcp_keys_service.McpKeyValidationError, 422, "invalid_mcp_key"),
     (streams_service.UnknownStreamError, 404, "unknown_stream"),

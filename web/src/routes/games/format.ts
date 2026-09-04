@@ -79,14 +79,6 @@ const SPEED_LABELS: Record<string, string> = {
   correspondence: 'Corr.',
 }
 
-/** The opening, with its ECO code split off so the code can be set in mono. */
-export function splitOpening(game: Pick<GameSummary, 'opening' | 'eco'>): {
-  name: string
-  eco: string | null
-} {
-  return { name: game.opening ?? '—', eco: game.eco ?? null }
-}
-
 /** Whole moves rather than plies, which is what the design's `Mv` column counts. */
 export function moveCount(plyCount: number | null | undefined): string {
   if (plyCount === null || plyCount === undefined) return '—'
@@ -146,11 +138,6 @@ export function tierOf(game: GameCard): Tier | null {
   if (game.deep) return 'deep'
   if (game.analyzed) return 'quick'
   return null
-}
-
-/** The sort rank of a tier: unanalysed < quick < deep. */
-export function tierRank(game: GameCard): number {
-  return game.deep ? 2 : game.analyzed ? 1 : 0
 }
 
 export const SOURCE_LABELS: Record<Source, string> = {

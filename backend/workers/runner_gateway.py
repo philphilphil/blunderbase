@@ -103,7 +103,6 @@ POLL = "poll"
 CANCEL_STOLEN = "stolen"
 CANCEL_REQUEUED = "requeued"
 CANCEL_PREEMPTED = "preempted"
-CANCEL_REVOKED = "revoked"
 
 # Why a link ended, as `runner.disconnected` reports it.
 REASON_CLOSED = "socket_closed"

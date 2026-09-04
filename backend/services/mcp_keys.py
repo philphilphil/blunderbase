@@ -58,10 +58,6 @@ class DuplicateMcpKeyError(McpKeyValidationError):
     """A key of that name already exists."""
 
 
-class UnknownMcpKeyError(McpKeyError, LookupError):
-    """No key with that id."""
-
-
 # --- the registry ----------------------------------------------------------
 
 
@@ -72,13 +68,6 @@ def list_keys(session: Session) -> list[McpKey]:
 
 def get_key(session: Session, key_id: int) -> McpKey | None:
     return session.get(McpKey, key_id)
-
-
-def require_key(session: Session, key_id: int) -> McpKey:
-    key = get_key(session, key_id)
-    if key is None:
-        raise UnknownMcpKeyError(f"no MCP key with id {key_id}")
-    return key
 
 
 def create_key(session: Session, name: str) -> tuple[McpKey, str]:

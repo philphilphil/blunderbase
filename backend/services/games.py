@@ -1033,11 +1033,6 @@ def outcome_from(color: Color | None, result: Result) -> str | None:
     return None
 
 
-def score_of(game: Game) -> float | None:
-    """The owner's score in a game: 1, 0.5 or 0."""
-    return score_from(outcome_of(game))
-
-
 def score_from(outcome: str | None) -> float | None:
     return {WIN: 1.0, DRAW: 0.5, LOSS: 0.0}.get(outcome or "")
 

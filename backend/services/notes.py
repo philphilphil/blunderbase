@@ -140,11 +140,6 @@ def save_line(session: Session, game_id: int, base_ply: int, moves: Sequence[str
     return line
 
 
-def get_line(session: Session, line_id: int) -> Line | None:
-    """One line."""
-    return session.get(Line, int(line_id))
-
-
 def get_lines(session: Session, game_id: int) -> list[Line]:
     """Every stored variation off a game, in the order they branch."""
     return list(
