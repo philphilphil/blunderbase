@@ -144,8 +144,8 @@ publish:
 v%: ; @:
 
 # Assemble the landing page (site/index.html plus the screenshots and brand assets) into
-# site/dist, to open in a browser. `.github/workflows/site.yml` runs the same script to
-# publish blunderbase.org.
+# site/dist, to open in a browser. Workers Builds runs the same script to publish
+# blunderbase.org (site/README.md, "Hosting").
 site:
 	@sh scripts/site.sh
 

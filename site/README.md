@@ -12,17 +12,27 @@ cd site && npx wrangler dev    # or serve it the way Cloudflare will
 ## Hosting
 
 The page is a Cloudflare Worker that serves static assets and nothing else
-(`wrangler.jsonc`: an `assets` directory, no script). Pushing a change under `site/`,
-`docs/screenshots/` or `docs/design/brand/` to `main` runs `.github/workflows/site.yml`,
-which assembles `site/dist` and deploys it with `wrangler`. One-time setup:
+(`wrangler.jsonc`: an `assets` directory, no script). Cloudflare builds it itself: the
+Worker `blunderbase-site` is connected to this repository through Workers Builds, and a
+push to `main` that touches `site/`, `scripts/site.sh`, `docs/screenshots/` or
+`docs/design/brand/` (the build's watch paths) assembles `site/dist` and deploys it. The
+repository holds no token and no workflow for this. The settings, under the Worker's
+**Settings → Build** in the dashboard:
 
-- The `blunderbase.org` zone on Cloudflare (nameservers at the registrar pointed there).
-- Two repository secrets: `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN` made from
-  the "Edit Cloudflare Workers" template. The custom domains in `wrangler.jsonc` create
-  their own DNS records on the first deploy, so the token needs DNS edit on the zone too,
-  which that template includes.
-- `demo.blunderbase.org` is not the Worker's: it is the demo container behind the owner's
-  proxy (`docs/deploy.md`, "A public demo"). Its record stays on the zone as before.
+| Setting | Value |
+|---|---|
+| Root directory | `/site` |
+| Build command | `sh ../scripts/site.sh` |
+| Deploy command | `npx wrangler deploy` |
+| Watch paths | the four above |
+
+One-time setup was the `blunderbase.org` zone on Cloudflare (nameservers at the
+registrar pointed there) and connecting the repository. The custom domains in
+`wrangler.jsonc` create their own DNS records on the first deploy.
+
+`demo.blunderbase.org` is not the Worker's: it is the demo container behind the owner's
+proxy (`docs/deploy.md`, "A public demo"), an unproxied A record on the zone pointing at
+that server so the proxy there holds the certificate.
 
 ## Downloads
 

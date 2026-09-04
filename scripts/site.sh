@@ -3,8 +3,9 @@
 #
 # `site/` holds the page and nothing else; the screenshots and the brand assets live where
 # the README and the app already keep them, so they are copied in here rather than kept
-# twice. The same script builds `make site` for a look in a browser and the directory
-# `.github/workflows/site.yml` hands to wrangler, which is what keeps the two identical.
+# twice. The same script builds `make site` for a look in a browser and, as the build
+# command of the Worker on Cloudflare, the directory wrangler deploys — which is what
+# keeps the two identical.
 # `site/wrangler.jsonc` points at the default output, so `cd site && npx wrangler dev`
 # serves the result the way Cloudflare will.
 #
