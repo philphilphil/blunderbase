@@ -1,10 +1,11 @@
-import { Bot, CircleHelp, KeyRound, LogOut, User, Users } from 'lucide-react'
+import { Bot, CircleHelp, Compass, KeyRound, LogOut, User, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useLogout, useProfile } from '@/lib/api/queries'
 import type { AccountSummary } from '@/lib/api/types'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
+import { useTour } from '@/lib/tour/TourProvider'
 import { cn } from '@/lib/utils'
 import { ChangePasswordDialog } from '@/routes/auth'
 
@@ -39,6 +40,7 @@ export function AccountMenu() {
   const capabilities = useRuntimeCapabilities()
   const profile = useProfile()
   const logout = useLogout()
+  const tour = useTour()
   const [open, setOpen] = useState(false)
   const [changing, setChanging] = useState(false)
   const container = useRef<HTMLDivElement>(null)
@@ -144,6 +146,23 @@ export function AccountMenu() {
             <CircleHelp className="size-3.5" aria-hidden />
             How analysis works
           </Link>
+          {/*
+            Beside it, because it answers the same kind of question one screen earlier: the
+            page explains what the engines do, the tour says what the screens are. The tour
+            runs once by itself on a fresh installation and this is the only way back to it.
+          */}
+          <button
+            type="button"
+            role="menuitem"
+            className={ITEM}
+            onClick={() => {
+              setOpen(false)
+              tour.replay()
+            }}
+          >
+            <Compass className="size-3.5" aria-hidden />
+            Show the tour again
+          </button>
           {capabilities.password_auth ? (
             <>
               <button

@@ -184,6 +184,23 @@ class AppSettingsUpdate(Input):
     blunder_threshold: float | None = None
 
 
+class TourState(BaseModel):
+    """Whether the owner has been through the orientation tour.
+
+    Its own tiny payload rather than a field on `AppSettings`: that shape is the analysis
+    form's, a PUT of it replaces every key it names, and a flag about the person would be
+    cleared by the next save of a node budget.
+    """
+
+    seen: bool = Field(description="true once the tour has been finished or skipped")
+
+
+class TourUpdate(Input):
+    """Mark the tour seen, or put it back so Settings can replay it."""
+
+    seen: bool
+
+
 # --- games ----------------------------------------------------------------
 
 # How many games one request may name — a batch to analyse, or a selection to delete. A

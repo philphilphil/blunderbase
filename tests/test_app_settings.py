@@ -313,6 +313,39 @@ def test_a_refused_set_of_thresholds_writes_nothing(session: Session) -> None:
     assert app_settings.get_quick_nodes(session) == 1000
 
 
+# --- the tour flag ---------------------------------------------------------
+
+
+def test_an_install_nobody_has_opened_has_not_seen_the_tour(session: Session) -> None:
+    """No row is the state the tour exists for, which is why it is the one that starts it."""
+    assert app_settings.get_tour_seen(session) is False
+
+
+def test_the_tour_is_remembered_once_it_has_been_through(session: Session) -> None:
+    assert app_settings.set_tour_seen(session, True) is True
+
+    assert app_settings.get_tour_seen(session) is True
+
+
+def test_showing_the_tour_again_removes_the_row_rather_than_writing_a_zero(
+    session: Session,
+) -> None:
+    app_settings.set_tour_seen(session, True)
+
+    assert app_settings.set_tour_seen(session, False) is False
+
+    assert session.get(AppSetting, app_settings.TOUR_SEEN) is None
+
+
+def test_the_tour_flag_is_not_one_of_the_settings_a_save_rewrites(session: Session) -> None:
+    """The analysis form replaces every key it knows; this must not be one of them."""
+    app_settings.set_tour_seen(session, True)
+
+    app_settings.replace(session, dict.fromkeys(app_settings.KEYS))
+
+    assert app_settings.get_tour_seen(session) is True
+
+
 # --- the endpoint ----------------------------------------------------------
 
 
@@ -559,3 +592,20 @@ def test_a_game_with_no_rating_says_so_rather_than_inventing_one(
         assert plan.owner_rating is None
         # Which is not the level Maia is asked at: that is the deployment's, not the game's.
         assert plan.maia_target_elo == MAIA_MAX_RATING
+
+
+def test_the_tour_endpoint_answers_and_stores_the_flag(api: TestClient) -> None:
+    assert api.get("/api/settings/tour").json() == {"seen": False}
+
+    assert api.put("/api/settings/tour", json={"seen": True}).json() == {"seen": True}
+
+    assert api.get("/api/settings/tour").json() == {"seen": True}
+
+
+def test_saving_the_analysis_form_does_not_forget_the_tour(api: TestClient) -> None:
+    """The two live under one prefix and are deliberately not one payload."""
+    api.put("/api/settings/tour", json={"seen": True})
+
+    api.put("/api/settings", json={"quick_nodes": 50_000})
+
+    assert api.get("/api/settings/tour").json() == {"seen": True}

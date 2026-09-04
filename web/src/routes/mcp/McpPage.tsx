@@ -70,7 +70,7 @@ export function McpPage() {
 
         <McpKeys minted={minted} onMinted={setMinted} onDismiss={() => setMinted(null)} />
 
-        <section className="flex flex-col rounded-xl border border-line bg-panel">
+        <section data-tour="assistant" className="flex flex-col rounded-xl border border-line bg-panel">
           <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
             <Bot className="size-3.5 text-faint" aria-hidden />
             <h2 className="text-xs font-semibold text-ink">Connect a client</h2>

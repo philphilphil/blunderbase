@@ -167,6 +167,18 @@ export interface AppSettings {
  */
 export type AppSettingsUpdate = { [K in keyof AppSettings]: AppSettings[K] | null }
 
+/**
+ * `GET`/`PUT /settings/tour` — whether the owner has been through the orientation tour.
+ *
+ * Stored on the deployment rather than in this browser because it is a fact about the
+ * person: a tour that came back on a second machine, or after clearing site data, would be
+ * a tour that had not run once. The demo is the exception and keeps its own copy — see
+ * `lib/tour/seen.ts`.
+ */
+export interface TourState {
+  seen: boolean
+}
+
 // --- games ----------------------------------------------------------------
 
 export interface GameSummary extends Extra {

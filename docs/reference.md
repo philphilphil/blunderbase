@@ -1,7 +1,7 @@
 # Reference
 
-The details that used to live in the README: authentication, engines, configuration,
-the CLI, releases and testing. Deployment is in [deploy.md](deploy.md), remote runners
+The details that used to live in the README: authentication, the tour, engines,
+configuration, the CLI, releases and testing. Deployment is in [deploy.md](deploy.md), remote runners
 in [runners.md](runners.md), the system design in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Signing in
@@ -52,6 +52,27 @@ refuses, which is what lets the owner's remote engine sit behind the demo's anal
 board without handing a visitor anything. The page shows a *Demo · read-only* chip in the titlebar
 and one toast the first time a write is refused. Run it only on a database `demo create`
 built; see "A public demo" in [deploy.md](deploy.md#a-public-demo).
+
+## The tour
+
+Nothing else in the app explains itself, so a fresh installation runs a five-step guided
+tour the first time it is opened: the import screen games come from, the engines that have to be
+registered before anything is analysed, the board settings behind the gear under the board,
+what a note is pinned to, and the MCP door onto the same database. It explains no chess and
+names no screen the reader can already see — only what they could not have found by
+clicking. Each step is a small card pointing at the real control, with **Back**, **Next** and a
+**Skip** that ends it; Escape does the same.
+
+It runs once. Whether it has been seen is a row on the deployment (`GET`/`PUT
+/settings/tour`, `{"seen": true}`) rather than something in the browser, so a second machine
+or a cleared cache does not bring it back — and **Show the tour again** in the account menu
+is how to get it back on purpose. The public demo has no owner and refuses every write, so
+there it starts for each visitor and remembers the answer in that browser's
+`localStorage` instead.
+
+A step whose control is not on screen is skipped rather than left pointing at nothing: an
+empty library has no game to open the board settings on, and a deployment serving no MCP has
+no assistant page, so neither step is part of the tour that install runs.
 
 ## Engines
 

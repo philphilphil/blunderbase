@@ -143,7 +143,7 @@ export function NotesPage() {
         is what makes that behave on a phone — there is no room for a 20rem filter bar beside
         the selector on a 375px screen, so the bar takes the next line whole.
       */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div data-tour="notes" className="flex flex-wrap items-center gap-2">
         <ViewToggle view={view} />
         <NoteFilterBar
           filters={filters}

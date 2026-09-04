@@ -100,6 +100,7 @@ import type {
   TagCount,
   Tier,
   TierStatusResponse,
+  TourState,
 } from './types'
 
 function filterParams(filters: GameFilters = {}): Record<string, QueryValue> {
@@ -140,6 +141,12 @@ export const getAppSettings = () => http.get<AppSettings>('/settings')
  */
 export const saveAppSettings = (body: AppSettingsUpdate) =>
   http.put<AppSettings>('/settings', { body })
+
+export const getTourState = () => http.get<TourState>('/settings/tour')
+
+/** `seen: false` is "Show the tour again"; the answer is the flag in force afterwards. */
+export const setTourSeen = (seen: boolean) =>
+  http.put<TourState>('/settings/tour', { body: { seen } })
 
 // --- games ----------------------------------------------------------------
 

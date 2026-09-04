@@ -30,6 +30,13 @@ export const queryKeys = {
   /** The analysis configuration read. Its Maia values also ride on `auth()`. */
   settings: (): QueryKey => ['settings'],
 
+  /**
+   * Whether the owner has seen the orientation tour. Under a key of its own rather than
+   * `settings()`: the analysis form's PUT writes that key wholesale, and a flag about the
+   * person must not be replaced by an answer that never mentions it.
+   */
+  tour: (): QueryKey => ['tour'],
+
   games: (): QueryKey => ['games'],
   gameList: (query: GameQuery = {}): QueryKey => ['games', 'list', query],
   gameCards: (query: GameQuery = {}): QueryKey => ['games', 'cards', query],

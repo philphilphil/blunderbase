@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthGate } from '@/app/AuthGate'
 import { Providers } from '@/app/Providers'
+import { TourProvider } from '@/lib/tour/TourProvider'
 
 import { AccountMenu } from './AccountMenu'
 
@@ -31,14 +32,18 @@ function json(status: number, body: unknown) {
 let routes: Record<string, () => Response>
 
 /** The chip lives in the titlebar, which only exists once there is a session — so it is
- * mounted behind the same gate here, and signing out has somewhere real to land. */
+ * mounted behind the same gate here, and signing out has somewhere real to land. The tour
+ * provider is here for the same reason: "Show the tour again" is one of the menu's items,
+ * and the shell is what mounts the tour around the whole app. */
 function draw() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <Providers client={client}>
       <AuthGate>
         <MemoryRouter>
-          <AccountMenu />
+          <TourProvider>
+            <AccountMenu />
+          </TourProvider>
         </MemoryRouter>
       </AuthGate>
     </Providers>,
@@ -49,6 +54,8 @@ function draw() {
 beforeEach(() => {
   routes = {
     'GET /api/auth/status': () => json(200, { setup_required: false, authenticated: true }),
+    // Seen, so the tour does not start itself over a test about the menu.
+    'GET /api/settings/tour': () => json(200, { seen: true }),
     'GET /api/stats/profile': () =>
       json(200, {
         accounts: [
@@ -95,6 +102,7 @@ describe('AccountMenu', () => {
       'href',
       '/help',
     )
+    expect(screen.getByRole('menuitem', { name: /show the tour again/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /change password/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument()
   })

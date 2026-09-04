@@ -26,6 +26,12 @@ vi.mock('@/lib/api/queries', () => ({
   useQueueStatus,
 }))
 
+// The account chip is the titlebar's, not the palette's, and it wants the tour provider
+// the shell mounts around the whole app. `AccountMenu.test.tsx` is where it is exercised.
+vi.mock('./AccountMenu', () => ({
+  AccountMenu: () => <div data-testid="account" />,
+}))
+
 /** Prints where the router is, so "Enter navigates" is an assertion and not a guess. */
 function Where() {
   const location = useLocation()

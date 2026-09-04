@@ -49,6 +49,7 @@ import type {
   SampleRequest,
   Source,
   Tier,
+  TourState,
 } from './types'
 
 type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>
@@ -192,6 +193,30 @@ export function useSaveAppSettings(
       void client.invalidateQueries({ queryKey: queryKeys.auth() })
       void client.invalidateQueries({ queryKey: queryKeys.maia() })
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+/**
+ * Whether the owner has been through the orientation tour.
+ *
+ * Not on the bootstrap payload, and deliberately a second call: the tour has to wait for a
+ * screen to point at anyway, so nothing is gained by knowing a frame earlier — and
+ * `AuthStatus` is the payload every unauthenticated caller gets back too.
+ */
+export function useTourState(options?: Options<Awaited<ReturnType<typeof api.getTourState>>>) {
+  return useQuery({ queryKey: queryKeys.tour(), queryFn: api.getTourState, ...options })
+}
+
+/** Record the tour as done, or put it back — "Show the tour again" writes `false`. */
+export function useSetTourSeen(options?: UseMutationOptions<TourState, Error, boolean>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (seen: boolean) => api.setTourSeen(seen),
+    ...options,
+    onSuccess: (...args) => {
+      client.setQueryData(queryKeys.tour(), args[0])
       options?.onSuccess?.(...args)
     },
   })

@@ -131,6 +131,7 @@ export function BoardSettingsButton({ className }: { className?: string }) {
       <button
         type="button"
         id={BOARD_SETTINGS_ID}
+        data-tour="board-settings"
         aria-label="Board settings"
         title="Board settings — arrows, sound, the eval graph and line preview (S)"
         onClick={() => setOpen(true)}

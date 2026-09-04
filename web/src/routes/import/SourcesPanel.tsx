@@ -58,7 +58,7 @@ export function SourcesPanel({
   const options: SyncOptions = { since, maxGames, skipEvaluation, fromTheBeginning }
 
   return (
-    <section className="flex flex-col rounded-xl border border-line bg-panel">
+    <section data-tour="sources" className="flex flex-col rounded-xl border border-line bg-panel">
       <div className="flex flex-wrap items-end gap-x-5 gap-y-3 border-b border-hairline px-3.5 py-3">
         <span className="self-center text-xs font-semibold text-ink">Sources</span>
         <div className="flex-1" />

@@ -12,6 +12,12 @@ empty body — clears that setting back to its default. A value outside what a s
 mean is clamped rather than refused, so the answer to a PUT is what is actually in force,
 which is not always what was sent. The exception is a set of classification thresholds
 that does not rise, which is refused whole with a 422 the page shows against the form.
+
+`/settings/tour` is here too, and is none of that: one flag saying whether the owner has
+been through the orientation tour. It hangs off this prefix because it is stored the way
+these are and read by nobody else, and it keeps its own pair of routes because the PUT
+above rewrites every key it names — a flag about the person has no business being cleared
+by a save of a node budget.
 """
 
 from __future__ import annotations
@@ -20,7 +26,7 @@ from fastapi import APIRouter
 from sqlalchemy.orm import Session
 
 from backend.api.deps import SessionDep
-from backend.api.schemas import AppSettings, AppSettingsUpdate
+from backend.api.schemas import AppSettings, AppSettingsUpdate, TourState, TourUpdate
 from backend.services import app_settings as app_settings_service
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -51,6 +57,17 @@ def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
     else:
         app_settings_service.set_maia_elos(session, None)
     return _answer(session, stored)
+
+
+@router.get("/tour", response_model=TourState, summary="Has the owner seen the tour")
+def get_tour(session: SessionDep) -> TourState:
+    return TourState(seen=app_settings_service.get_tour_seen(session))
+
+
+@router.put("/tour", response_model=TourState, summary="Record the tour as seen, or replay it")
+def put_tour(session: SessionDep, body: TourUpdate) -> TourState:
+    """`seen: false` is "Show the tour again" — the row goes rather than holding a 0."""
+    return TourState(seen=app_settings_service.set_tour_seen(session, body.seen))
 
 
 def _answer(session: Session, values: dict[str, int | float | None]) -> AppSettings:

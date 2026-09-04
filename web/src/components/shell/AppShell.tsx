@@ -2,12 +2,14 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { toast, Toaster } from 'sonner'
 
+import { TourCoachmark } from '@/components/tour/TourCoachmark'
 import { onWriteRefused } from '@/lib/api/readOnly'
 import { SITE_URL } from '@/lib/links'
 import { browserRunner } from '@/lib/runner'
 import { NativeFeedback } from '@/lib/desktop/NativeFeedback'
 import { PgnDropOverlay } from '@/lib/desktop/PgnDropOverlay'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
+import { TourProvider } from '@/lib/tour/TourProvider'
 
 import { CommandPaletteProvider } from './CommandPalette'
 import { ShortcutsOverlayProvider } from './ShortcutsOverlay'
@@ -51,6 +53,10 @@ const TOAST_CLASSES = {
  * it is up is the shell's state and not the titlebar's: the button that opens it is in the
  * titlebar but the drawer itself covers everything, and the two would otherwise have to
  * reach across the layout for each other.
+ *
+ * The orientation tour wraps the lot for the reason the palette does and one more: its
+ * steps walk from screen to screen, so it has to outlive every route under it, and the
+ * account menu — which is where "Show the tour again" lives — is inside the titlebar.
  */
 export function AppShell() {
   const capabilities = useRuntimeCapabilities()
@@ -114,48 +120,51 @@ export function AppShell() {
   }, [navigate])
 
   return (
-    <CommandPaletteProvider>
-      <ShortcutsOverlayProvider>
-        <a
-          href="#main-content"
-          className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-xs font-semibold text-accent-ink transition-transform focus:translate-y-0"
-        >
-          Skip to content
-        </a>
-        <div className="flex h-full min-h-0 flex-col bg-surface">
-          <TopBar onOpenNav={openNav} />
-          <div className="flex min-h-0 flex-1">
-            <SideNav />
-            <main
-              ref={main}
-              id="main-content"
-              tabIndex={-1}
-              className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
-            >
-              <Suspense
-                fallback={
-                  <div
-                    role="status"
-                    className="flex flex-1 items-center justify-center text-xs text-dim"
-                  >
-                    Loading…
-                  </div>
-                }
+    <TourProvider>
+      <CommandPaletteProvider>
+        <ShortcutsOverlayProvider>
+          <a
+            href="#main-content"
+            className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-xs font-semibold text-accent-ink transition-transform focus:translate-y-0"
+          >
+            Skip to content
+          </a>
+          <div className="flex h-full min-h-0 flex-col bg-surface">
+            <TopBar onOpenNav={openNav} />
+            <div className="flex min-h-0 flex-1">
+              <SideNav />
+              <main
+                ref={main}
+                id="main-content"
+                tabIndex={-1}
+                className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
               >
-                <Outlet />
-              </Suspense>
-            </main>
+                <Suspense
+                  fallback={
+                    <div
+                      role="status"
+                      className="flex flex-1 items-center justify-center text-xs text-dim"
+                    >
+                      Loading…
+                    </div>
+                  }
+                >
+                  <Outlet />
+                </Suspense>
+              </main>
+            </div>
           </div>
-        </div>
-        <NavDrawer open={navOpen} onClose={closeNav} />
-        <PgnDropOverlay />
-        <NativeFeedback />
-        <Toaster
-          position="bottom-right"
-          gap={8}
-          toastOptions={{ unstyled: true, classNames: TOAST_CLASSES }}
-        />
-      </ShortcutsOverlayProvider>
-    </CommandPaletteProvider>
+          <NavDrawer open={navOpen} onClose={closeNav} />
+          <PgnDropOverlay />
+          <NativeFeedback />
+          <TourCoachmark />
+          <Toaster
+            position="bottom-right"
+            gap={8}
+            toastOptions={{ unstyled: true, classNames: TOAST_CLASSES }}
+          />
+        </ShortcutsOverlayProvider>
+      </CommandPaletteProvider>
+    </TourProvider>
   )
 }

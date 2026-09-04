@@ -54,7 +54,7 @@ export function EnginesPage() {
           error={roles.error}
         />
 
-        <section className="flex flex-col gap-2.5">
+        <section data-tour="engines" className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2">
             <div>
               <h2 className="text-xs font-semibold text-ink">Engine inventory</h2>

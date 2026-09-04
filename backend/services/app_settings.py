@@ -5,8 +5,8 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are fourteen of them, in five groups, plus one switch that is not a setting at all
-(`queue_paused`, at the bottom).
+There are fourteen of them, in five groups, plus two rows that are not settings at all
+(`queue_paused` and `tour_seen`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
 is playing towards and the ones they want to contrast with, not the one they have. Batch
@@ -57,6 +57,12 @@ the *queue* rather than a number with a clamp, nobody sets it from the analysis 
 next save of the Engine passes page, which is exactly the bug a pause button must not have.
 Its own read/write pair goes at the row directly, the way the engine roles and `maia_elos`
 do. `services.analysis.claim_next_run` is the only thing that reads it in anger.
+
+**Whether the owner has seen the app explained** — `tour_seen`, set once the orientation
+tour has been finished or skipped. Not one of the fourteen and outside `replace` for the
+reason `queue_paused` is. It lives here rather than in the browser because it is a fact
+about the owner and not about a browser: a tour that came back on a second machine, or
+after clearing site data, would be a tour that had not run once.
 
 A value outside what a setting can mean is clamped, never refused: an owner aiming at 2200
 gets Maia's top level rather than a form that will not save. The one exception is the
@@ -119,6 +125,11 @@ QUEUE_PAUSED = "queue_paused"
 # Minutes between scheduled syncs of every connected account; no row means never. A
 # number rather than a flag and a number because "on, but at no interval" is not a state.
 AUTO_SYNC_MINUTES = "auto_sync_minutes"
+# Whether the owner has been through the orientation tour. Outside `SETTINGS` for the same
+# reason `queue_paused` is: it is a fact about the person rather than a number with a
+# range, and a member of the set `replace` rewrites would be un-seen by the next save of
+# the Engine passes page.
+TOUR_SEEN = "tour_seen"
 
 ROLE_KEYS: dict[EngineRole, str] = {
     EngineRole.QUICK: QUICK_ENGINE_ID,
@@ -442,6 +453,35 @@ def set_queue_paused(session: Session, paused: bool) -> bool:
     row = session.get(AppSetting, QUEUE_PAUSED)
     if row is None:
         session.add(AppSetting(key=QUEUE_PAUSED, value=FLAG_ON))
+    else:
+        row.value = FLAG_ON
+    session.commit()
+    return True
+
+
+def get_tour_seen(session: Session) -> bool:
+    """Whether the owner has been through the orientation tour, or waved it away.
+
+    No row means they have not: an install nobody has opened is exactly the install the
+    tour is for, which is why the absence of a row is the state that starts it.
+    """
+    row = session.get(AppSetting, TOUR_SEEN)
+    return False if row is None else bool(row.value)
+
+
+def set_tour_seen(session: Session, seen: bool) -> bool:
+    """Record the tour as done, or put it back. Returns the state in force afterwards.
+
+    "Show the tour again" writes False, which deletes the row rather than storing a 0 —
+    the same treatment every other write here gives "the owner has not chosen".
+    """
+    if not seen:
+        session.execute(delete(AppSetting).where(AppSetting.key == TOUR_SEEN))
+        session.commit()
+        return False
+    row = session.get(AppSetting, TOUR_SEEN)
+    if row is None:
+        session.add(AppSetting(key=TOUR_SEEN, value=FLAG_ON))
     else:
         row.value = FLAG_ON
     session.commit()
