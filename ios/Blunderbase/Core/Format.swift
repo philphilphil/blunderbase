@@ -151,6 +151,87 @@ enum Format {
         return "\(Int(value.rounded()))%"
     }
 
+    // MARK: The owner's own results
+
+    /// The three parts of a win / draw / loss bar, as percentages that always add up to 100.
+    ///
+    /// A copy of the explorer's `splitOf` (`web/src/routes/explorer/stats.ts`) rather than a
+    /// second rule of the phone's own: the shares are worked out over the games that were
+    /// **scored** — wins + draws + losses — and not over `games`, which at a position the
+    /// owner merely answered counts every game that reached it whether or not the server
+    /// broke it down. Dividing by `games` draws a bar that does not fill its track, which
+    /// reads as a run of losses nobody suffered.
+    struct Split: Equatable {
+        let wins: Int
+        let draws: Int
+        let losses: Int
+        let winPercent: Double
+        let drawPercent: Double
+        let lossPercent: Double
+        /// How many of the owner's games reached the position. Can exceed the three counts.
+        let games: Int
+    }
+
+    static func split(wins: Int?, draws: Int?, losses: Int?, games: Int? = nil) -> Split {
+        let wins = wins ?? 0
+        let draws = draws ?? 0
+        let losses = losses ?? 0
+        let scored = wins + draws + losses
+        let share = { (value: Int) in scored > 0 ? Double(value) / Double(scored) * 100 : 0 }
+        return Split(
+            wins: wins,
+            draws: draws,
+            losses: losses,
+            winPercent: share(wins),
+            drawPercent: share(draws),
+            lossPercent: share(losses),
+            games: games ?? scored
+        )
+    }
+
+    /// `0.643` -> `64.3%`, the explorer's own rounding.
+    ///
+    /// One decimal rather than a whole number on purpose: this is the same number the
+    /// explorer page prints for the same position, and a percentage that rounds differently
+    /// on the two screens is how one feature quietly becomes two.
+    static func scorePercent(_ score: Double?) -> String {
+        guard let score else { return absent }
+        return String(format: "%.1f%%", (score * 1000).rounded() / 10)
+    }
+
+    /// Green above 55, red below 45 — `scoreTone` in the web's explorer.
+    static func scoreColor(_ score: Double?) -> Color {
+        guard let score else { return Theme.dim2 }
+        let percent = (score * 1000).rounded() / 10
+        if percent >= 55 { return Theme.good }
+        if percent <= 45 { return Theme.blunder }
+        return Theme.body
+    }
+
+    /// `−4.2%` — the win percentage a move gave away, averaged over the times it was played.
+    ///
+    /// Not `winLoss`: that writes one move's own loss as a whole number, and this is a mean
+    /// over several games where the tenth is the part that separates a habit from a one-off.
+    /// The web draws the same column with `formatAvgDrop`, one decimal and a real minus.
+    static func avgDrop(_ avg: Double?) -> String {
+        guard let avg else { return absent }
+        if avg <= 0 { return "0.0%" }
+        return String(format: "−%.1f%%", avg)
+    }
+
+    /// The ramp `dropTone` uses, which is gentler than `severityColor`'s: a *mean* of ten
+    /// points over a dozen games is a habit worth colouring red, where a single move losing
+    /// ten is barely worth a tint.
+    static func dropColor(_ avg: Double?) -> Color {
+        guard let avg else { return Theme.dim2 }
+        switch avg {
+        case 10...: return Theme.blunder
+        case 5..<10: return Theme.mistake
+        case 2..<5: return Theme.inaccuracy
+        default: return Theme.body2
+        }
+    }
+
     // MARK: Moves
 
     /// `18.` for White and `18…` for Black — the ellipsis is what tells a reader which side

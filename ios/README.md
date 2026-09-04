@@ -39,7 +39,10 @@ forward for thirty days, so the app stays signed in between launches.
 ## The game screen
 
 The board and the panels share one column and trade space. The players strip, the board and
-the transport are on top; Moves, Eval, Engine and Notes are tabs directly underneath. Dragging the grabber between them makes the panels taller and the board smaller,
+the transport are on top; Moves, Eval, Engine, Book and Notes are tabs directly underneath.
+Book is the owner's own history of the position on the board — how often they have been
+here, how it went, and what they played from here — and it is the same fold over the same
+table the explorer page reads, so the two agree. Dragging the grabber between them makes the panels taller and the board smaller,
 and the chevron toggles between the resting split and a tall one. At rest the board is as
 wide as the phone and the panels get whatever is left, which is why a short phone shows a
 full-size board and one row of moves rather than a shrunken board and a long list.
@@ -107,7 +110,7 @@ imagesets are checked in so the app builds without `node_modules`.
 
 ## Not in the proof of concept
 
-The book pane, analysis lines and variations on the board, PGN copy (there is no per-game
+Analysis lines and variations on the board, PGN copy (there is no per-game
 PGN endpoint), and any offline cache. Live analysis cannot yet be pointed at
 a specific engine from the phone: it takes whichever engine holds the deep-tier role, which
 is also the one that may live on a runner. There is also no per-device revocable token: the app authenticates with

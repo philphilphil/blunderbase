@@ -8,6 +8,11 @@ import Foundation
 /// draws: both colours, clocks, a capture, a blunder with a classification, engine lines
 /// that disagree with the move played, and Maia at two levels agreeing with the blunder.
 ///
+/// It also carries a book at two of its positions — half-move counts 4 and 8, keyed as the
+/// server keys them, by **count** and as strings — each with the move this game played among
+/// its continuations. Two entries rather than one because the pane has to be nil somewhere
+/// as well as somewhere, and the gap between them (count 5, 6, 7) is what a test stands in.
+///
 /// The JSON is written in the shape the server really sends: absent keys rather than nulls,
 /// win percentages from the point of view of the side that moved, and **plies numbered from
 /// zero** — ply 0 is 1.e4, ply 9 is the blunder 5…Nxd5, `move_number` is `ply / 2 + 1` and an
@@ -67,7 +72,24 @@ enum GameFixture {
       "runs": [
         {"id": 4, "tier": "deep", "status": "done", "engine": "Stockfish 17", "engine_kind": "uci", "depth": 22, "multipv": 2}
       ],
-      "notes": []
+      "notes": [],
+      "book": {
+        "4": {
+          "games": 14, "wins": 8, "draws": 2, "losses": 4, "score": 0.6428571,
+          "moves": [
+            {"uci": "f1c4", "san": "Bc4", "games": 9, "wins": 6, "draws": 1, "losses": 2, "score": 0.7222222, "owner_moves": 9, "evaluated": 9, "avg_win_loss": 2.1, "blunders": 0},
+            {"uci": "f1b5", "san": "Bb5", "games": 3, "wins": 1, "draws": 1, "losses": 1, "score": 0.5, "owner_moves": 3, "evaluated": 3, "avg_win_loss": 4.8, "blunders": 1},
+            {"uci": "d2d4", "san": "d4", "games": 2, "wins": 1, "draws": 0, "losses": 1, "score": 0.5, "owner_moves": 2, "evaluated": 0}
+          ]
+        },
+        "8": {
+          "games": 5, "wins": 2, "draws": 1, "losses": 2, "score": 0.5,
+          "moves": [
+            {"uci": "e4d5", "san": "exd5", "games": 3, "wins": 2, "draws": 0, "losses": 1, "score": 0.6666667, "owner_moves": 3, "evaluated": 3, "avg_win_loss": 1.4, "blunders": 0},
+            {"uci": "c4d5", "san": "Bxd5", "games": 2, "wins": 0, "draws": 1, "losses": 1, "score": 0.25, "owner_moves": 2, "evaluated": 2, "avg_win_loss": 9.2, "blunders": 1}
+          ]
+        }
+      }
     }
     """
 }

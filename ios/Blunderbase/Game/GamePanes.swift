@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The four panes under the board, and the bar that switches between them.
+/// The five panes under the board, and the bar that switches between them.
 ///
 /// These used to live in a sheet that was dragged up over the board. A phone screen turned
 /// out to have room for both, and a sheet that is always up is not a sheet — it is a pane
@@ -8,10 +8,16 @@ import SwiftUI
 /// directly under the transport now, always visible, and the reader resizes them by
 /// dragging the grabber instead of summoning them.
 ///
-/// The four tabs are the web's four mobile tabs, in the same order and meaning the same
-/// thing: Moves is the game, Eval is its shape, Engine is the advice, Notes is what you
-/// wrote down. The order is fixed because this is a control the thumb learns, and a tab
-/// that moves is a tab that gets mis-tapped.
+/// The tabs are the web's mobile tabs, in the same order and meaning the same thing: Moves
+/// is the game, Eval is its shape, Engine is the advice, Book is your own history, Notes is
+/// what you wrote down. The order is fixed because this is a control the thumb learns, and a
+/// tab that moves is a tab that gets mis-tapped.
+///
+/// Book sits between Engine and Notes because that is the order the three are read in — what
+/// was best, what you have done before, what you concluded — and it is always on the strip
+/// even where the position has no book. A tab that appeared and disappeared as the board
+/// moved would slide Notes sideways every time the game left the opening, which is a moving
+/// target to tap at; an empty Book that says why is information, a missing one is not.
 struct GamePanes: View {
     @Bindable var store: GameStore
     @Bindable var live: LiveEngineStore
@@ -22,6 +28,7 @@ struct GamePanes: View {
         case moves = "Moves"
         case eval = "Eval"
         case engine = "Engine"
+        case book = "Book"
         case notes = "Notes"
         var id: String { rawValue }
     }
@@ -52,6 +59,7 @@ struct GamePanes: View {
                 case .moves: MovesPane(store: store)
                 case .eval: EvalPane(store: store)
                 case .engine: EnginePane(store: store, live: live)
+                case .book: BookPane(store: store)
                 case .notes: NotesPane(store: store, isReadOnly: isReadOnly)
                 }
             }

@@ -439,6 +439,37 @@ final class GameStore {
         return lines.sorted { ($0.multipv ?? .max) < ($1.multipv ?? .max) }
     }
 
+    // MARK: The owner's own book
+
+    /// What the owner's other games did from the position on the board.
+    ///
+    /// The book is keyed by half-move **count**, which is the cursor as it stands: the entry
+    /// under `8` is the tree of the position after eight half-moves, and that is the position
+    /// cursor 8 shows. So this is the one ply-keyed lookup on this screen that needs no
+    /// conversion — and the reason the key is a count rather than a move index is that the
+    /// board can stand on the position *after* the last move, which is a position like any
+    /// other and has a book like any other.
+    ///
+    /// Nil on a variation, for the same reason everything else the server said is withheld
+    /// there: the board is on a position no game of the owner's ever reached, so "you have
+    /// been here before" would be a claim about somewhere else. Nil is also the common
+    /// answer on the game itself — a book needs two of the owner's games through the same
+    /// position, and nearly every position in a library is reached by exactly one.
+    var bookHere: BookEntry? {
+        guard !isInLine else { return nil }
+        return detail?.book?[cursor]
+    }
+
+    /// Whether this game carries a book anywhere along it.
+    ///
+    /// What separates "nothing here" from "nothing at all": a game with a book somewhere
+    /// means walking back into the opening will find one, and a game with none means the
+    /// library has not yet seen this line twice. Those are different sentences to show, and
+    /// only the second one is worth explaining.
+    var hasBook: Bool {
+        !(detail?.book?.isEmpty ?? true)
+    }
+
     // MARK: Moving about
 
     /// Go to a position of the game, counted in half-moves as the cursor is. Seeking is a

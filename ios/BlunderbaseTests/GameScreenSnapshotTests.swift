@@ -90,6 +90,13 @@ final class GameScreenSnapshotTests: XCTestCase {
         try snapshot(EvalPane(store: store), named: "pane-eval")
         try snapshot(EnginePane(store: store, live: LiveEngineStore(surface: .game, gameID: store.gameID)), named: "pane-engine")
         try snapshot(NotesPane(store: store, isReadOnly: true), named: "pane-notes")
+
+        // The book lives at counts 4 and 8 and the blunder is at 9, so this pane gets its
+        // own store on a position that has one — an empty state is a sentence, and a
+        // picture of a sentence is not what this test is for.
+        let inBook = try loadedStore()
+        inBook.seek(to: 8)
+        try snapshot(BookPane(store: inBook), named: "pane-book")
     }
 
     private func snapshot(_ view: some View, named name: String) throws {

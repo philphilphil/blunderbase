@@ -114,6 +114,43 @@ final class FormatTests: XCTestCase {
         XCTAssertNil(Format.score(cp: nil, mate: nil))
     }
 
+    // MARK: The owner's own results
+
+    /// The shares are over the games that were scored, not over `games` — a position the
+    /// owner reached fourteen times but has only eleven results for still draws a full bar.
+    func testTheSplitDividesByTheGamesThatWereScored() {
+        let split = Format.split(wins: 8, draws: 2, losses: 4, games: 14)
+        XCTAssertEqual(split.games, 14)
+        XCTAssertEqual(split.winPercent + split.drawPercent + split.lossPercent, 100, accuracy: 0.001)
+        XCTAssertEqual(split.winPercent, 100 * 8 / 14, accuracy: 0.001)
+
+        let partial = Format.split(wins: 4, draws: 1, losses: 1, games: 9)
+        XCTAssertEqual(partial.games, 9, "the count of games is reported as sent")
+        XCTAssertEqual(partial.winPercent, 100 * 4 / 6, accuracy: 0.001, "but the bar fills")
+    }
+
+    func testASplitWithoutCountsIsEmptyRatherThanADivisionByZero() {
+        let split = Format.split(wins: nil, draws: nil, losses: nil)
+        XCTAssertEqual(split.games, 0)
+        XCTAssertEqual(split.winPercent, 0)
+        XCTAssertEqual(split.lossPercent, 0)
+    }
+
+    /// One decimal, the explorer's own rounding: the same position must not read 64% here
+    /// and 64.3% in the browser.
+    func testScorePercentRoundsTheWayTheExplorerDoes() {
+        XCTAssertEqual(Format.scorePercent(0.5192), "51.9%")
+        XCTAssertEqual(Format.scorePercent(0.6428571), "64.3%")
+        XCTAssertEqual(Format.scorePercent(0.5), "50.0%")
+        XCTAssertEqual(Format.scorePercent(nil), Format.absent)
+    }
+
+    func testAverageDropIsWrittenNegativeAndToOneDecimal() {
+        XCTAssertEqual(Format.avgDrop(4.23), "−4.2%")
+        XCTAssertEqual(Format.avgDrop(0), "0.0%")
+        XCTAssertEqual(Format.avgDrop(nil), Format.absent, "unevaluated is not a drop of nothing")
+    }
+
     // MARK: Moves
 
     /// Plies come off the wire numbered from zero, so ply 0 is White's first move and an
