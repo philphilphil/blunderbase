@@ -210,7 +210,8 @@ it safe is in `docs/reference.md` under "Signing in"; what makes it run is three
 2. **Run the stack and put the file in its volume.** `docker/docker-compose.demo.yml` is
    the whole configuration: `BLUNDERBASE_RUNTIME_MODE=demo`, the database at
    `/data/demo.db`, the workers off (nothing is ever queued in a read-only library), and
-   the port on loopback for the proxy to reach.
+   Traefik labels for `demo.blunderbase.org` on the external `gateway` network with the
+   `myresolver` certificate resolver — no port is published on the host.
 
    ```bash
    docker compose -f docker/docker-compose.demo.yml up -d
@@ -220,9 +221,10 @@ it safe is in `docs/reference.md` under "Signing in"; what makes it run is three
 
    The same two commands refresh it after a new `demo create`.
 
-3. **Give it a hostname.** One more site in the Caddyfile or nginx config above, pointing
-   at `127.0.0.1:8766` instead of `8765`; everything the three rules say applies unchanged.
-   There is no `/mcp` on a demo. `/runner` is there, for the one case where the library
+3. **Give it a hostname.** The compose file's labels do that for Traefik; with another
+   proxy, publish the port on loopback and add one more site to the Caddyfile or nginx
+   config above. Everything the three rules say applies unchanged. There is no `/mcp` on
+   a demo. `/runner` is there, for the one case where the library
    was built with `demo create --runners` and one of your own runners should serve the
    demo's analysis board; a proxy that only forwards `/`, `/api` and `/events` is
    otherwise forwarding everything there is.

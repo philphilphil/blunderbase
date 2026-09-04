@@ -1,12 +1,19 @@
-# The public demo. Setup is "A public demo" in docs/deploy.md.
+# The public demo at demo.blunderbase.org. Setup is "A public demo" in docs/deploy.md.
 services:
   blunderbase-demo:
     image: ghcr.io/philphilphil/blunderbase:latest
     container_name: blunderbase-demo
     restart: unless-stopped
-    ports:
-      # Loopback: it sits behind the same proxy as the owner's stack, on its own hostname.
-      - "127.0.0.1:8766:8765"
+    networks:
+      - gateway
+    # Traefik terminates TLS and routes the hostname; nothing is published on the host.
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: gateway
+      traefik.http.routers.blunderbase-demo.rule: Host(`demo.blunderbase.org`)
+      traefik.http.routers.blunderbase-demo.entrypoints: websecure
+      traefik.http.routers.blunderbase-demo.tls.certresolver: myresolver
+      traefik.http.services.blunderbase-demo.loadbalancer.server.port: "8765"
     volumes:
       - blunderbase-demo-data:/data
     environment:
@@ -16,6 +23,10 @@ services:
       BLUNDERBASE_ANALYSIS_WORKERS: "false"
       # Analysis boards a stranger can open at once; the default of three is for the phone.
       BLUNDERBASE_STREAM_MAX_SESSIONS: "2"
+
+networks:
+  gateway:
+    external: true
 
 volumes:
   blunderbase-demo-data:
