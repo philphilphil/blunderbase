@@ -1,53 +1,19 @@
-# A machine that runs engines for a Blunderbase somewhere else.
-#
-# Same image, different command: the runner is a headless worker that dials *out* to the
-# server, so it needs no port, no volume for a database and nothing published. Bring it up
-# on the machine with the cores:
-#
-#   blunderbase runners create gpu-box --slots 8     # on the server; prints the token once
-#   cp the printed yaml to ./runner.yaml             # here, and edit the engine paths
-#   BLUNDERBASE_RUNNER_TOKEN=bb_rnr_… docker compose -f docker/docker-compose.runner.yml up -d
-#
-# The link carries the token on every frame, so put HTTPS/WSS in front of the server —
-# docs/deploy.md is a Caddyfile and an nginx site that do. `server:` in the yaml is the
-# https URL; the socket URL is derived from it.
+# A machine that runs engines for a Blunderbase somewhere else. Setup is docs/runners.md.
 services:
   blunderbase-runner:
     image: ghcr.io/philphilphil/blunderbase:latest
-    # Build the image here instead of pulling it: docker compose -f … build
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
     container_name: blunderbase-runner
     restart: unless-stopped
     # The image's entrypoint migrates a database and serves the API; a runner has neither.
     entrypoint: ["blunderbase-runner"]
     command: ["--config", "/etc/blunderbase/runner.yaml"]
     volumes:
-      # The yaml this machine's engines are declared in. Read-only: the runner never
-      # writes to it, and the server never edits it either — a runner-bound engine row is
-      # an advertisement, and this file is where it comes from.
       - ./runner.yaml:/etc/blunderbase/runner.yaml:ro
-      # A Maia build and its weights, if this machine has them. Register the path in the
-      # yaml as `kind: maia`. The image ships Stockfish at /usr/games/stockfish already.
-      # If it runs on a GPU, give that engine `instances: 1` in the yaml as well: without
-      # it every slot starts its own copy and they fight over the card.
+      # A Maia build and its weights, if this machine has them; the image ships Stockfish.
       # - ./engines:/opt/engines:ro
     environment:
-      # The token beats whatever the mounted yaml says, so the secret can stay out of a
-      # file that gets copied around. Supply it from the shell or a `.env` beside this one.
+      # Beats the token in the yaml, so the secret can stay out of a file that gets copied.
       BLUNDERBASE_RUNNER_TOKEN: ${BLUNDERBASE_RUNNER_TOKEN:-}
-      # The other three overrides, for a runner configured entirely from the environment:
       # BLUNDERBASE_RUNNER_SERVER: https://blunderbase.example.com
       # BLUNDERBASE_RUNNER_NAME: gpu-box
       # BLUNDERBASE_RUNNER_SLOTS: "8"
-# Deliberately no healthcheck. `--check` is the way to test a setup —
-#
-#   docker compose -f docker/docker-compose.runner.yml run --rm --entrypoint blunderbase-runner \
-#     blunderbase-runner --config /etc/blunderbase/runner.yaml --check
-#
-# — but it is a one-off before starting, not something to run on a timer: it opens a second
-# connection with the same token, and a second connection takes the runner over and closes
-# the first. The runner's own log lines are what to watch instead; it exits nonzero on a
-# configuration failure (1) or a protocol version the server will not speak (2), and
-# `restart: unless-stopped` brings it back from anything else.

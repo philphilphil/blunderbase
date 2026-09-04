@@ -1,33 +1,20 @@
-# The public demo: the same image, serving a library `blunderbase demo create` built, to
-# everyone, read-only. It is a second stack beside the owner's own, never the same one —
-# demo mode has no password, so it must never be pointed at a real library.
-#
-#   docker compose -f docker/docker-compose.demo.yml up -d
-#
-# The library has to be put there once; see "A public demo" in docs/deploy.md:
-#
-#   uv run blunderbase demo create --games 72 --stockfish /usr/local/bin/stockfish
-#   docker cp data/demo.db blunderbase-demo:/data/demo.db && docker restart blunderbase-demo
+# The public demo. Setup is "A public demo" in docs/deploy.md.
 services:
   blunderbase-demo:
     image: ghcr.io/philphilphil/blunderbase:latest
     container_name: blunderbase-demo
     restart: unless-stopped
     ports:
-      # Behind the same terminator as the owner's stack, on its own hostname
-      # (demo.blunderbase.org). Publish it on loopback and let the proxy reach it.
+      # Loopback: it sits behind the same proxy as the owner's stack, on its own hostname.
       - "127.0.0.1:8766:8765"
     volumes:
       - blunderbase-demo-data:/data
     environment:
       BLUNDERBASE_RUNTIME_MODE: demo
       BLUNDERBASE_DB_PATH: /data/demo.db
-      # Nothing is ever queued in a read-only library, so the workers have nothing to do;
-      # the analysis board and the one-off eval run their own engine and are unaffected.
+      # Nothing is ever queued in a read-only library.
       BLUNDERBASE_ANALYSIS_WORKERS: "false"
-      # Two analysis boards at once is what a demo of one screen needs, and what a stranger
-      # can make the machine spend. One below the default of three, which exists for the
-      # companion app's surface — a demo has no phone on it.
+      # Analysis boards a stranger can open at once; the default of three is for the phone.
       BLUNDERBASE_STREAM_MAX_SESSIONS: "2"
 
 volumes:
