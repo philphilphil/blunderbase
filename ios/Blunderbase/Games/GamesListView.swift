@@ -21,6 +21,9 @@ import UIKit
 struct GamesListView: View {
     @Environment(Session.self) private var session
     @State private var store = GamesStore()
+    /// The six worst moments of the last month, which ride above the list. Their own store,
+    /// because they are one unfiltered call that fails on its own — see `MomentsStore`.
+    @State private var moments = MomentsStore()
 
     var body: some View {
         NavigationStack {
@@ -40,7 +43,12 @@ struct GamesListView: View {
         .task {
             guard let endpoints = session.endpoints else { return }
             store.attach(endpoints: endpoints, session: session)
+            moments.attach(endpoints: endpoints, session: session)
+            // The list first and the strip after it, deliberately: the strip is drawn inside
+            // the loaded list, so a phone on a slow connection sees the library arrive rather
+            // than waiting on six tiles it cannot see yet.
             if store.state == .idle { await store.load() }
+            if moments.state == .idle { await moments.load() }
         }
     }
 
@@ -70,6 +78,7 @@ struct GamesListView: View {
 
     private var rows: some View {
         List {
+            strip
             Section {
                 ForEach(store.cards) { card in
                     row(card)
@@ -84,7 +93,28 @@ struct GamesListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.defaultMinListRowHeight, 0)
-        .refreshable { await store.refresh() }
+        .refreshable {
+            // Two independent requests, so they go together: the pull ends when both have
+            // answered rather than when the slower one has waited for the other.
+            async let library: Void = store.refresh()
+            async let recent: Void = moments.refresh()
+            _ = await (library, recent)
+        }
+    }
+
+    /// The worst-moments strip, as the list's own first rows.
+    ///
+    /// A section of the `List` rather than a header on the games section: a plain list pins
+    /// its section headers, and a strip that stuck to the top of the screen would be exactly
+    /// the fixed height it must not have.
+    @ViewBuilder
+    private var strip: some View {
+        if let endpoints = session.endpoints, moments.isVisible(over: store) {
+            Section {
+                WorstMomentsStrip(store: moments, endpoints: endpoints)
+                    .modifier(BareRow())
+            }
+        }
     }
 
     @ViewBuilder

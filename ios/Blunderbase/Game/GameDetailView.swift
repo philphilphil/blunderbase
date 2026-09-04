@@ -34,7 +34,18 @@ struct GameDetailView: View {
     /// not in the store, which is about the game.
     @State private var input = MoveInput()
 
+    /// Whether the game has already been walked to `initialPly`. A `task` runs again when
+    /// the view comes back, and landing somebody back on the moment they had navigated away
+    /// from would be a screen that will not let them read the rest of the game.
+    @State private var hasOpenedAtInitialPly = false
+
     private let summary: GameSummary?
+    /// Where to open, as a **cursor** — a half-move count, the scale `GameStore.cursor` uses
+    /// and not the scale a `MoveRow.ply` uses. They differ by what a caller means: a moment's
+    /// 0-based ply `p` is the cursor of the position it was played *from*, so passing it
+    /// lands on the question; a note's ply is already a count and passes through as it is.
+    /// Nil is the ordinary case — the start of the game.
+    private let initialPly: Int?
     private let onPreviousGame: (() -> Void)?
     private let onNextGame: (() -> Void)?
 
@@ -42,6 +53,7 @@ struct GameDetailView: View {
         gameID: Int,
         summary: GameSummary? = nil,
         endpoints: Endpoints,
+        initialPly: Int? = nil,
         onPreviousGame: (() -> Void)? = nil,
         onNextGame: (() -> Void)? = nil
     ) {
@@ -50,6 +62,7 @@ struct GameDetailView: View {
         // board belongs to. The server never reads it; a person looking at the list does.
         _live = State(initialValue: LiveEngineStore(surface: .companion, gameID: gameID))
         self.summary = summary
+        self.initialPly = initialPly
         self.onPreviousGame = onPreviousGame
         self.onNextGame = onNextGame
     }
@@ -69,6 +82,9 @@ struct GameDetailView: View {
         _store = State(initialValue: store)
         _live = State(initialValue: LiveEngineStore(surface: .companion, gameID: store.gameID))
         self.summary = summary
+        // A store handed in is already wherever its owner put it, so there is nothing here
+        // to seek to: the caller moves the cursor itself.
+        self.initialPly = nil
         self.onPreviousGame = onPreviousGame
         self.onNextGame = onNextGame
     }
@@ -88,9 +104,15 @@ struct GameDetailView: View {
                 if let url = session.serverURL {
                     live.attach(serverURL: url, events: events)
                 }
-                guard store.state != .loaded else { return }
-                await store.load(maiaTargetElo: session.maiaTargetElo)
+                if store.state != .loaded {
+                    await store.load(maiaTargetElo: session.maiaTargetElo)
+                }
+                openAtInitialPly()
             }
+            // A load that finished after this `task` did — a retry from the failure screen —
+            // still lands where the caller asked. The one-shot flag is what keeps the two
+            // paths from being two seeks.
+            .onChange(of: store.state) { _, _ in openAtInitialPly() }
             .onChange(of: store.snapshot.fen, initial: true) { _, fen in
                 input.clear()
                 // The live board follows the cursor. The store debounces and only sends a
@@ -103,6 +125,18 @@ struct GameDetailView: View {
                 // there are only two slots, and the next screen wants one.
                 live.detach()
             }
+    }
+
+    /// Walk the loaded game to where the caller opened it, once.
+    ///
+    /// It is here rather than in `GameStore` on purpose: "where this screen was opened" is a
+    /// property of the navigation that made it, and the store already has one cursor with a
+    /// dozen things moving it. `adopt` puts the cursor at 0 when the game arrives, so this
+    /// runs after that and not before.
+    private func openAtInitialPly() {
+        guard !hasOpenedAtInitialPly, store.state == .loaded, let initialPly else { return }
+        hasOpenedAtInitialPly = true
+        store.seek(to: initialPly)
     }
 
     // MARK: Content states

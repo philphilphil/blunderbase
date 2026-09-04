@@ -36,6 +36,15 @@ On first launch the app asks for the server URL and the password. It signs in wi
 `POST /api/auth/login` and keeps the `blunderbase_session` cookie, which the server slides
 forward for thirty days, so the app stays signed in between launches.
 
+## The games list
+
+Above the rows, and scrolling away with them, is a strip of the six worst moments of the
+last thirty days — the phone's version of the web dashboard's panel, in words rather than
+boards, because a board that size is not legible on a phone. Tapping one opens its game on
+the position the blunder was played from, so the move and the engine's answer are both on
+screen. The strip is hidden whenever a search or a filter is on: the list is then an answer
+to a question, and six moments from the whole library would be answering a different one.
+
 ## The game screen
 
 The board and the panels share one column and trade space. The players strip, the board and
@@ -57,7 +66,7 @@ Only the existing REST API and the events socket — no backend change was neede
 | Screen | Endpoint |
 |---|---|
 | Connect | `GET /api/auth/status`, `POST /api/auth/login`, `POST /api/auth/logout` |
-| Games | `GET /api/games?cards=true&…` |
+| Games | `GET /api/games?cards=true&…`, `GET /api/stats/worst-moments` |
 | Game | `GET /api/games/{id}` |
 | Notes | `GET /api/notes`, `POST /api/notes` |
 | Live engine | `POST/PATCH/DELETE /api/streams`, output on `ws(s)://…/events` |

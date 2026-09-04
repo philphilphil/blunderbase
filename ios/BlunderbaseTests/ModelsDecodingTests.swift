@@ -416,6 +416,78 @@ final class ModelsDecodingTests: XCTestCase {
         XCTAssertEqual(status.maiaTargetOrDefault, AuthStatus.defaultMaiaTargetElo)
     }
 
+    // MARK: Stats
+
+    /// One row of `GET /stats/worst-moments`, written the way `_moment_of` in
+    /// `backend/services/stats.py` builds it: the game **nested** under `game` rather than
+    /// flattened as a game card is, `move_number` already `ply / 2 + 1`, and `run_id` and
+    /// `tier` present and unread. The nesting is the part worth pinning — `WorstMoment` and
+    /// this one are two shapes over the same idea, and decoding one as the other would
+    /// silently lose the game.
+    func testWorstMomentDecodesWithItsGameNested() throws {
+        let json = """
+        {
+          "game": {
+            "id": 412,
+            "source": "lichess",
+            "played_at": "2026-08-22T19:04:11Z",
+            "color": "black",
+            "result": "1-0",
+            "outcome": "loss",
+            "white": "someone",
+            "black": "phib",
+            "opponent": "someone",
+            "opponent_rating": 1744,
+            "speed": "blitz",
+            "eco": "C57"
+          },
+          "ply": 47,
+          "move_number": 24,
+          "san": "Nxe4",
+          "uci": "f6e4",
+          "classification": "blunder",
+          "win_loss": 44.2,
+          "phase": "middlegame",
+          "piece": "N",
+          "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4",
+          "best_move_uci": "d7d6",
+          "best_move_san": "d6",
+          "run_id": 88,
+          "tier": "deep"
+        }
+        """
+
+        let moment = try decode(MomentResponse.self, json)
+
+        XCTAssertEqual(moment.game.id, 412)
+        XCTAssertEqual(moment.game.opponent, "someone")
+        XCTAssertEqual(moment.game.playedAt, utc(2026, 8, 22, 19, 4, 11))
+        XCTAssertEqual(moment.classification, .blunder)
+        XCTAssertEqual(moment.winLoss ?? 0, 44.2, accuracy: 0.001)
+        XCTAssertEqual(moment.bestMoveSan, "d6")
+        XCTAssertEqual(moment.phase, "middlegame")
+        XCTAssertEqual(moment.piece, "N")
+        XCTAssertEqual(moment.id, "412-47")
+
+        // The ply is a 0-based move ply, as everywhere else: odd is Black's, and the number
+        // the server sent is the one `Format` spells from it rather than a second scale.
+        XCTAssertEqual(moment.ply, 47)
+        XCTAssertEqual(moment.moveNumber, moment.ply / 2 + 1)
+        XCTAssertEqual(Format.move(ply: moment.ply, san: moment.san), "24… Nxe4")
+    }
+
+    /// The list is a list, and an empty window is an empty array rather than a 404.
+    func testWorstMomentsDecodeAsAListAndCanBeEmpty() throws {
+        XCTAssertTrue(try decode([MomentResponse].self, "[]").isEmpty)
+        let one = try decode(
+            [MomentResponse].self,
+            #"[{"game": {"id": 1, "source": "manual"}, "ply": 0}]"#
+        )
+        XCTAssertEqual(one.count, 1)
+        XCTAssertNil(one.first?.san)
+        XCTAssertNil(one.first?.classification)
+    }
+
     // MARK: Dates
 
     func testBothTimestampFormsParse() throws {

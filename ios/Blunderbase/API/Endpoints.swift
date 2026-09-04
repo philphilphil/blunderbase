@@ -120,6 +120,7 @@ struct Endpoints: Sendable {
         static let logout = "/auth/logout"
         static let games = "/games"
         static let notes = "/notes"
+        static let worstMoments = "/stats/worst-moments"
 
         static func game(_ id: Int) -> String { "/games/\(id)" }
     }
@@ -162,6 +163,33 @@ struct Endpoints: Sendable {
             as: GameDetail.self
         )
     }
+
+    // MARK: Stats
+
+    /// The worst moments of the recent past, ranked by the win percentage they gave away.
+    ///
+    /// The route takes the whole games filter set as well, and this call deliberately sends
+    /// none of it: the phone shows the strip only over the unfiltered library, because a
+    /// filtered list is already an answer to a question and a strip beside it would be
+    /// answering a different one. `days` nil means the whole library, which is the server's
+    /// own default rather than this app's.
+    ///
+    /// `amount` is clamped rather than passed through: the backend refuses 0 and caps at
+    /// 100, and a caller's arithmetic should not be able to turn into a 422.
+    func worstMoments(days: Int? = nil, amount: Int = 5) async throws -> [MomentResponse] {
+        let items: [URLQueryItem?] = [
+            .number("days", days),
+            .number("amount", min(max(amount, 1), Endpoints.maxMoments)),
+        ]
+        return try await client.get(
+            Path.worstMoments,
+            query: items.compactMap { $0 },
+            as: [MomentResponse].self
+        )
+    }
+
+    /// `backend/api/routes/stats.py: MAX_MOMENTS`.
+    private static let maxMoments = 100
 
     // MARK: Notes
 

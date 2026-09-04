@@ -40,18 +40,25 @@ struct Sparkline: View {
 
         // Equality, so that "White is winning" is a place on the stamp rather than a value
         // to work out. Drawn even for a game with no curve, so an unanalysed row still
-        // reads as an empty track rather than as a blank.
-        let midline = Path { path in
-            path.move(to: CGPoint(x: 0, y: size.height / 2))
-            path.addLine(to: CGPoint(x: size.width, y: size.height / 2))
+        // reads as an empty track rather than as a blank — and drawn *over* the fill rather
+        // than under it, because the fill is opaque and a midline beneath it would disappear
+        // exactly when White is winning, which is when it is worth reading.
+        func strokeMidline(_ context: inout GraphicsContext) {
+            let midline = Path { path in
+                path.move(to: CGPoint(x: 0, y: size.height / 2))
+                path.addLine(to: CGPoint(x: size.width, y: size.height / 2))
+            }
+            context.stroke(midline, with: .color(Theme.graphGrid), lineWidth: 0.5)
         }
-        context.stroke(midline, with: .color(Theme.graphGrid), lineWidth: 0.5)
 
         guard points.count >= 2,
               let first = points.first?.ply,
               let last = points.last?.ply,
               last > first
-        else { return }
+        else {
+            strokeMidline(&context)
+            return
+        }
 
         let span = CGFloat(last - first)
         func x(_ ply: Int) -> CGFloat { CGFloat(ply - first) / span * size.width }
@@ -70,8 +77,14 @@ struct Sparkline: View {
                 path.addLine(to: CGPoint(x: x(end.ply), y: size.height))
             }
             path.closeSubpath()
-            context.fill(path, with: .color(Theme.sideWhite.opacity(0.7)))
+            // Solid, like the eval pane's own curve and the web's: `sideWhite` is white in
+            // both themes, so mixing it down against the plot ground made it near-white on
+            // near-white as soon as the light theme existed. At full strength the stamp is a
+            // white shape on the graph ground either way round.
+            context.fill(path, with: .color(Theme.sideWhite))
         }
+
+        strokeMidline(&context)
 
         for ply in flagged where ply >= first && ply <= last {
             let tick = Path { path in

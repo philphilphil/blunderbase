@@ -85,11 +85,21 @@ struct NotesListView: View {
     /// The `summary` handed to the detail screen is nil on purpose: a note carries a
     /// `GameBrief`, which is a label rather than a `GameSummary`, and inventing a summary out
     /// of it would put half-filled player rows on screen until the real game loaded.
+    ///
+    /// A note anchored to a ply opens the game *there*. The note's `ply` is a half-move
+    /// **count** — a note at count `c` is about the position after `c` half-moves — which is
+    /// what the cursor counts, so it passes through untouched. (The move *label* is the one
+    /// that needs `c - 1`, because that is a move rather than a position.)
     @ViewBuilder
     private func row(_ note: NoteResponse) -> some View {
         if let gameID = note.gameID, let endpoints = session.endpoints {
             NavigationLink {
-                GameDetailView(gameID: gameID, summary: nil, endpoints: endpoints)
+                GameDetailView(
+                    gameID: gameID,
+                    summary: nil,
+                    endpoints: endpoints,
+                    initialPly: note.ply ?? note.move?.ply
+                )
             } label: {
                 NoteRow(note: note)
             }

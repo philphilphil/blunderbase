@@ -944,3 +944,55 @@ struct NoteResponse: Decodable, Sendable, Equatable, Identifiable {
         move = try container.decodeIfPresent(MoveBrief.self, forKey: .move)
     }
 }
+
+// MARK: - Stats
+
+/// One of the worst recent moments, as `GET /stats/worst-moments` answers it: the game it
+/// happened in, the move that was played, and what the engine wanted instead.
+///
+/// It is deliberately **not** `WorstMoment`. That one rides on a game card and is therefore
+/// already inside a game — it needs no `game`, because the row it draws in supplies the
+/// opponent and the date. This one arrives on its own, ranked across the whole library, so
+/// it carries its game with it and is the only thing a tile has to read.
+///
+/// `ply` is the move's own **0-based ply**, the same scale `MoveRow` and `WorstMoment` use:
+/// the move was played *from* cursor `ply`, which is the position somebody opening this
+/// moment wants to land on — the question, not the answer.
+struct MomentResponse: Decodable, Sendable, Equatable, Identifiable {
+    let game: GameSummary
+    let ply: Int
+    var moveNumber: Int?
+    var san: String?
+    var uci: String?
+    var classification: Classification?
+    /// How much win percentage the move gave away, 0…100. The list is ranked by it.
+    var winLoss: Double?
+    /// `opening`, `middlegame` or `endgame` — the server's own bucketing.
+    var phase: String?
+    /// The piece that moved, as the server's single letter.
+    var piece: String?
+    /// The position the move was played *from*.
+    var fen: String?
+    var bestMoveUci: String?
+    var bestMoveSan: String?
+
+    /// The service keeps one moment per game, so the id could be the game's; it is the pair
+    /// because that is what actually identifies a position, and a future amount-per-game
+    /// would otherwise put two rows with the same id in a `ForEach`.
+    var id: String { "\(game.id)-\(ply)" }
+
+    enum CodingKeys: String, CodingKey {
+        case game
+        case ply
+        case moveNumber = "move_number"
+        case san
+        case uci
+        case classification
+        case winLoss = "win_loss"
+        case phase
+        case piece
+        case fen
+        case bestMoveUci = "best_move_uci"
+        case bestMoveSan = "best_move_san"
+    }
+}

@@ -34,13 +34,19 @@ extension Classification {
     }
 
     /// The text colour to put *on* `color` when it is used as a fill.
+    ///
+    /// `.unknown` is the odd one: it has no glyph, so nothing is ever actually drawn in this
+    /// ink, and it used to be `Theme.void` — which was black in a dark-only app and became
+    /// the near-white app ground the moment the light theme existed. The ground is never a
+    /// foreground colour, so it is the quietest grey instead, which is what an unjudged move
+    /// is worth in either theme.
     var ink: Color {
         switch self {
         case .blunder: return Theme.blunderInk
         case .mistake: return Theme.mistakeInk
         case .inaccuracy: return Theme.mistakeInk
         case .best, .good: return Theme.goodInk
-        case .unknown: return Theme.void
+        case .unknown: return Theme.faint
         }
     }
 
@@ -76,7 +82,7 @@ extension Classification {
 extension Optional where Wrapped == Classification {
     var glyph: String { self?.glyph ?? "" }
     var color: Color { self?.color ?? Theme.dim2 }
-    var ink: Color { self?.ink ?? Theme.void }
+    var ink: Color { self?.ink ?? Theme.faint }
     var isFlagged: Bool { self?.isFlagged ?? false }
     var name: String { self?.name ?? "Unclassified" }
 }

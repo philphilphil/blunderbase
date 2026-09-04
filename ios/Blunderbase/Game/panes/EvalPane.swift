@@ -87,6 +87,16 @@ struct EvalPane: View {
     /// Interpolation is monotone rather than straight segments: it keeps the curve from
     /// overshooting past a value the game never had, which a spline would do at exactly the
     /// moments that matter here — a sharp drop on a blunder.
+    ///
+    /// **Solid white on the full-strength plot ground**, which is the web's treatment
+    /// (`web/src/routes/game/components/EvalGraph.tsx`) and lichess's before it. The two used
+    /// to be mixed down — a 28 % white area over a 40 % ground — which read on the dark
+    /// theme and became near-white on near-white the moment the light theme existed, because
+    /// `sideWhite` is white in both themes and the ground it was diluted against is not. At
+    /// full strength the plot is its own surface and the fill is a colour rather than a tint,
+    /// so the same picture works either way round. The line is `sideWhiteEdge` for the same
+    /// reason the web rims its bars: it is the boundary of the white shape, and it has to
+    /// read against the fill on one side and the ground on the other.
     private var chart: some View {
         Chart {
             ForEach(store.curve) { point in
@@ -95,7 +105,7 @@ struct EvalPane: View {
                     y: .value("Win", point.win)
                 )
                 .interpolationMethod(.monotone)
-                .foregroundStyle(Theme.sideWhite.opacity(0.28))
+                .foregroundStyle(Theme.sideWhite)
             }
 
             ForEach(store.curve) { point in
@@ -105,7 +115,7 @@ struct EvalPane: View {
                 )
                 .interpolationMethod(.monotone)
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
-                .foregroundStyle(Theme.sideWhite.opacity(0.9))
+                .foregroundStyle(Theme.sideWhiteEdge)
             }
 
             ForEach(store.curve.filter { $0.classification.isFlagged }) { point in
@@ -171,7 +181,7 @@ struct EvalPane: View {
         .frame(height: 140)
         .padding(.horizontal, Theme.Metrics.gutter)
         .padding(.bottom, 12)
-        .background(Theme.graphBg.opacity(0.4))
+        .background(Theme.graphBg)
     }
 
     // MARK: Flagged list
