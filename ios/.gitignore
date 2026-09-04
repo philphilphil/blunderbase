@@ -1,0 +1,12 @@
+# The project is generated from project.yml by XcodeGen — never checked in, so that a
+# change to the file list is a change to project.yml and shows up as a readable diff.
+Blunderbase.xcodeproj/
+*.xcworkspace/
+.swiftpm/
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+
+# Layout snapshots written by the tests, for looking at rather than keeping.
+.snapshots/
