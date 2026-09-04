@@ -97,8 +97,12 @@ struct NotesPane: View {
 
     /// Where a note hangs, said in a reader's terms. A note on the whole game says so
     /// rather than showing a ply of zero.
+    ///
+    /// A note's ply is a half-move *count* — the position after the move — while a move's is
+    /// its own 0-based index, so the move a note is filed under is the one at `count - 1`.
     private func anchor(_ note: NoteResponse) -> String {
-        guard let ply = note.ply, ply > 0 else { return "on the game" }
+        guard let count = note.ply, count > 0 else { return "on the game" }
+        let ply = count - 1
         let san = store.moves.first { $0.ply == ply }?.san
         return "on \(Format.move(ply: ply, san: san))"
     }

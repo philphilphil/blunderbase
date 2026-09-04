@@ -138,8 +138,11 @@ struct EvalPane: View {
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 5)) { value in
                 AxisValueLabel {
-                    if let ply = value.as(Int.self) {
-                        Text(verbatim: "\((ply + 1) / 2)")
+                    // The axis is the cursor — half-moves played — and the label is the whole
+                    // move a reader counts in. After `n` half-moves the move that arrived is
+                    // number `(n + 1) / 2`: 1 and 2 are both move 1, 3 and 4 both move 2.
+                    if let count = value.as(Int.self) {
+                        Text(verbatim: "\((count + 1) / 2)")
                             .font(Theme.Font.mono(9))
                             .foregroundStyle(Theme.graphTick)
                     }
@@ -148,7 +151,8 @@ struct EvalPane: View {
         }
         .chartOverlay { proxy in
             // Tap or drag anywhere on the plot to move the game there. The chart is a
-            // control, not an illustration.
+            // control, not an illustration — and the axis is already the cursor's scale, so
+            // the value under the finger is the cursor to seek to.
             GeometryReader { geometry in
                 Rectangle()
                     .fill(.clear)
@@ -157,8 +161,8 @@ struct EvalPane: View {
                         DragGesture(minimumDistance: 0).onChanged { value in
                             guard let plotFrame = proxy.plotFrame else { return }
                             let x = value.location.x - geometry[plotFrame].origin.x
-                            if let ply: Int = proxy.value(atX: x) {
-                                store.seek(to: ply)
+                            if let count: Int = proxy.value(atX: x) {
+                                store.seek(to: count)
                             }
                         }
                     )
@@ -187,8 +191,9 @@ struct EvalPane: View {
                     Button {
                         // Land on the position the mistake was made *from*: the question at a
                         // blunder is what should have been played here, and that is only
-                        // answerable from the square before it.
-                        store.seek(to: move.ply - 1)
+                        // answerable from the square before it. A move's 0-based ply already
+                        // is the cursor it was played from, so there is nothing to convert.
+                        store.seek(to: move.ply)
                     } label: {
                         HStack(spacing: 8) {
                             Text(move.classification.glyph)
@@ -219,7 +224,7 @@ struct EvalPane: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .background(store.cursor == move.ply - 1 ? Theme.rowActive : .clear)
+                    .background(store.cursor == move.ply ? Theme.rowActive : .clear)
 
                     Divider().overlay(Theme.hairline).padding(.leading, Theme.Metrics.gutter)
                 }

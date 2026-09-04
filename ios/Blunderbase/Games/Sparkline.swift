@@ -17,10 +17,13 @@ import SwiftUI
 /// - **x is the ply, not the index.** Skipping the nils would otherwise squeeze the drawn
 ///   part of the curve across the full width and put the collapse in the wrong place.
 struct Sparkline: View {
-    /// White's win percentage per ply, 0…100, in the order the server sent it.
+    /// White's win percentage per ply, 0…100, in the order the server sent it. The ply is
+    /// the move's own, numbered from zero.
     let points: [EvalPoint]
     /// Plies the analysis flagged, marked with a hairline so the row's `??1 ?2` chips have
-    /// somewhere to point. Empty is the common case and draws nothing.
+    /// somewhere to point. On the same 0-based move ply as `points`, which is all this needs
+    /// — a tick and the curve under it come from the same card. Empty is the common case and
+    /// draws nothing.
     var flagged: [Int] = []
 
     var body: some View {

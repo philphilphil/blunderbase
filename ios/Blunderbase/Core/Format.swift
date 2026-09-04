@@ -155,12 +155,18 @@ enum Format {
 
     /// `18.` for White and `18…` for Black — the ellipsis is what tells a reader which side
     /// moved without spending a column on it.
+    ///
+    /// `ply` is a **0-based move ply**, the one `MoveRow.ply` carries: ply 0 is White's
+    /// first move, so an even ply is White's and the number is `ply / 2 + 1`. A caller
+    /// holding a half-move *count* — a note's ply, the board cursor — is one past the move
+    /// it means and has to pass `count - 1`.
     static func moveNumber(ply: Int) -> String {
-        let number = (ply + 1) / 2
-        return ply % 2 == 1 ? "\(number)." : "\(number)…"
+        let number = ply / 2 + 1
+        return ply % 2 == 0 ? "\(number)." : "\(number)…"
     }
 
-    /// `18. Bxf6` or `18… gxf6`, the form a note or a ticker quotes a move in.
+    /// `18. Bxf6` or `18… gxf6`, the form a note or a ticker quotes a move in. `ply` is a
+    /// 0-based move ply, as in `moveNumber(ply:)`.
     static func move(ply: Int, san: String?) -> String {
         guard let san else { return moveNumber(ply: ply) }
         return "\(moveNumber(ply: ply)) \(san)"

@@ -20,7 +20,8 @@ final class AnalysisLineTests: XCTestCase {
             endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!)
         )
         store.adopt(try GameFixture.friedLiver())
-        // After 5.exd5, Black to move. The game's own move here is the blunder 5…Nxd5.
+        // Cursor 9: nine half-moves played, so after 5.exd5 with Black to move. The game's
+        // own move from here is the blunder 5…Nxd5, which is ply 9.
         store.seek(to: 9)
     }
 
@@ -164,7 +165,8 @@ final class AnalysisLineTests: XCTestCase {
 
     func testTheLineIsWrittenWithTheGamesOwnMoveNumbers() {
         store.playLine(["c6a5", "c4b5"])
-        // Ply 9 is White's fifth move, so a line leaving it starts on Black's fifth.
+        // Nine half-moves in, White has played five moves, so a line leaving here starts on
+        // Black's fifth.
         XCTAssertTrue(store.lineText.hasPrefix("5… Na5"), "got \(store.lineText)")
         XCTAssertTrue(store.lineText.contains("6. Bb5+"), "got \(store.lineText)")
     }

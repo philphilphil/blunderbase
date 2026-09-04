@@ -167,6 +167,10 @@ struct GameRowView: View {
         card.worstMoments?.first?.winLoss
     }
 
+    /// Which plies to tick on the sparkline. Both these and the curve's points carry the
+    /// move's own 0-based ply straight from the card, so they are already on one scale and
+    /// need no conversion — the sparkline only has to agree with the curve beside it, not
+    /// with the game screen's cursor.
     private var flaggedPlies: [Int] {
         (card.worstMoments ?? []).filter(\.classification.isFlagged).map(\.ply)
     }

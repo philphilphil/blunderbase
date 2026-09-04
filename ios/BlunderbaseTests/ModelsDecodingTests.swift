@@ -110,13 +110,13 @@ final class ModelsDecodingTests: XCTestCase {
               "analyzed": true,
               "deep": false,
               "eval_curve": [
-                {"ply": 1, "win": 50.4},
-                {"ply": 2, "win": 43.2},
-                {"ply": 3}
+                {"ply": 0, "win": 50.4},
+                {"ply": 1, "win": 43.2},
+                {"ply": 2}
               ],
               "worst_moments": [
                 {
-                  "ply": 24,
+                  "ply": 23,
                   "move_number": 12,
                   "san": "Nxe5",
                   "uci": "f3e5",
@@ -151,10 +151,13 @@ final class ModelsDecodingTests: XCTestCase {
         XCTAssertEqual(card.evalCurve?.count, 3)
         XCTAssertEqual(card.evalCurve?[1].win, 43.2)
         // A curve point whose win percentage was dropped is still a point on the ply axis.
-        XCTAssertEqual(card.evalCurve?[2].ply, 3)
+        XCTAssertEqual(card.evalCurve?[2].ply, 2)
         XCTAssertNil(card.evalCurve?[2].win)
         XCTAssertEqual(card.worstMoments?.first?.classification, .blunder)
-        XCTAssertEqual(card.worstMoments?.first?.ply, 24)
+        // Both the curve and the moments are on the move's own 0-based ply, which is what
+        // lets the sparkline tick a flag against the curve drawn beside it.
+        XCTAssertEqual(card.worstMoments?.first?.ply, 23)
+        XCTAssertEqual(card.worstMoments?.first?.moveNumber, 12, "23 / 2 + 1")
         XCTAssertEqual(card.worstMoments?.first?.winLoss, 31.5)
 
         // The second row is what the card fields look like when the backend has nothing to
@@ -169,9 +172,9 @@ final class ModelsDecodingTests: XCTestCase {
     // MARK: Moves
 
     func testUnanalysedMoveDecodes() throws {
-        let move = try decode(MoveRow.self, #"{"ply": 3, "san": "Nf3", "color": "white"}"#)
+        let move = try decode(MoveRow.self, #"{"ply": 2, "san": "Nf3", "color": "white"}"#)
 
-        XCTAssertEqual(move.ply, 3)
+        XCTAssertEqual(move.ply, 2)
         XCTAssertEqual(move.san, "Nf3")
         XCTAssertNil(move.classification)
         XCTAssertNil(move.winBefore)
@@ -184,7 +187,7 @@ final class ModelsDecodingTests: XCTestCase {
     func testAnalysedMoveDecodesLinesAndMaia() throws {
         let json = """
         {
-          "ply": 24,
+          "ply": 23,
           "move_number": 12,
           "color": "black",
           "san": "Nxe5",
@@ -243,7 +246,7 @@ final class ModelsDecodingTests: XCTestCase {
     func testWinPercentIsFlippedToWhiteOnBlackPlies() throws {
         let black = try decode(
             MoveRow.self,
-            #"{"ply": 24, "color": "black", "win_before": 55, "win_after": 70}"#
+            #"{"ply": 23, "color": "black", "win_before": 55, "win_after": 70}"#
         )
         // 70 for Black is 30 for White. A graph that plotted the raw number here would
         // mirror every black ply and still look like a plausible curve.
@@ -252,16 +255,26 @@ final class ModelsDecodingTests: XCTestCase {
 
         let white = try decode(
             MoveRow.self,
-            #"{"ply": 23, "color": "white", "win_before": 55, "win_after": 70}"#
+            #"{"ply": 24, "color": "white", "win_before": 55, "win_after": 70}"#
         )
         XCTAssertEqual(white.whiteWinAfter, 70)
         XCTAssertEqual(white.whiteWinBefore, 55)
 
-        // A row that lost its colour falls back to the ply's parity: ply 1 is White's.
-        let noColour = try decode(MoveRow.self, #"{"ply": 24, "win_after": 70}"#)
+        // A row that lost its colour falls back to the ply's parity, and plies are numbered
+        // from zero: an even ply is White's. Reading them as 1-based mirrors the graph.
+        let noColour = try decode(MoveRow.self, #"{"ply": 23, "win_after": 70}"#)
         XCTAssertEqual(noColour.whiteWinAfter, 30)
-        let noColourWhite = try decode(MoveRow.self, #"{"ply": 23, "win_after": 70}"#)
+        let noColourWhite = try decode(MoveRow.self, #"{"ply": 24, "win_after": 70}"#)
         XCTAssertEqual(noColourWhite.whiteWinAfter, 70)
+    }
+
+    /// The parity rule on its own, because it is the one thing in `MoveRow` that has to
+    /// know how the backend numbers plies — everything else is told by `color`.
+    func testAColourlessRowReadsItsSideOffTheZeroBasedPly() throws {
+        XCTAssertTrue(try decode(MoveRow.self, #"{"ply": 0}"#).isWhiteMove, "ply 0 is 1.e4")
+        XCTAssertFalse(try decode(MoveRow.self, #"{"ply": 1}"#).isWhiteMove)
+        // `color` still wins where the server sent it, however odd the pairing looks.
+        XCTAssertTrue(try decode(MoveRow.self, #"{"ply": 1, "color": "white"}"#).isWhiteMove)
     }
 
     // MARK: Game detail
@@ -270,8 +283,8 @@ final class ModelsDecodingTests: XCTestCase {
         let json = """
         {
           "game": {"id": 412, "source": "lichess"},
-          "ply_range": [1, 61],
-          "moves": [{"ply": 1, "san": "e4", "color": "white"}],
+          "ply_range": [0, 60],
+          "moves": [{"ply": 0, "san": "e4", "color": "white"}],
           "runs": [
             {
               "id": 9,
@@ -301,9 +314,9 @@ final class ModelsDecodingTests: XCTestCase {
         let detail = try decode(GameDetail.self, json)
 
         XCTAssertEqual(detail.game.id, 412)
-        XCTAssertEqual(detail.plyRange, [1, 61])
+        XCTAssertEqual(detail.plyRange, [0, 60])
         XCTAssertEqual(detail.moves.count, 1)
-        XCTAssertEqual(detail.move(atPly: 1)?.san, "e4")
+        XCTAssertEqual(detail.move(atPly: 0)?.san, "e4", "ply 0 is White's first move")
         XCTAssertNil(detail.notes)
         XCTAssertEqual(detail.runs.first?.tier, "deep")
         XCTAssertEqual(detail.runs.first?.multipv, 3)
@@ -356,7 +369,13 @@ final class ModelsDecodingTests: XCTestCase {
         // timestamp field stays nil instead of taking the note's decode down with it.
         XCTAssertEqual(note.game?.date, "2026-08-22")
         XCTAssertNil(note.game?.playedAt)
+        // A note's ply is a half-move count, and the brief repeats it rather than converting
+        // it — the move it names is the one at 23, which is why the label reads 12... and
+        // not 13. Anything spelling this itself has to subtract one first.
+        XCTAssertEqual(note.ply, 24)
+        XCTAssertEqual(note.move?.ply, note.ply)
         XCTAssertEqual(note.move?.label, "12... Nxe5")
+        XCTAssertEqual(Format.move(ply: (note.ply ?? 0) - 1, san: note.move?.san), "12… Nxe5")
         XCTAssertEqual(note.move?.classification, .blunder)
         XCTAssertEqual(note.createdAt, utc(2026, 8, 22, 19, 44, 2))
     }

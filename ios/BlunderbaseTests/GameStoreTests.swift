@@ -10,6 +10,10 @@ import XCTest
 /// has already been left, and nothing throws. These tests exist to make that swap fail
 /// loudly.
 ///
+/// The other scale in play is `MoveRow.ply`, which the backend numbers **from zero**: the
+/// move at ply `p` is played from cursor `p` and arrives at cursor `p + 1`. The two are one
+/// apart, which is exactly why reading one as the other passes every eyeball test.
+///
 /// The fixture is the Fried Liver trap: 1.e4 e5 2.Nf3 Nc6 3.Bc4 Nf6 4.Ng5 d5 5.exd5 Nxd5??
 /// 6.Nxf7 — a real game shape with a real blunder on a known square.
 @MainActor
@@ -28,8 +32,45 @@ final class GameStoreTests: XCTestCase {
     func testAtTheStartNothingHasBeenPlayedAndTheFirstMoveIsWhatLeaves() {
         store.seek(to: 0)
         XCTAssertNil(store.playedMove)
-        XCTAssertEqual(store.positionMove?.ply, 1)
+        XCTAssertEqual(store.positionMove?.ply, 0, "the backend numbers plies from zero")
         XCTAssertEqual(store.positionMove?.san, "e4")
+    }
+
+    /// The move at ply `p` is played *from* cursor `p` and arrives *at* cursor `p + 1`.
+    ///
+    /// Every pane converts between the two — the move list seeks to the arrival, the flagged
+    /// list seeks to the departure — so the relationship is worth pinning once, over the
+    /// whole game, rather than at one hand-picked ply where an off-by-one might not show.
+    func testEveryMoveIsPlayedFromItsOwnPlyAndArrivesAtTheNext() {
+        for move in store.moves {
+            store.seek(to: move.ply)
+            XCTAssertEqual(store.positionMove?.san, move.san, "ply \(move.ply) leaves cursor \(move.ply)")
+            store.seek(to: move.ply + 1)
+            XCTAssertEqual(store.playedMove?.san, move.san, "ply \(move.ply) arrives at cursor \(move.ply + 1)")
+        }
+    }
+
+    /// What tapping a row of the move list does: it lands on the position the move made.
+    func testTappingAMoveInTheListLandsAfterIt() {
+        // 5…Nxd5 is ply 9, so its row seeks to 10 and the board shows the knight on d5.
+        let blunder = store.moves.first { $0.san == "Nxd5" }
+        XCTAssertEqual(blunder?.ply, 9)
+        store.seek(to: 9 + 1)
+        XCTAssertEqual(store.playedMove?.san, "Nxd5")
+        XCTAssertEqual(store.snapshot.pieces[BoardSquare(algebraic: "d5")!]?.kind, .knight)
+        XCTAssertEqual(store.snapshot.pieces[BoardSquare(algebraic: "d5")!]?.color, .black)
+    }
+
+    /// The parity the move list pairs rows by, and the numbering `Format` spells.
+    func testAnEvenPlyIsWhitesAndIsNumberedFromZero() {
+        let opening = store.moves.prefix(4)
+        XCTAssertEqual(opening.map(\.ply), [0, 1, 2, 3])
+        XCTAssertEqual(opening.map(\.isWhiteMove), [true, false, true, false])
+        XCTAssertEqual(opening.map { $0.moveNumber ?? -1 }, [1, 1, 2, 2])
+        XCTAssertEqual(opening.map { $0.ply / 2 + 1 }, [1, 1, 2, 2], "the move list pairs on this")
+
+        let blunder = store.moves.first { $0.san == "Nxd5" }
+        XCTAssertEqual(Format.move(ply: blunder?.ply ?? -1, san: blunder?.san), "5… Nxd5")
     }
 
     func testTheTwoLookupsAreAdjacentAndInThatOrder() {
@@ -49,15 +90,15 @@ final class GameStoreTests: XCTestCase {
 
     func testTheEvalBarReadsThePositionOnTheBoardNotTheMoveBehindIt() {
         store.seek(to: 9)
-        // Ply 10 is a black move whose `win_before` is 45 from Black's side, so White's
-        // share of this position is 55. Reading `whiteWinAfter` of ply 9 instead would give
+        // Ply 9 is Black's blunder, and its `win_before` is 45 from Black's side, so White's
+        // share of this position is 55. Reading `whiteWinAfter` of ply 8 instead would give
         // the same number here only by luck, so the fixture makes them differ.
         XCTAssertEqual(store.whiteWin ?? 0, 55, accuracy: 0.001)
     }
 
     func testAtTheEndTheEvalFallsBackToTheMoveThatArrived() {
         store.toEnd()
-        // Ply 11 is a white move with `win_after` 88, already from White's side.
+        // Ply 10 is a white move with `win_after` 88, already from White's side.
         XCTAssertEqual(store.whiteWin ?? 0, 88, accuracy: 0.001)
     }
 
@@ -67,11 +108,25 @@ final class GameStoreTests: XCTestCase {
     }
 
     func testTheCurveIsInWhitesFrameThroughout() {
-        // Ply 10, Black's blunder, has `win_after` 8 from Black's side — a disaster for
-        // Black, which in White's frame is 92.
+        // The blunder is ply 9 and its evaluation is the one *after* it, so its point sits
+        // at count 10. `win_after` is 8 from Black's side — a disaster for Black, which in
+        // White's frame is 92.
         let point = store.curve.first { $0.ply == 10 }
         XCTAssertEqual(point?.win ?? 0, 92, accuracy: 0.001)
         XCTAssertEqual(point?.classification, .blunder)
+    }
+
+    /// The graph's x axis is the cursor, so its drop has to fall where the board shows the
+    /// blunder. Plotting a point at the move's own ply would put it one half-move early —
+    /// still a plausible-looking curve, and the cursor rule would sit beside the drop
+    /// instead of on it.
+    func testTheCurvesDropSitsAtTheCountWhereTheBoardShowsTheGlyph() {
+        let count = store.curve.first { $0.classification == .blunder }?.ply
+        XCTAssertEqual(count, 10)
+
+        store.seek(to: count ?? -1)
+        XCTAssertEqual(store.playedMove?.san, "Nxd5", "the board is showing the flagged move")
+        XCTAssertEqual(store.glyph?.text, "??")
     }
 
     // MARK: The board's marks
@@ -95,12 +150,12 @@ final class GameStoreTests: XCTestCase {
     }
 
     func testThePlayedMoveAlwaysHasAnArrow() {
-        for ply in 0...10 {
-            store.seek(to: ply)
+        for count in 0...10 {
+            store.seek(to: count)
             guard store.positionMove != nil else { continue }
             XCTAssertTrue(
                 store.arrows.contains { $0.kind == .played },
-                "no played arrow at ply \(ply)"
+                "no played arrow at cursor \(count)"
             )
         }
     }
@@ -147,15 +202,30 @@ final class GameStoreTests: XCTestCase {
     func testTheNextFlaggedMoveLandsOnThePositionItWasPlayedFrom() {
         store.seek(to: 0)
         store.toNextFlagged()
-        // The blunder is ply 10, so the position it was made from is ply 9.
+        // The blunder is ply 9, and a move is played *from* the cursor of its own ply — so
+        // this is the position before it, with the blunder as the move that leaves.
         XCTAssertEqual(store.cursor, 9)
         XCTAssertEqual(store.positionMove?.san, "Nxd5")
+        XCTAssertEqual(store.playedMove?.san, "exd5", "one short of the blunder, not past it")
     }
 
     func testThereIsNoFlaggedMoveBeforeTheFirstOne() {
         store.seek(to: 0)
         XCTAssertFalse(store.hasPreviousFlagged)
         XCTAssertTrue(store.hasNextFlagged)
+    }
+
+    /// Standing on the position a blunder was made from, the blunder is not "next" — it is
+    /// where the reader already is — and it is not "previous" either.
+    func testTheFlaggedMoveYouAreStandingOnIsNeitherNextNorPrevious() {
+        store.seek(to: 9)
+        XCTAssertFalse(store.hasNextFlagged)
+        XCTAssertFalse(store.hasPreviousFlagged)
+
+        store.seek(to: 10)
+        XCTAssertTrue(store.hasPreviousFlagged, "it is behind us once it has been played")
+        store.toPreviousFlagged()
+        XCTAssertEqual(store.cursor, 9)
     }
 
     func testSeekingIsClampedToTheGameRatherThanCrashing() {

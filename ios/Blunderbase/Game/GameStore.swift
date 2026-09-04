@@ -7,9 +7,11 @@ import Observation
 /// strip, an engine pane — and the bug they invite is each panel deciding for itself what
 /// "here" means. So there is one cursor, and every panel reads from it.
 ///
-/// **The cursor is a ply, not a move index.** Cursor 0 is the starting position; cursor `n`
-/// is the position after `n` half-moves. That distinction is the source of the two lookups
-/// this whole file turns on:
+/// **The cursor is a half-move count, not a move index.** Cursor 0 is the starting position;
+/// cursor `n` is the position after `n` half-moves. `MoveRow.ply` is the other scale — the
+/// move's own 0-based index, so the move at ply `p` is played *from* cursor `p` and *arrives
+/// at* cursor `p + 1`. That distinction is the source of the two lookups this whole file
+/// turns on:
 ///
 /// - `playedMove` is `moves[cursor - 1]` — the move that *arrived* at this position. Its
 ///   classification is what earns a glyph on the board and a colour in the ticker.
@@ -19,7 +21,8 @@ import Observation
 ///   move behind us.
 ///
 /// Getting those two the wrong way round shows a plausible screen that is off by one move
-/// everywhere, which is why they are named rather than indexed at each call site.
+/// everywhere, which is why they are named rather than indexed at each call site. A note's
+/// ply is a count too, so it is a cursor as it stands and needs the `- 1` to name its move.
 @Observable
 @MainActor
 final class GameStore {
@@ -117,7 +120,7 @@ final class GameStore {
     /// The live engine is the exception: it follows the board, which is the whole reason it
     /// is worth having here.
     private(set) var line: [String] = []
-    /// The game ply the line leaves from. Returning to the game means returning here.
+    /// The cursor the line leaves from. Returning to the game means returning here.
     private(set) var lineBase: Int = 0
     /// How far along the line the board is: 0 is the base position, `line.count` is its end.
     private(set) var lineIndex: Int = 0
@@ -214,9 +217,10 @@ final class GameStore {
         gameSnapshot(at: isInLine ? lineBase : cursor).fen
     }
 
-    /// The game's own position at a ply, ignoring any line. The line is built on top of it.
-    private func gameSnapshot(at ply: Int) -> Snapshot {
-        if ply >= 0, ply < snapshots.count { return snapshots[ply] }
+    /// The game's own position at a half-move count, ignoring any line. The line is built on
+    /// top of it.
+    private func gameSnapshot(at count: Int) -> Snapshot {
+        if count >= 0, count < snapshots.count { return snapshots[count] }
         return snapshots.first ?? GameStore.emptyBoard
     }
 
@@ -288,14 +292,20 @@ final class GameStore {
         return nil
     }
 
-    /// One point per ply, in White's frame, for the strip and the graph. Ply 0 is a level
-    /// game at 50, so the curve starts where the eval bar starts rather than at the first
-    /// analysed move.
+    /// One point per ply, in White's frame, for the strip and the graph.
+    ///
+    /// The x axis is the **cursor**, not the move index, so the graph and the cursor rule
+    /// drawn over it are on one scale and a point sits where the board shows the position it
+    /// describes. A move's evaluation is the one *after* it, so the move at ply `p` plots at
+    /// `p + 1`; 0 is a level game at 50, so the curve starts where the eval bar starts
+    /// rather than at the first analysed move.
     var curve: [CurvePoint] {
         var points: [CurvePoint] = [CurvePoint(ply: 0, win: 50, classification: nil)]
         for move in moves {
             guard let win = move.whiteWinAfter else { continue }
-            points.append(CurvePoint(ply: move.ply, win: win, classification: move.classification))
+            points.append(
+                CurvePoint(ply: move.ply + 1, win: win, classification: move.classification)
+            )
         }
         return points
     }
@@ -431,11 +441,12 @@ final class GameStore {
 
     // MARK: Moving about
 
-    /// Go to a ply of the game. Seeking is a game move, so it leaves any line first —
-    /// tapping move 12 means the game's move 12, not a position twelve deep in a variation.
-    func seek(to ply: Int) {
+    /// Go to a position of the game, counted in half-moves as the cursor is. Seeking is a
+    /// game move, so it leaves any line first — tapping move 12 means the game's move 12,
+    /// not a position twelve deep in a variation.
+    func seek(to count: Int) {
         if isInLine { exitLine() }
-        cursor = min(max(0, ply), max(0, snapshots.count - 1))
+        cursor = min(max(0, count), max(0, snapshots.count - 1))
     }
 
     /// One step forward or back.
@@ -473,19 +484,20 @@ final class GameStore {
     ///
     /// It lands on the position the mistake was made *from*, not the one it led to: the
     /// question a reader has at a blunder is "what should I have played here", and that is
-    /// only answerable from the square before it.
+    /// only answerable from the square before it. The move at ply `p` is played from cursor
+    /// `p`, so the ply is the cursor to seek to, unconverted.
     func toNextFlagged() {
-        guard let next = flaggedMoves.first(where: { $0.ply - 1 > cursor }) else { return }
-        seek(to: next.ply - 1)
+        guard let next = flaggedMoves.first(where: { $0.ply > cursor }) else { return }
+        seek(to: next.ply)
     }
 
     func toPreviousFlagged() {
-        guard let previous = flaggedMoves.last(where: { $0.ply - 1 < cursor }) else { return }
-        seek(to: previous.ply - 1)
+        guard let previous = flaggedMoves.last(where: { $0.ply < cursor }) else { return }
+        seek(to: previous.ply)
     }
 
-    var hasNextFlagged: Bool { flaggedMoves.contains { $0.ply - 1 > cursor } }
-    var hasPreviousFlagged: Bool { flaggedMoves.contains { $0.ply - 1 < cursor } }
+    var hasNextFlagged: Bool { flaggedMoves.contains { $0.ply > cursor } }
+    var hasPreviousFlagged: Bool { flaggedMoves.contains { $0.ply < cursor } }
 
     func flip() {
         orientation = orientation == .white ? .black : .white
@@ -524,7 +536,9 @@ final class GameStore {
         notes.sorted { ($0.ply ?? 0) < ($1.ply ?? 0) }
     }
 
-    /// The plies that carry a note, so the move list can mark them without a lookup per row.
+    /// The half-move **counts** that carry a note, so the move list can mark them without a
+    /// lookup per row. A note hangs on the position after a move, so the move at ply `p`
+    /// wears a dot when this contains `p + 1`.
     var notedPlies: Set<Int> {
         Set(notes.compactMap(\.ply))
     }
@@ -572,6 +586,9 @@ final class GameStore {
 }
 
 /// One point of the eval curve, in White's frame.
+///
+/// `ply` is a half-move **count** — the cursor the position sits at — and not a move index,
+/// so a chart can put its cursor rule and its points on the same axis.
 struct CurvePoint: Identifiable, Equatable {
     let ply: Int
     let win: Double

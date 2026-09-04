@@ -380,6 +380,9 @@ struct GameSummary: Decodable, Sendable, Equatable, Identifiable {
 /// One point of a game's eval curve. `win` is a win percentage, 0…100, already from
 /// **White's** side — the curve is the one thing the backend orients for the caller, so a
 /// graph plots it as it arrives.
+///
+/// `ply` is the 0-based ply of the move the point is the evaluation *after*, on the same
+/// scale as `WorstMoment.ply`, which is what lets a sparkline put a flag tick on the curve.
 struct EvalPoint: Decodable, Sendable, Equatable, Identifiable {
     let ply: Int
     var win: Double?
@@ -394,6 +397,8 @@ struct EvalPoint: Decodable, Sendable, Equatable, Identifiable {
 
 /// A move the analysis singled out, as the game cards carry it — enough to label a row and
 /// jump to the ply, without the whole move list.
+///
+/// `ply` is the move's own 0-based ply, the same scale `MoveRow` and `EvalPoint` use.
 struct WorstMoment: Decodable, Sendable, Equatable, Identifiable {
     let ply: Int
     var moveNumber: Int?
@@ -571,8 +576,11 @@ struct MaiaPolicy: Decodable, Sendable, Equatable {
 
 /// One half-move of a game, with whatever analysis has been done to it.
 ///
-/// `ply` is a half-move count, 1-based: ply 1 is White's first move. Everything else is
-/// optional because an unanalysed game is a list of these carrying nothing but the move.
+/// `ply` is the move's own index, **0-based**: ply 0 is White's first move, ply 1 is
+/// Black's reply, and `move_number` is `ply / 2 + 1`. It is not the same scale as the
+/// cursor, which counts half-moves *played* — the move at ply `p` is played from cursor `p`
+/// and arrives at cursor `p + 1`. Everything else is optional because an unanalysed game is
+/// a list of these carrying nothing but the move.
 struct MoveRow: Decodable, Sendable, Equatable, Identifiable {
     let ply: Int
     /// The whole move number a person says out loud — 1 for both plies of move 1.
@@ -631,12 +639,12 @@ struct MoveRow: Decodable, Sendable, Equatable, Identifiable {
     var isFlagged: Bool { classification?.isMistake ?? false }
 
     /// Which side made the move. `color` says so; a row that lost it falls back to the ply's
-    /// parity, since ply 1 is White's and the count never lies.
+    /// parity, since plies are numbered from zero and ply 0 is White's first move.
     var isWhiteMove: Bool {
         switch color {
         case Side.white: return true
         case Side.black: return false
-        default: return ply % 2 == 1
+        default: return ply % 2 == 0
         }
     }
 
@@ -759,7 +767,7 @@ struct BookEntry: Decodable, Sendable, Equatable {
 /// already (`memory/blunderbase-meltdown-root-cause.md`).
 struct GameDetail: Decodable, Sendable, Equatable {
     let game: GameSummary
-    /// `[first, last]` when the detail was asked for a slice of the game.
+    /// `[first, last]` 0-based move plies, when the detail was asked for a slice of the game.
     var plyRange: [Int]?
     var moves: [MoveRow]
     var runs: [RunSummary]
@@ -797,8 +805,9 @@ struct GameDetail: Decodable, Sendable, Equatable {
         }
     }
 
-    /// The move at a half-move count, or nil where the game does not reach it. Linear rather
-    /// than indexed because a game is a few hundred rows and a slice does not start at 1.
+    /// The move with that 0-based ply, or nil where the game does not carry it. Linear rather
+    /// than indexed because a game is a few hundred rows and a windowed list does not start
+    /// at ply 0.
     func move(atPly ply: Int) -> MoveRow? {
         moves.first { $0.ply == ply }
     }
@@ -849,6 +858,11 @@ struct GameBrief: Decodable, Sendable, Equatable {
 
 /// The move a note was written on, already spelled by the backend, so a note that resurfaces
 /// at a position reached some other way can still name where it came from.
+///
+/// Its `ply` is the note's, so a half-move **count** rather than a move index — the backend
+/// builds this label from the position *after* the move (`services/notes.py::_move_label`),
+/// which means the move itself is the one at `ply - 1`. `label` is spelled server-side and
+/// is the field to prefer for exactly that reason.
 struct MoveBrief: Decodable, Sendable, Equatable {
     var ply: Int?
     var moveNumber: Int?
@@ -875,8 +889,10 @@ struct MoveBrief: Decodable, Sendable, Equatable {
 /// A note with its anchors resolved.
 ///
 /// `ply` is a half-move **count**, not a move index: 0 is the starting position and `n` the
-/// position after `n` half-moves — so the move it is about is the one at `ply`, and the note
-/// belongs *after* it. `scope` says which anchors it has at all (`game`, `position`, `line`
+/// position after `n` half-moves — so the move it is about is `MoveRow` ply `n - 1`, and the
+/// note belongs *after* it. It is the scale `GameStore.cursor` counts in, which is why
+/// seeking to a note is a plain `seek(to: note.ply)` while naming its move is not.
+/// `scope` says which anchors it has at all (`game`, `position`, `line`
 /// or `free`), and the game and move briefs ride along so a list of notes renders without a
 /// second call per row.
 struct NoteResponse: Decodable, Sendable, Equatable, Identifiable {

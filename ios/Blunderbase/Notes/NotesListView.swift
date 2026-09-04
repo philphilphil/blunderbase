@@ -159,8 +159,11 @@ private struct NoteRow: View {
 
     private var moveLabel: String? {
         if let label = note.move?.label, !label.isEmpty { return label }
-        guard let ply = note.move?.ply ?? note.ply, ply > 0 else { return nil }
-        return Format.move(ply: ply, san: note.move?.san)
+        // Both of these are half-move *counts* — the brief's ply is the note's, which the
+        // backend builds the label from — so the move they name is the one before, and
+        // `Format.move` wants a 0-based move ply.
+        guard let count = note.move?.ply ?? note.ply, count > 0 else { return nil }
+        return Format.move(ply: count - 1, san: note.move?.san)
     }
 
     private static func players(of game: GameBrief) -> String? {

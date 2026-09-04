@@ -87,13 +87,16 @@ struct MovesPane: View {
     @ViewBuilder
     private func moveCell(_ move: MoveRow?) -> some View {
         if let move {
+            // Tapping a move shows the position it produced, not the one before it — the
+            // cursor counts half-moves played, so the move at ply `p` lands at `p + 1`.
+            let arrival = move.ply + 1
             Button {
-                store.seek(to: move.ply)
+                store.seek(to: arrival)
             } label: {
                 HStack(spacing: 4) {
                     Text(move.san ?? "…")
-                        .font(Theme.Font.mono(14, weight: store.cursor == move.ply ? .semibold : .regular))
-                        .foregroundStyle(store.cursor == move.ply ? Theme.textBright : Theme.body)
+                        .font(Theme.Font.mono(14, weight: store.cursor == arrival ? .semibold : .regular))
+                        .foregroundStyle(store.cursor == arrival ? Theme.textBright : Theme.body)
 
                     if move.isFlagged {
                         Text(move.classification.glyph)
@@ -101,7 +104,8 @@ struct MovesPane: View {
                             .foregroundStyle(move.classification.color)
                     }
 
-                    if store.notedPlies.contains(move.ply) {
+                    // A note's ply is a half-move count too, so it is the arrival, not the ply.
+                    if store.notedPlies.contains(arrival) {
                         Image(systemName: "text.quote")
                             .font(.system(size: 9))
                             .foregroundStyle(Theme.accent)
@@ -129,6 +133,8 @@ struct MovesPane: View {
         pair.number == currentPairNumber && store.cursor > 0
     }
 
+    /// The whole move the cursor sits inside — a half-move count, so `(cursor + 1) / 2` is
+    /// the number of the move that arrived here.
     private var currentPairNumber: Int {
         max(1, (store.cursor + 1) / 2)
     }
@@ -137,13 +143,14 @@ struct MovesPane: View {
     ///
     /// The ply is the truth here, not the position in the array: a game that starts from a
     /// position, or one whose move list the server trimmed to a window, has a first ply
-    /// that is not 1, and pairing by array index would silently shift every row.
+    /// that is not 0, and pairing by array index would silently shift every row. Plies are
+    /// numbered from zero, so an even one is White's and the whole move is `ply / 2 + 1`.
     private var pairs: [MovePair] {
         var byNumber: [Int: MovePair] = [:]
         for move in store.moves {
-            let number = (move.ply + 1) / 2
+            let number = move.ply / 2 + 1
             var pair = byNumber[number] ?? MovePair(number: number, white: nil, black: nil)
-            if move.ply % 2 == 1 { pair.white = move } else { pair.black = move }
+            if move.ply % 2 == 0 { pair.white = move } else { pair.black = move }
             byNumber[number] = pair
         }
         return byNumber.values.sorted { $0.number < $1.number }

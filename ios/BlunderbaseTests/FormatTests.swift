@@ -116,20 +116,31 @@ final class FormatTests: XCTestCase {
 
     // MARK: Moves
 
+    /// Plies come off the wire numbered from zero, so ply 0 is White's first move and an
+    /// even ply is always White's. Reading them as 1-based mislabels every move as its
+    /// neighbour — right number, wrong side, or a move number out by one.
     func testMoveNumberSaysWhichSideMovedWithoutAColumnForIt() {
-        XCTAssertEqual(Format.moveNumber(ply: 1), "1.")
-        XCTAssertEqual(Format.moveNumber(ply: 2), "1…")
-        XCTAssertEqual(Format.moveNumber(ply: 35), "18.")
-        XCTAssertEqual(Format.moveNumber(ply: 36), "18…")
+        XCTAssertEqual(Format.moveNumber(ply: 0), "1.")
+        XCTAssertEqual(Format.moveNumber(ply: 1), "1…")
+        XCTAssertEqual(Format.moveNumber(ply: 34), "18.")
+        XCTAssertEqual(Format.moveNumber(ply: 35), "18…")
     }
 
     func testMoveQuotesThePlyAndTheSanTogether() {
-        XCTAssertEqual(Format.move(ply: 35, san: "Bxf6"), "18. Bxf6")
-        XCTAssertEqual(Format.move(ply: 36, san: "gxf6"), "18… gxf6")
+        XCTAssertEqual(Format.move(ply: 34, san: "Bxf6"), "18. Bxf6")
+        XCTAssertEqual(Format.move(ply: 35, san: "gxf6"), "18… gxf6")
     }
 
     func testAMoveWithoutSanStillNamesItsPly() {
-        XCTAssertEqual(Format.move(ply: 35, san: nil), "18.")
+        XCTAssertEqual(Format.move(ply: 34, san: nil), "18.")
+    }
+
+    /// A note's ply is a half-move *count* — the position after the move — so naming its
+    /// move means stepping back one. The proof is the backend's own label: a note at count
+    /// 24 comes back spelled `12... Nxe5`, and this has to agree with it.
+    func testANoteCountNamesTheMoveBeforeItAndAgreesWithTheServersLabel() {
+        XCTAssertEqual(Format.move(ply: 24 - 1, san: "Nxe5"), "12… Nxe5")
+        XCTAssertEqual(Format.move(ply: 1 - 1, san: "e4"), "1. e4")
     }
 
     func testMoveCountIsWholeMovesNotHalfOnes() {

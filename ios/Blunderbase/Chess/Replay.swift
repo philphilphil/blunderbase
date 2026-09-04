@@ -27,9 +27,10 @@ import Foundation
 /// full move generation to resolve. SAN is carried through only so a caller can label a
 /// move; the replay never reads it.
 public struct ReplayMove: Sendable, Hashable {
-    /// 1-based half-move count, as the backend numbers plies. The replay uses the array
-    /// order rather than this field, so a list with wrong or missing ply numbers still
-    /// replays; the field is here because every caller already has it.
+    /// Whatever the caller numbers this move — a `MoveRow.ply`, an array offset. The replay
+    /// uses the array order rather than this field, so a list with wrong or missing ply
+    /// numbers still replays; the field is here because every caller already has one and
+    /// carrying it costs nothing.
     public let ply: Int
     public let san: String?
     /// `"e2e4"`, `"e7e8q"`. Nil stops the replay.

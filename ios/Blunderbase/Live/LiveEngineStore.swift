@@ -238,7 +238,9 @@ final class LiveEngineStore {
     // MARK: Configuration
 
     private let surface: StreamSurface
-    /// Echoed back on the response; the server does nothing with either.
+    /// Echoed back on the response; the server does nothing with either — `services/streams`
+    /// stores both untouched so a page can say which board a session belongs to. The game
+    /// screen sends its cursor, a half-move count, and nothing converts it.
     private var gameID: Int?
     private var ply: Int?
 
