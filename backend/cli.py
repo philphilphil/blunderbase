@@ -262,6 +262,12 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
         "so the analysis board has a live engine (the image has one at /usr/local/bin/"
         "stockfish); defaults to a path that exists nowhere, which is fine for screenshots",
     )
+    create_demo.add_argument(
+        "--runners",
+        action="store_true",
+        help="copy the runner rows (name, slots, token hash) so a runner that dials into "
+        "the source library can dial into the demo with the token it already has",
+    )
 
     return parser
 
@@ -700,6 +706,7 @@ def command_demo(args: argparse.Namespace, settings: Settings) -> int:
             as_of=args.as_of,
             force=args.force,
             stockfish_path=args.stockfish or DEMO_STOCKFISH_PATH,
+            runners=args.runners,
         )
     except DemoDataError as exc:
         print(f"demo: {exc}")

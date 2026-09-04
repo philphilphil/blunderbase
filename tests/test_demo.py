@@ -9,8 +9,18 @@ from sqlalchemy import func, select
 from backend.cli import main
 from backend.config import Settings
 from backend.db.enums import EngineKind, Platform, RunStatus, Tier
-from backend.db.models import Account, AnalysisRun, Credential, Engine, Game, MoveEval, Note
+from backend.db.models import (
+    Account,
+    AnalysisRun,
+    Credential,
+    Engine,
+    Game,
+    MoveEval,
+    Note,
+    Runner,
+)
 from backend.db.session import session_scope
+from backend.services import runners as runners_service
 from backend.services.demo import DEMO_NAME, DemoDataError, create_demo_database
 
 
@@ -92,7 +102,8 @@ def test_demo_database_copies_chess_facts_but_no_personal_data(
         assert DEMO_NAME not in game.pgn  # Handles, not the display name, appear in games.
         owner_rating = game.white_rating if game.owner_color.value == "white" else game.black_rating
         assert owner_rating != source_rating
-        assert game.played_at == datetime(2026, 3, 6, 8, tzinfo=UTC)
+        # One game spans the minimum sixty days: the oldest slot, at eight in the morning.
+        assert game.played_at == datetime(2026, 6, 30, 8, tzinfo=UTC)
         assert session.scalar(select(func.count(AnalysisRun.id))) == 1
         assert session.scalar(select(func.count(MoveEval.id))) == 1
         assert session.scalar(select(func.count(Note.id))) == 9
@@ -175,3 +186,38 @@ def test_demo_stockfish_row_points_where_the_serving_machine_is_told(
     assert paths[EngineKind.UCI] == "/usr/local/bin/stockfish"
     assert paths[EngineKind.MAIA] == "/demo/maia"
     assert "BLUNDERBASE_RUNTIME_MODE=demo" in capsys.readouterr().out
+
+
+def test_demo_copies_runner_tokens_only_when_asked(
+    settings: Settings, fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """`--runners` is what lets a runner already dialling into the source library dial into
+    the demo with the token it has; a demo built for screenshots carries no token hash."""
+    _analyzed_source(settings, fixtures_dir / "query_games.pgn")
+    with session_scope(settings) as session:
+        runner, token = runners_service.create_runner(session, "gpu-box", slots=2)
+        runner.connected = True
+        expected_hash = runner.token_hash
+
+    plain = tmp_path / "plain.db"
+    create_demo_database(settings.database_path, plain, game_count=1)
+    plain_settings = Settings(
+        root=tmp_path, data_dir=tmp_path, BLUNDERBASE_DB_PATH=plain, analysis_workers=False
+    )
+    with session_scope(plain_settings) as session:
+        assert session.scalars(select(Runner)).all() == []
+
+    with_runners = tmp_path / "with-runners.db"
+    assert main(["demo", "create", "--games", "1", "--output", str(with_runners), "--runners"]) == 0
+    demo_settings = Settings(
+        root=tmp_path,
+        data_dir=tmp_path,
+        BLUNDERBASE_DB_PATH=with_runners,
+        analysis_workers=False,
+    )
+    with session_scope(demo_settings) as session:
+        copied = session.scalars(select(Runner)).one()
+        assert (copied.name, copied.slots, copied.token_hash) == ("gpu-box", 2, expected_hash)
+        # The source process's connection is not this one's.
+        assert copied.connected is False and copied.last_seen_at is None
+        assert runners_service.authenticate(session, token).id == copied.id

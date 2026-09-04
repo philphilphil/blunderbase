@@ -20,7 +20,9 @@ DESKTOP_CAPABILITIES = {
     "remote_runners": False,
     "read_only": False,
 }
-DEMO_CAPABILITIES = {**DESKTOP_CAPABILITIES, "read_only": True}
+# Runners stay on in the demo: a runner dials in with a token only the owner minted, and
+# minting one is a write the demo refuses.
+DEMO_CAPABILITIES = {**DESKTOP_CAPABILITIES, "remote_runners": True, "read_only": True}
 
 
 @pytest.fixture()
@@ -171,7 +173,12 @@ def test_demo_still_answers_the_reads_that_are_spelled_post(demo: TestClient) ->
         assert response.json().get("error") != "read_only", path
 
 
-def test_demo_has_no_coach_and_no_runners(demo: TestClient) -> None:
+def test_demo_has_no_coach_and_mints_no_runner(demo: TestClient) -> None:
     assert demo.get("/api/mcp-keys").status_code == 404
-    assert demo.get("/api/runners").status_code == 404
     assert demo.post("/auth/setup", json={"password": "valid-password"}).status_code == 404
+    # The runner door is mounted — the owner's machines may serve the demo's board — but
+    # nobody gets a key here: creating a runner is a write, and the demo refuses writes.
+    assert demo.get("/api/runners").status_code == 200
+    response = demo.post("/api/runners", json={"name": "stranger", "slots": 1})
+    assert response.status_code == 403
+    assert response.json()["error"] == "read_only"

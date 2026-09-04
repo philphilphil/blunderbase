@@ -153,10 +153,14 @@ site:
 # built from this checkout's own database, with `BLUNDERBASE_RUNTIME_MODE=demo` — no
 # password, every write refused, the analysis board on this machine's Stockfish. The demo
 # database is built once and kept; delete data/demo.db to rebuild it from newer games.
+# `--runners` copies this checkout's runner tokens across, so a runner that dials into
+# `make run` dials into this the same way and its engine shows up in the board's picker.
+# `migrate` is order-only (after the `|`): it is phony, so as a normal prerequisite it
+# would make the file look stale on every run and `demo create` refuses to overwrite.
 DEMO_DB := data/demo.db
 
-$(DEMO_DB): migrate
-	uv run blunderbase demo create --output $(DEMO_DB) --stockfish "$(SF)"
+$(DEMO_DB): | migrate
+	uv run blunderbase demo create --output $(DEMO_DB) --stockfish "$(SF)" --runners
 
 run-demo: $(DEMO_DB)
 	@trap 'kill 0' EXIT INT TERM; \

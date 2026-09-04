@@ -41,8 +41,11 @@ and lets nobody change anything: the guard answers every request, and a second m
 (`api/readonly.py`) refuses everything but `GET`, `HEAD` and `OPTIONS` with `403
 {"error": "read_only"}` before a handler sees it. The exceptions are the three "reads
 spelled as POSTs" that touch no row — the analysis board (`/streams`), Maia's answer for a
-position and a one-off engine eval — so the game view stays alive. `/mcp` and the runner
-transport are not mounted at all. The page shows a *Demo · read-only* chip in the titlebar
+position and a one-off engine eval — so the game view stays alive. `/mcp` is not mounted
+at all. The runner transport is: a runner dials in with a token only the owner minted
+(`demo create --runners` carries the hashes over) and minting one is a write the demo
+refuses, which is what lets the owner's remote engine sit behind the demo's analysis
+board without handing a visitor anything. The page shows a *Demo · read-only* chip in the titlebar
 and one toast the first time a write is refused. Run it only on a database `demo create`
 built; see "A public demo" in [deploy.md](deploy.md#a-public-demo).
 
@@ -148,7 +151,7 @@ Every setting is an environment variable with a `BLUNDERBASE_` prefix
 | `BLUNDERBASE_WEB_DIST` | `<root>/web/dist` | the built web app; a directory that is not there is simply not served |
 | `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` | `true` | serve the page with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, which is what a browser wants before it will give a tab a `SharedArrayBuffer` — and without one an engine running in the browser is single-threaded. The cost is that every **cross-origin** subresource must opt in with CORP or be blocked; the build loads none today. Turn it off for a proxy that rewrites the headers, or a page that has to load an asset from somewhere else |
 | `BLUNDERBASE_HOST` `BLUNDERBASE_PORT` | `127.0.0.1` `8765` | what `serve` binds |
-| `BLUNDERBASE_RUNTIME_MODE` | `server` | `server`, `desktop` (the native shell's, needs `BLUNDERBASE_DESKTOP_TOKEN`) or `demo` — the public, read-only demo: no password, no `/mcp`, no runners, and every write answers `403 read_only`. Only ever for a database `demo create` built |
+| `BLUNDERBASE_RUNTIME_MODE` | `server` | `server`, `desktop` (the native shell's, needs `BLUNDERBASE_DESKTOP_TOKEN`) or `demo` — the public, read-only demo: no password, no `/mcp`, runners only with tokens the source library already had, and every write answers `403 read_only`. Only ever for a database `demo create` built |
 | `BLUNDERBASE_MCP_BEARER_KEY` | — | one more token `/mcp` accepts, beside the minted keys and the owner's password; for compose files and automation |
 | `BLUNDERBASE_ANALYSIS_CONCURRENCY` | cores − 2 | engine processes at once, across every tier |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | off for a deployment that drains the queue from `blunderbase analyze` elsewhere |
@@ -371,7 +374,10 @@ credentials and personal notes are never copied. The engine rows it writes point
 which is right for screenshots: the analysis is copied in, so nothing needs to run. A demo
 that is going to be *served* wants a live engine behind its analysis board — `--stockfish
 PATH` is what its Stockfish row points at on the machine that will serve it (the image has
-one at `/usr/local/bin/stockfish`). Run the result as an ordinary deployment, or as the
+one at `/usr/local/bin/stockfish`). `--runners` copies the runner rows — name, slots and
+the token's hash, nothing else — so a runner that dials into the source library dials into
+the demo with the token it has and its engines appear in the board's picker once it says
+hello; `make run-demo` passes it. Run the result as an ordinary deployment, or as the
 public demo:
 
 ```bash
@@ -401,7 +407,12 @@ make publish
 ```
 
 Publishing pushes main and the tag, waits for that commit's main CI, then creates the
-GitHub release. The release builds the image once and publishes
+GitHub release and uploads the desktop installers `make desktop` left under
+`desktop/dist` as `Blunderbase-macOS-arm64.dmg` and `Blunderbase-Windows-x64-setup.exe`.
+Those names never change, because blunderbase.org's download buttons point at
+`releases/latest/download/<name>`; publishing refuses to run without both installers for
+the version being released unless `BB_SKIP_DESKTOP=1` is set, so the sequence is
+`make desktop`, then `make publish`. The release builds the image once and publishes
 `ghcr.io/philphilphil/blunderbase:0.2.0`, `:0.2`, `latest`, and `sha-<short>`.
 If that build fails, dispatch `release.yml` with the existing tag to rebuild and deploy it;
 dispatching it without a tag only redeploys the current `latest`.

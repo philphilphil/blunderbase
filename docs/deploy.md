@@ -222,8 +222,10 @@ it safe is in `docs/reference.md` under "Signing in"; what makes it run is three
 
 3. **Give it a hostname.** One more site in the Caddyfile or nginx config above, pointing
    at `127.0.0.1:8766` instead of `8765`; everything the three rules say applies unchanged.
-   There is no `/mcp` and no `/runner` on a demo, so a proxy that only forwards `/`, `/api`
-   and `/events` is forwarding everything there is.
+   There is no `/mcp` on a demo. `/runner` is there, for the one case where the library
+   was built with `demo create --runners` and one of your own runners should serve the
+   demo's analysis board; a proxy that only forwards `/`, `/api` and `/events` is
+   otherwise forwarding everything there is.
 
 What a visitor can make the machine do is bounded the way it is for the owner: at most
 `BLUNDERBASE_STREAM_MAX_SESSIONS` analysis boards at once (two), each dropped

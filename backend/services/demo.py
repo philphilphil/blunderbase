@@ -35,7 +35,7 @@ from backend.db.enums import (
     Tier,
 )
 from backend.db.migrate import upgrade_to_head
-from backend.db.models import Account, AnalysisRun, Engine, Game, ImportJob, MoveEval
+from backend.db.models import Account, AnalysisRun, Engine, Game, ImportJob, MoveEval, Runner
 from backend.db.session import create_db_engine, get_sessionmaker, reset_engines
 from backend.services import analysis as analysis_service
 from backend.services import app_settings as app_settings_service
@@ -53,6 +53,22 @@ DEFAULT_FILENAME = "demo.db"
 DEMO_STOCKFISH_PATH = "/demo/stockfish"
 DEMO_MAIA_PATH = "/demo/maia"
 DEMO_SEED = 0xB1D3
+# The fake dates cover this many days at most, about four years for a full-sized library.
+# A small demo is squeezed into fewer, so that 72 games still look like a season rather
+# than a game every three weeks: two and a half days per game, never under two months.
+SPAN_DAYS = 4 * 365
+MIN_SPAN_DAYS = 60
+DAYS_PER_GAME = 2.5
+# Where each speed's rating sits relative to the others; a bullet rating is usually the
+# lowest and rapid the highest, and the demo's owner is a rapid player at heart.
+RATING_OFFSETS: dict[Speed, int] = {
+    Speed.BULLET: -70,
+    Speed.BLITZ: 0,
+    Speed.RAPID: 35,
+    Speed.CLASSICAL: 20,
+    Speed.CORRESPONDENCE: 45,
+}
+CHESSCOM_RATING_OFFSET = -18
 DEMO_NAME = "Alex Knight"
 LICHESS_HANDLE = "alex_knight"
 CHESSCOM_HANDLE = "AlexKnight"
@@ -120,6 +136,7 @@ def create_demo_database(
     as_of: date | None = None,
     force: bool = False,
     stockfish_path: str = DEMO_STOCKFISH_PATH,
+    runners: bool = False,
 ) -> DemoSummary:
     """Create an anonymous demo database, returning what was written.
 
@@ -130,6 +147,12 @@ def create_demo_database(
     ``stockfish_path`` is what the demo's Stockfish row points at — a real binary on the
     machine that will serve the demo gives its analysis board a live engine; the default
     points nowhere and is right for screenshots.
+
+    ``runners`` copies the source's runner rows — name, slots and the token's hash — so a
+    runner already dialling into the source library dials into the demo with the token it
+    has. Only the rows: the engines a runner advertises are written when it says hello.
+    Off by default, because a token hash is the one credential a demo otherwise never
+    carries, and a demo built for screenshots has no reason to.
     """
     source = source_path.expanduser().resolve()
     target = target_path.expanduser().resolve()
@@ -172,6 +195,8 @@ def create_demo_database(
             summary = _seed(
                 source_session, target_session, candidates, target, anchor, stockfish_path
             )
+            if runners:
+                _runners(source_session, target_session)
             target_session.commit()
         return summary
     except Exception:
@@ -264,12 +289,15 @@ def _seed(
     accounts = _accounts(target)
     stockfish, maia = _engines(target, stockfish_path)
     _settings(target, stockfish, maia)
+    total = len(candidates)
+    span = _span_days(total)
+    curves = _rating_curves(span)
 
     jobs = {
         source_name: ImportJob(
             source=source_name,
             status=JobStatus.RUNNING,
-            started_at=datetime.combine(anchor - timedelta(days=180), time(9), tzinfo=UTC),
+            started_at=datetime.combine(anchor - timedelta(days=span), time(9), tzinfo=UTC),
         )
         for source_name in (Source.LICHESS, Source.CHESSCOM)
     }
@@ -278,13 +306,12 @@ def _seed(
 
     imported: list[Game] = []
     source_runs: list[AnalysisRun] = []
-    total = len(candidates)
     for index, candidate in enumerate(candidates):
         original = source.get(Game, candidate.game_id)
         original_run = source.get(AnalysisRun, candidate.run_id)
         if original is None or original_run is None:
             continue
-        parsed = _fake_game(original, index, total, anchor)
+        parsed = _fake_game(original, index, total, anchor, span, curves)
         outcome = ingest_game(
             target,
             jobs[parsed.source],
@@ -344,7 +371,7 @@ def _accounts(session: Session) -> AccountIndex:
 
 def _engines(session: Session, stockfish_path: str) -> tuple[Engine, Engine]:
     stockfish = Engine(
-        name="Stockfish 18 (demo)",
+        name="Stockfish 18",
         kind=EngineKind.UCI,
         path=stockfish_path,
         version="18",
@@ -352,7 +379,7 @@ def _engines(session: Session, stockfish_path: str) -> tuple[Engine, Engine]:
         enabled=True,
     )
     maia = Engine(
-        name="Maia 2 (demo)",
+        name="Maia",
         kind=EngineKind.MAIA,
         path=DEMO_MAIA_PATH,
         version="2",
@@ -364,6 +391,18 @@ def _engines(session: Session, stockfish_path: str) -> tuple[Engine, Engine]:
     return stockfish, maia
 
 
+def _runners(source: Session, target: Session) -> int:
+    """Copy the runner rows, so the same tokens open the demo. Nothing else about them:
+    `connected` and `last_seen_at` are facts about the source process, not this one."""
+    rows = [
+        Runner(name=runner.name, token_hash=runner.token_hash, slots=runner.slots)
+        for runner in source.scalars(select(Runner).order_by(Runner.id))
+    ]
+    target.add_all(rows)
+    target.flush()
+    return len(rows)
+
+
 def _settings(session: Session, stockfish: Engine, maia: Engine) -> None:
     app_settings_service.set_maia_elos(session, list(MAIA_ELOS))
     app_settings_service.set_role_engine_id(session, EngineRole.QUICK, stockfish.id)
@@ -371,27 +410,64 @@ def _settings(session: Session, stockfish: Engine, maia: Engine) -> None:
     app_settings_service.set_role_engine_id(session, EngineRole.HUMAN, maia.id)
 
 
-def _fake_game(original: Game, index: int, total: int, anchor: date) -> ParsedGame:
+def _span_days(total: int) -> int:
+    return min(SPAN_DAYS, max(MIN_SPAN_DAYS, round(total * DAYS_PER_GAME)))
+
+
+def _rating_curves(span: int) -> dict[Speed, list[float]]:
+    """One rating per speed per day: a slow, mean-reverting walk around a rising trend.
+
+    Real ratings move a few points a game and wander for weeks at a time; a straight line
+    in game index looked like a ruler, and a stretch with no games of one speed showed up
+    on that speed's chart as a cliff, because the line had moved on without it. A walk in
+    calendar time has neither: a gap is a gap, and the curve is where it would have been.
+    """
+    curves: dict[Speed, list[float]] = {}
+    for number, (speed, offset) in enumerate(RATING_OFFSETS.items()):
+        rng = random.Random(DEMO_SEED + 100 + number)
+        deviation = 0.0
+        values: list[float] = []
+        for day in range(span + 1):
+            trend = 1440 + 190 * day / max(span, 1) + offset
+            deviation += rng.gauss(0, 4.0) - 0.02 * deviation
+            values.append(trend + deviation)
+        curves[speed] = values
+    return curves
+
+
+def _fake_game(
+    original: Game,
+    index: int,
+    total: int,
+    anchor: date,
+    span: int,
+    curves: dict[Speed, list[float]],
+) -> ParsedGame:
     source = Source.LICHESS if index % 3 else Source.CHESSCOM
     owner_name = LICHESS_HANDLE if source is Source.LICHESS else CHESSCOM_HANDLE
     opponent = OPPONENTS[(index * 7) % len(OPPONENTS)]
     owner_white = original.owner_color is Color.WHITE
     white_name, black_name = (owner_name, opponent) if owner_white else (opponent, owner_name)
 
-    # Oldest to newest over roughly six months, with a visible but non-linear rating trend.
-    spread = 176 * index // max(total - 1, 1)
-    played_day = anchor - timedelta(days=176 - spread)
-    played_at = datetime.combine(
-        played_day,
-        time(hour=(8 + index * 5) % 24, minute=(index * 17) % 60),
-        tzinfo=UTC,
+    # Oldest to newest, evenly over the span; the time of day is the fractional part, so
+    # the games of one day are played in index order and a rating never runs backwards.
+    position = span * index / max(total - 1, 1)
+    day = int(position)
+    played_day = anchor - timedelta(days=span - day)
+    played_at = datetime.combine(played_day, time(8), tzinfo=UTC) + timedelta(
+        seconds=round((position - day) * 15 * 3600)
     )
-    owner_rating = 1480 + round(118 * index / max(total - 1, 1)) + (index % 7 - 3) * 3
-    opponent_rating = owner_rating + ((index * 37) % 181) - 90
+    speed, initial, increment = _clock(original.speed, index)
+    rng = random.Random(DEMO_SEED + index)
+    owner_rating = round(
+        curves[speed][day]
+        + (CHESSCOM_RATING_OFFSET if source is Source.CHESSCOM else 0)
+        + rng.gauss(0, 5)
+    )
+    opponent_rating = owner_rating + rng.randint(-90, 90)
     white_rating, black_rating = (
         (owner_rating, opponent_rating) if owner_white else (opponent_rating, owner_rating)
     )
-    speed, initial, increment = _clock(original.speed, index)
     clocks = _clocks(original.clocks, original.ply_count, initial, increment, index)
     pgn = _pgn(
         original,
