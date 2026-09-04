@@ -26,7 +26,8 @@ services:
       # the analysis board and the one-off eval run their own engine and are unaffected.
       BLUNDERBASE_ANALYSIS_WORKERS: "false"
       # Two analysis boards at once is what a demo of one screen needs, and what a stranger
-      # can make the machine spend. The default; here so it is seen.
+      # can make the machine spend. One below the default of three, which exists for the
+      # companion app's surface — a demo has no phone on it.
       BLUNDERBASE_STREAM_MAX_SESSIONS: "2"
 
 volumes:

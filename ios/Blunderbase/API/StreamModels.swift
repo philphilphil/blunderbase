@@ -22,10 +22,12 @@ import Foundation
 
 /// Which board a session belongs to. One session per surface, server-side, so opening a
 /// second `game` board anywhere replaces the first — which is what `replaced` means on the
-/// way out.
+/// way out. The phone opens `companion`, its own surface, so it never evicts a browser
+/// sitting on the same game.
 enum StreamSurface: String, Codable, Sendable, Equatable {
     case game
     case live
+    case companion
 }
 
 /// `POST /streams`.

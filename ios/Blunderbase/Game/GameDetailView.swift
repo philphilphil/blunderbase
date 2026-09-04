@@ -48,7 +48,7 @@ struct GameDetailView: View {
         _store = State(initialValue: GameStore(gameID: gameID, endpoints: endpoints))
         // The game id is echoed back on the stream, so `GET /streams` can say which game a
         // board belongs to. The server never reads it; a person looking at the list does.
-        _live = State(initialValue: LiveEngineStore(surface: .game, gameID: gameID))
+        _live = State(initialValue: LiveEngineStore(surface: .companion, gameID: gameID))
         self.summary = summary
         self.onPreviousGame = onPreviousGame
         self.onNextGame = onNextGame
@@ -67,7 +67,7 @@ struct GameDetailView: View {
         onNextGame: (() -> Void)? = nil
     ) {
         _store = State(initialValue: store)
-        _live = State(initialValue: LiveEngineStore(surface: .game, gameID: store.gameID))
+        _live = State(initialValue: LiveEngineStore(surface: .companion, gameID: store.gameID))
         self.summary = summary
         self.onPreviousGame = onPreviousGame
         self.onNextGame = onNextGame

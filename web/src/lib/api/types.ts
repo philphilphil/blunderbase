@@ -1618,7 +1618,11 @@ export interface McpKeyCreated {
 
 // --- streams --------------------------------------------------------------
 
-export type StreamSurface = 'game' | 'live'
+/**
+ * One session per surface. `companion` is the iOS app's own, which is why turning its
+ * engine on never takes the browser's board over; nothing in this app opens one.
+ */
+export type StreamSurface = 'game' | 'live' | 'companion'
 export type StreamState = 'starting' | 'running' | 'ended'
 export type StreamEndReason = 'closed' | 'replaced' | 'idle' | 'engine_failed' | 'runner_gone'
 

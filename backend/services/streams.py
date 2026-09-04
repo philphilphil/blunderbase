@@ -17,9 +17,10 @@ differently:
 
 - **`seq`.** Assigned here, per session, so local and remote snapshots number alike and a
   consumer can drop a frame that arrived out of order.
-- **The cap and the surfaces.** At most `stream_max_sessions` at once, and one per browser
-  surface: opening a second board on the same surface closes the first with `replaced`
-  rather than quietly running two searches nobody is watching.
+- **The cap and the surfaces.** At most `stream_max_sessions` at once, and one per surface —
+  the game page's board, the live board and the companion app's: opening a second board on
+  the same surface closes the first with `replaced` rather than quietly running two searches
+  nobody is watching.
 - **The idle reaper.** A slot held by a browser that has gone away is a slot the queue
   cannot have. `stream_idle_seconds` after the last `/events` listener disconnects, every
   session ends with `idle`.
@@ -64,8 +65,10 @@ EVENT_STREAM_ENDED = "stream.ended"
 LOCAL = "local"
 REMOTE = "runner"
 
-# One session per browser surface: the game page's analysis board, and the live board.
-SURFACES = ("game", "live")
+# One session per surface: the game page's analysis board, the live board, and the
+# companion app's. The phone has its own rather than sharing `game`, so switching the
+# engine on there does not take the browser's board away.
+SURFACES = ("game", "live", "companion")
 MAX_MULTIPV = 5
 
 STATE_STARTING = "starting"

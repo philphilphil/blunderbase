@@ -1752,7 +1752,9 @@ class StreamCreate(Input):
     fen: str = Field(min_length=1)
     engine_id: int | None = None
     multipv: int = Field(default=1, ge=1, le=5)
-    surface: str = Field(default="game", description="game | live — one session each")
+    surface: str = Field(
+        default="game", description="game | live | companion — one session each"
+    )
     # Echoed back untouched, so the page can tell which board a session belongs to.
     game_id: int | None = None
     ply: int | None = None

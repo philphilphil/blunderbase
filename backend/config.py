@@ -99,8 +99,8 @@ class Settings(BaseSettings):
     stream_snapshot_interval: float = Field(default=0.5, gt=0)
     # How long a session survives with nobody listening on `/events` before it frees its slot.
     stream_idle_seconds: float = Field(default=30.0, gt=0)
-    # One session per browser surface: the game board and the live board.
-    stream_max_sessions: int = Field(default=2, ge=1)
+    # One session per surface: the game board, the live board and the companion app's.
+    stream_max_sessions: int = Field(default=3, ge=1)
 
     # How this deployment is reached from outside, used to write the `runner.yaml` snippet
     # the create-runner flow hands over. Empty falls back to the requesting origin.

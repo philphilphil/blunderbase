@@ -82,11 +82,10 @@ local one are the same thing to the phone. The panel names the machine that answ
 needs the instance in `server` runtime mode, the runner connected over websocket rather than
 polling, and the engine advertising `streams: true`, which is the default for a UCI engine.
 
-One rough edge, and it is the server's rather than the app's: a stream belongs to a
-`surface`, there are only two of them (`game` and `live`), and opening a second board on the
-same surface evicts the first. The phone uses `game`, so turning on live analysis here takes
-the position over from a browser sitting on the same surface, and the browser says so. A
-third surface for the companion would fix it.
+A stream belongs to a `surface`, and opening a second board on the same surface evicts the
+first. The phone has its own — `companion`, beside the browser's `game` and `live` — so
+turning live analysis on here leaves a browser sitting on the same game alone, and the
+server holds three boards at once rather than two.
 
 ## Dependencies
 

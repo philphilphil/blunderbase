@@ -640,6 +640,13 @@ runner's socket and relays the snapshots back. The broker cannot tell them apart
 neither can the browser: `runner_id` on the response is context, not a different kind of
 session.
 
+**A session belongs to a surface, and a surface holds one.** `game` is the game page's
+analysis board, `live` the live board, `companion` the iOS app's — a second board on the
+same surface closes the first with `replaced`, which is how a page that has moved on stops
+searching a position nobody is looking at. They are separate so that switching the engine on
+from the phone does not take the browser's board away, and `stream_max_sessions` defaults to
+three for the same reason: one slot per surface.
+
 **Throttling belongs to the producer**, which is what keeps a runner from putting a flood
 on the wire for this process to thin out. **Numbering belongs to the broker**: `seq` is
 assigned here so a local board and a remote one are read the same way on `/events`, which

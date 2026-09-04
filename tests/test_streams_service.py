@@ -250,7 +250,9 @@ async def test_a_position_that_is_not_one_is_refused_before_any_engine_is_asked(
         await broker.open(fen="not a position")
     with pytest.raises(StreamRequestError, match="multipv is 1 to 5"):
         await broker.open(fen=STARTING_FEN, multipv=9)
-    with pytest.raises(StreamRequestError, match="unknown surface"):
+    # A third surface is not a free-for-all: anything outside the list is still a refusal,
+    # and the refusal names the ones there are.
+    with pytest.raises(StreamRequestError, match="unknown surface .*game, live, companion"):
         await broker.open(fen=STARTING_FEN, surface="telepathy")
 
 
@@ -308,7 +310,7 @@ async def test_a_second_board_on_the_same_surface_replaces_the_first(
     assert (ended["session_id"], ended["reason"]) == (first.id, "replaced")
 
 
-async def test_the_two_surfaces_each_get_their_own_board(
+async def test_the_three_surfaces_each_get_their_own_board(
     settings: Settings, sessions: sessionmaker[Session]
 ) -> None:
     add_engine(sessions)
@@ -316,8 +318,26 @@ async def test_the_two_surfaces_each_get_their_own_board(
 
     game = await broker.open(fen=STARTING_FEN, surface="game")
     live = await broker.open(fen=AFTER_E4, surface="live")
+    companion = await broker.open(fen=STARTING_FEN, surface="companion")
 
-    assert {session.id for session in broker.list()} == {game.id, live.id}
+    assert {session.id for session in broker.list()} == {game.id, live.id, companion.id}
+
+
+async def test_the_phone_and_the_browser_hold_the_same_game_at_once(
+    settings: Settings, sessions: sessionmaker[Session]
+) -> None:
+    """Why `companion` exists: the phone's board must not evict the browser's on the game
+    they are both looking at."""
+    add_engine(sessions)
+    local = Backend(streams_service.LOCAL)
+    broker = broker_for(settings, sessions, backends={streams_service.LOCAL: local})
+
+    browser = await broker.open(fen=STARTING_FEN, surface="game", game_id=14, ply=0)
+    phone = await broker.open(fen=STARTING_FEN, surface="companion", game_id=14, ply=0)
+
+    assert {session.id for session in broker.list()} == {browser.id, phone.id}
+    assert local.closed == []
+    assert {session.surface for session in broker.list()} == {"game", "companion"}
 
 
 async def test_more_boards_than_the_deployment_allows_is_a_refusal(
