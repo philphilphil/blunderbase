@@ -918,6 +918,31 @@ def refresh_card(session: Session, game: Game) -> dict[str, Any]:
     return card
 
 
+def refresh_cards(session: Session, game_ids: Sequence[int]) -> int:
+    """Refold the stored cards of these games; how many were rewritten.
+
+    For the other writer that changes what a card says — `accounts.reconcile_games`,
+    learning whose side of a game is whose, which is what decides the plies `build_card` is
+    allowed to call the owner's worst moments. A card folded while the owner was unknown
+    kept every ply and so lists the opponent's blunders as theirs, and unlike the stat
+    summaries beside it there is no sweep that would notice: `rebuild_game_cards` is a
+    command somebody has to run. So it is refolded here, in the transaction that recoloured
+    the games, and the commit is left to that caller.
+
+    A game with no stored card is left alone. NULL is what `game_card` folds live, so it
+    already answers with the colour the row has now, and writing one here would only make
+    the repair walk the evals of games nothing has asked about.
+    """
+    rebuilt = 0
+    for game_id in game_ids:
+        game = session.get(Game, game_id)
+        if game is None or game.card is None:
+            continue
+        refresh_card(session, game)
+        rebuilt += 1
+    return rebuilt
+
+
 def rebuild_game_cards(session: Session, *, chunk: int = CARD_BACKFILL_CHUNK) -> int:
     """Rewrite the stored card of every game with a finished run; how many were rebuilt.
 

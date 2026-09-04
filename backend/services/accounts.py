@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from backend.db.enums import Color, Platform, Source
 from backend.db.models import Account, Game
 from backend.services import explorer as explorer_service
+from backend.services import games as games_service
 from backend.services import stats as stats_service
 
 # Which platform's accounts name the owner in a game from this source. A PGN or a manual
@@ -190,6 +191,7 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
     targets = [row for row in accounts if account is None or row.id == account.id]
 
     filled = Reconciled()
+    recolored_games: list[int] = []
     for target in targets:
         folded = fold(target.username)
         sources = claimable_sources(target, accounts)
@@ -231,6 +233,15 @@ def reconcile_games(session: Session, account: Account | None = None) -> Reconci
                 # The explorer's per-colour book is wrong for exactly the same reason: a
                 # game with no owner was in none of its rows and now belongs in one side's.
                 explorer_service.mark_games_dirty(session, recolored)
+                recolored_games.extend(recolored)
+    if recolored_games:
+        # And so is the stored card, whose worst moments were filtered through the same
+        # question: with no owner it kept every ply, so it names the opponent's blunders as
+        # the owner's. The stats have a sweep to fall back on and the card has none, so it
+        # is refolded here rather than cleared. The bulk UPDATEs went round the ORM, which
+        # is why the colour has to be expired first — the fold reads the row as it is now.
+        session.expire_all()
+        games_service.refresh_cards(session, recolored_games)
     session.commit()
     # The rows went out as bulk statements, so whatever this Session had already loaded
     # still remembers the values from before; the next read of one comes off the database.

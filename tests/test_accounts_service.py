@@ -5,8 +5,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.db.enums import Color, Platform, Result, Source
-from backend.db.models import Account, Game
+from backend.db.enums import Classification, Color, Platform, Result, RunStatus, Source, Tier
+from backend.db.models import Account, AnalysisRun, Game, MoveEval
 from backend.services import accounts, games
 
 OWNER = "phib2"
@@ -187,6 +187,60 @@ def test_learning_the_owners_colour_throws_away_the_stats_folded_without_it(
         None,
         None,
     )
+
+
+def test_learning_the_owners_colour_refolds_the_card_folded_without_it(
+    session: Session,
+) -> None:
+    """A card's worst moments are the owner's own; with no owner it kept every ply.
+
+    So the card a game was analysed with before its account existed names the opponent's
+    blunder as the owner's worst moment — in the games table, its `worst` sort and every
+    card the coach reads. Nothing else would fix it: `game_card` serves a stored card
+    whenever there is one, and only a new run rewrites it.
+    """
+    game = _add_game(
+        session,
+        white=OWNER,
+        owner_color=None,
+        moves_san=["e4", "e5", "Nf3"],
+        moves_uci=["e2e4", "e7e5", "g1f3"],
+        ply_count=3,
+    )
+    run = AnalysisRun(game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE)
+    session.add(run)
+    session.flush()
+    session.add_all(
+        [
+            MoveEval(
+                run_id=run.id,
+                ply=1,
+                move_uci="e7e5",
+                win_loss=50.0,
+                classification=Classification.BLUNDER,
+            ),
+            MoveEval(
+                run_id=run.id,
+                ply=2,
+                move_uci="g1f3",
+                win_loss=20.0,
+                classification=Classification.MISTAKE,
+            ),
+        ]
+    )
+    session.commit()
+    games.refresh_card(session, game)
+    session.commit()
+    assert [moment["ply"] for moment in game.card["worst_moments"]] == [1, 2]
+
+    accounts.register_account(session, Platform.CHESSCOM, OWNER)
+
+    assert game.owner_color is Color.WHITE
+    card = games.game_card(session, game)
+    assert [moment["ply"] for moment in card["worst_moments"]] == [2]
+    # The stored card, not only what a reader recomputed: it is what the table's `worst`
+    # sort reads, and it is read in SQL.
+    assert [moment["ply"] for moment in game.card["worst_moments"]] == [2]
 
 
 def test_the_game_summary_reports_the_opponent_and_the_ratings_after_a_repair(
