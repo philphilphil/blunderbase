@@ -23,12 +23,18 @@ struct BlunderbaseApp: App {
     /// way to the games list and take the analysis with it.
     @State private var events = EventsClient()
 
+    /// The theme, at the top of the window so that every sheet, alert and keyboard the app
+    /// puts up is in it too — a `preferredColorScheme` further down would leave the system
+    /// chrome following the phone while the screens did not. `system` resolves to `nil`,
+    /// which is the absence of an override rather than a third look.
+    @AppStorage(Preferences.Key.appearance) private var appearance = Preferences.Appearance.system
+
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(session)
                 .environment(events)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(appearance.colorScheme)
                 .tint(Theme.accent)
                 .task { await session.restore() }
         }

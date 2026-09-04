@@ -26,12 +26,17 @@ struct SettingsView: View {
     @AppStorage(Preferences.Key.showHints) private var showHints = true
     @AppStorage(Preferences.Key.haptics) private var haptics = true
 
+    /// The theme. The same key is read by `BlunderbaseApp`, which is where the choice is
+    /// applied to the window; this screen only writes it.
+    @AppStorage(Preferences.Key.appearance) private var appearance = Preferences.Appearance.system
+
     @State private var isConfirmingSignOut = false
 
     var body: some View {
         NavigationStack {
             List {
                 serverSection
+                appearanceSection
                 boardSection
                 aboutSection
             }
@@ -90,6 +95,33 @@ struct SettingsView: View {
         session.maiaElos.isEmpty
             ? "None"
             : session.maiaElos.sorted().map(String.init).joined(separator: ", ")
+    }
+
+    // MARK: Appearance
+
+    /// Three states rather than a switch, for the same reason the web app's titlebar toggle
+    /// has three: "follow the phone" is a different answer from "dark", and a two-state
+    /// switch cannot say it. A segmented control shows all three at once, which is the
+    /// point — the reader can see that following the phone is an option without opening
+    /// anything.
+    private var appearanceSection: some View {
+        Section {
+            Picker("Appearance", selection: $appearance) {
+                ForEach(Preferences.Appearance.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(minHeight: 34)
+        } header: {
+            sectionHeader("Appearance")
+        } footer: {
+            Text("System follows the phone's own setting. Dark is the design's own look.")
+                .font(Theme.Font.text(11))
+                .foregroundStyle(Theme.faint)
+        }
+        .listRowBackground(Theme.surface)
     }
 
     // MARK: Board

@@ -108,7 +108,7 @@ imagesets are checked in so the app builds without `node_modules`.
 ## Not in the proof of concept
 
 The book pane, analysis lines and variations on the board, PGN copy (there is no per-game
-PGN endpoint), the light theme, and any offline cache. Live analysis cannot yet be pointed at
+PGN endpoint), and any offline cache. Live analysis cannot yet be pointed at
 a specific engine from the phone: it takes whichever engine holds the deep-tier role, which
 is also the one that may live on a runner. There is also no per-device revocable token: the app authenticates with
 the owner password like a browser does, because `AuthGuard` accepts only the session cookie

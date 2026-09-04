@@ -30,7 +30,9 @@ targets:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        UIUserInterfaceStyle: Dark
+        # No UIUserInterfaceStyle: the app has a theme setting of its own now, and that key
+        # would pin the whole process to one style — `.preferredColorScheme(nil)`, which is
+        # how "System" is expressed, would resolve to Dark for ever.
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false

@@ -134,6 +134,6 @@ struct PromotionPicker: View {
             RoundedRectangle(cornerRadius: Theme.Radius.card)
                 .strokeBorder(Theme.edgeStrong, lineWidth: 1)
         )
-        .shadow(color: Theme.void.opacity(0.6), radius: 12, y: 4)
+        .shadow(color: Theme.shadow, radius: 12, y: 4)
     }
 }
