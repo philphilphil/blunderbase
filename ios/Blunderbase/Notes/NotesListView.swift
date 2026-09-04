@@ -93,7 +93,7 @@ struct NotesListView: View {
     @ViewBuilder
     private func row(_ note: NoteResponse) -> some View {
         if let gameID = note.gameID, let endpoints = session.endpoints {
-            NavigationLink {
+            RowLink {
                 GameDetailView(
                     gameID: gameID,
                     summary: nil,
@@ -103,7 +103,6 @@ struct NotesListView: View {
             } label: {
                 NoteRow(note: note)
             }
-            .buttonStyle(.plain)
         } else {
             NoteRow(note: note)
         }

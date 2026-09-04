@@ -120,12 +120,11 @@ struct GamesListView: View {
     @ViewBuilder
     private func row(_ card: GameCard) -> some View {
         if let endpoints = session.endpoints {
-            NavigationLink {
+            RowLink {
                 GameDetailView(gameID: card.id, summary: card.game, endpoints: endpoints)
             } label: {
                 GameRowView(card: card)
             }
-            .buttonStyle(.plain)
             .modifier(BareRow())
             .contextMenu {
                 if let link = link(to: card.id) {
