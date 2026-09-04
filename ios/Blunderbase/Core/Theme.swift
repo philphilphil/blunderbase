@@ -71,14 +71,20 @@ enum Theme {
 
     // MARK: Board
 
-    /// Arrow hues are the panel hues at about two thirds saturation, because an arrow sits
-    /// on slate under a 0.6 layer opacity and three of them can stand at once.
-    static let arrowEngine = Color(hex: 0x99B9D1)
-    static let arrowMaia = Color(hex: 0xB7A5CF)
+    /// Arrow hues are a step more saturated than the web's. The web's arrows are the panel
+    /// hues at two thirds saturation, which is right on a desktop board eight hundred
+    /// points wide; on a phone the squares are a third of the size and the slate board is
+    /// itself a desaturated blue, so the same engine blue merged into it. Each arrow also
+    /// gets a dark halo (`arrowHalo`) so it holds on the light squares as well as the dark.
+    static let arrowEngine = Color(hex: 0x4D9BE6)
+    static let arrowMaia = Color(hex: 0xA98BE3)
     /// Deliberately hueless: the move that was played is a statement of fact, so it stands
     /// outside both engine hues and the classification ramp.
     static let arrowPlayed = Color(hex: 0xF1F1F1)
     static let arrowDeep = Color(hex: 0xB6AAC9)
+    /// The thin dark edge under every arrow. Not a colour of its own, so it lifts any hue
+    /// off any square without claiming a meaning.
+    static let arrowHalo = Color(red: 0.05, green: 0.06, blue: 0.07, opacity: 0.45)
 
     static let boardLight = Color(hex: 0xA9B2B8)
     static let boardDark = Color(hex: 0x616D75)

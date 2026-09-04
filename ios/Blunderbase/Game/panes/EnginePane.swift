@@ -9,13 +9,17 @@ import SwiftUI
 /// wrong is worth more attention than one only Stockfish sees, and that reading only works
 /// once you know what the right move was.
 ///
-/// Tapping a line plays it onto the board, and "back to game" undoes that in one tap.
+/// Tapping a line plays its next move onto the board — one move a tap, so the reader walks
+/// the variation position by position rather than being dropped at the end of it — and
+/// "back to game" undoes all of it in one tap.
 ///
-/// While a variation is open the stored halves of this pane go quiet. Both of them are the
-/// server's answers about a position in the *game*, and the board is no longer on one, so
-/// showing them would be answering a question nobody asked. The live engine is the half
-/// that still applies, because it follows the board wherever it goes — which is most of
-/// why it is worth having.
+/// While a variation is open, Maia's half of this pane goes quiet: it is the server's
+/// answer about a position in the *game*, and the board is no longer on one. The stored
+/// engine lines stay, because they are the lines of the position the variation left from
+/// and the reader is in the middle of playing one of them; the part already on the board
+/// is drawn brighter so a row reads as "here is where you are, here is what comes next".
+/// The live engine follows the board wherever it goes, which is most of why it is worth
+/// having.
 struct EnginePane: View {
     @Bindable var store: GameStore
     @Bindable var live: LiveEngineStore
@@ -165,6 +169,11 @@ struct EnginePane: View {
 
             if live.isOn {
                 liveBody
+            } else if !store.engineLines.isEmpty {
+                ForEach(Array(store.engineLines.prefix(4).enumerated()), id: \.offset) { _, line in
+                    engineRow(line)
+                }
+                playedRow
             } else if store.isInLine {
                 // The stored pass never saw this position, and saying "no lines" would read
                 // as the engine having nothing to say about it rather than never being asked.
@@ -173,13 +182,8 @@ struct EnginePane: View {
                 empty("The game ends here.")
             } else if store.detail?.runs.isEmpty == true {
                 empty("This game has not been analysed yet.")
-            } else if store.engineLines.isEmpty {
-                empty("No engine lines at this position.")
             } else {
-                ForEach(Array(store.engineLines.prefix(4).enumerated()), id: \.offset) { _, line in
-                    engineRow(line)
-                }
-                playedRow
+                empty("No engine lines at this position.")
             }
         }
     }
@@ -265,7 +269,10 @@ struct EnginePane: View {
     /// perfectly ordinary line and is wrong by a move.
     private func liveRow(_ line: LiveLine, from fen: String) -> some View {
         Button {
-            play(line.pv)
+            // One move, from wherever the board is. A live line is about the position on
+            // the board right now, so the next tap reads the engine's fresh lines for the
+            // new position rather than continuing an old one.
+            if let first = line.pv.first { store.play(uci: first) }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(Format.score(cp: line.cp, mate: line.mate) ?? Format.absent)
@@ -297,10 +304,17 @@ struct EnginePane: View {
         return Theme.body2
     }
 
+    /// One stored line. The moves of it already on the board are drawn bright and the rest
+    /// in the pane's usual ink, and the row being walked is tinted like the current move in
+    /// the move list — the same "you are here" the rest of the screen uses.
     private func engineRow(_ line: BestLine) -> some View {
         let pv = line.pv ?? []
+        let tokens = lineTokens(line)
+        let done = store.progress(along: pv)
+        let played = tokens.prefix(done).joined(separator: " ")
+        let rest = tokens.dropFirst(done).joined(separator: " ")
         return Button {
-            play(pv)
+            store.step(along: pv)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(Format.score(cp: line.cp, mate: line.mate) ?? Format.absent)
@@ -308,9 +322,9 @@ struct EnginePane: View {
                     .foregroundStyle(scoreColor(line))
                     .frame(width: 52, alignment: .leading)
 
-                Text(lineText(line))
-                    .font(Theme.Font.mono(12))
-                    .foregroundStyle(Theme.body2)
+                (Text(played).foregroundStyle(Theme.text)
+                    + Text(played.isEmpty || rest.isEmpty ? rest : " " + rest).foregroundStyle(Theme.body2))
+                    .font(Theme.Font.mono(12, weight: done > 0 ? .medium : .regular))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
@@ -321,6 +335,7 @@ struct EnginePane: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .background(done > 0 ? Theme.rowActive : .clear)
     }
 
     /// The move that was actually played, as a last row under the engine's own.
@@ -362,7 +377,7 @@ struct EnginePane: View {
 
     // MARK: Helpers
 
-    /// Tapping a line plays it onto the board.
+    /// Tapping a Maia move plays it onto the board.
     ///
     /// It used to draw arrows instead. Arrows answer "which move", and that is worth one
     /// tap at most; the question a reader actually has about a variation is what the
@@ -370,8 +385,8 @@ struct EnginePane: View {
     /// it is also reversible in one tap now that there is a way back to the game, which is
     /// what made a preview the safer choice before.
     private func play(_ pv: [String]) {
-        guard !pv.isEmpty else { return }
-        store.playLine(pv)
+        guard let first = pv.first else { return }
+        store.play(uci: first)
     }
 
     private func percent(_ p: Double?) -> String {
@@ -379,23 +394,30 @@ struct EnginePane: View {
         return "\(Int((p * 100).rounded()))%"
     }
 
-    /// A principal variation as a reader would write it: numbered from the current position,
-    /// with Black's first move after an ellipsis when the line starts on Black's turn.
+    /// A principal variation as a reader would write it, one token per move: numbered from
+    /// the position the line starts in, with Black's first move after an ellipsis when the
+    /// line starts on Black's turn. Tokens rather than one string so the row can draw the
+    /// moves already played differently from the ones still to come.
     ///
     /// The server sends SAN alongside the UCI for a stored line, and that is used when it is
-    /// there. It is not always there — a live analysis frame carries UCI only — so the
-    /// fallback derives SAN from the position on the board. Both paths have to produce the
-    /// same string, which is why the numbering lives in `SAN.line` and this function only
-    /// chooses which source to read.
-    private func lineText(_ line: BestLine) -> String {
-        let sans = line.san ?? []
+    /// there. When it is not, the notation is derived by replaying the line from the
+    /// position it belongs to — which is the position the line *left the game from*, not
+    /// the board, since on a variation the two differ and a line numbered from the wrong one
+    /// reads as a perfectly ordinary line that is off by a move.
+    private func lineTokens(_ line: BestLine) -> [String] {
+        var sans = Array((line.san ?? []).prefix(8))
         if sans.isEmpty {
-            let derived = SAN.line(line.pv ?? [], from: store.snapshot.fen, limit: 8)
-            return derived.isEmpty ? (line.moveSan ?? line.moveUci ?? "") : derived
+            let pv = Array((line.pv ?? []).prefix(8))
+            let snapshots = Replay.snapshots(
+                from: pv.enumerated().map { ReplayMove(ply: $0.offset + 1, uci: $0.element) },
+                startingFEN: store.lineStartFEN
+            )
+            sans = zip(pv, snapshots).compactMap { uci, before in SAN.san(forUCI: uci, fen: before.fen) }
+            if sans.isEmpty, let only = line.moveSan ?? line.moveUci { sans = [only] }
         }
         var out: [String] = []
         var ply = store.cursor + 1
-        for san in sans.prefix(8) {
+        for san in sans {
             if ply % 2 == 1 {
                 out.append("\((ply + 1) / 2). \(san)")
             } else if out.isEmpty {
@@ -405,7 +427,7 @@ struct EnginePane: View {
             }
             ply += 1
         }
-        return out.joined(separator: " ")
+        return out
     }
 
     /// The engine's score is written from White's side in the pane, matching the eval bar,

@@ -194,6 +194,53 @@ final class GameStoreTests: XCTestCase {
         XCTAssertFalse(store.replayIsTruncated)
     }
 
+    // MARK: Walking an engine line
+
+    func testATapPlaysOneMoveOfALineAndTheNextTapTheNext() {
+        store.seek(to: 9)
+        let pv = store.engineLines.first?.pv ?? []
+        XCTAssertEqual(pv, ["c6a5", "c4b5", "c7c6"])
+
+        store.step(along: pv)
+        XCTAssertTrue(store.isInLine)
+        XCTAssertEqual(store.lineIndex, 1)
+        XCTAssertEqual(store.progress(along: pv), 1)
+
+        store.step(along: pv)
+        XCTAssertEqual(store.lineIndex, 2)
+        XCTAssertEqual(store.progress(along: pv), 2)
+
+        store.step(along: pv)
+        store.step(along: pv)
+        // The line is three moves long; a fourth tap has nothing left to play.
+        XCTAssertEqual(store.lineIndex, 3)
+    }
+
+    func testTheEngineLinesStayWhileTheirLineIsBeingWalked() {
+        store.seek(to: 9)
+        let before = store.engineLines.map(\.moveUci)
+        let fen = store.snapshot.fen
+        store.step(along: store.engineLines.first?.pv ?? [])
+        XCTAssertTrue(store.isInLine)
+        XCTAssertNotEqual(store.snapshot.fen, fen)
+        XCTAssertEqual(store.engineLines.map(\.moveUci), before)
+        XCTAssertEqual(store.lineStartFEN, fen)
+    }
+
+    func testTappingAnotherLineStartsOverFromTheGame() {
+        store.seek(to: 9)
+        let first = store.engineLines[0].pv ?? []
+        let second = store.engineLines[1].pv ?? []
+        store.step(along: first)
+        store.step(along: first)
+
+        store.step(along: second)
+        XCTAssertEqual(store.line, ["c8e6"])
+        XCTAssertEqual(store.lineIndex, 1)
+        XCTAssertEqual(store.progress(along: first), 0)
+        XCTAssertEqual(store.progress(along: second), 1)
+    }
+
     // MARK: Fixture
 
     private func decodeDetail() throws -> GameDetail {

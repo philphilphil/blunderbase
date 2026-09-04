@@ -154,7 +154,7 @@ struct GameDetailView: View {
         GeometryReader { outer in
             let panes = paneHeight(in: outer.size)
             VStack(spacing: 0) {
-                playerRow(top: true)
+                players
 
                 GeometryReader { geometry in
                     let side = min(
@@ -203,8 +203,6 @@ struct GameDetailView: View {
                 // what keeps the position and the move list legible at the same time.
                 .frame(maxHeight: .infinity)
 
-                playerRow(top: false)
-
                 transport
 
                 PaneHandle(
@@ -230,10 +228,10 @@ struct GameDetailView: View {
 
     // MARK: How tall the panes are
 
-    /// The chrome between the board and the panes, and above the board: two player rows,
-    /// the transport and the handle. Kept as one number because the pane height is derived
-    /// by subtraction, and a row whose height changes has to change here too.
-    private static let chromeHeight: CGFloat = 34 + 34 + 38 + 26
+    /// The chrome around the board that is not the panes: the players strip above it, the
+    /// transport and the handle below. Kept as one number because the pane height is
+    /// derived by subtraction, and a row whose height changes has to change here too.
+    private static let chromeHeight: CGFloat = 34 + 38 + 26
 
     /// How wide a board can be, which is what a board wants to be.
     private func fullWidthBoardSide(_ width: CGFloat) -> CGFloat {
@@ -306,29 +304,37 @@ struct GameDetailView: View {
             .onEnded { _ in dragAnchor = nil }
     }
 
-    private func playerRow(top: Bool) -> some View {
-        // The owner sits at the bottom by default, because reviewing your own game means
-        // seeing it from where you sat. Flipping the board swaps who is where.
-        let showWhite = (store.orientation == .white) ? !top : top
+    /// Both players, the side at the bottom of the board first. The owner is at the bottom
+    /// by default, because reviewing your own game means seeing it from where you sat, and
+    /// flipping the board swaps who is where — in the strip as on the board.
+    private var players: some View {
+        PlayersRow(
+            near: player(white: store.orientation == .white, mirrored: false),
+            far: player(white: store.orientation != .white, mirrored: true)
+        )
+    }
+
+    private func player(white: Bool, mirrored: Bool) -> PlayerRow {
         let game = store.detail?.game ?? summary
         return PlayerRow(
-            name: showWhite ? game?.white : game?.black,
-            rating: showWhite ? game?.whiteRating : game?.blackRating,
-            isWhite: showWhite,
-            isOwner: game?.ownerIsWhite == showWhite,
-            clock: clock(forWhite: showWhite),
-            toMove: store.snapshot.sideToMove == (showWhite ? .white : .black),
-            trailing: (!top && store.isInLine) ? AnyView(backToGame) : nil
+            name: white ? game?.white : game?.black,
+            rating: white ? game?.whiteRating : game?.blackRating,
+            isWhite: white,
+            isOwner: game?.ownerIsWhite == white,
+            clock: clock(forWhite: white),
+            toMove: store.snapshot.sideToMove == (white ? .white : .black),
+            mirrored: mirrored
         )
     }
 
     /// The way out of a variation.
     ///
-    /// It appears only while a line is open, on the bottom row beside the reader's own
-    /// name. That is the corner of the screen the thumb is already near, and putting it in
-    /// the toolbar would mean reaching across the board to undo something done on the board.
-    /// It is a button rather than a gesture because leaving a line is the one thing a reader
-    /// must be able to do without knowing anything.
+    /// It appears only while a line is open, in the middle of the transport, where the
+    /// position counter otherwise is: directly under the board, where the thumb already is,
+    /// and in place of a number that means little on a line. Putting it in the toolbar
+    /// would mean reaching across the board to undo something done on the board. It is a
+    /// button rather than a gesture because leaving a line is the one thing a reader must
+    /// be able to do without knowing anything.
     private var backToGame: some View {
         Button {
             store.exitLine()
@@ -367,15 +373,19 @@ struct GameDetailView: View {
 
             Spacer(minLength: 0)
 
-            Button {
-                show(.eval)
-            } label: {
-                Text(store.positionLabel)
-                    .font(Theme.Font.mono(12))
-                    .foregroundStyle(Theme.dim)
-                    .monospacedDigit()
+            if store.isInLine {
+                backToGame
+            } else {
+                Button {
+                    show(.eval)
+                } label: {
+                    Text(store.positionLabel)
+                        .font(Theme.Font.mono(12))
+                        .foregroundStyle(Theme.dim)
+                        .monospacedDigit()
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             Spacer(minLength: 0)
 

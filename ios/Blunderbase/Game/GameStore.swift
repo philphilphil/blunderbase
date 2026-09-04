@@ -170,6 +170,34 @@ final class GameStore {
         Haptics.step()
     }
 
+    /// One more move of a variation, which is what tapping a stored engine line does.
+    ///
+    /// A whole line played at once lands the reader at the end of it, which answers "what
+    /// does it look like six moves in" and skips the five positions on the way — and the
+    /// way is the part worth reading. So a tap plays the *next* move of the line the board
+    /// is already on, and the same row tapped again plays the one after. A line the board
+    /// has gone a different way from starts over from the game.
+    func step(along pv: [String]) {
+        guard !pv.isEmpty else { return }
+        let done = progress(along: pv)
+        guard done < pv.count else { return }
+        if isInLine, done == 0, lineIndex > 0 {
+            line = []
+            lineSnapshots = []
+            lineIndex = 0
+        }
+        playLine([pv[done]])
+    }
+
+    /// How many moves of `pv` are on the board: the line so far when it is the start of
+    /// `pv`, and none when the board has gone another way. What lets the pane show which
+    /// part of a line has been played and which row the next tap continues.
+    func progress(along pv: [String]) -> Int {
+        guard isInLine, lineIndex > 0 else { return 0 }
+        let played = line.prefix(lineIndex)
+        return pv.starts(with: played) ? played.count : 0
+    }
+
     /// Back to the game, at the ply the line left from.
     func exitLine() {
         guard isInLine else { return }
@@ -178,6 +206,12 @@ final class GameStore {
         lineIndex = 0
         previewLine = nil
         Haptics.selectionChanged()
+    }
+
+    /// The position the stored engine lines are about: the board, or on a variation the
+    /// game position it left from. See `engineLines`.
+    var lineStartFEN: String {
+        gameSnapshot(at: isInLine ? lineBase : cursor).fen
     }
 
     /// The game's own position at a ply, ignoring any line. The line is built on top of it.
@@ -382,9 +416,16 @@ final class GameStore {
 
     private func topMaiaMove() -> MaiaMove? { maiaMoves.first }
 
-    /// The engine's lines at the current position, best first.
+    /// The engine's stored lines, best first.
+    ///
+    /// On the game they are the lines of the position on the board. On a variation they
+    /// are the lines of the position the variation *left the game from* — the rows the
+    /// reader tapped to get here, kept so the next tap can play the next move of one of
+    /// them. Everything else the server said about that position stays withheld on a line;
+    /// this is the one reading that is still about where the reader is going.
     var engineLines: [BestLine] {
-        guard let lines = positionMove?.bestLines else { return [] }
+        let ply = isInLine ? lineBase : cursor
+        guard ply >= 0, ply < moves.count, let lines = moves[ply].bestLines else { return [] }
         return lines.sorted { ($0.multipv ?? .max) < ($1.multipv ?? .max) }
     }
 

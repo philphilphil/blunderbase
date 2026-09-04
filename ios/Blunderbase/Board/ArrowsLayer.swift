@@ -56,11 +56,14 @@ struct BoardArrow: Identifiable, Equatable {
 /// triangles, and a single pass lets the layer nudge overlapping shafts apart with
 /// knowledge of all of them at once, which a view per arrow could not do.
 ///
-/// The layer sits **over** the pieces at 0.6 opacity, which is what the web does. Sliding
-/// the played arrow underneath and the engine arrows over would need two canvases, which
-/// splits the one thing this layer is for — knowing about all the arrows together — and
-/// buys little: at 0.6 the piece reads through the shaft anyway, and an arrow hidden behind
-/// a piece is an arrow the reader has to hunt for.
+/// The layer sits **over** the pieces, as on the web, but at 0.85 rather than the web's
+/// 0.6: at phone size a 0.6 arrow in a blue-grey hue on a blue-grey board was the thing
+/// readers said they could not see. Sliding the played arrow underneath and the engine
+/// arrows over would need two canvases, which splits the one thing this layer is for —
+/// knowing about all the arrows together — and buys little: the piece still reads through
+/// the shaft, and an arrow hidden behind a piece is an arrow the reader has to hunt for.
+/// Every arrow is drawn twice, a dark halo a hair wider and then the colour, so it has an
+/// edge on the light squares and the dark ones alike.
 struct ArrowsLayer: View {
     let arrows: [BoardArrow]
     let geometry: BoardGeometry
@@ -78,6 +81,8 @@ struct ArrowsLayer: View {
         /// Perpendicular separation between arrows leaving the same square.
         static let fan: CGFloat = 0.11
         static let badgeRadius: CGFloat = 0.17
+        /// How far the dark edge shows past the colour, each side.
+        static let halo: CGFloat = 0.035
     }
 
     var body: some View {
@@ -96,7 +101,7 @@ struct ArrowsLayer: View {
                 draw(arrow, fanRank: rank, square: square, in: &context)
             }
         }
-        .opacity(0.6)
+        .opacity(0.85)
         // The arrows are decoration over a board that already handles taps.
         .allowsHitTesting(false)
     }
@@ -145,18 +150,32 @@ struct ArrowsLayer: View {
         if let corner { path.addLine(to: corner + fanned * (offset / 2)) }
         path.addLine(to: shaftEnd)
 
+        var head = Path()
+        head.move(to: tip)
+        head.addLine(to: shaftEnd + perpendicular * (Ratio.headWidth * square / 2))
+        head.addLine(to: shaftEnd - perpendicular * (Ratio.headWidth * square / 2))
+        head.closeSubpath()
+
+        // Halo first, both parts, then the colour over it: the shaft's round cap sits
+        // inside the head's base, so the colour covers every bit of halo that is not edge.
+        let halo = Ratio.halo * square
+        context.stroke(
+            path,
+            with: .color(Theme.arrowHalo),
+            style: StrokeStyle(lineWidth: width + 2 * halo, lineCap: .round, lineJoin: .round)
+        )
+        context.stroke(
+            head,
+            with: .color(Theme.arrowHalo),
+            style: StrokeStyle(lineWidth: 2 * halo, lineJoin: .round)
+        )
+
         let color = arrow.kind.color
         context.stroke(
             path,
             with: .color(color),
             style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round)
         )
-
-        var head = Path()
-        head.move(to: tip)
-        head.addLine(to: shaftEnd + perpendicular * (Ratio.headWidth * square / 2))
-        head.addLine(to: shaftEnd - perpendicular * (Ratio.headWidth * square / 2))
-        head.closeSubpath()
         context.fill(head, with: .color(color))
 
         guard let label = arrow.label, !label.isEmpty else { return }

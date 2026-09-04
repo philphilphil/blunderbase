@@ -38,9 +38,8 @@ forward for thirty days, so the app stays signed in between launches.
 
 ## The game screen
 
-The board and the panels share one column and trade space. The board, both player rows, the
-move ticker and the transport are on top; Moves, Eval, Engine and Notes are tabs directly
-underneath. Dragging the grabber between them makes the panels taller and the board smaller,
+The board and the panels share one column and trade space. The players strip, the board and
+the transport are on top; Moves, Eval, Engine and Notes are tabs directly underneath. Dragging the grabber between them makes the panels taller and the board smaller,
 and the chevron toggles between the resting split and a tall one. At rest the board is as
 wide as the phone and the panels get whatever is left, which is why a short phone shows a
 full-size board and one row of moves rather than a shrunken board and a long list.

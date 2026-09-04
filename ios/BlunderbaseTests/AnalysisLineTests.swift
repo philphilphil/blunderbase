@@ -67,12 +67,15 @@ final class AnalysisLineTests: XCTestCase {
 
     func testTheStoredLookupsGoQuietInsideALine() {
         XCTAssertNotNil(store.positionMove, "precondition: the game has a move here")
+        let lines = store.engineLines.map(\.moveUci)
         store.play(uci: "c6a5")
 
         XCTAssertNil(store.playedMove)
         XCTAssertNil(store.positionMove)
-        XCTAssertTrue(store.engineLines.isEmpty)
         XCTAssertTrue(store.maiaMoves.isEmpty)
+        // The engine lines are the exception: they stay the lines of the position the
+        // line left from, so the reader can keep walking one of them.
+        XCTAssertEqual(store.engineLines.map(\.moveUci), lines)
     }
 
     func testThereIsNoStoredEvaluationForALinePosition() {
