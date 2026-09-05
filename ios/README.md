@@ -80,12 +80,12 @@ phone; it decides where the pieces are, never what a move is worth.
 The Engine tab has a switch that opens an analysis board on the **server**, the same
 mechanism the web app's infinite analysis uses. Nothing is computed on the phone.
 
-That choice was deliberate. Bundling Stockfish would have made the app 60 MB larger and,
-because Stockfish is GPL v3 and this project is MIT, would have changed the licence of the
-shipped app. Asking the server instead costs a network round trip and buys three things: the
-live numbers come from the same engine as the stored analysis and therefore agree with it,
-the licence stays put, and — the useful one — **the engine does not have to be on the server
-either.**
+That choice was deliberate. Bundling Stockfish would have made the app 60 MB larger and
+put a GPL binary through App Store review, which has a history of rejecting GPL software
+over the store terms. Asking the server instead costs a network round trip and buys three
+things: the live numbers come from the same engine as the stored analysis and therefore
+agree with it, the app ships nothing but its own code, and — the useful one — **the engine
+does not have to be on the server either.**
 
 If the always-on instance has a desktop connected as a runner, a live board can be served by
 that desktop's engine. The stream broker resolves the engine, sees it belongs to a runner and
