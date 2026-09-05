@@ -205,6 +205,11 @@ analysis board, Maia's answer for a position, and a one-off engine evaluation â€
 view stays alive. `/mcp` is not mounted at all. The page shows a *Demo Â· read-only* chip in
 the title bar and one toast the first time a write is refused.
 
+Two reads are closed too: the database backup and the PGN export of the whole library. Each
+one is seconds of CPU and the complete library as a file, to anyone, so a demo answers them
+with the same `403 read_only`. The library is synthetic anyway; whoever wants a copy runs
+`blunderbase demo create` on their own machine.
+
 Three steps.
 
 **1. Build the library on a machine that has your real one.** Every game arrives with its

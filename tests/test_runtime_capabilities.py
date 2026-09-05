@@ -173,6 +173,25 @@ def test_demo_still_answers_the_reads_that_are_spelled_post(demo: TestClient) ->
         assert response.json().get("error") != "read_only", path
 
 
+def test_demo_hands_out_no_whole_library_download(demo: TestClient) -> None:
+    """A backup copies and checks the whole database per request and an export renders
+    every game: seconds of CPU and hundreds of megabytes to anyone, so the demo refuses
+    them even though they are GETs. The single-game reads beside them stay open."""
+    for path in (
+        "/library/backup",
+        "/library/backup/estimate",
+        "/library/backup/prepared/2026-01-01_abcdefghijklmnopqrstuvwxyz012345",
+        "/games/export",
+        "/api/library/backup",
+    ):
+        response = demo.get(path)
+        assert response.status_code == 403, path
+        assert response.json()["error"] == "read_only"
+        assert "download" in response.json()["detail"]
+    assert demo.get("/games").status_code == 200
+    assert demo.get("/library/deleted-games").status_code == 200
+
+
 def test_demo_has_no_coach_and_mints_no_runner(demo: TestClient) -> None:
     assert demo.get("/api/mcp-keys").status_code == 404
     assert demo.post("/auth/setup", json={"password": "valid-password"}).status_code == 404

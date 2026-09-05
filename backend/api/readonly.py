@@ -20,6 +20,13 @@ by `POSITION_SLOTS` plus, in demo mode alone, `DEMO_POSITION_NODES` (`services/a
 `/auth/*` is let through for a different reason: its writes are already 404
 `capability_unavailable` without a password in the picture (`routes/auth.py`), and a 404
 that names the reason beats a 403 that does not.
+
+The mirror image is the short list of GETs the demo refuses: the whole-library downloads.
+A database backup copies and integrity-checks the entire file into the data volume before
+the first byte goes out, and a PGN export renders every game; both are seconds of CPU and
+hundreds of megabytes per request, to anyone, unauthenticated, and a loop of them is the
+cheapest way to take the demo — and the host it shares — down. Nothing in the demo needs
+them: its data is synthetic and the person who wants a copy runs `blunderbase demo create`.
 """
 
 from __future__ import annotations
@@ -32,18 +39,33 @@ from backend.api.errors import error_response
 READ_ONLY = "read_only"
 DETAIL = "this is the read-only demo; run your own Blunderbase to change a library"
 
+DOWNLOAD_DETAIL = (
+    "this is the read-only demo; it serves no whole-library downloads — "
+    "run your own Blunderbase to back one up"
+)
+
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # Writes to nothing but the process's own memory and CPU, and the door that answers with
 # its own refusal — see the module docstring.
 EXEMPT_PREFIXES = ("/streams", "/auth")
 EXEMPT_EXACT = frozenset({"/maia/policy", "/analysis/position"})
+# Reads the demo refuses anyway: every one is the whole library as a file — see the module
+# docstring. A prefix, so the estimate and the prepared-download routes go with the backup.
+DOWNLOAD_PREFIXES = ("/library/backup", "/games/export")
+
+
+def _under(path: str, prefixes: tuple[str, ...]) -> bool:
+    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in prefixes)
 
 
 def exempt(path: str) -> bool:
     """Whether this path is one of the few POSTs the demo answers."""
-    return path in EXEMPT_EXACT or any(
-        path == prefix or path.startswith(f"{prefix}/") for prefix in EXEMPT_PREFIXES
-    )
+    return path in EXEMPT_EXACT or _under(path, EXEMPT_PREFIXES)
+
+
+def whole_library_download(path: str) -> bool:
+    """Whether this path hands out the complete library as one file."""
+    return _under(path, DOWNLOAD_PREFIXES)
 
 
 class ReadOnlyGuard:
@@ -53,13 +75,14 @@ class ReadOnlyGuard:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if (
-            scope["type"] == "http"
-            and scope["method"] not in SAFE_METHODS
-            and not exempt(scope["path"])
-        ):
-            await error_response(403, READ_ONLY, DETAIL)(scope, receive, send)
-            return
+        if scope["type"] == "http":
+            path = scope["path"]
+            if scope["method"] not in SAFE_METHODS and not exempt(path):
+                await error_response(403, READ_ONLY, DETAIL)(scope, receive, send)
+                return
+            if whole_library_download(path):
+                await error_response(403, READ_ONLY, DOWNLOAD_DETAIL)(scope, receive, send)
+                return
         await self.app(scope, receive, send)
 
 

@@ -216,6 +216,12 @@ Engine-Bewertung –, damit die Partieansicht lebendig bleibt. `/mcp` wird gar n
 eingehängt. Die Seite zeigt in der Titelleiste einen Chip *Demo · schreibgeschützt* und
 beim ersten abgewiesenen Schreibzugriff einen Hinweis.
 
+Zwei Lesezugriffe sind ebenfalls zu: die Datenbanksicherung und der PGN-Export der ganzen
+Bibliothek. Beide kosten pro Anfrage Sekunden an Rechenzeit und liefern die komplette
+Bibliothek als Datei, an jeden – eine Demo antwortet darauf mit demselben `403 read_only`.
+Die Bibliothek ist ohnehin erfunden; wer eine Kopie will, lässt `blunderbase demo create`
+auf dem eigenen Rechner laufen.
+
 Drei Schritte.
 
 **1. Bau die Bibliothek auf einem Rechner, der deine echte hat.** Jede Partie kommt mit
