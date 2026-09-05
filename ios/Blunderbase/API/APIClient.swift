@@ -214,6 +214,24 @@ actor APIClient {
         return try decode(data, as: type)
     }
 
+    /// A GET whose answer may be a bare `null` — `/explorer/book` for a position no two of
+    /// the owner's games reached, which is nearly every position.
+    ///
+    /// Separate from `get` rather than `get(as: T?.self)` because a top-level `null` is a
+    /// JSON *fragment*, and whether a decoder accepts one is a property of the decoder that
+    /// has changed between Foundation versions. Reading the body is one line and cannot
+    /// change under the app.
+    func getOptional<T: Decodable & Sendable>(
+        _ path: String,
+        query: [URLQueryItem] = [],
+        as type: T.Type
+    ) async throws -> T? {
+        let data = try await perform(request(path, method: "GET", query: query, body: nil))
+        let body = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty, body != "null" else { return nil }
+        return try decode(data, as: type)
+    }
+
     func post<B: Encodable & Sendable, T: Decodable & Sendable>(
         _ path: String,
         body: B,

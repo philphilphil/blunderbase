@@ -121,6 +121,7 @@ struct Endpoints: Sendable {
         static let games = "/games"
         static let notes = "/notes"
         static let worstMoments = "/stats/worst-moments"
+        static let explorerBook = "/explorer/book"
 
         static func game(_ id: Int) -> String { "/games/\(id)" }
     }
@@ -161,6 +162,25 @@ struct Endpoints: Sendable {
             Path.game(id),
             query: [URLQueryItem.flag("notes", notes)].compactMap { $0 },
             as: GameDetail.self
+        )
+    }
+
+    // MARK: The explorer
+
+    /// One position's book, for a board that has left the game.
+    ///
+    /// A game ships the book of its own positions with it, so stepping through it costs no
+    /// request — asking per ply while somebody holds the transport down is the shape that
+    /// took the server down once already. This is the other half, and the caller is the
+    /// reason it is safe: playing a move of your own is one deliberate act at a time.
+    ///
+    /// Null is the ordinary answer, and it is an answer rather than an absence: no two of
+    /// the owner's games reached this position.
+    func positionBook(fen: String) async throws -> BookEntry? {
+        try await client.getOptional(
+            Path.explorerBook,
+            query: [URLQueryItem(name: "fen", value: fen)],
+            as: BookEntry.self
         )
     }
 

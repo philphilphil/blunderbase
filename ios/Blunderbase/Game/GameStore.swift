@@ -428,47 +428,80 @@ final class GameStore {
 
     /// The engine's stored lines, best first.
     ///
-    /// On the game they are the lines of the position on the board. On a variation they
-    /// are the lines of the position the variation *left the game from* — the rows the
-    /// reader tapped to get here, kept so the next tap can play the next move of one of
-    /// them. Everything else the server said about that position stays withheld on a line;
-    /// this is the one reading that is still about where the reader is going.
+    /// On the game they are the lines of the position on the board. On a variation they are
+    /// the lines of the position the variation *left the game from*, and only **the ones the
+    /// board is still inside**: a line the reader is walking is the one reading that is still
+    /// about where they are going, and its score is the score of walking it. A line the board
+    /// has left is a real number about a position two moves back, which is the kind of wrong
+    /// that is hardest to notice — so playing a move of your own, or walking past the end of
+    /// a line, takes the stored numbers away and leaves the live engine as the way to read
+    /// the position.
+    ///
+    /// At the base of a line the board is on the game position again and all of them are
+    /// about it, which falls out of `progress` returning 0 there.
     var engineLines: [BestLine] {
         let ply = isInLine ? lineBase : cursor
         guard ply >= 0, ply < moves.count, let lines = moves[ply].bestLines else { return [] }
-        return lines.sorted { ($0.multipv ?? .max) < ($1.multipv ?? .max) }
+        let sorted = lines.sorted { ($0.multipv ?? .max) < ($1.multipv ?? .max) }
+        guard isInLine else { return sorted }
+        return sorted.filter { progress(along: $0.pv ?? []) == lineIndex }
     }
 
     // MARK: The owner's own book
 
     /// What the owner's other games did from the position on the board.
     ///
-    /// The book is keyed by half-move **count**, which is the cursor as it stands: the entry
-    /// under `8` is the tree of the position after eight half-moves, and that is the position
-    /// cursor 8 shows. So this is the one ply-keyed lookup on this screen that needs no
-    /// conversion — and the reason the key is a count rather than a move index is that the
-    /// board can stand on the position *after* the last move, which is a position like any
-    /// other and has a book like any other.
+    /// **The book follows the board**, which is what makes tapping a continuation worth
+    /// doing: the move is played, the next position's book takes its place, and the reader
+    /// walks the opening one row at a time.
     ///
-    /// On a variation it is the book of the position the variation *left the game from*,
-    /// the same anchoring as `engineLines` and for the same reason: the rows are what the
-    /// reader tapped to get here, and a pane that went blank the moment one was tapped would
-    /// be answering the tap with nothing. The book of the new position itself is not known —
-    /// the game only ships entries for its own positions — so the pane says which row is on
-    /// the board rather than pretending the board is still on the game. Nil is the common
-    /// answer on the game itself — a book needs two of the owner's games through the same
-    /// position, and nearly every position in a library is reached by exactly one.
+    /// It comes from two places for one reason. The game's own positions ship with the game,
+    /// keyed by half-move **count** — the entry under `8` is the tree of the position after
+    /// eight half-moves, which is the position cursor 8 shows — because a request per ply
+    /// while somebody holds the transport down is the shape that took the server down once
+    /// already. A position off the game line is asked for one at a time, by
+    /// `loadBookForBoard`, since playing a move of your own is a deliberate act and not a
+    /// held key.
+    ///
+    /// Nil is the common answer either way: a book needs two of the owner's games through
+    /// the same position, and nearly every position in a library is reached by exactly one.
     var bookHere: BookEntry? {
-        detail?.book?[isInLine ? lineBase : cursor]
+        guard isInLine else { return detail?.book?[cursor] }
+        return exploredBooks[snapshot.fen] ?? nil
     }
 
-    /// The game's own move out of the position `bookHere` describes — `positionMove` on the
-    /// game, and on a variation the move the game went on with from where the line left.
-    /// What the pane marks "played", so the mark stays on the right row along a line.
-    var bookMove: MoveRow? {
-        let count = isInLine ? lineBase : cursor
-        guard count >= 0, count < moves.count else { return nil }
-        return moves[count]
+    /// Books asked for by FEN, for positions the game does not carry.
+    ///
+    /// The value is itself optional and the double optional is the point: a key with `nil`
+    /// under it is "asked, and there is no book here", which is not the same as never having
+    /// asked, and is what keeps walking back and forth over a square from asking twice.
+    private var exploredBooks: [String: BookEntry?] = [:]
+    private var bookRequests: Set<String> = []
+
+    /// True while the board's own book is in flight, so the pane can wait rather than say
+    /// "you have not been here" and then contradict itself a moment later.
+    var isLoadingBook: Bool { bookRequests.contains(snapshot.fen) }
+
+    /// Ask the server for the book of the position on the board.
+    ///
+    /// Only off the game line — on it the answer already shipped with the game — and only
+    /// from the pane that shows it, so a reader who never opens Book never asks. A failed
+    /// lookup is not remembered: the next time the pane comes back it tries again, which is
+    /// the right answer for a request that failed because the network was gone.
+    func loadBookForBoard() async {
+        guard isInLine else { return }
+        let fen = snapshot.fen
+        guard exploredBooks.index(forKey: fen) == nil, !bookRequests.contains(fen) else { return }
+        bookRequests.insert(fen)
+        defer { bookRequests.remove(fen) }
+        do {
+            // Remembered even when the answer is "no book here", which it usually is: that
+            // is what stops the pane asking again on every step back and forth over the
+            // same square.
+            exploredBooks[fen] = .some(try await endpoints.positionBook(fen: fen))
+        } catch {
+            // Nothing is written, so the next visit asks again.
+        }
     }
 
     /// Whether this game carries a book anywhere along it.

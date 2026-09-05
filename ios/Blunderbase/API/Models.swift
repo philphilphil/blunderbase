@@ -764,7 +764,9 @@ struct BookEntry: Decodable, Sendable, Equatable {
 ///
 /// The book ships with the game rather than from a per-position endpoint on purpose: a fetch
 /// per ply while somebody steps through a game is the pattern that took the server down once
-/// already (`memory/blunderbase-meltdown-root-cause.md`).
+/// already (`memory/blunderbase-meltdown-root-cause.md`). `/explorer/book` is asked only
+/// where this payload cannot answer — a position the reader played their own move into,
+/// which is one deliberate act at a time and not a held key.
 struct GameDetail: Decodable, Sendable, Equatable {
     let game: GameSummary
     /// `[first, last]` 0-based move plies, when the detail was asked for a slice of the game.

@@ -187,55 +187,63 @@ struct GameDetailView: View {
     private var board: some View {
         GeometryReader { outer in
             let panes = paneHeight(in: outer.size)
+            // The board's block is measured by subtraction rather than by a second
+            // `GeometryReader` inside the stack. A nested reader reports the size it was
+            // given *after* the layout that gave it, so the board would follow the drag one
+            // frame behind the transport and the handle above it — which is what a resize
+            // that flickers actually is. The chrome around it has fixed heights, so this
+            // arithmetic is the same number a frame earlier.
+            let block = max(0, outer.size.height - Self.chromeHeight - panes)
+            let side = max(
+                0,
+                min(
+                    outer.size.width - Theme.Metrics.evalBarWidth - 3 * boardMargin,
+                    block - 2 * boardMargin
+                )
+            )
             VStack(spacing: 0) {
                 players
 
-                GeometryReader { geometry in
-                    let side = min(
-                        geometry.size.width - Theme.Metrics.evalBarWidth - 3 * boardMargin,
-                        geometry.size.height - 2 * boardMargin
+                HStack(spacing: boardMargin) {
+                    EvalBarView(
+                        whiteWin: store.whiteWin,
+                        scoreLabel: store.scoreLabel,
+                        orientation: store.orientation
                     )
-                    HStack(spacing: boardMargin) {
-                        EvalBarView(
-                            whiteWin: store.whiteWin,
-                            scoreLabel: store.scoreLabel,
-                            orientation: store.orientation
-                        )
-                        .frame(width: Theme.Metrics.evalBarWidth, height: side)
+                    .frame(width: Theme.Metrics.evalBarWidth, height: side)
 
-                        BoardView(
-                            snapshot: store.snapshot,
-                            orientation: store.orientation,
-                            arrows: store.arrows,
-                            glyph: store.glyph,
-                            selectedSquare: input.selected,
-                            destinations: input.destinations,
-                            onSquareTap: { square in
-                                if let move = input.tapped(square, fen: store.snapshot.fen) {
-                                    store.play(from: move.from, to: move.to)
-                                }
+                    BoardView(
+                        snapshot: store.snapshot,
+                        orientation: store.orientation,
+                        arrows: store.arrows,
+                        glyph: store.glyph,
+                        selectedSquare: input.selected,
+                        destinations: input.destinations,
+                        onSquareTap: { square in
+                            if let move = input.tapped(square, fen: store.snapshot.fen) {
+                                store.play(from: move.from, to: move.to)
                             }
-                        )
-                        .frame(width: side, height: side)
-                        .gesture(walkGesture(stepWidth: side / 14))
-                        .overlay {
-                            if let pending = input.promotion {
-                                PromotionPicker(color: pending.color) { kind in
-                                    if let move = input.choose(kind) {
-                                        store.play(from: move.from, to: move.to, promotion: move.promotion)
-                                    }
-                                } onCancel: {
-                                    input.cancelPromotion()
+                        }
+                    )
+                    .frame(width: side, height: side)
+                    .gesture(walkGesture(stepWidth: side / 14))
+                    .overlay {
+                        if let pending = input.promotion {
+                            PromotionPicker(color: pending.color) { kind in
+                                if let move = input.choose(kind) {
+                                    store.play(from: move.from, to: move.to, promotion: move.promotion)
                                 }
+                            } onCancel: {
+                                input.cancelPromotion()
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(boardMargin)
                 }
+                .padding(boardMargin)
                 // The board takes what the panes leave. Shrinking rather than scrolling is
                 // what keeps the position and the move list legible at the same time.
-                .frame(maxHeight: .infinity)
+                .frame(height: block)
+                .frame(maxWidth: .infinity)
 
                 transport
 

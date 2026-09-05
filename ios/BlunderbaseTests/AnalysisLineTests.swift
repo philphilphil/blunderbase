@@ -68,15 +68,37 @@ final class AnalysisLineTests: XCTestCase {
 
     func testTheStoredLookupsGoQuietInsideALine() {
         XCTAssertNotNil(store.positionMove, "precondition: the game has a move here")
-        let lines = store.engineLines.map(\.moveUci)
         store.play(uci: "c6a5")
 
         XCTAssertNil(store.playedMove)
         XCTAssertNil(store.positionMove)
         XCTAssertTrue(store.maiaMoves.isEmpty)
-        // The engine lines are the exception: they stay the lines of the position the
-        // line left from, so the reader can keep walking one of them.
-        XCTAssertEqual(store.engineLines.map(\.moveUci), lines)
+        // The engine's lines are the exception, and only the one being walked: the reader
+        // is inside it and the next tap plays its next move. The other line is about a
+        // position two plies back and says nothing about this board.
+        XCTAssertEqual(store.engineLines.map(\.moveUci), ["c6a5"])
+    }
+
+    /// A move of the reader's own leaves every stored line, and the numbers go with them.
+    /// Keeping them would put a real evaluation of a real position against a board that is
+    /// not it, which is the kind of wrong nobody notices.
+    func testTheStoredLinesGoWhenTheBoardLeavesThemAll() {
+        XCTAssertEqual(store.engineLines.count, 2, "precondition: two lines at this position")
+        store.play(uci: "h7h6")
+
+        XCTAssertTrue(store.isInLine)
+        XCTAssertTrue(store.engineLines.isEmpty)
+
+        store.step(-1)
+        XCTAssertEqual(store.engineLines.count, 2, "the base of a line is the game position again")
+    }
+
+    func testWalkingPastTheEndOfALineLeavesIt() {
+        store.playLine(["c6a5", "c4b5", "c7c6"])
+        XCTAssertEqual(store.engineLines.map(\.moveUci), ["c6a5"], "walked to its last move")
+
+        store.play(uci: "b5c6")
+        XCTAssertTrue(store.engineLines.isEmpty, "there is no line left to be inside of")
     }
 
     func testThereIsNoStoredEvaluationForALinePosition() {

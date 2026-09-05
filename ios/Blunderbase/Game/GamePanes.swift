@@ -104,8 +104,15 @@ struct PaneHandle: View {
         .frame(height: 26)
         .background(Theme.surface)
         .contentShape(Rectangle())
+        // **The drag is measured against the screen, not against this bar.** A
+        // `DragGesture` reports its translation in its own view's space by default, and
+        // this view *moves under the finger as it is dragged* — every point the panes grow
+        // slides the handle up by a point, which changes the finger's position inside it by
+        // a point, which changes the translation again. That feedback is the flicker: the
+        // board and the panes shudder instead of following the thumb. In the global space
+        // the translation is the distance the finger actually travelled and nothing else.
         .gesture(
-            DragGesture(minimumDistance: 2)
+            DragGesture(minimumDistance: 2, coordinateSpace: .global)
                 .onChanged { onDrag($0.translation.height) }
                 .onEnded { _ in onDragEnded() }
         )

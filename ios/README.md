@@ -51,7 +51,10 @@ The board and the panels share one column and trade space. The players strip, th
 the transport are on top; Moves, Eval, Engine, Book and Notes are tabs directly underneath.
 Book is the owner's own history of the position on the board — how often they have been
 here, how it went, and what they played from here — and it is the same fold over the same
-table the explorer page reads, so the two agree. Dragging the grabber between them makes the panels taller and the board smaller,
+table the explorer page reads, so the two agree. Tapping a continuation plays it and the
+book of the position it led to takes its place, so a line can be clicked through row by
+row; the game's own plies ship with the game, and a position off the game line is asked for
+one at a time from `/explorer/book`. Dragging the grabber between them makes the panels taller and the board smaller,
 and the chevron toggles between the resting split and a tall one. At rest the board is as
 wide as the phone and the panels get whatever is left, which is why a short phone shows a
 full-size board and one row of moves rather than a shrunken board and a long list.
@@ -67,7 +70,7 @@ Only the existing REST API and the events socket — no backend change was neede
 |---|---|
 | Connect | `GET /api/auth/status`, `POST /api/auth/login`, `POST /api/auth/logout` |
 | Games | `GET /api/games?cards=true&…`, `GET /api/stats/worst-moments` |
-| Game | `GET /api/games/{id}` |
+| Game | `GET /api/games/{id}`, `GET /api/explorer/book` |
 | Notes | `GET /api/notes`, `POST /api/notes` |
 | Live engine | `POST/PATCH/DELETE /api/streams`, output on `ws(s)://…/events` |
 

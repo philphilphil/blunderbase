@@ -286,14 +286,17 @@ final class GameStoreTests: XCTestCase {
         XCTAssertEqual(store.lineIndex, 3)
     }
 
-    func testTheEngineLinesStayWhileTheirLineIsBeingWalked() {
+    /// The line being walked stays, and it is the only one that does: the others are scores
+    /// for moves that are not playable from the board any more.
+    func testTheEngineLineBeingWalkedIsTheOneThatStays() {
         store.seek(to: 9)
-        let before = store.engineLines.map(\.moveUci)
+        XCTAssertEqual(store.engineLines.count, 2, "precondition")
         let fen = store.snapshot.fen
         store.step(along: store.engineLines.first?.pv ?? [])
+
         XCTAssertTrue(store.isInLine)
         XCTAssertNotEqual(store.snapshot.fen, fen)
-        XCTAssertEqual(store.engineLines.map(\.moveUci), before)
+        XCTAssertEqual(store.engineLines.map(\.moveUci), [Optional("c6a5")])
         XCTAssertEqual(store.lineStartFEN, fen)
     }
 
