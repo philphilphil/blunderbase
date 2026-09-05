@@ -7,6 +7,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 
@@ -34,7 +35,10 @@ def main() -> None:
             cwd=root, env=environment, check=True, timeout=60,
         )
         # A per-game import failure still exits zero; inspect the result, not just the exit.
-        with sqlite3.connect(database) as connection:
+        # `closing`, not the connection's own context manager: that one only ends the
+        # transaction, and a handle still open on Windows keeps the directory from being
+        # removed when this block ends.
+        with closing(sqlite3.connect(database)) as connection:
             job = connection.execute(
                 "SELECT status, games_imported, games_failed, errors FROM import_jobs"
             ).fetchone()
