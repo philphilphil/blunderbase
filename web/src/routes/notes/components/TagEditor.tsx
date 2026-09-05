@@ -5,6 +5,7 @@
  * many notes carry it — offered through a native `<datalist>` so the list behaves like the
  * browser's own completion and needs no floating panel of its own.
  */
+import { useLingui } from '@lingui/react/macro'
 import { useId, useState } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -33,10 +34,15 @@ export function TagEditor({
   tags,
   onChange,
   suggestions = [],
-  placeholder = 'add a tag',
+  placeholder,
   className,
-  label = 'Tags',
+  label,
 }: TagEditorProps) {
+  // The two defaults are resolved in the body rather than in the parameter list: they are
+  // words now, and `t` is a hook result that does not exist yet where a default would run.
+  const { t } = useLingui()
+  const hint = placeholder ?? t`add a tag`
+  const name = label ?? t`Tags`
   const [draft, setDraft] = useState('')
   const listId = useId()
 
@@ -61,7 +67,7 @@ export function TagEditor({
           {tag}
           <button
             type="button"
-            aria-label={`Remove the tag ${tag}`}
+            aria-label={t`Remove the tag ${tag}`}
             onClick={() => onChange(tags.filter((one) => one !== tag))}
             className="text-faint transition-colors hover:text-blunder"
           >
@@ -73,8 +79,8 @@ export function TagEditor({
         type="text"
         value={draft}
         list={offered.length ? listId : undefined}
-        aria-label={label}
-        placeholder={placeholder}
+        aria-label={name}
+        placeholder={hint}
         onChange={(event) => {
           const value = event.target.value
           // A comma is how a list is typed, and picking from the datalist fires a change

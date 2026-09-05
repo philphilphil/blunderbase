@@ -6,10 +6,13 @@
  * `YYYY-MM-DD` because that is what `<input type="date">` speaks; `until` is widened to
  * the end of the day on the way to the API, so "until 6 Dec" includes the 6th.
  */
+import { i18n, type MessageDescriptor } from '@lingui/core'
+import { msg, t } from '@lingui/core/macro'
+
 import type { GameFilters, Outcome, Result, Source, Speed, Whose } from '@/lib/api/types'
 import type { Color } from '@/lib/api/types'
 
-import { OUTCOME_LABELS, SOURCE_LABELS } from './format'
+import { SOURCE_LABELS } from './format'
 
 export interface LibraryFilters {
   /** `YYYY-MM-DD`, inclusive. */
@@ -137,15 +140,15 @@ export function toGameQuery(filters: LibraryFilters): GameFilters {
 /** Which popover a chip belongs to; several filters share one. */
 export type FilterGroup = 'date' | 'source' | 'color' | 'result' | 'opening' | 'time' | 'opponent' | 'analysis'
 
-export const GROUP_LABELS: Record<FilterGroup, string> = {
-  date: 'Date',
-  source: 'Source',
-  color: 'Colour',
-  result: 'Result',
-  opening: 'Opening',
-  time: 'Time control',
-  opponent: 'Opponent',
-  analysis: 'Analysis',
+export const GROUP_LABELS: Record<FilterGroup, MessageDescriptor> = {
+  date: msg`Date`,
+  source: msg`Source`,
+  color: msg`Colour`,
+  result: msg`Result`,
+  opening: msg`Opening`,
+  time: msg`Time control`,
+  opponent: msg`Opponent`,
+  analysis: msg`Analysis`,
 }
 
 /** Which filter keys each popover owns, so "clear this chip" clears the whole group. */
@@ -171,22 +174,50 @@ export const FILTER_GROUPS: FilterGroup[] = [
   'analysis',
 ]
 
+/**
+ * A chip reads `Colour: black`, in lower case and in the middle of a line — so the words a
+ * summary is built from are their own messages rather than the title-case labels the
+ * popovers set over the same options. Lower-casing a translated `Sieg` or `Weiß` is not
+ * how any language but English writes them.
+ */
+const COLOR_SUMMARY: Record<Color, MessageDescriptor> = {
+  white: msg({ message: 'white', context: 'filter chip' }),
+  black: msg({ message: 'black', context: 'filter chip' }),
+}
+
+const OUTCOME_SUMMARY: Record<Outcome, MessageDescriptor> = {
+  win: msg({ message: 'win', context: 'filter chip' }),
+  loss: msg({ message: 'loss', context: 'filter chip' }),
+  draw: msg({ message: 'draw', context: 'filter chip' }),
+}
+
+/** Also the speed popover's own option labels, which the design writes in lower case too. */
+export const SPEED_WORDS: Record<Speed, MessageDescriptor> = {
+  bullet: msg({ message: 'bullet', context: 'filter chip' }),
+  blitz: msg({ message: 'blitz', context: 'filter chip' }),
+  rapid: msg({ message: 'rapid', context: 'filter chip' }),
+  classical: msg({ message: 'classical', context: 'filter chip' }),
+  correspondence: msg({ message: 'correspondence', context: 'filter chip' }),
+}
+
 /** `Colour: black` — what an active chip reads, or null when the group is unset. */
 export function groupSummary(group: FilterGroup, filters: LibraryFilters): string | null {
   switch (group) {
     case 'date': {
-      if (filters.since && filters.until) return `${filters.since} → ${filters.until}`
-      if (filters.since) return `from ${filters.since}`
-      if (filters.until) return `until ${filters.until}`
+      const since = filters.since
+      const until = filters.until
+      if (since && until) return `${since} → ${until}`
+      if (since) return t`from ${since}`
+      if (until) return t`until ${until}`
       return null
     }
     case 'source':
       return filters.source ? SOURCE_LABELS[filters.source] : null
     case 'color':
-      return filters.color ?? null
+      return filters.color ? i18n._(COLOR_SUMMARY[filters.color]) : null
     case 'result': {
       const parts = [
-        filters.outcome ? OUTCOME_LABELS[filters.outcome].toLowerCase() : null,
+        filters.outcome ? i18n._(OUTCOME_SUMMARY[filters.outcome]) : null,
         filters.result ?? null,
       ].filter(Boolean)
       return parts.length ? parts.join(' · ') : null
@@ -194,7 +225,10 @@ export function groupSummary(group: FilterGroup, filters: LibraryFilters): strin
     case 'opening':
       return filters.eco ?? null
     case 'time': {
-      const parts = [filters.speed ?? null, filters.time_control ?? null].filter(Boolean)
+      const parts = [
+        filters.speed ? i18n._(SPEED_WORDS[filters.speed]) : null,
+        filters.time_control ?? null,
+      ].filter(Boolean)
       return parts.length ? parts.join(' · ') : null
     }
     case 'opponent':
@@ -202,13 +236,13 @@ export function groupSummary(group: FilterGroup, filters: LibraryFilters): strin
     case 'analysis': {
       const parts: string[] = []
       if (filters.has_blunders !== undefined) {
-        parts.push(filters.has_blunders ? 'has blunders' : 'no blunders')
+        parts.push(filters.has_blunders ? t`has blunders` : t`no blunders`)
       }
       if (filters.analyzed !== undefined) {
-        parts.push(filters.analyzed ? 'analysed' : 'unanalysed')
+        parts.push(filters.analyzed ? t`analysed` : t`unanalysed`)
       }
       if (filters.deep_analyzed !== undefined) {
-        parts.push(filters.deep_analyzed ? 'deep' : 'not deep')
+        parts.push(filters.deep_analyzed ? t`deep` : t`not deep`)
       }
       return parts.length ? parts.join(' · ') : null
     }

@@ -12,6 +12,9 @@
  * columns full of holes. What replaces it is `ageBuckets` — time is the only ordering that
  * is always true of a note, and a date rule takes a line rather than a row.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg, plural, t } from '@lingui/core/macro'
+
 import type { LineResponse, NoteGameBrief, NoteResponse, NoteScope } from '@/lib/api/types'
 import { moveNumberLabel } from '@/lib/chess/evaluation'
 
@@ -23,23 +26,23 @@ export function scopeOf(note: NoteResponse): NoteScope {
   return 'free'
 }
 
-export const SCOPE_BADGES: Record<NoteScope, string> = {
-  game: 'game',
+export const SCOPE_BADGES: Record<NoteScope, MessageDescriptor> = {
+  game: msg`game`,
   // Not "position": every note is about a position, so the word said nothing about which
   // kind this is. What this scope actually means is a note written against a position on
   // its own rather than against a game of yours — which is the opening explorer's note.
-  position: 'opening line',
-  line: 'variation',
-  free: 'loose',
+  position: msg`opening line`,
+  line: msg`variation`,
+  free: msg`loose`,
 }
 
 /** `kn1ghtmare vs Dr_Nykterstein`, or the id when the note carries no game summary. */
 export function gameLabel(game: NoteGameBrief | null | undefined, gameId: number): string {
-  if (!game) return `Game #${gameId}`
+  if (!game) return t`Game #${gameId}`
   const white = game.white ?? '?'
   const black = game.black ?? '?'
-  if (white === '?' && black === '?') return `Game #${gameId}`
-  return `${white} vs ${black}`
+  if (white === '?' && black === '?') return t`Game #${gameId}`
+  return t`${white} vs ${black}`
 }
 
 /**
@@ -49,7 +52,7 @@ export function gameLabel(game: NoteGameBrief | null | undefined, gameId: number
  */
 export function notePlyLabel(ply: number | null | undefined): string | null {
   if (typeof ply !== 'number' || !Number.isFinite(ply)) return null
-  if (ply <= 0) return 'start'
+  if (ply <= 0) return t`start`
   return moveNumberLabel(ply - 1)
 }
 
@@ -127,17 +130,24 @@ export function originLabel(note: NoteResponse): string | null {
 export function reachLabel(note: NoteResponse): string | null {
   const mine = note.position_games ?? 0
   const model = note.position_reference_games ?? 0
-  const parts: string[] = []
-  if (mine > 0) parts.push(mine === 1 ? '1 game of yours' : `${mine} of your games`)
-  if (model > 0) parts.push(`${model} model game${model === 1 ? '' : 's'}`)
-  if (!parts.length) return null
-  return `In ${parts.join(' and ')}`
+  // Three whole phrases rather than one built by joining two: "and" is not the only way a
+  // language pairs two counts, and a translator handed the halves separately cannot see
+  // which sentence they are going into.
+  if (mine > 0 && model > 0) {
+    return t`In ${plural(mine, {
+      one: '# game of yours',
+      other: '# of your games',
+    })} and ${plural(model, { one: '# model game', other: '# model games' })}`
+  }
+  if (mine > 0) return t`In ${plural(mine, { one: '# game of yours', other: '# of your games' })}`
+  if (model > 0) return t`In ${plural(model, { one: '# model game', other: '# model games' })}`
+  return null
 }
 
 /** A note as one line — what the command palette's row shows. */
 export function oneLine(note: NoteResponse, max = 80): string {
   const first = note.text.split('\n', 1)[0]?.trim() ?? ''
-  if (!first) return 'note'
+  if (!first) return t`note`
   return first.length > max ? `${first.slice(0, max - 1)}…` : first
 }
 
@@ -151,20 +161,41 @@ export interface NoteBucket {
 }
 
 const DAY = 86_400_000
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
+/**
+ * The rule over a calendar month — `July 2026`.
+ *
+ * A whole message per month rather than a name looked up and a year glued after it: a
+ * language that writes the year first, or declines the month, cannot be served by a table
+ * of twelve nouns. The year arrives as a string so nothing is tempted to group its digits.
+ */
+function monthLabel(month: number, year: string): string {
+  switch (month) {
+    case 0:
+      return t`January ${year}`
+    case 1:
+      return t`February ${year}`
+    case 2:
+      return t`March ${year}`
+    case 3:
+      return t`April ${year}`
+    case 4:
+      return t`May ${year}`
+    case 5:
+      return t`June ${year}`
+    case 6:
+      return t`July ${year}`
+    case 7:
+      return t`August ${year}`
+    case 8:
+      return t`September ${year}`
+    case 9:
+      return t`October ${year}`
+    case 10:
+      return t`November ${year}`
+    default:
+      return t`December ${year}`
+  }
+}
 
 /**
  * The list cut into slices of time, in the order it arrived — which is newest first, by
@@ -194,17 +225,17 @@ export function ageBuckets(notes: readonly NoteResponse[], now = Date.now()): No
     let label: string
     if (at >= startOfToday) {
       key = 'today'
-      label = 'Today'
+      label = t`Today`
     } else if (at >= startOfToday - 6 * DAY) {
       key = 'week'
-      label = 'This week'
+      label = t`This week`
     } else if (at >= startOfMonth) {
       key = 'month'
-      label = 'Earlier this month'
+      label = t`Earlier this month`
     } else {
       const day = new Date(at)
       key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}`
-      label = `${MONTHS[day.getMonth()]} ${day.getFullYear()}`
+      label = monthLabel(day.getMonth(), String(day.getFullYear()))
     }
     // Consecutive only: the list is already in order, so a bucket is a run of it. Reopening
     // an earlier one would mean the notes under a rule were not the notes after it.

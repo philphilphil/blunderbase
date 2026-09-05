@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Copy, Loader2, Plus } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 
@@ -15,6 +16,7 @@ import type { RunnerCreated } from '@/lib/api/types'
  * query cache, and there is no second reading of it to offer later.
  */
 export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
+  const { t } = useLingui()
   const [name, setName] = useState('')
   const [slots, setSlots] = useState('1')
   const [invalid, setInvalid] = useState<string | null>(null)
@@ -26,11 +28,11 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
     event.preventDefault()
     const count = Number.parseInt(slots, 10)
     if (!name.trim()) {
-      setInvalid('a runner needs a name')
+      setInvalid(t`a runner needs a name`)
       return
     }
     if (!Number.isFinite(count) || count < 1) {
-      setInvalid('a runner needs at least one slot')
+      setInvalid(t`a runner needs at least one slot`)
       return
     }
     setInvalid(null)
@@ -38,6 +40,7 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
   }
 
   if (created) {
+    const runnerName = created.runner.name
     return (
       <div
         aria-live="polite"
@@ -45,35 +48,41 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
       >
         <div className="flex items-center gap-2.5">
           <span className="text-xs font-semibold text-ink">
-            {created.runner.name} is registered
+            <Trans>{runnerName} is registered</Trans>
           </span>
           <div className="flex-1" />
           <Button type="button" size="sm" onClick={onCancel}>
-            Done
+            <Trans>Done</Trans>
           </Button>
         </div>
 
         <p className="rounded-md border border-mistake/28 bg-mistake/5 px-3 py-2 text-[0.6875rem] leading-[1.6] text-mistake">
-          Shown once. Nothing stores it, so nothing can show it again — a lost token is a revoke
-          and a new runner.
+          <Trans>
+            Shown once. Nothing stores it, so nothing can show it again — a lost token is a revoke
+            and a new runner.
+          </Trans>
         </p>
 
-        <CopyField label="Token" value={created.token}>
+        <CopyField label={t`Token`} copyLabel={t`Copy token`} value={created.token}>
           <code className="block truncate font-mono text-[0.71875rem] text-ink">
             {created.token}
           </code>
         </CopyField>
 
-        <CopyField label="runner.yaml" value={created.config_yaml}>
+        {/* The yaml's own file name is the label, so it is not a word to translate — only
+            the verb in front of it on the button is. */}
+        <CopyField label="runner.yaml" copyLabel={t`Copy runner.yaml`} value={created.config_yaml}>
           <pre className="overflow-x-auto font-mono text-[0.65625rem] leading-[1.6] text-soft">
             {created.config_yaml}
           </pre>
         </CopyField>
 
         <p className="text-[0.6875rem] leading-[1.6] text-dim">
-          Save that as <span className="font-mono text-soft">runner.yaml</span> on the other
-          machine, edit the engine paths, and start it with{' '}
-          <span className="font-mono text-soft">blunderbase-runner --config runner.yaml</span>.
+          <Trans>
+            Save that as <span className="font-mono text-soft">runner.yaml</span> on the other
+            machine, edit the engine paths, and start it with{' '}
+            <span className="font-mono text-soft">blunderbase-runner --config runner.yaml</span>.
+          </Trans>
         </p>
       </div>
     )
@@ -85,20 +94,24 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
     >
       <div className="flex items-center gap-2.5">
-        <span className="text-xs font-semibold text-ink">Add a remote runner</span>
+        <span className="text-xs font-semibold text-ink">
+          <Trans>Add a remote runner</Trans>
+        </span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={onCancel}
           className="text-[0.6875rem] text-dim transition-colors hover:text-ink"
         >
-          Cancel
+          <Trans>Cancel</Trans>
         </button>
       </div>
 
       <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_6.875rem]">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="add-runner-name">Name</Label>
+          <Label htmlFor="add-runner-name">
+            <Trans>Name</Trans>
+          </Label>
           <Input
             id="add-runner-name"
             value={name}
@@ -109,7 +122,9 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="add-runner-slots">Slots</Label>
+          <Label htmlFor="add-runner-slots">
+            <Trans>Slots</Trans>
+          </Label>
           <Input
             id="add-runner-slots"
             value={slots}
@@ -127,12 +142,14 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
 
       <div className="flex items-center gap-2">
         <p className="flex-1 text-[0.6875rem] leading-[1.6] text-dim">
-          A slot is one engine job or one analysis board. The token is minted here and shown
-          once.
+          <Trans>
+            A slot is one engine job or one analysis board. The token is minted here and shown
+            once.
+          </Trans>
         </p>
         <Button type="submit" size="sm" disabled={create.isPending}>
           {create.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
-          Register remote runner
+          <Trans>Register remote runner</Trans>
         </Button>
       </div>
     </form>
@@ -148,13 +165,17 @@ export function CreateRunnerForm({ onCancel }: { onCancel: () => void }) {
  */
 function CopyField({
   label,
+  copyLabel,
   value,
   children,
 }: {
   label: string
+  /** The button's resting words, resolved by the caller: one of the two labels is a file name. */
+  copyLabel: string
   value: string
   children: ReactNode
 }) {
+  const { t } = useLingui()
   const [copied, setCopied] = useState(false)
 
   async function copy() {
@@ -185,7 +206,7 @@ function CopyField({
         <div className="flex-1" />
         <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
           <Copy aria-hidden />
-          {copied ? 'Copied' : `Copy ${label.toLowerCase()}`}
+          {copied ? t`Copied` : copyLabel}
         </Button>
       </div>
       <div className="rounded-md border border-edge bg-elevated px-3 py-2">{children}</div>

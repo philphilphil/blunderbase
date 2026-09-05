@@ -1,0 +1,6083 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-09-04 20:58+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: en\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: src/app/router.tsx
+msgid "Not found"
+msgstr "Not found"
+
+#: src/app/router.tsx
+msgid "That route does not exist."
+msgstr "That route does not exist."
+
+#: src/app/router.tsx
+msgid "Back to the dashboard"
+msgstr "Back to the dashboard"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "Analyse this position continuously"
+msgstr "Analyse this position continuously"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "nothing is on the board"
+msgstr "nothing is on the board"
+
+#: src/components/analysis/AnalysisControls.tsx
+#: src/routes/engines/EngineBadges.tsx
+#: src/routes/game/components/MobileGameView.tsx
+msgid "Engine"
+msgstr "Engine"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "deep tier — {deepName}"
+msgstr "deep tier — {deepName}"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "deep tier"
+msgstr "deep tier"
+
+#: src/components/analysis/AnalysisControls.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Lines"
+msgstr "Lines"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "{lines, plural, one {# line} other {# lines}}"
+msgstr "{lines, plural, one {# line} other {# lines}}"
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "{where} went away mid-search."
+msgstr "{where} went away mid-search."
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "The engine on {where} stopped mid-search."
+msgstr "The engine on {where} stopped mid-search."
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "The search was closed for sitting idle."
+msgstr "The search was closed for sitting idle."
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "The search ended."
+msgstr "The search ended."
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "Analyse this position continuously."
+msgstr "Analyse this position continuously."
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "this machine"
+msgstr "this machine"
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "Live analysis"
+msgstr "Live analysis"
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "{nodes} nodes"
+msgstr "{nodes} nodes"
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "Resume on {engine}"
+msgstr "Resume on {engine}"
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "Dismiss"
+msgstr "Dismiss"
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Peek at the line"
+msgstr "Peek at the line"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Layered arrows"
+msgstr "Layered arrows"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Plan overlay"
+msgstr "Plan overlay"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Playthrough"
+msgstr "Playthrough"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Peek board"
+msgstr "Peek board"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Nothing"
+msgstr "Nothing"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hovering a line draws the whole line as layered arrows. Click to cycle."
+msgstr "Hovering a line draws the whole line as layered arrows. Click to cycle."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hovering a line shows where the pieces end up. Click to cycle."
+msgstr "Hovering a line shows where the pieces end up. Click to cycle."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hovering a line plays the line out on the board. Click to cycle."
+msgstr "Hovering a line plays the line out on the board. Click to cycle."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hovering a line opens a small board beside the row. Click to cycle."
+msgstr "Hovering a line opens a small board beside the row. Click to cycle."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hovering a line draws nothing. Click to cycle."
+msgstr "Hovering a line draws nothing. Click to cycle."
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "arrows"
+msgstr "arrows"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "overlay"
+msgstr "overlay"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "play"
+msgstr "play"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "peek"
+msgstr "peek"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "off"
+msgstr "off"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Line preview: {mode}"
+msgstr "Line preview: {mode}"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Row hover"
+msgstr "Row hover"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Hover a move to show its position"
+msgstr "Hover a move to show its position"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Move badges"
+msgstr "Move badges"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Colour arrows by side"
+msgstr "Colour arrows by side"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Fade with depth"
+msgstr "Fade with depth"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Plies drawn"
+msgstr "Plies drawn"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Look-ahead"
+msgstr "Look-ahead"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Badge label"
+msgstr "Badge label"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Move number"
+msgstr "Move number"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Ply count"
+msgstr "Ply count"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Tempo"
+msgstr "Tempo"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Start delay"
+msgstr "Start delay"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Loop"
+msgstr "Loop"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Arrow one move ahead"
+msgstr "Arrow one move ahead"
+
+#: src/components/analysis/LinePreviewSettings.tsx
+msgid "Dim current pieces"
+msgstr "Dim current pieces"
+
+#: src/components/badges/SideDot.tsx
+#: src/routes/game/components/EvalGraph.tsx
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/games/components/columns.ts
+#: src/routes/live/LivePage.tsx
+msgid "White"
+msgstr "White"
+
+#: src/components/badges/SideDot.tsx
+#: src/routes/game/components/EvalGraph.tsx
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/games/components/columns.ts
+#: src/routes/live/LivePage.tsx
+msgid "Black"
+msgstr "Black"
+
+#: src/components/badges/SideDot.tsx
+msgid "Side unknown"
+msgstr "Side unknown"
+
+#: src/components/badges/TierBadge.tsx
+#: src/lib/chess/classification.ts
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Quick"
+msgstr "Quick"
+
+#: src/components/badges/TierBadge.tsx
+#: src/lib/chess/classification.ts
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Deep"
+msgstr "Deep"
+
+#: src/components/badges/TierBadge.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Unanalysed"
+msgstr "Unanalysed"
+
+#: src/components/badges/TierBadge.tsx
+#: src/routes/game/components/BoardPanel.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Queued"
+msgstr "Queued"
+
+#: src/components/badges/TierBadge.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Running"
+msgstr "Running"
+
+#: src/components/badges/TierBadge.tsx
+#: src/components/tour/TourCoachmark.tsx
+#: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/import/SyncHistory.tsx
+#: src/routes/mcp/McpKeys.tsx
+msgid "Done"
+msgstr "Done"
+
+#: src/components/badges/TierBadge.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Failed"
+msgstr "Failed"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Engine move"
+msgstr "Engine move"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Maia move"
+msgstr "Maia move"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Played move"
+msgstr "Played move"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Bars — one per move"
+msgstr "Bars — one per move"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Filled curve"
+msgstr "Filled curve"
+
+#: src/components/board/BoardSettings.tsx
+msgid "None"
+msgstr "None"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Dots"
+msgstr "Dots"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Glyphs"
+msgstr "Glyphs"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Board settings"
+msgstr "Board settings"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Board settings — arrows, sound, the eval graph and line preview (S)"
+msgstr "Board settings — arrows, sound, the eval graph and line preview (S)"
+
+#: src/components/board/BoardSettings.tsx
+#: src/routes/live/SessionMeta.tsx
+msgid "Board"
+msgstr "Board"
+
+#: src/components/board/BoardSettings.tsx
+msgid "This browser only."
+msgstr "This browser only."
+
+#: src/components/board/BoardSettings.tsx
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "Close"
+msgstr "Close"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Arrows"
+msgstr "Arrows"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Drawn on the position the board is showing."
+msgstr "Drawn on the position the board is showing."
+
+#: src/components/board/BoardSettings.tsx
+msgid "Sound"
+msgstr "Sound"
+
+#: src/components/board/BoardSettings.tsx
+msgid "A click as each move lands."
+msgstr "A click as each move lands."
+
+#: src/components/board/BoardSettings.tsx
+msgid "Move sounds"
+msgstr "Move sounds"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Level"
+msgstr "Level"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Evaluation graph"
+msgstr "Evaluation graph"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Shape"
+msgstr "Shape"
+
+#: src/components/board/BoardSettings.tsx
+#: src/routes/live/SessionMeta.tsx
+msgid "Marks"
+msgstr "Marks"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Line preview"
+msgstr "Line preview"
+
+#: src/components/board/BoardSettings.tsx
+msgid "What pointing at an engine line does to the board."
+msgstr "What pointing at an engine line does to the board."
+
+#: src/components/board/MiniBoard.tsx
+msgid "Chess position"
+msgstr "Chess position"
+
+#: src/components/import/WhoseGamesToggle.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Mine"
+msgstr "Mine"
+
+#: src/components/import/WhoseGamesToggle.tsx
+msgid "Games you played. They count in every statistic, and the sides are attributed to your accounts."
+msgstr "Games you played. They count in every statistic, and the sides are attributed to your accounts."
+
+#: src/components/import/WhoseGamesToggle.tsx
+msgid "Not mine"
+msgstr "Not mine"
+
+#: src/components/import/WhoseGamesToggle.tsx
+msgid "Somebody else's games — a master collection, a friend's export. Analysed and annotated like any other game, and counted in no statistic."
+msgstr "Somebody else's games — a master collection, a friend's export. Analysed and annotated like any other game, and counted in no statistic."
+
+#: src/components/import/WhoseGamesToggle.tsx
+msgid "Whose games this PGN holds"
+msgstr "Whose games this PGN holds"
+
+#: src/components/settings/SettingField.tsx
+msgid "not set"
+msgstr "not set"
+
+#: src/components/settings/SettingField.tsx
+msgid "Revert"
+msgstr "Revert"
+
+#: src/components/settings/SettingField.tsx
+#: src/routes/engines/RunnerCard.tsx
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Save"
+msgstr "Save"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "No account connected — connect one on the import page"
+msgstr "No account connected — connect one on the import page"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "Account — {label}"
+msgstr "Account — {label}"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "Account"
+msgstr "Account"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "No account connected"
+msgstr "No account connected"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "read-only demo library"
+msgstr "read-only demo library"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "signed in as the owner"
+msgstr "signed in as the owner"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "local library"
+msgstr "local library"
+
+#: src/components/shell/AccountMenu.tsx
+msgid " · owner"
+msgstr " · owner"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "Connected accounts"
+msgstr "Connected accounts"
+
+#: src/components/shell/AccountMenu.tsx
+#: src/components/shell/CommandPalette.tsx
+#: src/routes/mcp/McpPage.tsx
+msgid "Assistant"
+msgstr "Assistant"
+
+#: src/components/shell/AccountMenu.tsx
+#: src/routes/help/HelpPage.tsx
+msgid "How analysis works"
+msgstr "How analysis works"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "Show the tour again"
+msgstr "Show the tour again"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "Language"
+msgstr "Language"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "Change password"
+msgstr "Change password"
+
+#: src/components/shell/AccountMenu.tsx
+msgid "Sign out"
+msgstr "Sign out"
+
+#: src/components/shell/AppShell.tsx
+msgid "This is the read-only demo. Nothing you do here is saved."
+msgstr "This is the read-only demo. Nothing you do here is saved."
+
+#: src/components/shell/AppShell.tsx
+msgid "Run your own Blunderbase to import, analyse and annotate your games."
+msgstr "Run your own Blunderbase to import, analyse and annotate your games."
+
+#: src/components/shell/AppShell.tsx
+msgid "Get it"
+msgstr "Get it"
+
+#: src/components/shell/AppShell.tsx
+msgid "Skip to content"
+msgstr "Skip to content"
+
+#: src/components/shell/AppShell.tsx
+msgid "Loading…"
+msgstr "Loading…"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "Pages"
+msgstr "Pages"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/lib/ui/shortcuts.ts
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+#: src/routes/game/components/BookPanel.tsx
+#: src/routes/games/GamesPage.tsx
+#: src/routes/games/components/GamesTable.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "Games"
+msgstr "Games"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "Opponents"
+msgstr "Opponents"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "Openings"
+msgstr "Openings"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/lib/ui/shortcuts.ts
+#: src/routes/game/components/MobileGameView.tsx
+#: src/routes/game/components/NotesTrack.tsx
+#: src/routes/notes/NotesPage.tsx
+msgid "Notes"
+msgstr "Notes"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/lib/ui/shortcuts.ts
+msgid "Dashboard"
+msgstr "Dashboard"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "the last games and what went wrong"
+msgstr "the last games and what went wrong"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/routes/analysis/AnalysisPage.tsx
+msgid "the library"
+msgstr "the library"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/lib/ui/shortcuts.ts
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/game/GamePage.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Explorer"
+msgstr "Explorer"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "your games, the reference books and model games"
+msgstr "your games, the reference books and model games"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/lib/ui/shortcuts.ts
+#: src/routes/stats/StatsPage.tsx
+msgid "Stats"
+msgstr "Stats"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "reports over the library"
+msgstr "reports over the library"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "everything written down"
+msgstr "everything written down"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/routes/live/LivePage.tsx
+msgid "Live"
+msgstr "Live"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "the game being played now"
+msgstr "the game being played now"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/routes/game/GamePage.tsx
+#: src/routes/import/ImportPage.tsx
+#: src/routes/import/LibraryManagePage.tsx
+msgid "Library"
+msgstr "Library"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "import, export and reset"
+msgstr "import, export and reset"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/routes/analysis/AnalysisPage.tsx
+#: src/routes/analysis/AnalysisSettings.tsx
+#: src/routes/games/filters.ts
+msgid "Analysis"
+msgstr "Analysis"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "coverage, backfills and what they cost"
+msgstr "coverage, backfills and what they cost"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/routes/engines/EnginesPage.tsx
+msgid "Engines"
+msgstr "Engines"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "the roster and what runs what"
+msgstr "the roster and what runs what"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Engine passes"
+msgstr "Engine passes"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "budgets and move labels"
+msgstr "budgets and move labels"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+msgid "Maia"
+msgstr "Maia"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "human levels and when they run"
+msgstr "human levels and when they run"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/lib/ui/shortcuts.ts
+#: src/routes/games/GamesPage.tsx
+#: src/routes/import/ImportPage.tsx
+msgid "Import"
+msgstr "Import"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "lichess, chess.com, FICS and PGN"
+msgstr "lichess, chess.com, FICS and PGN"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/routes/import/LibraryManagePage.tsx
+msgid "Manage Library"
+msgstr "Manage Library"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "export or reset"
+msgstr "export or reset"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "MCP keys and client setup"
+msgstr "MCP keys and client setup"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "stats report"
+msgstr "stats report"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "saved filter"
+msgstr "saved filter"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "report · {hint}"
+msgstr "report · {hint}"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/routes/import/DeletedGamesCard.tsx
+#: src/routes/notes/presentation.ts
+msgid "{white} vs {black}"
+msgstr "{white} vs {black}"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "{played, plural, one {# game} other {# games}}"
+msgstr "{played, plural, one {# game} other {# games}}"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/routes/notes/presentation.ts
+msgid "note"
+msgstr "note"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/TopBar.tsx
+msgid "Search everything"
+msgstr "Search everything"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "Search games, opponents, openings, notes…"
+msgstr "Search games, opponents, openings, notes…"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "Results"
+msgstr "Results"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "Searching…"
+msgstr "Searching…"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "Nothing matches that."
+msgstr "Nothing matches that."
+
+#: src/components/shell/CommandPalette.tsx
+msgid "↑↓ move"
+msgstr "↑↓ move"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "↵ open"
+msgstr "↵ open"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "type two letters to search the library"
+msgstr "type two letters to search the library"
+
+#: src/components/shell/QueueDestinations.tsx
+msgid "nothing will drain this until the machine connects"
+msgstr "nothing will drain this until the machine connects"
+
+#. Short for “queued”, beside the count of runs waiting
+#: src/components/shell/QueueDestinations.tsx
+msgid "{queued} q"
+msgstr "{queued} q"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "{queued} queued, {running} running — the queue is paused"
+msgstr "{queued} queued, {running} running — the queue is paused"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "analysis queue"
+msgstr "analysis queue"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "{queued} queued, {running} running"
+msgstr "{queued} queued, {running} running"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "{queued} queued, {running} running — workers are not draining the queue"
+msgstr "{queued} queued, {running} running — workers are not draining the queue"
+
+#: src/components/shell/QueueIndicator.tsx
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Analysing"
+msgstr "Analysing"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Paused"
+msgstr "Paused"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Idle"
+msgstr "Idle"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Nothing new is claimed while it is paused; a run already started finishes."
+msgstr "Nothing new is claimed while it is paused; a run already started finishes."
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Clear drops what is still queued; a run already being worked finishes."
+msgstr "Clear drops what is still queued; a run already being worked finishes."
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Resume the analysis queue"
+msgstr "Resume the analysis queue"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Pause the analysis queue"
+msgstr "Pause the analysis queue"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Clear {queued} queued runs"
+msgstr "Clear {queued} queued runs"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Clear the analysis queue"
+msgstr "Clear the analysis queue"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Drop everything still queued"
+msgstr "Drop everything still queued"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Clear {queued}?"
+msgstr "Clear {queued}?"
+
+#: src/components/shell/QueueIndicator.tsx
+msgid "Clear"
+msgstr "Clear"
+
+#: src/components/shell/QueueMeter.tsx
+msgid "{running} running, {queued} queued"
+msgstr "{running} running, {queued} queued"
+
+#: src/components/shell/ShortcutsOverlay.tsx
+msgid "Keyboard shortcuts"
+msgstr "Keyboard shortcuts"
+
+#: src/components/shell/ShortcutsOverlay.tsx
+msgid "what this screen answers to"
+msgstr "what this screen answers to"
+
+#: src/components/shell/ShortcutsOverlay.tsx
+msgid "Keyboard shortcuts (?)"
+msgstr "Keyboard shortcuts (?)"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/import/LibraryManagePage.tsx
+msgid "Manage"
+msgstr "Manage"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/analysis/AnalysisPage.tsx
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "Coverage"
+msgstr "Coverage"
+
+#: src/components/shell/SideNav.tsx
+msgid "No engines configured"
+msgstr "No engines configured"
+
+#: src/components/shell/SideNav.tsx
+msgid "Forget the saved filter “{name}”"
+msgstr "Forget the saved filter “{name}”"
+
+#: src/components/shell/SideNav.tsx
+msgid "Forget this filter"
+msgstr "Forget this filter"
+
+#: src/components/shell/SideNav.tsx
+msgid "Filters"
+msgstr "Filters"
+
+#: src/components/shell/SideNav.tsx
+msgid "No saved filters yet"
+msgstr "No saved filters yet"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "both colours"
+msgstr "both colours"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/live/SessionMeta.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "white"
+msgstr "white"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/live/SessionMeta.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "black"
+msgstr "black"
+
+#: src/components/shell/SideNav.tsx
+msgid "Your lines · {scopeLabel}"
+msgstr "Your lines · {scopeLabel}"
+
+#: src/components/shell/SideNav.tsx
+msgid "{name} — {played} of your last {sample} games"
+msgstr "{name} — {played} of your last {sample} games"
+
+#: src/components/shell/SideNav.tsx
+msgid "No openings on record yet"
+msgstr "No openings on record yet"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/live/LivePage.tsx
+msgid "live · reconnected {reconnects}×"
+msgstr "live · reconnected {reconnects}×"
+
+#. Pill saying these numbers were computed just now, not read from the run
+#: src/components/shell/SideNav.tsx
+#: src/routes/game/components/MaiaPanel.tsx
+#: src/routes/live/LivePage.tsx
+msgid "live"
+msgstr "live"
+
+#: src/components/shell/SideNav.tsx
+msgid "connecting to /events"
+msgstr "connecting to /events"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/live/LivePage.tsx
+msgid "offline — retrying"
+msgstr "offline — retrying"
+
+#: src/components/shell/SideNav.tsx
+msgid "Expand the navigation"
+msgstr "Expand the navigation"
+
+#: src/components/shell/SideNav.tsx
+msgid "Collapse the navigation"
+msgstr "Collapse the navigation"
+
+#: src/components/shell/SideNav.tsx
+msgid "Blunderbase on GitHub"
+msgstr "Blunderbase on GitHub"
+
+#: src/components/shell/SideNav.tsx
+msgid "Blunderbase {VERSION_LABEL} — what changed"
+msgstr "Blunderbase {VERSION_LABEL} — what changed"
+
+#: src/components/shell/SideNav.tsx
+msgid "Workspace"
+msgstr "Workspace"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/live/LivePage.tsx
+msgid "on air"
+msgstr "on air"
+
+#: src/components/shell/SideNav.tsx
+msgid "Data & compute"
+msgstr "Data & compute"
+
+#: src/components/shell/SideNav.tsx
+msgid "Sections"
+msgstr "Sections"
+
+#: src/components/shell/SideNav.tsx
+msgid "Close the navigation"
+msgstr "Close the navigation"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "Dark"
+msgstr "Dark"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "Light"
+msgstr "Light"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "Match the system"
+msgstr "Match the system"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "dark"
+msgstr "dark"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "light"
+msgstr "light"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "Theme"
+msgstr "Theme"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "Match the system — currently {current}"
+msgstr "Match the system — currently {current}"
+
+#: src/components/shell/ThemeToggle.tsx
+msgid "{label} theme"
+msgstr "{label} theme"
+
+#: src/components/shell/TopBar.tsx
+msgid "Open the navigation"
+msgstr "Open the navigation"
+
+#: src/components/shell/TopBar.tsx
+msgid "This is the public demo: look at everything, change nothing. Get your own Blunderbase at blunderbase.org."
+msgstr "This is the public demo: look at everything, change nothing. Get your own Blunderbase at blunderbase.org."
+
+#: src/components/shell/TopBar.tsx
+msgid "Demo"
+msgstr "Demo"
+
+#: src/components/shell/TopBar.tsx
+msgid "· read-only"
+msgstr "· read-only"
+
+#: src/components/shell/TopBar.tsx
+msgid "Search everything (⌘K)"
+msgstr "Search everything (⌘K)"
+
+#: src/components/tour/TourCoachmark.tsx
+msgid "{position} of {total}"
+msgstr "{position} of {total}"
+
+#: src/components/tour/TourCoachmark.tsx
+msgid "Skip"
+msgstr "Skip"
+
+#: src/components/tour/TourCoachmark.tsx
+msgid "Back"
+msgstr "Back"
+
+#: src/components/tour/TourCoachmark.tsx
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Next"
+msgstr "Next"
+
+#: src/lib/analysis/duration.ts
+msgid "under a minute"
+msgstr "under a minute"
+
+#: src/lib/analysis/duration.ts
+msgid "{minutes}m"
+msgstr "{minutes}m"
+
+#: src/lib/analysis/duration.ts
+msgid "{hours}h"
+msgstr "{hours}h"
+
+#: src/lib/analysis/duration.ts
+msgid "{hours}h {rest}m"
+msgstr "{hours}h {rest}m"
+
+#: src/lib/analysis/useStreamSession.ts
+msgid "Another analysis board took this position over."
+msgstr "Another analysis board took this position over."
+
+#: src/lib/board/linePreview.ts
+msgid "after {at}"
+msgstr "after {at}"
+
+#: src/lib/chess/classification.ts
+msgid "blunder"
+msgstr "blunder"
+
+#: src/lib/chess/classification.ts
+msgid "mistake"
+msgstr "mistake"
+
+#: src/lib/chess/classification.ts
+msgid "inaccuracy"
+msgstr "inaccuracy"
+
+#: src/lib/chess/classification.ts
+msgid "interesting"
+msgstr "interesting"
+
+#: src/lib/chess/classification.ts
+msgid "best"
+msgstr "best"
+
+#: src/lib/chess/classification.ts
+msgid "brilliant"
+msgstr "brilliant"
+
+#: src/lib/chess/classification.ts
+msgid "{count, plural, one {# blunder} other {# blunders}}"
+msgstr "{count, plural, one {# blunder} other {# blunders}}"
+
+#: src/lib/chess/classification.ts
+msgid "{count, plural, one {# mistake} other {# mistakes}}"
+msgstr "{count, plural, one {# mistake} other {# mistakes}}"
+
+#: src/lib/chess/classification.ts
+msgid "{count, plural, one {# inaccuracy} other {# inaccuracies}}"
+msgstr "{count, plural, one {# inaccuracy} other {# inaccuracies}}"
+
+#: src/lib/chess/classification.ts
+msgid "{count, plural, one {# interesting} other {# interestings}}"
+msgstr "{count, plural, one {# interesting} other {# interestings}}"
+
+#: src/lib/chess/classification.ts
+msgid "{count, plural, one {# best} other {# bests}}"
+msgstr "{count, plural, one {# best} other {# bests}}"
+
+#: src/lib/chess/classification.ts
+msgid "{count, plural, one {# brilliant} other {# brilliants}}"
+msgstr "{count, plural, one {# brilliant} other {# brilliants}}"
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "Analysis finished with errors"
+msgstr "Analysis finished with errors"
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "Analysis complete"
+msgstr "Analysis complete"
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "One analysis failed. Open Blunderbase for details."
+msgstr "One analysis failed. Open Blunderbase for details."
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "One game is ready to review."
+msgstr "One game is ready to review."
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "{done} completed, {failed} failed."
+msgstr "{done} completed, {failed} failed."
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "{done} completed."
+msgstr "{done} completed."
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "{imported} imported, {skipped} already in the Library."
+msgstr "{imported} imported, {skipped} already in the Library."
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "Import failed"
+msgstr "Import failed"
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "Import stopped"
+msgstr "Import stopped"
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "Import complete"
+msgstr "Import complete"
+
+#: src/lib/desktop/NativeFeedback.tsx
+msgid "Open Blunderbase for details."
+msgstr "Open Blunderbase for details."
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgid "That file carried no PGN."
+msgstr "That file carried no PGN."
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgid "PGN import started."
+msgstr "PGN import started."
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgid "The PGN could not be imported."
+msgstr "The PGN could not be imported."
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgid "Drop to import PGN"
+msgstr "Drop to import PGN"
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgid "{count, plural, one {# file} other {# files}}"
+msgstr "{count, plural, one {# file} other {# files}}"
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgid "Whose games are these?"
+msgstr "Whose games are these?"
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgid "<0>{named}</0>. Games that are not yours are stored and analysed like any other, and counted in no statistic."
+msgstr "<0>{named}</0>. Games that are not yours are stored and analysed like any other, and counted in no statistic."
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+#: src/routes/auth/ChangePasswordDialog.tsx
+#: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/engines/EngineDetail.tsx
+#: src/routes/engines/RunnerCard.tsx
+#: src/routes/games/components/DeleteGamesDialog.tsx
+#: src/routes/import/DeleteAllGamesDialog.tsx
+#: src/routes/live/SaveMoment.tsx
+#: src/routes/mcp/McpKeys.tsx
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Cancel"
+msgstr "Cancel"
+
+#: src/lib/desktop/PgnDropOverlay.tsx
+msgctxt "button"
+msgid "Import"
+msgstr "Import"
+
+#: src/lib/engines/hosts.ts
+#: src/routes/engines/MachineEngineList.tsx
+msgid "answers with a policy rather than a search"
+msgstr "answers with a policy rather than a search"
+
+#: src/lib/engines/hosts.ts
+msgid "this host does not run analysis boards on it"
+msgstr "this host does not run analysis boards on it"
+
+#: src/lib/engines/hosts.ts
+msgid "{host} runs queued analysis on it but no analysis board — pick another engine"
+msgstr "{host} runs queued analysis on it but no analysis board — pick another engine"
+
+#: src/lib/engines/hosts.ts
+msgid "switched off"
+msgstr "switched off"
+
+#: src/lib/engines/hosts.ts
+msgid "{host} is not connected"
+msgstr "{host} is not connected"
+
+#: src/lib/engines/hosts.ts
+msgid "queue only — {host} is connected over polling"
+msgstr "queue only — {host} is connected over polling"
+
+#: src/lib/mcp/status.ts
+msgid "just now"
+msgstr "just now"
+
+#: src/lib/mcp/status.ts
+msgid "{minutes}m ago"
+msgstr "{minutes}m ago"
+
+#: src/lib/mcp/status.ts
+msgid "{hours}h ago"
+msgstr "{hours}h ago"
+
+#: src/lib/mcp/status.ts
+msgid "{days}d ago"
+msgstr "{days}d ago"
+
+#: src/lib/runner/support.ts
+msgid "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md"
+msgstr "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md"
+
+#: src/lib/runner/support.ts
+msgid "this browser has no WebAssembly, so it cannot run an engine"
+msgstr "this browser has no WebAssembly, so it cannot run an engine"
+
+#: src/lib/runner/support.ts
+msgid "this browser has no web workers, so the engine has nothing to run on"
+msgstr "this browser has no web workers, so the engine has nothing to run on"
+
+#: src/lib/runner/support.ts
+msgid "this browser has no WebSocket, so it cannot be dispatched work"
+msgstr "this browser has no WebSocket, so it cannot be dispatched work"
+
+#: src/lib/tour/steps.ts
+msgid "Your games come from here"
+msgstr "Your games come from here"
+
+#: src/lib/tour/steps.ts
+msgid "Connect Lichess, chess.com or FICS and sync — or drop a PGN anywhere in the window."
+msgstr "Connect Lichess, chess.com or FICS and sync — or drop a PGN anywhere in the window."
+
+#: src/lib/tour/steps.ts
+msgid "Set up your engines"
+msgstr "Set up your engines"
+
+#: src/lib/tour/steps.ts
+msgid "Register Stockfish and Maia here and give each job one. Nothing is analysed until you do."
+msgstr "Register Stockfish and Maia here and give each job one. Nothing is analysed until you do."
+
+#: src/lib/tour/steps.ts
+msgid "The board settings"
+msgstr "The board settings"
+
+#: src/lib/tour/steps.ts
+msgid "Arrows, the eval graph and the line preview are behind this gear. Or press S."
+msgstr "Arrows, the eval graph and the line preview are behind this gear. Or press S."
+
+#: src/lib/tour/steps.ts
+msgid "Notes stick to positions"
+msgstr "Notes stick to positions"
+
+#: src/lib/tour/steps.ts
+msgid "A note pinned to a position comes back in every game that reaches it."
+msgstr "A note pinned to a position comes back in every game that reaches it."
+
+#: src/lib/tour/steps.ts
+msgid "The other front door"
+msgstr "The other front door"
+
+#: src/lib/tour/steps.ts
+msgid "Point Claude or any MCP client at this database and it reads what the app reads."
+msgstr "Point Claude or any MCP client at this database and it reads what the app reads."
+
+#: src/lib/ui/shortcuts.ts
+msgid "One move back"
+msgstr "One move back"
+
+#: src/lib/ui/shortcuts.ts
+msgid "One move on"
+msgstr "One move on"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The previous flagged move"
+msgstr "The previous flagged move"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The next flagged move"
+msgstr "The next flagged move"
+
+#: src/lib/ui/shortcuts.ts
+msgid "{JUMP} moves back"
+msgstr "{JUMP} moves back"
+
+#: src/lib/ui/shortcuts.ts
+msgid "{JUMP} moves on"
+msgstr "{JUMP} moves on"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The starting position"
+msgstr "The starting position"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The last move"
+msgstr "The last move"
+
+#: src/lib/ui/shortcuts.ts
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Play the game through"
+msgstr "Play the game through"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Previous game in your games list"
+msgstr "Previous game in your games list"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Next game in your games list"
+msgstr "Next game in your games list"
+
+#: src/lib/ui/shortcuts.ts
+#: src/routes/live/LivePage.tsx
+msgid "Flip the board"
+msgstr "Flip the board"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Hints — the board’s arrows and the engine columns"
+msgstr "Hints — the board’s arrows and the engine columns"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The live engine on this position"
+msgstr "The live engine on this position"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Play the engine’s move onto the board"
+msgstr "Play the engine’s move onto the board"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Board settings — arrows, sound, the eval graph"
+msgstr "Board settings — arrows, sound, the eval graph"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Back to the game"
+msgstr "Back to the game"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Write a note about this position"
+msgstr "Write a note about this position"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Queue a quick pass"
+msgstr "Queue a quick pass"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Queue a deep pass"
+msgstr "Queue a deep pass"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Copy the PGN"
+msgstr "Copy the PGN"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Swap the move column between Moves and Flagged"
+msgstr "Swap the move column between Moves and Flagged"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Moving about the game"
+msgstr "Moving about the game"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The board"
+msgstr "The board"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The game itself"
+msgstr "The game itself"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Anywhere"
+msgstr "Anywhere"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Search games, opponents, openings and notes"
+msgstr "Search games, opponents, openings and notes"
+
+#: src/lib/ui/shortcuts.ts
+msgid "This list"
+msgstr "This list"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Close whatever is open"
+msgstr "Close whatever is open"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The library table"
+msgstr "The library table"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Move along the rows"
+msgstr "Move along the rows"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The first and the last row"
+msgstr "The first and the last row"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Open the game under the cursor"
+msgstr "Open the game under the cursor"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Search the library"
+msgstr "Search the library"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Walking a line"
+msgstr "Walking a line"
+
+#: src/lib/ui/shortcuts.ts
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Back one move"
+msgstr "Back one move"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Forward, back down the line you just left"
+msgstr "Forward, back down the line you just left"
+
+#: src/routes/analysis/AnalysisPage.tsx
+msgid "{analysed} of {games} games have had an engine over them."
+msgstr "{analysed} of {games} games have had an engine over them."
+
+#: src/routes/analysis/AnalysisPage.tsx
+msgid "What the library has been analysed with, and what finishing it would cost."
+msgstr "What the library has been analysed with, and what finishing it would cost."
+
+#: src/routes/analysis/AnalysisPage.tsx
+msgid "The coverage could not be read."
+msgstr "The coverage could not be read."
+
+#: src/routes/analysis/AnalysisPage.tsx
+#: src/routes/analysis/AnalysisSettings.tsx
+#: src/routes/auth/AuthLoading.tsx
+#: src/routes/engines/CapacityGrid.tsx
+#: src/routes/engines/EnginesPage.tsx
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/games/components/GamesTable.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+#: src/routes/stats/kit/states.tsx
+msgid "Try again"
+msgstr "Try again"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Quick nodes"
+msgstr "Quick nodes"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Default 250,000"
+msgstr "Default 250,000"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Deep nodes"
+msgstr "Deep nodes"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Default 2,000,000"
+msgstr "Default 2,000,000"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Deep lines"
+msgstr "Deep lines"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Default 4"
+msgstr "Default 4"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Inaccuracy"
+msgstr "Inaccuracy"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Default 5"
+msgstr "Default 5"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Mistake"
+msgstr "Mistake"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Default 10"
+msgstr "Default 10"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Blunder"
+msgstr "Blunder"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Default 15"
+msgstr "Default 15"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Run Maia on quick passes"
+msgstr "Run Maia on quick passes"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Adds human-move predictions to the automatic pass each imported game receives."
+msgstr "Adds human-move predictions to the automatic pass each imported game receives."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Run Maia on deep passes"
+msgstr "Run Maia on deep passes"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "A game that already has every configured level is skipped, so this only pays for what a quick pass missed."
+msgstr "A game that already has every configured level is skipped, so this only pays for what a quick pass missed."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Ask about both sides"
+msgstr "Ask about both sides"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Off asks only about your moves; on also predicts what the opponent is likely to play."
+msgstr "Off asks only about your moves; on also predicts what the opponent is likely to play."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "The analysis configuration could not be read."
+msgstr "The analysis configuration could not be read."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "How much work quick and deep passes do, and how their results become move labels."
+msgstr "How much work quick and deep passes do, and how their results become move labels."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Pass budgets"
+msgstr "Pass budgets"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Quick runs automatically on import; deep is requested explicitly and keeps several candidate lines."
+msgstr "Quick runs automatically on import; deep is requested explicitly and keeps several candidate lines."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Move classification"
+msgstr "Move classification"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Win-percentage points lost by the mover. The three thresholds must rise."
+msgstr "Win-percentage points lost by the mover. The three thresholds must rise."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Remove {elo}"
+msgstr "Remove {elo}"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Add a level"
+msgstr "Add a level"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgctxt "button"
+msgid "Add"
+msgstr "Add"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Which human levels the analysis asks about and when it asks them."
+msgstr "Which human levels the analysis asks about and when it asks them."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Human levels"
+msgstr "Human levels"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Choose up to {MAX_MAIA_ELOS} rating levels. Every position is asked at all of them, so the answers can be read against each other."
+msgstr "Choose up to {MAX_MAIA_ELOS} rating levels. Every position is asked at all of them, so the answers can be read against each other."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "When Maia runs"
+msgstr "When Maia runs"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Choose which passes pay for human-move predictions and whose moves they cover."
+msgstr "Choose which passes pay for human-move predictions and whose moves they cover."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Changed the levels? <0>Fill missing levels</0> from Analysis overview."
+msgstr "Changed the levels? <0>Fill missing levels</0> from Analysis overview."
+
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "Deep pass"
+msgstr "Deep pass"
+
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "a full deep pass, several lines a position"
+msgstr "a full deep pass, several lines a position"
+
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "Quick only"
+msgstr "Quick only"
+
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "the automatic pass on import, and no deep pass yet"
+msgstr "the automatic pass on import, and no deep pass yet"
+
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "No pass"
+msgstr "No pass"
+
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "never analysed — no engine has been over these"
+msgstr "never analysed — no engine has been over these"
+
+#: src/routes/analysis/CoverageSplit.tsx
+msgid "{games} games"
+msgstr "{games} games"
+
+#: src/routes/analysis/FailedRuns.tsx
+#: src/routes/dashboard/QueueCard.tsx
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "quick"
+msgstr "quick"
+
+#: src/routes/analysis/FailedRuns.tsx
+#: src/routes/dashboard/QueueCard.tsx
+#: src/routes/dashboard/RecentGamesList.tsx
+#: src/routes/games/filters.ts
+msgid "deep"
+msgstr "deep"
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "no message was recorded"
+msgstr "no message was recorded"
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Nothing was queued: the tier these runs failed under still has no engine that can take them, so a retry would fail the same way. <0>Register or enable an engine</0> for it first."
+msgstr "Nothing was queued: the tier these runs failed under still has no engine that can take them, so a retry would fail the same way. <0>Register or enable an engine</0> for it first."
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Failed runs"
+msgstr "Failed runs"
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Retry them all"
+msgstr "Retry them all"
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Nothing queued — all {skippedCount} of them are over games that have since been analysed, or over a position rather than a game."
+msgstr "Nothing queued — all {skippedCount} of them are over games that have since been analysed, or over a position rather than a game."
+
+#. placeholder {0}: receipt.queued
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Queued {queuedCount} {0, plural, one {game} other {games}}; skipped {skippedCount}."
+msgstr "Queued {queuedCount} {0, plural, one {game} other {games}}; skipped {skippedCount}."
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Nothing has failed. A run that does will be listed here until it is retried."
+msgstr "Nothing has failed. A run that does will be listed here until it is retried."
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Reading the failures…"
+msgstr "Reading the failures…"
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Showing the newest {shown} of {failures}. Retrying takes on every one of them, not only the ones listed."
+msgstr "Showing the newest {shown} of {failures}. Retrying takes on every one of them, not only the ones listed."
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "Over a position rather than a game — nothing to re-analyse."
+msgstr "Over a position rather than a game — nothing to re-analyse."
+
+#: src/routes/analysis/FailedRuns.tsx
+msgid "and {more} more"
+msgstr "and {more} more"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "{label} remaining"
+msgstr "{label} remaining"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Backfill deep"
+msgstr "Backfill deep"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Backfill quick"
+msgstr "Backfill quick"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass."
+msgstr "A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass."
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off."
+msgstr "The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off."
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "nothing to queue"
+msgstr "nothing to queue"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "{waiting} {pending, plural, one {game} other {games}}"
+msgstr "{waiting} {pending, plural, one {game} other {games}}"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Nothing to queue — every game already has a pass of this tier."
+msgstr "Nothing to queue — every game already has a pass of this tier."
+
+#. placeholder {0}: receipt.queued
+#. placeholder {1}: receipt.outstanding
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Queued {queued} {0, plural, one {game} other {games}}; {outstanding} {1, plural, one {run} other {runs}} outstanding at this tier."
+msgstr "Queued {queued} {0, plural, one {game} other {games}}; {outstanding} {1, plural, one {run} other {runs}} outstanding at this tier."
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Fill missing Maia levels"
+msgstr "Fill missing Maia levels"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Adds the configured levels to games that already have a pass. Maia-only — nothing is searched again — so it costs minutes where a re-analysis would cost the weekend."
+msgstr "Adds the configured levels to games that already have a pass. Maia-only — nothing is searched again — so it costs minutes where a re-analysis would cost the weekend."
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "{waiting} {missing, plural, one {game} other {games}}"
+msgstr "{waiting} {missing, plural, one {game} other {games}}"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Nothing to queue — every analysed game already has every level."
+msgstr "Nothing to queue — every analysed game already has every level."
+
+#. placeholder {0}: receipt.queued
+#. placeholder {1}: receipt.already_complete
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Queued {queued} {0, plural, one {game} other {games}}; {complete} {1, plural, one {game} other {games}} already complete."
+msgstr "Queued {queued} {0, plural, one {game} other {games}}; {complete} {1, plural, one {game} other {games}} already complete."
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Fill missing levels"
+msgstr "Fill missing levels"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Clear the queue"
+msgstr "Clear the queue"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Drops everything still queued, whatever tier or shape it is queued in. Runs already on an engine are left to finish, and no game loses the analysis it already has."
+msgstr "Drops everything still queued, whatever tier or shape it is queued in. Runs already on an engine are left to finish, and no game loses the analysis it already has."
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "nothing queued"
+msgstr "nothing queued"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "{waiting} {queued, plural, one {run} other {runs}} queued"
+msgstr "{waiting} {queued, plural, one {run} other {runs}} queued"
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "{onEngine} running"
+msgstr "{onEngine} running"
+
+#. placeholder {0}: receipt.dropped
+#. placeholder {1}: receipt.outstanding
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Dropped {dropped} {0, plural, one {run} other {runs}}; {outstanding} {1, plural, one {run} other {runs}} still outstanding."
+msgstr "Dropped {dropped} {0, plural, one {run} other {runs}}; {outstanding} {1, plural, one {run} other {runs}} still outstanding."
+
+#: src/routes/analysis/LibraryActions.tsx
+msgid "Times are approximate: measured off this deployment’s own finished runs at the budget configured now, including matching work already queued or running, over {concurrency, plural, one {one run at a time} other {# runs at a time}}. A blank means too few runs have finished at that budget to be worth averaging."
+msgstr "Times are approximate: measured off this deployment’s own finished runs at the budget configured now, including matching work already queued or running, over {concurrency, plural, one {one run at a time} other {# runs at a time}}. A blank means too few runs have finished at that budget to be worth averaging."
+
+#: src/routes/analysis/MaiaLevels.tsx
+msgid "Maia levels"
+msgstr "Maia levels"
+
+#: src/routes/analysis/MaiaLevels.tsx
+msgid "every analysed game has every level"
+msgstr "every analysed game has every level"
+
+#: src/routes/analysis/MaiaLevels.tsx
+msgid "{missing} missing a level"
+msgstr "{missing} missing a level"
+
+#: src/routes/analysis/MaiaLevels.tsx
+#: src/routes/import/AccountCard.tsx
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "games"
+msgstr "games"
+
+#: src/routes/analysis/MaiaLevels.tsx
+msgid "No levels configured."
+msgstr "No levels configured."
+
+#. placeholder {0}: orphans.length
+#: src/routes/analysis/MaiaLevels.tsx
+msgid "{levelCount} {0, plural, one {level} other {levels}} no longer configured, across {pairCount} game-level {pairs, plural, one {pair} other {pairs}}"
+msgstr "{levelCount} {0, plural, one {level} other {levels}} no longer configured, across {pairCount} game-level {pairs, plural, one {pair} other {pairs}}"
+
+#: src/routes/analysis/MaiaLevels.tsx
+msgid "Maia used to be asked at each game’s own rating rather than at a fixed set, so the library carries a level for nearly every rating it has ever seen. They cost nothing and answer nothing — a fill is what puts the configured levels on those games."
+msgstr "Maia used to be asked at each game’s own rating rather than at a fixed set, so the library carries a level for nearly every rating it has ever seen. They cost nothing and answer nothing — a fill is what puts the configured levels on those games."
+
+#: src/routes/auth/AuthLoading.tsx
+msgid "Blunderbase is not answering."
+msgstr "Blunderbase is not answering."
+
+#: src/routes/auth/AuthLoading.tsx
+msgid "The page is here but the server behind it is not, so there is nothing to sign in to yet. It reconnects on its own once the backend is back."
+msgstr "The page is here but the server behind it is not, so there is nothing to sign in to yet. It reconnects on its own once the backend is back."
+
+#: src/routes/auth/AuthLoading.tsx
+msgid "Checking your session…"
+msgstr "Checking your session…"
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "the current password is missing"
+msgstr "the current password is missing"
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "Change the password"
+msgstr "Change the password"
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "Every other browser is signed out, and the MCP bearer key changes with it — the coach reconnects with the new one. This browser stays signed in."
+msgstr "Every other browser is signed out, and the MCP bearer key changes with it — the coach reconnects with the new one. This browser stays signed in."
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "Changed. You are still signed in here."
+msgstr "Changed. You are still signed in here."
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "Current password"
+msgstr "Current password"
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "New password"
+msgstr "New password"
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "Repeat the new one"
+msgstr "Repeat the new one"
+
+#: src/routes/auth/ChangePasswordDialog.tsx
+msgid "Change it"
+msgstr "Change it"
+
+#: src/routes/auth/LoginPage.tsx
+msgid "Sign in"
+msgstr "Sign in"
+
+#: src/routes/auth/LoginPage.tsx
+msgid "This Blunderbase is behind the owner's password — the one the deployment was set up with."
+msgstr "This Blunderbase is behind the owner's password — the one the deployment was set up with."
+
+#: src/routes/auth/LoginPage.tsx
+#: src/routes/auth/SetupPage.tsx
+msgid "Password"
+msgstr "Password"
+
+#: src/routes/auth/LoginPage.tsx
+msgid "Lost it? <0>{RESET_COMMAND}</0> resets it from a shell on the host."
+msgstr "Lost it? <0>{RESET_COMMAND}</0> resets it from a shell on the host."
+
+#: src/routes/auth/SetupPage.tsx
+msgid "Choose the owner's password"
+msgstr "Choose the owner's password"
+
+#: src/routes/auth/SetupPage.tsx
+msgid "Nobody has set one yet. One user, one password, no registration — whoever chooses it here is the owner of this deployment from now on."
+msgstr "Nobody has set one yet. One user, one password, no registration — whoever chooses it here is the owner of this deployment from now on."
+
+#: src/routes/auth/SetupPage.tsx
+msgid "Repeat it"
+msgstr "Repeat it"
+
+#: src/routes/auth/SetupPage.tsx
+msgid "Set the password and sign in"
+msgstr "Set the password and sign in"
+
+#: src/routes/auth/SetupPage.tsx
+msgid "This is also the <0>MCP bearer key</0>: the coach connects with exactly what you type here, so there is nothing else to configure. Changing the password later changes the key."
+msgstr "This is also the <0>MCP bearer key</0>: the coach connects with exactly what you type here, so there is nothing else to configure. Changing the password later changes the key."
+
+#: src/routes/auth/password.ts
+msgid "a password has to be at least {minimum} characters"
+msgstr "a password has to be at least {minimum} characters"
+
+#: src/routes/auth/password.ts
+msgid "those two do not match"
+msgstr "those two do not match"
+
+#: src/routes/auth/password.ts
+msgid "could not reach Blunderbase — is the server running?"
+msgstr "could not reach Blunderbase — is the server running?"
+
+#: src/routes/auth/password.ts
+msgid "that is not the password"
+msgstr "that is not the password"
+
+#: src/routes/auth/password.ts
+msgid "the server answered {status}"
+msgstr "the server answered {status}"
+
+#: src/routes/dashboard/DashboardPage.tsx
+msgid "The backend is not answering. Nothing below will be current."
+msgstr "The backend is not answering. Nothing below will be current."
+
+#: src/routes/dashboard/DashboardPage.tsx
+msgid "Reading the database…"
+msgstr "Reading the database…"
+
+#: src/routes/dashboard/DashboardPage.tsx
+msgid "Nothing imported yet. Start with a sync or a PGN."
+msgstr "Nothing imported yet. Start with a sync or a PGN."
+
+#: src/routes/dashboard/DashboardPage.tsx
+msgid "{gameCount} games in the database."
+msgstr "{gameCount} games in the database."
+
+#: src/routes/dashboard/DashboardPage.tsx
+msgid "{gameCount} games in the database. {blunders, plural, one {{blunderCount} blunder} other {{blunderCount} blunders}} on the record."
+msgstr "{gameCount} games in the database. {blunders, plural, one {{blunderCount} blunder} other {{blunderCount} blunders}} on the record."
+
+#: src/routes/dashboard/DashboardPage.tsx
+#: src/routes/stats/reports.ts
+msgid "Overview"
+msgstr "Overview"
+
+#: src/routes/dashboard/DashboardPage.tsx
+msgid "Import PGN"
+msgstr "Import PGN"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "queued"
+msgstr "queued"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "running"
+msgstr "running"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "done"
+msgstr "done"
+
+#: src/routes/dashboard/QueueCard.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "failed"
+msgstr "failed"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "the missing Maia levels only; nothing is searched"
+msgstr "the missing Maia levels only; nothing is searched"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "retry"
+msgstr "retry"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "Game #{id}"
+msgstr "Game #{id}"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "workers idle"
+msgstr "workers idle"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "idle"
+msgstr "idle"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "Analysis queue"
+msgstr "Analysis queue"
+
+#: src/routes/dashboard/QueueCard.tsx
+#: src/routes/live/SessionMeta.tsx
+msgid "ad-hoc position"
+msgstr "ad-hoc position"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "+ {hidden} more queued"
+msgstr "+ {hidden} more queued"
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "{queued} queued and {running} running. Individual runs appear here as the socket reports them."
+msgstr "{queued} queued and {running} running. Individual runs appear here as the socket reports them."
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "Nothing outstanding. <0>Pick a game</0> to put something in."
+msgstr "Nothing outstanding. <0>Pick a game</0> to put something in."
+
+#: src/routes/dashboard/QueueCard.tsx
+msgid "This process is not draining the queue. Runs will sit there until a worker picks them up."
+msgstr "This process is not draining the queue. Runs will sit there until a worker picks them up."
+
+#: src/routes/dashboard/RatingCard.tsx
+#: src/routes/game/gameModel.ts
+#: src/routes/games/format.ts
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Bullet"
+msgstr "Bullet"
+
+#: src/routes/dashboard/RatingCard.tsx
+#: src/routes/game/gameModel.ts
+#: src/routes/games/format.ts
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Blitz"
+msgstr "Blitz"
+
+#: src/routes/dashboard/RatingCard.tsx
+#: src/routes/game/gameModel.ts
+#: src/routes/games/format.ts
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Rapid"
+msgstr "Rapid"
+
+#: src/routes/dashboard/RatingCard.tsx
+#: src/routes/game/gameModel.ts
+#: src/routes/games/format.ts
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Classical"
+msgstr "Classical"
+
+#: src/routes/dashboard/RatingCard.tsx
+#: src/routes/game/gameModel.ts
+msgid "Correspondence"
+msgstr "Correspondence"
+
+#: src/routes/dashboard/RatingCard.tsx
+msgid "speeds"
+msgstr "speeds"
+
+#: src/routes/dashboard/RatingCard.tsx
+msgid "Speeds"
+msgstr "Speeds"
+
+#: src/routes/dashboard/RatingCard.tsx
+#: src/routes/stats/cards/ProgressCard.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Rating"
+msgstr "Rating"
+
+#: src/routes/dashboard/RatingCard.tsx
+msgid "Rating window"
+msgstr "Rating window"
+
+#: src/routes/dashboard/RatingCard.tsx
+msgid "No rated games yet, so there is no rating to plot."
+msgstr "No rated games yet, so there is no rating to plot."
+
+#: src/routes/dashboard/RatingCard.tsx
+msgid "Not enough rated games in {period}. Widen the window."
+msgstr "Not enough rated games in {period}. Widen the window."
+
+#: src/routes/dashboard/RatingCard.tsx
+msgid "Every speed is hidden. Pick one in the speeds menu."
+msgstr "Every speed is hidden. Pick one in the speeds menu."
+
+#. One-letter result marker for a win
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "W"
+msgstr "W"
+
+#. One-letter result marker for a loss
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "L"
+msgstr "L"
+
+#. One-letter result marker for a draw
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "D"
+msgstr "D"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "Unnamed opening"
+msgstr "Unnamed opening"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+#: src/routes/games/filters.ts
+msgid "unanalysed"
+msgstr "unanalysed"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Unknown"
+msgstr "Unknown"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "Recent games"
+msgstr "Recent games"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "All games"
+msgstr "All games"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "All {total}"
+msgstr "All {total}"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "Import games"
+msgstr "Import games"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+msgid "No games in the database yet. Sync an account or drop a PGN in and this fills up."
+msgstr "No games in the database yet. Sync an account or drop a PGN in and this fills up."
+
+#: src/routes/dashboard/SyncAllButton.tsx
+msgid "the sync did not start"
+msgstr "the sync did not start"
+
+#: src/routes/dashboard/SyncAllButton.tsx
+msgid "Connect account"
+msgstr "Connect account"
+
+#: src/routes/dashboard/SyncAllButton.tsx
+#: src/routes/import/AccountCard.tsx
+#: src/routes/import/JobProgress.tsx
+msgid "Syncing"
+msgstr "Syncing"
+
+#: src/routes/dashboard/SyncAllButton.tsx
+msgid "Sync all"
+msgstr "Sync all"
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "Nothing has moved either way. A flat window is still a window."
+msgstr "Nothing has moved either way. A flat window is still a window."
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "Fewer blunders and more points. Whatever you changed, keep it."
+msgstr "Fewer blunders and more points. Whatever you changed, keep it."
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "Fewer blunders, fewer points. You are losing the game in smaller pieces now."
+msgstr "Fewer blunders, fewer points. You are losing the game in smaller pieces now."
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "More blunders and more points. You are getting away with it."
+msgstr "More blunders and more points. You are getting away with it."
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "More blunders and fewer points. The two usually travel together."
+msgstr "More blunders and fewer points. The two usually travel together."
+
+#: src/routes/dashboard/TrendsCard.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "Blunders per game"
+msgstr "Blunders per game"
+
+#: src/routes/dashboard/TrendsCard.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "Win % given away"
+msgstr "Win % given away"
+
+#. Table column: the win/draw/loss bar
+#: src/routes/dashboard/TrendsCard.tsx
+#: src/routes/explorer/components/LineSummary.tsx
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/game/components/BookPanel.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/ProgressCard.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Score"
+msgstr "Score"
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "to today"
+msgstr "to today"
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "to {until}"
+msgstr "to {until}"
+
+#: src/routes/dashboard/TrendsCard.tsx
+#: src/routes/game/components/NotesTrack.tsx
+msgid "{games, plural, one {# game} other {# games}}"
+msgstr "{games, plural, one {# game} other {# games}}"
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "Last {days} days"
+msgstr "Last {days} days"
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "Trend window"
+msgstr "Trend window"
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "No games in {period}. Widen the window, or play some chess."
+msgstr "No games in {period}. Widen the window, or play some chess."
+
+#: src/routes/dashboard/TrendsCard.tsx
+msgid "Against the {windowKey} before this one, once there is one to compare."
+msgstr "Against the {windowKey} before this one, once there is one to compare."
+
+#. Stands in for a player the game does not name
+#: src/routes/dashboard/WorstMomentsRow.tsx
+#: src/routes/explorer/stats.ts
+#: src/routes/game/components/BoardPanel.tsx
+#: src/routes/game/components/MobileGameView.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "unknown"
+msgstr "unknown"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "{move} vs {opponent} — {cost} win chance, better: {better}"
+msgstr "{move} vs {opponent} — {cost} win chance, better: {better}"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "{move} vs {opponent} — {cost} win chance"
+msgstr "{move} vs {opponent} — {cost} win chance"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "Worst recent moments"
+msgstr "Worst recent moments"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "nothing in the last {days} days — showing all time"
+msgstr "nothing in the last {days} days — showing all time"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "the last {days} days, by the win percentage they gave away"
+msgstr "the last {days} days, by the win percentage they gave away"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "All blunders"
+msgstr "All blunders"
+
+#: src/routes/dashboard/WorstMomentsRow.tsx
+msgid "Nothing analysed has gone badly wrong yet. Either the engine has not been over your games, or — less likely — you have not blundered."
+msgstr "Nothing analysed has gone badly wrong yet. Either the engine has not been over your games, or — less likely — you have not blundered."
+
+#: src/routes/dashboard/useRunActivity.ts
+msgid "the run failed"
+msgstr "the run failed"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "an engine needs a name and a path"
+msgstr "an engine needs a name and a path"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "Add an engine"
+msgstr "Add an engine"
+
+#: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Path"
+msgstr "Path"
+
+#: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Probe"
+msgstr "Probe"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "That binary could not be started."
+msgstr "That binary could not be started."
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "unnamed engine"
+msgstr "unnamed engine"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "{declared, plural, one {# option} other {# options}}"
+msgstr "{declared, plural, one {# option} other {# options}}"
+
+#: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Name"
+msgstr "Name"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "Kind"
+msgstr "Kind"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "Normal engine"
+msgstr "Normal engine"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "Human moves (Maia)"
+msgstr "Human moves (Maia)"
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "A Maia model is a network behind an lc0-style binary — give the command line as the path."
+msgstr "A Maia model is a network behind an lc0-style binary — give the command line as the path."
+
+#: src/routes/engines/AddEngineForm.tsx
+msgid "Add engine"
+msgstr "Add engine"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "{reason} — the token was kept, so nothing is orphaned"
+msgstr "{reason} — the token was kept, so nothing is orphaned"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "unsupported"
+msgstr "unsupported"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "not installed"
+msgstr "not installed"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/engines/EngineInventory.tsx
+msgid "This browser"
+msgstr "This browser"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "Collapse this browser"
+msgstr "Collapse this browser"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "Expand this browser"
+msgstr "Expand this browser"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "Install browser Stockfish"
+msgstr "Install browser Stockfish"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "Revoke and uninstall"
+msgstr "Revoke and uninstall"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "Start"
+msgstr "Start"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/import/JobProgress.tsx
+msgid "Stop"
+msgstr "Stop"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "Uninstall"
+msgstr "Uninstall"
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "{unsupportedReason}. Everything else on this page works as it always did — engines on this host, and runners on other machines."
+msgstr "{unsupportedReason}. Everything else on this page works as it always did — engines on this host, and runners on other machines."
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "Nothing is installed here. The engine and its network are about 15 MB and are served by Blunderbase itself, so nothing is fetched from anywhere else — and the token this creates lives in this browser only."
+msgstr "Nothing is installed here. The engine and its network are about 15 MB and are served by Blunderbase itself, so nothing is fetched from anywhere else — and the token this creates lives in this browser only."
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "The engine has not started yet. It lives in this browser rather than at a path — there is nothing on a filesystem to point at."
+msgstr "The engine has not started yet. It lives in this browser rather than at a path — there is nothing on a filesystem to point at."
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "This page is not cross-origin isolated, so the engine gets one thread instead of several. Blunderbase sends the headers that ask for isolation; a reverse proxy in front of it is the usual reason they do not arrive."
+msgstr "This page is not cross-origin isolated, so the engine gets one thread instead of several. Blunderbase sends the headers that ask for isolation; a reverse proxy in front of it is the usual reason they do not arrive."
+
+#: src/routes/engines/BrowserRunnerSection.tsx
+msgid "The server refused {refusedName}: {refusedReason}"
+msgstr "The server refused {refusedName}: {refusedReason}"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Compute capacity"
+msgstr "Compute capacity"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "This server, this browser, and remote machines that can take engine work."
+msgstr "This server, this browser, and remote machines that can take engine work."
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "The engines and analysis capacity on this computer."
+msgstr "The engines and analysis capacity on this computer."
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "How remote runners work"
+msgstr "How remote runners work"
+
+#: src/routes/engines/CapacityGrid.tsx
+#: src/routes/engines/EngineInventory.tsx
+#: src/routes/engines/RunnerCard.tsx
+msgid "Remote runner"
+msgstr "Remote runner"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Compute capacity could not be read."
+msgstr "Compute capacity could not be read."
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "No remote runners are registered. This server and browser still work independently."
+msgstr "No remote runners are registered. This server and browser still work independently."
+
+#: src/routes/engines/CapacityGrid.tsx
+#: src/routes/engines/EnginesPage.tsx
+msgid "This computer"
+msgstr "This computer"
+
+#: src/routes/engines/CapacityGrid.tsx
+#: src/routes/engines/EngineInventory.tsx
+#: src/routes/engines/EnginesPage.tsx
+msgid "This server"
+msgstr "This server"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "ready for queued work"
+msgstr "ready for queued work"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "not draining the queue"
+msgstr "not draining the queue"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Computer"
+msgstr "Computer"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Server"
+msgstr "Server"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Collapse this computer"
+msgstr "Collapse this computer"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Expand this computer"
+msgstr "Expand this computer"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Collapse this server"
+msgstr "Collapse this server"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "Expand this server"
+msgstr "Expand this server"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgctxt "button"
+msgid "Engine"
+msgstr "Engine"
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "{queued} queued and {running} running here. Paths and options for these engines are editable in the inventory above."
+msgstr "{queued} queued and {running} running here. Paths and options for these engines are editable in the inventory above."
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "This process is not draining the queue. Runs wait until a worker picks them up."
+msgstr "This process is not draining the queue. Runs wait until a worker picks them up."
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "A runner is a small process on another machine that connects outward to this Blunderbase deployment. Registering one mints a token shown once and a paste-ready <0>runner.yaml</0>. Copy both to that machine, set its engine paths in the yaml, and start the runner. Its advertised engines then appear in the inventory above; their paths and options remain read-only here because the yaml on that machine is the source of truth."
+msgstr "A runner is a small process on another machine that connects outward to this Blunderbase deployment. Registering one mints a token shown once and a paste-ready <0>runner.yaml</0>. Copy both to that machine, set its engine paths in the yaml, and start the runner. Its advertised engines then appear in the inventory above; their paths and options remain read-only here because the yaml on that machine is the source of truth."
+
+#: src/routes/engines/CapacityGrid.tsx
+msgid "A longer setup and troubleshooting guide will be linked here when the documentation is ready."
+msgstr "A longer setup and troubleshooting guide will be linked here when the documentation is ready."
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "a runner needs a name"
+msgstr "a runner needs a name"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "a runner needs at least one slot"
+msgstr "a runner needs at least one slot"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "{runnerName} is registered"
+msgstr "{runnerName} is registered"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Shown once. Nothing stores it, so nothing can show it again — a lost token is a revoke and a new runner."
+msgstr "Shown once. Nothing stores it, so nothing can show it again — a lost token is a revoke and a new runner."
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Token"
+msgstr "Token"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Copy token"
+msgstr "Copy token"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Copy runner.yaml"
+msgstr "Copy runner.yaml"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Save that as <0>runner.yaml</0> on the other machine, edit the engine paths, and start it with <1>blunderbase-runner --config runner.yaml</1>."
+msgstr "Save that as <0>runner.yaml</0> on the other machine, edit the engine paths, and start it with <1>blunderbase-runner --config runner.yaml</1>."
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Add a remote runner"
+msgstr "Add a remote runner"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Slots"
+msgstr "Slots"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "A slot is one engine job or one analysis board. The token is minted here and shown once."
+msgstr "A slot is one engine job or one analysis board. The token is minted here and shown once."
+
+#: src/routes/engines/CreateRunnerForm.tsx
+msgid "Register remote runner"
+msgstr "Register remote runner"
+
+#: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/mcp/CopyButton.tsx
+msgid "Copied"
+msgstr "Copied"
+
+#: src/routes/engines/EngineBadges.tsx
+msgid "Human"
+msgstr "Human"
+
+#: src/routes/engines/EngineBadges.tsx
+msgid "Assigned to nothing right now"
+msgstr "Assigned to nothing right now"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "that machine"
+msgstr "that machine"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "in this browser"
+msgstr "in this browser"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "in {runnerName}"
+msgstr "in {runnerName}"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "In this browser"
+msgstr "In this browser"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "In {runnerName}"
+msgstr "In {runnerName}"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Runner-owned settings are read-only here"
+msgstr "Runner-owned settings are read-only here"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Engine settings"
+msgstr "Engine settings"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Enabled"
+msgstr "Enabled"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Disabled"
+msgstr "Disabled"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Disable {engineName}"
+msgstr "Disable {engineName}"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Enable {engineName}"
+msgstr "Enable {engineName}"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Binary"
+msgstr "Binary"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Runs <0>{whereItRuns}</0>. This row is the tab’s own advertisement and is rewritten every time it connects — there is no file to point at and nothing here to edit. It goes away when the browser runner is uninstalled."
+msgstr "Runs <0>{whereItRuns}</0>. This row is the tab’s own advertisement and is rewritten every time it connects — there is no file to point at and nothing here to edit. It goes away when the browser runner is uninstalled."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Advertised by <0>{runnerName}</0>. This row is that machine’s advertisement and is rewritten every time it connects — change it in <1>runner.yaml</1> over there. Its path is a path on that machine."
+msgstr "Advertised by <0>{runnerName}</0>. This row is that machine’s advertisement and is rewritten every time it connects — change it in <1>runner.yaml</1> over there. Its path is a path on that machine."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Which machine advertises this engine is not known yet, so nothing here is editable and the binary is not probed — a runner’s path is a path on that machine, not on this one."
+msgstr "Which machine advertises this engine is not known yet, so nothing here is editable and the binary is not probed — a runner’s path is a path on that machine, not on this one."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Assigned to <0>{assignment}</0>."
+msgstr "Assigned to <0>{assignment}</0>."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Assigned to nothing, so it runs only when a test run or an analysis board asks for it by name."
+msgstr "Assigned to nothing, so it runs only when a test run or an analysis board asks for it by name."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Which engine runs what is chosen under <0>What runs what</0> at the top of this page."
+msgstr "Which engine runs what is chosen under <0>What runs what</0> at the top of this page."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Where it runs"
+msgstr "Where it runs"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "The build ships with Blunderbase and is loaded by the tab itself. There is no file on any machine."
+msgstr "The build ships with Blunderbase and is loaded by the tab itself. There is no file on any machine."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "A path on {runnerName}, not here."
+msgstr "A path on {runnerName}, not here."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary."
+msgstr "A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "More settings"
+msgstr "More settings"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "UCI options and test runs"
+msgstr "UCI options and test runs"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "UCI options"
+msgstr "UCI options"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "probing…"
+msgstr "probing…"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "unnamed"
+msgstr "unnamed"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Options come from the runner’s own probe."
+msgstr "Options come from the runner’s own probe."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "The binary could not be probed."
+msgstr "The binary could not be probed."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Probing a Maia model loads its network first, which takes a while — press Probe when you want to edit its options."
+msgstr "Probing a Maia model loads its network first, which takes a while — press Probe when you want to edit its options."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Press Probe to read what this binary declares."
+msgstr "Press Probe to read what this binary declares."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Test run"
+msgstr "Test run"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "A test run starts a binary on this host. This engine has none — it runs <0>{whereItRuns}</0>."
+msgstr "A test run starts a binary on this host. This engine has none — it runs <0>{whereItRuns}</0>."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "A test run starts the binary here; <0>{enginePath}</0> is a path on <1>{runnerName}</1>."
+msgstr "A test run starts the binary here; <0>{enginePath}</0> is a path on <1>{runnerName}</1>."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Position"
+msgstr "Position"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "starting position"
+msgstr "starting position"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Ratings"
+msgstr "Ratings"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Nodes"
+msgstr "Nodes"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Runs whether the engine is enabled or not — the point of the button is to decide."
+msgstr "Runs whether the engine is enabled or not — the point of the button is to decide."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "The engine did not answer."
+msgstr "The engine did not answer."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Nothing here is editable. This row belongs to a browser tab — uninstall it under <0>This browser</0> in Compute capacity below, or revoke the runner there."
+msgstr "Nothing here is editable. This row belongs to a browser tab — uninstall it under <0>This browser</0> in Compute capacity below, or revoke the runner there."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Nothing here is editable. Change this engine in <0>runner.yaml</0> on {runnerName}, or open {runnerName} under Compute capacity below to revoke it."
+msgstr "Nothing here is editable. Change this engine in <0>runner.yaml</0> on {runnerName}, or open {runnerName} under Compute capacity below to revoke it."
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Remove {engineName}? Analysis already stored keeps its runs."
+msgstr "Remove {engineName}? Analysis already stored keeps its runs."
+
+#: src/routes/engines/EngineDetail.tsx
+msgctxt "button"
+msgid "Remove"
+msgstr "Remove"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Fix the options above first"
+msgstr "Fix the options above first"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "Save changes"
+msgstr "Save changes"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "inventory column"
+msgid "Engine"
+msgstr "Engine"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "inventory column"
+msgid "Kind"
+msgstr "Kind"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "inventory column"
+msgid "Assignment"
+msgstr "Assignment"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "inventory column"
+msgid "Where"
+msgstr "Where"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "inventory column"
+msgid "State"
+msgstr "State"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "Collapse {engineName}"
+msgstr "Collapse {engineName}"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "Edit {engineName}"
+msgstr "Edit {engineName}"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "Checking…"
+msgstr "Checking…"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "engine state"
+msgid "Off"
+msgstr "Off"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "Host away"
+msgstr "Host away"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "Queue only"
+msgstr "Queue only"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "engine state"
+msgid "On"
+msgstr "On"
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "Assign each job, compare every configured engine, and see all compute capacity in one place."
+msgstr "Assign each job, compare every configured engine, and see all compute capacity in one place."
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "Engine inventory"
+msgstr "Engine inventory"
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "Every configured engine, what it does and where it runs."
+msgstr "Every configured engine, what it does and where it runs."
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "The engine list could not be read."
+msgstr "The engine list could not be read."
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "No engines are registered."
+msgstr "No engines are registered."
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "Add a path-based engine below, install browser Stockfish, or connect a remote runner."
+msgstr "Add a path-based engine below, install browser Stockfish, or connect a remote runner."
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "Add a path-based engine on this computer below."
+msgstr "Add a path-based engine on this computer below."
+
+#: src/routes/engines/HostBadge.tsx
+#: src/routes/engines/RolesForm.tsx
+msgid "local"
+msgstr "local"
+
+#: src/routes/engines/HostBadge.tsx
+msgid "{runnerName} is not connected"
+msgstr "{runnerName} is not connected"
+
+#: src/routes/engines/HostBadge.tsx
+#: src/routes/engines/MachineEngineList.tsx
+msgid "queue only"
+msgstr "queue only"
+
+#: src/routes/engines/MachineEngineList.tsx
+msgid "Nothing has been advertised."
+msgstr "Nothing has been advertised."
+
+#: src/routes/engines/MachineEngineList.tsx
+msgid "this link takes queue work but cannot open an analysis board"
+msgstr "this link takes queue work but cannot open an analysis board"
+
+#. placeholder {0}: Number(engines)
+#: src/routes/engines/MachineRow.tsx
+msgid "{0, plural, one {# engine} other {# engines}}"
+msgstr "{0, plural, one {# engine} other {# engines}}"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "set per analysis"
+msgstr "set per analysis"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "action"
+msgstr "action"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default ({fallback})"
+msgstr "default ({fallback})"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default"
+msgstr "default"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "Filter options"
+msgstr "Filter options"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "Only set"
+msgstr "Only set"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "{set} of {total} set"
+msgstr "{set} of {total} set"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "This binary declared no options."
+msgstr "This binary declared no options."
+
+#: src/routes/engines/OptionsEditor.tsx
+#: src/routes/engines/options.ts
+msgid "this engine does not declare that option"
+msgstr "this engine does not declare that option"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "Remove {name}"
+msgstr "Remove {name}"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default {optionDefault}"
+msgstr "default {optionDefault}"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "Reset {optionName}"
+msgstr "Reset {optionName}"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "{name} (off)"
+msgstr "{name} (off)"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "available"
+msgstr "available"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "unavailable"
+msgstr "unavailable"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "not set up"
+msgstr "not set up"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "Nothing assigned"
+msgstr "Nothing assigned"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "engine {assigned}"
+msgstr "engine {assigned}"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "What runs what could not be read — {reason}"
+msgstr "What runs what could not be read — {reason}"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "What runs what"
+msgstr "What runs what"
+
+#: src/routes/engines/RolesForm.tsx
+msgid "Each job runs on the engine chosen for it and on no other — nothing falls back, so a role left empty simply does not run."
+msgstr "Each job runs on the engine chosen for it and on no other — nothing falls back, so a role left empty simply does not run."
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Collapse {runnerName}"
+msgstr "Collapse {runnerName}"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Expand {runnerName}"
+msgstr "Expand {runnerName}"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Name of {runnerName}"
+msgstr "Name of {runnerName}"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Slots on {runnerName}"
+msgstr "Slots on {runnerName}"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Edit {runnerName}"
+msgstr "Edit {runnerName}"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Rename or resize"
+msgstr "Rename or resize"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "last seen {seen}"
+msgstr "last seen {seen}"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "{free} free · {queued} queued here"
+msgstr "{free} free · {queued} queued here"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "{busy, plural, one {# queue run} other {# queue runs}} and {streams, plural, one {# analysis board} other {# analysis boards}} are holding slots."
+msgstr "{busy, plural, one {# queue run} other {# queue runs}} and {streams, plural, one {# analysis board} other {# analysis boards}} are holding slots."
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Advertised engines"
+msgstr "Advertised engines"
+
+#: src/routes/engines/RunnerCard.tsx
+msgid "Revoking closes the link, deletes the engines it advertised and hands its running work back to the queue with the attempt refunded. The token stops working; a new one means a new runner."
+msgstr "Revoking closes the link, deletes the engines it advertised and hands its running work back to the queue with the attempt refunded. The token stops working; a new one means a new runner."
+
+#: src/routes/engines/RunnerCard.tsx
+#: src/routes/mcp/McpKeys.tsx
+msgctxt "button"
+msgid "Revoke"
+msgstr "Revoke"
+
+#: src/routes/engines/SampleResult.tsx
+msgid "{elapsed} ms"
+msgstr "{elapsed} ms"
+
+#: src/routes/engines/SampleResult.tsx
+msgid "The model returned no policy."
+msgstr "The model returned no policy."
+
+#: src/routes/engines/SampleResult.tsx
+msgid "policy"
+msgstr "policy"
+
+#: src/routes/engines/SampleResult.tsx
+msgid "rating {level}"
+msgstr "rating {level}"
+
+#: src/routes/engines/SampleResult.tsx
+msgid "{depth} · {nodes} nodes"
+msgstr "{depth} · {nodes} nodes"
+
+#: src/routes/engines/browserRunner.ts
+msgid "not running"
+msgstr "not running"
+
+#: src/routes/engines/browserRunner.ts
+msgid "loading the engine"
+msgstr "loading the engine"
+
+#: src/routes/engines/browserRunner.ts
+#: src/routes/live/LivePage.tsx
+msgid "connecting"
+msgstr "connecting"
+
+#: src/routes/engines/browserRunner.ts
+msgid "reconnecting"
+msgstr "reconnecting"
+
+#: src/routes/engines/browserRunner.ts
+msgid "stopped"
+msgstr "stopped"
+
+#. placeholder {0}: state.activeRuns
+#: src/routes/engines/browserRunner.ts
+msgid "{0, plural, one {analysing a game} other {analysing # games}}"
+msgstr "{0, plural, one {analysing a game} other {analysing # games}}"
+
+#: src/routes/engines/browserRunner.ts
+msgid "connected · idle"
+msgstr "connected · idle"
+
+#. placeholder {0}: state.threads
+#: src/routes/engines/browserRunner.ts
+msgid "{0, plural, one {# thread} other {# threads}}"
+msgstr "{0, plural, one {# thread} other {# threads}}"
+
+#: src/routes/engines/browserRunner.ts
+msgid "{name} · browser · {threads}"
+msgstr "{name} · browser · {threads}"
+
+#: src/routes/engines/browserRunner.ts
+msgid "{name} · browser · {threads} (not isolated)"
+msgstr "{name} · browser · {threads} (not isolated)"
+
+#: src/routes/engines/options.ts
+msgid "set per analysis — it cannot be stored"
+msgstr "set per analysis — it cannot be stored"
+
+#: src/routes/engines/options.ts
+msgid "a button is an action, not a stored value"
+msgstr "a button is an action, not a stored value"
+
+#: src/routes/engines/options.ts
+msgid "has to be true or false"
+msgstr "has to be true or false"
+
+#: src/routes/engines/options.ts
+msgid "has to be a whole number"
+msgstr "has to be a whole number"
+
+#: src/routes/engines/options.ts
+msgid "at least {min}"
+msgstr "at least {min}"
+
+#: src/routes/engines/options.ts
+msgid "at most {max}"
+msgstr "at most {max}"
+
+#: src/routes/engines/options.ts
+msgid "one of {choices}"
+msgstr "one of {choices}"
+
+#: src/routes/engines/roles.ts
+msgctxt "engine role"
+msgid "Quick"
+msgstr "Quick"
+
+#: src/routes/engines/roles.ts
+msgctxt "engine role"
+msgid "Deep"
+msgstr "Deep"
+
+#: src/routes/engines/roles.ts
+msgctxt "engine role"
+msgid "Human moves"
+msgstr "Human moves"
+
+#: src/routes/engines/runners.ts
+#: src/routes/import/AccountCard.tsx
+msgid "not connected"
+msgstr "not connected"
+
+#: src/routes/engines/runners.ts
+msgid "connected · polling — queue only"
+msgstr "connected · polling — queue only"
+
+#: src/routes/engines/runners.ts
+msgid "connected · websocket"
+msgstr "connected · websocket"
+
+#: src/routes/engines/runners.ts
+msgid "{used}/{total} slots"
+msgstr "{used}/{total} slots"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "The initial position"
+msgstr "The initial position"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "This line"
+msgstr "This line"
+
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Forward one move"
+msgstr "Forward one move"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "⇅ Flip"
+msgstr "⇅ Flip"
+
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Reset"
+msgstr "Reset"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "← Back to game"
+msgstr "← Back to game"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "{turn} to move · ply {ply}"
+msgstr "{turn} to move · ply {ply}"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "Your move tree from here"
+msgstr "Your move tree from here"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "What masters play from here"
+msgstr "What masters play from here"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "What lichess plays from here"
+msgstr "What lichess plays from here"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "Could not read that database"
+msgstr "Could not read that database"
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "Lichess did not answer."
+msgstr "Lichess did not answer."
+
+#: src/routes/explorer/ExplorerPage.tsx
+msgid "Could not read the tree"
+msgstr "Could not read the tree"
+
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/games/components/GamesTable.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "The backend did not answer."
+msgstr "The backend did not answer."
+
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "both"
+msgstr "both"
+
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "as white"
+msgstr "as white"
+
+#: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "as black"
+msgstr "as black"
+
+#: src/routes/explorer/components/GamesInLine.tsx
+msgid "Games in this line"
+msgstr "Games in this line"
+
+#: src/routes/explorer/components/GamesInLine.tsx
+msgid "open in library"
+msgstr "open in library"
+
+#: src/routes/explorer/components/GamesInLine.tsx
+msgid "Nothing has reached this position yet."
+msgstr "Nothing has reached this position yet."
+
+#. Breadcrumb crumb for the position the line is replayed from.
+#. Stands in for a move at the starting position
+#: src/routes/explorer/components/LineBreadcrumb.tsx
+#: src/routes/game/components/EvalGraph.tsx
+#: src/routes/game/notesModel.ts
+#: src/routes/notes/presentation.ts
+msgid "start"
+msgstr "start"
+
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "Your results in this line"
+msgstr "Your results in this line"
+
+#. placeholder {0}: split.games
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "{0, plural, one {# game} other {# games}}"
+msgstr "{0, plural, one {# game} other {# games}}"
+
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "You have never had this position on the board. Walk back a move, or play a different continuation."
+msgstr "You have never had this position on the board. Walk back a move, or play a different continuation."
+
+#. W abbreviates “wins”.
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "{wins} W"
+msgstr "{wins} W"
+
+#. D abbreviates “draws”.
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "{draws} D"
+msgstr "{draws} D"
+
+#. L abbreviates “losses”.
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "{losses} L"
+msgstr "{losses} L"
+
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "Avg. drop"
+msgstr "Avg. drop"
+
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "Ended here"
+msgstr "Ended here"
+
+#: src/routes/explorer/components/LineSummary.tsx
+msgid "Worst move here"
+msgstr "Worst move here"
+
+#: src/routes/explorer/components/ModelGames.tsx
+msgid "Model games"
+msgstr "Model games"
+
+#: src/routes/explorer/components/ModelGames.tsx
+msgid "from the masters database"
+msgstr "from the masters database"
+
+#: src/routes/explorer/components/ModelGames.tsx
+msgid "top-rated and recent rated lichess games"
+msgstr "top-rated and recent rated lichess games"
+
+#: src/routes/explorer/components/ModelGames.tsx
+msgid "This database has no game to show from here."
+msgstr "This database has no game to show from here."
+
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+#: src/routes/game/components/BookPanel.tsx
+msgid "Move"
+msgstr "Move"
+
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+msgid "Share"
+msgstr "Share"
+
+#. Table column: score as a percentage
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Score%"
+msgstr "Score%"
+
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/game/components/BookPanel.tsx
+msgid "Avg drop"
+msgstr "Avg drop"
+
+#. Column heading, short for “blunders”.
+#: src/routes/explorer/components/MoveTreeTable.tsx
+msgid "Blund"
+msgstr "Blund"
+
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+#: src/routes/games/components/columns.ts
+#: src/routes/games/filters.ts
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Opening"
+msgstr "Opening"
+
+#. Button in the transport row that opens the note composer
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/game/components/BoardPanel.tsx
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Note"
+msgstr "Note"
+
+#: src/routes/explorer/components/MoveTreeTable.tsx
+msgid "Continuations"
+msgstr "Continuations"
+
+#: src/routes/explorer/components/MoveTreeTable.tsx
+msgid "No game of yours goes any further than this position."
+msgstr "No game of yours goes any further than this position."
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "Your notes on this position"
+msgstr "Your notes on this position"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "saved"
+msgstr "saved"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "Add note"
+msgstr "Add note"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "Nothing written about this position yet. What is worth remembering here?"
+msgstr "Nothing written about this position yet. What is worth remembering here?"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Open {from} at {move}"
+msgstr "Open {from} at {move}"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Open {from}"
+msgstr "Open {from}"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "in the model game {from}"
+msgstr "in the model game {from}"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "in {from}"
+msgstr "in {from}"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "written over MCP by {MCP_SERVER_NAME}"
+msgstr "written over MCP by {MCP_SERVER_NAME}"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "note via MCP"
+msgstr "note via MCP"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "Edit this note"
+msgstr "Edit this note"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/game/components/NoteComposer.tsx
+msgid "Delete this note"
+msgstr "Delete this note"
+
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "What is worth remembering about this position? It saves when you click away."
+msgstr "What is worth remembering about this position? It saves when you click away."
+
+#: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/game/components/NoteComposer.tsx
+msgid "Note text"
+msgstr "Note text"
+
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "bullet"
+msgstr "bullet"
+
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "blitz"
+msgstr "blitz"
+
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "rapid"
+msgstr "rapid"
+
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "classical"
+msgstr "classical"
+
+#: src/routes/explorer/components/ReferenceFilters.tsx
+msgid "speed"
+msgstr "speed"
+
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/cards/ProgressCard.tsx
+msgid "rating"
+msgstr "rating"
+
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+msgid "White / draw / black"
+msgstr "White / draw / black"
+
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+msgid "Avg elo"
+msgstr "Avg elo"
+
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+msgid "Reference continuations"
+msgstr "Reference continuations"
+
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+msgid "No game in this database goes any further than this position."
+msgstr "No game in this database goes any further than this position."
+
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+msgid "{count, plural, one {{count} game} other {{count} games}}"
+msgstr "{count, plural, one {{count} game} other {{count} games}}"
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "Lichess refused that token"
+msgstr "Lichess refused that token"
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "Lichess needs a token"
+msgstr "Lichess needs a token"
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "The stored token was rejected — it may have been revoked. Paste a new personal API token to read the masters and lichess databases."
+msgstr "The stored token was rejected — it may have been revoked. Paste a new personal API token to read the masters and lichess databases."
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "The masters and lichess databases no longer answer anonymous requests. Paste a personal API token to read them; no scope is needed."
+msgstr "The masters and lichess databases no longer answer anonymous requests. Paste a personal API token to read them; no scope is needed."
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "Lichess API token"
+msgstr "Lichess API token"
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "Saving…"
+msgstr "Saving…"
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "Create one on lichess.org"
+msgstr "Create one on lichess.org"
+
+#: src/routes/explorer/components/ReferenceTokenCard.tsx
+msgid "Remove the stored token"
+msgstr "Remove the stored token"
+
+#: src/routes/explorer/components/ScoreBar.tsx
+msgid "{wins} wins, {draws} draws, {losses} losses"
+msgstr "{wins} wins, {draws} draws, {losses} losses"
+
+#: src/routes/explorer/components/ScoreBar.tsx
+msgid "{white} white wins, {draws} draws, {black} black wins"
+msgstr "{white} white wins, {draws} draws, {black} black wins"
+
+#: src/routes/explorer/reference.ts
+msgid "my games"
+msgstr "my games"
+
+#: src/routes/explorer/reference.ts
+msgid "masters"
+msgstr "masters"
+
+#. The site’s own name — keep it as it is.
+#: src/routes/explorer/reference.ts
+msgid "lichess"
+msgstr "lichess"
+
+#: src/routes/explorer/stats.ts
+msgid "you have only played the next move once"
+msgstr "you have only played the next move once"
+
+#: src/routes/explorer/stats.ts
+msgid "no two games of yours played the whole line"
+msgstr "no two games of yours played the whole line"
+
+#: src/routes/explorer/stats.ts
+msgid "no game of yours goes further"
+msgstr "no game of yours goes further"
+
+#: src/routes/explorer/stats.ts
+msgid "the walk hit its depth limit"
+msgstr "the walk hit its depth limit"
+
+#: src/routes/explorer/stats.ts
+msgid "the next position is not in the database"
+msgstr "the next position is not in the database"
+
+#: src/routes/explorer/stats.ts
+msgid "the stored continuation is not legal here"
+msgstr "the stored continuation is not legal here"
+
+#: src/routes/explorer/stats.ts
+msgid "you have never reached this position"
+msgstr "you have never reached this position"
+
+#: src/routes/game/GamePage.tsx
+msgid "“{id}” is not a game id."
+msgstr "“{id}” is not a game id."
+
+#: src/routes/game/GamePage.tsx
+msgid "The game payload was empty."
+msgstr "The game payload was empty."
+
+#: src/routes/game/GamePage.tsx
+msgid "Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it."
+msgstr "Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it."
+
+#: src/routes/game/GamePage.tsx
+msgid "Moves column width"
+msgstr "Moves column width"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Flip the board (F)"
+msgstr "Flip the board (F)"
+
+#: src/routes/game/components/BoardPanel.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Flip"
+msgstr "Flip"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+msgstr "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints"
+msgstr "Hints"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Write a note about this position (N)"
+msgstr "Write a note about this position (N)"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Leave the analysis line and go back to the game (Esc)"
+msgstr "Leave the analysis line and go back to the game (Esc)"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Back to game"
+msgstr "Back to game"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "analysis +{lineDepth}"
+msgstr "analysis +{lineDepth}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "ply {ply} / {plyCount}"
+msgstr "ply {ply} / {plyCount}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
+msgstr "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "First"
+msgstr "First"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Previous"
+msgstr "Previous"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Last"
+msgstr "Last"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Stop playing through"
+msgstr "Stop playing through"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Previous flagged move"
+msgstr "Previous flagged move"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Next flagged move"
+msgstr "Next flagged move"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Up {advantage} in material"
+msgstr "Up {advantage} in material"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Down {deficit} in material"
+msgstr "Down {deficit} in material"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Quick analysis complete — click to re-run"
+msgstr "Quick analysis complete — click to re-run"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Deep analysis complete — click to re-run"
+msgstr "Deep analysis complete — click to re-run"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Queue a quick analysis pass over this game"
+msgstr "Queue a quick analysis pass over this game"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Queue a deep analysis pass over this game"
+msgstr "Queue a deep analysis pass over this game"
+
+#: src/routes/game/components/BookPanel.tsx
+msgid "None of your games reached this position."
+msgstr "None of your games reached this position."
+
+#: src/routes/game/components/BookPanel.tsx
+msgid "Your games from this position"
+msgstr "Your games from this position"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "Evaluation"
+msgstr "Evaluation"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "only mine"
+msgstr "only mine"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "No evaluations yet — run an analysis pass to draw the curve."
+msgstr "No evaluations yet — run an analysis pass to draw the curve."
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "{count} blunders"
+msgstr "{count} blunders"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "{count} mistakes"
+msgstr "{count} mistakes"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "{count} inaccuracies"
+msgstr "{count} inaccuracies"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "You"
+msgstr "You"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "Opp."
+msgstr "Opp."
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "average centipawn loss unavailable"
+msgstr "average centipawn loss unavailable"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "{acpl} average centipawn loss"
+msgstr "{acpl} average centipawn loss"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "{name}: {counts}, {acplProse}"
+msgstr "{name}: {counts}, {acplProse}"
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "Average centipawn loss"
+msgstr "Average centipawn loss"
+
+#. Abbreviation of “average centipawn loss”, beside the number itself
+#: src/routes/game/components/EvalGraph.tsx
+msgid "ACPL"
+msgstr "ACPL"
+
+#: src/routes/game/components/FlaggedMoments.tsx
+#: src/routes/game/components/MoveList.tsx
+msgid "Nothing flagged in this game."
+msgstr "Nothing flagged in this game."
+
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "Previous game"
+msgstr "Previous game"
+
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "Next game"
+msgstr "Next game"
+
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "casual"
+msgstr "casual"
+
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "Added from the reference explorer. Analysed and annotated like any other game, and counted in no statistic."
+msgstr "Added from the reference explorer. Analysed and annotated like any other game, and counted in no statistic."
+
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "not your game"
+msgstr "not your game"
+
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "analysed {analysedAt}"
+msgstr "analysed {analysedAt}"
+
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "never analysed"
+msgstr "never analysed"
+
+#: src/routes/game/components/GameStates.tsx
+msgid "No such game"
+msgstr "No such game"
+
+#: src/routes/game/components/GameStates.tsx
+msgid "Could not load this game"
+msgstr "Could not load this game"
+
+#: src/routes/game/components/GameStates.tsx
+msgid "The id in the URL does not match a game in this database. It may have been removed, or the database may be a different one than when the link was made."
+msgstr "The id in the URL does not match a game in this database. It may have been removed, or the database may be a different one than when the link was made."
+
+#: src/routes/game/components/GameStates.tsx
+msgid "Back to the library"
+msgstr "Back to the library"
+
+#: src/routes/game/components/GameStates.tsx
+msgid "Retry"
+msgstr "Retry"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Reading this position…"
+msgstr "Reading this position…"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "No engine run"
+msgstr "No engine run"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "The rest of the line this run gave, from where the board now stands"
+msgstr "The rest of the line this run gave, from where the board now stands"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "along its line"
+msgstr "along its line"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "human moves"
+msgstr "human moves"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "What people at this level actually play here — not the engine’s best move"
+msgstr "What people at this level actually play here — not the engine’s best move"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Maia level"
+msgstr "Maia level"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Which level the human column speaks for"
+msgstr "Which level the human column speaks for"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "{elo} — re-analyse to add"
+msgstr "{elo} — re-analyse to add"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Read one level at a time"
+msgstr "Read one level at a time"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Compare the levels side by side"
+msgstr "Compare the levels side by side"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Play {san} on the analysis board"
+msgstr "Play {san} on the analysis board"
+
+#. Chip marking the engine row for the move the game actually played
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "played"
+msgstr "played"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "likely continuation"
+msgstr "likely continuation"
+
+#: src/routes/game/components/MobileGameView.tsx
+#: src/routes/game/components/MoveList.tsx
+msgid "Moves"
+msgstr "Moves"
+
+#: src/routes/game/components/MobileGameView.tsx
+#: src/routes/game/components/MoveList.tsx
+msgid "Flagged"
+msgstr "Flagged"
+
+#: src/routes/game/components/MobileGameView.tsx
+msgid "Eval"
+msgstr "Eval"
+
+#: src/routes/game/components/MobileGameView.tsx
+msgid "vs"
+msgstr "vs"
+
+#: src/routes/game/components/MobileGameView.tsx
+msgid "ply {plyNumber}/{plyCount}"
+msgstr "ply {plyNumber}/{plyCount}"
+
+#: src/routes/game/components/MobileGameView.tsx
+msgid "Game panels"
+msgstr "Game panels"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "{plyCount} plies"
+msgstr "{plyCount} plies"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "moves 1–{collapsedThrough} collapsed"
+msgstr "moves 1–{collapsedThrough} collapsed"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "No moves — this game has an empty move list."
+msgstr "No moves — this game has an empty move list."
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Copy this game as PGN (C)"
+msgstr "Copy this game as PGN (C)"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "copied"
+msgstr "copied"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "no clipboard"
+msgstr "no clipboard"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "{moveLabel} — noted"
+msgstr "{moveLabel} — noted"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "{moveLabel} — kept line, noted"
+msgstr "{moveLabel} — kept line, noted"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "{moveLabel} — kept line"
+msgstr "{moveLabel} — kept line"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "{moveLabel} — analysis, noted"
+msgstr "{moveLabel} — analysis, noted"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "{moveLabel} — analysis"
+msgstr "{moveLabel} — analysis"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Unpin this line"
+msgstr "Unpin this line"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Stop keeping this line"
+msgstr "Stop keeping this line"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Extend the pin to the whole line"
+msgstr "Extend the pin to the whole line"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Pin this line"
+msgstr "Pin this line"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Kept only as far as its first moves — pin the rest"
+msgstr "Kept only as far as its first moves — pin the rest"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Keep this line with the game"
+msgstr "Keep this line with the game"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "Best was"
+msgstr "Best was"
+
+#: src/routes/game/components/MoveList.tsx
+msgid "(<0>{winLoss}</0> win)"
+msgstr "(<0>{winLoss}</0> win)"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "What is worth remembering about this position?"
+msgstr "What is worth remembering about this position?"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "pins the line"
+msgstr "pins the line"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "Remove “{tag}”"
+msgstr "Remove “{tag}”"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "tag…"
+msgstr "tag…"
+
+#: src/routes/game/components/NoteComposer.tsx
+#: src/routes/notes/components/TagEditor.tsx
+#: src/routes/notes/filters.ts
+msgid "Tags"
+msgstr "Tags"
+
+#: src/routes/game/components/NoteComposer.tsx
+#: src/routes/live/SaveMoment.tsx
+msgid "Save note"
+msgstr "Save note"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Book and notes"
+msgstr "Book and notes"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Book"
+msgstr "Book"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "{noteCount, plural, one {# note} other {# notes}}"
+msgstr "{noteCount, plural, one {# note} other {# notes}}"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Open this position in the explorer"
+msgstr "Open this position in the explorer"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "No notes in this game yet."
+msgstr "No notes in this game yet."
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Written elsewhere, about a position this game reached"
+msgstr "Written elsewhere, about a position this game reached"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "On a pinned variation"
+msgstr "On a pinned variation"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "On the game"
+msgstr "On the game"
+
+#. Label on a note that hangs on the whole game rather than one move
+#: src/routes/game/components/NotesTrack.tsx
+#: src/routes/notes/presentation.ts
+msgid "game"
+msgstr "game"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "from {origin}"
+msgstr "from {origin}"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "not from this game"
+msgstr "not from this game"
+
+#: src/routes/game/components/StudioActions.tsx
+msgid "← Back to explorer"
+msgstr "← Back to explorer"
+
+#: src/routes/game/components/StudioActions.tsx
+msgid "Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic."
+msgstr "Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic."
+
+#: src/routes/game/components/StudioActions.tsx
+msgid "Adding…"
+msgstr "Adding…"
+
+#: src/routes/game/components/StudioActions.tsx
+msgid "Could not add — retry"
+msgstr "Could not add — retry"
+
+#: src/routes/game/components/StudioActions.tsx
+msgid "+ Add to library"
+msgstr "+ Add to library"
+
+#: src/routes/game/gameModel.ts
+msgid "undated"
+msgstr "undated"
+
+#: src/routes/game/notesModel.ts
+msgid "branch"
+msgstr "branch"
+
+#: src/routes/game/notesModel.ts
+msgid "{move} (variation)"
+msgstr "{move} (variation)"
+
+#: src/routes/game/notesModel.ts
+msgid "a variation"
+msgstr "a variation"
+
+#: src/routes/game/notesModel.ts
+msgid "the starting position"
+msgstr "the starting position"
+
+#: src/routes/game/notesModel.ts
+msgid "ply {count}"
+msgstr "ply {count}"
+
+#: src/routes/games/GamesPage.tsx
+msgid "the request never landed"
+msgstr "the request never landed"
+
+#: src/routes/games/GamesPage.tsx
+msgid "{queued, plural, one {# quick run} other {# quick runs}} queued"
+msgstr "{queued, plural, one {# quick run} other {# quick runs}} queued"
+
+#: src/routes/games/GamesPage.tsx
+msgid "{queued, plural, one {# deep run} other {# deep runs}} queued"
+msgstr "{queued, plural, one {# deep run} other {# deep runs}} queued"
+
+#: src/routes/games/GamesPage.tsx
+msgid "{queued} queued, {refused} refused — {reason}"
+msgstr "{queued} queued, {refused} refused — {reason}"
+
+#: src/routes/games/GamesPage.tsx
+msgid "{queued} queued, {refused} refused"
+msgstr "{queued} queued, {refused} refused"
+
+#: src/routes/games/GamesPage.tsx
+msgid "{deleted, plural, one {# game} other {# games}} deleted"
+msgstr "{deleted, plural, one {# game} other {# games}} deleted"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Counting…"
+msgstr "Counting…"
+
+#: src/routes/games/GamesPage.tsx
+msgid "<0>{totalGames}</0> of your games match this filter"
+msgstr "<0>{totalGames}</0> of your games match this filter"
+
+#: src/routes/games/GamesPage.tsx
+msgid "<0>{totalGames}</0> of your games match these {active} filters"
+msgstr "<0>{totalGames}</0> of your games match these {active} filters"
+
+#: src/routes/games/GamesPage.tsx
+msgid "<0>{totalGames}</0> games in the database"
+msgstr "<0>{totalGames}</0> games in the database"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Search games"
+msgstr "Search games"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Opponent, ECO, PGN text…"
+msgstr "Opponent, ECO, PGN text…"
+
+#: src/routes/games/GamesPage.tsx
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Clear {active}"
+msgstr "Clear {active}"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Nothing matches these filters"
+msgstr "Nothing matches these filters"
+
+#: src/routes/games/GamesPage.tsx
+msgid "No games yet"
+msgstr "No games yet"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Loosen a filter — the library only ever shows games that are already imported."
+msgstr "Loosen a filter — the library only ever shows games that are already imported."
+
+#: src/routes/games/GamesPage.tsx
+msgid "Import a Lichess or Chess.com account, or drop a PGN in, and the library fills itself."
+msgstr "Import a Lichess or Chess.com account, or drop a PGN in, and the library fills itself."
+
+#: src/routes/games/GamesPage.tsx
+msgid "Clear the filters"
+msgstr "Clear the filters"
+
+#: src/routes/games/GamesPage.tsx
+msgid "Go to import"
+msgstr "Go to import"
+
+#: src/routes/games/components/DeleteGamesDialog.tsx
+msgid "{count, plural, one {Delete 1 game} other {Delete # games}}"
+msgstr "{count, plural, one {Delete 1 game} other {Delete # games}}"
+
+#: src/routes/games/components/DeleteGamesDialog.tsx
+msgid "{count, plural, one {The game goes with their analysis, the notes written about them and the variations kept off them. Notes about a position stay, and so does the sync history — a source you sync again will not fetch it back. There is no undo.} other {They go with their analysis, the notes written about them and the variations kept off them. Notes about a position stay, and so does the sync history — a source you sync again will not fetch them back. There is no undo.}}"
+msgstr "{count, plural, one {The game goes with their analysis, the notes written about them and the variations kept off them. Notes about a position stay, and so does the sync history — a source you sync again will not fetch it back. There is no undo.} other {They go with their analysis, the notes written about them and the variations kept off them. Notes about a position stay, and so does the sync history — a source you sync again will not fetch them back. There is no undo.}}"
+
+#: src/routes/games/components/DeleteGamesDialog.tsx
+msgid "{count, plural, one {Delete it} other {Delete them}}"
+msgstr "{count, plural, one {Delete it} other {Delete them}}"
+
+#. Date preset button: the last 7 days
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/stats/kit/analytics.ts
+msgid "7d"
+msgstr "7d"
+
+#. Date preset button: the last 30 days
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/stats/kit/analytics.ts
+msgid "30d"
+msgstr "30d"
+
+#. Date preset button: the last 90 days
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/stats/kit/analytics.ts
+msgid "90d"
+msgstr "90d"
+
+#. Date preset button: the last 12 months
+#: src/routes/games/components/FilterBar.tsx
+msgid "12m"
+msgstr "12m"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Your own games — the ones every statistic counts"
+msgstr "Your own games — the ones every statistic counts"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Others"
+msgstr "Others"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Games added from the reference books"
+msgstr "Games added from the reference books"
+
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/stats/kit/analytics.ts
+msgid "All"
+msgstr "All"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Both together"
+msgstr "Both together"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Whose games"
+msgstr "Whose games"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Keep this cut of the library in the sidebar"
+msgstr "Keep this cut of the library in the sidebar"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Set a filter first — there is nothing to save yet"
+msgstr "Set a filter first — there is nothing to save yet"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Save filter"
+msgstr "Save filter"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Save this cut as"
+msgstr "Save this cut as"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Filter name"
+msgstr "Filter name"
+
+#: src/routes/games/components/FilterBar.tsx
+msgctxt "button"
+msgid "Save"
+msgstr "Save"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Played between"
+msgstr "Played between"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Played from"
+msgstr "Played from"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Played until"
+msgstr "Played until"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Imported from"
+msgstr "Imported from"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "You played"
+msgstr "You played"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Your result"
+msgstr "Your result"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "PGN result"
+msgstr "PGN result"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "ECO code or prefix"
+msgstr "ECO code or prefix"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "ECO code"
+msgstr "ECO code"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "B22, or just C6"
+msgstr "B22, or just C6"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "A prefix matches the whole family — <0>C6</0> is every Caro-Kann from C60 to C69."
+msgstr "A prefix matches the whole family — <0>C6</0> is every Caro-Kann from C60 to C69."
+
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "Speed"
+msgstr "Speed"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Exact clock"
+msgstr "Exact clock"
+
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/games/filters.ts
+msgid "Time control"
+msgstr "Time control"
+
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/games/filters.ts
+msgid "Opponent"
+msgstr "Opponent"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Part of a name"
+msgstr "Part of a name"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Contains a blunder"
+msgstr "Contains a blunder"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Any analysis done"
+msgstr "Any analysis done"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Analysed"
+msgstr "Analysed"
+
+#: src/routes/games/components/FilterBar.tsx
+msgid "Deep pass done"
+msgstr "Deep pass done"
+
+#: src/routes/games/components/FilterPopover.tsx
+msgid "Clear {label} filter"
+msgstr "Clear {label} filter"
+
+#: src/routes/games/components/FilterPopover.tsx
+msgid "Yes"
+msgstr "Yes"
+
+#: src/routes/games/components/FilterPopover.tsx
+msgid "No"
+msgstr "No"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "Select game {id}"
+msgstr "Select game {id}"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "Unknown opening"
+msgstr "Unknown opening"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "queueing…"
+msgstr "queueing…"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "analyse"
+msgstr "analyse"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "Delete game {id}"
+msgstr "Delete game {id}"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "Delete this game"
+msgstr "Delete this game"
+
+#: src/routes/games/components/GamesTable.tsx
+msgid "Select every game on this page"
+msgstr "Select every game on this page"
+
+#: src/routes/games/components/GamesTable.tsx
+msgid "Could not load the library"
+msgstr "Could not load the library"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "{selected} selected"
+msgstr "{selected} selected"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Queue quick analysis"
+msgstr "Queue quick analysis"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Queue deep analysis"
+msgstr "Queue deep analysis"
+
+#: src/routes/games/components/TableFooter.tsx
+msgctxt "button"
+msgid "Delete"
+msgstr "Delete"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Clear selection"
+msgstr "Clear selection"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Select rows to queue analysis over them, or to delete them."
+msgstr "Select rows to queue analysis over them, or to delete them."
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Rows"
+msgstr "Rows"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Rows per page"
+msgstr "Rows per page"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "Fit ({fitRows})"
+msgstr "Fit ({fitRows})"
+
+#: src/routes/games/components/TableFooter.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Previous page"
+msgstr "Previous page"
+
+#: src/routes/games/components/TableFooter.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Next page"
+msgstr "Next page"
+
+#: src/routes/games/components/TableFooter.tsx
+msgid "{firstRow}–{lastRow} of {games}"
+msgstr "{firstRow}–{lastRow} of {games}"
+
+#. The rating, named after Arpad Elo — left as it is in most languages
+#: src/routes/games/components/columns.ts
+msgid "Elo"
+msgstr "Elo"
+
+#. Column header, short for "Result", in a 40px column
+#: src/routes/games/components/columns.ts
+msgid "Res"
+msgstr "Res"
+
+#. Column header, short for "Moves", in a 40px column
+#: src/routes/games/components/columns.ts
+msgid "Mv"
+msgstr "Mv"
+
+#: src/routes/games/components/columns.ts
+#: src/routes/games/filters.ts
+msgid "Date"
+msgstr "Date"
+
+#: src/routes/games/components/columns.ts
+msgid "Time"
+msgstr "Time"
+
+#: src/routes/games/components/columns.ts
+msgid "Worst"
+msgstr "Worst"
+
+#: src/routes/games/components/columns.ts
+#: src/routes/games/filters.ts
+#: src/routes/import/SyncHistory.tsx
+#: src/routes/live/SessionMeta.tsx
+msgid "Source"
+msgstr "Source"
+
+#: src/routes/games/components/columns.ts
+msgid "Tier"
+msgstr "Tier"
+
+#: src/routes/games/components/columns.ts
+msgid "Flags"
+msgstr "Flags"
+
+#: src/routes/games/filters.ts
+#: src/routes/stats/StatsPage.tsx
+msgid "Colour"
+msgstr "Colour"
+
+#: src/routes/games/filters.ts
+msgid "Result"
+msgstr "Result"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "white"
+msgstr "white"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "black"
+msgstr "black"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "win"
+msgstr "win"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "loss"
+msgstr "loss"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "draw"
+msgstr "draw"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "bullet"
+msgstr "bullet"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "blitz"
+msgstr "blitz"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "rapid"
+msgstr "rapid"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "classical"
+msgstr "classical"
+
+#: src/routes/games/filters.ts
+msgctxt "filter chip"
+msgid "correspondence"
+msgstr "correspondence"
+
+#: src/routes/games/filters.ts
+#: src/routes/notes/filters.ts
+msgid "from {since}"
+msgstr "from {since}"
+
+#: src/routes/games/filters.ts
+#: src/routes/notes/filters.ts
+msgid "until {until}"
+msgstr "until {until}"
+
+#: src/routes/games/filters.ts
+msgid "has blunders"
+msgstr "has blunders"
+
+#: src/routes/games/filters.ts
+msgid "no blunders"
+msgstr "no blunders"
+
+#: src/routes/games/filters.ts
+msgid "analysed"
+msgstr "analysed"
+
+#: src/routes/games/filters.ts
+msgid "not deep"
+msgstr "not deep"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Jan"
+msgstr "Jan"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Feb"
+msgstr "Feb"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Mar"
+msgstr "Mar"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Apr"
+msgstr "Apr"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "May"
+msgstr "May"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Jun"
+msgstr "Jun"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Jul"
+msgstr "Jul"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Aug"
+msgstr "Aug"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Sep"
+msgstr "Sep"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Oct"
+msgstr "Oct"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Nov"
+msgstr "Nov"
+
+#: src/routes/games/format.ts
+msgctxt "month abbreviation"
+msgid "Dec"
+msgstr "Dec"
+
+#. Short for "correspondence", the speed of a game played over days
+#. Short for "correspondence", the speed of a game played over days
+#: src/routes/games/format.ts
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Corr."
+msgstr "Corr."
+
+#: src/routes/games/format.ts
+msgid "Win"
+msgstr "Win"
+
+#: src/routes/games/format.ts
+msgid "Loss"
+msgstr "Loss"
+
+#: src/routes/games/format.ts
+msgid "Draw"
+msgstr "Draw"
+
+#: src/routes/games/savedFilters.ts
+msgid "Losses as black"
+msgstr "Losses as black"
+
+#: src/routes/games/savedFilters.ts
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Blunders"
+msgstr "Blunders"
+
+#: src/routes/games/savedFilters.ts
+msgid "No deep pass"
+msgstr "No deep pass"
+
+#: src/routes/help/HelpPage.tsx
+msgid "Help"
+msgstr "Help"
+
+#: src/routes/help/HelpPage.tsx
+msgid "Two engines"
+msgstr "Two engines"
+
+#: src/routes/help/HelpPage.tsx
+msgid "asks"
+msgstr "asks"
+
+#: src/routes/help/HelpPage.tsx
+msgid "what's best"
+msgstr "what's best"
+
+#: src/routes/help/HelpPage.tsx
+msgid "what a 2000 would play"
+msgstr "what a 2000 would play"
+
+#: src/routes/help/HelpPage.tsx
+msgid "spends"
+msgstr "spends"
+
+#: src/routes/help/HelpPage.tsx
+msgid "250k – 2M nodes"
+msgstr "250k – 2M nodes"
+
+#: src/routes/help/HelpPage.tsx
+msgid "one look, no search"
+msgstr "one look, no search"
+
+#: src/routes/help/HelpPage.tsx
+msgid "gives"
+msgstr "gives"
+
+#: src/routes/help/HelpPage.tsx
+msgid "1 line quick, 4 deep"
+msgstr "1 line quick, 4 deep"
+
+#: src/routes/help/HelpPage.tsx
+msgid "5 moves, each with odds"
+msgstr "5 moves, each with odds"
+
+#: src/routes/help/HelpPage.tsx
+msgid "lines?"
+msgstr "lines?"
+
+#: src/routes/help/HelpPage.tsx
+msgid "yes"
+msgstr "yes"
+
+#: src/routes/help/HelpPage.tsx
+msgid "never — <0>why?</0>"
+msgstr "never — <0>why?</0>"
+
+#: src/routes/help/HelpPage.tsx
+msgid "Quick vs deep"
+msgstr "Quick vs deep"
+
+#: src/routes/help/HelpPage.tsx
+msgid "Quick runs on import. Deep is the one you ask for, and it jumps the queue."
+msgstr "Quick runs on import. Deep is the one you ask for, and it jumps the queue."
+
+#: src/routes/help/HelpPage.tsx
+msgid "Why Maia never shows a line"
+msgstr "Why Maia never shows a line"
+
+#: src/routes/help/HelpPage.tsx
+msgid "One look, no search. Instinct is a spread of moves, not a continuation."
+msgstr "One look, no search. Instinct is a spread of moves, not a continuation."
+
+#: src/routes/help/HelpPage.tsx
+msgid "What a move cost"
+msgstr "What a move cost"
+
+#: src/routes/help/HelpPage.tsx
+msgid "Win% before minus after. 5, 10 and 15 are an inaccuracy, a mistake and a blunder."
+msgstr "Win% before minus after. 5, 10 and 15 are an inaccuracy, a mistake and a blunder."
+
+#: src/routes/help/HelpPage.tsx
+msgid "Change these numbers under <0>Engine passes</0>."
+msgstr "Change these numbers under <0>Engine passes</0>."
+
+#: src/routes/import/AccountCard.tsx
+msgid "Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes."
+msgstr "Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes."
+
+#: src/routes/import/AccountCard.tsx
+msgid "lichess username"
+msgstr "lichess username"
+
+#: src/routes/import/AccountCard.tsx
+msgid "Reads the monthly archives from the last cursor, newest month last."
+msgstr "Reads the monthly archives from the last cursor, newest month last."
+
+#: src/routes/import/AccountCard.tsx
+msgid "chess.com username"
+msgstr "chess.com username"
+
+#: src/routes/import/AccountCard.tsx
+msgid "Reads yearly player archives from the FICS Games Database and resumes at the last date."
+msgstr "Reads yearly player archives from the FICS Games Database and resumes at the last date."
+
+#: src/routes/import/AccountCard.tsx
+msgid "FICS username"
+msgstr "FICS username"
+
+#: src/routes/import/AccountCard.tsx
+msgid "a {platform} sync needs the username whose games to read"
+msgstr "a {platform} sync needs the username whose games to read"
+
+#: src/routes/import/AccountCard.tsx
+msgid "Username"
+msgstr "Username"
+
+#: src/routes/import/AccountCard.tsx
+msgid "never synced"
+msgstr "never synced"
+
+#: src/routes/import/AccountCard.tsx
+msgid "synced {when}"
+msgstr "synced {when}"
+
+#: src/routes/import/AccountCard.tsx
+msgid "Sync"
+msgstr "Sync"
+
+#: src/routes/import/AccountCard.tsx
+msgid "Connect"
+msgstr "Connect"
+
+#: src/routes/import/AutoSyncControl.tsx
+msgid "Sync automatically"
+msgstr "Sync automatically"
+
+#: src/routes/import/AutoSyncControl.tsx
+msgid "Every connected account above, from its last cursor, on this clock — the same as pressing Sync on each row. The history below records every run."
+msgstr "Every connected account above, from its last cursor, on this clock — the same as pressing Sync on each row. The history below records every run."
+
+#: src/routes/import/AutoSyncControl.tsx
+msgid "<0>every</0><1/><2>minutes</2>"
+msgstr "<0>every</0><1/><2>minutes</2>"
+
+#: src/routes/import/AutoSyncControl.tsx
+msgid "Minutes between syncs"
+msgstr "Minutes between syncs"
+
+#: src/routes/import/DeleteAllGamesDialog.tsx
+msgid "Reset imported library"
+msgstr "Reset imported library"
+
+#: src/routes/import/DeleteAllGamesDialog.tsx
+msgid "Every game goes, with game analysis, game notes and sync history. Accounts, engines and position-only notes stay. There is no undo."
+msgstr "Every game goes, with game analysis, game notes and sync history. Accounts, engines and position-only notes stay. There is no undo."
+
+#. placeholder {0}: games ?? 0
+#: src/routes/import/DeleteAllGamesDialog.tsx
+msgid "{0, plural, one {{count} game goes} other {{count} games go}}, with game analysis, game notes and sync history. Accounts, engines and position-only notes stay. There is no undo."
+msgstr "{0, plural, one {{count} game goes} other {{count} games go}}, with game analysis, game notes and sync history. Accounts, engines and position-only notes stay. There is no undo."
+
+#: src/routes/import/DeleteAllGamesDialog.tsx
+msgid "Your password"
+msgstr "Your password"
+
+#: src/routes/import/DeleteAllGamesDialog.tsx
+msgid "Delete them"
+msgstr "Delete them"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "Deleted games"
+msgstr "Deleted games"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "{total, plural, one {One game is on record as deleted, so importing it again is refused — otherwise the next sync would put it straight back. Forgetting a row lets the next import store that game again, with no analysis and no notes.} other {{count} games are on record as deleted, so importing them again is refused — otherwise the next sync would put them straight back. Forgetting a row lets the next import store that game again, with no analysis and no notes.}}"
+msgstr "{total, plural, one {One game is on record as deleted, so importing it again is refused — otherwise the next sync would put it straight back. Forgetting a row lets the next import store that game again, with no analysis and no notes.} other {{count} games are on record as deleted, so importing them again is refused — otherwise the next sync would put them straight back. Forgetting a row lets the next import store that game again, with no analysis and no notes.}}"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "Hide list"
+msgstr "Hide list"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "Show list"
+msgstr "Show list"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "Forget all"
+msgstr "Forget all"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "Reading the record…"
+msgstr "Reading the record…"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "and {rest} more — “Forget all” covers every one of them."
+msgstr "and {rest} more — “Forget all” covers every one of them."
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "deleted {when}"
+msgstr "deleted {when}"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "Forget the deletion of {white} vs {black}"
+msgstr "Forget the deletion of {white} vs {black}"
+
+#: src/routes/import/DeletedGamesCard.tsx
+msgid "Forget"
+msgstr "Forget"
+
+#: src/routes/import/ImportPage.tsx
+msgid "Connect an account, sync it, or upload a PGN export."
+msgstr "Connect an account, sync it, or upload a PGN export."
+
+#: src/routes/import/ImportPage.tsx
+msgid "{count} games in the database. Every import is deduplicated on the way in."
+msgstr "{count} games in the database. Every import is deduplicated on the way in."
+
+#: src/routes/import/ImportPage.tsx
+msgid "all {count}"
+msgstr "all {count}"
+
+#: src/routes/import/JobProgress.tsx
+msgid "Stopping"
+msgstr "Stopping"
+
+#: src/routes/import/JobProgress.tsx
+msgid "Sync failed"
+msgstr "Sync failed"
+
+#: src/routes/import/JobProgress.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Stopped"
+msgstr "Stopped"
+
+#: src/routes/import/JobProgress.tsx
+msgid "Finished — {failed} failed"
+msgstr "Finished — {failed} failed"
+
+#: src/routes/import/JobProgress.tsx
+msgid "Finished"
+msgstr "Finished"
+
+#: src/routes/import/JobProgress.tsx
+msgid "job {jobId}"
+msgstr "job {jobId}"
+
+#: src/routes/import/JobProgress.tsx
+msgid "Stop after the game it is on. Everything imported so far stays, and running the import again picks up from there."
+msgstr "Stop after the game it is on. Everything imported so far stays, and running the import again picks up from there."
+
+#: src/routes/import/JobProgress.tsx
+msgid "{imported} imported"
+msgstr "{imported} imported"
+
+#: src/routes/import/JobProgress.tsx
+msgid "{skipped} skipped"
+msgstr "{skipped} skipped"
+
+#: src/routes/import/JobProgress.tsx
+msgid "{blocked} previously deleted"
+msgstr "{blocked} previously deleted"
+
+#: src/routes/import/JobProgress.tsx
+msgid "{failed} failed"
+msgstr "{failed} failed"
+
+#: src/routes/import/JobProgress.tsx
+msgid "and {extra} more — see the sync history"
+msgstr "and {extra} more — see the sync history"
+
+#: src/routes/import/LibraryManagePage.tsx
+msgid "Export a portable copy or reset the imported data in this installation."
+msgstr "Export a portable copy or reset the imported data in this installation."
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Estimated backup size: about {size}."
+msgstr "Estimated backup size: about {size}."
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Backup size estimate unavailable."
+msgstr "Backup size estimate unavailable."
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Estimating backup size…"
+msgstr "Estimating backup size…"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Portable PGN export"
+msgstr "Portable PGN export"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Every game, note and saved line for another chess application. Engine analysis and settings are not part of PGN."
+msgstr "Every game, note and saved line for another chess application. Engine analysis and settings are not part of PGN."
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Export PGN"
+msgstr "Export PGN"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Database backup"
+msgstr "Database backup"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Technical"
+msgstr "Technical"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "A lossless SQLite copy including analysis, accounts and settings. Restoring it requires the CLI while Blunderbase is stopped. <0>Restore guide ↗</0>"
+msgstr "A lossless SQLite copy including analysis, accounts and settings. Restoring it requires the CLI while Blunderbase is stopped. <0>Restore guide ↗</0>"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "The download appears after Blunderbase prepares a consistent snapshot."
+msgstr "The download appears after Blunderbase prepares a consistent snapshot."
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Download backup"
+msgstr "Download backup"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Reset imported Library"
+msgstr "Reset imported Library"
+
+#. placeholder {0}: deleted.games
+#. placeholder {1}: deleted.runs
+#. placeholder {2}: deleted.notes
+#: src/routes/import/LibraryManagement.tsx
+msgid "Deleted {0, plural, one {# game} other {# games}}, {1, plural, one {# analysis run} other {# analysis runs}} and {2, plural, one {# note} other {# notes}}."
+msgstr "Deleted {0, plural, one {# game} other {# games}}, {1, plural, one {# analysis run} other {# analysis runs}} and {2, plural, one {# note} other {# notes}}."
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Delete the imported games and everything attached to them."
+msgstr "Delete the imported games and everything attached to them."
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "{total, plural, one {Delete # game and everything attached to it.} other {Delete # games and everything attached to them.}}"
+msgstr "{total, plural, one {Delete # game and everything attached to it.} other {Delete # games and everything attached to them.}}"
+
+#: src/routes/import/LibraryManagement.tsx
+msgid "Reset imported Library…"
+msgstr "Reset imported Library…"
+
+#: src/routes/import/PgnCard.tsx
+msgid "that file carried no PGN"
+msgstr "that file carried no PGN"
+
+#: src/routes/import/PgnCard.tsx
+msgid "the file could not be read"
+msgstr "the file could not be read"
+
+#: src/routes/import/PgnCard.tsx
+msgid "A PGN export, of one game or a hundred thousand."
+msgstr "A PGN export, of one game or a hundred thousand."
+
+#. placeholder {0}: files.length
+#: src/routes/import/PgnCard.tsx
+msgid "{0, plural, one {# file} other {# files}}"
+msgstr "{0, plural, one {# file} other {# files}}"
+
+#: src/routes/import/PgnCard.tsx
+msgid "Clear the selected file"
+msgstr "Clear the selected file"
+
+#: src/routes/import/PgnCard.tsx
+msgid "Choose a file, or drop one here"
+msgstr "Choose a file, or drop one here"
+
+#: src/routes/import/PgnCard.tsx
+msgid "Upload"
+msgstr "Upload"
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "Sources"
+msgstr "Sources"
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "Since"
+msgstr "Since"
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "Max games"
+msgstr "Max games"
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "all"
+msgstr "all"
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "From the beginning"
+msgstr "From the beginning"
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "Ignore the stored cursor and read the whole archive. Games already in the library are skipped, and games you deleted stay deleted."
+msgstr "Ignore the stored cursor and read the whole archive. Games already in the library are skipped, and games you deleted stay deleted."
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "Skip evaluation"
+msgstr "Skip evaluation"
+
+#: src/routes/import/SourcesPanel.tsx
+msgid "Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards."
+msgstr "Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards."
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Sync history"
+msgstr "Sync history"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "The sync history could not be read."
+msgstr "The sync history could not be read."
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Nothing has been synced yet."
+msgstr "Nothing has been synced yet."
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Connect an account above, or drop a PGN export in."
+msgstr "Connect an account above, or drop a PGN export in."
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Started"
+msgstr "Started"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Took"
+msgstr "Took"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Seen"
+msgstr "Seen"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Imported"
+msgstr "Imported"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Skipped"
+msgstr "Skipped"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Deleted"
+msgstr "Deleted"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Status"
+msgstr "Status"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Hide failures"
+msgstr "Hide failures"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "Show failures"
+msgstr "Show failures"
+
+#: src/routes/import/SyncHistory.tsx
+msgid "{first}–{last} of {total}"
+msgstr "{first}–{last} of {total}"
+
+#. A duration in minutes and seconds, e.g. "4m 12s"
+#: src/routes/import/format.ts
+msgid "{mins}m {secs}s"
+msgstr "{mins}m {secs}s"
+
+#. A duration in seconds, e.g. "1.3s" or "47s"
+#: src/routes/import/format.ts
+msgid "{secs}s"
+msgstr "{secs}s"
+
+#: src/routes/live/CoachComment.tsx
+msgid "Coach"
+msgstr "Coach"
+
+#: src/routes/live/CoachComment.tsx
+#: src/routes/notes/components/NoteItem.tsx
+msgid "via MCP"
+msgstr "via MCP"
+
+#: src/routes/live/CoachComment.tsx
+msgid "Nothing said yet. Whatever your assistant writes with <0>annotate</0> appears here as it types it."
+msgstr "Nothing said yet. Whatever your assistant writes with <0>annotate</0> appears here as it types it."
+
+#: src/routes/live/LivePage.tsx
+msgid "The live session could not be read."
+msgstr "The live session could not be read."
+
+#: src/routes/live/LivePage.tsx
+msgid "Nothing is on the board."
+msgstr "Nothing is on the board."
+
+#: src/routes/live/LivePage.tsx
+msgid "Ask your assistant to put a game on it — <0>show_game</0> for a stored game, <1>show_position</1> for a FEN. It appears here the moment it does, no refresh."
+msgstr "Ask your assistant to put a game on it — <0>show_game</0> for a stored game, <1>show_position</1> for a FEN. It appears here the moment it does, no refresh."
+
+#: src/routes/live/LivePage.tsx
+msgid "The followed game could not be read — {followedError}"
+msgstr "The followed game could not be read — {followedError}"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "Saved"
+msgstr "Saved"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "open it"
+msgstr "open it"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "Write a note about the position on the board"
+msgstr "Write a note about the position on the board"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "Nothing is on the board to write about"
+msgstr "Nothing is on the board to write about"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "Save this moment"
+msgstr "Save this moment"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "About this position"
+msgstr "About this position"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "Note about this position"
+msgstr "Note about this position"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "What is worth remembering here?"
+msgstr "What is worth remembering here?"
+
+#: src/routes/live/SaveMoment.tsx
+msgid "The board's position is taken on the server, along with the game it is following and any line it has wandered into."
+msgstr "The board's position is taken on the server, along with the game it is following and any line it has wandered into."
+
+#: src/routes/live/SessionMeta.tsx
+msgid "Session"
+msgstr "Session"
+
+#. placeholder {0}: state.viewer_count
+#: src/routes/live/SessionMeta.tsx
+msgid "{0, plural, one {# viewer} other {# viewers}}"
+msgstr "{0, plural, one {# viewer} other {# viewers}}"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "game {followed}"
+msgstr "game {followed}"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "Ply"
+msgstr "Ply"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "To move"
+msgstr "To move"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "Last move"
+msgstr "Last move"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "{arrows, plural, one {# arrow} other {# arrows}} · {squares, plural, one {# square} other {# squares}}"
+msgstr "{arrows, plural, one {# arrow} other {# arrows}} · {squares, plural, one {# square} other {# squares}}"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "Off the game"
+msgstr "Off the game"
+
+#: src/routes/live/SessionMeta.tsx
+msgid "Played"
+msgstr "Played"
+
+#: src/routes/live/live.ts
+msgid "Nothing on the board"
+msgstr "Nothing on the board"
+
+#: src/routes/live/live.ts
+msgid "game {id}"
+msgstr "game {id}"
+
+#: src/routes/live/live.ts
+msgid "{players} + {played} played"
+msgstr "{players} + {played} played"
+
+#: src/routes/live/live.ts
+msgid "{players} · ply {ply} + {played} played"
+msgstr "{players} · ply {ply} + {played} played"
+
+#: src/routes/live/live.ts
+msgid "{players} · ply {ply}"
+msgstr "{players} · ply {ply}"
+
+#: src/routes/live/live.ts
+msgid "Ad-hoc position + {played} played"
+msgstr "Ad-hoc position + {played} played"
+
+#: src/routes/live/live.ts
+msgid "Ad-hoc position"
+msgstr "Ad-hoc position"
+
+#: src/routes/mcp/CopyButton.tsx
+msgid "Copy"
+msgstr "Copy"
+
+#: src/routes/mcp/CopyButton.tsx
+msgid "No clipboard"
+msgstr "No clipboard"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "never"
+msgstr "never"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "Revoking <0>{keyName}</0> stops its token dead; a client still holding it is refused from the next call. A new one means a new key."
+msgstr "Revoking <0>{keyName}</0> stops its token dead; a client still holding it is refused from the next call. A new one means a new key."
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "created {created} · last used {lastUsed}"
+msgstr "created {created} · last used {lastUsed}"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "a key needs a name"
+msgstr "a key needs a name"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "Bearer keys"
+msgstr "Bearer keys"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "{active} active"
+msgstr "{active} active"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "No keys yet. Mint one below and paste it into your client’s config."
+msgstr "No keys yet. Mint one below and paste it into your client’s config."
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "{mintedName} is ready — this key is shown once"
+msgstr "{mintedName} is ready — this key is shown once"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "Copy key"
+msgstr "Copy key"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "Nothing stores it, so nothing can show it again. The connect commands below already carry it; a lost key is a revoke and a new one."
+msgstr "Nothing stores it, so nothing can show it again. The connect commands below already carry it; a lost key is a revoke and a new one."
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "New key name"
+msgstr "New key name"
+
+#: src/routes/mcp/McpKeys.tsx
+msgid "laptop, claude-code, …"
+msgstr "laptop, claude-code, …"
+
+#: src/routes/mcp/McpKeys.tsx
+msgctxt "button"
+msgid "Create"
+msgstr "Create"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Connect your assistant"
+msgstr "Connect your assistant"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Every game you import is a fact the coach can query over MCP."
+msgstr "Every game you import is a fact the coach can query over MCP."
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Connect a client"
+msgstr "Connect a client"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "streamable HTTP at /mcp"
+msgstr "streamable HTTP at /mcp"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "These carry the key you just minted; copy them before you press Done."
+msgstr "These carry the key you just minted; copy them before you press Done."
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Mint a key above and these fill in with it; until then the secret is a placeholder to replace."
+msgstr "Mint a key above and these fill in with it; until then the secret is a placeholder to replace."
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Every client reads this database over the same URL your browser is on."
+msgstr "Every client reads this database over the same URL your browser is on."
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Copy command"
+msgstr "Copy command"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Copy commands"
+msgstr "Copy commands"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Codex only takes the secret from an environment variable, never from the command line, so the first line sets one and the second names it."
+msgstr "Codex only takes the secret from an environment variable, never from the command line, so the first line sets one and the second names it."
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Any MCP client"
+msgstr "Any MCP client"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Copy config"
+msgstr "Copy config"
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Drop this into the client’s JSON config."
+msgstr "Drop this into the client’s JSON config."
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Where the deployment sets <0>BLUNDERBASE_MCP_BEARER_KEY</0> that key is accepted too, and so is your own password — a minted key is just the one that belongs in a file. <1>make mcp-key</1> prints the local URL and header."
+msgstr "Where the deployment sets <0>BLUNDERBASE_MCP_BEARER_KEY</0> that key is accepted too, and so is your own password — a minted key is just the one that belongs in a file. <1>make mcp-key</1> prints the local URL and header."
+
+#: src/routes/mcp/McpPage.tsx
+msgid "Nothing to query yet? <0>Import some games</0> first — the coach only knows what the database holds."
+msgstr "Nothing to query yet? <0>Import some games</0> first — the coach only knows what the database holds."
+
+#: src/routes/notes/NotesPage.tsx
+msgid "{total, plural, one {# note} other {# notes}} (the newest page)"
+msgstr "{total, plural, one {# note} other {# notes}} (the newest page)"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "{total, plural, one {# note} other {# notes}}"
+msgstr "{total, plural, one {# note} other {# notes}}"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "Nothing written matches that."
+msgstr "Nothing written matches that."
+
+#: src/routes/notes/NotesPage.tsx
+msgid "Nothing written down yet."
+msgstr "Nothing written down yet."
+
+#: src/routes/notes/NotesPage.tsx
+msgid "What you and the coach have written down."
+msgstr "What you and the coach have written down."
+
+#: src/routes/notes/NotesPage.tsx
+msgid "The notes could not be read."
+msgstr "The notes could not be read."
+
+#: src/routes/notes/NotesPage.tsx
+msgid "The note you followed"
+msgstr "The note you followed"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "outside the filters below"
+msgstr "outside the filters below"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "Stream"
+msgstr "Stream"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "One column, every note in full"
+msgstr "One column, every note in full"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "Sheet"
+msgstr "Sheet"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "A grid of positions, text clamped"
+msgstr "A grid of positions, text clamped"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "How to show the notes"
+msgstr "How to show the notes"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "No note matches those filters. Clear one and try again."
+msgstr "No note matches those filters. Clear one and try again."
+
+#: src/routes/notes/NotesPage.tsx
+msgid "Nothing here yet. Write a note from a game, or ask your assistant to — anything it saves over MCP lands on this page."
+msgstr "Nothing here yet. Write a note from a game, or ask your assistant to — anything it saves over MCP lands on this page."
+
+#: src/routes/notes/NotesPage.tsx
+msgid "Every note these filters show, as Markdown"
+msgstr "Every note these filters show, as Markdown"
+
+#: src/routes/notes/NotesPage.tsx
+msgid "The same notes as PGN comments and variations"
+msgstr "The same notes as PGN comments and variations"
+
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "This note's tags"
+msgstr "This note's tags"
+
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Forget this note for good?"
+msgstr "Forget this note for good?"
+
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Forget it"
+msgstr "Forget it"
+
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Keep it"
+msgstr "Keep it"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Search the notes"
+msgstr "Search the notes"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Search what you wrote…"
+msgstr "Search what you wrote…"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "The note is about"
+msgstr "The note is about"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "A variation note is pinned to a line off a game; a loose note is pinned to nothing at all."
+msgstr "A variation note is pinned to a line off a game; a loose note is pinned to nothing at all."
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Game id"
+msgstr "Game id"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "e.g. 412"
+msgstr "e.g. 412"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Usually arrived at by following a note into its game and back — the id is the one in the game's address."
+msgstr "Usually arrived at by following a note into its game and back — the id is the one in the game's address."
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Written between"
+msgstr "Written between"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Written from"
+msgstr "Written from"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Written until"
+msgstr "Written until"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Carrying every tag"
+msgstr "Carrying every tag"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Reading the tags…"
+msgstr "Reading the tags…"
+
+#: src/routes/notes/components/NoteFilterBar.tsx
+msgid "Nothing is tagged yet."
+msgstr "Nothing is tagged yet."
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "from live"
+msgstr "from live"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "written via MCP"
+msgstr "written via MCP"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "written from live"
+msgstr "written from live"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Written on a model game, not one of yours"
+msgstr "Written on a model game, not one of yours"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "model game"
+msgstr "model game"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "written {when}"
+msgstr "written {when}"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Rewrite this note"
+msgstr "Rewrite this note"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Forget this note"
+msgstr "Forget this note"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Show only notes tagged {tag}"
+msgstr "Show only notes tagged {tag}"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "The position at {move}"
+msgstr "The position at {move}"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "The position this note is about"
+msgstr "The position this note is about"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "no position"
+msgstr "no position"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Written on <0>{move}</0> in {from}"
+msgstr "Written on <0>{move}</0> in {from}"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Written in {from}"
+msgstr "Written in {from}"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "Open this position in the opening explorer"
+msgstr "Open this position in the opening explorer"
+
+#: src/routes/notes/components/NoteItem.tsx
+msgid "In the opening explorer"
+msgstr "In the opening explorer"
+
+#: src/routes/notes/components/TagEditor.tsx
+msgid "add a tag"
+msgstr "add a tag"
+
+#: src/routes/notes/components/TagEditor.tsx
+msgid "Remove the tag {tag}"
+msgstr "Remove the tag {tag}"
+
+#: src/routes/notes/filters.ts
+msgid "On a game"
+msgstr "On a game"
+
+#: src/routes/notes/filters.ts
+msgid "On a position"
+msgstr "On a position"
+
+#: src/routes/notes/filters.ts
+msgid "On a variation"
+msgstr "On a variation"
+
+#: src/routes/notes/filters.ts
+msgid "Loose"
+msgstr "Loose"
+
+#: src/routes/notes/filters.ts
+msgid "on a game"
+msgstr "on a game"
+
+#: src/routes/notes/filters.ts
+msgid "on a position"
+msgstr "on a position"
+
+#: src/routes/notes/filters.ts
+msgid "on a variation"
+msgstr "on a variation"
+
+#: src/routes/notes/filters.ts
+#: src/routes/notes/presentation.ts
+msgid "loose"
+msgstr "loose"
+
+#: src/routes/notes/filters.ts
+msgid "About"
+msgstr "About"
+
+#: src/routes/notes/filters.ts
+msgid "Game"
+msgstr "Game"
+
+#: src/routes/notes/filters.ts
+msgid "Written"
+msgstr "Written"
+
+#. placeholder {0}: tagged.length
+#: src/routes/notes/filters.ts
+msgid "{0, plural, one {# tag} other {# tags}}"
+msgstr "{0, plural, one {# tag} other {# tags}}"
+
+#: src/routes/notes/presentation.ts
+msgid "opening line"
+msgstr "opening line"
+
+#: src/routes/notes/presentation.ts
+msgid "variation"
+msgstr "variation"
+
+#: src/routes/notes/presentation.ts
+msgid "Game #{gameId}"
+msgstr "Game #{gameId}"
+
+#: src/routes/notes/presentation.ts
+msgid "In {mine, plural, one {# game of yours} other {# of your games}} and {model, plural, one {# model game} other {# model games}}"
+msgstr "In {mine, plural, one {# game of yours} other {# of your games}} and {model, plural, one {# model game} other {# model games}}"
+
+#: src/routes/notes/presentation.ts
+msgid "In {mine, plural, one {# game of yours} other {# of your games}}"
+msgstr "In {mine, plural, one {# game of yours} other {# of your games}}"
+
+#: src/routes/notes/presentation.ts
+msgid "In {model, plural, one {# model game} other {# model games}}"
+msgstr "In {model, plural, one {# model game} other {# model games}}"
+
+#: src/routes/notes/presentation.ts
+msgid "January {year}"
+msgstr "January {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "February {year}"
+msgstr "February {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "March {year}"
+msgstr "March {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "April {year}"
+msgstr "April {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "May {year}"
+msgstr "May {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "June {year}"
+msgstr "June {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "July {year}"
+msgstr "July {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "August {year}"
+msgstr "August {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "September {year}"
+msgstr "September {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "October {year}"
+msgstr "October {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "November {year}"
+msgstr "November {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "December {year}"
+msgstr "December {year}"
+
+#: src/routes/notes/presentation.ts
+msgid "Today"
+msgstr "Today"
+
+#: src/routes/notes/presentation.ts
+msgid "This week"
+msgstr "This week"
+
+#: src/routes/notes/presentation.ts
+msgid "Earlier this month"
+msgstr "Earlier this month"
+
+#: src/routes/reference/ReferenceGamePage.tsx
+msgid "“{sourceParam}/{gameId}” is not a reference game."
+msgstr "“{sourceParam}/{gameId}” is not a reference game."
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgctxt "repertoire toggle"
+msgid "white"
+msgstr "white"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgctxt "repertoire toggle"
+msgid "black"
+msgstr "black"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Repertoire"
+msgstr "Repertoire"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "White repertoire"
+msgstr "White repertoire"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Black repertoire"
+msgstr "Black repertoire"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "white to move · ply {ply}"
+msgstr "white to move · ply {ply}"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "black to move · ply {ply}"
+msgstr "black to move · ply {ply}"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "This line is not in your white repertoire yet."
+msgstr "This line is not in your white repertoire yet."
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "This line is not in your black repertoire yet."
+msgstr "This line is not in your black repertoire yet."
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Add this line"
+msgstr "Add this line"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Your white repertoire"
+msgstr "Your white repertoire"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Your black repertoire"
+msgstr "Your black repertoire"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "{total, plural, one {# move} other {# moves}}"
+msgstr "{total, plural, one {# move} other {# moves}}"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Could not read the repertoire"
+msgstr "Could not read the repertoire"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Reading your repertoire…"
+msgstr "Reading your repertoire…"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Nothing here yet. Play moves on the board to start your white repertoire — every move you play is saved as you go."
+msgstr "Nothing here yet. Play moves on the board to start your white repertoire — every move you play is saved as you go."
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Nothing here yet. Play moves on the board to start your black repertoire — every move you play is saved as you go."
+msgstr "Nothing here yet. Play moves on the board to start your black repertoire — every move you play is saved as you go."
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "No move selected"
+msgstr "No move selected"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Play a move on the board, or pick one from the tree, to comment on it."
+msgstr "Play a move on the board, or pick one from the tree, to comment on it."
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "<0>{san}</0> — your note on this move"
+msgstr "<0>{san}</0> — your note on this move"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Why this move? It saves when you click away."
+msgstr "Why this move? It saves when you click away."
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Comment on {san}"
+msgstr "Comment on {san}"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Promote to main"
+msgstr "Promote to main"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Confirm — delete branch"
+msgstr "Confirm — delete branch"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Delete branch"
+msgstr "Delete branch"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Repertoire moves"
+msgstr "Repertoire moves"
+
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "has a comment"
+msgstr "has a comment"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "correspondence"
+msgstr "correspondence"
+
+#. Short for "correspondence", inside a sentence
+#. Short for "correspondence", the speed of a game played over days
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "corr."
+msgstr "corr."
+
+#: src/routes/stats/StatsPage.tsx
+msgid "{analysedCount} analysed of {gameCount} games · {period} · {colours}"
+msgstr "{analysedCount} analysed of {gameCount} games · {period} · {colours}"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "{analysedCount} analysed of {gameCount} games · {period} · {colours} · {speedList} only"
+msgstr "{analysedCount} analysed of {gameCount} games · {period} · {colours} · {speedList} only"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "Window"
+msgstr "Window"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "Count {speedWord} games"
+msgstr "Count {speedWord} games"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "Reading the aggregations…"
+msgstr "Reading the aggregations…"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "Show every number against the equally long window before this one"
+msgstr "Show every number against the equally long window before this one"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "All time has nothing before it to compare against"
+msgstr "All time has nothing before it to compare against"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "vs previous"
+msgstr "vs previous"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "Export CSV"
+msgstr "Export CSV"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "{analysedCount} analysed"
+msgstr "{analysedCount} analysed"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "of the point"
+msgstr "of the point"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "per game"
+msgstr "per game"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "per move"
+msgstr "per move"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "Blunder rate"
+msgstr "Blunder rate"
+
+#: src/routes/stats/StatsPage.tsx
+msgid "of your moves"
+msgstr "of your moves"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "moves 1–12"
+msgstr "moves 1–12"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Middlegame"
+msgstr "Middlegame"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "moves 13+"
+msgstr "moves 13+"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Endgame"
+msgstr "Endgame"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "thin material"
+msgstr "thin material"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "opening"
+msgstr "opening"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "middlegame"
+msgstr "middlegame"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "endgame"
+msgstr "endgame"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "No blunders in this window. Either you were careful or nothing has been analysed."
+msgstr "No blunders in this window. Either you were careful or nothing has been analysed."
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Every blunder in this window fell outside the three phases."
+msgstr "Every blunder in this window fell outside the three phases."
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "{share}% of them happen in the {phase}, where the position stops explaining itself."
+msgstr "{share}% of them happen in the {phase}, where the position stops explaining itself."
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "Blunders by game phase"
+msgstr "Blunders by game phase"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "{all, plural, one {# blunder} other {# blunders}}"
+msgstr "{all, plural, one {# blunder} other {# blunders}}"
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "No analysed moves in this window. Run an analysis pass and the phases fill in."
+msgstr "No analysed moves in this window. Run an analysis pass and the phases fill in."
+
+#: src/routes/stats/cards/BlundersByPhaseCard.tsx
+msgid "{blunders} blunders in {moves} moves — {rate}% of them"
+msgstr "{blunders} blunders in {moves} moves — {rate}% of them"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Pawn"
+msgstr "Pawn"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Knight"
+msgstr "Knight"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Bishop"
+msgstr "Bishop"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Rook"
+msgstr "Rook"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Queen"
+msgstr "Queen"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "King"
+msgstr "King"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "pawn"
+msgstr "pawn"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "knight"
+msgstr "knight"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "bishop"
+msgstr "bishop"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "rook"
+msgstr "rook"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "queen"
+msgstr "queen"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "king"
+msgstr "king"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Nothing to blame on any one piece in this window."
+msgstr "Nothing to blame on any one piece in this window."
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "The {piece} costs you most: {blunders} of {all}, {rate}% of the {moves} times you moved it."
+msgstr "The {piece} costs you most: {blunders} of {all}, {rate}% of the {moves} times you moved it."
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "Blunders by piece"
+msgstr "Blunders by piece"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "count · rate"
+msgstr "count · rate"
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "No analysed moves in this window, so nothing has a piece attached to it yet."
+msgstr "No analysed moves in this window, so nothing has a piece attached to it yet."
+
+#: src/routes/stats/cards/BlundersByPieceCard.tsx
+msgid "{count} · {share}% of {played}"
+msgstr "{count} · {share}% of {played}"
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "under {seconds}"
+msgstr "under {seconds}"
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "The clock is not what is costing you anything here."
+msgstr "The clock is not what is costing you anything here."
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "With {band} on the clock you give away {factor}× what you give away at leisure. No surprise, but it is now numbered."
+msgstr "With {band} on the clock you give away {factor}× what you give away at leisure. No surprise, but it is now numbered."
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "Eval loss by clock remaining"
+msgstr "Eval loss by clock remaining"
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "avg win % given away"
+msgstr "avg win % given away"
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "{unclocked} moves have no clock and are left out"
+msgstr "{unclocked} moves have no clock and are left out"
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "None of the {unclocked} analysed moves in this window carry clock times, so there is no time trouble to measure. Lichess and Chess.com exports include them; a plain PGN often does not."
+msgstr "None of the {unclocked} analysed moves in this window carry clock times, so there is no time trouble to measure. Lichess and Chess.com exports include them; a plain PGN often does not."
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "No analysed moves in this window."
+msgstr "No analysed moves in this window."
+
+#: src/routes/stats/cards/ClockPressureCard.tsx
+msgid "{loss}% over {moves} moves"
+msgstr "{loss}% over {moves} moves"
+
+#: src/routes/stats/cards/ProgressCard.tsx
+msgid "Blunders / 100 moves"
+msgstr "Blunders / 100 moves"
+
+#: src/routes/stats/cards/ProgressCard.tsx
+msgid "Average rating"
+msgstr "Average rating"
+
+#: src/routes/stats/cards/ProgressCard.tsx
+#: src/routes/stats/reports.ts
+msgid "Progress"
+msgstr "Progress"
+
+#: src/routes/stats/cards/ProgressCard.tsx
+msgid "blunders/100"
+msgstr "blunders/100"
+
+#: src/routes/stats/cards/ProgressCard.tsx
+msgid "No games in this window, so there is no trend to draw."
+msgstr "No games in this window, so there is no trend to draw."
+
+#: src/routes/stats/cards/ProgressCard.tsx
+msgid "blunders per 100 moves in {month} — one month is not a trend yet"
+msgstr "blunders per 100 moves in {month} — one month is not a trend yet"
+
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "The clock barely changes how many pieces you give away."
+msgstr "The clock barely changes how many pieces you give away."
+
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "{quick} costs you {extra} more blunders a game than {patient}. Time is the cheapest thing you can buy."
+msgstr "{quick} costs you {extra} more blunders a game than {patient}. Time is the cheapest thing you can buy."
+
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "You blunder {extra} more per game at {patient} than at {brisk}, which is the opposite of the usual excuse."
+msgstr "You blunder {extra} more per game at {patient} than at {brisk}, which is the opposite of the usual excuse."
+
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Performance by time control"
+msgstr "Performance by time control"
+
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "score · blunders"
+msgstr "score · blunders"
+
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "No games in this window. Import a few, or widen the window."
+msgstr "No games in this window. Import a few, or widen the window."
+
+#. Table column: the time control a bucket of games was played at
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Control"
+msgstr "Control"
+
+#. Table column, abbreviated: blunders per game
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "Bl/g"
+msgstr "Bl/g"
+
+#. The initials of win, draw and loss after each count
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "{wins}W · {draws}D · {losses}L"
+msgstr "{wins}W · {draws}D · {losses}L"
+
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "Blunders / game"
+msgstr "Blunders / game"
+
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "You are at your loosest around {loosest}:00 UTC ({loosestRate} blunders a game) and at your tightest around {tightest}:00 ({tightestRate})."
+msgstr "You are at your loosest around {loosest}:00 UTC ({loosestRate} blunders a game) and at your tightest around {tightest}:00 ({tightestRate})."
+
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "Performance by time of day"
+msgstr "Performance by time of day"
+
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "blunders/game"
+msgstr "blunders/game"
+
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "hour of day, UTC — the API cannot take a timezone offset yet"
+msgstr "hour of day, UTC — the API cannot take a timezone offset yet"
+
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "No games with a timestamp in this window."
+msgstr "No games with a timestamp in this window."
+
+#: src/routes/stats/cards/TimeOfDayCard.tsx
+msgid "{hour}:00 UTC"
+msgstr "{hour}:00 UTC"
+
+#: src/routes/stats/kit/analytics.ts
+msgid "1y"
+msgstr "1y"
+
+#: src/routes/stats/kit/analytics.ts
+msgid "the last 7 days"
+msgstr "the last 7 days"
+
+#: src/routes/stats/kit/analytics.ts
+msgid "the last 30 days"
+msgstr "the last 30 days"
+
+#: src/routes/stats/kit/analytics.ts
+msgid "the last 90 days"
+msgstr "the last 90 days"
+
+#: src/routes/stats/kit/analytics.ts
+msgid "the last 12 months"
+msgstr "the last 12 months"
+
+#: src/routes/stats/kit/analytics.ts
+msgid "all time"
+msgstr "all time"
+
+#: src/routes/stats/kit/analytics.ts
+msgid "the {days} days to {to}"
+msgstr "the {days} days to {to}"
+
+#: src/routes/stats/kit/states.tsx
+msgid "Could not load this."
+msgstr "Could not load this."
+
+#: src/routes/stats/kit/states.tsx
+msgid "the request failed"
+msgstr "the request failed"
+
+#: src/routes/stats/kit/states.tsx
+msgid "Nothing here for this window yet."
+msgstr "Nothing here for this window yet."
+
+#: src/routes/stats/reports.ts
+msgid "phase, time control, time trouble, progress"
+msgstr "phase, time control, time trouble, progress"
+
+#: src/routes/stats/reports.ts
+msgid "Blunder taxonomy"
+msgstr "Blunder taxonomy"
+
+#: src/routes/stats/reports.ts
+msgid "where they happen and what moves them"
+msgstr "where they happen and what moves them"
+
+#: src/routes/stats/reports.ts
+msgid "Clock behaviour"
+msgstr "Clock behaviour"
+
+#: src/routes/stats/reports.ts
+msgid "time trouble and time of day"
+msgstr "time trouble and time of day"
+
+#: src/routes/stats/reports.ts
+msgid "rating over the window"
+msgstr "rating over the window"

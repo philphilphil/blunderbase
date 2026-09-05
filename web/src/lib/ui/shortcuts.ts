@@ -19,7 +19,14 @@
  * The shell's own bindings (⌘K, ⌘1–5) are listed but not dispatched from here: they live
  * in the components that own the dialogs and the router, and lifting them out would move
  * code that works to serve a list. What this table owes them is an accurate line.
+ *
+ * Every word a reader sees is a `MessageDescriptor` rather than a string. These tables are
+ * module-level constants: a sentence resolved where it is written would be frozen at import
+ * in whatever language was loaded then. The descriptor is resolved where it is drawn
+ * instead — `ShortcutsOverlay` is the only thing that prints one.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 
 /**
  * Typing in a field is never a shortcut.
@@ -62,7 +69,7 @@ export interface Shortcut {
   /** What is pressed, as the overlay prints it. One chip per entry. */
   keys: string[]
   /** What it does, in the overlay's words — a phrase, not a sentence. */
-  label: string
+  label: MessageDescriptor
 }
 
 /**
@@ -122,103 +129,127 @@ export const BOARD_SECTIONS: BoardSection[] = [MOVING, BOARD, GAME]
  */
 export const BOARD_SHORTCUTS: BoardShortcut[] = [
   // Moving about the game.
-  { section: MOVING, action: 'step-back', press: ['ArrowLeft'], keys: ['←'], label: 'One move back' },
+  {
+    section: MOVING,
+    action: 'step-back',
+    press: ['ArrowLeft'],
+    keys: ['←'],
+    label: msg`One move back`,
+  },
   {
     section: MOVING,
     action: 'step-forward',
     press: ['ArrowRight'],
     keys: ['→'],
-    label: 'One move on',
+    label: msg`One move on`,
   },
   {
     section: MOVING,
     action: 'previous-flagged',
     press: ['ArrowUp', ','],
     keys: ['↑', ','],
-    label: 'The previous flagged move',
+    label: msg`The previous flagged move`,
   },
   {
     section: MOVING,
     action: 'next-flagged',
     press: ['ArrowDown', '.'],
     keys: ['↓', '.'],
-    label: 'The next flagged move',
+    label: msg`The next flagged move`,
   },
   {
     section: MOVING,
     action: 'jump-back',
     press: ['shift+ArrowLeft'],
     keys: ['⇧←'],
-    label: `${JUMP} moves back`,
+    label: msg`${JUMP} moves back`,
   },
   {
     section: MOVING,
     action: 'jump-forward',
     press: ['shift+ArrowRight'],
     keys: ['⇧→'],
-    label: `${JUMP} moves on`,
+    label: msg`${JUMP} moves on`,
   },
   {
     section: MOVING,
     action: 'seek-start',
     press: ['Home'],
     keys: ['Home'],
-    label: 'The starting position',
+    label: msg`The starting position`,
   },
-  { section: MOVING, action: 'seek-end', press: ['End'], keys: ['End'], label: 'The last move' },
+  {
+    section: MOVING,
+    action: 'seek-end',
+    press: ['End'],
+    keys: ['End'],
+    label: msg`The last move`,
+  },
   {
     section: MOVING,
     action: 'autoplay',
     press: [' '],
     keys: ['Space'],
-    label: 'Play the game through',
+    label: msg`Play the game through`,
   },
   {
     section: MOVING,
     action: 'previous-game',
     press: ['['],
     keys: ['['],
-    label: 'Previous game in your games list',
+    label: msg`Previous game in your games list`,
   },
   {
     section: MOVING,
     action: 'next-game',
     press: [']'],
     keys: [']'],
-    label: 'Next game in your games list',
+    label: msg`Next game in your games list`,
   },
 
   // What the board draws, and what the engines are asked.
-  { section: BOARD, action: 'flip', press: ['f', 'F'], keys: ['F'], label: 'Flip the board' },
+  {
+    section: BOARD,
+    action: 'flip',
+    press: ['f', 'F'],
+    keys: ['F'],
+    label: msg`Flip the board`,
+  },
   {
     section: BOARD,
     action: 'toggle-hints',
     press: ['h', 'H'],
     keys: ['H'],
-    label: 'Hints — the board’s arrows and the engine columns',
+    label: msg`Hints — the board’s arrows and the engine columns`,
   },
   {
     section: BOARD,
     action: 'toggle-engine',
     press: ['e', 'E'],
     keys: ['E'],
-    label: 'The live engine on this position',
+    label: msg`The live engine on this position`,
   },
   {
     section: BOARD,
     action: 'play-best',
     press: ['Enter'],
     keys: ['↵'],
-    label: 'Play the engine’s move onto the board',
+    label: msg`Play the engine’s move onto the board`,
   },
   {
     section: BOARD,
     action: 'board-settings',
     press: ['s', 'S'],
     keys: ['S'],
-    label: 'Board settings — arrows, sound, the eval graph',
+    label: msg`Board settings — arrows, sound, the eval graph`,
   },
-  { section: BOARD, action: 'exit-line', press: ['Escape'], keys: ['Esc'], label: 'Back to the game' },
+  {
+    section: BOARD,
+    action: 'exit-line',
+    press: ['Escape'],
+    keys: ['Esc'],
+    label: msg`Back to the game`,
+  },
 
   // Acting on the game.
   {
@@ -226,28 +257,40 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     action: 'note',
     press: ['n', 'N'],
     keys: ['N'],
-    label: 'Write a note about this position',
+    label: msg`Write a note about this position`,
   },
   {
     section: GAME,
     action: 'queue-quick',
     press: ['q', 'Q'],
     keys: ['Q'],
-    label: 'Queue a quick pass',
+    label: msg`Queue a quick pass`,
   },
-  { section: GAME, action: 'queue-deep', press: ['d', 'D'], keys: ['D'], label: 'Queue a deep pass' },
-  { section: GAME, action: 'copy-pgn', press: ['c', 'C'], keys: ['C'], label: 'Copy the PGN' },
+  {
+    section: GAME,
+    action: 'queue-deep',
+    press: ['d', 'D'],
+    keys: ['D'],
+    label: msg`Queue a deep pass`,
+  },
+  {
+    section: GAME,
+    action: 'copy-pgn',
+    press: ['c', 'C'],
+    keys: ['C'],
+    label: msg`Copy the PGN`,
+  },
   {
     section: GAME,
     action: 'toggle-move-tab',
     press: ['t', 'T'],
     keys: ['T'],
-    label: 'Swap the move column between Moves and Flagged',
+    label: msg`Swap the move column between Moves and Flagged`,
   },
 ]
 
 export interface ShortcutGroup {
-  name: string
+  name: MessageDescriptor
   /**
    * Where the group applies, tested against the pathname. A group with no `where` is
    * everywhere, and the overlay prints it whatever screen it was raised from.
@@ -262,44 +305,56 @@ export const HELP_KEY = '?'
 /** A library game or a model game out of the reference books: the same screen either way. */
 const READING_A_GAME = /^\/(games\/[^/]+|reference\/)/
 
+/**
+ * A board section's heading, in the reader's language.
+ *
+ * The union itself stays English: it is the discriminator a row is filed under, not the
+ * words — a section that renamed itself with the locale would stop matching its own rows.
+ */
+const SECTION_NAMES: Record<BoardSection, MessageDescriptor> = {
+  [MOVING]: msg`Moving about the game`,
+  [BOARD]: msg`The board`,
+  [GAME]: msg`The game itself`,
+}
+
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
-    name: 'Anywhere',
+    name: msg`Anywhere`,
     shortcuts: [
-      { keys: ['⌘K'], label: 'Search games, opponents, openings and notes' },
-      { keys: ['?'], label: 'This list' },
-      { keys: ['⌘1'], label: 'Dashboard' },
-      { keys: ['⌘2'], label: 'Games' },
-      { keys: ['⌘3'], label: 'Explorer' },
-      { keys: ['⌘4'], label: 'Notes' },
-      { keys: ['⌘5'], label: 'Stats' },
-      { keys: ['⌘⇧I'], label: 'Import' },
-      { keys: ['Esc'], label: 'Close whatever is open' },
+      { keys: ['⌘K'], label: msg`Search games, opponents, openings and notes` },
+      { keys: ['?'], label: msg`This list` },
+      { keys: ['⌘1'], label: msg`Dashboard` },
+      { keys: ['⌘2'], label: msg`Games` },
+      { keys: ['⌘3'], label: msg`Explorer` },
+      { keys: ['⌘4'], label: msg`Notes` },
+      { keys: ['⌘5'], label: msg`Stats` },
+      { keys: ['⌘⇧I'], label: msg`Import` },
+      { keys: ['Esc'], label: msg`Close whatever is open` },
     ],
   },
   ...BOARD_SECTIONS.map(
     (section): ShortcutGroup => ({
-      name: section,
+      name: SECTION_NAMES[section],
       where: READING_A_GAME,
       shortcuts: BOARD_SHORTCUTS.filter((shortcut) => shortcut.section === section),
     }),
   ),
   {
-    name: 'The library table',
+    name: msg`The library table`,
     where: /^\/games\/?$/,
     shortcuts: [
-      { keys: ['↑', '↓'], label: 'Move along the rows' },
-      { keys: ['Home', 'End'], label: 'The first and the last row' },
-      { keys: ['↵'], label: 'Open the game under the cursor' },
-      { keys: ['/'], label: 'Search the library' },
+      { keys: ['↑', '↓'], label: msg`Move along the rows` },
+      { keys: ['Home', 'End'], label: msg`The first and the last row` },
+      { keys: ['↵'], label: msg`Open the game under the cursor` },
+      { keys: ['/'], label: msg`Search the library` },
     ],
   },
   {
-    name: 'Walking a line',
+    name: msg`Walking a line`,
     where: /^\/(explorer|repertoire)/,
     shortcuts: [
-      { keys: ['←'], label: 'Back one move' },
-      { keys: ['→'], label: 'Forward, back down the line you just left' },
+      { keys: ['←'], label: msg`Back one move` },
+      { keys: ['→'], label: msg`Forward, back down the line you just left` },
     ],
   },
 ]

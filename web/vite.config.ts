@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import tailwindcss from '@tailwindcss/vite'
+import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
+import babel from '@rolldown/plugin-babel'
 import react from '@vitejs/plugin-react'
 import { configDefaults, defineConfig } from 'vitest/config'
 
@@ -46,7 +48,18 @@ const DOM_LOGIC_TESTS = [
 ]
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), engineAssets()],
+  plugins: [
+    react(),
+    // The Lingui macros (`<Trans>`, `t`, `msg`) are a Babel transform, and Vite 8's own
+    // transformer is not Babel, so the preset rides on rolldown's Babel plugin and touches
+    // only files that import a macro. `lingui()` is what lets a `.po` catalog be imported
+    // as compiled messages. Both are inherited by the vitest projects below, so tests see
+    // the same code the browser does.
+    lingui(),
+    babel({ presets: [linguiTransformerBabelPreset()] }),
+    tailwindcss(),
+    engineAssets(),
+  ],
   define: { __APP_VERSION__: JSON.stringify(version) },
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, './src') },

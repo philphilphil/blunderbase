@@ -2,10 +2,13 @@
  * Design 2b's filter bar: the free-text box and one chip per filter group. Every chip writes
  * straight into the page's `LibraryFilters`, which the page mirrors into the URL.
  */
+import type { I18n, MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
-import type { Whose } from '@/lib/api/types'
+import type { Color, Whose } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
 import {
@@ -16,6 +19,7 @@ import {
   GROUP_LABELS,
   groupSummary,
   prune,
+  SPEED_WORDS,
   type FilterGroup,
   type LibraryFilters,
 } from '../filters'
@@ -28,13 +32,19 @@ export interface FilterBarProps {
   onChange: (next: LibraryFilters) => void
 }
 
-/** Presets for the date popover, in days back from today. */
-const DATE_PRESETS: { label: string; days: number }[] = [
-  { label: '7d', days: 7 },
-  { label: '30d', days: 30 },
-  { label: '90d', days: 90 },
-  { label: '12m', days: 365 },
+/**
+ * Presets for the date popover, in days back from today. The labels are as short as the
+ * four buttons they sit on, so each carries a comment saying what the letter stands for.
+ */
+const DATE_PRESETS: { label: MessageDescriptor; days: number }[] = [
+  { label: msg({ message: '7d', comment: 'Date preset button: the last 7 days' }), days: 7 },
+  { label: msg({ message: '30d', comment: 'Date preset button: the last 30 days' }), days: 30 },
+  { label: msg({ message: '90d', comment: 'Date preset button: the last 90 days' }), days: 90 },
+  { label: msg({ message: '12m', comment: 'Date preset button: the last 12 months' }), days: 365 },
 ]
+
+/** The two sides, title-cased the way the popover sets its options. */
+const COLOR_LABELS: Record<Color, MessageDescriptor> = { white: msg`White`, black: msg`Black` }
 
 function isoDay(offsetDays: number): string {
   const date = new Date()
@@ -43,6 +53,7 @@ function isoDay(offsetDays: number): string {
 }
 
 export function FilterBar({ filters, onChange }: FilterBarProps) {
+  const { i18n } = useLingui()
   const patch = (next: Partial<LibraryFilters>) => onChange(prune({ ...filters, ...next }))
 
   return (
@@ -62,7 +73,7 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
       {FILTER_GROUPS.map((group) => (
         <FilterPopover
           key={group}
-          label={GROUP_LABELS[group]}
+          label={i18n._(GROUP_LABELS[group])}
           value={groupSummary(group, filters)}
           onClear={() => onChange(clearGroup(filters, group))}
           width={group === 'date' ? '15.625rem' : '14.5rem'}
@@ -76,17 +87,22 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
   )
 }
 
-const WHOSE_OPTIONS: { label: string; value: Whose; title: string }[] = [
-  { label: 'Mine', value: 'mine', title: 'Your own games — the ones every statistic counts' },
-  { label: 'Others', value: 'others', title: 'Games added from the reference books' },
-  { label: 'All', value: 'all', title: 'Both together' },
+const WHOSE_OPTIONS: { label: MessageDescriptor; value: Whose; title: MessageDescriptor }[] = [
+  {
+    label: msg`Mine`,
+    value: 'mine',
+    title: msg`Your own games — the ones every statistic counts`,
+  },
+  { label: msg`Others`, value: 'others', title: msg`Games added from the reference books` },
+  { label: msg`All`, value: 'all', title: msg`Both together` },
 ]
 
 function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whose) => void }) {
+  const { t, i18n } = useLingui()
   return (
     <div
       role="group"
-      aria-label="Whose games"
+      aria-label={t`Whose games`}
       className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.71875rem]"
     >
       {WHOSE_OPTIONS.map((option, index) => (
@@ -94,7 +110,7 @@ function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whos
           key={option.value}
           type="button"
           aria-pressed={value === option.value}
-          title={option.title}
+          title={i18n._(option.title)}
           onClick={() => onChange(option.value)}
           className={cn(
             'px-2.5 py-1 transition-colors',
@@ -102,7 +118,7 @@ function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whos
             value === option.value ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
           )}
         >
-          {option.label}
+          {i18n._(option.label)}
         </button>
       ))}
     </div>
@@ -116,6 +132,7 @@ function WhoseToggle({ value, onChange }: { value: Whose; onChange: (whose: Whos
  * cut, so the link says so rather than pretending.
  */
 function SaveFilter({ filters }: { filters: LibraryFilters }) {
+  const { t } = useLingui()
   const [open, setOpen] = useState(false)
   const [label, setLabel] = useState('')
   const host = useRef<HTMLDivElement>(null)
@@ -149,8 +166,8 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
         aria-expanded={open}
         title={
           active
-            ? 'Keep this cut of the library in the sidebar'
-            : 'Set a filter first — there is nothing to save yet'
+            ? t`Keep this cut of the library in the sidebar`
+            : t`Set a filter first — there is nothing to save yet`
         }
         onClick={() => {
           setLabel(suggestLabel(filters))
@@ -158,17 +175,19 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
         }}
         className="px-1 text-[0.71875rem] text-accent-teal transition-colors hover:text-accent-link disabled:cursor-not-allowed disabled:text-faint"
       >
-        Save filter
+        <Trans>Save filter</Trans>
       </button>
       {open ? (
         // Anchored to the bar rather than to the chip below `md`, like every other panel
         // on this bar — this one sits at its right-hand end, where a 250px panel has the
         // least room of all.
         <div className="absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:right-0">
-          <PopoverLabel>Save this cut as</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Save this cut as</Trans>
+          </PopoverLabel>
           <Input
             autoFocus
-            aria-label="Filter name"
+            aria-label={t`Filter name`}
             value={label}
             maxLength={MAX_LABEL_LENGTH}
             onChange={(event) => setLabel(event.target.value)}
@@ -183,7 +202,7 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
             onClick={commit}
             className="rounded-md bg-accent-teal px-2.5 py-1.5 text-[0.71875rem] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
-            Save
+            <Trans context="button">Save</Trans>
           </button>
         </div>
       ) : null}
@@ -200,15 +219,18 @@ function GroupPanel({
   filters: LibraryFilters
   patch: (next: Partial<LibraryFilters>) => void
 }) {
+  const { t, i18n } = useLingui()
   switch (group) {
     case 'date':
       return (
         <>
-          <PopoverLabel>Played between</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Played between</Trans>
+          </PopoverLabel>
           <div className="flex items-center gap-1.5">
             <Input
               type="date"
-              aria-label="Played from"
+              aria-label={t`Played from`}
               value={filters.since ?? ''}
               onChange={(event) => patch({ since: event.target.value || undefined })}
               className="h-7 text-[0.71875rem]"
@@ -216,7 +238,7 @@ function GroupPanel({
             <span className="text-faint">→</span>
             <Input
               type="date"
-              aria-label="Played until"
+              aria-label={t`Played until`}
               value={filters.until ?? ''}
               onChange={(event) => patch({ until: event.target.value || undefined })}
               className="h-7 text-[0.71875rem]"
@@ -225,12 +247,12 @@ function GroupPanel({
           <div className="flex gap-1">
             {DATE_PRESETS.map((preset) => (
               <button
-                key={preset.label}
+                key={preset.days}
                 type="button"
                 onClick={() => patch({ since: isoDay(preset.days), until: undefined })}
                 className="flex-1 rounded-sm border border-edge bg-raised px-2 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
               >
-                {preset.label}
+                {i18n._(preset.label)}
               </button>
             ))}
           </div>
@@ -240,7 +262,9 @@ function GroupPanel({
     case 'source':
       return (
         <>
-          <PopoverLabel>Imported from</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Imported from</Trans>
+          </PopoverLabel>
           <OptionRow
             options={FILTER_OPTIONS.sources}
             value={filters.source}
@@ -253,12 +277,14 @@ function GroupPanel({
     case 'color':
       return (
         <>
-          <PopoverLabel>You played</PopoverLabel>
+          <PopoverLabel>
+            <Trans>You played</Trans>
+          </PopoverLabel>
           <OptionRow
             options={FILTER_OPTIONS.colors}
             value={filters.color}
             onChange={(color) => patch({ color })}
-            labels={{ white: 'White', black: 'Black' }}
+            labels={resolve(i18n, COLOR_LABELS)}
           />
         </>
       )
@@ -266,14 +292,18 @@ function GroupPanel({
     case 'result':
       return (
         <>
-          <PopoverLabel>Your result</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Your result</Trans>
+          </PopoverLabel>
           <OptionRow
             options={FILTER_OPTIONS.outcomes}
             value={filters.outcome}
             onChange={(outcome) => patch({ outcome })}
-            labels={OUTCOME_LABELS}
+            labels={resolve(i18n, OUTCOME_LABELS)}
           />
-          <PopoverLabel>PGN result</PopoverLabel>
+          <PopoverLabel>
+            <Trans>PGN result</Trans>
+          </PopoverLabel>
           <OptionRow
             options={FILTER_OPTIONS.results}
             value={filters.result}
@@ -286,17 +316,21 @@ function GroupPanel({
     case 'opening':
       return (
         <>
-          <PopoverLabel>ECO code or prefix</PopoverLabel>
+          <PopoverLabel>
+            <Trans>ECO code or prefix</Trans>
+          </PopoverLabel>
           <Input
-            aria-label="ECO code"
-            placeholder="B22, or just C6"
+            aria-label={t`ECO code`}
+            placeholder={t`B22, or just C6`}
             value={filters.eco ?? ''}
             onChange={(event) => patch({ eco: event.target.value.toUpperCase() || undefined })}
             className="h-7 font-mono text-[0.71875rem]"
           />
           <span className="text-[0.6875rem] leading-snug text-dim">
-            A prefix matches the whole family — <span className="font-mono">C6</span> is every
-            Caro-Kann from C60 to C69.
+            <Trans>
+              A prefix matches the whole family — <span className="font-mono">C6</span> is every
+              Caro-Kann from C60 to C69.
+            </Trans>
           </span>
         </>
       )
@@ -304,15 +338,20 @@ function GroupPanel({
     case 'time':
       return (
         <>
-          <PopoverLabel>Speed</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Speed</Trans>
+          </PopoverLabel>
           <OptionRow
             options={FILTER_OPTIONS.speeds}
             value={filters.speed}
             onChange={(speed) => patch({ speed })}
+            labels={resolve(i18n, SPEED_WORDS)}
           />
-          <PopoverLabel>Exact clock</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Exact clock</Trans>
+          </PopoverLabel>
           <Input
-            aria-label="Time control"
+            aria-label={t`Time control`}
             placeholder="600+0"
             value={filters.time_control ?? ''}
             onChange={(event) => patch({ time_control: event.target.value || undefined })}
@@ -324,10 +363,12 @@ function GroupPanel({
     case 'opponent':
       return (
         <>
-          <PopoverLabel>Opponent</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Opponent</Trans>
+          </PopoverLabel>
           <DebouncedInput
-            aria-label="Opponent"
-            placeholder="Part of a name"
+            aria-label={t`Opponent`}
+            placeholder={t`Part of a name`}
             value={filters.opponent ?? ''}
             onCommit={(value) => patch({ opponent: value || undefined })}
           />
@@ -337,19 +378,25 @@ function GroupPanel({
     case 'analysis':
       return (
         <>
-          <PopoverLabel>Contains a blunder</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Contains a blunder</Trans>
+          </PopoverLabel>
           <TriState
             value={filters.has_blunders}
             onChange={(has_blunders) => patch({ has_blunders })}
           />
-          <PopoverLabel>Any analysis done</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Any analysis done</Trans>
+          </PopoverLabel>
           <TriState
             value={filters.analyzed}
             onChange={(analyzed) => patch({ analyzed })}
-            yes="Analysed"
-            no="Unanalysed"
+            yes={t`Analysed`}
+            no={t`Unanalysed`}
           />
-          <PopoverLabel>Deep pass done</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Deep pass done</Trans>
+          </PopoverLabel>
           <TriState
             value={filters.deep_analyzed}
             onChange={(deep_analyzed) => patch({ deep_analyzed })}
@@ -357,6 +404,19 @@ function GroupPanel({
         </>
       )
   }
+}
+
+/**
+ * An option table as `OptionRow` takes it. The tables are messages so a language switch
+ * reaches them; the row wants the words, so they are resolved on the way in.
+ */
+function resolve<T extends string>(
+  i18n: I18n,
+  labels: Record<T, MessageDescriptor>,
+): Record<T, string> {
+  const out = {} as Record<T, string>
+  for (const key of Object.keys(labels) as T[]) out[key] = i18n._(labels[key])
+  return out
 }
 
 /**

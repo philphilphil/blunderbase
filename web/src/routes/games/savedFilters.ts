@@ -17,6 +17,8 @@
  * blunders were a place rather than a filter, and left the owner two ways to reach the
  * same list with two different counts beside them.
  */
+import type { I18n, MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import { useSyncExternalStore } from 'react'
 
 import {
@@ -63,6 +65,34 @@ export const BUILT_IN_FILTERS: readonly SavedFilter[] = [
     builtin: true,
   },
 ]
+
+/**
+ * The built-ins' names, by id.
+ *
+ * `label` stays a plain string on every entry, because for a cut the owner saved it *is*
+ * plain text — what they typed into the box, in whatever language they typed it. Only the
+ * three shipped ones have a translation to look up, and the id is what they are known by
+ * (it is stable, it is what `saveFilter` keeps clear of, and it never changes with the
+ * language). `filterLabel` is the one door: it answers with the catalog's word for a
+ * built-in and with the stored text for everything else.
+ */
+const BUILT_IN_LABELS: Record<string, MessageDescriptor> = {
+  'losses-as-black': msg`Losses as black`,
+  'with-blunders': msg`Blunders`,
+  'no-deep-pass': msg`No deep pass`,
+}
+
+/**
+ * What a row in the rail prints: the translated name of a built-in, or the owner's own.
+ *
+ * The flag is checked as well as the id so a stored cut can never be renamed by colliding
+ * with one — `saveFilter` already keeps the ids apart, and this keeps a hand-edited
+ * `localStorage` from getting a word the owner never wrote.
+ */
+export function filterLabel(i18n: I18n, filter: SavedFilter): string {
+  const builtin = filter.builtin ? BUILT_IN_LABELS[filter.id] : undefined
+  return builtin ? i18n._(builtin) : filter.label
+}
 
 const SAVED_DOT = 'bg-accent-teal'
 /** Enough to fill the rail without pushing the pinned footer off the bottom. */

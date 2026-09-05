@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 import { createBrowserRouter, Link, Navigate } from 'react-router-dom'
 
@@ -26,11 +27,12 @@ import {
 } from './lazyRoutes'
 
 function NotFound() {
+  const { t } = useLingui()
   return (
     <PageBody>
-      <PageHeader title="Not found" description="That route does not exist." />
+      <PageHeader title={t`Not found`} description={t`That route does not exist.`} />
       <Link to="/" className="text-xs">
-        Back to the dashboard
+        <Trans>Back to the dashboard</Trans>
       </Link>
     </PageBody>
   )

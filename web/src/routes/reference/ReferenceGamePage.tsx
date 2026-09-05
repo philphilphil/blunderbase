@@ -23,6 +23,7 @@
  * refusing. The one door through is "Add to library" in the board's control row, which
  * stores the game as one the owner did not play and navigates to the real thing.
  */
+import { useLingui } from '@lingui/react/macro'
 import { useParams } from 'react-router-dom'
 
 import type { ReferenceSource } from '@/lib/api/types'
@@ -31,6 +32,7 @@ import { GameLoadError } from '@/routes/game/components/GameStates'
 import { parseSource } from '@/routes/explorer/reference'
 
 export function ReferenceGamePage() {
+  const { t } = useLingui()
   const { source: sourceParam, gameId } = useParams<{ source: string; gameId: string }>()
   // `parseSource` answers `mine` for anything that is not one of the two books, which is
   // exactly the check this route needs: a hand-typed `/reference/nonsense/x` is a bad URL,
@@ -39,7 +41,7 @@ export function ReferenceGamePage() {
   if (parsed === 'mine' || !gameId) {
     return (
       <GameLoadError
-        error={new Error(`“${sourceParam}/${gameId}” is not a reference game.`)}
+        error={new Error(t`“${sourceParam}/${gameId}” is not a reference game.`)}
         onRetry={() => {}}
       />
     )

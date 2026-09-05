@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { toast, Toaster } from 'sonner'
@@ -60,6 +61,7 @@ const TOAST_CLASSES = {
  */
 export function AppShell() {
   const capabilities = useRuntimeCapabilities()
+  const { t } = useLingui()
   // If a browser runner is installed in this browser, this is where it comes back: the
   // shell is what a signed-in tab mounts, and the link has to be alive on every page rather
   // than only while somebody is looking at `/engines`. A no-op when nothing is installed,
@@ -72,16 +74,26 @@ export function AppShell() {
   // The demo refusing a write is said here, once, whichever button was pressed — see
   // `lib/api/readOnly.ts`. One toast id, so a visitor who keeps trying reads one sentence
   // rather than a stack of them.
+  //
+  // The three strings are resolved during the render rather than inside the callback, so
+  // the subscription depends on plain values: it is renewed when the language changes and
+  // at no other time.
+  const refusedTitle = t`This is the read-only demo. Nothing you do here is saved.`
+  const refusedDetail = t`Run your own Blunderbase to import, analyse and annotate your games.`
+  const refusedAction = t`Get it`
   useEffect(
     () =>
       onWriteRefused(() =>
-        toast.info('This is the read-only demo. Nothing you do here is saved.', {
+        toast.info(refusedTitle, {
           id: 'read-only',
-          description: 'Run your own Blunderbase to import, analyse and annotate your games.',
-          action: { label: 'Get it', onClick: () => window.open(SITE_URL, '_blank', 'noopener') },
+          description: refusedDetail,
+          action: {
+            label: refusedAction,
+            onClick: () => window.open(SITE_URL, '_blank', 'noopener'),
+          },
         }),
       ),
-    [],
+    [refusedTitle, refusedDetail, refusedAction],
   )
 
   const [navOpen, setNavOpen] = useState(false)
@@ -127,7 +139,7 @@ export function AppShell() {
             href="#main-content"
             className="fixed top-2 left-2 z-[80] -translate-y-16 rounded-md bg-accent-teal px-3 py-2 text-xs font-semibold text-accent-ink transition-transform focus:translate-y-0"
           >
-            Skip to content
+            <Trans>Skip to content</Trans>
           </a>
           <div className="flex h-full min-h-0 flex-col bg-surface">
             <TopBar onOpenNav={openNav} />
@@ -145,7 +157,7 @@ export function AppShell() {
                       role="status"
                       className="flex flex-1 items-center justify-center text-xs text-dim"
                     >
-                      Loading…
+                      <Trans>Loading…</Trans>
                     </div>
                   }
                 >

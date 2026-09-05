@@ -1,9 +1,12 @@
-import { Bot, CircleHelp, Compass, KeyRound, LogOut, User, Users } from 'lucide-react'
+import { Trans, useLingui } from '@lingui/react/macro'
+import { Bot, CircleHelp, Compass, KeyRound, Languages, LogOut, User, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useLogout, useProfile } from '@/lib/api/queries'
 import type { AccountSummary } from '@/lib/api/types'
+import { useLocale } from '@/lib/i18n/I18nProvider'
+import { LOCALE_NAMES, LOCALES } from '@/lib/i18n/locale'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { useTour } from '@/lib/tour/TourProvider'
 import { cn } from '@/lib/utils'
@@ -32,15 +35,22 @@ const ITEM =
  * The chip is a plain person icon — initials read as an identity the app does not have,
  * and the accessible name already says whose installation this is. The menu it opens
  * heads with every connected account, then the deployment's own settings, the MCP config an
- * assistant is handed, the page explaining what the engines are doing, signing out and
- * changing the password: everything an owner does to or asks about their installation
- * rather than about their games.
+ * assistant is handed, the page explaining what the engines are doing, the language,
+ * signing out and changing the password: everything an owner does to or asks about their
+ * installation rather than about their games.
+ *
+ * The language sits here rather than beside the theme control because it is not a thing
+ * you toggle while reading — it is set once, like a password, and the menu is where the
+ * once-only things live. Each language is named in itself, so the row is legible whatever
+ * the page currently speaks.
  */
 export function AccountMenu() {
   const capabilities = useRuntimeCapabilities()
   const profile = useProfile()
   const logout = useLogout()
   const tour = useTour()
+  const { t } = useLingui()
+  const { locale, setLocale } = useLocale()
   const [open, setOpen] = useState(false)
   const [changing, setChanging] = useState(false)
   const container = useRef<HTMLDivElement>(null)
@@ -50,7 +60,7 @@ export function AccountMenu() {
   const name = account ? nameOf(account) : null
   const label = account
     ? `${name} · ${account.platform}`
-    : 'No account connected — connect one on the import page'
+    : t`No account connected — connect one on the import page`
 
   useEffect(() => {
     if (!open) return
@@ -74,7 +84,7 @@ export function AccountMenu() {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Account — ${label}`}
+        aria-label={t`Account — ${label}`}
         title={label}
         onClick={() => setOpen((was) => !was)}
         className="flex size-6 items-center justify-center rounded-md border border-edge-strong bg-avatar text-[0.625rem] font-semibold text-soft transition-colors hover:border-edge-hover hover:text-ink"
@@ -85,7 +95,7 @@ export function AccountMenu() {
       {open ? (
         <div
           role="menu"
-          aria-label="Account"
+          aria-label={t`Account`}
           className="bb-card absolute right-0 top-[calc(100%+0.4375rem)] z-40 flex w-[13.5rem] flex-col gap-0.5 p-1 shadow-[0_0.75rem_2rem_var(--bb-shadow)]"
         >
           {/*
@@ -96,14 +106,14 @@ export function AccountMenu() {
             {accounts.length === 0 ? (
               <>
                 <p className="truncate text-[0.6875rem] font-medium text-ink">
-                  No account connected
+                  <Trans>No account connected</Trans>
                 </p>
                 <p className="truncate text-[0.625rem] text-dim">
                   {capabilities.read_only
-                    ? 'read-only demo library'
+                    ? t`read-only demo library`
                     : capabilities.password_auth
-                      ? 'signed in as the owner'
-                      : 'local library'}
+                      ? t`signed in as the owner`
+                      : t`local library`}
                 </p>
               </>
             ) : (
@@ -115,7 +125,7 @@ export function AccountMenu() {
                     </p>
                     <p className="truncate text-[0.625rem] text-dim">
                       {connected.platform}
-                      {connected.is_owner ? ' · owner' : ''}
+                      {connected.is_owner ? t` · owner` : ''}
                     </p>
                   </div>
                   <span className="font-mono text-[0.625rem] tabular text-dim-2">
@@ -129,7 +139,7 @@ export function AccountMenu() {
 
           <Link to="/library/import" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <Users className="size-3.5" aria-hidden />
-            Connected accounts
+            <Trans>Connected accounts</Trans>
           </Link>
           {capabilities.mcp ? (
             <Link
@@ -139,12 +149,12 @@ export function AccountMenu() {
               onClick={() => setOpen(false)}
             >
               <Bot className="size-3.5" aria-hidden />
-              Assistant
+              <Trans>Assistant</Trans>
             </Link>
           ) : null}
           <Link to="/help" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
             <CircleHelp className="size-3.5" aria-hidden />
-            How analysis works
+            <Trans>How analysis works</Trans>
           </Link>
           {/*
             Beside it, because it answers the same kind of question one screen earlier: the
@@ -161,8 +171,39 @@ export function AccountMenu() {
             }}
           >
             <Compass className="size-3.5" aria-hidden />
-            Show the tour again
+            <Trans>Show the tour again</Trans>
           </button>
+          <div className="my-0.5 h-px bg-hairline" />
+          <div className="flex items-center gap-2 px-2 py-1.5 text-[0.6875rem] text-soft">
+            <Languages className="size-3.5" aria-hidden />
+            <span className="flex-1">
+              <Trans>Language</Trans>
+            </span>
+            <div
+              role="group"
+              aria-label={t`Language`}
+              className="flex overflow-hidden rounded-md border border-edge bg-elevated"
+            >
+              {LOCALES.map((option, index) => (
+                <button
+                  key={option}
+                  type="button"
+                  lang={option}
+                  aria-pressed={option === locale}
+                  onClick={() => void setLocale(option)}
+                  className={cn(
+                    'px-1.5 py-0.5 text-[0.625rem] transition-colors',
+                    index > 0 && 'border-l border-edge',
+                    option === locale
+                      ? 'bg-selected text-ink'
+                      : 'text-dim hover:bg-raised hover:text-ink',
+                  )}
+                >
+                  {LOCALE_NAMES[option]}
+                </button>
+              ))}
+            </div>
+          </div>
           {capabilities.password_auth ? (
             <>
               <button
@@ -175,7 +216,7 @@ export function AccountMenu() {
                 }}
               >
                 <KeyRound className="size-3.5" aria-hidden />
-                Change password
+                <Trans>Change password</Trans>
               </button>
               <button
                 type="button"
@@ -188,7 +229,7 @@ export function AccountMenu() {
                 }}
               >
                 <LogOut className="size-3.5" aria-hidden />
-                Sign out
+                <Trans>Sign out</Trans>
               </button>
             </>
           ) : null}

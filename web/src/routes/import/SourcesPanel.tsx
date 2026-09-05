@@ -19,6 +19,7 @@
  * to remember to tick before pressing a second Sync. A PGN takes none of them but the
  * last, and ignores the rest.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useState } from 'react'
 
 import { Input } from '@/components/ui/input'
@@ -50,6 +51,7 @@ export function SourcesPanel({
   latestOf: (source: 'lichess' | 'chesscom' | 'fics') => ImportJob | undefined
   progress: ImportProgressState
 }) {
+  const { t } = useLingui()
   const [since, setSince] = useState('')
   const [maxGames, setMaxGames] = useState('')
   const [skipEvaluation, setSkipEvaluation] = useState(false)
@@ -60,10 +62,14 @@ export function SourcesPanel({
   return (
     <section data-tour="sources" className="flex flex-col rounded-xl border border-line bg-panel">
       <div className="flex flex-wrap items-end gap-x-5 gap-y-3 border-b border-hairline px-3.5 py-3">
-        <span className="self-center text-xs font-semibold text-ink">Sources</span>
+        <span className="self-center text-xs font-semibold text-ink">
+          <Trans>Sources</Trans>
+        </span>
         <div className="flex-1" />
         <div className="flex w-40 flex-col gap-1.5">
-          <Label htmlFor="sync-since">Since</Label>
+          <Label htmlFor="sync-since">
+            <Trans>Since</Trans>
+          </Label>
           {/*
             A native date input: it already yields the `YYYY-MM-DD` the adapters take, and
             it is one keystroke or one click either way. Empty is not "everything" — it is
@@ -80,12 +86,14 @@ export function SourcesPanel({
           />
         </div>
         <div className="flex w-28 flex-col gap-1.5">
-          <Label htmlFor="sync-max">Max games</Label>
+          <Label htmlFor="sync-max">
+            <Trans>Max games</Trans>
+          </Label>
           <Input
             id="sync-max"
             value={maxGames}
             inputMode="numeric"
-            placeholder="all"
+            placeholder={t`all`}
             className="h-7 font-mono"
             onChange={(event) => setMaxGames(event.target.value)}
           />
@@ -95,15 +103,15 @@ export function SourcesPanel({
               finds. A date and "from the beginning" are two answers to the first question,
               so choosing this one takes the date out of the argument. */}
           <SyncCheckbox
-            label="From the beginning"
-            title="Ignore the stored cursor and read the whole archive. Games already in the library are skipped, and games you deleted stay deleted."
+            label={t`From the beginning`}
+            title={t`Ignore the stored cursor and read the whole archive. Games already in the library are skipped, and games you deleted stay deleted.`}
             checked={fromTheBeginning}
             onChange={setFromTheBeginning}
             disabled={running}
           />
           <SyncCheckbox
-            label="Skip evaluation"
-            title="Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards."
+            label={t`Skip evaluation`}
+            title={t`Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards.`}
             checked={skipEvaluation}
             onChange={setSkipEvaluation}
             disabled={running}

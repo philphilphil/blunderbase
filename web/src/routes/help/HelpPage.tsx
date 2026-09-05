@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Cpu, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -79,13 +80,14 @@ function Answer({ id, question, children }: { id?: string; question: string; chi
 }
 
 export function HelpPage() {
+  const { t } = useLingui()
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: 'Help' }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Help` }]} />
       <div className="flex max-w-xl flex-col gap-4">
-        <PageHeader title="How analysis works" />
+        <PageHeader title={t`How analysis works`} />
 
-        <Section icon={Cpu} title="Two engines">
+        <Section icon={Cpu} title={t`Two engines`}>
           <Table className="[&_tr:last-child]:border-0">
             <TableHeader>
               <TableRow>
@@ -95,19 +97,27 @@ export function HelpPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <Compare of="asks" stockfish="what's best" maia="what a 2000 would play" />
-              <Compare of="spends" stockfish="250k – 2M nodes" maia="one look, no search" />
-              <Compare of="gives" stockfish="1 line quick, 4 deep" maia="5 moves, each with odds" />
+              <Compare of={t`asks`} stockfish={t`what's best`} maia={t`what a 2000 would play`} />
               <Compare
-                of="lines?"
-                stockfish="yes"
+                of={t`spends`}
+                stockfish={t`250k – 2M nodes`}
+                maia={t`one look, no search`}
+              />
+              <Compare
+                of={t`gives`}
+                stockfish={t`1 line quick, 4 deep`}
+                maia={t`5 moves, each with odds`}
+              />
+              <Compare
+                of={t`lines?`}
+                stockfish={t`yes`}
                 maia={
-                  <>
+                  <Trans>
                     never —{' '}
                     <a href="#no-lines" className="text-accent-teal hover:text-accent-link">
                       why?
                     </a>
-                  </>
+                  </Trans>
                 }
               />
             </TableBody>
@@ -115,24 +125,32 @@ export function HelpPage() {
         </Section>
 
         <div className="flex flex-col divide-y divide-hairline rounded-xl border border-line bg-panel">
-          <Answer question="Quick vs deep">
-            Quick runs on import. Deep is the one you ask for, and it jumps the queue.
+          <Answer question={t`Quick vs deep`}>
+            <Trans>
+              Quick runs on import. Deep is the one you ask for, and it jumps the queue.
+            </Trans>
           </Answer>
-          <Answer id="no-lines" question="Why Maia never shows a line">
-            One look, no search. Instinct is a spread of moves, not a continuation.
+          <Answer id="no-lines" question={t`Why Maia never shows a line`}>
+            <Trans>
+              One look, no search. Instinct is a spread of moves, not a continuation.
+            </Trans>
           </Answer>
-          <Answer question="What a move cost">
-            Win&#37; before minus after. 5, 10 and 15 are an inaccuracy, a mistake and a
-            blunder.
+          <Answer question={t`What a move cost`}>
+            <Trans>
+              Win&#37; before minus after. 5, 10 and 15 are an inaccuracy, a mistake and a
+              blunder.
+            </Trans>
           </Answer>
         </div>
 
         <p className="text-[0.6875rem] text-faint">
-          Change these numbers under{' '}
-          <Link to="/analysis/engine" className="text-accent-teal hover:text-accent-link">
-            Engine passes
-          </Link>
-          .
+          <Trans>
+            Change these numbers under{' '}
+            <Link to="/analysis/engine" className="text-accent-teal hover:text-accent-link">
+              Engine passes
+            </Link>
+            .
+          </Trans>
         </p>
       </div>
     </PageBody>

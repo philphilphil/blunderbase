@@ -1,3 +1,4 @@
+import { Trans } from '@lingui/react/macro'
 import { Link } from 'react-router-dom'
 
 import { Skeleton } from '@/components/ui/skeleton'
@@ -110,19 +111,24 @@ export function GameLoadError({ error, onRetry }: { error: Error; onRetry: () =>
       <div className="flex max-w-md flex-col items-start gap-3 rounded-xl border border-line bg-panel p-6">
         <span className="inline-flex items-center gap-2 text-[0.8125rem] font-semibold text-ink">
           <span className="size-[0.375rem] rounded-full bg-blunder" />
-          {missing ? 'No such game' : 'Could not load this game'}
+          {missing ? <Trans>No such game</Trans> : <Trans>Could not load this game</Trans>}
         </span>
         <p className="text-[0.78125rem] leading-relaxed text-dim">
-          {missing
-            ? 'The id in the URL does not match a game in this database. It may have been removed, or the database may be a different one than when the link was made.'
-            : error.message}
+          {missing ? (
+            <Trans>
+              The id in the URL does not match a game in this database. It may have been removed, or
+              the database may be a different one than when the link was made.
+            </Trans>
+          ) : (
+            error.message
+          )}
         </p>
         <div className="flex items-center gap-2 pt-1">
           <Link
             to="/games"
             className="rounded-md border border-edge bg-elevated px-2.5 py-1.5 text-xs text-soft hover:text-ink"
           >
-            Back to the library
+            <Trans>Back to the library</Trans>
           </Link>
           {missing ? null : (
             <button
@@ -130,7 +136,7 @@ export function GameLoadError({ error, onRetry }: { error: Error; onRetry: () =>
               onClick={onRetry}
               className="rounded-md bg-accent-teal px-2.5 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-hover"
             >
-              Retry
+              <Trans>Retry</Trans>
             </button>
           )}
         </div>

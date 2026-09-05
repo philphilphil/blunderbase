@@ -14,13 +14,16 @@
  * opponent. Naming both sides reads the same for every row, and the owner's side is said
  * by which name is set bold (`GameRow`) rather than by a disc in a column of its own.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import type * as React from 'react'
 
 import type { SortKey } from '../sorting'
 
 export interface Column {
   id: string
-  label: string
+  /** Resolved where the header is drawn (`GamesTable`); `null` for the checkbox column. */
+  label: MessageDescriptor | null
   width: number | 'flex'
   align?: 'left' | 'right' | 'center'
   sort?: SortKey
@@ -78,21 +81,30 @@ const CARD = {
   flags: 'max-md:col-start-6 max-md:row-start-2 max-md:justify-end',
 } as const
 
+/**
+ * The header words. Three of them are cut to fit a narrow column rather than written out,
+ * so they carry a comment saying what they are short for — a translator handed `Mv` with
+ * nothing around it has no way to know.
+ */
+const ELO = msg({ message: 'Elo', comment: 'The rating, named after Arpad Elo — left as it is in most languages' })
+const RES = msg({ message: 'Res', comment: 'Column header, short for "Result", in a 40px column' })
+const MV = msg({ message: 'Mv', comment: 'Column header, short for "Moves", in a 40px column' })
+
 export const COLUMNS: Column[] = [
-  { id: 'select', label: '', width: 20, phone: CARD.select },
-  { id: 'date', label: 'Date', width: 78, sort: 'played_at', mono: true, phone: CARD.date },
-  { id: 'white', label: 'White', width: 118, sort: 'white', phone: CARD.white },
-  { id: 'white_rating', label: 'Elo', width: 46, align: 'right', sort: 'white_rating', mono: true, phone: CARD.white_rating },
-  { id: 'black', label: 'Black', width: 118, sort: 'black', phone: CARD.black },
-  { id: 'black_rating', label: 'Elo', width: 46, align: 'right', sort: 'black_rating', mono: true, phone: CARD.black_rating },
-  { id: 'opening', label: 'Opening', width: 186, sort: 'opening', phone: null },
-  { id: 'result', label: 'Res', width: 40, align: 'center', sort: 'result', phone: CARD.result },
-  { id: 'time', label: 'Time', width: 70, sort: 'time_control', mono: true, phone: null },
-  { id: 'moves', label: 'Mv', width: 40, align: 'right', sort: 'ply_count', mono: true, phone: null },
-  { id: 'worst', label: 'Worst', width: 56, align: 'right', sort: 'worst', mono: true, phone: CARD.worst },
-  { id: 'source', label: 'Source', width: 82, sort: 'source', phone: null },
-  { id: 'tier', label: 'Tier', width: 84, sort: 'tier', phone: null },
-  { id: 'flags', label: 'Flags', width: 'flex', phone: CARD.flags },
+  { id: 'select', label: null, width: 20, phone: CARD.select },
+  { id: 'date', label: msg`Date`, width: 78, sort: 'played_at', mono: true, phone: CARD.date },
+  { id: 'white', label: msg`White`, width: 118, sort: 'white', phone: CARD.white },
+  { id: 'white_rating', label: ELO, width: 46, align: 'right', sort: 'white_rating', mono: true, phone: CARD.white_rating },
+  { id: 'black', label: msg`Black`, width: 118, sort: 'black', phone: CARD.black },
+  { id: 'black_rating', label: ELO, width: 46, align: 'right', sort: 'black_rating', mono: true, phone: CARD.black_rating },
+  { id: 'opening', label: msg`Opening`, width: 186, sort: 'opening', phone: null },
+  { id: 'result', label: RES, width: 40, align: 'center', sort: 'result', phone: CARD.result },
+  { id: 'time', label: msg`Time`, width: 70, sort: 'time_control', mono: true, phone: null },
+  { id: 'moves', label: MV, width: 40, align: 'right', sort: 'ply_count', mono: true, phone: null },
+  { id: 'worst', label: msg`Worst`, width: 56, align: 'right', sort: 'worst', mono: true, phone: CARD.worst },
+  { id: 'source', label: msg`Source`, width: 82, sort: 'source', phone: null },
+  { id: 'tier', label: msg`Tier`, width: 84, sort: 'tier', phone: null },
+  { id: 'flags', label: msg`Flags`, width: 'flex', phone: CARD.flags },
 ]
 
 /**

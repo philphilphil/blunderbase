@@ -1,3 +1,4 @@
+import { Trans } from '@lingui/react/macro'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -28,17 +29,23 @@ export function AuthLoading() {
     >
       {unreachable ? (
         <div className="flex max-w-[20rem] flex-col items-center gap-2.5 text-center">
-          <p className="text-xs text-ink">Blunderbase is not answering.</p>
+          <p className="text-xs text-ink">
+            <Trans>Blunderbase is not answering.</Trans>
+          </p>
           <p className="text-[0.6875rem] leading-[1.6] text-dim">
-            The page is here but the server behind it is not, so there is nothing to sign in
-            to yet. It reconnects on its own once the backend is back.
+            <Trans>
+              The page is here but the server behind it is not, so there is nothing to sign
+              in to yet. It reconnects on its own once the backend is back.
+            </Trans>
           </p>
           <Button variant="outline" size="sm" onClick={recheck}>
-            Try again
+            <Trans>Try again</Trans>
           </Button>
         </div>
       ) : slow ? (
-        <p className="text-xs text-dim">Checking your session…</p>
+        <p className="text-xs text-dim">
+          <Trans>Checking your session…</Trans>
+        </p>
       ) : null}
     </div>
   )

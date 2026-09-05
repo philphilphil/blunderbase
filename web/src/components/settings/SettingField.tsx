@@ -8,6 +8,7 @@
  * saying nobody has set this, which is why the caption under the box is part of the field
  * rather than something each page writes for itself.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, RotateCcw, Save } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ export function SettingField({
   value: string
   onChange: (value: string) => void
 }) {
+  const { t } = useLingui()
   const id = field.key.replace(/_/g, '-')
   return (
     <div className="flex w-36 flex-none flex-col gap-1.5">
@@ -47,7 +49,7 @@ export function SettingField({
         max={field.max}
         step={field.step}
         value={value}
-        placeholder="not set"
+        placeholder={t`not set`}
         autoComplete="off"
         className="w-full font-mono tabular"
         onChange={(event) => onChange(event.target.value)}
@@ -71,12 +73,12 @@ export function SaveRow({
     <div className="flex items-center justify-end gap-2">
       {dirty ? (
         <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onRevert}>
-          <RotateCcw aria-hidden /> Revert
+          <RotateCcw aria-hidden /> <Trans>Revert</Trans>
         </Button>
       ) : null}
       <Button type="submit" size="sm" disabled={!dirty || pending}>
         {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />}
-        Save
+        <Trans>Save</Trans>
       </Button>
     </div>
   )

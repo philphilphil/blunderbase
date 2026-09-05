@@ -13,6 +13,7 @@
  * thing on the screen that scrolls, and the filter bar above and the selection footer
  * below are worth more pinned than scrolled past.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import type * as React from 'react'
 import { useEffect, useRef } from 'react'
 
@@ -68,6 +69,7 @@ export function GamesTable({
   onCapacityChange,
   empty,
 }: GamesTableProps) {
+  const { t, i18n } = useLingui()
   const body = useRef<HTMLDivElement>(null)
   const report = useRef(onCapacityChange)
   useEffect(() => {
@@ -135,7 +137,7 @@ export function GamesTable({
   }, [])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" role="table" aria-label="Games">
+    <div className="flex min-h-0 flex-1 flex-col" role="table" aria-label={t`Games`}>
       <div
         role="row"
         // The six chips and the checkbox measure ~260px of text; at `gap-x-3` the gaps
@@ -154,7 +156,7 @@ export function GamesTable({
                   type="button"
                   role="checkbox"
                   aria-checked={allSelected}
-                  aria-label="Select every game on this page"
+                  aria-label={t`Select every game on this page`}
                   onClick={onToggleAll}
                   disabled={games.length === 0}
                   className={cn(
@@ -190,12 +192,12 @@ export function GamesTable({
                     active ? 'text-soft' : 'text-dim-2',
                   )}
                 >
-                  {col.label}
+                  {col.label ? i18n._(col.label) : null}
                   {arrow}
                 </button>
-              ) : (
-                col.label
-              )}
+              ) : col.label ? (
+                i18n._(col.label)
+              ) : null}
             </span>
           )
         })}
@@ -271,19 +273,22 @@ function LoadingRows({ rows = 14 }: { rows?: number }) {
 }
 
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const { t } = useLingui()
   return (
     <div className="flex flex-1 items-center justify-center p-10 max-md:p-4">
       <div className="flex max-w-md flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
-        <span className="text-[0.75rem] font-semibold text-blunder">Could not load the library</span>
+        <span className="text-[0.75rem] font-semibold text-blunder">
+          <Trans>Could not load the library</Trans>
+        </span>
         <p className="text-[0.78125rem] leading-relaxed text-soft">
-          {error?.message ?? 'The backend did not answer.'}
+          {error?.message ?? t`The backend did not answer.`}
         </p>
         <button
           type="button"
           onClick={onRetry}
           className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
         >
-          Try again
+          <Trans>Try again</Trans>
         </button>
       </div>
     </div>

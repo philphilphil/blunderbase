@@ -16,6 +16,7 @@
  * laying out (a queue row arrives, a board finishes sizing itself), and a card pointing at
  * where something used to be is worse than no card.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import {
   useCallback,
   useEffect,
@@ -86,6 +87,7 @@ const BUTTON =
 
 export function TourCoachmark() {
   const { step, position, total, anchor, next, back, dismiss } = useTour()
+  const { i18n } = useLingui()
   const card = useRef<HTMLDivElement>(null)
   const [metrics, setMetrics] = useState<Metrics | null>(null)
 
@@ -199,20 +201,22 @@ export function TourCoachmark() {
         style={at ? { left: at.left, top: at.top } : { left: 0, top: 0 }}
       >
         <p id="tour-title" className="text-[0.8125rem] font-semibold text-ink">
-          {step.title}
+          {i18n._(step.title)}
         </p>
-        <p className="text-[0.75rem] leading-relaxed text-soft">{step.body}</p>
+        <p className="text-[0.75rem] leading-relaxed text-soft">{i18n._(step.body)}</p>
         <div className="mt-1 flex items-center gap-2">
           <span className="font-mono text-[0.625rem] tabular text-faint">
-            {position} of {total}
+            <Trans>
+              {position} of {total}
+            </Trans>
           </span>
           <button type="button" onClick={dismiss} className="text-[0.6875rem] text-dim hover:text-ink">
-            Skip
+            <Trans>Skip</Trans>
           </button>
           <span className="flex-1" />
           {position > 1 ? (
             <button type="button" onClick={back} className={BUTTON}>
-              Back
+              <Trans>Back</Trans>
             </button>
           ) : null}
           <button
@@ -220,7 +224,7 @@ export function TourCoachmark() {
             onClick={last ? dismiss : next}
             className="rounded-md bg-accent-teal px-2.5 py-[0.3125rem] text-[0.6875rem] font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
           >
-            {last ? 'Done' : 'Next'}
+            {last ? <Trans>Done</Trans> : <Trans>Next</Trans>}
           </button>
         </div>
       </div>

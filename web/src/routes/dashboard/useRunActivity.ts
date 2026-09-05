@@ -6,6 +6,7 @@
  * socket instead. That means the list is what has happened since the page was opened, not
  * a backlog: the card says so, and falls back to the counts when it is empty.
  */
+import { useLingui } from '@lingui/react/macro'
 import { useCallback, useState } from 'react'
 
 import { useEventListener } from '@/lib/events/EventsProvider'
@@ -59,6 +60,7 @@ const STATUS_OF: Record<string, RunStatus> = {
 
 export function useRunActivity(): RunActivity[] {
   const [runs, setRuns] = useState<RunActivity[]>([])
+  const { t } = useLingui()
 
   // The socket hands events to a listener bound once, so the update is functional and
   // never closes over a stale list.
@@ -82,12 +84,12 @@ export function useRunActivity(): RunActivity[] {
               : status === 'running'
                 ? (previous?.progress ?? null)
                 : null,
-        error: event.error ?? (status === 'failed' ? 'the run failed' : null),
+        error: event.error ?? (status === 'failed' ? t`the run failed` : null),
         updatedAt: Date.now(),
       }
       return [next, ...current.filter((run) => run.runId !== event.run_id)].slice(0, KEEP)
     })
-  }, [])
+  }, [t])
 
   useEventListener('analysis.queued', record)
   useEventListener('analysis.running', record)

@@ -1,3 +1,5 @@
+import { t } from '@lingui/core/macro'
+
 import type { ImportJob } from '@/lib/api/types'
 
 const WHEN = new Intl.DateTimeFormat(undefined, {
@@ -19,8 +21,18 @@ export function duration(job: ImportJob): string {
   if (!job.started_at || !job.finished_at) return '—'
   const ms = Date.parse(job.finished_at) - Date.parse(job.started_at)
   if (!Number.isFinite(ms) || ms < 0) return '—'
-  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`
-  const seconds = Math.round(ms / 1000)
-  if (seconds < 60) return `${seconds}s`
-  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+  if (ms < 10_000) return seconds((ms / 1000).toFixed(1))
+  const whole = Math.round(ms / 1000)
+  if (whole < 60) return seconds(String(whole))
+  const mins = Math.floor(whole / 60)
+  const secs = whole % 60
+  return t({
+    message: `${mins}m ${secs}s`,
+    comment: 'A duration in minutes and seconds, e.g. "4m 12s"',
+  })
+}
+
+/** The seconds half of `duration`, so both branches carry one message rather than two. */
+function seconds(secs: string): string {
+  return t({ message: `${secs}s`, comment: 'A duration in seconds, e.g. "1.3s" or "47s"' })
 }

@@ -1,3 +1,4 @@
+import { useLingui } from '@lingui/react/macro'
 import { keepPreviousData } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -31,6 +32,7 @@ function newestFirst(jobs: ImportJob[] | undefined): ImportJob[] | undefined {
  * have a stable route and cannot be mistaken for another import source.
  */
 export function ImportPage() {
+  const { t } = useLingui()
   const [page, setPage] = useState(1)
   // `keepPreviousData` is not decoration here: without it the page being turned to has no
   // data for a beat, the total reads as zero, and the clamp below would send the reader
@@ -59,23 +61,24 @@ export function ImportPage() {
   if (jobs.data && page > pageCount) setPage(pageCount)
 
   const latestOf = (source: Source) => front?.find((job) => job.source === source)
+  const count = total?.toLocaleString()
 
   return (
     <PageBody>
       <SetPageChrome
-        breadcrumb={[{ label: 'Library', to: '/library' }, { label: 'Import' }]}
+        breadcrumb={[{ label: t`Library`, to: '/library' }, { label: t`Import` }]}
       />
       <PageHeader
-        title="Import"
+        title={t`Import`}
         description={
-          total === undefined
-            ? 'Connect an account, sync it, or upload a PGN export.'
-            : `${total.toLocaleString()} games in the database. Every import is deduplicated on the way in.`
+          count === undefined
+            ? t`Connect an account, sync it, or upload a PGN export.`
+            : t`${count} games in the database. Every import is deduplicated on the way in.`
         }
         actions={
           total ? (
             <Link to="/games" className="text-[0.6875rem] text-accent-teal hover:text-accent-link">
-              all {total.toLocaleString()}
+              {t`all ${count}`}
             </Link>
           ) : null
         }

@@ -13,6 +13,8 @@
  * roles form all name the same three jobs, and three spellings of "Human moves" is how the
  * page stops agreeing with itself.
  */
+import { t } from '@lingui/core/macro'
+
 import { ENGINE_ROLES, type EngineRoleName, type EngineRolesResponse } from '@/lib/api/types'
 
 /** The roles one engine holds. Empty for an engine the owner has assigned to nothing. */
@@ -29,9 +31,11 @@ export const NO_ROLE_LABEL = '—'
 
 /** One role in the words the whole Engines page uses for it. */
 export function roleName(role: EngineRoleName): string {
-  if (role === 'quick') return 'Quick'
-  if (role === 'deep') return 'Deep'
-  return 'Human moves'
+  // `context` keeps these apart from `TierBadge`'s "Quick"/"Deep", which name a pass that
+  // happened rather than a job an engine holds — the distinction this file's header is about.
+  if (role === 'quick') return t({ message: 'Quick', context: 'engine role' })
+  if (role === 'deep') return t({ message: 'Deep', context: 'engine role' })
+  return t({ message: 'Human moves', context: 'engine role' })
 }
 
 /**

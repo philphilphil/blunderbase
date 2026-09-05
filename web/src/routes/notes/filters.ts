@@ -6,6 +6,9 @@
  * Like the library's filters these live in the URL, so a cut of the notes is a link: the
  * dashboard, a game page and the export buttons all point at `/notes?...`.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg, plural, t } from '@lingui/core/macro'
+
 import type { NoteExportQuery, NoteQuery } from '@/lib/api/endpoints'
 import { NOTE_SCOPES, type NoteScope } from '@/lib/api/types'
 
@@ -22,11 +25,30 @@ export interface NoteFilters {
   until?: string
 }
 
-export const SCOPE_LABELS: Record<NoteScope, string> = {
-  game: 'On a game',
-  position: 'On a position',
-  line: 'On a variation',
-  free: 'Loose',
+export const SCOPE_LABELS: Record<NoteScope, MessageDescriptor> = {
+  game: msg`On a game`,
+  position: msg`On a position`,
+  line: msg`On a variation`,
+  free: msg`Loose`,
+}
+
+/**
+ * The same four scopes as the chip reads them, under the group's own name.
+ *
+ * A second table rather than `SCOPE_LABELS[…].toLowerCase()`: lowercasing a translated
+ * label is an English habit, and German would capitalise the noun whatever the chip wants.
+ */
+function scopeSummary(scope: NoteScope): string {
+  switch (scope) {
+    case 'game':
+      return t`on a game`
+    case 'position':
+      return t`on a position`
+    case 'line':
+      return t`on a variation`
+    case 'free':
+      return t`loose`
+  }
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -133,11 +155,11 @@ export type NoteFilterGroup = 'tags' | 'scope' | 'game' | 'date'
 
 export const NOTE_FILTER_GROUPS: NoteFilterGroup[] = ['tags', 'scope', 'game', 'date']
 
-export const GROUP_LABELS: Record<NoteFilterGroup, string> = {
-  tags: 'Tags',
-  scope: 'About',
-  game: 'Game',
-  date: 'Written',
+export const GROUP_LABELS: Record<NoteFilterGroup, MessageDescriptor> = {
+  tags: msg`Tags`,
+  scope: msg`About`,
+  game: msg`Game`,
+  date: msg`Written`,
 }
 
 const GROUP_KEYS: Record<NoteFilterGroup, (keyof NoteFilters)[]> = {
@@ -153,16 +175,20 @@ export function groupSummary(group: NoteFilterGroup, filters: NoteFilters): stri
     case 'tags': {
       const tagged = filters.tags ?? []
       if (tagged.length === 0) return null
-      return tagged.length === 1 ? tagged[0]! : `${tagged.length} tags`
+      return tagged.length === 1
+        ? tagged[0]!
+        : plural(tagged.length, { one: '# tag', other: '# tags' })
     }
     case 'scope':
-      return filters.scope ? SCOPE_LABELS[filters.scope].toLowerCase() : null
+      return filters.scope ? scopeSummary(filters.scope) : null
     case 'game':
       return filters.game_id === undefined ? null : `#${filters.game_id}`
     case 'date': {
-      if (filters.since && filters.until) return `${filters.since} → ${filters.until}`
-      if (filters.since) return `from ${filters.since}`
-      if (filters.until) return `until ${filters.until}`
+      const since = filters.since
+      const until = filters.until
+      if (since && until) return `${since} → ${until}`
+      if (since) return t`from ${since}`
+      if (until) return t`until ${until}`
       return null
     }
   }

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, Columns3, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -205,6 +206,7 @@ export function MaiaPanel({
   onPlayLine,
   className,
 }: MaiaPanelProps) {
+  const { t } = useLingui()
   const rollout = live?.rollout ?? []
   const nodes = formatNodes(run?.nodes)
   const comparing = showHuman && compare && comparison.length > 1
@@ -340,7 +342,7 @@ export function MaiaPanel({
             <CompareGrid columns={comparison} onHoverMove={onHoverMove} onPlayLine={onPlayLine} />
           ) : human.length === 0 ? (
             <p className="px-1 py-1 text-[0.6875rem] text-dim">
-              {live?.pending ? 'Reading this position…' : '–'}
+              {live?.pending ? <Trans>Reading this position…</Trans> : '–'}
             </p>
           ) : (
             // Tight rather than spaced: each row's own background is a measurement, and
@@ -382,7 +384,7 @@ export function MaiaPanel({
               )}
             />
             <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-              {run?.engine ?? 'No engine run'}
+              {run?.engine ?? t`No engine run`}
             </span>
             {/* The analysis board's own purple, the colour the score chip under the board
                 takes while it is reading the same line: these rows are the tail of a line
@@ -390,10 +392,10 @@ export function MaiaPanel({
             {alongLine ? (
               <span
                 data-testid="maia-engine-along-line"
-                title="The rest of the line this run gave, from where the board now stands"
+                title={t`The rest of the line this run gave, from where the board now stands`}
                 className="flex-none rounded-sm border border-brilliant/35 bg-brilliant/10 px-[0.3125rem] py-px font-mono text-[0.625rem] text-brilliant"
               >
-                along its line
+                <Trans>along its line</Trans>
               </span>
             ) : null}
             {/*
@@ -405,7 +407,9 @@ export function MaiaPanel({
               <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
             ) : null}
             {nodes !== '—' ? (
-              <span className="font-mono text-[0.625rem] tabular text-dim">{nodes} nodes</span>
+              <span className="font-mono text-[0.625rem] tabular text-dim">
+                <Trans>{nodes} nodes</Trans>
+              </span>
             ) : null}
             {run?.multipv ? (
               <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
@@ -464,7 +468,7 @@ export function MaiaPanel({
             fen={peek}
             orientation={orientation}
             size="7.5rem"
-            label="Peek at the line"
+            label={t`Peek at the line`}
           />
           {peekLabel ? (
             <span className="font-mono text-[0.59375rem] text-dim">{peekLabel}</span>
@@ -486,11 +490,12 @@ export function MaiaPanel({
  * who hovers it.
  */
 function HumanMark() {
+  const { t } = useLingui()
   return (
     <span
       role="img"
-      aria-label="human moves"
-      title="What people at this level actually play here — not the engine’s best move"
+      aria-label={t`human moves`}
+      title={t`What people at this level actually play here — not the engine’s best move`}
       className="inline-flex flex-none items-center"
     >
       <User className="size-2.5 text-brilliant" aria-hidden />
@@ -517,6 +522,9 @@ function LevelLabel({
   levels: MaiaLevelOption[]
   onSelectLevel?: (elo: number) => void
 }) {
+  const { t } = useLingui()
+  // "Maia" is the model's name and the number is its level, so the label is the same in
+  // every language — nothing here is a word.
   const label = rating ? `Maia ${rating}` : 'Maia'
   const pickable = levels.length > 1 && onSelectLevel !== undefined
   if (!pickable) {
@@ -541,8 +549,8 @@ function LevelLabel({
       </span>
       <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
       <select
-        aria-label="Maia level"
-        title="Which level the human column speaks for"
+        aria-label={t`Maia level`}
+        title={t`Which level the human column speaks for`}
         value={rating ?? ''}
         onChange={(event) => onSelectLevel(Number(event.target.value))}
         className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
@@ -550,11 +558,15 @@ function LevelLabel({
         {/* A live answer from a fixed-weights build names no level; the box still has to
             have the value it is showing, or the platform picks one nobody asked for. */}
         {rating === null ? <option value="">Maia</option> : null}
-        {levels.map((option) => (
-          <option key={option.elo} value={String(option.elo)} disabled={!option.available}>
-            {option.available ? String(option.elo) : `${option.elo} — re-analyse to add`}
-          </option>
-        ))}
+        {levels.map((option) => {
+          // Named, because the number is the placeholder a translator sees in the message.
+          const elo = option.elo
+          return (
+            <option key={elo} value={String(elo)} disabled={!option.available}>
+              {option.available ? String(elo) : t`${elo} — re-analyse to add`}
+            </option>
+          )
+        })}
       </select>
     </span>
   )
@@ -562,13 +574,15 @@ function LevelLabel({
 
 /** One level, or all of them side by side. */
 function CompareToggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
+  const { t } = useLingui()
+  const label = on ? t`Read one level at a time` : t`Compare the levels side by side`
   return (
     <button
       type="button"
       data-testid="maia-compare-toggle"
       aria-pressed={on}
-      title={on ? 'Read one level at a time' : 'Compare the levels side by side'}
-      aria-label={on ? 'Read one level at a time' : 'Compare the levels side by side'}
+      title={label}
+      aria-label={label}
       onClick={() => onChange(!on)}
       className={cn(
         'inline-flex flex-none items-center rounded-sm border px-1 py-px',
@@ -675,8 +689,10 @@ function CompareRow({
   onHoverMove?: (uci: string | null) => void
   onPlay?: () => void
 }) {
+  const { t } = useLingui()
   const verdict = glyphStyle(move.classification)
   const hue = verdict?.color ?? MAIA_HUE
+  const san = move.san
 
   return (
     <button
@@ -686,7 +702,7 @@ function CompareRow({
       onClick={onPlay}
       onMouseEnter={() => onHoverMove?.(move.uci)}
       onMouseLeave={() => onHoverMove?.(null)}
-      title={`Play ${move.san} on the analysis board`}
+      title={t`Play ${san} on the analysis board`}
       className={cn(
         'relative flex w-full items-baseline gap-1 overflow-hidden rounded-[0.1875rem] border-l-2 px-1 py-px text-left',
         move.played ? null : 'border-transparent',
@@ -723,7 +739,7 @@ function LivePill({ pending }: { pending: boolean }) {
         className={cn('size-1 rounded-full bg-brilliant', pending && 'animate-pulse')}
         aria-hidden
       />
-      live
+      <Trans comment="Pill saying these numbers were computed just now, not read from the run">live</Trans>
     </span>
   )
 }
@@ -753,10 +769,12 @@ function HumanRow({
   onHoverMove?: (uci: string | null) => void
   onPlay?: () => void
 }) {
+  const { t } = useLingui()
   const verdict = glyphStyle(move.classification)
   const hue = verdict?.color ?? MAIA_HUE
   const share = Math.min(100, Math.max(0, (move.probability ?? 0) * 100))
   const stop = `${share.toFixed(1)}%`
+  const san = move.san
 
   return (
     <button
@@ -766,7 +784,7 @@ function HumanRow({
       onClick={onPlay}
       onMouseEnter={() => onHoverMove?.(move.uci)}
       onMouseLeave={() => onHoverMove?.(null)}
-      title={`Play ${move.san} on the analysis board`}
+      title={t`Play ${san} on the analysis board`}
       className={cn(
         'flex w-full items-baseline gap-2 rounded-[0.25rem] border-l-2 px-1.5 py-[0.1875rem] text-left',
         move.played ? null : 'border-transparent',
@@ -964,7 +982,7 @@ function EngineRow({
             verdict ? { borderColor: tint(verdict.color, 35), color: verdict.color } : undefined
           }
         >
-          played
+          <Trans comment="Chip marking the engine row for the move the game actually played">played</Trans>
         </span>
       ) : null}
     </div>
@@ -991,7 +1009,7 @@ function Rollout({
       className="flex flex-col gap-1 border-t border-line pt-[0.4375rem]"
     >
       <span className="font-mono text-[0.59375rem] uppercase tracking-[0.04em] text-faint">
-        likely continuation
+        <Trans>likely continuation</Trans>
       </span>
       <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
         {rollout.map((move, index) => (

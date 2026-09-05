@@ -94,7 +94,7 @@ import {
   type RunPlan,
 } from './protocol'
 import type { SearchSnapshot } from './search'
-import { ISOLATION_HINT, threadPlan } from './support'
+import { isolationHint, threadPlan } from './support'
 
 export type BrowserRunnerPhase =
   | 'off'
@@ -439,7 +439,7 @@ export class BrowserRunnerClient {
           phase: 'refused',
           error: {
             code: 'engine_failed',
-            message: plan.isolated ? message(cause) : `${message(cause)} — ${ISOLATION_HINT}`,
+            message: plan.isolated ? message(cause) : `${message(cause)} — ${isolationHint()}`,
           },
         })
       },

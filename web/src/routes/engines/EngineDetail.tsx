@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, Loader2, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -99,10 +100,13 @@ export function EngineDetail({
   embedded?: boolean
   onDeleted: () => void
 }) {
+  const { t } = useLingui()
   const remote = isRemote(host)
   /** Known to be somebody else's, or not yet known to be ours. */
   const locked = remote || !hostKnown
-  const runnerName = host?.runnerName ?? 'that machine'
+  const runnerName = host?.runnerName ?? t`that machine`
+  const engineName = engine.name
+  const enginePath = engine.path
   /**
    * Whether this engine lives inside a browser tab rather than on a filesystem.
    *
@@ -113,7 +117,11 @@ export function EngineDetail({
    * must not be described as a file.
    */
   const inBrowser = engine.path_scheme === 'wasm' || host?.browser === true
-  const whereItRuns = installedHere(host) ? 'in this browser' : `in ${runnerName}`
+  // Two whole phrases rather than one run through a capitaliser: which letter a language
+  // raises at the head of a field value is not something a `charAt(0)` can decide.
+  const here = installedHere(host)
+  const whereItRuns = here ? t`in this browser` : t`in ${runnerName}`
+  const whereItRunsLeading = here ? t`In this browser` : t`In ${runnerName}`
   const [name, setName] = useState(engine.name)
   const [path, setPath] = useState(engine.path)
   const [draft, setDraft] = useState<OptionDraft>(() => draftFrom(engine.options))
@@ -157,6 +165,7 @@ export function EngineDetail({
   const remove = useDeleteEngine({ onSuccess: onDeleted })
   const testRun = useTestRunEngine()
 
+  const assignment = roleLabel(roles)
   const renamed = name.trim() !== engine.name
   const repathed = path.trim() !== engine.path
   // An options change can only be trusted once the probe has said what this binary
@@ -202,7 +211,7 @@ export function EngineDetail({
       <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
         {embedded ? (
           <span className="text-[0.6875rem] text-dim">
-            {locked ? 'Runner-owned settings are read-only here' : 'Engine settings'}
+            {locked ? t`Runner-owned settings are read-only here` : t`Engine settings`}
           </span>
         ) : (
           <>
@@ -217,41 +226,51 @@ export function EngineDetail({
           </>
         )}
         <div className="flex-1" />
-        <span className="text-[0.6875rem] text-dim">{engine.enabled ? 'Enabled' : 'Disabled'}</span>
+        <span className="text-[0.6875rem] text-dim">
+          {engine.enabled ? t`Enabled` : t`Disabled`}
+        </span>
         <Toggle
-          label={`${engine.enabled ? 'Disable' : 'Enable'} ${engine.name}`}
+          label={engine.enabled ? t`Disable ${engineName}` : t`Enable ${engineName}`}
           checked={engine.enabled}
           disabled={locked || update.isPending}
           onChange={(next) => update.mutate({ id: engine.id, body: { enabled: next } })}
         />
       </div>
 
-      <Section title="Binary" aside={<RoleBadge roles={roles} />}>
+      <Section title={t`Binary`} aside={<RoleBadge roles={roles} />}>
         {remote && inBrowser ? (
           // A tab has no yaml and no filesystem, so the sentence a remote *machine* gets
           // would be three wrong instructions in a row.
           <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
-            Runs <span className="font-medium text-soft">{whereItRuns}</span>. This row is the
-            tab&rsquo;s own advertisement and is rewritten every time it connects — there is no
-            file to point at and nothing here to edit. It goes away when the browser runner is
-            uninstalled.
+            <Trans>
+              Runs <span className="font-medium text-soft">{whereItRuns}</span>. This row is the
+              tab&rsquo;s own advertisement and is rewritten every time it connects — there is no
+              file to point at and nothing here to edit. It goes away when the browser runner is
+              uninstalled.
+            </Trans>
           </p>
         ) : remote ? (
           <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
-            Advertised by <span className="font-medium text-soft">{runnerName}</span>. This row is
-            that machine&rsquo;s advertisement and is rewritten every time it connects — change it
-            in <span className="font-mono text-soft">runner.yaml</span> over there. Its path is a
-            path on that machine.
+            <Trans>
+              Advertised by <span className="font-medium text-soft">{runnerName}</span>. This row
+              is that machine&rsquo;s advertisement and is rewritten every time it connects —
+              change it in <span className="font-mono text-soft">runner.yaml</span> over there.
+              Its path is a path on that machine.
+            </Trans>
           </p>
         ) : hostKnown ? null : (
           <p className="rounded-md border border-edge bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
-            Which machine advertises this engine is not known yet, so nothing here is editable
-            and the binary is not probed — a runner&rsquo;s path is a path on that machine, not
-            on this one.
+            <Trans>
+              Which machine advertises this engine is not known yet, so nothing here is editable
+              and the binary is not probed — a runner&rsquo;s path is a path on that machine, not
+              on this one.
+            </Trans>
           </p>
         )}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`engine-${engine.id}-name`}>Name</Label>
+          <Label htmlFor={`engine-${engine.id}-name`}>
+            <Trans>Name</Trans>
+          </Label>
           {/*
             A row nobody can edit has no draft to preserve, and the runner rewrites it on
             every connection — so it is read from the row rather than from the state this
@@ -273,14 +292,19 @@ export function EngineDetail({
         */}
         <p className="text-[0.65625rem] leading-[1.5] text-dim">
           {roles.length > 0 ? (
-            <>
-              Assigned to <span className="font-medium text-soft">{roleLabel(roles)}</span>.
-            </>
+            <Trans>
+              Assigned to <span className="font-medium text-soft">{assignment}</span>.
+            </Trans>
           ) : (
-            'Assigned to nothing, so it runs only when a test run or an analysis board asks for it by name.'
+            <Trans>
+              Assigned to nothing, so it runs only when a test run or an analysis board asks for
+              it by name.
+            </Trans>
           )}{' '}
-          Which engine runs what is chosen under{' '}
-          <span className="font-medium text-soft">What runs what</span> at the top of this page.
+          <Trans>
+            Which engine runs what is chosen under{' '}
+            <span className="font-medium text-soft">What runs what</span> at the top of this page.
+          </Trans>
         </p>
         <div className="flex flex-col gap-1.5">
           {/*
@@ -289,10 +313,12 @@ export function EngineDetail({
             for it, so the field is relabelled and answers the question it is really being
             asked: where does this thing run.
           */}
-          <Label htmlFor={`engine-${engine.id}-path`}>{inBrowser ? 'Where it runs' : 'Path'}</Label>
+          <Label htmlFor={`engine-${engine.id}-path`}>
+            {inBrowser ? t`Where it runs` : t`Path`}
+          </Label>
           <Input
             id={`engine-${engine.id}-path`}
-            value={inBrowser ? capitalise(whereItRuns) : remote ? engine.path : path}
+            value={inBrowser ? whereItRunsLeading : remote ? engine.path : path}
             spellCheck={false}
             readOnly={locked}
             className={inBrowser ? undefined : 'font-mono'}
@@ -300,10 +326,10 @@ export function EngineDetail({
           />
           <p className="text-[0.65625rem] text-dim">
             {inBrowser
-              ? 'The build ships with Blunderbase and is loaded by the tab itself. There is no file on any machine.'
+              ? t`The build ships with Blunderbase and is loaded by the tab itself. There is no file on any machine.`
               : remote
-                ? `A path on ${runnerName}, not here.`
-                : 'A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary.'}
+                ? t`A path on ${runnerName}, not here.`
+                : t`A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary.`}
           </p>
         </div>
       </Section>
@@ -314,8 +340,12 @@ export function EngineDetail({
         onClick={() => setMoreSettings((open) => !open)}
         className="flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left transition-colors hover:bg-raised"
       >
-        <span className="text-[0.6875rem] font-medium text-soft">More settings</span>
-        <span className="text-[0.65625rem] text-dim">UCI options and test runs</span>
+        <span className="text-[0.6875rem] font-medium text-soft">
+          <Trans>More settings</Trans>
+        </span>
+        <span className="text-[0.65625rem] text-dim">
+          <Trans>UCI options and test runs</Trans>
+        </span>
         <div className="flex-1" />
         <ChevronRight
           className={cn('size-3.5 text-faint transition-transform', moreSettings && 'rotate-90')}
@@ -326,15 +356,15 @@ export function EngineDetail({
       {moreSettings ? (
         <>
           <Section
-            title="UCI options"
+            title={t`UCI options`}
             aside={
               remote ? null : (
                 <div className="flex items-center gap-2">
                   {probe.isFetching ? (
-                    <span className="text-[0.65625rem] text-dim">probing…</span>
+                    <span className="text-[0.65625rem] text-dim">{t`probing…`}</span>
                   ) : probe.isSuccess ? (
                     <span className="font-mono text-[0.65625rem] text-dim">
-                      {probe.data.name ?? 'unnamed'}
+                      {probe.data.name ?? t`unnamed`}
                       {probe.data.author ? ` · ${probe.data.author.split('(')[0]!.trim()}` : ''}
                     </span>
                   ) : null}
@@ -349,7 +379,7 @@ export function EngineDetail({
                     }}
                   >
                     <RefreshCw aria-hidden />
-                    Probe
+                    <Trans>Probe</Trans>
                   </Button>
                 </div>
               )
@@ -357,7 +387,7 @@ export function EngineDetail({
           >
             {remote ? (
               <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
-                Options come from the runner&rsquo;s own probe.
+                <Trans>Options come from the runner&rsquo;s own probe.</Trans>
               </p>
             ) : probe.isFetching && !probe.data ? (
               <div className="flex flex-col gap-2" data-testid="probe-loading">
@@ -367,7 +397,9 @@ export function EngineDetail({
               </div>
             ) : probe.isError ? (
               <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-                <p className="text-[0.75rem] text-blunder">The binary could not be probed.</p>
+                <p className="text-[0.75rem] text-blunder">
+                  <Trans>The binary could not be probed.</Trans>
+                </p>
                 <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
                   {probe.error.message}
                 </p>
@@ -375,8 +407,8 @@ export function EngineDetail({
             ) : !probe.data ? (
               <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
                 {engine.kind === 'maia'
-                  ? 'Probing a Maia model loads its network first, which takes a while — press Probe when you want to edit its options.'
-                  : 'Press Probe to read what this binary declares.'}
+                  ? t`Probing a Maia model loads its network first, which takes a while — press Probe when you want to edit its options.`
+                  : t`Press Probe to read what this binary declares.`}
               </p>
             ) : (
               <OptionsEditor
@@ -389,39 +421,43 @@ export function EngineDetail({
           </Section>
 
           {remote ? (
-            <Section title="Test run">
+            <Section title={t`Test run`}>
               <p className="text-[0.6875rem] leading-[1.6] text-dim">
                 {inBrowser ? (
-                  <>
+                  <Trans>
                     A test run starts a binary on this host. This engine has none — it runs{' '}
                     <span className="font-medium text-soft">{whereItRuns}</span>.
-                  </>
+                  </Trans>
                 ) : (
-                  <>
+                  <Trans>
                     A test run starts the binary here;{' '}
-                    <span className="font-mono text-soft">{engine.path}</span> is a path on{' '}
+                    <span className="font-mono text-soft">{enginePath}</span> is a path on{' '}
                     <span className="font-medium text-soft">{runnerName}</span>.
-                  </>
+                  </Trans>
                 )}
               </p>
             </Section>
           ) : (
-            <Section title="Test run">
+            <Section title={t`Test run`}>
               <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_5.625rem_4.375rem]">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={`engine-${engine.id}-fen`}>Position</Label>
+                  <Label htmlFor={`engine-${engine.id}-fen`}>
+                    <Trans>Position</Trans>
+                  </Label>
                   <Input
                     id={`engine-${engine.id}-fen`}
                     value={fen}
                     spellCheck={false}
                     className="font-mono"
-                    placeholder="starting position"
+                    placeholder={t`starting position`}
                     onChange={(event) => setFen(event.target.value)}
                   />
                 </div>
                 {engine.kind === 'maia' ? (
                   <div className="col-span-2 flex flex-col gap-1.5">
-                    <Label htmlFor={`engine-${engine.id}-ratings`}>Ratings</Label>
+                    <Label htmlFor={`engine-${engine.id}-ratings`}>
+                      <Trans>Ratings</Trans>
+                    </Label>
                     <Input
                       id={`engine-${engine.id}-ratings`}
                       value={ratings}
@@ -433,7 +469,9 @@ export function EngineDetail({
                 ) : (
                   <>
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor={`engine-${engine.id}-nodes`}>Nodes</Label>
+                      <Label htmlFor={`engine-${engine.id}-nodes`}>
+                        <Trans>Nodes</Trans>
+                      </Label>
                       <Input
                         id={`engine-${engine.id}-nodes`}
                         value={nodes}
@@ -443,7 +481,9 @@ export function EngineDetail({
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor={`engine-${engine.id}-multipv`}>Lines</Label>
+                      <Label htmlFor={`engine-${engine.id}-multipv`}>
+                        <Trans>Lines</Trans>
+                      </Label>
                       <Input
                         id={`engine-${engine.id}-multipv`}
                         value={multipv}
@@ -458,8 +498,10 @@ export function EngineDetail({
 
               <div className="flex items-center gap-2">
                 <span className="flex-1 text-[0.6875rem] text-dim">
-                  Runs whether the engine is enabled or not — the point of the button is to
-                  decide.
+                  <Trans>
+                    Runs whether the engine is enabled or not — the point of the button is to
+                    decide.
+                  </Trans>
                 </span>
                 <Button
                   type="button"
@@ -472,13 +514,15 @@ export function EngineDetail({
                   ) : (
                     <Play aria-hidden />
                   )}
-                  Test run
+                  <Trans>Test run</Trans>
                 </Button>
               </div>
 
               {testRun.isError ? (
                 <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-                  <p className="text-[0.75rem] text-blunder">The engine did not answer.</p>
+                  <p className="text-[0.75rem] text-blunder">
+                    <Trans>The engine did not answer.</Trans>
+                  </p>
                   <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
                     {testRun.error.message}
                   </p>
@@ -497,23 +541,23 @@ export function EngineDetail({
           // connection. Revoking the runner in the section below is the honest way out.
           <p className="text-[0.6875rem] leading-[1.6] text-dim">
             {inBrowser ? (
-              <>
+              <Trans>
                 Nothing here is editable. This row belongs to a browser tab — uninstall it under{' '}
                 <span className="font-medium text-soft">This browser</span> in Compute capacity
                 below, or revoke the runner there.
-              </>
+              </Trans>
             ) : (
-              <>
+              <Trans>
                 Nothing here is editable. Change this engine in{' '}
                 <span className="font-mono text-soft">runner.yaml</span> on {runnerName}, or open{' '}
                 {runnerName} under Compute capacity below to revoke it.
-              </>
+              </Trans>
             )}
           </p>
         ) : confirmDelete ? (
           <>
             <span className="flex-1 text-[0.6875rem] text-blunder">
-              Remove {engine.name}? Analysis already stored keeps its runs.
+              <Trans>Remove {engineName}? Analysis already stored keeps its runs.</Trans>
             </span>
             <Button
               type="button"
@@ -521,7 +565,7 @@ export function EngineDetail({
               size="sm"
               onClick={() => setConfirmDelete(false)}
             >
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             <Button
               type="button"
@@ -530,7 +574,7 @@ export function EngineDetail({
               disabled={remove.isPending}
               onClick={() => remove.mutate(engine.id)}
             >
-              Remove
+              <Trans context="button">Remove</Trans>
             </Button>
           </>
         ) : (
@@ -542,7 +586,7 @@ export function EngineDetail({
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 aria-hidden />
-              Remove
+              <Trans context="button">Remove</Trans>
             </Button>
             {update.isError ? (
               <span className="min-w-0 flex-1 truncate text-[0.6875rem] text-blunder" title={update.error.message}>
@@ -552,7 +596,9 @@ export function EngineDetail({
               <div className="flex-1" />
             )}
             {blocked ? (
-              <span className="text-[0.6875rem] text-blunder">Fix the options above first</span>
+              <span className="text-[0.6875rem] text-blunder">
+                <Trans>Fix the options above first</Trans>
+              </span>
             ) : null}
             <Button
               type="button"
@@ -561,7 +607,7 @@ export function EngineDetail({
               onClick={save}
             >
               {update.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              Save changes
+              <Trans>Save changes</Trans>
             </Button>
           </>
         )}
@@ -584,9 +630,4 @@ export function EngineDetail({
 function installedHere(host: EngineHost | undefined): boolean {
   if (!host || host.runnerId === null) return false
   return readCredential()?.runnerId === host.runnerId
-}
-
-/** `in this browser` → `In this browser`, for a field value rather than a sentence. */
-function capitalise(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1)
 }

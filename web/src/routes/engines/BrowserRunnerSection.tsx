@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { AppWindow, Loader2, Play, Square, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -54,6 +55,7 @@ export function BrowserRunnerSection({
   /** The one-page screen presents capacity as cards without changing browser-runner behavior. */
   layout?: 'row' | 'card'
 }) {
+  const { t } = useLingui()
   const state = useBrowserRunner()
   const support = browserRunnerSupport()
   const create = useCreateRunner()
@@ -99,7 +101,8 @@ export function BrowserRunnerSection({
       // Already gone server-side: the local copy is stale, and keeping it would leave the
       // owner with an install button that will not appear and a token that cannot connect.
       if (!(cause instanceof ApiError && cause.status === 404)) {
-        setFailure(`${message(cause)} — the token was kept, so nothing is orphaned`)
+        const reason = message(cause)
+        setFailure(t`${reason} — the token was kept, so nothing is orphaned`)
         return
       }
     }
@@ -107,36 +110,37 @@ export function BrowserRunnerSection({
   }
 
   const caption = !support.supported
-    ? (support.reason ?? 'unsupported')
+    ? (support.reason ?? t`unsupported`)
     : !installed
-      ? 'not installed'
+      ? t`not installed`
       : statusLabel(state).label
   const tone = !support.supported || !installed ? 'away' : statusLabel(state).tone
+  const unsupportedReason = support.reason
   const slots =
     installed && runner ? `${runner.busy + runner.streams}/${runner.slots}` : installed ? '1' : '—'
 
   return (
     <MachineRow
       tone={tone}
-      name={installed ? (state.runnerName ?? 'This browser') : 'This browser'}
+      name={installed ? (state.runnerName ?? t`This browser`) : t`This browser`}
       caption={caption}
-      type="This browser"
+      type={t`This browser`}
       slots={slots}
       engines={hasEngine(state) ? '1' : '0'}
       expanded={expanded}
       onToggleExpand={onToggleExpand}
-      ariaLabel={`${expanded ? 'Collapse' : 'Expand'} this browser`}
+      ariaLabel={expanded ? t`Collapse this browser` : t`Expand this browser`}
       layout={layout}
       actions={
         !support.supported ? null : !installed ? (
           <Button type="button" size="sm" disabled={busy} onClick={() => void install()}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : <AppWindow aria-hidden />}
-            Install browser Stockfish
+            <Trans>Install browser Stockfish</Trans>
           </Button>
         ) : confirmRemove ? (
           <>
             <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             <Button
               type="button"
@@ -146,7 +150,7 @@ export function BrowserRunnerSection({
               onClick={() => void uninstall()}
             >
               {remove.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              Revoke and uninstall
+              <Trans>Revoke and uninstall</Trans>
             </Button>
           </>
         ) : (
@@ -159,17 +163,17 @@ export function BrowserRunnerSection({
                 onClick={() => browserRunner.resume()}
               >
                 <Play aria-hidden />
-                Start
+                <Trans>Start</Trans>
               </Button>
             ) : (
               <Button type="button" size="sm" variant="outline" onClick={() => browserRunner.stop()}>
                 <Square aria-hidden />
-                Stop
+                <Trans>Stop</Trans>
               </Button>
             )}
             <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmRemove(true)}>
               <Trash2 aria-hidden />
-              Uninstall
+              <Trans>Uninstall</Trans>
             </Button>
           </>
         )
@@ -177,14 +181,18 @@ export function BrowserRunnerSection({
       detail={
         !support.supported ? (
           <p className="text-[0.71875rem] leading-[1.6] text-dim">
-            {support.reason}. Everything else on this page works as it always did — engines on
-            this host, and runners on other machines.
+            <Trans>
+              {unsupportedReason}. Everything else on this page works as it always did — engines
+              on this host, and runners on other machines.
+            </Trans>
           </p>
         ) : !installed ? (
           <div className="text-[0.71875rem] leading-[1.6] text-dim">
-            Nothing is installed here. The engine and its network are about 15 MB and are served
-            by Blunderbase itself, so nothing is fetched from anywhere else — and the token this
-            creates lives in this browser only.
+            <Trans>
+              Nothing is installed here. The engine and its network are about 15 MB and are served
+              by Blunderbase itself, so nothing is fetched from anywhere else — and the token this
+              creates lives in this browser only.
+            </Trans>
             {failure ? <p className="mt-2 text-blunder">{failure}</p> : null}
           </div>
         ) : (
@@ -198,24 +206,34 @@ export function BrowserRunnerSection({
               </div>
             ) : (
               <p className="rounded-md border border-edge bg-elevated px-3 py-2 text-[0.6875rem] text-dim">
-                The engine has not started yet. It lives in this browser rather than at a path —
-                there is nothing on a filesystem to point at.
+                <Trans>
+                  The engine has not started yet. It lives in this browser rather than at a path —
+                  there is nothing on a filesystem to point at.
+                </Trans>
               </p>
             )}
 
             {!state.isolated && hasEngine(state) ? (
               <p className="text-[0.6875rem] leading-[1.6] text-mistake">
-                This page is not cross-origin isolated, so the engine gets one thread instead of
-                several. Blunderbase sends the headers that ask for isolation; a reverse proxy in
-                front of it is the usual reason they do not arrive.
+                <Trans>
+                  This page is not cross-origin isolated, so the engine gets one thread instead of
+                  several. Blunderbase sends the headers that ask for isolation; a reverse proxy in
+                  front of it is the usual reason they do not arrive.
+                </Trans>
               </p>
             ) : null}
 
-            {state.refused.map((engine) => (
-              <p key={engine.name} className="text-[0.6875rem] leading-[1.6] text-mistake">
-                The server refused {engine.name}: {engine.reason}
-              </p>
-            ))}
+            {state.refused.map((engine) => {
+              const refusedName = engine.name
+              const refusedReason = engine.reason
+              return (
+                <p key={engine.name} className="text-[0.6875rem] leading-[1.6] text-mistake">
+                  <Trans>
+                    The server refused {refusedName}: {refusedReason}
+                  </Trans>
+                </p>
+              )
+            })}
 
             {state.error ? (
               <p

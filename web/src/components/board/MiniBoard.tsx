@@ -7,6 +7,8 @@
  * the theme and the last-move highlight then cannot drift apart — with only the chrome the
  * full-size board carries taken off.
  */
+import { useLingui } from '@lingui/react/macro'
+
 import { cn } from '@/lib/utils'
 
 import { Board, type BoardOrientation } from './Board'
@@ -31,11 +33,12 @@ export function MiniBoard({
   label,
   className,
 }: MiniBoardProps) {
+  const { t } = useLingui()
   return (
     <div
       style={{ width: size }}
       role="img"
-      aria-label={label ?? 'Chess position'}
+      aria-label={label ?? t`Chess position`}
       className={cn('flex-none overflow-hidden rounded-md border border-line', className)}
     >
       <Board

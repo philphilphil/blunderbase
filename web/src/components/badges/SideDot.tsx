@@ -1,7 +1,11 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { useLingui } from '@lingui/react/macro'
+
 import type { Color } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
-const LABEL: Record<Color, string> = { white: 'White', black: 'Black' }
+const LABEL: Record<Color, MessageDescriptor> = { white: msg`White`, black: msg`Black` }
 
 /**
  * The disc that says which side of a game is meant: light for white, dark for black, and a
@@ -21,7 +25,8 @@ export function SideDot({
   size?: 'sm' | 'md'
   className?: string
 }) {
-  const label = side ? LABEL[side] : 'Side unknown'
+  const { t, i18n } = useLingui()
+  const label = side ? i18n._(LABEL[side]) : t`Side unknown`
   return (
     <span
       role="img"

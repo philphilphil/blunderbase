@@ -28,6 +28,7 @@
  * - **Delivery is lossy and may reorder** (`CLIENT_BACKLOG = 256`, oldest dropped), so a
  *   frame whose `seq` is not ahead of the last one accepted is dropped.
  */
+import { useLingui } from '@lingui/react/macro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ApiError } from '@/lib/api/client'
@@ -138,6 +139,7 @@ export function useStreamSession({
   ply = null,
   defaultMultipv = 3,
 }: UseStreamSessionOptions): StreamSessionApi {
+  const { t } = useLingui()
   const { reconnects } = useEvents()
   const status = useRunnersStatus()
   const engines = useMemo(() => engineHosts(status.data), [status.data])
@@ -413,7 +415,7 @@ export function useStreamSession({
       setPhase('off')
       setNote(
         finished.reason === 'replaced'
-          ? 'Another analysis board took this position over.'
+          ? t`Another analysis board took this position over.`
           : null,
       )
       return

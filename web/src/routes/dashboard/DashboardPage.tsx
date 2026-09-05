@@ -17,6 +17,8 @@
  * in the order they are written — ratings and worst moments first, because they are what
  * the page is for, then the recent games, the queue and the trends under them.
  */
+import { plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -35,26 +37,31 @@ import { WorstMomentsRow } from './WorstMomentsRow'
 function useSubtitle(): string {
   const profile = useProfile()
   const phase = useStats('blunders_by_phase')
-  if (profile.isError) return 'The backend is not answering. Nothing below will be current.'
-  if (profile.isPending) return 'Reading the database…'
+  const { t } = useLingui()
+  if (profile.isError) return t`The backend is not answering. Nothing below will be current.`
+  if (profile.isPending) return t`Reading the database…`
 
   const games = num(profile.data.volume as Record<string, unknown>, 'games') ?? 0
-  if (games === 0) return 'Nothing imported yet. Start with a sync or a PGN.'
+  if (games === 0) return t`Nothing imported yet. Start with a sync or a PGN.`
   const blunders = numOr(total(phase.data), 'blunder')
-  if (!phase.data) return `${formatCount(games)} games in the database.`
-  return `${formatCount(games)} games in the database. ${formatCount(blunders)} blunder${
-    blunders === 1 ? '' : 's'
-  } on the record.`
+  const gameCount = formatCount(games)
+  if (!phase.data) return t`${gameCount} games in the database.`
+  const blunderCount = formatCount(blunders)
+  return t`${gameCount} games in the database. ${plural(blunders, {
+    one: `${blunderCount} blunder`,
+    other: `${blunderCount} blunders`,
+  })} on the record.`
 }
 
 export function DashboardPage() {
   const subtitle = useSubtitle()
+  const { t } = useLingui()
 
   return (
     <PageBody className="gap-[1.1875rem]">
-      <SetPageChrome breadcrumb={[{ label: 'Overview' }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Overview` }]} />
       <PageHeader
-        title="Overview"
+        title={t`Overview`}
         description={subtitle}
         actions={
           <div className="flex items-center gap-2">
@@ -62,7 +69,7 @@ export function DashboardPage() {
               to="/library/import"
               className="rounded-md border border-input bg-elevated px-2.5 py-[0.4375rem] text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
             >
-              Import PGN
+              <Trans>Import PGN</Trans>
             </Link>
             <SyncAllButton />
           </div>

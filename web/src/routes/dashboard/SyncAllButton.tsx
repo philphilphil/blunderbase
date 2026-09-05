@@ -8,6 +8,7 @@
  * username survives a reload. Nothing synced yet — nothing to press, so the button becomes
  * a link to the page that can connect an account.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -71,6 +72,7 @@ export function syncTargets(jobs: ImportJob[] | undefined): SyncTarget[] {
 }
 
 export function SyncAllButton() {
+  const { t } = useLingui()
   const jobs = useImportJobs({ limit: JOB_LIMIT })
   const progress = useImportProgress()
   const start = useStartImport()
@@ -95,7 +97,9 @@ export function SyncAllButton() {
     )
     const rejected = results.find((result) => result.status === 'rejected')
     setFailure(
-      rejected ? ((rejected.reason as Error | undefined)?.message ?? 'the sync did not start') : null,
+      rejected
+        ? ((rejected.reason as Error | undefined)?.message ?? t`the sync did not start`)
+        : null,
     )
     setPending(false)
   }
@@ -103,7 +107,7 @@ export function SyncAllButton() {
   if (!jobs.isPending && targets.length === 0) {
     return (
       <Link to="/library/import" className={BUTTON}>
-        Connect account
+        <Trans>Connect account</Trans>
       </Link>
     )
   }
@@ -134,7 +138,7 @@ export function SyncAllButton() {
         ) : (
           <RefreshCw className="size-3" aria-hidden />
         )}
-        {syncing ? 'Syncing' : 'Sync all'}
+        {syncing ? t`Syncing` : t`Sync all`}
       </button>
     </>
   )

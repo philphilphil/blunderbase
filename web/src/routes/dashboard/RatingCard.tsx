@@ -10,6 +10,9 @@
  * than by the API, and it is anchored on the newest rated game across every series so all
  * the charts are cut at the same instant.
  */
+import type { I18n, MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Check } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
 import { useEffect, useRef, useState } from 'react'
@@ -82,8 +85,21 @@ interface SpeedChart {
   lines: PlatformLine[]
 }
 
-function speedLabel(speed: string): string {
-  return speed.charAt(0).toUpperCase() + speed.slice(1)
+/**
+ * The five speeds the profile can carry. A speed the backend starts reporting that is not
+ * in here still gets a heading — its own name, capitalised — rather than nothing.
+ */
+const SPEED_LABELS: Record<string, MessageDescriptor> = {
+  bullet: msg`Bullet`,
+  blitz: msg`Blitz`,
+  rapid: msg`Rapid`,
+  classical: msg`Classical`,
+  correspondence: msg`Correspondence`,
+}
+
+function speedLabel(speed: string, i18n: I18n): string {
+  const label = SPEED_LABELS[speed]
+  return label ? i18n._(label) : speed.charAt(0).toUpperCase() + speed.slice(1)
 }
 
 /**
@@ -168,10 +184,13 @@ function SpeedGraph({
   /** The axis formatter the window calls for: days inside a quarter, months beyond it. */
   tick: (value: string) => string
 }) {
+  const { i18n } = useLingui()
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-[0.6875rem] font-medium text-soft">{speedLabel(chart.speed)}</span>
+        <span className="text-[0.6875rem] font-medium text-soft">
+          {speedLabel(chart.speed, i18n)}
+        </span>
         <div className="flex-1" />
         {chart.lines.map((line) => (
           <LegendSwatch key={line.platform} color={PLATFORM_COLOR[line.platform]}>
@@ -273,6 +292,7 @@ function SpeedsMenu({
 }) {
   const [open, setOpen] = useState(false)
   const container = useRef<HTMLDivElement>(null)
+  const { t, i18n } = useLingui()
 
   useEffect(() => {
     if (!open) return
@@ -299,7 +319,7 @@ function SpeedsMenu({
         onClick={() => setOpen((was) => !was)}
         className="flex items-center gap-1 rounded-md border border-edge px-1.5 py-0.5 text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
       >
-        speeds
+        <Trans>speeds</Trans>
         {charts.length !== allCharts.length ? (
           <span className="font-mono tabular text-dim-2">
             {charts.length}/{allCharts.length}
@@ -310,7 +330,7 @@ function SpeedsMenu({
       {open ? (
         <div
           role="menu"
-          aria-label="Speeds"
+          aria-label={t`Speeds`}
           className="bb-card absolute right-0 top-[calc(100%+0.4375rem)] z-40 flex w-[10rem] flex-col gap-0.5 p-1 shadow-[0_0.75rem_2rem_var(--bb-shadow)]"
         >
           {allCharts.map((chart) => {
@@ -321,12 +341,12 @@ function SpeedsMenu({
                 type="button"
                 role="menuitemcheckbox"
                 aria-checked={checked}
-                aria-label={speedLabel(chart.speed)}
+                aria-label={speedLabel(chart.speed, i18n)}
                 onClick={() => toggleHiddenSpeed(chart.speed)}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.6875rem] text-soft transition-colors hover:bg-raised hover:text-ink"
               >
                 <CheckboxGlyph checked={checked} />
-                <span className="flex-1 truncate">{speedLabel(chart.speed)}</span>
+                <span className="flex-1 truncate">{speedLabel(chart.speed, i18n)}</span>
                 <span className="font-mono tabular text-dim-2">{chart.games}</span>
               </button>
             )
@@ -338,6 +358,7 @@ function SpeedsMenu({
 }
 
 export function RatingCard() {
+  const { t } = useLingui()
   const profile = useProfile()
   const [windowKey, setWindowKey] = useState<WindowKey>('all')
   const hidden = useHiddenSpeeds()
@@ -350,6 +371,9 @@ export function RatingCard() {
   // a query key — the points are in hand and the cut is made in this render — so no memo.
   const anchor = anchorOf(newestPoint(playable))
   const range = windowRange(windowKey, anchor)
+  // Named, because it is what the empty state interpolates and the placeholder a
+  // translator sees is the identifier: "the last 90 days", "the 30 days to 7 Dec 2016".
+  const period = windowProse(windowKey, anchor)
 
   // The profile stamps points as `+00:00` and `windowRange` as `Z`, so the cut is made on
   // parsed time rather than on the strings.
@@ -363,13 +387,13 @@ export function RatingCard() {
           most of a phone's width — below `md` they wrap under the title rather than
           squeezing it. */}
       <SectionHead
-        title="Rating"
-        detail={windowProse(windowKey, anchor)}
+        title={t`Rating`}
+        detail={period}
         className="max-md:flex-wrap max-md:gap-y-2"
         end={
           <>
             <Segmented
-              label="Rating window"
+              label={t`Rating window`}
               value={windowKey}
               onChange={setWindowKey}
               options={DEFAULT_WINDOWS.map((key) => ({
@@ -395,13 +419,15 @@ export function RatingCard() {
         />
       ) : allCharts.length === 0 ? (
         <EmptyBlock className="h-[10.625rem] flex-none">
-          {playable.length === 0
-            ? 'No rated games yet, so there is no rating to plot.'
-            : `Not enough rated games in ${windowProse(windowKey, anchor)}. Widen the window.`}
+          {playable.length === 0 ? (
+            <Trans>No rated games yet, so there is no rating to plot.</Trans>
+          ) : (
+            <Trans>Not enough rated games in {period}. Widen the window.</Trans>
+          )}
         </EmptyBlock>
       ) : charts.length === 0 ? (
         <EmptyBlock className="h-[10.625rem] flex-none">
-          Every speed is hidden. Pick one in the speeds menu.
+          <Trans>Every speed is hidden. Pick one in the speeds menu.</Trans>
         </EmptyBlock>
       ) : (
         <div className="flex flex-col gap-3.5">

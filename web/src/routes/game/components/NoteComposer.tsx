@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
@@ -91,6 +92,7 @@ export function NoteComposer({
   onClose,
   className,
 }: NoteComposerProps) {
+  const { t } = useLingui()
   const [loaded, setLoaded] = useState<Loaded>(() => loadedFrom(note))
   const [text, setText] = useState(loaded.text)
   const [tags, setTags] = useState<string[]>(loaded.tags)
@@ -217,8 +219,8 @@ export function NoteComposer({
             save()
           }
         }}
-        placeholder="What is worth remembering about this position?"
-        aria-label="Note text"
+        placeholder={t`What is worth remembering about this position?`}
+        aria-label={t`Note text`}
         // The box is what gives way when the column is short: `min-h-0`, so what shrinks is
         // the writing and never the row under it, and no resize handle — the slot decides
         // the height now.
@@ -284,7 +286,9 @@ export function NoteComposer({
           {/* No "edit" either: a box that comes up already filled in says so by itself,
               and the delete button beside Save is only there for a note that exists. */}
           {target.line && editing === null ? (
-            <span className="text-brilliant">pins the line</span>
+            <span className="text-brilliant">
+              <Trans>pins the line</Trans>
+            </span>
           ) : null}
         </h2>
 
@@ -293,7 +297,7 @@ export function NoteComposer({
             key={tag}
             type="button"
             onClick={() => setTags((current) => current.filter((entry) => entry !== tag))}
-            title={`Remove “${tag}”`}
+            title={t`Remove “${tag}”`}
             className="flex items-center gap-1 rounded-sm border border-edge bg-chip-info px-1.5 py-0.5 font-mono text-[0.6875rem] text-soft hover:text-ink"
           >
             {tag}
@@ -314,8 +318,8 @@ export function NoteComposer({
             // Backspace on an empty box takes the last chip back, as a chip list should.
             if (event.key === 'Backspace' && draft === '') setTags((current) => current.slice(0, -1))
           }}
-          placeholder="tag…"
-          aria-label="Tags"
+          placeholder={t`tag…`}
+          aria-label={t`Tags`}
           className="h-6 w-24 min-w-[4rem] flex-1 rounded-md border border-input bg-raised px-2 font-mono text-[0.6875rem] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
         />
 
@@ -331,7 +335,7 @@ export function NoteComposer({
           )}
         >
           {pending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-          Save note
+          <Trans>Save note</Trans>
         </button>
         {/* ⌘↵ saves and Escape leaves the box; the box itself is always there, so there is
             no Cancel to press. */}
@@ -339,8 +343,8 @@ export function NoteComposer({
           <button
             type="button"
             onClick={() => onDelete(editing)}
-            aria-label="Delete this note"
-            title="Delete this note"
+            aria-label={t`Delete this note`}
+            title={t`Delete this note`}
             className="shrink-0 px-0.5 text-faint hover:text-blunder"
           >
             <Trash2 className="size-3.5" aria-hidden />

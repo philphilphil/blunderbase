@@ -23,6 +23,9 @@
  * visible on the board the moment the box is ticked, which is what this dialog is placed
  * beside. That reasoning stays here in the source, where it costs the reader nothing.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Settings2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -58,23 +61,23 @@ import { cn } from '@/lib/utils'
  * A dot and three words each. The sentence that used to follow every row said what the
  * board says better: tick the box and the arrow appears on the position in front of you.
  */
-const ARROWS = [
-  { key: 'engine' as const, label: 'Engine move', swatch: 'var(--bb-arrow-engine)' },
-  { key: 'maia' as const, label: 'Maia move', swatch: 'var(--bb-arrow-maia)' },
-  { key: 'played' as const, label: 'Played move', swatch: 'var(--bb-arrow-played)' },
+const ARROWS: { key: 'engine' | 'maia' | 'played'; label: MessageDescriptor; swatch: string }[] = [
+  { key: 'engine', label: msg`Engine move`, swatch: 'var(--bb-arrow-engine)' },
+  { key: 'maia', label: msg`Maia move`, swatch: 'var(--bb-arrow-maia)' },
+  { key: 'played', label: msg`Played move`, swatch: 'var(--bb-arrow-played)' },
 ]
 
 /** The two shapes the evaluation pane can draw. The option names are the explanation. */
-const GRAPH_STYLES: { value: EvalGraphStyle; label: string }[] = [
-  { value: 'bars', label: 'Bars — one per move' },
-  { value: 'area', label: 'Filled curve' },
+const GRAPH_STYLES: { value: EvalGraphStyle; label: MessageDescriptor }[] = [
+  { value: 'bars', label: msg`Bars — one per move` },
+  { value: 'area', label: msg`Filled curve` },
 ]
 
 /** What a flagged move is marked with, quietest first. */
-const GRAPH_MARKS: { value: EvalGraphMarks; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'dots', label: 'Dots' },
-  { value: 'glyphs', label: 'Glyphs' },
+const GRAPH_MARKS: { value: EvalGraphMarks; label: MessageDescriptor }[] = [
+  { value: 'none', label: msg`None` },
+  { value: 'dots', label: msg`Dots` },
+  { value: 'glyphs', label: msg`Glyphs` },
 ]
 
 /**
@@ -87,6 +90,7 @@ const GRAPH_MARKS: { value: EvalGraphMarks; label: string }[] = [
 export const BOARD_SETTINGS_ID = 'board-settings-button'
 
 export function BoardSettingsButton({ className }: { className?: string }) {
+  const { t, i18n } = useLingui()
   const [open, setOpen] = useState(false)
   const arrows = useBoardArrowPrefs()
   const sound = useMoveSoundPrefs()
@@ -132,8 +136,8 @@ export function BoardSettingsButton({ className }: { className?: string }) {
         type="button"
         id={BOARD_SETTINGS_ID}
         data-tour="board-settings"
-        aria-label="Board settings"
-        title="Board settings — arrows, sound, the eval graph and line preview (S)"
+        aria-label={t`Board settings`}
+        title={t`Board settings — arrows, sound, the eval graph and line preview (S)`}
         onClick={() => setOpen(true)}
         className={cn(
           'flex-none rounded-md border border-edge bg-elevated px-2 py-[0.3125rem] text-dim transition-colors hover:text-ink max-md:py-1.5',
@@ -157,15 +161,17 @@ export function BoardSettingsButton({ className }: { className?: string }) {
             <header className="flex items-start gap-3 border-b border-hairline px-4 py-3.5">
               <div className="flex flex-1 flex-col gap-1">
                 <h2 id="board-settings-title" className="text-sm font-semibold text-ink">
-                  Board
+                  <Trans>Board</Trans>
                 </h2>
-                <p className="text-[0.6875rem] text-dim">This browser only.</p>
+                <p className="text-[0.6875rem] text-dim">
+                  <Trans>This browser only.</Trans>
+                </p>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Close"
+                aria-label={t`Close`}
                 onClick={() => setOpen(false)}
               >
                 <X aria-hidden />
@@ -174,9 +180,11 @@ export function BoardSettingsButton({ className }: { className?: string }) {
 
             <section className="flex flex-col gap-3 px-4 py-4">
               <div className="flex flex-col gap-0.5">
-                <h3 className="text-[0.75rem] font-semibold text-ink">Arrows</h3>
+                <h3 className="text-[0.75rem] font-semibold text-ink">
+                  <Trans>Arrows</Trans>
+                </h3>
                 <p className="text-[0.6875rem] text-dim">
-                  Drawn on the position the board is showing.
+                  <Trans>Drawn on the position the board is showing.</Trans>
                 </p>
               </div>
               {/* One wrapping line now that the sentences are gone: three switches, read
@@ -191,7 +199,7 @@ export function BoardSettingsButton({ className }: { className?: string }) {
                     />
                     <SettingsCheck
                       id={`board-arrow-${arrow.key}`}
-                      label={arrow.label}
+                      label={i18n._(arrow.label)}
                       checked={arrows[arrow.key]}
                       onChange={(on) => setBoardArrowPrefs({ [arrow.key]: on })}
                     />
@@ -208,13 +216,17 @@ export function BoardSettingsButton({ className }: { className?: string }) {
                 anyone has ever set a volume. */}
             <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
               <div className="flex flex-col gap-0.5">
-                <h3 className="text-[0.75rem] font-semibold text-ink">Sound</h3>
-                <p className="text-[0.6875rem] text-dim">A click as each move lands.</p>
+                <h3 className="text-[0.75rem] font-semibold text-ink">
+                  <Trans>Sound</Trans>
+                </h3>
+                <p className="text-[0.6875rem] text-dim">
+                  <Trans>A click as each move lands.</Trans>
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <SettingsCheck
                   id="board-sound-enabled"
-                  label="Move sounds"
+                  label={t`Move sounds`}
                   checked={sound.enabled}
                   onChange={(on) => {
                     setMoveSoundPrefs({ enabled: on })
@@ -224,7 +236,7 @@ export function BoardSettingsButton({ className }: { className?: string }) {
                 />
                 <Range
                   id="board-sound-volume"
-                  label="Level"
+                  label={t`Level`}
                   value={sound.volume}
                   min={0}
                   max={100}
@@ -240,13 +252,15 @@ export function BoardSettingsButton({ className }: { className?: string }) {
             </section>
 
             <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
-              <h3 className="text-[0.75rem] font-semibold text-ink">Evaluation graph</h3>
+              <h3 className="text-[0.75rem] font-semibold text-ink">
+                <Trans>Evaluation graph</Trans>
+              </h3>
               {/* Two fields on their own line under the heading, each named by its own
                   label — the section title cannot label two controls, and a word over a
                   select is shorter than a sentence beside it. */}
               <div className="flex flex-wrap gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="eval-graph-style">Shape</Label>
+                  <Label htmlFor="eval-graph-style">{t`Shape`}</Label>
                   <select
                     id="eval-graph-style"
                     value={graph.style}
@@ -257,13 +271,13 @@ export function BoardSettingsButton({ className }: { className?: string }) {
                   >
                     {GRAPH_STYLES.map((style) => (
                       <option key={style.value} value={style.value}>
-                        {style.label}
+                        {i18n._(style.label)}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="eval-graph-marks">Marks</Label>
+                  <Label htmlFor="eval-graph-marks">{t`Marks`}</Label>
                   <select
                     id="eval-graph-marks"
                     value={graph.marks}
@@ -274,7 +288,7 @@ export function BoardSettingsButton({ className }: { className?: string }) {
                   >
                     {GRAPH_MARKS.map((mark) => (
                       <option key={mark.value} value={mark.value}>
-                        {mark.label}
+                        {i18n._(mark.label)}
                       </option>
                     ))}
                   </select>
@@ -284,9 +298,11 @@ export function BoardSettingsButton({ className }: { className?: string }) {
 
             <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
               <div className="flex flex-col gap-0.5">
-                <h3 className="text-[0.75rem] font-semibold text-ink">Line preview</h3>
+                <h3 className="text-[0.75rem] font-semibold text-ink">
+                  <Trans>Line preview</Trans>
+                </h3>
                 <p className="text-[0.6875rem] text-dim">
-                  What pointing at an engine line does to the board.
+                  <Trans>What pointing at an engine line does to the board.</Trans>
                 </p>
               </div>
               <LinePreviewFields />

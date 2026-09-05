@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, Square } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -10,12 +13,18 @@ import type { SourceProgress } from './useImportProgress'
 /** How many per-game failures the inline block shows before it defers to the history. */
 const SHOWN_FAILURES = 4
 
-function label(progress: SourceProgress, stopping: boolean): { text: string; tone: string } {
-  if (progress.running) return { text: stopping ? 'Stopping' : 'Syncing', tone: 'text-soft' }
-  if (progress.status === 'failed') return { text: 'Sync failed', tone: 'text-blunder' }
-  if (progress.status === 'cancelled') return { text: 'Stopped', tone: 'text-mistake' }
-  if (progress.failed > 0) return { text: `Finished — ${progress.failed} failed`, tone: 'text-mistake' }
-  return { text: 'Finished', tone: 'text-good' }
+function label(
+  progress: SourceProgress,
+  stopping: boolean,
+): { text: MessageDescriptor; tone: string } {
+  if (progress.running) {
+    return { text: stopping ? msg`Stopping` : msg`Syncing`, tone: 'text-soft' }
+  }
+  if (progress.status === 'failed') return { text: msg`Sync failed`, tone: 'text-blunder' }
+  if (progress.status === 'cancelled') return { text: msg`Stopped`, tone: 'text-mistake' }
+  const failed = progress.failed
+  if (failed > 0) return { text: msg`Finished — ${failed} failed`, tone: 'text-mistake' }
+  return { text: msg`Finished`, tone: 'text-good' }
 }
 
 /**
@@ -53,6 +62,7 @@ export function JobProgress({
   progress: SourceProgress
   className?: string
 }) {
+  const { t, i18n } = useLingui()
   const cancel = useCancelImport()
   const jobId = progress.jobId
   // The request returns long before the loop notices, so the mutation's own state is what
@@ -71,13 +81,16 @@ export function JobProgress({
           ? 'bg-accent-teal'
           : 'bg-good'
   const extra = progress.failures.length - SHOWN_FAILURES
+  const { imported, skipped, blocked, failed } = progress
 
   return (
     <div className={cn('flex flex-col gap-2 border-t border-hairline pt-2.5', className)}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className={cn('text-[0.6875rem]', tone)}>{text}</span>
+        <span className={cn('text-[0.6875rem]', tone)}>{i18n._(text)}</span>
         {jobId !== null ? (
-          <span className="font-mono text-[0.625rem] text-faint">job {jobId}</span>
+          <span className="font-mono text-[0.625rem] text-faint">
+            <Trans>job {jobId}</Trans>
+          </span>
         ) : null}
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] text-ink tabular">
@@ -89,11 +102,11 @@ export function JobProgress({
             size="sm"
             variant="outline"
             disabled={stopping}
-            title="Stop after the game it is on. Everything imported so far stays, and running the import again picks up from there."
+            title={t`Stop after the game it is on. Everything imported so far stays, and running the import again picks up from there.`}
             onClick={() => cancel.mutate(jobId)}
           >
             {stopping ? <Loader2 className="animate-spin" aria-hidden /> : <Square aria-hidden />}
-            {stopping ? 'Stopping' : 'Stop'}
+            {stopping ? t`Stopping` : t`Stop`}
           </Button>
         ) : null}
       </div>
@@ -109,15 +122,21 @@ export function JobProgress({
       />
 
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-[0.65625rem] text-dim tabular">
-        <span className="text-soft">{progress.imported} imported</span>
-        <span>{progress.skipped} skipped</span>
+        <span className="text-soft">
+          <Trans>{imported} imported</Trans>
+        </span>
+        <span>
+          <Trans>{skipped} skipped</Trans>
+        </span>
         {/* Only when there are any: on the ordinary sync this line is already four numbers
             long, and a permanent "0 previously deleted" would be the loudest of them. */}
-        {progress.blocked > 0 ? (
-          <span className="text-mistake">{progress.blocked} previously deleted</span>
+        {blocked > 0 ? (
+          <span className="text-mistake">
+            <Trans>{blocked} previously deleted</Trans>
+          </span>
         ) : null}
-        <span className={progress.failed > 0 ? 'text-blunder' : undefined}>
-          {progress.failed} failed
+        <span className={failed > 0 ? 'text-blunder' : undefined}>
+          <Trans>{failed} failed</Trans>
         </span>
       </div>
 
@@ -138,7 +157,9 @@ export function JobProgress({
             </li>
           ))}
           {extra > 0 ? (
-            <li className="text-[0.65625rem] text-dim">and {extra} more — see the sync history</li>
+            <li className="text-[0.65625rem] text-dim">
+              <Trans>and {extra} more — see the sync history</Trans>
+            </li>
           ) : null}
         </ul>
       ) : null}

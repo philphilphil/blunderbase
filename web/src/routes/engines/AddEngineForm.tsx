@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { useMutation } from '@tanstack/react-query'
 import { Check, Loader2, Plus, Search } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
@@ -29,6 +30,7 @@ export function AddEngineForm({
   onAdded: (engine: EngineResponse) => void
   onCancel: () => void
 }) {
+  const { t } = useLingui()
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [kind, setKind] = useState<EngineKind>('uci')
@@ -45,7 +47,7 @@ export function AddEngineForm({
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim() || !path.trim()) {
-      setInvalid('an engine needs a name and a path')
+      setInvalid(t`an engine needs a name and a path`)
       return
     }
     setInvalid(null)
@@ -60,19 +62,23 @@ export function AddEngineForm({
       className="flex flex-col gap-3 rounded-xl border border-line bg-panel px-3.5 py-3.5"
     >
       <div className="flex items-center gap-2.5">
-        <span className="text-xs font-semibold text-ink">Add an engine</span>
+        <span className="text-xs font-semibold text-ink">
+          <Trans>Add an engine</Trans>
+        </span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={onCancel}
           className="text-[0.6875rem] text-dim transition-colors hover:text-ink"
         >
-          Cancel
+          <Trans>Cancel</Trans>
         </button>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="add-engine-path">Path</Label>
+        <Label htmlFor="add-engine-path">
+          <Trans>Path</Trans>
+        </Label>
         <div className="flex gap-2">
           <Input
             id="add-engine-path"
@@ -93,14 +99,16 @@ export function AddEngineForm({
             onClick={() => probe.mutate()}
           >
             {probe.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Search aria-hidden />}
-            Probe
+            <Trans>Probe</Trans>
           </Button>
         </div>
       </div>
 
       {probe.isError ? (
         <div className="rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-          <p className="text-[0.75rem] text-blunder">That binary could not be started.</p>
+          <p className="text-[0.75rem] text-blunder">
+            <Trans>That binary could not be started.</Trans>
+          </p>
           <p className="mt-1 font-mono text-[0.6875rem] leading-[1.5] text-blunder/80">
             {probe.error.message}
           </p>
@@ -111,17 +119,19 @@ export function AddEngineForm({
         <div className="flex items-center gap-2.5 rounded-md border border-good/30 bg-good/8 px-3 py-2">
           <Check className="size-3.5 flex-none text-good" aria-hidden />
           <span className="min-w-0 flex-1 truncate font-mono text-[0.71875rem] text-good">
-            {probe.data.name ?? 'unnamed engine'}
+            {probe.data.name ?? t`unnamed engine`}
           </span>
           <span className="font-mono text-[0.65625rem] text-good/70 tabular">
-            {declared} option{declared === 1 ? '' : 's'}
+            <Plural value={declared} one="# option" other="# options" />
           </span>
         </div>
       ) : null}
 
       <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_11.25rem]">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="add-engine-name">Name</Label>
+          <Label htmlFor="add-engine-name">
+            <Trans>Name</Trans>
+          </Label>
           <Input
             id="add-engine-name"
             value={name}
@@ -131,15 +141,17 @@ export function AddEngineForm({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="add-engine-kind">Kind</Label>
+          <Label htmlFor="add-engine-kind">
+            <Trans>Kind</Trans>
+          </Label>
           <select
             id="add-engine-kind"
             value={kind}
             onChange={(event) => setKind(event.target.value as EngineKind)}
             className="h-8 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors focus-visible:border-accent-teal/50"
           >
-            <option value="uci">Normal engine</option>
-            <option value="maia">Human moves (Maia)</option>
+            <option value="uci">{t`Normal engine`}</option>
+            <option value="maia">{t`Human moves (Maia)`}</option>
           </select>
         </div>
       </div>
@@ -149,12 +161,14 @@ export function AddEngineForm({
 
       <div className="flex items-center gap-2">
         <p className="flex-1 text-[0.6875rem] text-dim">
-          A Maia model is a network behind an lc0-style binary — give the command line as
-          the path.
+          <Trans>
+            A Maia model is a network behind an lc0-style binary — give the command line as the
+            path.
+          </Trans>
         </p>
         <Button type="submit" size="sm" disabled={add.isPending}>
           {add.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
-          Add engine
+          <Trans>Add engine</Trans>
         </Button>
       </div>
     </form>

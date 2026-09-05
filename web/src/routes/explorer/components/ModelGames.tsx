@@ -16,6 +16,7 @@
  * outcome-for-the-owner here, so it is the two players with their ratings, the result, the
  * year, and (lichess only) the time control.
  */
+import { Trans } from '@lingui/react/macro'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { Skeleton } from '@/components/ui/skeleton'
@@ -50,11 +51,15 @@ export function ModelGames({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 max-md:flex-none">
       <div className="flex items-baseline gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">Model games</span>
+        <span className="text-[0.75rem] font-semibold text-ink">
+          <Trans>Model games</Trans>
+        </span>
         <span className="text-[0.6875rem] text-dim">
-          {source === 'masters'
-            ? 'from the masters database'
-            : 'top-rated and recent rated lichess games'}
+          {source === 'masters' ? (
+            <Trans>from the masters database</Trans>
+          ) : (
+            <Trans>top-rated and recent rated lichess games</Trans>
+          )}
         </span>
       </div>
 
@@ -66,7 +71,7 @@ export function ModelGames({
         </div>
       ) : games.length === 0 ? (
         <p className="rounded-[0.3125rem] border border-dashed border-edge-strong px-3 py-5 text-center text-[0.75rem] text-dim">
-          This database has no game to show from here.
+          <Trans>This database has no game to show from here.</Trans>
         </p>
       ) : (
         <div className="flex min-h-0 flex-col overflow-y-auto font-mono text-[0.71875rem] tabular max-md:overflow-visible">

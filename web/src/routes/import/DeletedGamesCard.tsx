@@ -15,6 +15,7 @@
  * Collapsed by default and absent entirely on a library that has deleted nothing: this is a
  * record to consult, not a thing to read every time the page opens.
  */
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronRight, Loader2, Undo2 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -30,12 +31,15 @@ import { stamp } from './format'
 const SHOWN = 25
 
 export function DeletedGamesCard() {
+  const { t } = useLingui()
   const [open, setOpen] = useState(false)
   const deleted = useDeletedGames({ limit: SHOWN })
   const forget = useForgetDeletions()
   const total = deleted.data?.total ?? 0
   const rows = deleted.data?.games ?? []
   const pending = forget.isPending ? forget.variables : undefined
+  const count = total.toLocaleString('en-US')
+  const rest = (total - rows.length).toLocaleString('en-US')
 
   // Nothing deleted, nothing to explain. The card appears with the first deletion.
   if (total === 0) return null
@@ -45,13 +49,18 @@ export function DeletedGamesCard() {
       <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
         <Undo2 className="size-4 text-faint" aria-hidden />
         <div className="min-w-56 flex-1">
-          <h2 className="text-xs font-semibold text-ink">Deleted games</h2>
+          <h2 className="text-xs font-semibold text-ink">
+            <Trans>Deleted games</Trans>
+          </h2>
+          {/* One message per number rather than four singular/plural switches inside one
+              sentence: "it" and "them" agree with the count in ways no other language
+              agrees in the same places. */}
           <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
-            {total === 1 ? 'One game is' : `${total.toLocaleString('en-US')} games are`} on
-            record as deleted, so importing {total === 1 ? 'it' : 'them'} again is refused —
-            otherwise the next sync would put {total === 1 ? 'it' : 'them'} straight back.
-            Forgetting a row lets the next import store that game again, with no analysis and
-            no notes.
+            <Plural
+              value={total}
+              one="One game is on record as deleted, so importing it again is refused — otherwise the next sync would put it straight back. Forgetting a row lets the next import store that game again, with no analysis and no notes."
+              other={`${count} games are on record as deleted, so importing them again is refused — otherwise the next sync would put them straight back. Forgetting a row lets the next import store that game again, with no analysis and no notes.`}
+            />
           </p>
           {forget.isError ? (
             <p role="alert" className="mt-1 text-[0.6875rem] text-blunder">
@@ -67,7 +76,7 @@ export function DeletedGamesCard() {
           onClick={() => setOpen((current) => !current)}
         >
           {open ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
-          {open ? 'Hide' : 'Show'} list
+          {open ? t`Hide list` : t`Show list`}
         </Button>
         <Button
           type="button"
@@ -79,14 +88,16 @@ export function DeletedGamesCard() {
           {forget.isPending && pending === undefined ? (
             <Loader2 className="animate-spin" aria-hidden />
           ) : null}
-          Forget all
+          <Trans>Forget all</Trans>
         </Button>
       </div>
 
       {open ? (
         <ul className="flex flex-col border-t border-hairline">
           {deleted.isPending ? (
-            <li className="px-4 py-3 text-[0.6875rem] text-dim">Reading the record…</li>
+            <li className="px-4 py-3 text-[0.6875rem] text-dim">
+              <Trans>Reading the record…</Trans>
+            </li>
           ) : null}
           {rows.map((row) => (
             <Row
@@ -98,8 +109,7 @@ export function DeletedGamesCard() {
           ))}
           {total > rows.length ? (
             <li className="px-4 py-2 text-[0.6875rem] text-dim">
-              and {(total - rows.length).toLocaleString('en-US')} more — “Forget all” covers
-              every one of them.
+              <Trans>and {rest} more — “Forget all” covers every one of them.</Trans>
             </li>
           ) : null}
         </ul>
@@ -122,6 +132,10 @@ function Row({
   busy: boolean
   onForget: () => void
 }) {
+  const { t } = useLingui()
+  const white = row.white_name
+  const black = row.black_name
+  const when = stamp(row.deleted_at)
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline px-4 py-2 last:border-b-0">
       <SourceBadge source={row.source} size="sm" />
@@ -135,13 +149,15 @@ function Row({
         {row.source_id ?? `${row.dedup_hash.slice(0, 12)}…`}
       </span>
       <span className="min-w-40 flex-1 truncate text-[0.71875rem] text-body">
-        {row.white_name} vs {row.black_name}
+        <Trans>
+          {white} vs {black}
+        </Trans>
       </span>
       <span className="font-mono text-[0.6875rem] text-dim tabular">
         {row.played_at ? stamp(row.played_at) : '—'}
       </span>
       <span className="font-mono text-[0.65625rem] text-faint tabular">
-        deleted {stamp(row.deleted_at)}
+        <Trans>deleted {when}</Trans>
       </span>
       <Button
         type="button"
@@ -149,10 +165,10 @@ function Row({
         size="sm"
         disabled={busy}
         onClick={onForget}
-        aria-label={`Forget the deletion of ${row.white_name} vs ${row.black_name}`}
+        aria-label={t`Forget the deletion of ${white} vs ${black}`}
       >
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
-        Forget
+        <Trans>Forget</Trans>
       </Button>
     </li>
   )

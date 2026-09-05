@@ -14,6 +14,8 @@
  * A game carries no FEN per ply either, so the move list is replayed once with chessops
  * to get a position for every ply.
  */
+import { i18n, type MessageDescriptor } from '@lingui/core'
+import { msg, t } from '@lingui/core/macro'
 import { Chess, normalizeMove } from 'chessops/chess'
 import { makeFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
@@ -33,6 +35,7 @@ import type {
 import { isFlagged } from '@/lib/chess/classification'
 import { winPercent, type Score } from '@/lib/chess/evaluation'
 import { formatClock } from '@/lib/chess/timeControl'
+import { dateLocale } from '@/lib/i18n/locale'
 
 export type Side = 'white' | 'black'
 
@@ -146,9 +149,27 @@ export function formatResult(result: string | null | undefined): string {
   return result.replace('-', '–')
 }
 
+/**
+ * The five speeds the sources report, as words rather than as the API's own lowercase
+ * keys. A speed outside the list is title-cased and shown as it arrived, which is the
+ * only honest thing to do with a name this app has never heard of.
+ */
+const SPEED_LABELS: Record<string, MessageDescriptor> = {
+  bullet: msg`Bullet`,
+  blitz: msg`Blitz`,
+  rapid: msg`Rapid`,
+  classical: msg`Classical`,
+  correspondence: msg`Correspondence`,
+}
+
 /** `Rapid 10+0`, or whatever the source gave us of it. */
 export function formatTimeControl(game: GameSummary): string | null {
-  const speed = game.speed ? game.speed[0].toUpperCase() + game.speed.slice(1) : null
+  const label = game.speed ? SPEED_LABELS[game.speed] : undefined
+  const speed = !game.speed
+    ? null
+    : label
+      ? i18n._(label)
+      : game.speed[0].toUpperCase() + game.speed.slice(1)
   const clock = game.time_control ? formatClock(game.time_control) : null
   if (speed && clock) return `${speed} ${clock}`
   return speed ?? clock
@@ -156,10 +177,14 @@ export function formatTimeControl(game: GameSummary): string | null {
 
 /** `22 Aug 2026` — the breadcrumb and header date format. */
 export function formatGameDate(played: string | null | undefined): string {
-  if (!played) return 'undated'
+  if (!played) return t`undated`
   const value = new Date(played)
-  if (Number.isNaN(value.getTime())) return 'undated'
-  return value.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  if (Number.isNaN(value.getTime())) return t`undated`
+  return value.toLocaleDateString(dateLocale(), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 // --- evaluations ----------------------------------------------------------

@@ -1,3 +1,4 @@
+import { useLingui } from '@lingui/react/macro'
 import { useEffect, useRef } from 'react'
 
 import { useEventListener } from '@/lib/events/EventsProvider'
@@ -11,6 +12,7 @@ import { hasNativeBridge, sendNativeNotification, setNativeProgress } from './na
 
 /** OS notifications and Dock/taskbar progress for work that outlives the current page. */
 export function NativeFeedback() {
+  const { t } = useLingui()
   const clearProgress = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeImports = useRef(0)
   const activeAnalyses = useRef(new Map<number, { done: number; total: number | null }>())
@@ -54,13 +56,19 @@ export function NativeFeedback() {
       finished.current = { done: 0, failed: 0 }
       notificationTimer.current = null
       const total = counts.done + counts.failed
-      const title = counts.failed > 0 ? 'Analysis finished with errors' : 'Analysis complete'
+      const done = counts.done
+      const failed = counts.failed
+      const title = failed > 0 ? t`Analysis finished with errors` : t`Analysis complete`
+      // Two whole sentences for the many case rather than a clause appended to one: the
+      // failure count is part of what is being said, not a suffix.
       const body =
         total === 1
-          ? counts.failed
-            ? 'One analysis failed. Open Blunderbase for details.'
-            : 'One game is ready to review.'
-          : `${counts.done} completed${counts.failed ? `, ${counts.failed} failed` : ''}.`
+          ? failed
+            ? t`One analysis failed. Open Blunderbase for details.`
+            : t`One game is ready to review.`
+          : failed
+            ? t`${done} completed, ${failed} failed.`
+            : t`${done} completed.`
       void sendNativeNotification(title, body)
     }, 1_200)
   }
@@ -76,10 +84,12 @@ export function NativeFeedback() {
     if (!document.hidden) return
     const failed = finishedImport.status === 'failed'
     const stopped = finishedImport.status === 'cancelled'
-    const counted = `${finishedImport.imported} imported, ${finishedImport.skipped} already in the Library.`
+    const imported = finishedImport.imported
+    const skipped = finishedImport.skipped
+    const counted = t`${imported} imported, ${skipped} already in the Library.`
     void sendNativeNotification(
-      failed ? 'Import failed' : stopped ? 'Import stopped' : 'Import complete',
-      failed ? finishedImport.message || 'Open Blunderbase for details.' : counted,
+      failed ? t`Import failed` : stopped ? t`Import stopped` : t`Import complete`,
+      failed ? finishedImport.message || t`Open Blunderbase for details.` : counted,
     )
   })
   useEventListener('analysis.running', (event) => {

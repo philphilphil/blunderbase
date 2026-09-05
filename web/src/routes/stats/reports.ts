@@ -12,20 +12,31 @@
  * card but gives no report of its own. A report that answered nothing would be a dead row
  * in the rail.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+
 export type ReportKey = 'overview' | 'blunders' | 'clock' | 'progress'
 
 export interface Report {
   key: ReportKey
-  label: string
+  label: MessageDescriptor
   /** The sentence under the page title while this report is open. */
-  hint: string
+  hint: MessageDescriptor
 }
 
 export const REPORTS: Report[] = [
-  { key: 'overview', label: 'Overview', hint: 'phase, time control, time trouble, progress' },
-  { key: 'blunders', label: 'Blunder taxonomy', hint: 'where they happen and what moves them' },
-  { key: 'clock', label: 'Clock behaviour', hint: 'time trouble and time of day' },
-  { key: 'progress', label: 'Progress', hint: 'rating over the window' },
+  {
+    key: 'overview',
+    label: msg`Overview`,
+    hint: msg`phase, time control, time trouble, progress`,
+  },
+  {
+    key: 'blunders',
+    label: msg`Blunder taxonomy`,
+    hint: msg`where they happen and what moves them`,
+  },
+  { key: 'clock', label: msg`Clock behaviour`, hint: msg`time trouble and time of day` },
+  { key: 'progress', label: msg`Progress`, hint: msg`rating over the window` },
 ]
 
 export const DEFAULT_REPORT: ReportKey = 'overview'

@@ -1,3 +1,4 @@
+import { useLingui } from '@lingui/react/macro'
 import { Check, Copy } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
@@ -10,7 +11,11 @@ import { Button } from '@/components/ui/button'
  * self-hosted Blunderbase on a LAN often is. Saying so keeps the button from being a
  * no-op; the text it copies is selectable either way.
  */
-export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
+export function CopyButton({ text, label }: { text: string; label?: string }) {
+  const { t } = useLingui()
+  // Resolved here rather than as a default parameter: a default is evaluated before the
+  // component body runs, which is before `useLingui` has handed anything back.
+  const resting = label ?? t`Copy`
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -32,7 +37,7 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
   return (
     <Button type="button" variant="secondary" size="sm" onClick={() => void copy()}>
       {state === 'copied' ? <Check aria-hidden /> : <Copy aria-hidden />}
-      {state === 'copied' ? 'Copied' : state === 'failed' ? 'No clipboard' : label}
+      {state === 'copied' ? t`Copied` : state === 'failed' ? t`No clipboard` : resting}
     </Button>
   )
 }

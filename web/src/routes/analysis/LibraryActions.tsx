@@ -1,3 +1,6 @@
+import type { I18n } from '@lingui/core'
+import { msg, plural } from '@lingui/core/macro'
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, ListX, Microscope, Wand2, Zap } from 'lucide-react'
 import { type ComponentType, type ReactNode } from 'react'
 
@@ -28,15 +31,15 @@ import { estimateLabel } from './estimate'
  * the app has no reason to hide itself while a pass drains.
  */
 
-/** A count with the noun it counts, so no sentence has to say "1 games". */
-function plural(count: number, one: string, many = `${one}s`): string {
-  return `${formatCount(count)} ${count === 1 ? one : many}`
-}
-
-function remainingEstimate(seconds: number | null, concurrency: number, pending: number) {
+function remainingEstimate(
+  seconds: number | null,
+  concurrency: number,
+  pending: number,
+  i18n: I18n,
+) {
   if (seconds === 0) return null
   const label = estimateLabel(seconds, concurrency)
-  return label && pending === 0 ? `${label} remaining` : label
+  return label && pending === 0 ? i18n._(msg`${label} remaining`) : label
 }
 
 function ActionCard({
@@ -93,29 +96,44 @@ function BackfillCard({
   seconds: number | null
   concurrency: number
 }) {
+  const { i18n, t } = useLingui()
   // One mutation per card, so the quick card's receipt is never the deep card's.
   const start = useStartBackfill()
   const receipt = start.data ?? null
   const deep = tier === 'deep'
+  // Named locals: the identifier is what a translator sees as the placeholder.
+  const waiting = formatCount(pending)
+  const queued = formatCount(receipt?.queued ?? 0)
+  const outstanding = formatCount(receipt?.outstanding ?? 0)
 
   return (
     <ActionCard
       icon={deep ? Microscope : Zap}
-      title={deep ? 'Backfill deep' : 'Backfill quick'}
+      title={deep ? t`Backfill deep` : t`Backfill quick`}
       blurb={
         deep
-          ? 'A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass.'
-          : 'The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off.'
+          ? t`A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass.`
+          : t`The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off.`
       }
-      figure={pending === 0 ? 'nothing to queue' : plural(pending, 'game')}
-      estimate={remainingEstimate(seconds, concurrency, pending)}
+      figure={
+        pending === 0
+          ? t`nothing to queue`
+          : t`${waiting} ${plural(pending, { one: 'game', other: 'games' })}`
+      }
+      estimate={remainingEstimate(seconds, concurrency, pending, i18n)}
       footer={
         <>
           {receipt ? (
             <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
               {receipt.queued === 0
-                ? 'Nothing to queue — every game already has a pass of this tier.'
-                : `Queued ${plural(receipt.queued, 'game')}; ${plural(receipt.outstanding, 'run')} outstanding at this tier.`}
+                ? t`Nothing to queue — every game already has a pass of this tier.`
+                : t`Queued ${queued} ${plural(receipt.queued, {
+                    one: 'game',
+                    other: 'games',
+                  })}; ${outstanding} ${plural(receipt.outstanding, {
+                    one: 'run',
+                    other: 'runs',
+                  })} outstanding at this tier.`}
             </p>
           ) : null}
           {start.isError ? (
@@ -140,7 +158,7 @@ function BackfillCard({
         ) : (
           <Zap aria-hidden />
         )}
-        {deep ? 'Backfill deep' : 'Backfill quick'}
+        {deep ? <Trans>Backfill deep</Trans> : <Trans>Backfill quick</Trans>}
       </Button>
     </ActionCard>
   )
@@ -159,23 +177,38 @@ function MaiaFillCard({
   seconds: number | null
   concurrency: number
 }) {
+  const { i18n, t } = useLingui()
   const fill = useMaiaFill()
   const receipt = fill.data ?? null
+  // Named locals: the identifier is what a translator sees as the placeholder.
+  const waiting = formatCount(missing)
+  const queued = formatCount(receipt?.queued ?? 0)
+  const complete = formatCount(receipt?.already_complete ?? 0)
 
   return (
     <ActionCard
       icon={Wand2}
-      title="Fill missing Maia levels"
-      blurb="Adds the configured levels to games that already have a pass. Maia-only — nothing is searched again — so it costs minutes where a re-analysis would cost the weekend."
-      figure={missing === 0 ? 'nothing to queue' : plural(missing, 'game')}
-      estimate={remainingEstimate(seconds, concurrency, missing)}
+      title={t`Fill missing Maia levels`}
+      blurb={t`Adds the configured levels to games that already have a pass. Maia-only — nothing is searched again — so it costs minutes where a re-analysis would cost the weekend.`}
+      figure={
+        missing === 0
+          ? t`nothing to queue`
+          : t`${waiting} ${plural(missing, { one: 'game', other: 'games' })}`
+      }
+      estimate={remainingEstimate(seconds, concurrency, missing, i18n)}
       footer={
         <>
           {receipt ? (
             <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
               {receipt.queued === 0
-                ? 'Nothing to queue — every analysed game already has every level.'
-                : `Queued ${plural(receipt.queued, 'game')}; ${plural(receipt.already_complete, 'game')} already complete.`}
+                ? t`Nothing to queue — every analysed game already has every level.`
+                : t`Queued ${queued} ${plural(receipt.queued, {
+                    one: 'game',
+                    other: 'games',
+                  })}; ${complete} ${plural(receipt.already_complete, {
+                    one: 'game',
+                    other: 'games',
+                  })} already complete.`}
             </p>
           ) : null}
           {fill.isError ? (
@@ -194,7 +227,7 @@ function MaiaFillCard({
         onClick={() => fill.mutate(undefined)}
       >
         {fill.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Wand2 aria-hidden />}
-        Fill missing levels
+        <Trans>Fill missing levels</Trans>
       </Button>
     </ActionCard>
   )
@@ -208,24 +241,40 @@ function MaiaFillCard({
  * the buttons that fill the queue are, and it says what it dropped afterwards.
  */
 function ClearQueueCard() {
+  const { t } = useLingui()
   const queue = useQueueStatus()
   const clear = useClearQueue()
   const queued = queue.data?.queued ?? 0
   const running = queue.data?.running ?? 0
   const receipt = clear.data ?? null
+  // Named locals: the identifier is what a translator sees as the placeholder.
+  const waiting = formatCount(queued)
+  const onEngine = formatCount(running)
+  const dropped = formatCount(receipt?.dropped ?? 0)
+  const outstanding = formatCount(receipt?.outstanding ?? 0)
 
   return (
     <ActionCard
       icon={ListX}
-      title="Clear the queue"
-      blurb="Drops everything still queued, whatever tier or shape it is queued in. Runs already on an engine are left to finish, and no game loses the analysis it already has."
-      figure={queued === 0 ? 'nothing queued' : `${plural(queued, 'run')} queued`}
-      estimate={running > 0 ? `${formatCount(running)} running` : null}
+      title={t`Clear the queue`}
+      blurb={t`Drops everything still queued, whatever tier or shape it is queued in. Runs already on an engine are left to finish, and no game loses the analysis it already has.`}
+      figure={
+        queued === 0
+          ? t`nothing queued`
+          : t`${waiting} ${plural(queued, { one: 'run', other: 'runs' })} queued`
+      }
+      estimate={running > 0 ? t`${onEngine} running` : null}
       footer={
         <>
           {receipt ? (
             <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
-              {`Dropped ${plural(receipt.dropped, 'run')}; ${plural(receipt.outstanding, 'run')} still outstanding.`}
+              {t`Dropped ${dropped} ${plural(receipt.dropped, {
+                one: 'run',
+                other: 'runs',
+              })}; ${outstanding} ${plural(receipt.outstanding, {
+                one: 'run',
+                other: 'runs',
+              })} still outstanding.`}
             </p>
           ) : null}
           {clear.isError ? (
@@ -244,7 +293,7 @@ function ClearQueueCard() {
         onClick={() => clear.mutate()}
       >
         {clear.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <ListX aria-hidden />}
-        Clear the queue
+        <Trans>Clear the queue</Trans>
       </Button>
     </ActionCard>
   )
@@ -276,10 +325,12 @@ export function LibraryActions({ coverage }: { coverage: AnalysisCoverage }) {
         <ClearQueueCard />
       </div>
       <p className="text-[0.625rem] leading-[1.5] text-dim-2">
-        Times are approximate: measured off this deployment&rsquo;s own finished runs at the
-        budget configured now, including matching work already queued or running, over{' '}
-        {concurrency === 1 ? 'one run at a time' : `${concurrency} runs at a time`}. A blank
-        means too few runs have finished at that budget to be worth averaging.
+        <Trans>
+          Times are approximate: measured off this deployment&rsquo;s own finished runs at the
+          budget configured now, including matching work already queued or running, over{' '}
+          <Plural value={concurrency} one="one run at a time" other="# runs at a time" />. A blank
+          means too few runs have finished at that budget to be worth averaging.
+        </Trans>
       </p>
     </div>
   )

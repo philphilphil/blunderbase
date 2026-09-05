@@ -6,6 +6,8 @@
  * What is left here is the defaulting: a mark the coach drew without naming a colour, and
  * which way round the board should face.
  */
+import { t } from '@lingui/core/macro'
+
 import type { BoardArrow, BoardOrientation, BoardSquare } from '@/components/board/Board'
 import type { GameSummary, LiveState } from '@/lib/api/types'
 
@@ -63,17 +65,22 @@ export function describeSession(
   state: LiveState | undefined,
   game: GameSummary | undefined,
 ): string {
-  if (!state?.active) return 'Nothing on the board'
+  if (!state?.active) return t`Nothing on the board`
+  const played = state.moves.length
   if (state.game_id) {
-    const players = game ? `${game.white ?? '?'} — ${game.black ?? '?'}` : `game ${state.game_id}`
-    const ply = typeof state.ply === 'number' ? ` · ply ${state.ply}` : ''
+    const id = state.game_id
+    const players = game ? `${game.white ?? '?'} — ${game.black ?? '?'}` : t`game ${id}`
+    // Four whole sentences rather than one assembled from a stem and two optional tails:
+    // where the ply and the played moves sit in the line is a translator's decision.
+    const ply = state.ply
+    if (typeof ply !== 'number') {
+      return isVariation(state) ? t`${players} + ${played} played` : players
+    }
     return isVariation(state)
-      ? `${players}${ply} + ${state.moves.length} played`
-      : `${players}${ply}`
+      ? t`${players} · ply ${ply} + ${played} played`
+      : t`${players} · ply ${ply}`
   }
-  return state.moves.length > 0
-    ? `Ad-hoc position + ${state.moves.length} played`
-    : 'Ad-hoc position'
+  return played > 0 ? t`Ad-hoc position + ${played} played` : t`Ad-hoc position`
 }
 
 /** `4` -> `2…`, `3` -> `2.` — the move number a ply lands on, as the design writes it. */

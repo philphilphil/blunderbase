@@ -9,6 +9,8 @@
  * the "worst move here" corner drops out — right, since nothing on the card would be the
  * owner's play. Both are already null-safe; neither invents a zero.
  */
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
+
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ExplorerResponse } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
@@ -34,6 +36,8 @@ export function LineSummary({
   ply: number
   loading: boolean
 }) {
+  const { t } = useLingui()
+
   if (loading || !tree) {
     return (
       <div className="flex flex-col gap-3 rounded-[0.5625rem] border border-line bg-panel p-3.5">
@@ -45,6 +49,7 @@ export function LineSummary({
   }
 
   const split = splitOf(tree.totals)
+  const { wins, draws, losses } = split
   const percent = scorePercent(tree.totals.score as number | null | undefined)
   const drop = averageDrop(tree.moves)
   const worst = worstContinuation(tree.moves)
@@ -53,45 +58,57 @@ export function LineSummary({
   return (
     <div className="flex flex-col gap-2.5 rounded-[0.5625rem] border border-line bg-panel p-3.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">Your results in this line</span>
+        <span className="text-[0.75rem] font-semibold text-ink">
+          <Trans>Your results in this line</Trans>
+        </span>
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] tabular text-dim">
-          {split.games} {split.games === 1 ? 'game' : 'games'}
+          <Plural value={split.games} one="# game" other="# games" />
         </span>
       </div>
 
       {split.games === 0 ? (
         <p className="py-3 text-[0.78125rem] leading-relaxed text-dim">
-          You have never had this position on the board. Walk back a move, or play a different
-          continuation.
+          <Trans>
+            You have never had this position on the board. Walk back a move, or play a different
+            continuation.
+          </Trans>
         </p>
       ) : (
         <>
           <ScoreBar split={split} />
           <div className="flex font-mono text-[0.6875rem] tabular text-soft-2">
-            <span className="flex-1">{split.wins} W</span>
-            <span className="flex-1 text-center">{split.draws} D</span>
-            <span className="flex-1 text-right">{split.losses} L</span>
+            <span className="flex-1">
+              <Trans comment="W abbreviates “wins”.">{wins} W</Trans>
+            </span>
+            <span className="flex-1 text-center">
+              <Trans comment="D abbreviates “draws”.">{draws} D</Trans>
+            </span>
+            <span className="flex-1 text-right">
+              <Trans comment="L abbreviates “losses”.">{losses} L</Trans>
+            </span>
           </div>
 
           {/* Three stats and the worst move are wider than a phone; they wrap rather
               than push the card sideways. */}
           <div className="flex gap-5 border-t border-hairline pt-2.5 max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-2.5">
             <Stat
-              label="Score"
+              label={t`Score`}
               value={percent === null ? '—' : `${percent.toFixed(1)}%`}
               tone={scoreTone(tree.totals.score as number | null | undefined)}
             />
-            <Stat label="Avg. drop" value={formatAvgDrop(drop)} tone={dropTone(drop)} />
+            <Stat label={t`Avg. drop`} value={formatAvgDrop(drop)} tone={dropTone(drop)} />
             <Stat
-              label="Ended here"
+              label={t`Ended here`}
               value={String(endedHere)}
               tone={endedHere > 0 ? 'text-soft' : 'text-dim-2'}
             />
             <div className="flex-1" />
             {worst ? (
               <div className="flex flex-col items-end gap-[0.1875rem]">
-                <span className="text-[0.65625rem] text-dim-2">Worst move here</span>
+                <span className="text-[0.65625rem] text-dim-2">
+                  <Trans>Worst move here</Trans>
+                </span>
                 <span className={cn('font-mono text-[0.8125rem]', dropTone(worst.avg_win_loss))}>
                   {plyLabel(ply)}
                   {worst.san}

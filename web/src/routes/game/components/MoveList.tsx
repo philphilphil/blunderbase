@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Pin, PinOff } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -273,10 +274,10 @@ export function MoveList({
       {showTabRow ? (
       <div className="flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5">
         <Tab active={tab === 'moves'} onClick={() => setTab('moves')}>
-          Moves
+          <Trans>Moves</Trans>
         </Tab>
         <Tab active={tab === 'flagged'} onClick={() => setTab('flagged')}>
-          Flagged
+          <Trans>Flagged</Trans>
           {flaggedCount > 0 ? (
             <span className="ml-1.5 font-mono text-[0.625rem] tabular text-blunder">{flaggedCount}</span>
           ) : null}
@@ -294,7 +295,9 @@ export function MoveList({
           worth the two words.
         */}
         <div className="flex flex-none items-center gap-2.5 whitespace-nowrap font-mono text-[0.625rem] tabular text-faint">
-          <span className="max-md:hidden">{plyCount} plies</span>
+          <span className="max-md:hidden">
+            <Trans>{plyCount} plies</Trans>
+          </span>
           <PgnButton pgn={pgn} />
         </div>
       </div>
@@ -309,7 +312,7 @@ export function MoveList({
           >
             <div className="h-px flex-1 bg-hairline" />
             <span className="font-mono text-[0.625rem] text-faint hover:text-soft">
-              moves 1–{collapsedThrough} collapsed
+              <Trans>moves 1–{collapsedThrough} collapsed</Trans>
             </span>
             <div className="h-px flex-1 bg-hairline" />
           </button>
@@ -317,9 +320,11 @@ export function MoveList({
 
         {rows.length === 0 ? (
           <p className="px-3 py-6 text-center text-[0.71875rem] text-dim">
-            {tab === 'flagged'
-              ? 'Nothing flagged in this game.'
-              : 'No moves — this game has an empty move list.'}
+            {tab === 'flagged' ? (
+              <Trans>Nothing flagged in this game.</Trans>
+            ) : (
+              <Trans>No moves — this game has an empty move list.</Trans>
+            )}
           </p>
         ) : null}
 
@@ -451,6 +456,7 @@ export const PGN_BUTTON_ID = 'game-pgn-copy'
  * off below `md` (`showTabRow`), and the phone layout has to put it somewhere of its own.
  */
 export function PgnButton({ pgn }: { pgn?: string }) {
+  const { t } = useLingui()
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -477,7 +483,7 @@ export function PgnButton({ pgn }: { pgn?: string }) {
       type="button"
       id={PGN_BUTTON_ID}
       onClick={() => void copy()}
-      title="Copy this game as PGN (C)"
+      title={t`Copy this game as PGN (C)`}
       className={cn(
         'transition-colors',
         state === 'copied'
@@ -487,7 +493,14 @@ export function PgnButton({ pgn }: { pgn?: string }) {
             : 'text-faint hover:text-soft',
       )}
     >
-      {state === 'copied' ? 'copied' : state === 'failed' ? 'no clipboard' : 'PGN'}
+      {/* `PGN` is the format's name and stays in every language; the two flashes are prose. */}
+      {state === 'copied' ? (
+        <Trans>copied</Trans>
+      ) : state === 'failed' ? (
+        <Trans>no clipboard</Trans>
+      ) : (
+        'PGN'
+      )}
     </button>
   )
 }
@@ -504,16 +517,20 @@ function MoveCell({
   noted?: boolean
   onSelectPly: (ply: number) => void
 }) {
+  const { t } = useLingui()
   if (!move?.san) return <span className="min-w-0 flex-1 px-1" />
   const glyph = glyphFor(move.classification)
   const flagged = isFlagged(move.classification)
   const active = move.ply === cursor
+  // The number and the move are one unit — `1…d5` — so the title is one message with that
+  // unit in it rather than a translated tail glued onto an untranslated head.
+  const moveLabel = `${plyLabel(move.ply)}${move.san}`
 
   return (
     <button
       type="button"
       onClick={() => onSelectPly(move.ply)}
-      title={`${plyLabel(move.ply)}${move.san}${noted ? ' — noted' : ''}`}
+      title={noted ? t`${moveLabel} — noted` : moveLabel}
       className={cn(
         // `min-w-0` so the row can never push past the track: at the 250px band the two
         // move cells are what has to give, and the san truncates rather than the number,
@@ -593,6 +610,7 @@ function Variation({
   onPin?: (variation: MoveListVariation) => void
   onUnpin?: (lineId: number) => void
 }) {
+  const { t } = useLingui()
   const cursor = variation.cursor ?? 0
   const lineId = variation.lineId ?? null
   const pinnedThrough = variation.pinnedThrough ?? 0
@@ -621,6 +639,16 @@ function Variation({
         {variation.sans.map((san, index) => {
           const ply = variation.base + index
           const active = !quiet && cursor === index + 1
+          // Four whole sentences rather than a stem with two tails bolted on: what a line is
+          // and whether it carries a note are one statement, and a translator needs it whole.
+          const moveLabel = `${plyLabel(ply)}${san}`
+          const title = quiet
+            ? noted.has(index)
+              ? t`${moveLabel} — kept line, noted`
+              : t`${moveLabel} — kept line`
+            : noted.has(index)
+              ? t`${moveLabel} — analysis, noted`
+              : t`${moveLabel} — analysis`
           return (
             <span key={`${index}-${san}`} className="inline-flex items-baseline gap-1">
               {ply % 2 === 0 || index === 0 ? (
@@ -633,7 +661,7 @@ function Variation({
                 type="button"
                 disabled={!onSelectMove}
                 onClick={() => onSelectMove?.(index)}
-                title={`${plyLabel(ply)}${san} — ${quiet ? 'kept line' : 'analysis'}${noted.has(index) ? ', noted' : ''}`}
+                title={title}
                 className={cn(
                   'inline-flex items-center gap-0.5 rounded-[0.1875rem] px-0.5',
                   active
@@ -686,6 +714,7 @@ function PinButton({
   onPin?: (variation: MoveListVariation) => void
   onUnpin?: (lineId: number) => void
 }) {
+  const { t } = useLingui()
   const pinned = lineId !== null
   const extendable = pinned && pinnedThrough < variation.sans.length
 
@@ -695,8 +724,8 @@ function PinButton({
       <button
         type="button"
         onClick={() => onUnpin(lineId)}
-        aria-label="Unpin this line"
-        title="Stop keeping this line"
+        aria-label={t`Unpin this line`}
+        title={t`Stop keeping this line`}
         className="ml-0.5 text-brilliant/70 hover:text-blunder"
       >
         <PinOff className="size-2.5" aria-hidden />
@@ -709,11 +738,11 @@ function PinButton({
     <button
       type="button"
       onClick={() => onPin(variation)}
-      aria-label={extendable ? 'Extend the pin to the whole line' : 'Pin this line'}
+      aria-label={extendable ? t`Extend the pin to the whole line` : t`Pin this line`}
       title={
         extendable
-          ? 'Kept only as far as its first moves — pin the rest'
-          : 'Keep this line with the game'
+          ? t`Kept only as far as its first moves — pin the rest`
+          : t`Keep this line with the game`
       }
       className={cn(
         'ml-0.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/line:opacity-100',
@@ -729,6 +758,7 @@ function PinButton({
 function Annotation({ annotation }: { annotation: MoveAnnotation }) {
   const glyph = glyphFor(annotation.classification)
   const color = glyph ? GLYPHS[glyph].color : 'var(--bb-blunder)'
+  const winLoss = formatWinLoss(annotation.winLoss)
   return (
     <div className="flex gap-2 py-1.5 pl-[2.625rem] pr-2 font-sans text-[0.71875rem] italic leading-[1.5] text-soft-2">
       <div className="w-0.5 flex-none rounded-sm opacity-50" style={{ background: color }} />
@@ -743,7 +773,11 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
         ) : null}
         {annotation.bestSan ? (
           <>
-            <span className="not-italic">Best was </span>
+            {/* The space rides outside the message: Lingui trims a message's own edges, and
+                what separates the words from the move is layout rather than wording. */}
+            <span className="not-italic">
+              <Trans>Best was</Trans>{' '}
+            </span>
             <span className="font-mono not-italic text-ink">{annotation.bestSan}</span>
             <span className="not-italic">. </span>
           </>
@@ -757,7 +791,7 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
         {annotation.winLoss !== null ? (
           <span className="font-mono tabular not-italic text-dim">
             {' '}
-            (<span style={{ color }}>{formatWinLoss(annotation.winLoss)}</span> win)
+            <Trans>(<span style={{ color }}>{winLoss}</span> win)</Trans>
           </span>
         ) : null}
       </div>

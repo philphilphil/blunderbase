@@ -1,3 +1,5 @@
+import { Plural, useLingui } from '@lingui/react/macro'
+
 import type { StreamSessionApi } from '@/lib/analysis'
 import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
@@ -86,6 +88,7 @@ export function AnalysisControls({
   fen: string | null
   className?: string
 }) {
+  const { t } = useLingui()
   const idle = fen === null || fen === ''
   // The name the server resolved "the deep tier" to. It is only knowable from a session
   // that is actually open, so before the first one the option says what it does, not who.
@@ -98,13 +101,13 @@ export function AnalysisControls({
       <Toggle
         checked={stream.enabled}
         onChange={stream.setEnabled}
-        label="Analyse this position continuously"
+        label={t`Analyse this position continuously`}
         disabled={idle}
-        title={idle ? 'nothing is on the board' : 'Analyse this position continuously'}
+        title={idle ? t`nothing is on the board` : t`Analyse this position continuously`}
       />
 
       <select
-        aria-label="Engine"
+        aria-label={t`Engine`}
         value={stream.engineId === null ? '' : String(stream.engineId)}
         disabled={idle}
         onChange={(event) =>
@@ -114,7 +117,7 @@ export function AnalysisControls({
         // row has left, and never less than enough for a name to be read.
         className={cn(SELECT_CLASS, 'min-w-40 flex-1 truncate')}
       >
-        <option value="">{deepName ? `deep tier — ${deepName}` : 'deep tier'}</option>
+        <option value="">{deepName ? t`deep tier — ${deepName}` : t`deep tier`}</option>
         {stream.engines
           .filter((host) => host.streams)
           .map((host) => (
@@ -125,7 +128,7 @@ export function AnalysisControls({
       </select>
 
       <select
-        aria-label="Lines"
+        aria-label={t`Lines`}
         value={String(stream.multipv)}
         disabled={idle}
         onChange={(event) => stream.setMultipv(Number(event.target.value))}
@@ -133,7 +136,7 @@ export function AnalysisControls({
       >
         {[1, 2, 3, 4, 5].map((lines) => (
           <option key={lines} value={String(lines)}>
-            {lines} {lines === 1 ? 'line' : 'lines'}
+            <Plural value={lines} one="# line" other="# lines" />
           </option>
         ))}
       </select>

@@ -26,6 +26,9 @@
  * A note written on a model game rather than one of the owner's says so beside its scope:
  * the same sentence means something different when the game is not theirs.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Library, Network, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -48,7 +51,19 @@ import {
 } from '../presentation'
 import { DeleteConfirm, NoteEditor } from './NoteEditor'
 
-const SOURCE_LABELS: Record<string, string> = { mcp: 'via MCP', live: 'from live' }
+const SOURCE_LABELS: Record<string, MessageDescriptor> = {
+  mcp: msg`via MCP`,
+  live: msg`from live`,
+}
+
+/**
+ * The same two, as the hover says them. A whole sentence apiece rather than "written " with
+ * the chip's words appended: the two halves do not necessarily stay in that order.
+ */
+const SOURCE_TITLES: Record<string, MessageDescriptor> = {
+  mcp: msg`written via MCP`,
+  live: msg`written from live`,
+}
 
 export type NoteLayout = 'stream' | 'sheet'
 
@@ -70,6 +85,7 @@ export function NoteItem({
   tagSuggestions = [],
   onTagClick,
 }: NoteItemProps) {
+  const { t, i18n } = useLingui()
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const host = useRef<HTMLElement>(null)
@@ -83,25 +99,30 @@ export function NoteItem({
   const scope = scopeOf(note)
   const move = originLabel(note)
   const sheet = layout === 'sheet'
+  // Named because the identifier is the placeholder a translator sees in "written {when}".
+  const when = new Date(note.created_at).toLocaleString()
 
   const parts = {
     heads: (
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge variant={scope === 'free' ? 'dashed' : 'default'}>{SCOPE_BADGES[scope]}</Badge>
+        <Badge variant={scope === 'free' ? 'dashed' : 'default'}>{i18n._(SCOPE_BADGES[scope])}</Badge>
         {note.game?.is_owner_game === false ? (
-          <Badge variant="dashed" title="Written on a model game, not one of yours">
-            model game
+          <Badge variant="dashed" title={t`Written on a model game, not one of yours`}>
+            <Trans>model game</Trans>
           </Badge>
         ) : null}
         {note.source && SOURCE_LABELS[note.source] ? (
-          <span className="text-[0.625rem] text-faint" title={`written ${SOURCE_LABELS[note.source]}`}>
-            {SOURCE_LABELS[note.source]}
+          <span
+            className="text-[0.625rem] text-faint"
+            title={i18n._(SOURCE_TITLES[note.source] ?? SOURCE_LABELS[note.source]!)}
+          >
+            {i18n._(SOURCE_LABELS[note.source]!)}
           </span>
         ) : null}
         <span className="flex-1" />
         <span
           className="font-mono text-[0.625rem] text-dim-2"
-          title={`written ${new Date(note.created_at).toLocaleString()}`}
+          title={t`written ${when}`}
         >
           {relative(note.created_at)}
         </span>
@@ -110,8 +131,8 @@ export function NoteItem({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              aria-label="Rewrite this note"
-              title="Rewrite this note"
+              aria-label={t`Rewrite this note`}
+              title={t`Rewrite this note`}
               className="text-faint transition-colors hover:text-ink"
             >
               <Pencil className="size-3.5" aria-hidden />
@@ -119,8 +140,8 @@ export function NoteItem({
             <button
               type="button"
               onClick={() => setConfirming((was) => !was)}
-              aria-label="Forget this note"
-              title="Forget this note"
+              aria-label={t`Forget this note`}
+              title={t`Forget this note`}
               className={cn(
                 'transition-colors hover:text-blunder',
                 confirming ? 'text-blunder' : 'text-faint',
@@ -157,7 +178,7 @@ export function NoteItem({
               type="button"
               onClick={() => onTagClick?.(tag)}
               disabled={!onTagClick}
-              title={onTagClick ? `Show only notes tagged ${tag}` : undefined}
+              title={onTagClick ? t`Show only notes tagged ${tag}` : undefined}
               className="rounded-sm border border-edge bg-elevated px-1.5 py-px text-[0.625rem] text-soft transition-colors enabled:hover:border-accent-teal/40 enabled:hover:text-accent-teal"
             >
               {tag}
@@ -176,7 +197,7 @@ export function NoteItem({
   const board = note.fen ? (
     <MiniBoard
       fen={note.fen}
-      label={move ? `The position at ${move}` : 'The position this note is about'}
+      label={move ? t`The position at ${move}` : t`The position this note is about`}
       // `MiniBoard` sets its width inline, so the responsive case has to be part of the
       // value rather than a class over it. In the sheet the board is the tile's whole width
       // and the width comes from the grid, so it is handed 100%.
@@ -186,7 +207,7 @@ export function NoteItem({
     // A tile with no position would otherwise be a hole in the pattern. It says what it is
     // instead, which is also the only honest thing to draw: some notes are about no board.
     <div className="grid aspect-square place-items-center rounded-md border border-dashed border-edge bg-elevated/40 text-[0.6875rem] text-faint">
-      no position
+      <Trans>no position</Trans>
     </div>
   ) : null
 
@@ -251,6 +272,7 @@ export function NoteItem({
  * disappears under the editor takes the reader's place with it.
  */
 function Provenance({ note, move }: { note: NoteResponse; move: string | null }) {
+  const { t } = useLingui()
   const origin = gameHref(note)
   const from = typeof note.game_id === 'number' ? gameLabel(note.game, note.game_id) : null
   const explorer = explorerHref(note.fen)
@@ -270,30 +292,29 @@ function Provenance({ note, move }: { note: NoteResponse; move: string | null })
         {origin ? (
           <Link
             to={origin}
-            title={move ? `Open ${from} at ${move}` : `Open ${from}`}
+            title={move ? t`Open ${from} at ${move}` : t`Open ${from}`}
             className="flex min-w-0 items-center gap-1.5 text-dim transition-colors hover:text-accent-teal"
           >
             <Library className="size-3 flex-none" aria-hidden />
             <span className="truncate">
               {move ? (
-                <>
-                  Written on <span className="font-mono tabular text-soft-2">{move}</span> in{' '}
-                </>
+                <Trans>
+                  Written on <span className="font-mono tabular text-soft-2">{move}</span> in {from}
+                </Trans>
               ) : (
-                'Written in '
+                <Trans>Written in {from}</Trans>
               )}
-              {from}
             </span>
           </Link>
         ) : null}
         {explorer ? (
           <Link
             to={explorer}
-            title="Open this position in the opening explorer"
+            title={t`Open this position in the opening explorer`}
             className="flex flex-none items-center gap-1.5 text-dim transition-colors hover:text-accent-teal"
           >
             <Network className="size-3" aria-hidden />
-            {reach ?? 'In the opening explorer'}
+            {reach ?? t`In the opening explorer`}
           </Link>
         ) : null}
       </div>

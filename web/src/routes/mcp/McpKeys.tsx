@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
@@ -16,8 +17,12 @@ import { CopyButton } from './CopyButton'
  * rather than a dialog for something that is a two-second decision.
  */
 function KeyRow({ item }: { item: McpKeyResponse }) {
+  const { t } = useLingui()
   const [confirmRevoke, setConfirmRevoke] = useState(false)
   const revoke = useDeleteMcpKey()
+  const keyName = item.name
+  const created = relative(item.created_at)
+  const lastUsed = item.last_used_at ? relative(item.last_used_at) : t`never`
 
   return (
     <li className="flex flex-col gap-1.5 px-3.5 py-2.5">
@@ -26,8 +31,10 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
         {confirmRevoke ? (
           <>
             <span className="flex-1 text-[0.6875rem] leading-[1.6] text-blunder">
-              Revoking <span className="font-mono">{item.name}</span> stops its token dead; a
-              client still holding it is refused from the next call. A new one means a new key.
+              <Trans>
+                Revoking <span className="font-mono">{keyName}</span> stops its token dead; a
+                client still holding it is refused from the next call. A new one means a new key.
+              </Trans>
             </span>
             <Button
               type="button"
@@ -35,7 +42,7 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
               size="sm"
               onClick={() => setConfirmRevoke(false)}
             >
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             <Button
               type="button"
@@ -45,7 +52,7 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
               onClick={() => revoke.mutate(item.id)}
             >
               {revoke.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              Revoke
+              <Trans context="button">Revoke</Trans>
             </Button>
           </>
         ) : (
@@ -53,8 +60,9 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
             <KeyRound className="size-3.5 shrink-0 text-faint" aria-hidden />
             <span className="font-mono text-xs text-ink">{item.name}</span>
             <span className="flex-1 truncate text-[0.6875rem] text-dim">
-              created {relative(item.created_at)} · last used{' '}
-              {item.last_used_at ? relative(item.last_used_at) : 'never'}
+              <Trans>
+                created {created} · last used {lastUsed}
+              </Trans>
             </span>
             <Button
               type="button"
@@ -63,7 +71,7 @@ function KeyRow({ item }: { item: McpKeyResponse }) {
               onClick={() => setConfirmRevoke(true)}
             >
               <Trash2 aria-hidden />
-              Revoke
+              <Trans context="button">Revoke</Trans>
             </Button>
           </>
         )}
@@ -96,6 +104,7 @@ export function McpKeys({
   onMinted: (created: McpKeyCreated) => void
   onDismiss: () => void
 }) {
+  const { t } = useLingui()
   const [name, setName] = useState('')
   const [invalid, setInvalid] = useState<string | null>(null)
   const keys = useMcpKeys()
@@ -109,21 +118,26 @@ export function McpKeys({
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim()) {
-      setInvalid('a key needs a name')
+      setInvalid(t`a key needs a name`)
       return
     }
     setInvalid(null)
     create.mutate({ name: name.trim() })
   }
 
+  const active = keys.data ? keys.data.length : null
+  const mintedName = minted?.key.name
+
   return (
     <section className="flex flex-col rounded-xl border border-line bg-panel">
       <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
         <KeyRound className="size-3.5 text-faint" aria-hidden />
-        <h2 className="text-xs font-semibold text-ink">Bearer keys</h2>
+        <h2 className="text-xs font-semibold text-ink">
+          <Trans>Bearer keys</Trans>
+        </h2>
         <div className="flex-1" />
         <span className="font-mono text-[0.625rem] text-dim">
-          {keys.data ? `${keys.data.length} active` : ''}
+          {active === null ? '' : t`${active} active`}
         </span>
       </div>
 
@@ -131,7 +145,7 @@ export function McpKeys({
         <p className="px-3.5 py-3 text-[0.6875rem] text-blunder">{keys.error.message}</p>
       ) : keys.data && keys.data.length === 0 ? (
         <p className="px-3.5 py-3 text-[0.6875rem] leading-[1.5] text-dim">
-          No keys yet. Mint one below and paste it into your client&rsquo;s config.
+          <Trans>No keys yet. Mint one below and paste it into your client&rsquo;s config.</Trans>
         </p>
       ) : (
         <ul className="divide-y divide-hairline">
@@ -148,20 +162,22 @@ export function McpKeys({
         >
           <div className="flex items-center gap-2.5 max-md:flex-wrap">
             <span className="text-xs font-semibold text-ink">
-              {minted.key.name} is ready — this key is shown once
+              <Trans>{mintedName} is ready — this key is shown once</Trans>
             </span>
             <div className="flex-1" />
-            <CopyButton text={minted.token} label="Copy key" />
+            <CopyButton text={minted.token} label={t`Copy key`} />
             <Button type="button" size="sm" onClick={onDismiss}>
-              Done
+              <Trans>Done</Trans>
             </Button>
           </div>
           <code className="block overflow-x-auto rounded-md border border-edge bg-elevated px-3 py-2 font-mono text-[0.71875rem] text-ink">
             {minted.token}
           </code>
           <p className="text-[0.6875rem] leading-[1.5] text-dim">
-            Nothing stores it, so nothing can show it again. The connect commands below already
-            carry it; a lost key is a revoke and a new one.
+            <Trans>
+              Nothing stores it, so nothing can show it again. The connect commands below already
+              carry it; a lost key is a revoke and a new one.
+            </Trans>
           </p>
         </div>
       ) : null}
@@ -172,11 +188,11 @@ export function McpKeys({
       >
         <div className="flex items-center gap-2">
           <Input
-            aria-label="New key name"
+            aria-label={t`New key name`}
             value={name}
             spellCheck={false}
             autoComplete="off"
-            placeholder="laptop, claude-code, …"
+            placeholder={t`laptop, claude-code, …`}
             className="max-w-xs"
             onChange={(event) => setName(event.target.value)}
           />
@@ -187,7 +203,7 @@ export function McpKeys({
             ) : (
               <Plus aria-hidden />
             )}
-            Create
+            <Trans context="button">Create</Trans>
           </Button>
         </div>
         {invalid ? <p className="text-[0.6875rem] text-blunder">{invalid}</p> : null}

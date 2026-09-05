@@ -20,6 +20,7 @@
  * phone: "Queue deep analysis" is what the button does, and a second line costs less than
  * guessing which word the owner would still recognise it by.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type * as React from 'react'
 
@@ -70,14 +71,20 @@ export function TableFooter({
   rowsPerPage,
   fitRows,
 }: TableFooterProps) {
+  const { t } = useLingui()
   const { first, last } = pageRange(page, rowsPerPage, loadedCount, total)
+  // Named, because every one of these is what a translator sees as the placeholder.
+  const selected = formatCount(selectedCount)
+  const firstRow = formatCount(first)
+  const lastRow = formatCount(last)
+  const games = formatCount(total)
 
   return (
     <div className="flex h-[2.875rem] flex-none items-center gap-3 border-t border-hairline bg-panel px-5 max-md:h-auto max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1.5 max-md:px-3 max-md:py-2.5">
       {selectedCount > 0 ? (
         <>
           <span className="font-mono text-[0.71875rem] tabular text-accent-teal">
-            {formatCount(selectedCount)} selected
+            <Trans>{selected} selected</Trans>
           </span>
           <span className="h-4 w-px bg-line" />
           <Button
@@ -87,7 +94,7 @@ export function TableFooter({
             disabled={queueing}
             onClick={() => onQueue('quick')}
           >
-            Queue quick analysis
+            <Trans>Queue quick analysis</Trans>
           </Button>
           <Button
             type="button"
@@ -96,7 +103,7 @@ export function TableFooter({
             disabled={queueing}
             onClick={() => onQueue('deep')}
           >
-            Queue deep analysis
+            <Trans>Queue deep analysis</Trans>
           </Button>
           <Button
             type="button"
@@ -106,15 +113,15 @@ export function TableFooter({
             onClick={onDelete}
             className="border-blunder/35 text-blunder hover:border-blunder hover:text-blunder"
           >
-            Delete
+            <Trans context="button">Delete</Trans>
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={onClearSelection}>
-            Clear selection
+            <Trans>Clear selection</Trans>
           </Button>
         </>
       ) : (
         <span className="text-[0.71875rem] text-dim-2">
-          Select rows to queue analysis over them, or to delete them.
+          <Trans>Select rows to queue analysis over them, or to delete them.</Trans>
         </span>
       )}
 
@@ -125,9 +132,9 @@ export function TableFooter({
       <div className="flex-1 max-md:hidden" />
 
       <label className="flex items-center gap-1.5 text-[0.6875rem] text-dim-2">
-        Rows
+        <Trans>Rows</Trans>
         <select
-          aria-label="Rows per page"
+          aria-label={t`Rows per page`}
           value={String(pageSize)}
           onChange={(event) => {
             const value = event.target.value
@@ -137,7 +144,7 @@ export function TableFooter({
         >
           {PAGE_SIZE_OPTIONS.map((option) => (
             <option key={String(option)} value={String(option)}>
-              {option === 'fit' ? `Fit (${fitRows})` : option}
+              {option === 'fit' ? t`Fit (${fitRows})` : option}
             </option>
           ))}
         </select>
@@ -145,7 +152,7 @@ export function TableFooter({
 
       <div className="flex items-center gap-1">
         <PageStep
-          label="Previous page"
+          label={t`Previous page`}
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
         >
@@ -155,7 +162,7 @@ export function TableFooter({
           {formatCount(page)} / {formatCount(pageCount)}
         </span>
         <PageStep
-          label="Next page"
+          label={t`Next page`}
           disabled={page >= pageCount}
           onClick={() => onPageChange(page + 1)}
         >
@@ -164,7 +171,9 @@ export function TableFooter({
       </div>
 
       <span className="font-mono text-[0.6875rem] tabular text-dim-2">
-        {formatCount(first)}–{formatCount(last)} of {formatCount(total)}
+        <Trans>
+          {firstRow}–{lastRow} of {games}
+        </Trans>
       </span>
     </div>
   )

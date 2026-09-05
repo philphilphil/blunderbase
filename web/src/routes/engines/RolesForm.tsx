@@ -22,6 +22,10 @@
  * human-move model has one fewer column, not a fault. A role that *is* assigned and cannot
  * run is the red one, and it always names the engine that was chosen.
  */
+import type { I18n } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusDot } from '@/components/badges/StatusDot'
 import { Label } from '@/components/ui/label'
@@ -41,6 +45,13 @@ import { roleName } from './roles'
 /** How a picker is doing: assigned and working, assigned and broken, or not assigned at all. */
 type Tone = 'ok' | 'broken' | 'absent'
 
+/**
+ * `optionLabel` is not a component, and the `t` macro only rewrites itself inside one —
+ * handed `t` as an argument it stays a tagged template and the option renders blank. So the
+ * words are descriptors, resolved with the picker's own `i18n`.
+ */
+const LOCAL = msg`local`
+
 /** The kind of engine a role can be served by — `services.engines.ROLE_KINDS`. */
 function kindFor(role: EngineRoleName): EngineResponse['kind'] {
   return role === 'human' ? 'maia' : 'uci'
@@ -51,10 +62,14 @@ function kindFor(role: EngineRoleName): EngineResponse['kind'] {
  * of the same name on two machines is the ordinary case, and "which of these is the one on
  * my other machine" is the question this form exists to answer.
  */
-function optionLabel(engine: EngineResponse, host: EngineHost | undefined): string {
-  const where = host ? (host.runnerName ?? 'local') : null
+function optionLabel(
+  engine: EngineResponse,
+  host: EngineHost | undefined,
+  i18n: I18n,
+): string {
+  const where = host ? (host.runnerName ?? i18n._(LOCAL)) : null
   const name = where === null ? engine.name : `${engine.name} · ${where}`
-  return engine.enabled ? name : `${name} (off)`
+  return engine.enabled ? name : i18n._(msg`${name} (off)`)
 }
 
 /**
@@ -82,6 +97,7 @@ function RolePicker({
   error: Error | null
   onAssign: (engineId: number | null) => void
 }) {
+  const { t, i18n } = useLingui()
   const tone: Tone = status.available ? 'ok' : status.configured ? 'broken' : 'absent'
   const id = `engine-role-${status.role}`
   const assigned = status.engine_id ?? null
@@ -102,7 +118,7 @@ function RolePicker({
       <div className="flex items-center gap-2">
         <StatusDot
           tone={tone === 'ok' ? 'healthy' : tone === 'broken' ? 'degraded' : 'away'}
-          label={tone === 'ok' ? 'available' : tone === 'broken' ? 'unavailable' : 'not set up'}
+          label={tone === 'ok' ? t`available` : tone === 'broken' ? t`unavailable` : t`not set up`}
         />
         <Label htmlFor={id}>{roleName(status.role)}</Label>
       </div>
@@ -113,13 +129,13 @@ function RolePicker({
         onChange={(event) => onAssign(event.target.value === '' ? null : Number(event.target.value))}
         className="h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50"
       >
-        <option value="">Nothing assigned</option>
+        <option value="">{t`Nothing assigned`}</option>
         {missing ? (
-          <option value={String(assigned)}>{status.engine_name ?? `engine ${assigned}`}</option>
+          <option value={String(assigned)}>{status.engine_name ?? t`engine ${assigned}`}</option>
         ) : null}
         {engines.map((engine) => (
           <option key={engine.id} value={String(engine.id)}>
-            {optionLabel(engine, hosts.get(engine.id))}
+            {optionLabel(engine, hosts.get(engine.id), i18n)}
           </option>
         ))}
       </select>
@@ -170,9 +186,10 @@ export function RolesForm({
   }
 
   if (error) {
+    const reason = error.message
     return (
       <p className="rounded-lg border border-blunder/28 bg-blunder/5 px-3 py-2.5 text-[0.71875rem] text-blunder">
-        What runs what could not be read — {error.message}
+        <Trans>What runs what could not be read — {reason}</Trans>
       </p>
     )
   }
@@ -183,10 +200,14 @@ export function RolesForm({
 
   return (
     <section className="flex flex-col gap-1.5">
-      <h2 className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">What runs what</h2>
+      <h2 className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">
+        <Trans>What runs what</Trans>
+      </h2>
       <p className="text-[0.6875rem] leading-[1.5] text-dim">
-        Each job runs on the engine chosen for it and on no other — nothing falls back, so a
-        role left empty simply does not run.
+        <Trans>
+          Each job runs on the engine chosen for it and on no other — nothing falls back, so a
+          role left empty simply does not run.
+        </Trans>
       </p>
       {/* One picker per row below `md`: a third of 375px cannot hold "Stockfish · nuc". */}
       <div className="mt-1 grid grid-cols-3 gap-2.5 max-md:grid-cols-1">

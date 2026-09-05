@@ -1,3 +1,5 @@
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import type { QueueDestination } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -22,17 +24,19 @@ export function QueueDestinations({
   dense?: boolean
   className?: string
 }) {
+  const { t } = useLingui()
   if (destinations.length <= 1) return null
 
   return (
     <div className={cn('flex flex-col', dense ? 'gap-px' : 'gap-0.5', className)}>
       {destinations.map((destination) => {
-        const stalled = !destination.connected && destination.queued > 0
+        const queued = destination.queued
+        const stalled = !destination.connected && queued > 0
         return (
           <div
             key={destination.runner_id ?? 'local'}
             title={
-              stalled ? 'nothing will drain this until the machine connects' : undefined
+              stalled ? t`nothing will drain this until the machine connects` : undefined
             }
             className={cn(
               'flex items-center gap-2 rounded-[0.3125rem] px-1',
@@ -63,7 +67,9 @@ export function QueueDestinations({
                 stalled ? 'text-mistake' : 'text-dim-2',
               )}
             >
-              {destination.queued} q
+              <Trans comment="Short for “queued”, beside the count of runs waiting">
+                {queued} q
+              </Trans>
             </span>
           </div>
         )

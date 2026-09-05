@@ -1,3 +1,5 @@
+import { plural, t } from '@lingui/core/macro'
+
 import type { Classification, Source, Tier } from '@/lib/api/types'
 
 /**
@@ -9,7 +11,13 @@ export type Glyph = 'blunder' | 'mistake' | 'inaccuracy' | 'interesting' | 'best
 
 export interface GlyphStyle {
   glyph: string
-  label: string
+  /**
+   * The word for the glyph, in the reader's language. A getter rather than a stored
+   * string: the tables below are module-level constants, so a value computed where they
+   * are written would be frozen at import in whatever language was active then. Read on
+   * access it is always the live catalog's, and every call site keeps taking a `string`.
+   */
+  readonly label: string
   /** Tailwind classes for the small square badge. */
   badgeClass: string
   /** Tailwind text colour for the move itself. */
@@ -21,42 +29,54 @@ export interface GlyphStyle {
 export const GLYPHS: Record<Glyph, GlyphStyle> = {
   blunder: {
     glyph: '??',
-    label: 'blunder',
+    get label() {
+      return t`blunder`
+    },
     badgeClass: 'bg-blunder text-blunder-ink',
     textClass: 'text-blunder',
     color: 'var(--bb-blunder)',
   },
   mistake: {
     glyph: '?',
-    label: 'mistake',
+    get label() {
+      return t`mistake`
+    },
     badgeClass: 'bg-mistake/16 text-mistake',
     textClass: 'text-mistake',
     color: 'var(--bb-mistake)',
   },
   inaccuracy: {
     glyph: '?!',
-    label: 'inaccuracy',
+    get label() {
+      return t`inaccuracy`
+    },
     badgeClass: 'bg-inaccuracy/14 text-inaccuracy',
     textClass: 'text-inaccuracy',
     color: 'var(--bb-inaccuracy)',
   },
   interesting: {
     glyph: '!?',
-    label: 'interesting',
+    get label() {
+      return t`interesting`
+    },
     badgeClass: 'bg-info/14 text-info',
     textClass: 'text-info',
     color: 'var(--bb-info)',
   },
   best: {
     glyph: '!',
-    label: 'best',
+    get label() {
+      return t`best`
+    },
     badgeClass: 'bg-accent-teal/14 text-accent-teal',
     textClass: 'text-accent-teal',
     color: 'var(--bb-accent)',
   },
   brilliant: {
     glyph: '!!',
-    label: 'brilliant',
+    get label() {
+      return t`brilliant`
+    },
     badgeClass: 'bg-brilliant/14 text-brilliant',
     textClass: 'text-brilliant',
     color: 'var(--bb-brilliant)',
@@ -86,6 +106,31 @@ export function glyphFor(classification: Classification | null | undefined): Gly
 export function glyphStyle(classification: Classification | null | undefined): GlyphStyle | null {
   const glyph = glyphFor(classification)
   return glyph ? GLYPHS[glyph] : null
+}
+
+/**
+ * How many moves of a class a row has, as words: "3 blunders", "1 inaccuracy".
+ *
+ * A switch rather than the plural of `label` with an `s` glued on, because a language
+ * that is not English does not build a plural that way — and even English wanted a
+ * special case for "inaccuracies". One message per glyph is one thing a translator can
+ * put both forms of.
+ */
+export function glyphCountLabel(glyph: Glyph, count: number): string {
+  switch (glyph) {
+    case 'blunder':
+      return plural(count, { one: '# blunder', other: '# blunders' })
+    case 'mistake':
+      return plural(count, { one: '# mistake', other: '# mistakes' })
+    case 'inaccuracy':
+      return plural(count, { one: '# inaccuracy', other: '# inaccuracies' })
+    case 'interesting':
+      return plural(count, { one: '# interesting', other: '# interestings' })
+    case 'best':
+      return plural(count, { one: '# best', other: '# bests' })
+    case 'brilliant':
+      return plural(count, { one: '# brilliant', other: '# brilliants' })
+  }
 }
 
 /** Whether a classification is one the UI flags — the move list tints only these rows. */
@@ -150,19 +195,24 @@ export const SOURCE_STYLES: Record<Source, SourceStyle> = {
 // --- analysis tiers (design 1c, "Analysis tiers") -------------------------
 
 export interface TierStyle {
-  label: string
+  /** Read on access for the same reason `GlyphStyle.label` is. */
+  readonly label: string
   chipClass: string
   color: string
 }
 
 export const TIER_STYLES: Record<Tier, TierStyle> = {
   quick: {
-    label: 'Quick',
+    get label() {
+      return t`Quick`
+    },
     chipClass: 'border-edge-strong bg-raised text-soft',
     color: 'var(--bb-muted)',
   },
   deep: {
-    label: 'Deep',
+    get label() {
+      return t`Deep`
+    },
     chipClass: 'border-deep/28 bg-deep/10 text-deep',
     color: 'var(--bb-deep)',
   },

@@ -9,6 +9,7 @@
  * `rating_trend` buckets monthly and nothing else: the service takes a `bucket` option but
  * `/stats/{dimension}` forwards only the game filters, so there is no period control here.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from 'recharts'
 
 import {
@@ -24,8 +25,8 @@ import { Async, LegendSwatch, LoadingChart, StatCard, type StatsQuery } from '..
 import { asPercent, buckets, num, numOr, periodLabel } from '../kit/analytics'
 
 const CHART: ChartConfig = {
-  blunderRate: { label: 'Blunders / 100 moves', color: 'var(--bb-accent)' },
-  rating: { label: 'Average rating', color: 'var(--bb-faint)' },
+  blunderRate: { label: <Trans>Blunders / 100 moves</Trans>, color: 'var(--bb-accent)' },
+  rating: { label: <Trans>Average rating</Trans>, color: 'var(--bb-faint)' },
 }
 
 interface Row {
@@ -48,6 +49,7 @@ function ThenNow({ label, value }: { label: string; value: string }) {
 }
 
 export function ProgressCard({ query }: { query: StatsQuery }) {
+  const { t } = useLingui()
   const rows: Row[] = buckets(query.data).map((bucket: StatsBucket) => ({
     key: bucket.key,
     label: periodLabel(bucket.key),
@@ -60,15 +62,20 @@ export function ProgressCard({ query }: { query: StatsQuery }) {
   const first = rows[0]
   const last = rows[rows.length - 1]
   const span = rows.length > 1
+  // Named here rather than in the sentence, because the identifier is the placeholder a
+  // translator sees. Guarded because an empty window has no last row to read.
+  const month = last?.label ?? ''
 
   return (
     <StatCard
-      title="Progress"
+      title={t`Progress`}
       aside={
         <div className="flex items-center gap-3">
-          <LegendSwatch color="var(--bb-accent)">blunders/100</LegendSwatch>
+          <LegendSwatch color="var(--bb-accent)">
+            <Trans>blunders/100</Trans>
+          </LegendSwatch>
           <LegendSwatch color="var(--bb-faint)" dashed>
-            rating
+            <Trans>rating</Trans>
           </LegendSwatch>
           {span ? (
             <span className="font-mono text-[0.65625rem] tabular text-dim-2">
@@ -81,15 +88,15 @@ export function ProgressCard({ query }: { query: StatsQuery }) {
         span ? (
           <span className="flex gap-5 max-md:flex-wrap max-md:gap-x-5 max-md:gap-y-1.5">
             <ThenNow
-              label="Blunders / 100 moves"
+              label={t`Blunders / 100 moves`}
               value={`${first.blunderRate.toFixed(1)} → ${last.blunderRate.toFixed(1)}`}
             />
             <ThenNow
-              label="Score"
+              label={t`Score`}
               value={`${first.score.toFixed(0)}% → ${last.score.toFixed(0)}%`}
             />
             <ThenNow
-              label="Rating"
+              label={t`Rating`}
               value={
                 first.rating === null || last.rating === null
                   ? '—'
@@ -104,7 +111,7 @@ export function ProgressCard({ query }: { query: StatsQuery }) {
         query={query}
         loading={<LoadingChart />}
         empty={rows.length === 0}
-        emptyMessage="No games in this window, so there is no trend to draw."
+        emptyMessage={<Trans>No games in this window, so there is no trend to draw.</Trans>}
       >
         {rows.length === 1 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-1.5 text-center">
@@ -112,7 +119,7 @@ export function ProgressCard({ query }: { query: StatsQuery }) {
               {last.blunderRate.toFixed(1)}
             </span>
             <span className="text-[0.71875rem] text-dim-2">
-              blunders per 100 moves in {last.label} — one month is not a trend yet
+              <Trans>blunders per 100 moves in {month} — one month is not a trend yet</Trans>
             </span>
           </div>
         ) : (

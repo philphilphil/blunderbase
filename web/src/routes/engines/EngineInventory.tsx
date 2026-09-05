@@ -1,3 +1,6 @@
+import type { I18n } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronRight } from 'lucide-react'
 
 import { StatusDot } from '@/components/badges/StatusDot'
@@ -37,7 +40,7 @@ export function EngineInventory({
   hostKnown,
   openDetail,
   onOpenDetail,
-  localLabel = 'This server',
+  localLabel,
 }: {
   engines: EngineResponse[]
   hosts: Map<number, EngineHost>
@@ -47,6 +50,10 @@ export function EngineInventory({
   onOpenDetail: (detail: string | null) => void
   localLabel?: string
 }) {
+  const { t, i18n } = useLingui()
+  // Resolved here rather than as a default parameter: a default is evaluated before the
+  // component body runs, which is before `useLingui` has handed anything back.
+  const local = localLabel ?? t`This server`
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-panel">
       <div
@@ -55,22 +62,33 @@ export function EngineInventory({
           COLUMNS,
         )}
       >
-        <span>Engine</span>
-        <span>Kind</span>
-        <span className="max-md:hidden">Assignment</span>
-        <span className="max-md:hidden">Where</span>
-        <span className="text-right">State</span>
+        <span>
+          <Trans context="inventory column">Engine</Trans>
+        </span>
+        <span>
+          <Trans context="inventory column">Kind</Trans>
+        </span>
+        <span className="max-md:hidden">
+          <Trans context="inventory column">Assignment</Trans>
+        </span>
+        <span className="max-md:hidden">
+          <Trans context="inventory column">Where</Trans>
+        </span>
+        <span className="text-right">
+          <Trans context="inventory column">State</Trans>
+        </span>
       </div>
       {engines.map((engine) => {
         const host = hosts.get(engine.id)
         const expanded = openDetail === `engine:${engine.id}`
-        const state = engineState(engine, host, hostKnown)
+        const engineName = engine.name
+        const state = engineState(engine, host, hostKnown, i18n)
         return (
           <div key={engine.id} className="border-t border-hairline">
             <button
               type="button"
               aria-expanded={expanded}
-              aria-label={`${expanded ? 'Collapse' : 'Edit'} ${engine.name}`}
+              aria-label={expanded ? t`Collapse ${engineName}` : t`Edit ${engineName}`}
               onClick={() => onOpenDetail(expanded ? null : `engine:${engine.id}`)}
               className={cn(
                 'grid w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raised',
@@ -104,7 +122,7 @@ export function EngineInventory({
                 className="max-md:hidden"
               />
               <span className="truncate text-[0.6875rem] text-dim max-md:hidden">
-                {hostLabel(host, hostKnown, localLabel)}
+                {hostLabel(host, hostKnown, local, i18n)}
               </span>
               <span
                 className={cn(
@@ -138,27 +156,51 @@ export function EngineInventory({
 
 type EngineTone = 'on' | 'off' | 'bad'
 
+/**
+ * The words these two say, as descriptors rather than strings.
+ *
+ * Neither function is a component, and the `t` macro only rewrites itself inside one — handed
+ * `t` as an argument it stays a tagged template and the row renders blank. `msg` carries the
+ * source text out to wherever the caller's `i18n` can resolve it, which is the render.
+ */
+const STATE = {
+  checking: msg`Checking…`,
+  off: msg({ message: 'Off', context: 'engine state' }),
+  hostAway: msg`Host away`,
+  queueOnly: msg`Queue only`,
+  on: msg({ message: 'On', context: 'engine state' }),
+}
+
+const WHERE = {
+  browser: msg`This browser`,
+  remote: msg`Remote runner`,
+}
+
 function engineState(
   engine: EngineResponse,
   host: EngineHost | undefined,
   hostKnown: boolean,
+  i18n: I18n,
 ): { label: string; tone: EngineTone } {
-  if (!hostKnown) return { label: 'Checking…', tone: 'off' }
-  if (!engine.enabled) return { label: 'Off', tone: 'off' }
-  if (host?.runnerId != null && !host.connected) return { label: 'Host away', tone: 'bad' }
-  if (host?.transport === 'poll' && engine.kind === 'uci') {
-    return { label: 'Queue only', tone: 'bad' }
+  if (!hostKnown) return { label: i18n._(STATE.checking), tone: 'off' }
+  if (!engine.enabled) return { label: i18n._(STATE.off), tone: 'off' }
+  if (host?.runnerId != null && !host.connected) {
+    return { label: i18n._(STATE.hostAway), tone: 'bad' }
   }
-  return { label: 'On', tone: 'on' }
+  if (host?.transport === 'poll' && engine.kind === 'uci') {
+    return { label: i18n._(STATE.queueOnly), tone: 'bad' }
+  }
+  return { label: i18n._(STATE.on), tone: 'on' }
 }
 
 function hostLabel(
   host: EngineHost | undefined,
   hostKnown: boolean,
   localLabel: string,
+  i18n: I18n,
 ): string {
-  if (!hostKnown) return 'Checking…'
+  if (!hostKnown) return i18n._(STATE.checking)
   if (!host || host.runnerId === null) return localLabel
-  if (host.browser) return 'This browser'
-  return host.runnerName ?? 'Remote runner'
+  if (host.browser) return i18n._(WHERE.browser)
+  return host.runnerName ?? i18n._(WHERE.remote)
 }

@@ -28,6 +28,7 @@
  *
  * There is deliberately no coach card and no per-move prose here. One was built and cut.
  */
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { ArrowUpRight } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
@@ -104,6 +105,7 @@ export function NotesTrack({
   composer,
   className,
 }: NotesTrackProps) {
+  const { t } = useLingui()
   // Null until the reader picks one, and their pick from then on.
   const [chosen, setChosen] = useState<'book' | 'notes' | null>(null)
 
@@ -118,13 +120,14 @@ export function NotesTrack({
   // The entry's own count, which includes games that *ended* here and so is not the sum of
   // the continuations. Falling back to that sum keeps the tab honest either way.
   const games = book?.games ?? moves.reduce((total, move) => total + (move.games ?? 0), 0)
+  const noteCount = notes.length
 
   return (
     <section
       data-testid="notes-track"
       className={cn('flex min-h-0 min-w-0 flex-col', className)}
     >
-      <div role="tablist" aria-label="Book and notes" className={TAB_ROW}>
+      <div role="tablist" aria-label={t`Book and notes`} className={TAB_ROW}>
         <button
           type="button"
           role="tab"
@@ -134,7 +137,7 @@ export function NotesTrack({
           onClick={() => setChosen('book')}
           className={cn(TAB, active === 'book' && TAB_ON)}
         >
-          Book
+          <Trans>Book</Trans>
         </button>
         <button
           type="button"
@@ -145,14 +148,16 @@ export function NotesTrack({
           onClick={() => setChosen('notes')}
           className={cn(TAB, active === 'notes' && TAB_ON)}
         >
-          Notes
+          <Trans>Notes</Trans>
         </button>
         <span className="flex-1" />
         {/* The count belongs to whichever pane is open, in the quietest type on the row. */}
         <span className="flex items-center font-mono text-[0.625rem] text-faint tabular">
-          {active === 'book'
-            ? `${games} ${games === 1 ? 'game' : 'games'}`
-            : `${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`}
+          {active === 'book' ? (
+            <Plural value={games} one="# game" other="# games" />
+          ) : (
+            <Plural value={noteCount} one="# note" other="# notes" />
+          )}
         </span>
         {/*
           The way out to the full explorer, on the Book tab only: this pane is four columns
@@ -165,8 +170,8 @@ export function NotesTrack({
           <button
             type="button"
             onClick={onOpenInExplorer}
-            aria-label="Open this position in the explorer"
-            title="Open this position in the explorer"
+            aria-label={t`Open this position in the explorer`}
+            title={t`Open this position in the explorer`}
             className="ml-1.5 flex items-center rounded-sm border border-edge bg-elevated px-1 py-px text-dim transition-colors hover:border-edge-hover hover:text-ink"
           >
             <ArrowUpRight className="size-3" aria-hidden />
@@ -250,74 +255,90 @@ function NoteList({
   activeNoteId: number | null
   onSelect: (row: NoteRow) => void
 }) {
+  const { t } = useLingui()
+
   if (notes.length === 0) {
-    return <p className="px-3 py-4 text-[0.71875rem] text-faint">No notes in this game yet.</p>
+    return (
+      <p className="px-3 py-4 text-[0.71875rem] text-faint">
+        <Trans>No notes in this game yet.</Trans>
+      </p>
+    )
   }
 
   return (
     <div data-testid="game-notes" className="flex flex-col px-1.5 pt-1 pb-2">
-      {notes.map((row) => (
-        <button
-          key={row.note.id}
-          type="button"
-          onClick={() => onSelect(row)}
-          className={cn(
-            'flex items-baseline gap-2.5 rounded-[0.3125rem] px-1.5 py-1.5 text-left transition-colors',
-            row.note.id === activeNoteId ? 'bg-row-active' : 'hover:bg-elevated',
-          )}
-        >
-          <span
-            // A note on a pinned variation and a note on the game both label themselves
-            // with a move, and `1…c6` on a detour is not the `1…c6` of the game. The old
-            // panel said which by printing the word "variation" beside it; this row is a
-            // quarter of that width, so it says it in the colour instead — the same
-            // brilliant the variation's own moves are drawn in — and spells it out in the
-            // title for anyone the colour does not reach. A note from somewhere else gets
-            // the quietest of the three: the label is still where *this* game reaches the
-            // position, which is where clicking the row goes.
+      {notes.map((row) => {
+        // Named, because it is the placeholder a translator sees in "from …".
+        const origin = row.from
+        return (
+          <button
+            key={row.note.id}
+            type="button"
+            onClick={() => onSelect(row)}
             className={cn(
-              'w-14 flex-none font-mono text-[0.6875rem] tabular',
-              row.elsewhere ? 'text-faint' : row.onLine ? 'text-brilliant' : 'text-dim',
+              'flex items-baseline gap-2.5 rounded-[0.3125rem] px-1.5 py-1.5 text-left transition-colors',
+              row.note.id === activeNoteId ? 'bg-row-active' : 'hover:bg-elevated',
             )}
-            title={
-              row.elsewhere
-                ? 'Written elsewhere, about a position this game reached'
-                : row.onLine
-                  ? 'On a pinned variation'
-                  : 'On the game'
-            }
           >
-            {/* A note that names no position is about the game entire; it still needs a
-                label, and "game" is what it is. */}
-            {row.context ?? 'game'}
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span
+              // A note on a pinned variation and a note on the game both label themselves
+              // with a move, and `1…c6` on a detour is not the `1…c6` of the game. The old
+              // panel said which by printing the word "variation" beside it; this row is a
+              // quarter of that width, so it says it in the colour instead — the same
+              // brilliant the variation's own moves are drawn in — and spells it out in the
+              // title for anyone the colour does not reach. A note from somewhere else gets
+              // the quietest of the three: the label is still where *this* game reaches the
+              // position, which is where clicking the row goes.
               className={cn(
-                'line-clamp-2 text-xs leading-[1.45]',
-                row.elsewhere ? 'text-dim' : 'text-soft-2',
+                'w-14 flex-none font-mono text-[0.6875rem] tabular',
+                row.elsewhere ? 'text-faint' : row.onLine ? 'text-brilliant' : 'text-dim',
               )}
+              title={
+                row.elsewhere
+                  ? t`Written elsewhere, about a position this game reached`
+                  : row.onLine
+                    ? t`On a pinned variation`
+                    : t`On the game`
+              }
             >
-              {row.note.text}
+              {/* A note that names no position is about the game entire; it still needs a
+                  label, and "game" is what it is. */}
+              {row.context ??
+                t({
+                  message: 'game',
+                  comment: 'Label on a note that hangs on the whole game rather than one move',
+                })}
             </span>
-            {row.elsewhere ? (
-              <span className="truncate text-[0.625rem] text-faint">
-                {row.from ? (
-                  <>
-                    from {row.from}
-                    {row.originMove ? <span className="font-mono"> · {row.originMove}</span> : null}
-                  </>
-                ) : (
-                  // No game to name: a note written against a bare position, in the
-                  // explorer or by the coach over MCP. Which of those it was is not
-                  // something this row can know, so it says only what is certain.
-                  'not from this game'
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span
+                className={cn(
+                  'line-clamp-2 text-xs leading-[1.45]',
+                  row.elsewhere ? 'text-dim' : 'text-soft-2',
                 )}
+              >
+                {row.note.text}
               </span>
-            ) : null}
-          </span>
-        </button>
-      ))}
+              {row.elsewhere ? (
+                <span className="truncate text-[0.625rem] text-faint">
+                  {origin ? (
+                    <>
+                      <Trans>from {origin}</Trans>
+                      {row.originMove ? (
+                        <span className="font-mono"> · {row.originMove}</span>
+                      ) : null}
+                    </>
+                  ) : (
+                    // No game to name: a note written against a bare position, in the
+                    // explorer or by the coach over MCP. Which of those it was is not
+                    // something this row can know, so it says only what is certain.
+                    <Trans>not from this game</Trans>
+                  )}
+                </span>
+              ) : null}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }

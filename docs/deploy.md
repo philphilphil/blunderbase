@@ -229,6 +229,13 @@ it safe is in `docs/reference.md` under "Signing in"; what makes it run is three
    demo's analysis board; a proxy that only forwards `/`, `/api` and `/events` is
    otherwise forwarding everything there is.
 
+A release then keeps it current on its own. `release.yml`'s deploy job names both stacks,
+`blunderbase` and `blunderbase-demo`, so the demo pulls the same new `latest` the owner's
+library does and migrates the library already in its volume — nothing there is replaced,
+and the file only changes when you copy a newer `demo create` in. Both stacks are
+attempted even if one fails, and the job fails afterwards if either did, so the Komodo API
+key has to hold permission on both.
+
 What a visitor can make the machine do is bounded the way it is for the owner: at most
 `BLUNDERBASE_STREAM_MAX_SESSIONS` analysis boards at once (two), each dropped
 `BLUNDERBASE_STREAM_IDLE_SECONDS` after its tab goes away, and one-off evals capped by the

@@ -21,6 +21,10 @@
  * Nothing here is ever written down. A row plays its move into the line the same way the
  * owner's own table does, and that line is a URL; the counts behind it stay upstream.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg, plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ReferenceExplorerResponse, ReferenceMove } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
@@ -29,14 +33,15 @@ import { plyLabel } from '../line'
 import { formatCount, sharePercent } from '../reference'
 import { SPLIT_WIDTH, SidesBar } from './ScoreBar'
 
-const COLUMNS = [
-  { id: 'move', label: 'Move', width: 78 },
-  { id: 'games', label: 'Games', width: 62, align: 'right' as const },
-  { id: 'share', label: 'Share', width: 44, align: 'right' as const },
-  { id: 'split', label: 'White / draw / black', width: SPLIT_WIDTH },
-  { id: 'rating', label: 'Avg elo', width: 56, align: 'right' as const },
-  { id: 'opening', label: 'Opening', width: 'flex' as const },
-]
+const COLUMNS: { id: string; label: MessageDescriptor; width: number | 'flex'; align?: 'right' }[] =
+  [
+    { id: 'move', label: msg`Move`, width: 78 },
+    { id: 'games', label: msg`Games`, width: 62, align: 'right' },
+    { id: 'share', label: msg`Share`, width: 44, align: 'right' },
+    { id: 'split', label: msg`White / draw / black`, width: SPLIT_WIDTH },
+    { id: 'rating', label: msg`Avg elo`, width: 56, align: 'right' },
+    { id: 'opening', label: msg`Opening`, width: 'flex' },
+  ]
 
 function style(width: number | 'flex') {
   return width === 'flex' ? { flex: 1, minWidth: 0 } : { width, flex: 'none' as const }
@@ -77,12 +82,13 @@ export function ReferenceMoveTable({
 }) {
   const moves = data?.moves ?? []
   const total = data?.totals.games ?? 0
+  const { i18n, t } = useLingui()
 
   return (
     <div
       className="flex flex-col gap-3.5 max-md:overflow-x-auto"
       role="table"
-      aria-label="Reference continuations"
+      aria-label={t`Reference continuations`}
     >
       <div
         role="row"
@@ -97,7 +103,7 @@ export function ReferenceMoveTable({
             style={style(column.width)}
             className={cn(column.align === 'right' && 'text-right')}
           >
-            {column.label}
+            {i18n._(column.label)}
           </span>
         ))}
       </div>
@@ -128,7 +134,7 @@ export function ReferenceMoveTable({
           className="flex items-center justify-center rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-3 text-center"
         >
           <p className="text-[0.78125rem] text-dim">
-            No game in this database goes any further than this position.
+            <Trans>No game in this database goes any further than this position.</Trans>
           </p>
         </div>
       ) : (
@@ -141,6 +147,9 @@ export function ReferenceMoveTable({
         >
           {moves.map((move) => {
             const share = sharePercent(move.games, total)
+            // The exact count, unrounded and ungrouped — the cell beside it is the rounded
+            // one, so a thousands separator here would read as a second, different figure.
+            const count = move.games
             return (
               <button
                 key={move.uci}
@@ -160,7 +169,7 @@ export function ReferenceMoveTable({
                 <span
                   style={style(62)}
                   className="text-right text-body"
-                  title={`${move.games} games`}
+                  title={t`${plural(count, { one: `${count} game`, other: `${count} games` })}`}
                 >
                   {formatCount(move.games)}
                 </span>

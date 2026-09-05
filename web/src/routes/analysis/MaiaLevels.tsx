@@ -1,3 +1,5 @@
+import { plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
@@ -19,9 +21,15 @@ import { formatCount } from '@/routes/games/format'
  * a hundred rows nobody asked for is a hundred rows either way.
  */
 export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
+  const { t } = useLingui()
   const [showing, setShowing] = useState(false)
   const orphans = maia.orphan_levels
   const pairs = orphans.reduce((sum, level) => sum + level.games, 0)
+  // Named locals: an identifier is what a translator sees as the placeholder, and the two
+  // counts are formatted before the sentence so the plural only has to choose the word.
+  const missing = formatCount(maia.missing_games)
+  const levelCount = formatCount(orphans.length)
+  const pairCount = formatCount(pairs)
 
   return (
     <section
@@ -30,13 +38,15 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
     >
       <header className="flex items-baseline gap-2">
         <h2 id="maia-levels-title" className="text-xs font-semibold text-ink">
-          Maia levels
+          <Trans>Maia levels</Trans>
         </h2>
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] tabular text-dim-2">
-          {maia.missing_games === 0
-            ? 'every analysed game has every level'
-            : `${formatCount(maia.missing_games)} missing a level`}
+          {maia.missing_games === 0 ? (
+            <Trans>every analysed game has every level</Trans>
+          ) : (
+            <Trans>{missing} missing a level</Trans>
+          )}
         </span>
       </header>
 
@@ -50,11 +60,15 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
             <span className="font-mono text-[0.8125rem] leading-none tabular text-ink">
               {formatCount(level.games)}
             </span>
-            <span className="text-[0.5625rem] text-dim-2">games</span>
+            <span className="text-[0.5625rem] text-dim-2">
+              <Trans>games</Trans>
+            </span>
           </div>
         ))}
         {maia.per_level.length === 0 ? (
-          <span className="text-[0.6875rem] text-dim-2">No levels configured.</span>
+          <span className="text-[0.6875rem] text-dim-2">
+            <Trans>No levels configured.</Trans>
+          </span>
         ) : null}
       </div>
 
@@ -71,13 +85,21 @@ export function MaiaLevels({ maia }: { maia: CoverageMaia }) {
             ) : (
               <ChevronRight className="size-3 text-faint" aria-hidden />
             )}
-            {`${formatCount(orphans.length)} ${orphans.length === 1 ? 'level' : 'levels'} no longer configured, across ${formatCount(pairs)} game-level ${pairs === 1 ? 'pair' : 'pairs'}`}
+            {t`${levelCount} ${plural(orphans.length, {
+              one: 'level',
+              other: 'levels',
+            })} no longer configured, across ${pairCount} game-level ${plural(pairs, {
+              one: 'pair',
+              other: 'pairs',
+            })}`}
           </button>
           <p className="text-[0.625rem] leading-[1.5] text-dim-2">
-            Maia used to be asked at each game&rsquo;s own rating rather than at a fixed set,
-            so the library carries a level for nearly every rating it has ever seen. They
-            cost nothing and answer nothing — a fill is what puts the configured levels on
-            those games.
+            <Trans>
+              Maia used to be asked at each game&rsquo;s own rating rather than at a fixed set,
+              so the library carries a level for nearly every rating it has ever seen. They
+              cost nothing and answer nothing — a fill is what puts the configured levels on
+              those games.
+            </Trans>
           </p>
           {showing ? (
             <ul className="flex flex-wrap gap-1.5">

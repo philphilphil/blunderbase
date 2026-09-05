@@ -1,3 +1,5 @@
+import { useLingui } from '@lingui/react/macro'
+
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 
@@ -9,14 +11,15 @@ import { LibraryManagement } from './LibraryManagement'
  * linkable, and none of the account/history queries run merely to manage stored data.
  */
 export function LibraryManagePage() {
+  const { t } = useLingui()
   return (
     <PageBody>
       <SetPageChrome
-        breadcrumb={[{ label: 'Library', to: '/library' }, { label: 'Manage' }]}
+        breadcrumb={[{ label: t`Library`, to: '/library' }, { label: t`Manage` }]}
       />
       <PageHeader
-        title="Manage Library"
-        description="Export a portable copy or reset the imported data in this installation."
+        title={t`Manage Library`}
+        description={t`Export a portable copy or reset the imported data in this installation.`}
       />
       <LibraryManagement />
     </PageBody>

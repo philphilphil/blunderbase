@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Fragment, useEffect, useRef, useState } from 'react'
 
 import { MiniBoard } from '@/components/board/MiniBoard'
@@ -154,17 +157,22 @@ function LineTokens({
   )
 }
 
-/** The end reasons the panel offers a way out of, in words rather than in wire vocabulary. */
-function reasonSentence(reason: StreamEndReason, where: string): string {
+/**
+ * The end reasons the panel offers a way out of, in words rather than in wire vocabulary.
+ *
+ * A descriptor rather than a string, because this is module level: the sentence is resolved
+ * where it is drawn, against whatever catalog is loaded then.
+ */
+function reasonSentence(reason: StreamEndReason, where: string): MessageDescriptor {
   switch (reason) {
     case 'runner_gone':
-      return `${where} went away mid-search.`
+      return msg`${where} went away mid-search.`
     case 'engine_failed':
-      return `The engine on ${where} stopped mid-search.`
+      return msg`The engine on ${where} stopped mid-search.`
     case 'idle':
-      return 'The search was closed for sitting idle.'
+      return msg`The search was closed for sitting idle.`
     default:
-      return 'The search ended.'
+      return msg`The search ended.`
   }
 }
 
@@ -245,6 +253,7 @@ export function InfiniteAnalysisPanel({
   orientation = 'white',
   className,
 }: InfiniteAnalysisPanelProps) {
+  const { t, i18n } = useLingui()
   const { phase, snapshot, session, offer, error, note } = stream
   const lines: StreamLine[] = [...(snapshot?.lines ?? [])].sort((a, b) => a.multipv - b.multipv)
   const prefs = useLinePreviewPrefs()
@@ -312,7 +321,7 @@ export function InfiniteAnalysisPanel({
         <div className="flex items-center gap-2 px-3 py-2.5">
           <span className="size-1.5 flex-none rounded-full bg-edge-strong" />
           <span className="text-[0.71875rem] text-dim">
-            Analyse this position continuously.
+            <Trans>Analyse this position continuously.</Trans>
           </span>
         </div>
         {note ? (
@@ -323,7 +332,10 @@ export function InfiniteAnalysisPanel({
     )
   }
 
-  const where = session?.runner ?? 'this machine'
+  const where = session?.runner ?? t`this machine`
+  // Named here rather than in the readout below, because the identifier is the placeholder
+  // a translator sees in "{nodes} nodes".
+  const nodes = snapshot?.nodes ? formatNodes(snapshot.nodes) : null
 
   return (
     <section className={shell} data-testid="infinite-analysis">
@@ -346,7 +358,7 @@ export function InfiniteAnalysisPanel({
             title={session?.engine}
             className="max-w-[45%] flex-none truncate text-xs font-semibold text-ink"
           >
-            {session ? displayEngine(session.engine, session.runner ?? null) : 'Live analysis'}
+            {session ? displayEngine(session.engine, session.runner ?? null) : t`Live analysis`}
           </span>
           {session ? <HostChip runner={session.runner ?? null} /> : null}
           <div className="flex-1" />
@@ -368,9 +380,9 @@ export function InfiniteAnalysisPanel({
             {snapshot?.depth ? (
               <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">d{snapshot.depth}</span>
             ) : null}
-            {snapshot?.nodes ? (
+            {nodes ? (
               <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
-                {formatNodes(snapshot.nodes)} nodes
+                <Trans>{nodes} nodes</Trans>
               </span>
             ) : null}
             {snapshot?.nps ? (
@@ -385,28 +397,31 @@ export function InfiniteAnalysisPanel({
       {offer ? (
         <div className="mx-1.5 mb-1.5 rounded-md border border-mistake/28 bg-mistake/5 px-2.5 py-2">
           <p className="text-[0.71875rem] text-mistake">
-            {reasonSentence(offer.reason, where)}
+            {i18n._(reasonSentence(offer.reason, where))}
           </p>
           {offer.error ? (
             <p className="mt-1 font-mono text-[0.625rem] text-mistake/80">{offer.error}</p>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {offer.candidates.map((host) => (
-              <button
-                key={host.engineId}
-                type="button"
-                onClick={() => stream.resume(host.engineId)}
-                className="rounded-md border border-edge bg-elevated px-2 py-[0.1875rem] text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
-              >
-                Resume on {host.name}
-              </button>
-            ))}
+            {offer.candidates.map((host) => {
+              const engine = host.name
+              return (
+                <button
+                  key={host.engineId}
+                  type="button"
+                  onClick={() => stream.resume(host.engineId)}
+                  className="rounded-md border border-edge bg-elevated px-2 py-[0.1875rem] text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
+                >
+                  <Trans>Resume on {engine}</Trans>
+                </button>
+              )
+            })}
             <button
               type="button"
               onClick={stream.dismissOffer}
               className="rounded-md px-2 py-[0.1875rem] text-[0.6875rem] text-dim transition-colors hover:text-ink"
             >
-              Dismiss
+              <Trans>Dismiss</Trans>
             </button>
           </div>
         </div>
@@ -519,7 +534,7 @@ export function InfiniteAnalysisPanel({
                       fen={peek}
                       orientation={orientation}
                       size="7.5rem"
-                      label="Peek at the line"
+                      label={t`Peek at the line`}
                     />
                     {caption ? (
                       <span className="font-mono text-[0.59375rem] text-dim">{caption}</span>

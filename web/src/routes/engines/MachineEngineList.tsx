@@ -7,6 +7,8 @@
  * is a fact about the deployment's policy (which engine serves quick, which serves deep),
  * not about a machine, and belongs to the role strip at the top of the page.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { StatusDot } from '@/components/badges/StatusDot'
 import type { RunnerEngine } from '@/lib/api/types'
 
@@ -23,7 +25,11 @@ export function MachineEngineList({
   connected: boolean
 }) {
   if (engines.length === 0) {
-    return <p className="text-[0.6875rem] text-dim-2">Nothing has been advertised.</p>
+    return (
+      <p className="text-[0.6875rem] text-dim-2">
+        <Trans>Nothing has been advertised.</Trans>
+      </p>
+    )
   }
   return (
     <div className="flex flex-col gap-px">
@@ -53,6 +59,7 @@ function MachineEngineRow({
   // counted against it precisely because nothing is draining it — and the status caption
   // beside the row's name has already said so.
   const queueOnly = connected && !(engine.streams && streamable)
+  const { t } = useLingui()
   return (
     <div className="flex items-center gap-2 rounded-[0.3125rem] px-1 py-1.5 hover:bg-raised">
       <StatusDot tone={engine.enabled ? 'healthy' : 'away'} />
@@ -63,11 +70,11 @@ function MachineEngineRow({
           className="flex-none rounded-sm border border-mistake/28 bg-mistake/8 px-1.5 py-px text-[0.59375rem] text-mistake"
           title={
             engine.streams
-              ? 'this link takes queue work but cannot open an analysis board'
-              : 'answers with a policy rather than a search'
+              ? t`this link takes queue work but cannot open an analysis board`
+              : t`answers with a policy rather than a search`
           }
         >
-          queue only
+          <Trans>queue only</Trans>
         </span>
       ) : null}
       <div className="flex-1" />

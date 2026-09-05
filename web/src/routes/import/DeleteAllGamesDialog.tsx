@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 
@@ -25,6 +26,7 @@ export function DeleteAllGamesDialog({
   onClose: () => void
   onDone: (deleted: GamesDeleted) => void
 }) {
+  const { t } = useLingui()
   const capabilities = useRuntimeCapabilities()
   const [password, setPassword] = useState('')
   const wipe = useDeleteAllGames({ onSuccess: onDone })
@@ -60,19 +62,30 @@ export function DeleteAllGamesDialog({
         <div className="flex flex-col gap-1.5">
           <h2 id="delete-all-games-title" className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink">
             <TriangleAlert className="size-3.5 text-blunder" aria-hidden />
-            Reset imported library
+            <Trans>Reset imported library</Trans>
           </h2>
+          {/* Two whole sentences rather than a count glued to a tail: which of them is on
+              screen turns on whether the library has been counted yet. */}
           <p className="text-[0.75rem] leading-[1.65] text-dim">
-            {count ? `${count} ${count === '1' ? 'game goes' : 'games go'}` : 'Every game goes'},
-            with game analysis, game notes and sync history. Accounts, engines and position-only
-            notes stay. There is no undo.
+            {count === undefined ? (
+              <Trans>
+                Every game goes, with game analysis, game notes and sync history. Accounts,
+                engines and position-only notes stay. There is no undo.
+              </Trans>
+            ) : (
+              <Trans>
+                <Plural value={games ?? 0} one={`${count} game goes`} other={`${count} games go`} />
+                , with game analysis, game notes and sync history. Accounts, engines and
+                position-only notes stay. There is no undo.
+              </Trans>
+            )}
           </p>
         </div>
         <form onSubmit={submit} className="flex flex-col gap-4">
           {capabilities.password_auth ? (
             <PasswordField
               id="delete-all-games-password"
-              label="Your password"
+              label={t`Your password`}
               value={password}
               onChange={(value) => {
                 setPassword(value)
@@ -85,7 +98,9 @@ export function DeleteAllGamesDialog({
           ) : null}
           {message ? <FormError>{message}</FormError> : null}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              <Trans>Cancel</Trans>
+            </Button>
             <Button
               type="submit"
               variant="destructive"
@@ -93,7 +108,7 @@ export function DeleteAllGamesDialog({
               disabled={(capabilities.password_auth && !password) || wipe.isPending}
             >
               {wipe.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              Delete them
+              <Trans>Delete them</Trans>
             </Button>
           </div>
         </form>

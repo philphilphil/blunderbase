@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Check, Loader2, Pencil, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 
@@ -38,6 +39,7 @@ export function RunnerCard({
   /** The one-page screen presents capacity as cards without changing runner mutations. */
   layout?: 'row' | 'card'
 }) {
+  const { t } = useLingui()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(runner.name)
   const [slots, setSlots] = useState(String(runner.slots))
@@ -72,18 +74,24 @@ export function RunnerCard({
   const status = statusLabel(runner)
   const shares = slotShares(runner)
   const streamable = canStream(runner)
+  const runnerName = runner.name
+  const free = runner.free_slots
+  const queued = runner.queued_eligible
+  const busy = runner.busy
+  const streams = runner.streams
+  const seen = relative(runner.last_seen_at)
 
   return (
     <MachineRow
       tone={TONE[status.tone]}
       name={runner.name}
       caption={status.label}
-      type="Remote runner"
+      type={t`Remote runner`}
       slots={`${runner.busy + runner.streams}/${runner.slots}`}
       engines={String(runner.engines.length)}
       expanded={expanded}
       onToggleExpand={onToggleExpand}
-      ariaLabel={`${expanded ? 'Collapse' : 'Expand'} ${runner.name}`}
+      ariaLabel={expanded ? t`Collapse ${runnerName}` : t`Expand ${runnerName}`}
       layout={layout}
       detail={
         <div className="flex flex-col gap-3">
@@ -91,14 +99,14 @@ export function RunnerCard({
             {editing ? (
               <>
                 <Input
-                  aria-label={`Name of ${runner.name}`}
+                  aria-label={t`Name of ${runnerName}`}
                   value={name}
                   spellCheck={false}
                   className="h-7 max-w-[11rem]"
                   onChange={(event) => setName(event.target.value)}
                 />
                 <Input
-                  aria-label={`Slots on ${runner.name}`}
+                  aria-label={t`Slots on ${runnerName}`}
                   value={slots}
                   inputMode="numeric"
                   className="h-7 max-w-[4rem] font-mono"
@@ -115,30 +123,30 @@ export function RunnerCard({
                   ) : (
                     <Check aria-hidden />
                   )}
-                  Save
+                  <Trans>Save</Trans>
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>
                   <X aria-hidden />
-                  Cancel
+                  <Trans>Cancel</Trans>
                 </Button>
               </>
             ) : (
               <>
                 <button
                   type="button"
-                  aria-label={`Edit ${runner.name}`}
+                  aria-label={t`Edit ${runnerName}`}
                   onClick={open}
                   className="inline-flex items-center gap-1.5 text-[0.6875rem] text-dim transition-colors hover:text-ink"
                 >
                   <Pencil className="size-3" aria-hidden />
-                  Rename or resize
+                  <Trans>Rename or resize</Trans>
                 </button>
                 <div className="flex-1" />
                 {runner.version ? (
                   <span className="font-mono text-[0.65625rem] text-dim">{runner.version}</span>
                 ) : null}
                 <span className="text-[0.65625rem] text-faint">
-                  last seen {relative(runner.last_seen_at)}
+                  <Trans>last seen {seen}</Trans>
                 </span>
               </>
             )}
@@ -157,18 +165,23 @@ export function RunnerCard({
                 </div>
               </div>
               <span className="text-[0.65625rem] text-dim-2">
-                {runner.free_slots} free · {runner.queued_eligible} queued here
+                <Trans>
+                  {free} free · {queued} queued here
+                </Trans>
               </span>
             </div>
             <p className="text-[0.625rem] text-faint">
-              {runner.busy} queue run{runner.busy === 1 ? '' : 's'} and {runner.streams} analysis
-              board{runner.streams === 1 ? '' : 's'} are holding slots.
+              <Trans>
+                <Plural value={busy} one="# queue run" other="# queue runs" /> and{' '}
+                <Plural value={streams} one="# analysis board" other="# analysis boards" /> are
+                holding slots.
+              </Trans>
             </p>
           </div>
 
           <div className="flex flex-col gap-px border-t border-hairline pt-2.5">
             <h4 className="mb-1 text-[0.625rem] tracking-[0.1em] text-faint uppercase">
-              Advertised engines
+              <Trans>Advertised engines</Trans>
             </h4>
             <MachineEngineList
               engines={runner.engines}
@@ -183,9 +196,11 @@ export function RunnerCard({
               {confirmRevoke ? (
                 <>
                   <span className="flex-1 text-[0.6875rem] leading-[1.6] text-blunder">
-                    Revoking closes the link, deletes the engines it advertised and hands its
-                    running work back to the queue with the attempt refunded. The token stops
-                    working; a new one means a new runner.
+                    <Trans>
+                      Revoking closes the link, deletes the engines it advertised and hands its
+                      running work back to the queue with the attempt refunded. The token stops
+                      working; a new one means a new runner.
+                    </Trans>
                   </span>
                   <Button
                     type="button"
@@ -193,7 +208,7 @@ export function RunnerCard({
                     size="sm"
                     onClick={() => setConfirmRevoke(false)}
                   >
-                    Cancel
+                    <Trans>Cancel</Trans>
                   </Button>
                   <Button
                     type="button"
@@ -203,7 +218,7 @@ export function RunnerCard({
                     onClick={() => revoke.mutate(runner.id)}
                   >
                     {revoke.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-                    Revoke
+                    <Trans context="button">Revoke</Trans>
                   </Button>
                 </>
               ) : (
@@ -215,7 +230,7 @@ export function RunnerCard({
                     onClick={() => setConfirmRevoke(true)}
                   >
                     <Trash2 aria-hidden />
-                    Revoke
+                    <Trans context="button">Revoke</Trans>
                   </Button>
                   <div className="flex-1" />
                 </>

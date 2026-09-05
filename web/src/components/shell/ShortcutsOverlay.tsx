@@ -12,6 +12,7 @@
  * the filtering themselves; the groups that apply everywhere stay, because those are true
  * here too.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Keyboard } from 'lucide-react'
 import {
   createContext,
@@ -42,25 +43,32 @@ function Key({ children }: { children: ReactNode }) {
  * across a column boundary reads as two half-lists under one heading.
  */
 function Group({ group }: { group: ShortcutGroup }) {
+  // The table holds descriptors, not sentences (`lib/ui/shortcuts.ts`), so this is where
+  // they become words — and the row's key with them, since a group's keycaps are unique
+  // within it but its label is what the reader is looking at.
+  const { i18n } = useLingui()
   return (
     <section className="mb-4 break-inside-avoid">
       <h3 className="border-b border-hairline px-1.5 pb-1 text-[0.625rem] tracking-[0.12em] text-faint uppercase">
-        {group.name}
+        {i18n._(group.name)}
       </h3>
       <div className="pt-1">
-        {group.shortcuts.map((shortcut) => (
-          <div
-            key={shortcut.label}
-            className="flex items-baseline gap-3 rounded-md px-1.5 py-[0.1875rem] text-[0.71875rem] leading-snug text-soft"
-          >
-            <span className="min-w-0 flex-1">{shortcut.label}</span>
-            <span className="flex flex-none items-center gap-1">
-              {shortcut.keys.map((key) => (
-                <Key key={key}>{key}</Key>
-              ))}
-            </span>
-          </div>
-        ))}
+        {group.shortcuts.map((shortcut) => {
+          const label = i18n._(shortcut.label)
+          return (
+            <div
+              key={label}
+              className="flex items-baseline gap-3 rounded-md px-1.5 py-[0.1875rem] text-[0.71875rem] leading-snug text-soft"
+            >
+              <span className="min-w-0 flex-1">{label}</span>
+              <span className="flex flex-none items-center gap-1">
+                {shortcut.keys.map((key) => (
+                  <Key key={key}>{key}</Key>
+                ))}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </section>
   )
@@ -69,6 +77,7 @@ function Group({ group }: { group: ShortcutGroup }) {
 function Dialog({ onClose }: { onClose: () => void }) {
   const { pathname } = useLocation()
   const groups = useMemo(() => shortcutsFor(pathname), [pathname])
+  const { t, i18n } = useLingui()
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -103,16 +112,16 @@ function Dialog({ onClose }: { onClose: () => void }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Keyboard shortcuts"
+        aria-label={t`Keyboard shortcuts`}
         className="bb-card flex max-h-full w-full max-w-[52rem] flex-col overflow-hidden shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-none items-center gap-2.5 border-b border-hairline px-4 py-2.5">
           <Keyboard className="size-3.5 flex-none text-faint" aria-hidden />
           <span className="min-w-0 flex-1 text-[0.8125rem] font-semibold text-ink">
-            Keyboard shortcuts
+            <Trans>Keyboard shortcuts</Trans>
           </span>
           <span className="flex-none text-[0.625rem] text-faint max-md:hidden">
-            what this screen answers to
+            <Trans>what this screen answers to</Trans>
           </span>
           <Key>esc</Key>
         </div>
@@ -125,7 +134,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
         */}
         <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-1 columns-1 gap-x-8 md:columns-2 lg:columns-3">
           {groups.map((group) => (
-            <Group key={group.name} group={group} />
+            <Group key={i18n._(group.name)} group={group} />
           ))}
         </div>
       </div>
@@ -171,12 +180,13 @@ export function ShortcutsOverlayProvider({ children }: { children: ReactNode }) 
 /** The titlebar chip. Named beside the palette's, and the same size and weight. */
 export function ShortcutsButton({ className }: { className?: string }) {
   const shortcuts = useShortcutsOverlay()
+  const { t } = useLingui()
   return (
     <button
       type="button"
       onClick={shortcuts.open}
-      aria-label="Keyboard shortcuts"
-      title="Keyboard shortcuts (?)"
+      aria-label={t`Keyboard shortcuts`}
+      title={t`Keyboard shortcuts (?)`}
       className={cn(
         'flex flex-none items-center rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim transition-colors hover:border-edge-hover hover:text-ink',
         className,

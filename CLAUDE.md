@@ -62,6 +62,10 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 - Components carry a doc comment saying *why* they are shaped the way they are; keep that
   habit — the reasoning is the part that is not obvious from the JSX.
 - Native `select`/`textarea` styled with Tailwind is the norm over heavy widgets.
+- **Every string a person reads goes through Lingui.** `<Trans>` for JSX text, `useLingui()`'s
+  `t` for props and toasts, `msg` for labels in module-level tables, the global `t` only in
+  helpers with no React. English is the source text; `pnpm i18n` refreshes the catalogs under
+  `web/src/locales/` and CI fails when they are stale. Details in `docs/reference.md`.
 - `web/src/lib/api/` is the typed client; `web/src/lib/events/` handles the `/events`
   WebSocket and query invalidation.
 - `web/src/lib/board/linePreview.ts` is the only place engine-line-preview shapes are

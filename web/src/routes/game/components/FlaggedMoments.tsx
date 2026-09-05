@@ -1,3 +1,5 @@
+import { Trans } from '@lingui/react/macro'
+
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import type { MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
@@ -41,7 +43,9 @@ export function FlaggedMoments({
   if (flagged.length === 0) {
     return (
       <div className={cn('flex items-start justify-center px-3 py-6', className)}>
-        <p className="text-center text-[0.71875rem] text-dim">Nothing flagged in this game.</p>
+        <p className="text-center text-[0.71875rem] text-dim">
+          <Trans>Nothing flagged in this game.</Trans>
+        </p>
       </div>
     )
   }

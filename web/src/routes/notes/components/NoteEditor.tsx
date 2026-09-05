@@ -11,6 +11,7 @@
  * for a parent to hold on their behalf, and keeping the mutation here is what lets either
  * view drop one in without wiring anything up.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, Loader2, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -30,6 +31,7 @@ export interface NoteEditorProps {
 
 /** The box a note is rewritten in: its text, its tags, and the two ways out. */
 export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProps) {
+  const { t } = useLingui()
   const [text, setText] = useState(note.text)
   const [tags, setTags] = useState<string[]>(note.tags)
   const update = useUpdateNote()
@@ -51,7 +53,7 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
           // ⌘/Ctrl+Enter saves, the way every box that takes prose does.
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) save()
         }}
-        aria-label="Note"
+        aria-label={t`Note`}
         rows={4}
         className="w-full resize-y rounded-md border border-input bg-elevated px-2.5 py-2 text-[0.78125rem] leading-[1.55] text-ink outline-none focus-visible:border-accent-teal/50"
       />
@@ -59,7 +61,7 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
         tags={tags}
         onChange={setTags}
         suggestions={tagSuggestions}
-        label="This note's tags"
+        label={t`This note's tags`}
         className="rounded-md border border-input bg-elevated px-1.5 py-1"
       />
       <div className="flex items-center gap-1.5 max-md:flex-wrap max-md:gap-y-1.5">
@@ -69,11 +71,11 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
           ) : (
             <Check className="size-3" aria-hidden />
           )}
-          Save
+          <Trans>Save</Trans>
         </Button>
         <Button size="sm" variant="ghost" onClick={onDone}>
           <X className="size-3" aria-hidden />
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
         {update.isError ? (
           <span className="text-[0.6875rem] text-blunder">{update.error.message}</span>
@@ -91,7 +93,9 @@ export function DeleteConfirm({ noteId, onCancel }: { noteId: number; onCancel: 
   const remove = useDeleteNote()
   return (
     <div className="flex items-center gap-2 rounded-md border border-blunder/28 bg-blunder/5 px-2 py-1.5 max-md:flex-wrap max-md:gap-y-1.5">
-      <span className="text-[0.6875rem] text-blunder">Forget this note for good?</span>
+      <span className="text-[0.6875rem] text-blunder">
+        <Trans>Forget this note for good?</Trans>
+      </span>
       <span className="flex-1" />
       <Button
         size="sm"
@@ -100,10 +104,10 @@ export function DeleteConfirm({ noteId, onCancel }: { noteId: number; onCancel: 
         onClick={() => remove.mutate(noteId)}
       >
         {remove.isPending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-        Forget it
+        <Trans>Forget it</Trans>
       </Button>
       <Button size="sm" variant="ghost" onClick={onCancel}>
-        Keep it
+        <Trans>Keep it</Trans>
       </Button>
     </div>
   )

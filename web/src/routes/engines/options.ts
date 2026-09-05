@@ -7,6 +7,8 @@
  * source of truth: it is the same rules, applied before the round trip, so a typo is a
  * message under the field rather than a 422.
  */
+import { t } from '@lingui/core/macro'
+
 import type { ProbeOption, ProbeResponse } from '@/lib/api/types'
 
 export type UciOptionType = 'check' | 'spin' | 'combo' | 'button' | 'string'
@@ -80,22 +82,25 @@ export function isEditable(option: DeclaredOption): boolean {
 export function optionError(option: DeclaredOption, raw: string): string | null {
   const value = raw.trim()
   if (value === '') return null
-  if (option.managed) return 'set per analysis — it cannot be stored'
-  if (option.type === 'button') return 'a button is an action, not a stored value'
+  if (option.managed) return t`set per analysis — it cannot be stored`
+  if (option.type === 'button') return t`a button is an action, not a stored value`
 
   switch (option.type) {
     case 'check':
-      return value === 'true' || value === 'false' ? null : 'has to be true or false'
+      return value === 'true' || value === 'false' ? null : t`has to be true or false`
     case 'spin': {
-      if (!/^-?\d+$/.test(value)) return 'has to be a whole number'
+      if (!/^-?\d+$/.test(value)) return t`has to be a whole number`
       const parsed = Number.parseInt(value, 10)
-      if (option.min !== null && parsed < option.min) return `at least ${option.min}`
-      if (option.max !== null && parsed > option.max) return `at most ${option.max}`
+      const { min, max } = option
+      if (min !== null && parsed < min) return t`at least ${min}`
+      if (max !== null && parsed > max) return t`at most ${max}`
       return null
     }
-    case 'combo':
+    case 'combo': {
       if (option.choices.length === 0) return null
-      return option.choices.includes(value) ? null : `one of ${option.choices.join(', ')}`
+      const choices = option.choices.join(', ')
+      return option.choices.includes(value) ? null : t`one of ${choices}`
+    }
     default:
       return null
   }
@@ -166,7 +171,7 @@ export function resolveDraft(
     if (!option) {
       // Kept, not dropped: an option the probe no longer declares is a real problem the
       // person has to see, and the backend would refuse the write anyway.
-      errors[name] = 'this engine does not declare that option'
+      errors[name] = t`this engine does not declare that option`
       continue
     }
     const problem = optionError(option, raw)

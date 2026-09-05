@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Fragment, useMemo, useRef, useState } from 'react'
 import {
   Area,
@@ -56,7 +59,7 @@ function markFor(classification: CurvePoint['classification']): MarkedGlyph | nu
   return glyph === 'blunder' || glyph === 'mistake' ? glyph : null
 }
 
-const CONFIG: ChartConfig = { win: { label: 'White', color: CURVE } }
+const CONFIG: ChartConfig = { win: { label: <Trans>White</Trans>, color: CURVE } }
 
 /**
  * A curve point split into the half above and the half below the axis, so each half can
@@ -264,7 +267,9 @@ export function EvalGraph({
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 [grid-area:head]">
         <span className="flex items-center gap-2">
-          <span className="text-[0.6875rem] font-medium text-soft">Evaluation</span>
+          <span className="text-[0.6875rem] font-medium text-soft">
+            <Trans>Evaluation</Trans>
+          </span>
           {ownerSide ? (
             <label className="inline-flex cursor-pointer select-none items-center gap-1 text-[0.625rem] text-dim">
               <input
@@ -273,7 +278,7 @@ export function EvalGraph({
                 onChange={(e) => setOnlyMine(e.target.checked)}
                 className="size-2.5 accent-accent"
               />
-              only mine
+              <Trans>only mine</Trans>
             </label>
           ) : null}
         </span>
@@ -289,7 +294,7 @@ export function EvalGraph({
 
       {points.length === 0 ? (
         <div className="flex min-h-[2.875rem] min-w-0 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-center text-[0.6875rem] text-dim [grid-area:plot]">
-          No evaluations yet — run an analysis pass to draw the curve.
+          <Trans>No evaluations yet — run an analysis pass to draw the curve.</Trans>
         </div>
       ) : (
         <div
@@ -397,10 +402,17 @@ export function EvalGraph({
  */
 type TallyField = 'blunder' | 'mistake' | 'inaccuracy'
 
-const TALLY_PLURALS: Record<TallyField, string> = {
-  blunder: 'blunders',
-  mistake: 'mistakes',
-  inaccuracy: 'inaccuracies',
+/**
+ * The count and the word for it, as one message per severity.
+ *
+ * Deliberately not a plural rule: the tally reads "1 mistakes" today, and these strings are
+ * a translation pass over the screen rather than a rewording of it. A translator whose
+ * language needs the count to pick the noun's form has the count in the message.
+ */
+const TALLY_QUANTITIES: Record<TallyField, (count: number) => MessageDescriptor> = {
+  blunder: (count) => msg`${count} blunders`,
+  mistake: (count) => msg`${count} mistakes`,
+  inaccuracy: (count) => msg`${count} inaccuracies`,
 }
 
 /** Spoken worst-first; visual row-major order produces the two requested columns. */
@@ -416,6 +428,7 @@ const TALLY_LAYOUT: readonly TallyField[] = ['blunder', 'inaccuracy', 'mistake']
  * skipped rather than drawn as an empty box.
  */
 function CurveReadout({ payload }: { payload?: { payload?: SeriesPoint }[] }) {
+  const { t } = useLingui()
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
   const mark = glyphFor(point.classification)
@@ -424,7 +437,8 @@ function CurveReadout({ payload }: { payload?: { payload?: SeriesPoint }[] }) {
     <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-[0.65625rem] whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
       <span className="font-mono tabular text-dim">{plyLabel(point.ply)}</span>{' '}
       <span className={cn('font-mono', glyph ? glyph.textClass : 'text-ink')}>
-        {point.san ?? 'start'}
+        {point.san ??
+          t({ message: 'start', comment: 'Stands in for a move at the starting position' })}
         {glyph ? <span className="ml-[0.125rem] font-bold opacity-75">{glyph.glyph}</span> : null}
       </span>{' '}
       <span className="font-mono tabular text-body-3">{formatScore(point.score)}</span>
@@ -451,6 +465,8 @@ function PlayerTallies({
   ownerSide: Color | null
   playerNames?: Partial<Record<Color, string | null>>
 }) {
+  const { i18n } = useLingui()
+
   return (
     <div
       data-testid="player-summaries"
@@ -460,7 +476,7 @@ function PlayerTallies({
         <PlayerTally
           key={side}
           side={side}
-          name={tallyName(side, ownerSide, playerNames?.[side])}
+          name={playerNames?.[side] || i18n._(tallyName(side, ownerSide))}
           row={summary[side]}
         />
       ))}
@@ -468,11 +484,15 @@ function PlayerTallies({
   )
 }
 
-/** The player's own name when the game carries one, else who they are to the owner. */
-function tallyName(side: Color, ownerSide: Color | null, name: string | null | undefined): string {
-  if (name) return name
-  if (!ownerSide) return side === 'white' ? 'White' : 'Black'
-  return side === ownerSide ? 'You' : 'Opp.'
+const SIDE_NAMES: Record<Color, MessageDescriptor> = {
+  white: msg`White`,
+  black: msg`Black`,
+}
+
+/** Who a player is to the owner, for the game that names nobody. */
+function tallyName(side: Color, ownerSide: Color | null): MessageDescriptor {
+  if (!ownerSide) return SIDE_NAMES[side]
+  return side === ownerSide ? msg`You` : msg`Opp.`
 }
 
 /**
@@ -493,14 +513,17 @@ function PlayerTally({
   name: string
   row: PlayerAnalysisSummary
 }) {
-  const quantity = (count: number, plural: string) => `${count} ${plural}`
+  const { t, i18n } = useLingui()
+  const quantity = (field: TallyField) => i18n._(TALLY_QUANTITIES[field](row[field]))
+  const acpl = row.acpl
   const acplProse =
-    row.acpl === null ? 'average centipawn loss unavailable' : `${row.acpl} average centipawn loss`
+    acpl === null ? t`average centipawn loss unavailable` : t`${acpl} average centipawn loss`
+  const counts = TALLY_A11Y.map(quantity).join(', ')
 
   return (
     <div
       role="group"
-      aria-label={`${name}: ${TALLY_A11Y.map((field) => quantity(row[field], TALLY_PLURALS[field])).join(', ')}, ${acplProse}`}
+      aria-label={t`${name}: ${counts}, ${acplProse}`}
       className="flex min-w-0 flex-col items-center gap-[0.15625rem] text-[0.65625rem]"
     >
       <span className="flex min-w-0 max-w-full items-center gap-1.5">
@@ -525,7 +548,7 @@ function PlayerTally({
               is using to tell `??` from `?!` at a glance. What says "none" is the digit.
             */}
             <span
-              title={quantity(row[field], TALLY_PLURALS[field])}
+              title={quantity(field)}
               className={cn('text-right font-mono font-semibold tabular', GLYPHS[field].textClass)}
             >
               {row[field]}
@@ -536,8 +559,10 @@ function PlayerTally({
           </Fragment>
         ))}
         <span className="text-right font-mono tabular text-body-3">{row.acpl ?? '—'}</span>
-        <span title="Average centipawn loss" className="font-mono text-dim">
-          ACPL
+        <span title={t`Average centipawn loss`} className="font-mono text-dim">
+          <Trans comment="Abbreviation of “average centipawn loss”, beside the number itself">
+            ACPL
+          </Trans>
         </span>
       </span>
     </div>

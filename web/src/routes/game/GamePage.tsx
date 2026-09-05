@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
@@ -212,10 +213,11 @@ function writeMovesWidth(width: number | null): void {
 const AUTOPLAY_MS = 800
 
 export function GamePage() {
+  const { t } = useLingui()
   const { id } = useParams<{ id: string }>()
   const gameId = Number(id)
   if (!Number.isInteger(gameId) || gameId <= 0) {
-    return <GameLoadError error={new Error(`“${id}” is not a game id.`)} onRetry={() => {}} />
+    return <GameLoadError error={new Error(t`“${id}” is not a game id.`)} onRetry={() => {}} />
   }
   // Keyed on the id so navigating between games starts a fresh board rather than carrying
   // the previous game's cursor and orientation over.
@@ -262,6 +264,7 @@ function intParam(raw: string | null): number | null {
 const LIVE_MAIA = false
 
 export function GameStudio({ game: from }: { game: StudioGame }) {
+  const { t } = useLingui()
   /*
    * One of the two queries runs and the other stands down, and everything below reads
    * `query` and `detail` without caring which. A reference game has no id in the library, so
@@ -1469,7 +1472,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   if (query.isError || !detail || !position) {
     return (
       <GameLoadError
-        error={query.error ?? new Error('The game payload was empty.')}
+        error={query.error ?? new Error(t`The game payload was empty.`)}
         onRetry={() => void query.refetch()}
       />
     )
@@ -1649,8 +1652,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    */
   const referenceComposer = (
     <div className="flex min-w-0 flex-col justify-center rounded-md border border-dashed border-edge-strong px-3 text-[0.71875rem] leading-relaxed text-dim">
-      Notes hang off a game in your library. Add this one and it can be annotated like any
-      other — counted in no statistic, since you did not play it.
+      <Trans>
+        Notes hang off a game in your library. Add this one and it can be annotated like any other
+        — counted in no statistic, since you did not play it.
+      </Trans>
     </div>
   )
 
@@ -1758,9 +1763,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     <SetPageChrome
       breadcrumb={
         readOnly
-          ? [{ label: 'Explorer', to: backToExplorer ?? '/explorer' }, { label: players }]
+          ? [{ label: t`Explorer`, to: backToExplorer ?? '/explorer' }, { label: players }]
           : [
-              { label: 'Library', to: '/games' },
+              { label: t`Library`, to: '/games' },
               { label: formatGameDate(detail.game.played_at), mono: true },
               { label: players },
             ]
@@ -1875,7 +1880,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         </div>
 
         <ColumnSplitter
-          label="Moves column width"
+          label={t`Moves column width`}
           onResizeStart={startResize}
           onResize={resize}
           onResizeEnd={endResize}

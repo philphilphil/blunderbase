@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Menu, Search } from 'lucide-react'
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
@@ -42,13 +43,14 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
   const { breadcrumb, actions } = usePageChrome()
   const palette = useCommandPalette()
   const capabilities = useRuntimeCapabilities()
+  const { t } = useLingui()
 
   return (
     <header className="flex h-[calc(2.625rem+env(safe-area-inset-top,0rem))] flex-none items-center gap-3 border-b border-edge-strong bg-panel pt-[env(safe-area-inset-top,0rem)] pr-[max(0.75rem,env(safe-area-inset-right,0rem))] pl-[max(0.75rem,env(safe-area-inset-left,0rem))] max-md:gap-2.5">
       <button
         type="button"
         onClick={onOpenNav}
-        aria-label="Open the navigation"
+        aria-label={t`Open the navigation`}
         className="-ml-1 rounded-md p-1 text-dim transition-colors hover:bg-raised hover:text-ink md:hidden"
       >
         <Menu className="size-4" />
@@ -73,11 +75,13 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           href={SITE_URL}
           target="_blank"
           rel="noreferrer"
-          title="This is the public demo: look at everything, change nothing. Get your own Blunderbase at blunderbase.org."
+          title={t`This is the public demo: look at everything, change nothing. Get your own Blunderbase at blunderbase.org.`}
           className="flex flex-none items-center gap-1.5 rounded-md border border-chip-info-edge bg-chip-info px-2 py-[0.1875rem] text-[0.6875rem] font-medium text-info transition-colors hover:border-edge-hover hover:text-ink"
         >
-          Demo
-          <span className="text-dim max-md:hidden">· read-only</span>
+          <Trans>Demo</Trans>
+          <span className="text-dim max-md:hidden">
+            <Trans>· read-only</Trans>
+          </span>
         </a>
       ) : null}
       <div className="h-[1.125rem] w-px bg-line max-md:hidden" />
@@ -126,8 +130,8 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
       <button
         type="button"
         onClick={palette.open}
-        aria-label="Search everything"
-        title="Search everything (⌘K)"
+        aria-label={t`Search everything`}
+        title={t`Search everything (⌘K)`}
         className="flex flex-none items-center gap-1.5 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] font-mono text-[0.6875rem] text-dim transition-colors hover:border-edge-hover hover:text-ink max-md:px-2"
       >
         <Search className="size-3.5 md:hidden" aria-hidden />

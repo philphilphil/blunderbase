@@ -1,3 +1,7 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { cn } from '@/lib/utils'
 import { formatCount } from '@/routes/games/format'
 import type { AnalysisCoverage } from '@/lib/api/types'
@@ -21,8 +25,8 @@ const MIN_SEGMENT = '0.375rem'
 
 interface Bucket {
   key: 'deep' | 'quick_only' | 'no_pass'
-  label: string
-  hint: string
+  label: MessageDescriptor
+  hint: MessageDescriptor
   barClass: string
 }
 
@@ -33,20 +37,20 @@ interface Bucket {
 const BUCKETS: Bucket[] = [
   {
     key: 'deep',
-    label: 'Deep pass',
-    hint: 'a full deep pass, several lines a position',
+    label: msg`Deep pass`,
+    hint: msg`a full deep pass, several lines a position`,
     barClass: 'bg-deep',
   },
   {
     key: 'quick_only',
-    label: 'Quick only',
-    hint: 'the automatic pass on import, and no deep pass yet',
+    label: msg`Quick only`,
+    hint: msg`the automatic pass on import, and no deep pass yet`,
     barClass: 'bg-accent-teal',
   },
   {
     key: 'no_pass',
-    label: 'No pass',
-    hint: 'never analysed — no engine has been over these',
+    label: msg`No pass`,
+    hint: msg`never analysed — no engine has been over these`,
     barClass: 'bg-edge-strong',
   },
 ]
@@ -56,8 +60,15 @@ function share(count: number, total: number): number {
 }
 
 export function CoverageSplit({ coverage }: { coverage: AnalysisCoverage }) {
+  const { i18n } = useLingui()
   const { total } = coverage
-  const rows = BUCKETS.map((bucket) => ({ ...bucket, count: coverage[bucket.key] }))
+  const rows = BUCKETS.map((bucket) => ({
+    ...bucket,
+    label: i18n._(bucket.label),
+    hint: i18n._(bucket.hint),
+    count: coverage[bucket.key],
+  }))
+  const games = formatCount(total)
 
   return (
     <section
@@ -66,11 +77,11 @@ export function CoverageSplit({ coverage }: { coverage: AnalysisCoverage }) {
     >
       <header className="flex items-baseline gap-2">
         <h2 id="coverage-title" className="text-xs font-semibold text-ink">
-          Coverage
+          <Trans>Coverage</Trans>
         </h2>
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] tabular text-dim-2">
-          {formatCount(total)} games
+          <Trans>{games} games</Trans>
         </span>
       </header>
 

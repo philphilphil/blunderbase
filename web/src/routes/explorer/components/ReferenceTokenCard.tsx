@@ -17,6 +17,7 @@
  * run again by itself — the owner pastes a token and the table appears, with nothing to
  * press twice.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useState } from 'react'
 
 import { useReferenceToken, useSetReferenceToken } from '@/lib/api/queries'
@@ -28,16 +29,17 @@ export function ReferenceTokenCard({ reason }: { reason: 'missing' | 'rejected' 
   const save = useSetReferenceToken()
   const [token, setToken] = useState('')
   const trimmed = token.trim()
+  const { t } = useLingui()
 
   return (
     <div className="flex flex-col items-start gap-2.5 rounded-xl border border-edge-strong bg-panel p-5">
       <span className="text-[0.75rem] font-semibold text-ink">
-        {reason === 'rejected' ? 'Lichess refused that token' : 'Lichess needs a token'}
+        {reason === 'rejected' ? t`Lichess refused that token` : t`Lichess needs a token`}
       </span>
       <p className="text-[0.78125rem] leading-relaxed text-soft">
         {reason === 'rejected'
-          ? 'The stored token was rejected — it may have been revoked. Paste a new personal API token to read the masters and lichess databases.'
-          : 'The masters and lichess databases no longer answer anonymous requests. Paste a personal API token to read them; no scope is needed.'}
+          ? t`The stored token was rejected — it may have been revoked. Paste a new personal API token to read the masters and lichess databases.`
+          : t`The masters and lichess databases no longer answer anonymous requests. Paste a personal API token to read them; no scope is needed.`}
       </p>
       <form
         className="flex w-full items-center gap-2"
@@ -54,7 +56,7 @@ export function ReferenceTokenCard({ reason }: { reason: 'missing' | 'rejected' 
           autoComplete="off"
           spellCheck={false}
           placeholder="lip_…"
-          aria-label="Lichess API token"
+          aria-label={t`Lichess API token`}
           className="min-w-0 flex-1 rounded-md border border-input bg-raised px-2.5 py-1 font-mono text-[0.71875rem] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
         />
         <button
@@ -62,7 +64,7 @@ export function ReferenceTokenCard({ reason }: { reason: 'missing' | 'rejected' 
           disabled={!trimmed || save.isPending}
           className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink disabled:text-faint-2 disabled:hover:border-edge-input"
         >
-          {save.isPending ? 'Saving…' : 'Save'}
+          {save.isPending ? t`Saving…` : t`Save`}
         </button>
       </form>
       {save.error ? (
@@ -75,7 +77,7 @@ export function ReferenceTokenCard({ reason }: { reason: 'missing' | 'rejected' 
           rel="noreferrer"
           className="text-[0.6875rem] text-accent-teal hover:text-accent-link"
         >
-          Create one on lichess.org
+          <Trans>Create one on lichess.org</Trans>
         </a>
         {/*
           Only offered when the backend says something is stored — which, on a rejected
@@ -89,7 +91,7 @@ export function ReferenceTokenCard({ reason }: { reason: 'missing' | 'rejected' 
             disabled={save.isPending}
             className="text-[0.6875rem] text-dim hover:text-ink disabled:text-faint-2"
           >
-            Remove the stored token
+            <Trans>Remove the stored token</Trans>
           </button>
         ) : null}
       </div>

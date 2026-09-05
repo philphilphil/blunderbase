@@ -1,3 +1,5 @@
+import { t } from '@lingui/core/macro'
+
 import { ApiError } from '@/lib/api/client'
 
 /** `backend/services/auth.py: MIN_PASSWORD_LENGTH`. Checked here so a short one costs no round trip. */
@@ -9,9 +11,10 @@ export const MIN_PASSWORD_LENGTH = 8
  */
 export function passwordProblem(password: string, confirm: string): string | null {
   if (password.length < MIN_PASSWORD_LENGTH) {
-    return `a password has to be at least ${MIN_PASSWORD_LENGTH} characters`
+    const minimum = MIN_PASSWORD_LENGTH
+    return t`a password has to be at least ${minimum} characters`
   }
-  if (password !== confirm) return 'those two do not match'
+  if (password !== confirm) return t`those two do not match`
   return null
 }
 
@@ -24,8 +27,11 @@ export function passwordProblem(password: string, confirm: string): string | nul
  * useful to quote get words of ours.
  */
 export function authErrorMessage(error: Error): string {
-  if (!(error instanceof ApiError)) return 'could not reach Blunderbase — is the server running?'
-  if (error.error === 'invalid_password') return 'that is not the password'
-  if (error.error === 'http_error') return `the server answered ${error.status}`
+  if (!(error instanceof ApiError)) return t`could not reach Blunderbase — is the server running?`
+  if (error.error === 'invalid_password') return t`that is not the password`
+  if (error.error === 'http_error') {
+    const status = error.status
+    return t`the server answered ${status}`
+  }
   return error.message
 }

@@ -10,6 +10,8 @@
  * These are quieter than a tier badge on purpose: on this page the name is the headline and
  * the chips are the annotation, where on a game row the tier *is* the headline.
  */
+import { useLingui } from '@lingui/react/macro'
+
 import type { EngineKind } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +28,7 @@ import { NO_ROLE_LABEL, roleLabel, type EngineRoles } from './roles'
  * person. `AddEngineForm` offers the same two words in the same order.
  */
 export function KindBadge({ kind, className }: { kind: EngineKind; className?: string }) {
+  const { t } = useLingui()
   return (
     <span
       className={cn(
@@ -36,7 +39,7 @@ export function KindBadge({ kind, className }: { kind: EngineKind; className?: s
         className,
       )}
     >
-      {kind === 'maia' ? 'Human' : 'Engine'}
+      {kind === 'maia' ? t`Human` : t`Engine`}
     </span>
   )
 }
@@ -49,11 +52,12 @@ export function KindBadge({ kind, className }: { kind: EngineKind; className?: s
  * about the roster, not as a chip claiming something.
  */
 export function RoleBadge({ roles, className }: { roles: EngineRoles; className?: string }) {
+  const { t } = useLingui()
   const label = roleLabel(roles)
   const idle = label === NO_ROLE_LABEL
   return (
     <span
-      title={idle ? 'Assigned to nothing right now' : undefined}
+      title={idle ? t`Assigned to nothing right now` : undefined}
       className={cn(
         'inline-flex flex-none items-center rounded-sm border px-1.5 py-px text-[0.59375rem]',
         idle ? 'border-transparent text-faint' : 'border-edge-strong bg-raised text-soft',

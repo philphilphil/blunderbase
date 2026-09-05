@@ -1,4 +1,4 @@
-import { GLYPHS, glyphFor, type Glyph } from '@/lib/chess/classification'
+import { GLYPHS, glyphCountLabel, glyphFor, type Glyph } from '@/lib/chess/classification'
 import type { Classification } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -42,10 +42,7 @@ export function ClassificationBadge({
   const kind = glyph ?? glyphFor(classification)
   if (!kind) return null
   const style = GLYPHS[kind]
-  const label =
-    count === undefined
-      ? style.label
-      : `${count} ${count === 1 ? style.label : style.label === 'inaccuracy' ? 'inaccuracies' : `${style.label}s`}`
+  const label = count === undefined ? style.label : glyphCountLabel(kind, count)
 
   const badge = (
     <span

@@ -74,6 +74,51 @@ A step whose control is not on screen is skipped rather than left pointing at no
 empty library has no game to open the board settings on, and a deployment serving no MCP has
 no assistant page, so neither step is part of the tour that install runs.
 
+## Languages
+
+The web app speaks English and German. The choice is the browser's, not the account's: it
+is kept in that browser's `localStorage` (`blunderbase.locale`) beside the theme, so a phone
+in German and a desk in English is an ordinary setup, and the login screen is readable
+before there is a session to hold a preference. With nothing stored the browser's own
+language list decides; anything that is not one of the two falls back to English. The
+switch is in the account menu, under **Language**, and takes effect at once — the page
+under it remounts, which is why an unsaved note is worth saving first.
+
+Only the web app is translated. The MCP tools, the backend's error text and the CLI stay
+English: an assistant reads those, not a person, and a coach that is handed a German tool
+description answers worse. The landing page has a German copy at `/de/`
+(`site/de/index.html`), written by hand rather than generated.
+
+**How it is built.** [Lingui](https://lingui.dev). The English text in a component *is* the
+source string — `<Trans>Nothing to analyse yet</Trans>`, `` t`Save note` `` — and its
+message id is derived from it, so there is no key file to keep in step with the code. Four
+forms, and which one depends only on where the string sits:
+
+| Where | Use |
+|---|---|
+| Text in JSX | `<Trans>…</Trans>` from `@lingui/react/macro`; the whole sentence in one, links and `<strong>` inside it |
+| A string in a component or hook (`title`, `aria-label`, a toast) | `const { t } = useLingui()` from `@lingui/react/macro`, then `` t`…` `` |
+| A label in a module-level table | `` msg`…` `` from `@lingui/core/macro`, typed `MessageDescriptor`, resolved with `i18n._()` where it is rendered |
+| A helper with no React in it | the global `t` from `@lingui/core/macro` |
+
+Plurals are `<Plural>` / `plural()`; the same English word with two meanings gets a
+`context`. Never build a sentence from translated fragments.
+
+The catalogs are `web/src/locales/{en,de}/messages.po`, checked in. `pnpm i18n` (from
+`web/`) re-extracts them from the source after a string is added or changed; the English one
+is only a listing, the German one is where translations go, with `msgstr ""` marking what is
+still missing. CI runs the extraction and fails when the checked-in catalogs differ from
+what the code says, so a new string cannot ship unnoticed. The `.po` files are compiled at
+build time by the Vite plugin; nothing generated is committed. Tests activate English with an
+empty catalog, so what they read is the source text and no test has to know a language
+exists.
+
+**Adding a language.** Add its tag to `locales` in `web/lingui.config.ts` and to `LOCALES`
+and `LOCALE_NAMES` in `web/src/lib/i18n/locale.ts` (the name is in the language itself),
+run `pnpm i18n`, translate `web/src/locales/<tag>/messages.po`, and add the tag to
+`isLocale`. Number and date formatting follows the browser, not the chosen language, so
+nothing else changes.
+
 ## Engines
 
 Engines are rows, not configuration: on **Engines**, give one a path (a file, a
@@ -440,7 +485,9 @@ the version being released unless `BB_SKIP_DESKTOP=1` is set, so the sequence is
 `make desktop`, then `make publish`. The release builds the image once and publishes
 `ghcr.io/philphilphil/blunderbase:0.2.0`, `:0.2`, `latest`, and `sha-<short>`.
 If that build fails, dispatch `release.yml` with the existing tag to rebuild and deploy it;
-dispatching it without a tag only redeploys the current `latest`.
+dispatching it without a tag only redeploys the current `latest`. Deploying tells Komodo to
+redeploy both stacks that run that image — `blunderbase` and the public demo beside it,
+`blunderbase-demo` (`docs/deploy.md`, "A public demo").
 
 ## Testing
 

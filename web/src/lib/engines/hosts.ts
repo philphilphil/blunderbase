@@ -15,6 +15,8 @@
  * `streams: false` needs a different engine picked, and a polling link only needs the
  * socket back.
  */
+import { t } from '@lingui/core/macro'
+
 import type {
   EngineKind,
   RunnerEngine,
@@ -56,26 +58,29 @@ function hostOf(engine: RunnerEngine, runner: RunnerResponse | null): EngineHost
   let reason: string | null = null
   if (!engine.streams && engine.kind !== 'uci') {
     // The backend's own sentence for a Maia: it answers with a policy, not a search.
-    reason = 'answers with a policy rather than a search'
+    reason = t`answers with a policy rather than a search`
     streams = false
   } else if (!engine.streams) {
     // A search engine whose host said it answers no `stream_open` — the browser runner is
     // one, and a tab that offered a board would leave it waiting for a `stream_started`
     // that never comes. Nothing here fixes it, so the sentence points at the way out:
     // another engine.
+    const host = runner?.name ?? ''
     reason =
       runner === null
-        ? 'this host does not run analysis boards on it'
-        : `${runner.name} runs queued analysis on it but no analysis board — pick another engine`
+        ? t`this host does not run analysis boards on it`
+        : t`${host} runs queued analysis on it but no analysis board — pick another engine`
     streams = false
   } else if (!engine.enabled) {
-    reason = 'switched off'
+    reason = t`switched off`
     streams = false
   } else if (runner !== null && !connected) {
-    reason = `${runner.name} is not connected`
+    const host = runner.name
+    reason = t`${host} is not connected`
     streams = false
   } else if (runner !== null && transport === 'poll') {
-    reason = `queue only — ${runner.name} is connected over polling`
+    const host = runner.name
+    reason = t`queue only — ${host} is connected over polling`
     streams = false
   }
 

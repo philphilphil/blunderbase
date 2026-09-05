@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
@@ -20,17 +23,18 @@ import { pageRange } from '@/routes/games/paging'
 
 import { duration, stamp } from './format'
 
-const STATUS: Record<JobStatus, { label: string; dot: string; text: string }> = {
-  queued: { label: 'Queued', dot: 'bg-mistake', text: 'text-soft' },
-  running: { label: 'Running', dot: 'bg-accent-teal', text: 'text-soft' },
-  done: { label: 'Done', dot: 'bg-good', text: 'text-soft' },
-  failed: { label: 'Failed', dot: 'bg-blunder', text: 'text-blunder' },
+const STATUS: Record<JobStatus, { label: MessageDescriptor; dot: string; text: string }> = {
+  queued: { label: msg`Queued`, dot: 'bg-mistake', text: 'text-soft' },
+  running: { label: msg`Running`, dot: 'bg-accent-teal', text: 'text-soft' },
+  done: { label: msg`Done`, dot: 'bg-good', text: 'text-soft' },
+  failed: { label: msg`Failed`, dot: 'bg-blunder', text: 'text-blunder' },
   // Stopped on purpose, part-way: not a failure, and not a run whose cursor anything
   // resumes from. What it stored is in the library like any other import.
-  cancelled: { label: 'Stopped', dot: 'bg-mistake', text: 'text-mistake' },
+  cancelled: { label: msg`Stopped`, dot: 'bg-mistake', text: 'text-mistake' },
 }
 
 function StatusChip({ status }: { status: JobStatus }) {
+  const { i18n } = useLingui()
   const style = STATUS[status] ?? STATUS.queued
   return (
     <span
@@ -40,7 +44,7 @@ function StatusChip({ status }: { status: JobStatus }) {
       )}
     >
       <span className={cn('size-[0.3125rem] rounded-full', style.dot)} />
-      {style.label}
+      {i18n._(style.label)}
     </span>
   )
 }
@@ -54,6 +58,7 @@ function Count({ value, tone }: { value: number; tone?: string }) {
 }
 
 function Failures({ job, columns }: { job: ImportJob; columns: number }) {
+  const { t } = useLingui()
   return (
     <tr className="border-b border-hairline bg-surface-2">
       <td colSpan={columns} className="px-2.5 py-2.5">
@@ -61,7 +66,7 @@ function Failures({ job, columns }: { job: ImportJob; columns: number }) {
           {job.errors.map((failure, index) => (
             <li key={index} className="flex gap-3 font-mono text-[0.6875rem]">
               <span className="w-40 flex-none truncate text-soft-2">{failure.ref ?? '—'}</span>
-              <span className="min-w-0 flex-1 text-blunder">{failure.error ?? 'failed'}</span>
+              <span className="min-w-0 flex-1 text-blunder">{failure.error ?? t`failed`}</span>
             </li>
           ))}
         </ul>
@@ -101,6 +106,7 @@ export function SyncHistory({
   pageSize: number
   onPageChange: (page: number) => void
 }) {
+  const { t } = useLingui()
   const [open, setOpen] = useState<number | null>(null)
   // The deleted column earns its width only on a library where something was deleted, and
   // the folded-out failure row has to span whatever that leaves.
@@ -113,7 +119,9 @@ export function SyncHistory({
   return (
     <section className="flex flex-col rounded-xl border border-line bg-panel">
       <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
-        <span className="text-xs font-semibold text-ink">Sync history</span>
+        <span className="text-xs font-semibold text-ink">
+          <Trans>Sync history</Trans>
+        </span>
         <div className="flex-1" />
         {jobs ? (
           <span className="font-mono text-[0.625rem] text-dim tabular">{total}</span>
@@ -128,14 +136,18 @@ export function SyncHistory({
         </div>
       ) : error ? (
         <div className="px-3.5 py-6 text-center">
-          <p className="text-[0.78125rem] text-blunder">The sync history could not be read.</p>
+          <p className="text-[0.78125rem] text-blunder">
+            <Trans>The sync history could not be read.</Trans>
+          </p>
           <p className="mt-1 font-mono text-[0.6875rem] text-dim">{error.message}</p>
         </div>
       ) : !jobs || jobs.length === 0 ? (
         <div className="px-3.5 py-8 text-center">
-          <p className="text-[0.78125rem] text-soft">Nothing has been synced yet.</p>
+          <p className="text-[0.78125rem] text-soft">
+            <Trans>Nothing has been synced yet.</Trans>
+          </p>
           <p className="mt-1 text-[0.71875rem] text-dim">
-            Connect an account above, or drop a PGN export in.
+            <Trans>Connect an account above, or drop a PGN export in.</Trans>
           </p>
         </div>
       ) : (
@@ -143,20 +155,38 @@ export function SyncHistory({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-8" />
-              <TableHead className="w-28">Source</TableHead>
-              <TableHead className="w-32">Started</TableHead>
-              <TableHead className="w-20 text-right">Took</TableHead>
-              <TableHead className="w-16 text-right">Seen</TableHead>
-              <TableHead className="w-20 text-right">Imported</TableHead>
-              <TableHead className="w-20 text-right">Skipped</TableHead>
+              <TableHead className="w-28">
+                <Trans>Source</Trans>
+              </TableHead>
+              <TableHead className="w-32">
+                <Trans>Started</Trans>
+              </TableHead>
+              <TableHead className="w-20 text-right">
+                <Trans>Took</Trans>
+              </TableHead>
+              <TableHead className="w-16 text-right">
+                <Trans>Seen</Trans>
+              </TableHead>
+              <TableHead className="w-20 text-right">
+                <Trans>Imported</Trans>
+              </TableHead>
+              <TableHead className="w-20 text-right">
+                <Trans>Skipped</Trans>
+              </TableHead>
               {/* Only when some run has one: a column of zeroes on every library that has
                   never deleted a game is a column that only takes width from the ones
                   people read. */}
               {anyBlocked ? (
-                <TableHead className="w-24 text-right">Deleted</TableHead>
+                <TableHead className="w-24 text-right">
+                  <Trans>Deleted</Trans>
+                </TableHead>
               ) : null}
-              <TableHead className="w-16 text-right">Failed</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="w-16 text-right">
+                <Trans>Failed</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Status</Trans>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -169,7 +199,7 @@ export function SyncHistory({
                     {expandable ? (
                       <button
                         type="button"
-                        aria-label={expanded ? 'Hide failures' : 'Show failures'}
+                        aria-label={expanded ? t`Hide failures` : t`Show failures`}
                         aria-expanded={expanded}
                         onClick={() => setOpen(expanded ? null : job.id)}
                         className="text-faint hover:text-ink"
@@ -235,14 +265,16 @@ export function SyncHistory({
       {pageCount > 1 ? (
         <div className="flex items-center gap-2 border-t border-hairline px-3.5 py-2">
           <span className="font-mono text-[0.65625rem] text-dim tabular">
-            {first}–{last} of {total}
+            <Trans>
+              {first}–{last} of {total}
+            </Trans>
           </span>
           <div className="flex-1" />
           <Button
             type="button"
             size="sm"
             variant="outline"
-            aria-label="Previous page"
+            aria-label={t`Previous page`}
             className="size-7 p-0"
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
@@ -256,7 +288,7 @@ export function SyncHistory({
             type="button"
             size="sm"
             variant="outline"
-            aria-label="Next page"
+            aria-label={t`Next page`}
             className="size-7 p-0"
             disabled={page >= pageCount}
             onClick={() => onPageChange(page + 1)}

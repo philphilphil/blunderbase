@@ -16,8 +16,11 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$root/site/dist}"
 
 rm -rf "$out"
-mkdir -p "$out/assets"
+mkdir -p "$out/assets" "$out/de"
 cp "$root"/site/index.html "$root"/site/404.html "$out"/
+# The German page is a second copy of the page, not a template: `site/de/index.html` is
+# translated by hand and served at /de/. It reaches the shared assets by absolute path.
+cp "$root"/site/de/index.html "$out"/de/
 # The sample compose file the page links; the one under docker/ has no build block for
 # exactly this reason.
 cp "$root"/docker/docker-compose.yml "$out"/

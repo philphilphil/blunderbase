@@ -1,3 +1,5 @@
+import { useLingui } from '@lingui/react/macro'
+
 import { cn } from '@/lib/utils'
 
 /**
@@ -17,11 +19,12 @@ export function QueueMeter({
 }) {
   const total = queued + running
   const share = (count: number) => (total === 0 ? 0 : (count / total) * 100)
+  const { t } = useLingui()
 
   return (
     <div
       role="img"
-      aria-label={`${running} running, ${queued} queued`}
+      aria-label={t`${running} running, ${queued} queued`}
       className={cn('flex overflow-hidden rounded-sm bg-edge', className)}
     >
       {running > 0 ? (

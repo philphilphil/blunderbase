@@ -6,6 +6,7 @@
  * label and two states (teal when the group is set, hairline when it is not), and the
  * panel is the only floating surface in either of these two screens.
  */
+import { useLingui } from '@lingui/react/macro'
 import type * as React from 'react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
@@ -22,6 +23,7 @@ export function FilterChipButton({
   summary: string | null
   onClear?: () => void
 }) {
+  const { t } = useLingui()
   const active = summary !== null
   return (
     <span
@@ -52,7 +54,7 @@ export function FilterChipButton({
       {active && onClear ? (
         <button
           type="button"
-          aria-label={`Clear ${label} filter`}
+          aria-label={t`Clear ${label} filter`}
           onClick={onClear}
           className="px-1.5 py-1 text-accent-teal/70 outline-none hover:text-accent-teal"
         >
@@ -181,19 +183,20 @@ export function OptionRow<T extends string>({
 export function TriState({
   value,
   onChange,
-  yes = 'Yes',
-  no = 'No',
+  yes,
+  no,
 }: {
   value: boolean | undefined
   onChange: (next: boolean | undefined) => void
   yes?: string
   no?: string
 }) {
+  const { t } = useLingui()
   return (
     <div className="flex gap-1">
       {[
-        { label: yes, next: true },
-        { label: no, next: false },
+        { label: yes ?? t`Yes`, next: true },
+        { label: no ?? t`No`, next: false },
       ].map(({ label, next }) => {
         const selected = value === next
         return (

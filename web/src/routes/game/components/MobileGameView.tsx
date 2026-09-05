@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
@@ -28,12 +31,12 @@ export type MobileTab = MoveTab | 'eval' | 'engine' | 'notes'
  */
 const MOBILE_TABS: readonly MobileTab[] = ['moves', 'eval', 'engine', 'notes']
 
-const TAB_LABEL: Record<MobileTab, string> = {
-  moves: 'Moves',
-  flagged: 'Flagged',
-  notes: 'Notes',
-  eval: 'Eval',
-  engine: 'Engine',
+const TAB_LABEL: Record<MobileTab, MessageDescriptor> = {
+  moves: msg`Moves`,
+  flagged: msg`Flagged`,
+  notes: msg`Notes`,
+  eval: msg`Eval`,
+  engine: msg`Engine`,
 }
 
 export interface MobileGameViewProps {
@@ -232,6 +235,7 @@ function CompactHeader({
   score: Score | null
 }) {
   const winner = game.result === '1-0' ? 'white' : game.result === '0-1' ? 'black' : null
+  const plyNumber = cursor + 1
 
   return (
     <div
@@ -241,7 +245,9 @@ function CompactHeader({
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="flex min-w-0 items-center gap-1.5 text-[0.71875rem] leading-tight">
           <Name side="white" name={game.white} rating={game.white_rating} won={winner === 'white'} owner={game.color === 'white'} />
-          <span className="flex-none text-faint-2">vs</span>
+          <span className="flex-none text-faint-2">
+            <Trans>vs</Trans>
+          </span>
           <Name side="black" name={game.black} rating={game.black_rating} won={winner === 'black'} owner={game.color === 'black'} />
         </div>
         <div className="flex min-w-0 items-center gap-1.5 text-[0.625rem] leading-tight text-dim">
@@ -256,7 +262,9 @@ function CompactHeader({
           <span className="flex-none text-faint-2">·</span>
           {/* The ply readout the transport row gives up below `md`; free here. */}
           <span className="flex-none font-mono tabular text-faint">
-            ply {cursor + 1}/{plyCount}
+            <Trans>
+              ply {plyNumber}/{plyCount}
+            </Trans>
           </span>
           {game.opening ? (
             <>
@@ -308,11 +316,13 @@ function Name({
   won: boolean
   owner: boolean
 }) {
+  const { t } = useLingui()
+
   return (
     <span className="inline-flex min-w-0 max-w-[48%] items-center gap-1">
       <SideDot side={side} size="sm" className="flex-none" />
       <span className={cn('truncate', owner && 'font-medium', won ? 'text-good' : owner ? 'text-ink' : 'text-soft')}>
-        {name ?? 'unknown'}
+        {name ?? t`unknown`}
       </span>
       <span className="flex-none font-mono text-[0.625rem] tabular text-faint">{rating ?? '—'}</span>
     </span>
@@ -349,10 +359,12 @@ function TabStrip({
   flaggedCount: number
   noteCount: number
 }) {
+  const { t, i18n } = useLingui()
+
   return (
     <div
       role="tablist"
-      aria-label="Game panels"
+      aria-label={t`Game panels`}
       className="flex h-[2.5rem] flex-none items-stretch border-y border-hairline"
     >
       {MOBILE_TABS.map((name) => {
@@ -372,7 +384,7 @@ function TabStrip({
                 : 'text-dim hover:text-ink',
             )}
           >
-            {TAB_LABEL[name]}
+            {i18n._(TAB_LABEL[name])}
             {count > 0 ? (
               <span
                 className={cn(

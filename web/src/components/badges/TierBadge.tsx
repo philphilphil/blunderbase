@@ -1,3 +1,7 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import type { RunStatus, Tier } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -27,7 +31,7 @@ export function TierBadge({
         className,
       )}
     >
-      {tier === 'deep' ? 'Deep' : 'Quick'}
+      {tier === 'deep' ? <Trans>Deep</Trans> : <Trans>Quick</Trans>}
       {suffix}
     </span>
   )
@@ -42,7 +46,7 @@ export function UnanalysedBadge({ className }: { className?: string }) {
         className,
       )}
     >
-      Unanalysed
+      <Trans>Unanalysed</Trans>
     </span>
   )
 }
@@ -54,14 +58,15 @@ const STATUS_DOT: Record<RunStatus, string> = {
   failed: 'bg-blunder',
 }
 
-const STATUS_LABEL: Record<RunStatus, string> = {
-  queued: 'Queued',
-  running: 'Running',
-  done: 'Done',
-  failed: 'Failed',
+const STATUS_LABEL: Record<RunStatus, MessageDescriptor> = {
+  queued: msg`Queued`,
+  running: msg`Running`,
+  done: msg`Done`,
+  failed: msg`Failed`,
 }
 
 export function RunStatusBadge({ status, className }: { status: RunStatus; className?: string }) {
+  const { i18n } = useLingui()
   return (
     <span
       className={cn(
@@ -70,7 +75,7 @@ export function RunStatusBadge({ status, className }: { status: RunStatus; class
       )}
     >
       <span className={cn('size-[0.3125rem] rounded-full', STATUS_DOT[status])} />
-      {STATUS_LABEL[status]}
+      {i18n._(STATUS_LABEL[status])}
     </span>
   )
 }

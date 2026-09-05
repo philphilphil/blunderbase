@@ -10,6 +10,8 @@
  * its size do not: which slice you are reading is not what a link to a filtered library is
  * about, and the size is a preference the reader keeps (`./paging`).
  */
+import { plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -54,6 +56,7 @@ import { useGameLibrary } from './useGameLibrary'
 const SEARCH_ID = 'games-search'
 
 export function GamesPage() {
+  const { t } = useLingui()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
 
@@ -199,20 +202,28 @@ export function GamesPage() {
         // says why — a selection over the batch cap, a tier with no engine behind it.
         // Without the reason on the receipt the refusal reads as the server losing the
         // selection for no stated cause, which is the one thing that never happened.
-        reason = refusalReason(error)
+        reason = refusalReason(error, t`the request never landed`)
       }
       setAnalysing((current) => {
         const next = new Set(current)
         for (const id of ids) next.delete(id)
         return next
       })
+      // One whole message per tier rather than the tier word dropped into a shared frame:
+      // "quick" and "deep" decline with the noun beside them in most languages.
+      const queuedMessage =
+        tier === 'quick'
+          ? t`${plural(queued, { one: '# quick run', other: '# quick runs' })} queued`
+          : t`${plural(queued, { one: '# deep run', other: '# deep runs' })} queued`
       setMessage(
         refused === 0
-          ? `${queued} ${tier} ${queued === 1 ? 'run' : 'runs'} queued`
-          : `${queued} queued, ${refused} refused${reason ? ` — ${reason}` : ''}`,
+          ? queuedMessage
+          : reason
+            ? t`${queued} queued, ${refused} refused — ${reason}`
+            : t`${queued} queued, ${refused} refused`,
       )
     },
-    [analysis],
+    [analysis, t],
   )
 
   // Deleting goes through the dialog, which is what `doomed` is: the ids it is open over.
@@ -233,8 +244,9 @@ export function GamesPage() {
       for (const id of ids) next.delete(id)
       return next
     })
-    setMessage(`${receipt.games} ${receipt.games === 1 ? 'game' : 'games'} deleted`)
-  }, [deletion, doomed])
+    const deleted = receipt.games
+    setMessage(t`${plural(deleted, { one: '# game', other: '# games' })} deleted`)
+  }, [deletion, doomed, t])
 
   const closeDelete = useCallback(() => {
     setDoomed(null)
@@ -250,10 +262,11 @@ export function GamesPage() {
 
   const active = filterCount(filters)
   const loaded = rows.length
+  const totalGames = formatCount(library.total)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: 'Games', to: '/games' }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Games`, to: '/games' }]} />
 
       <div className="flex flex-none flex-col gap-3 border-b border-hairline px-5 pt-4 pb-3 max-md:px-3 max-md:pt-3">
         {/* Below `md` the search box takes a line of its own: at 375px it and the title
@@ -261,20 +274,28 @@ export function GamesPage() {
             wrong half to give up. The two buttons wrap under it. */}
         <div className="flex items-end gap-3 max-md:flex-wrap max-md:gap-y-2.5">
           <div className="flex flex-col gap-[0.1875rem]">
-            <h1 className="text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">Games</h1>
+            <h1 className="text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">
+              <Trans>Games</Trans>
+            </h1>
+            {/* One `Trans` per case rather than a count swapped inside a shared frame: the
+                sentence is what a translator needs whole, and the mono count is part of it. */}
             <p className="text-[0.78125rem] text-dim">
               {library.status === 'pending' ? (
-                'Counting…'
+                t`Counting…`
+              ) : active === 1 ? (
+                <Trans>
+                  <span className="font-mono text-soft">{totalGames}</span> of your games match this
+                  filter
+                </Trans>
               ) : active > 0 ? (
-                <>
-                  <span className="font-mono text-soft">{formatCount(library.total)}</span> of your
-                  games match {active === 1 ? 'this filter' : `these ${active} filters`}
-                </>
+                <Trans>
+                  <span className="font-mono text-soft">{totalGames}</span> of your games match
+                  these {active} filters
+                </Trans>
               ) : (
-                <>
-                  <span className="font-mono text-soft">{formatCount(library.total)}</span> games in
-                  the database
-                </>
+                <Trans>
+                  <span className="font-mono text-soft">{totalGames}</span> games in the database
+                </Trans>
               )}
             </p>
           </div>
@@ -283,8 +304,8 @@ export function GamesPage() {
 
           <DebouncedInput
             id={SEARCH_ID}
-            aria-label="Search games"
-            placeholder="Opponent, ECO, PGN text…"
+            aria-label={t`Search games`}
+            placeholder={t`Opponent, ECO, PGN text…`}
             value={filters.text ?? ''}
             onCommit={(value) => setFilters({ ...filters, text: value || undefined })}
             className="h-8 w-[13.75rem] text-xs max-md:w-full"
@@ -296,7 +317,7 @@ export function GamesPage() {
               onClick={() => setFilters({})}
               className="rounded-md border border-edge-input px-2.5 py-1.5 text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
             >
-              Clear {active}
+              <Trans>Clear {active}</Trans>
             </button>
           ) : null}
 
@@ -304,7 +325,7 @@ export function GamesPage() {
             to="/library/import"
             className="rounded-md border border-edge-input px-2.5 py-1.5 text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink"
           >
-            Import
+            <Trans>Import</Trans>
           </Link>
         </div>
 
@@ -356,7 +377,7 @@ export function GamesPage() {
         <DeleteGamesDialog
           count={doomed.length}
           pending={deletion.isPending}
-          error={deletion.isError ? refusalReason(deletion.error) : null}
+          error={deletion.isError ? refusalReason(deletion.error, t`the request never landed`) : null}
           onConfirm={() => void confirmDelete()}
           onClose={closeDelete}
         />
@@ -365,11 +386,15 @@ export function GamesPage() {
   )
 }
 
-/** What the backend called it, or the nearest true sentence when it never answered. */
-function refusalReason(error: unknown): string {
+/**
+ * What the backend called it, or the nearest true sentence when it never answered. The
+ * fallback is handed in rather than written here, because this is not a component and the
+ * only sentence in it has to come from the caller's catalog.
+ */
+function refusalReason(error: unknown, fallback: string): string {
   if (error instanceof ApiError) return error.message || error.error
   if (error instanceof Error && error.message) return error.message
-  return 'the request never landed'
+  return fallback
 }
 
 function EmptyState({ active, onClear }: { active: number; onClear: () => void }) {
@@ -380,12 +405,22 @@ function EmptyState({ active, onClear }: { active: number; onClear: () => void }
       )}
     >
       <span className="text-[0.8125rem] font-semibold text-ink">
-        {active > 0 ? 'Nothing matches these filters' : 'No games yet'}
+        {active > 0 ? (
+          <Trans>Nothing matches these filters</Trans>
+        ) : (
+          <Trans>No games yet</Trans>
+        )}
       </span>
       <p className="text-[0.78125rem] leading-relaxed text-dim">
-        {active > 0
-          ? 'Loosen a filter — the library only ever shows games that are already imported.'
-          : 'Import a Lichess or Chess.com account, or drop a PGN in, and the library fills itself.'}
+        {active > 0 ? (
+          <Trans>
+            Loosen a filter — the library only ever shows games that are already imported.
+          </Trans>
+        ) : (
+          <Trans>
+            Import a Lichess or Chess.com account, or drop a PGN in, and the library fills itself.
+          </Trans>
+        )}
       </p>
       {active > 0 ? (
         <button
@@ -393,14 +428,14 @@ function EmptyState({ active, onClear }: { active: number; onClear: () => void }
           onClick={onClear}
           className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
         >
-          Clear the filters
+          <Trans>Clear the filters</Trans>
         </button>
       ) : (
         <Link
           to="/library/import"
           className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
         >
-          Go to import
+          <Trans>Go to import</Trans>
         </Link>
       )}
     </div>

@@ -11,6 +11,7 @@
  * the answer to a save is what it kept. Off leaves the last number in the box, greyed, so
  * switching back on does not start from a blank.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useEffect, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
@@ -27,6 +28,7 @@ function wholeMinutes(draft: string): number | null {
 }
 
 export function AutoSyncControl() {
+  const { t } = useLingui()
   const schedule = useSyncSchedule()
   const update = useUpdateSyncSchedule()
   const minutes = schedule.data?.minutes ?? null
@@ -49,34 +51,38 @@ export function AutoSyncControl() {
     if (wanted !== minutes) update.mutate({ minutes: wanted })
   }
 
+  const word = on ? 'text-[0.6875rem] text-soft' : 'text-[0.6875rem] text-dim'
+
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-hairline px-3.5 py-2.5">
       <SyncCheckbox
-        label="Sync automatically"
-        title="Every connected account above, from its last cursor, on this clock — the same as pressing Sync on each row. The history below records every run."
+        label={t`Sync automatically`}
+        title={t`Every connected account above, from its last cursor, on this clock — the same as pressing Sync on each row. The history below records every run.`}
         checked={on}
         onChange={toggle}
         disabled={schedule.isPending || update.isPending}
       />
-      <span className={on ? 'text-[0.6875rem] text-soft' : 'text-[0.6875rem] text-dim'}>every</span>
-      <Input
-        aria-label="Minutes between syncs"
-        value={draft}
-        inputMode="numeric"
-        placeholder={String(DEFAULT_MINUTES)}
-        disabled={!on || update.isPending}
-        className="h-7 w-16 font-mono"
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter') return
-          event.preventDefault()
-          commit()
-        }}
-      />
-      <span className={on ? 'text-[0.6875rem] text-soft' : 'text-[0.6875rem] text-dim'}>
-        minutes
-      </span>
+      {/* One message with the field inside it: "every … minutes" is a sentence a
+          translator has to be able to reorder around the box. */}
+      <Trans>
+        <span className={word}>every</span>
+        <Input
+          aria-label={t`Minutes between syncs`}
+          value={draft}
+          inputMode="numeric"
+          placeholder={String(DEFAULT_MINUTES)}
+          disabled={!on || update.isPending}
+          className="h-7 w-16 font-mono"
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            commit()
+          }}
+        />
+        <span className={word}>minutes</span>
+      </Trans>
       {update.isError ? (
         <span className="text-[0.6875rem] text-blunder">{update.error.message}</span>
       ) : null}

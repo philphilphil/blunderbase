@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -32,21 +33,31 @@ import { MaiaLevels } from './MaiaLevels'
  * these buttons put in it already exists, and two of them would drift.
  */
 export function AnalysisPage() {
+  const { t } = useLingui()
   const coverage = useCoverage()
+
+  // Named locals rather than expressions in the template: the identifier is what a
+  // translator sees as the placeholder.
+  const analysed = coverage.data
+    ? formatCount(coverage.data.deep + coverage.data.quick_only)
+    : undefined
+  const games = coverage.data ? formatCount(coverage.data.total) : undefined
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: 'Analysis', to: '/analysis' }, { label: 'Coverage' }]} />
+      <SetPageChrome
+        breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: t`Coverage` }]}
+      />
       <PageHeader
-        title="Analysis"
+        title={t`Analysis`}
         description={
           coverage.data
-            ? `${formatCount(coverage.data.deep + coverage.data.quick_only)} of ${formatCount(coverage.data.total)} games have had an engine over them.`
-            : 'What the library has been analysed with, and what finishing it would cost.'
+            ? t`${analysed} of ${games} games have had an engine over them.`
+            : t`What the library has been analysed with, and what finishing it would cost.`
         }
         actions={
           <Link to="/games" className="text-[0.6875rem] text-accent-teal hover:text-accent-link">
-            the library
+            <Trans>the library</Trans>
           </Link>
         }
       />
@@ -55,7 +66,9 @@ export function AnalysisPage() {
         <Skeleton className="h-28 w-full max-w-3xl" data-testid="coverage-loading" />
       ) : coverage.isError ? (
         <div className="max-w-2xl rounded-md border border-blunder/28 bg-blunder/5 px-3 py-2.5">
-          <p className="text-[0.75rem] text-blunder">The coverage could not be read.</p>
+          <p className="text-[0.75rem] text-blunder">
+            <Trans>The coverage could not be read.</Trans>
+          </p>
           <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">
             {coverage.error.message}
           </p>
@@ -66,7 +79,7 @@ export function AnalysisPage() {
             className="mt-2.5"
             onClick={() => void coverage.refetch()}
           >
-            Try again
+            <Trans>Try again</Trans>
           </Button>
         </div>
       ) : (

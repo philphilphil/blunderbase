@@ -1,5 +1,6 @@
 // Setup for the tests that never touch a DOM. `setup.ts` pulls this in on top of the
 // jsdom shims, so anything environment-agnostic belongs here rather than there.
+import { i18n } from '@lingui/core'
 
 // Every `toLocaleString` in the app leaves the locale to the machine, and assertions
 // spell the result out ("1,042"). CI runs en-US, a German desktop groups that as
@@ -34,3 +35,8 @@ function pinConstructor<T extends Intl.NumberFormatConstructor | Intl.DateTimeFo
 
 Intl.NumberFormat = pinConstructor(Intl.NumberFormat)
 Intl.DateTimeFormat = pinConstructor(Intl.DateTimeFormat)
+
+// Every component speaks through Lingui, and a catalog has to be active before the first
+// render. English with no translations: the macros keep the source text on each message
+// outside production, so what a test reads is exactly what the component says.
+i18n.loadAndActivate({ locale: 'en', messages: {} })

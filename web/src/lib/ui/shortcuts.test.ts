@@ -14,7 +14,7 @@ describe('the shortcut table', () => {
     for (const shortcut of BOARD_SHORTCUTS) {
       expect(shortcut.press.length).toBeGreaterThan(0)
       expect(shortcut.keys.length).toBeGreaterThan(0)
-      expect(shortcut.label).not.toBe('')
+      expect(shortcut.label.message).not.toBe('')
     }
   })
 
@@ -56,13 +56,15 @@ describe('the shortcut table', () => {
   })
 
   it('describes each group once', () => {
-    const names = SHORTCUT_GROUPS.map((group) => group.name)
+    const names = SHORTCUT_GROUPS.map((group) => group.name.message)
     expect(new Set(names).size).toBe(names.length)
   })
 })
 
 describe('shortcutsFor', () => {
-  const names = (pathname: string) => shortcutsFor(pathname).map((group) => group.name)
+  // The names are message descriptors now; what a reader sees is the source text on each.
+  const names = (pathname: string) =>
+    shortcutsFor(pathname).map((group) => group.name.message)
 
   it('prints the global group on any screen', () => {
     expect(names('/stats')).toEqual(['Anywhere'])

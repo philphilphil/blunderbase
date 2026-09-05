@@ -15,6 +15,8 @@
  * only question here is whether to upload this file. The sync history below records every
  * upload with its time, which is where that belongs.
  */
+import { plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { FileUp, Loader2, Upload, X } from 'lucide-react'
 import { useRef, useState, type DragEvent } from 'react'
 
@@ -44,6 +46,7 @@ export function PgnCard({
   /** The grid's own switch, shared with the accounts beside it. */
   skipEvaluation: boolean
 }) {
+  const { t } = useLingui()
   const [files, setFiles] = useState<File[]>([])
   const [mine, setMine] = useState(true)
   const [over, setOver] = useState(false)
@@ -74,7 +77,7 @@ export function PgnCard({
       const texts = await Promise.all(files.map((file) => file.text()))
       const pgn = texts.join('\n\n')
       if (!pgn.trim()) {
-        setReadError('that file carried no PGN')
+        setReadError(t`that file carried no PGN`)
         return
       }
       // `analyze` only ever travels to turn evaluation off; left out, the upload is queued.
@@ -85,7 +88,7 @@ export function PgnCard({
         mine: mine ? undefined : false,
       })
     } catch (error) {
-      setReadError(error instanceof Error ? error.message : 'the file could not be read')
+      setReadError(error instanceof Error ? error.message : t`the file could not be read`)
     }
   }
 
@@ -106,7 +109,7 @@ export function PgnCard({
       )}
     >
       <div className="flex items-center gap-2">
-        <SourceBadge source="pgn" title="A PGN export, of one game or a hundred thousand." />
+        <SourceBadge source="pgn" title={t`A PGN export, of one game or a hundred thousand.`} />
         <div className="flex-1" />
         {files.length > 0 ? (
           <span className="font-mono text-[0.71875rem] text-dim tabular">{size(total)}</span>
@@ -119,11 +122,13 @@ export function PgnCard({
         {files.length > 0 ? (
           <>
             <span className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-soft">
-              {files.length === 1 ? files[0]!.name : `${files.length} files`}
+              {files.length === 1
+                ? files[0]!.name
+                : plural(files.length, { one: '# file', other: '# files' })}
             </span>
             <button
               type="button"
-              aria-label="Clear the selected file"
+              aria-label={t`Clear the selected file`}
               onClick={() => {
                 setFiles([])
                 if (input.current) input.current.value = ''
@@ -140,7 +145,7 @@ export function PgnCard({
             className="inline-flex items-center gap-1.5 text-[0.6875rem] text-accent-teal transition-colors hover:text-accent-link"
           >
             <FileUp className="size-3.5" aria-hidden />
-            Choose a file, or drop one here
+            <Trans>Choose a file, or drop one here</Trans>
           </button>
         )}
       </div>
@@ -166,7 +171,7 @@ export function PgnCard({
         <div className="flex-1" />
         <Button type="button" size="sm" disabled={files.length === 0 || busy} onClick={() => void send()}>
           {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Upload aria-hidden />}
-          Upload
+          <Trans>Upload</Trans>
         </Button>
       </div>
 

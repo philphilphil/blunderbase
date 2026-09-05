@@ -5,12 +5,33 @@
  * vocabulary — the opening explorer (design 2c) imports the game-shaped ones for its
  * "games in this line" list, and nothing else in the app uses them yet.
  */
+import { i18n, type MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+
 import type { Classification, GameCard, GameSummary, Outcome, Source, Tier } from '@/lib/api/types'
 import { glyphFor, type Glyph } from '@/lib/chess/classification'
 import { MINUS } from '@/lib/chess/evaluation'
 import { formatClock } from '@/lib/chess/timeControl'
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/**
+ * The twelve abbreviations the date column is built from. `context` is what tells a
+ * translator these are months — `May` and `Mar` are words in their own right, and a
+ * three-letter string with nothing around it is the one thing a catalog cannot guess.
+ */
+const MONTHS: MessageDescriptor[] = [
+  msg({ message: 'Jan', context: 'month abbreviation' }),
+  msg({ message: 'Feb', context: 'month abbreviation' }),
+  msg({ message: 'Mar', context: 'month abbreviation' }),
+  msg({ message: 'Apr', context: 'month abbreviation' }),
+  msg({ message: 'May', context: 'month abbreviation' }),
+  msg({ message: 'Jun', context: 'month abbreviation' }),
+  msg({ message: 'Jul', context: 'month abbreviation' }),
+  msg({ message: 'Aug', context: 'month abbreviation' }),
+  msg({ message: 'Sep', context: 'month abbreviation' }),
+  msg({ message: 'Oct', context: 'month abbreviation' }),
+  msg({ message: 'Nov', context: 'month abbreviation' }),
+  msg({ message: 'Dec', context: 'month abbreviation' }),
+]
 
 /**
  * `22 Aug` for a game from this year, `7 Dec 16` for an older one — the design's 78px
@@ -23,7 +44,7 @@ export function formatGameDate(
   if (!played) return '—'
   const date = new Date(played)
   if (Number.isNaN(date.getTime())) return '—'
-  const day = `${date.getDate()} ${MONTHS[date.getMonth()]}`
+  const day = `${date.getDate()} ${i18n._(MONTHS[date.getMonth()])}`
   return date.getFullYear() === now.getFullYear()
     ? day
     : `${day} ${String(date.getFullYear() % 100).padStart(2, '0')}`
@@ -67,16 +88,19 @@ export function outcomeTone(outcome: string | null | undefined): string {
 export function formatTimeControl(game: Pick<GameSummary, 'time_control' | 'speed' | 'source'>): string {
   const prefix = game.source === 'manual' ? 'OTB ' : ''
   const raw = game.time_control
-  if (!raw) return game.speed ? `${prefix}${SPEED_LABELS[game.speed] ?? game.speed}` : '—'
+  if (!raw) {
+    const speed = game.speed ? SPEED_LABELS[game.speed] : undefined
+    return game.speed ? `${prefix}${speed ? i18n._(speed) : game.speed}` : '—'
+  }
   return `${prefix}${formatClock(raw)}`
 }
 
-const SPEED_LABELS: Record<string, string> = {
-  bullet: 'Bullet',
-  blitz: 'Blitz',
-  rapid: 'Rapid',
-  classical: 'Classical',
-  correspondence: 'Corr.',
+const SPEED_LABELS: Record<string, MessageDescriptor> = {
+  bullet: msg`Bullet`,
+  blitz: msg`Blitz`,
+  rapid: msg`Rapid`,
+  classical: msg`Classical`,
+  correspondence: msg({ message: 'Corr.', comment: 'Short for "correspondence", the speed of a game played over days' }),
 }
 
 /** Whole moves rather than plies, which is what the design's `Mv` column counts. */
@@ -140,6 +164,10 @@ export function tierOf(game: GameCard): Tier | null {
   return null
 }
 
+/**
+ * Left untranslated on purpose: four of the six are the platforms' own names and a file
+ * format, and `OTB` and `Masters` are what the chess world calls those two everywhere.
+ */
 export const SOURCE_LABELS: Record<Source, string> = {
   lichess: 'Lichess',
   chesscom: 'Chess.com',
@@ -149,10 +177,10 @@ export const SOURCE_LABELS: Record<Source, string> = {
   masters: 'Masters',
 }
 
-export const OUTCOME_LABELS: Record<Outcome, string> = {
-  win: 'Win',
-  loss: 'Loss',
-  draw: 'Draw',
+export const OUTCOME_LABELS: Record<Outcome, MessageDescriptor> = {
+  win: msg`Win`,
+  loss: msg`Loss`,
+  draw: msg`Draw`,
 }
 
 /** `1,284` — every count in the design is grouped. */

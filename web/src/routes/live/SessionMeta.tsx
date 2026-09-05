@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { ExternalLink } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -31,34 +32,42 @@ export function SessionMeta({
   className?: string
 }) {
   const marks = state.arrows.length + state.squares.length
+  const { t } = useLingui()
+  const arrows = state.arrows.length
+  const squares = state.squares.length
+  const followed = state.game_id
 
   return (
     <section className={cn('flex flex-col rounded-xl border border-line bg-panel', className)}>
       <div className="flex items-center gap-2 border-b border-hairline px-3.5 py-2.5">
-        <span className="text-xs font-semibold text-ink">Session</span>
+        <span className="text-xs font-semibold text-ink">
+          <Trans>Session</Trans>
+        </span>
         <div className="flex-1" />
         <span className="font-mono text-[0.625rem] text-dim tabular">
-          {state.viewer_count} viewer{state.viewer_count === 1 ? '' : 's'}
+          <Plural value={state.viewer_count} one="# viewer" other="# viewers" />
         </span>
       </div>
 
       <div className="flex flex-col px-3.5 py-2">
-        <Row label="Board">
+        <Row label={t`Board`}>
           {state.game_id ? (
             <Link
               to={`/games/${state.game_id}`}
               className="inline-flex items-center gap-1.5 text-accent-teal hover:text-accent-link"
             >
-              {game ? `${game.white ?? '?'} — ${game.black ?? '?'}` : `game ${state.game_id}`}
+              {game ? `${game.white ?? '?'} — ${game.black ?? '?'}` : t`game ${followed}`}
               <ExternalLink className="size-3" aria-hidden />
             </Link>
           ) : (
-            <span className="text-soft">ad-hoc position</span>
+            <span className="text-soft">
+              <Trans>ad-hoc position</Trans>
+            </span>
           )}
         </Row>
 
         {game ? (
-          <Row label="Source">
+          <Row label={t`Source`}>
             <span className="inline-flex items-center gap-2">
               {game.opening ? (
                 <span className="truncate text-[0.71875rem] text-soft-2">{game.opening}</span>
@@ -68,26 +77,34 @@ export function SessionMeta({
           </Row>
         ) : null}
 
-        <Row label="Ply">
+        <Row label={t`Ply`}>
           <span className="font-mono tabular">
             {typeof state.ply === 'number' ? `${state.ply} · ${plyLabel(state.ply)}` : '—'}
           </span>
         </Row>
 
-        <Row label="To move">
+        <Row label={t`To move`}>
           <span className={state.turn === 'black' ? 'text-soft' : 'text-bright'}>
-            {state.turn ?? '—'}
+            {/* Anything the backend sends that is not one of the two colours goes through
+                as it stands rather than through a message nobody has written. */}
+            {state.turn === 'white'
+              ? t`white`
+              : state.turn === 'black'
+                ? t`black`
+                : (state.turn ?? '—')}
           </span>
         </Row>
 
-        <Row label="Last move">
+        <Row label={t`Last move`}>
           <span className="font-mono">{state.last_move ?? '—'}</span>
         </Row>
 
-        <Row label="Marks">
+        <Row label={t`Marks`}>
           <span className="font-mono tabular text-soft">
-            {state.arrows.length} arrow{state.arrows.length === 1 ? '' : 's'} ·{' '}
-            {state.squares.length} square{state.squares.length === 1 ? '' : 's'}
+            <Trans>
+              <Plural value={arrows} one="# arrow" other="# arrows" /> ·{' '}
+              <Plural value={squares} one="# square" other="# squares" />
+            </Trans>
           </span>
         </Row>
       </div>
@@ -95,7 +112,7 @@ export function SessionMeta({
       {state.moves.length > 0 ? (
         <div className="flex flex-col gap-1.5 border-t border-hairline px-3.5 py-2.5">
           <span className="text-[0.625rem] tracking-[0.1em] text-faint uppercase">
-            {isVariation(state) ? 'Off the game' : 'Played'}
+            {isVariation(state) ? t`Off the game` : t`Played`}
           </span>
           <div className="flex flex-wrap gap-1">
             {state.moves.map((move, index) => (

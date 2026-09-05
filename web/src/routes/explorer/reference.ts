@@ -13,6 +13,9 @@
  * so an empty list is not a state the page is allowed to reach, and anything unreadable
  * falls back to the defaults instead.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+
 import { ApiError } from '@/lib/api/client'
 import type { ReferenceSource } from '@/lib/api/types'
 
@@ -22,10 +25,10 @@ export type ExplorerSource = 'mine' | ReferenceSource
 export const SOURCES: readonly ExplorerSource[] = ['mine', 'masters', 'lichess']
 
 /** How each source names itself in the segmented control. */
-export const SOURCE_LABELS: Record<ExplorerSource, string> = {
-  mine: 'my games',
-  masters: 'masters',
-  lichess: 'lichess',
+export const SOURCE_LABELS: Record<ExplorerSource, MessageDescriptor> = {
+  mine: msg`my games`,
+  masters: msg`masters`,
+  lichess: msg({ message: 'lichess', comment: 'The site’s own name — keep it as it is.' }),
 }
 
 /** The four Lichess time controls the explorer buckets games into. */

@@ -23,6 +23,8 @@
  * answer — "no games from here" is information, and a tab that appeared and disappeared as
  * the board moved was a moving target to click at.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { cn } from '@/lib/utils'
 import { ScoreBar } from '@/routes/explorer/components/ScoreBar'
 import { dropTone, formatAvgDrop, splitOf } from '@/routes/explorer/stats'
@@ -85,13 +87,15 @@ const GRID = 'grid grid-cols-[3.625rem_2.125rem_minmax(0,1fr)_3.25rem] items-cen
 const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-[0.6875rem] tabular')
 
 export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPanelProps) {
+  const { t } = useLingui()
+
   if (moves.length === 0) {
     return (
       <p
         data-testid="book-panel-empty"
         className={cn('px-3 py-6 text-center text-[0.71875rem] text-dim', className)}
       >
-        None of your games reached this position.
+        <Trans>None of your games reached this position.</Trans>
       </p>
     )
   }
@@ -99,7 +103,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
   return (
     <div
       role="table"
-      aria-label="Your games from this position"
+      aria-label={t`Your games from this position`}
       data-testid="book-panel"
       className={cn('flex flex-none flex-col px-1.5 pb-2', className)}
     >
@@ -110,10 +114,18 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
           'h-5 border-b border-hairline px-1.5 text-[0.5625rem] tracking-[.06em] text-faint uppercase',
         )}
       >
-        <span>Move</span>
-        <span className="text-right">Games</span>
-        <span>Score</span>
-        <span className="text-right">Avg drop</span>
+        <span>
+          <Trans>Move</Trans>
+        </span>
+        <span className="text-right">
+          <Trans>Games</Trans>
+        </span>
+        <span>
+          <Trans>Score</Trans>
+        </span>
+        <span className="text-right">
+          <Trans>Avg drop</Trans>
+        </span>
       </div>
 
       {moves.map((move) => {

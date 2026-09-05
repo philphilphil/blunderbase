@@ -27,6 +27,9 @@
  * appears on a wide screen would leave the tour on a phone as two coachmarks and a
  * counter that says five.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+
 import type { Side } from './place'
 
 /** What the tour knows about the deployment while it is deciding where a step lives. */
@@ -39,8 +42,8 @@ export interface TourContext {
 
 export interface TourStep {
   id: string
-  title: string
-  body: string
+  title: MessageDescriptor
+  body: MessageDescriptor
   /** The `data-tour` attribute of the element this step points at. */
   anchor: string
   /**
@@ -56,40 +59,40 @@ export interface TourStep {
 export const TOUR_STEPS: TourStep[] = [
   {
     id: 'library',
-    title: 'Your games come from here',
-    body: 'Connect Lichess, chess.com or FICS and sync — or drop a PGN anywhere in the window.',
+    title: msg`Your games come from here`,
+    body: msg`Connect Lichess, chess.com or FICS and sync — or drop a PGN anywhere in the window.`,
     anchor: 'sources',
     route: '/library/import',
     side: 'bottom',
   },
   {
     id: 'engines',
-    title: 'Set up your engines',
-    body: 'Register Stockfish and Maia here and give each job one. Nothing is analysed until you do.',
+    title: msg`Set up your engines`,
+    body: msg`Register Stockfish and Maia here and give each job one. Nothing is analysed until you do.`,
     anchor: 'engines',
     route: '/engines',
     side: 'right',
   },
   {
     id: 'board-settings',
-    title: 'The board settings',
-    body: 'Arrows, the eval graph and the line preview are behind this gear. Or press S.',
+    title: msg`The board settings`,
+    body: msg`Arrows, the eval graph and the line preview are behind this gear. Or press S.`,
     anchor: 'board-settings',
     route: ({ latestGameId }) => (latestGameId === null ? null : `/games/${latestGameId}`),
     side: 'right',
   },
   {
     id: 'notes',
-    title: 'Notes stick to positions',
-    body: 'A note pinned to a position comes back in every game that reaches it.',
+    title: msg`Notes stick to positions`,
+    body: msg`A note pinned to a position comes back in every game that reaches it.`,
     anchor: 'notes',
     route: '/notes',
     side: 'bottom',
   },
   {
     id: 'assistant',
-    title: 'The other front door',
-    body: 'Point Claude or any MCP client at this database and it reads what the app reads.',
+    title: msg`The other front door`,
+    body: msg`Point Claude or any MCP client at this database and it reads what the app reads.`,
     anchor: 'assistant',
     route: ({ mcp }) => (mcp ? '/assistant' : null),
     side: 'left',

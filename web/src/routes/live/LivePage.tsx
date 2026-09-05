@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { FlipVertical2, Radio } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -22,14 +23,15 @@ const FLASH_MS = 700
 
 function ConnectionPill() {
   const { status, reconnects } = useEvents()
+  const { t } = useLingui()
   const label =
     status === 'open'
       ? reconnects > 0
-        ? `live · reconnected ${reconnects}×`
-        : 'live'
+        ? t`live · reconnected ${reconnects}×`
+        : t`live`
       : status === 'connecting'
-        ? 'connecting'
-        : 'offline — retrying'
+        ? t`connecting`
+        : t`offline — retrying`
   return (
     <span
       className={cn(
@@ -70,9 +72,12 @@ export function LivePage() {
   const [flipped, setFlipped] = useState(false)
   const [flash, setFlash] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { t } = useLingui()
 
   const followed = useGame(state?.game_id ?? 0, {}, { enabled: Boolean(state?.game_id) })
   const game = followed.data?.game
+  // Named so the sentence it goes in stays one message with one placeholder.
+  const followedError = followed.error?.message
 
   useLiveUpdates(() => {
     setFlash(true)
@@ -101,7 +106,7 @@ export function LivePage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: 'Live' }]} actions={<ConnectionPill />} />
+      <SetPageChrome breadcrumb={[{ label: t`Live` }]} actions={<ConnectionPill />} />
 
       {/*
         The heading wraps below `md`: "Save this moment" and the flip control are the two
@@ -111,11 +116,11 @@ export function LivePage() {
       <header className="flex flex-none items-end gap-3 px-5 pt-4.5 pb-3 max-md:flex-wrap max-md:px-3">
         <div className="flex flex-col gap-[0.1875rem] max-md:min-w-0">
           <h1 className="flex items-center gap-2.5 text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">
-            Live
+            <Trans>Live</Trans>
             {active ? (
               <span className="inline-flex items-center gap-1.5 rounded-md border border-accent-teal/30 bg-accent-teal/10 px-2 py-px text-[0.6875rem] font-normal text-accent-teal">
                 <Radio className="size-3" aria-hidden />
-                on air
+                <Trans>on air</Trans>
               </span>
             ) : null}
           </h1>
@@ -126,11 +131,11 @@ export function LivePage() {
         <button
           type="button"
           onClick={() => setFlipped((value) => !value)}
-          aria-label="Flip the board"
+          aria-label={t`Flip the board`}
           className="inline-flex items-center gap-2 rounded-md border border-edge px-2.5 py-[0.3125rem] text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
         >
           <FlipVertical2 className="size-3.5" aria-hidden />
-          {orientation === 'white' ? 'White' : 'Black'}
+          {orientation === 'white' ? t`White` : t`Black`}
         </button>
       </header>
 
@@ -149,7 +154,9 @@ export function LivePage() {
             />
           ) : live.isError ? (
             <div className="max-w-md rounded-xl border border-blunder/28 bg-blunder/5 px-4 py-6 text-center">
-              <p className="text-[0.78125rem] text-blunder">The live session could not be read.</p>
+              <p className="text-[0.78125rem] text-blunder">
+                <Trans>The live session could not be read.</Trans>
+              </p>
               <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">{live.error.message}</p>
             </div>
           ) : (
@@ -175,12 +182,16 @@ export function LivePage() {
                 <div className="absolute inset-0 flex items-center justify-center p-6">
                   <div className="flex max-w-sm flex-col items-center gap-2 rounded-xl border border-line bg-panel/95 px-5 py-6 text-center">
                     <Radio className="size-5 text-faint" aria-hidden />
-                    <p className="text-[0.78125rem] text-soft">Nothing is on the board.</p>
+                    <p className="text-[0.78125rem] text-soft">
+                      <Trans>Nothing is on the board.</Trans>
+                    </p>
                     <p className="text-[0.71875rem] leading-[1.55] text-dim">
-                      Ask your assistant to put a game on it —{' '}
-                      <span className="font-mono text-soft-2">show_game</span> for a stored
-                      game, <span className="font-mono text-soft-2">show_position</span> for a
-                      FEN. It appears here the moment it does, no refresh.
+                      <Trans>
+                        Ask your assistant to put a game on it —{' '}
+                        <span className="font-mono text-soft-2">show_game</span> for a stored
+                        game, <span className="font-mono text-soft-2">show_position</span> for a
+                        FEN. It appears here the moment it does, no refresh.
+                      </Trans>
                     </p>
                   </div>
                 </div>
@@ -202,7 +213,7 @@ export function LivePage() {
           {state && active ? <SessionMeta state={state} game={game} /> : null}
           {followed.isError ? (
             <p className="rounded-lg border border-mistake/28 bg-mistake/5 px-3 py-2.5 text-[0.71875rem] text-mistake">
-              The followed game could not be read — {followed.error.message}
+              <Trans>The followed game could not be read — {followedError}</Trans>
             </p>
           ) : null}
         </aside>

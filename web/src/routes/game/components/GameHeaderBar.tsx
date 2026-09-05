@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { SourceBadge } from '@/components/badges/SourceBadge'
@@ -54,7 +55,9 @@ export function GameHeaderBar({
   } | null
   className?: string
 }) {
+  const { t } = useLingui()
   const timeControl = formatTimeControl(game)
+  const analysedAt = best?.finished_at ? relative(best.finished_at) : null
 
   return (
     <div
@@ -72,19 +75,25 @@ export function GameHeaderBar({
         // there is a game that way, or there is not.
         <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
           <StepButton
-            label="Previous game"
+            label={t`Previous game`}
             hint="["
             onClick={trail.onPrevious}
             icon={ChevronLeft}
           />
-          <StepButton label="Next game" hint="]" onClick={trail.onNext} icon={ChevronRight} last />
+          <StepButton
+            label={t`Next game`}
+            hint="]"
+            onClick={trail.onNext}
+            icon={ChevronRight}
+            last
+          />
         </div>
       ) : null}
 
       {/* The only element on the line allowed to shrink: everything after it is a chip or a
           handful of mono characters, and a truncated ECO or result says nothing at all. */}
       <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
-        {game.opening ?? 'Unnamed opening'}
+        {game.opening ?? t`Unnamed opening`}
       </h1>
       {game.eco ? (
         <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.6875rem] tabular text-dim">
@@ -100,14 +109,16 @@ export function GameHeaderBar({
         {formatResult(game.result)}
       </span>
       {game.rated === false ? (
-        <span className="flex-none text-[0.6875rem] text-faint">casual</span>
+        <span className="flex-none text-[0.6875rem] text-faint">
+          <Trans>casual</Trans>
+        </span>
       ) : null}
       {game.is_owner_game === false ? (
         <span
-          title="Added from the reference explorer. Analysed and annotated like any other game, and counted in no statistic."
+          title={t`Added from the reference explorer. Analysed and annotated like any other game, and counted in no statistic.`}
           className="flex-none rounded-sm border border-dashed border-edge-strong px-[0.3125rem] py-px text-[0.625rem] text-dim"
         >
-          not your game
+          <Trans>not your game</Trans>
         </span>
       ) : null}
 
@@ -128,7 +139,7 @@ export function GameHeaderBar({
         <UnanalysedBadge className="flex-none" />
       )}
       <span className="flex-none font-mono text-[0.625rem] text-faint">
-        {best?.finished_at ? `analysed ${relative(best.finished_at)}` : 'never analysed'}
+        {analysedAt ? t`analysed ${analysedAt}` : t`never analysed`}
       </span>
     </div>
   )

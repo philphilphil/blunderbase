@@ -13,10 +13,22 @@
  * Masters never sees this: that database is one book with no time control and no rating
  * band to choose, and a pair of controls that do nothing is worse than no controls.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { useLingui } from '@lingui/react/macro'
+
 import { ChipRow, FilterChip } from '@/components/ui/chip'
 import { toggleFilter } from '@/lib/filters'
 
 import { RATINGS, SPEEDS, type Speed } from '../reference'
+
+/** Chip labels, the way the Stats page names the same buckets. */
+const SPEED_LABELS: Record<Speed, MessageDescriptor> = {
+  bullet: msg`bullet`,
+  blitz: msg`blitz`,
+  rapid: msg`rapid`,
+  classical: msg`classical`,
+}
 
 export function ReferenceFilters({
   speeds,
@@ -29,19 +41,20 @@ export function ReferenceFilters({
   onSpeeds: (next: Speed[]) => void
   onRatings: (next: number[]) => void
 }) {
+  const { i18n, t } = useLingui()
   return (
     <div className="flex flex-col gap-1.5">
-      <ChipRow label="speed">
+      <ChipRow label={t`speed`}>
         {SPEEDS.map((speed) => (
           <FilterChip
             key={speed}
-            label={speed}
+            label={i18n._(SPEED_LABELS[speed])}
             on={speeds.includes(speed)}
             onClick={() => onSpeeds(toggleFilter(speeds, speed, SPEEDS))}
           />
         ))}
       </ChipRow>
-      <ChipRow label="rating">
+      <ChipRow label={t`rating`}>
         {RATINGS.map((rating) => (
           <FilterChip
             key={rating}

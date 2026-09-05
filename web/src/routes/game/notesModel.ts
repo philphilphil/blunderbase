@@ -13,6 +13,8 @@
  * markers and the composer all read so that the three cannot disagree about where a note
  * belongs.
  */
+import { t } from '@lingui/core/macro'
+
 import type { LineResponse, MoveRow, NoteSource } from '@/lib/api/types'
 import { gameLabel } from '@/routes/notes/presentation'
 
@@ -77,7 +79,7 @@ export function noteAnchor(note: GameNote, lines: readonly LineResponse[]): Note
 
 /** `2…d5` — the move that produced the position a note is about. */
 function moveContext(moves: readonly MoveRow[], count: number): string | null {
-  if (count <= 0) return 'start'
+  if (count <= 0) return t`start`
   const move = moves[count - 1]
   if (!move?.san) return null
   return `${plyLabel(count - 1)}${move.san}`
@@ -85,7 +87,7 @@ function moveContext(moves: readonly MoveRow[], count: number): string | null {
 
 /** The same, inside a variation: SAN comes off the line rather than off the game. */
 function lineContext(line: LineResponse | undefined, base: number, index: number): string | null {
-  if (index <= 0) return 'branch'
+  if (index <= 0) return t`branch`
   const san = line?.sans[index - 1]
   if (!san) return null
   return `${plyLabel(base + index - 1)}${san}`
@@ -254,13 +256,14 @@ export function noteTarget(input: {
     const index = Math.min(branch.cursor, branch.sans.length)
     const san = branch.sans[index - 1]
     const ply = branch.base + index
+    const move = san ? `${plyLabel(ply - 1)}${san}` : null
     return {
       kind: 'line',
       gameId,
       ply,
       fen,
       line: { game_id: gameId, base_ply: branch.base, moves: [...branch.moves] },
-      label: san ? `${plyLabel(ply - 1)}${san} (variation)` : 'a variation',
+      label: move ? t`${move} (variation)` : t`a variation`,
     }
   }
   const count = Math.max(0, boardIndex)
@@ -270,7 +273,8 @@ export function noteTarget(input: {
     ply: count,
     fen,
     line: null,
-    label: count === 0 ? 'the starting position' : (moveContext(moves, count) ?? `ply ${count}`),
+    label:
+      count === 0 ? t`the starting position` : (moveContext(moves, count) ?? t`ply ${count}`),
   }
 }
 

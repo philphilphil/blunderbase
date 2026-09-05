@@ -61,3 +61,6 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # The catalogs are checked in and extracted by hand (`pnpm i18n`); a string added
+      # without re-running it would ship untranslatable. This fails the build instead.
+      - run: pnpm i18n && git diff --exit-code -- src/locales

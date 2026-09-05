@@ -7,6 +7,7 @@
  * the mainline, the departure as a kept line — so the note is pinned to what was actually
  * on the board at that instant and not to whatever this tab last received.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, Loader2, StickyNote } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -25,6 +26,7 @@ export function SaveMoment({ active }: SaveMomentProps) {
   const [saved, setSaved] = useState<number | null>(null)
   const host = useRef<HTMLDivElement>(null)
   const save = useSaveNote()
+  const { t } = useLingui()
 
   useEffect(() => {
     if (!open) return
@@ -62,12 +64,12 @@ export function SaveMoment({ active }: SaveMomentProps) {
       {saved !== null && !open ? (
         <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-good">
           <Check className="size-3" aria-hidden />
-          Saved
+          <Trans>Saved</Trans>
           <Link
             to={`/notes?note=${saved}`}
             className="text-accent-teal transition-colors hover:text-accent-link"
           >
-            open it
+            <Trans>open it</Trans>
           </Link>
         </span>
       ) : null}
@@ -78,8 +80,8 @@ export function SaveMoment({ active }: SaveMomentProps) {
         aria-expanded={open}
         title={
           active
-            ? 'Write a note about the position on the board'
-            : 'Nothing is on the board to write about'
+            ? t`Write a note about the position on the board`
+            : t`Nothing is on the board to write about`
         }
         onClick={() => {
           setSaved(null)
@@ -88,7 +90,7 @@ export function SaveMoment({ active }: SaveMomentProps) {
         className="inline-flex items-center gap-2 rounded-md border border-edge px-2.5 py-[0.3125rem] text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink disabled:cursor-not-allowed disabled:text-faint"
       >
         <StickyNote className="size-3.5" aria-hidden />
-        Save this moment
+        <Trans>Save this moment</Trans>
       </button>
 
       {open ? (
@@ -97,7 +99,7 @@ export function SaveMoment({ active }: SaveMomentProps) {
         // of it cannot reach past the left edge of a phone.
         <div className="absolute top-[calc(100%+0.375rem)] right-0 z-30 flex w-[19rem] flex-col gap-2 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] max-md:w-[15rem]">
           <span className="text-[0.625rem] tracking-[.1em] text-faint uppercase">
-            About this position
+            <Trans>About this position</Trans>
           </span>
           <textarea
             autoFocus
@@ -107,25 +109,27 @@ export function SaveMoment({ active }: SaveMomentProps) {
             onKeyDown={(event) => {
               if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) commit()
             }}
-            aria-label="Note about this position"
-            placeholder="What is worth remembering here?"
+            aria-label={t`Note about this position`}
+            placeholder={t`What is worth remembering here?`}
             className="w-full resize-y rounded-md border border-input bg-panel px-2.5 py-2 text-[0.75rem] leading-[1.55] text-ink outline-none focus-visible:border-accent-teal/50"
           />
           <div className="flex items-center gap-1.5">
             <Button size="sm" onClick={commit} disabled={save.isPending || !text.trim()}>
               {save.isPending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-              Save note
+              <Trans>Save note</Trans>
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
           </div>
           {save.isError ? (
             <span className="text-[0.6875rem] text-blunder">{save.error.message}</span>
           ) : null}
           <span className="text-[0.625rem] leading-snug text-dim">
-            The board's position is taken on the server, along with the game it is following
-            and any line it has wandered into.
+            <Trans>
+              The board's position is taken on the server, along with the game it is following
+              and any line it has wandered into.
+            </Trans>
           </span>
         </div>
       ) : null}

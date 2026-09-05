@@ -15,6 +15,7 @@
  * has walked off the end of a line the engine has since shortened, a FEN nothing can parse
  * — each degrades to fewer shapes or none. A preview must never blank the page it decorates.
  */
+import { t } from '@lingui/core/macro'
 import type { DrawShape } from '@lichess-org/chessground/draw'
 import type { Key } from '@lichess-org/chessground/types'
 import { Chess, castlingSide, normalizeMove } from 'chessops/chess'
@@ -396,7 +397,8 @@ function peekPly(replay: LineReplay, prefs: LinePreviewPrefs, state: PreviewStat
 function caption(replay: LineReplay, ply: number, startPly: number): string | null {
   const move = replay.moves[ply - 1]
   if (!move) return null
-  return `after ${formatVariation(halfMove(ply, startPly), [move.san])}`
+  const at = formatVariation(halfMove(ply, startPly), [move.san])
+  return t`after ${at}`
 }
 
 /** `ply` is 1-based within the line; the arrow is the move at that ply. */

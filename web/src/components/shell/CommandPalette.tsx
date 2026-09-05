@@ -11,6 +11,9 @@
  * highlight moves across the *groups*, not within them: ↓ from the last page lands on the
  * first game. The groups are only how the flat list is printed.
  */
+import type { I18n, MessageDescriptor } from '@lingui/core'
+import { msg, plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import {
   Bot,
   ChartNoAxesColumn,
@@ -45,7 +48,7 @@ import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 import { paramsFromFilters } from '@/routes/games/filters'
 import { formatGameDate, formatResult, outcomeTone } from '@/routes/games/format'
-import { useSavedFilters } from '@/routes/games/savedFilters'
+import { filterLabel, useSavedFilters } from '@/routes/games/savedFilters'
 import { noteHref, oneLine } from '@/routes/notes/presentation'
 import { REPORTS } from '@/routes/stats/reports'
 
@@ -54,7 +57,20 @@ const MIN_QUERY = 2
 /** Per group. The dialog is a jump list, not a results page — five is a glance. */
 const PER_GROUP = 5
 
+/**
+ * The identity of a group, and never the words printed over it: the flat list is bucketed
+ * by this and the heading is looked up from it, so a translated heading cannot silently
+ * re-bucket a row.
+ */
 type GroupName = 'Pages' | 'Games' | 'Opponents' | 'Openings' | 'Notes'
+
+const GROUP_LABELS = {
+  Pages: msg`Pages`,
+  Games: msg`Games`,
+  Opponents: msg`Opponents`,
+  Openings: msg`Openings`,
+  Notes: msg`Notes`,
+} satisfies Record<GroupName, MessageDescriptor>
 
 interface PaletteItem {
   /** Unique across every group — it is the React key and the highlight's identity. */
@@ -73,8 +89,8 @@ interface PaletteItem {
 // --- the pages half -------------------------------------------------------
 
 interface PageRoute {
-  label: string
-  hint: string
+  label: MessageDescriptor
+  hint: MessageDescriptor
   icon: ComponentType<{ className?: string }>
   to: string
 }
@@ -84,43 +100,71 @@ interface PageRoute {
  * and its menus. This is the empty-query list: what you get for pressing ⌘K and Enter.
  */
 const PAGES: PageRoute[] = [
-  { label: 'Dashboard', hint: 'the last games and what went wrong', icon: LayoutDashboard, to: '/' },
-  { label: 'Games', hint: 'the library', icon: Library, to: '/games' },
-  { label: 'Explorer', hint: 'your games, the reference books and model games', icon: Network, to: '/explorer' },
+  {
+    label: msg`Dashboard`,
+    hint: msg`the last games and what went wrong`,
+    icon: LayoutDashboard,
+    to: '/',
+  },
+  { label: msg`Games`, hint: msg`the library`, icon: Library, to: '/games' },
+  {
+    label: msg`Explorer`,
+    hint: msg`your games, the reference books and model games`,
+    icon: Network,
+    to: '/explorer',
+  },
   // `/repertoire` is deliberately absent, as it is from the rail: routed, not yet offered
   // (see `SideNav`).
-  { label: 'Stats', hint: 'reports over the library', icon: ChartNoAxesColumn, to: '/stats' },
-  { label: 'Notes', hint: 'everything written down', icon: StickyNote, to: '/notes' },
-  { label: 'Live', hint: 'the game being played now', icon: Radio, to: '/live' },
   {
-    label: 'Library',
-    hint: 'import, export and reset',
+    label: msg`Stats`,
+    hint: msg`reports over the library`,
+    icon: ChartNoAxesColumn,
+    to: '/stats',
+  },
+  { label: msg`Notes`, hint: msg`everything written down`, icon: StickyNote, to: '/notes' },
+  { label: msg`Live`, hint: msg`the game being played now`, icon: Radio, to: '/live' },
+  {
+    label: msg`Library`,
+    hint: msg`import, export and reset`,
     icon: Database,
     to: '/library',
   },
   {
-    label: 'Analysis',
-    hint: 'coverage, backfills and what they cost',
+    label: msg`Analysis`,
+    hint: msg`coverage, backfills and what they cost`,
     icon: Gauge,
     to: '/analysis/coverage',
   },
-  { label: 'Engines', hint: 'the roster and what runs what', icon: Cpu, to: '/engines' },
-  { label: 'Engine passes', hint: 'budgets and move labels', icon: Gauge, to: '/analysis/engine' },
-  { label: 'Maia', hint: 'human levels and when they run', icon: Gauge, to: '/analysis/maia' },
+  { label: msg`Engines`, hint: msg`the roster and what runs what`, icon: Cpu, to: '/engines' },
   {
-    label: 'Import',
-    hint: 'lichess, chess.com, FICS and PGN',
+    label: msg`Engine passes`,
+    hint: msg`budgets and move labels`,
+    icon: Gauge,
+    to: '/analysis/engine',
+  },
+  { label: msg`Maia`, hint: msg`human levels and when they run`, icon: Gauge, to: '/analysis/maia' },
+  {
+    label: msg`Import`,
+    hint: msg`lichess, chess.com, FICS and PGN`,
     icon: Database,
     to: '/library/import',
   },
   {
-    label: 'Manage Library',
-    hint: 'export or reset',
+    label: msg`Manage Library`,
+    hint: msg`export or reset`,
     icon: Database,
     to: '/library/manage',
   },
-  { label: 'Assistant', hint: 'MCP keys and client setup', icon: Bot, to: '/assistant' },
+  { label: msg`Assistant`, hint: msg`MCP keys and client setup`, icon: Bot, to: '/assistant' },
 ]
+
+/**
+ * Words that are matched but never printed: a report and a saved cut answer to what they
+ * *are* as well as to what they are called, and the owner types that in their own language.
+ * `saved filter` is also the cut's hint, so the one message does both jobs.
+ */
+const REPORT_KEYWORD = msg`stats report`
+const SAVED_FILTER = msg`saved filter`
 
 function matches(query: string, ...fields: (string | undefined)[]): boolean {
   if (!query) return true
@@ -133,44 +177,60 @@ function matches(query: string, ...fields: (string | undefined)[]): boolean {
  * An empty query is deliberately *not* everything: the reports and the saved filters are
  * only worth the space once they have been asked for, so the resting list is the nine
  * routes and nothing else.
+ *
+ * The catalog is handed in rather than reached for globally: this is called out of the
+ * dialog's render, so what it matches against is the language on screen — the owner types
+ * "Eröffnungen", not "Openings".
  */
 function pageItems(
+  i18n: I18n,
   query: string,
   saved: ReturnType<typeof useSavedFilters>,
   capabilities: RuntimeCapabilities,
 ): PaletteItem[] {
-  const items: PaletteItem[] = PAGES.filter(
-    (page) =>
-      (capabilities.mcp || page.to !== '/assistant') && matches(query, page.label, page.hint),
-  ).map((page) => ({
-    id: `page:${page.to}`,
-    group: 'Pages',
-    label: page.label,
-    hint: page.hint,
-    icon: page.icon,
-    to: page.to,
-  }))
+  const items: PaletteItem[] = []
+
+  for (const page of PAGES) {
+    if (!capabilities.mcp && page.to === '/assistant') continue
+    const label = i18n._(page.label)
+    const hint = i18n._(page.hint)
+    if (!matches(query, label, hint)) continue
+    items.push({
+      id: `page:${page.to}`,
+      group: 'Pages',
+      label,
+      hint,
+      icon: page.icon,
+      to: page.to,
+    })
+  }
   if (!query) return items
 
   for (const report of REPORTS) {
-    if (!matches(query, report.label, report.hint, 'stats report')) continue
+    const label = i18n._(report.label)
+    const hint = i18n._(report.hint)
+    if (!matches(query, label, hint, i18n._(REPORT_KEYWORD))) continue
     items.push({
       id: `report:${report.key}`,
       group: 'Pages',
-      label: report.label,
-      hint: `report · ${report.hint}`,
+      label,
+      hint: i18n._(msg`report · ${hint}`),
       icon: ChartNoAxesColumn,
       to: `/stats?report=${report.key}`,
     })
   }
 
+  const savedLabel = i18n._(SAVED_FILTER)
   for (const filter of saved) {
-    if (!matches(query, filter.label, 'saved filter')) continue
+    // The shipped cuts are named by the catalog, so they are searched by that name too —
+    // typing the English one in a German UI should not find a row that reads differently.
+    const name = filterLabel(i18n, filter)
+    if (!matches(query, name, savedLabel)) continue
     items.push({
       id: `filter:${filter.id}`,
       group: 'Pages',
-      label: filter.label,
-      hint: 'saved filter',
+      label: name,
+      hint: savedLabel,
       icon: Signpost,
       to: `/games?${paramsFromFilters(filter.filters).toString()}`,
     })
@@ -181,10 +241,10 @@ function pageItems(
 // --- the searched half ----------------------------------------------------
 
 /** `kn1ghtmare vs Dr_Nykterstein` — whoever the two were, in the colours they had. */
-function gameLabel(game: GameSummary): string {
+function gameLabel(i18n: I18n, game: GameSummary): string {
   const white = game.white ?? '?'
   const black = game.black ?? '?'
-  return `${white} vs ${black}`
+  return i18n._(msg`${white} vs ${black}`)
 }
 
 function gameHint(game: GameSummary): string {
@@ -193,6 +253,7 @@ function gameHint(game: GameSummary): string {
 }
 
 function searchItems(
+  i18n: I18n,
   games: GameSummary[],
   opponents: OpponentHit[],
   openings: OpeningHit[],
@@ -204,7 +265,7 @@ function searchItems(
     items.push({
       id: `game:${game.id}`,
       group: 'Games',
-      label: gameLabel(game),
+      label: gameLabel(i18n, game),
       hint: gameHint(game),
       trailing: `${formatResult(game.result)}  ${formatGameDate(game.played_at)}`,
       trailingClass: outcomeTone(game.outcome),
@@ -214,11 +275,12 @@ function searchItems(
   }
 
   for (const opponent of opponents) {
+    const played = opponent.games
     items.push({
       id: `opponent:${opponent.name}`,
       group: 'Opponents',
       label: opponent.name,
-      hint: `${opponent.games} ${opponent.games === 1 ? 'game' : 'games'}`,
+      hint: i18n._(msg`${plural(played, { one: '# game', other: '# games' })}`),
       trailing: `${Math.round(opponent.score)}%`,
       icon: User,
       to: `/games?opponent=${encodeURIComponent(opponent.name)}`,
@@ -245,7 +307,7 @@ function searchItems(
       id: `note:${note.id}`,
       group: 'Notes',
       label: oneLine(note),
-      hint: note.tags.length ? note.tags.join(' · ') : 'note',
+      hint: note.tags.length ? note.tags.join(' · ') : i18n._(msg`note`),
       trailing: formatGameDate(note.updated_at),
       icon: StickyNote,
       to: noteHref(note),
@@ -310,18 +372,19 @@ function Dialog({ onClose }: { onClose: () => void }) {
   const saved = useSavedFilters()
   const search = useSearch(query, PER_GROUP)
   const capabilities = useRuntimeCapabilities()
+  const { t, i18n } = useLingui()
 
   const needle = query.trim().toLowerCase()
   const answered = search.data
 
   const items = useMemo(() => {
-    const pages = pageItems(needle, saved, capabilities)
+    const pages = pageItems(i18n, needle, saved, capabilities)
     if (needle.length < MIN_QUERY || !answered) return pages
     return [
       ...pages,
-      ...searchItems(answered.games, answered.opponents, answered.openings, answered.notes),
+      ...searchItems(i18n, answered.games, answered.opponents, answered.openings, answered.notes),
     ]
-  }, [needle, saved, answered, capabilities])
+  }, [i18n, needle, saved, answered, capabilities])
 
   // A new set of rows starts at the top: the highlight belongs to the list, not to a
   // position that happened to survive a keystroke. Adjusted during the render that
@@ -375,7 +438,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search everything"
+        aria-label={t`Search everything`}
         className="bb-card flex w-full max-w-[34rem] flex-col overflow-hidden shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-2.5">
@@ -384,8 +447,8 @@ function Dialog({ onClose }: { onClose: () => void }) {
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search games, opponents, openings, notes…"
-            aria-label="Search everything"
+            placeholder={t`Search games, opponents, openings, notes…`}
+            aria-label={t`Search everything`}
             aria-controls="command-palette-results"
             className="min-w-0 flex-1 bg-transparent text-[0.8125rem] text-ink outline-none placeholder:text-faint"
           />
@@ -397,12 +460,12 @@ function Dialog({ onClose }: { onClose: () => void }) {
         <div
           id="command-palette-results"
           role="listbox"
-          aria-label="Results"
+          aria-label={t`Results`}
           className="flex max-h-[26rem] flex-col gap-0.5 overflow-y-auto p-1.5"
         >
           {items.length === 0 ? (
             <p className="px-2 py-6 text-center text-[0.6875rem] text-dim">
-              {searching && search.isFetching ? 'Searching…' : 'Nothing matches that.'}
+              {searching && search.isFetching ? t`Searching…` : t`Nothing matches that.`}
             </p>
           ) : (
             GROUP_ORDER.map((group) => {
@@ -411,7 +474,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
               return (
                 <div key={group} className="flex flex-col gap-0.5">
                   <div className="px-2 pt-1.5 pb-1 text-[0.625rem] tracking-[0.12em] text-faint uppercase">
-                    {group}
+                    {i18n._(GROUP_LABELS[group])}
                   </div>
                   {rows.map((item) => (
                     <Row
@@ -428,10 +491,18 @@ function Dialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex items-center gap-3 border-t border-hairline px-3.5 py-2 text-[0.625rem] text-faint">
-          <span>↑↓ move</span>
-          <span>↵ open</span>
+          <span>
+            <Trans>↑↓ move</Trans>
+          </span>
+          <span>
+            <Trans>↵ open</Trans>
+          </span>
           <span className="flex-1" />
-          {searching ? null : <span>type two letters to search the library</span>}
+          {searching ? null : (
+            <span>
+              <Trans>type two letters to search the library</Trans>
+            </span>
+          )}
         </div>
       </div>
     </div>

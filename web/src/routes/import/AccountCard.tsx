@@ -11,6 +11,9 @@
  * and its button. The one thing it grows is the sync in flight, in the box that is doing
  * it rather than in a block appended under the grid.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -42,22 +45,22 @@ function usernameOf(job: ImportJob | undefined): string | undefined {
 
 const COPY: Record<
   'lichess' | 'chesscom' | 'fics',
-  { title: string; hint: string; placeholder: string }
+  { title: string; hint: MessageDescriptor; placeholder: MessageDescriptor }
 > = {
   lichess: {
     title: 'Lichess',
-    hint: 'Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes.',
-    placeholder: 'lichess username',
+    hint: msg`Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes.`,
+    placeholder: msg`lichess username`,
   },
   chesscom: {
     title: 'Chess.com',
-    hint: 'Reads the monthly archives from the last cursor, newest month last.',
-    placeholder: 'chess.com username',
+    hint: msg`Reads the monthly archives from the last cursor, newest month last.`,
+    placeholder: msg`chess.com username`,
   },
   fics: {
     title: 'FICS',
-    hint: 'Reads yearly player archives from the FICS Games Database and resumes at the last date.',
-    placeholder: 'FICS username',
+    hint: msg`Reads yearly player archives from the FICS Games Database and resumes at the last date.`,
+    placeholder: msg`FICS username`,
   },
 }
 
@@ -75,6 +78,7 @@ export function AccountCard({
   /** What the strip above the grid says this run should be told. */
   options: SyncOptions
 }) {
+  const { t, i18n } = useLingui()
   const copy = COPY[source]
   const suggested = account?.username ?? usernameOf(lastJob) ?? ''
   const [username, setUsername] = useState(suggested)
@@ -88,11 +92,13 @@ export function AccountCard({
 
   const start = useStartImport()
   const running = progress?.running === true || start.isPending
+  const when = lastJob ? relative(lastJob.finished_at ?? lastJob.created_at) : null
 
   function submit() {
     const name = username.trim()
     if (!name) {
-      setInvalid(`a ${copy.title} sync needs the username whose games to read`)
+      const platform = copy.title
+      setInvalid(t`a ${platform} sync needs the username whose games to read`)
       return
     }
     setInvalid(null)
@@ -122,22 +128,26 @@ export function AccountCard({
     >
       <div className="flex items-center gap-2">
         {/* The badge is the name; a word beside it saying the same thing is noise. */}
-        <SourceBadge source={source} title={copy.hint} />
+        <SourceBadge source={source} title={i18n._(copy.hint)} />
         <div className="flex-1" />
         {/* An account nobody has connected has no count to give, and a bare em dash in a
             box says less than the reason there is no number. */}
         {account ? (
           <span className="font-mono text-[0.71875rem] text-body tabular">
             {account.games?.toLocaleString() ?? '—'}
-            <span className="ml-1 font-sans text-dim">games</span>
+            <span className="ml-1 font-sans text-dim">
+              <Trans>games</Trans>
+            </span>
           </span>
         ) : (
-          <span className="text-[0.6875rem] text-faint">not connected</span>
+          <span className="text-[0.6875rem] text-faint">
+            <Trans>not connected</Trans>
+          </span>
         )}
       </div>
 
       <Label htmlFor={`${source}-username`} className="sr-only">
-        Username
+        <Trans>Username</Trans>
       </Label>
       <Input
         id={`${source}-username`}
@@ -145,7 +155,7 @@ export function AccountCard({
         spellCheck={false}
         autoComplete="off"
         aria-invalid={invalid !== null}
-        placeholder={copy.placeholder}
+        placeholder={i18n._(copy.placeholder)}
         className="h-7 w-full"
         onKeyDown={(event) => {
           if (event.key !== 'Enter') return
@@ -165,12 +175,12 @@ export function AccountCard({
 
       <div className="flex items-center gap-2">
         <span className="font-mono text-[0.6875rem] text-dim tabular">
-          {lastJob ? `synced ${relative(lastJob.finished_at ?? lastJob.created_at)}` : 'never synced'}
+          {when === null ? t`never synced` : t`synced ${when}`}
         </span>
         <div className="flex-1" />
         <Button type="button" size="sm" disabled={running} onClick={submit}>
           {running ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
-          {progress?.running ? 'Syncing' : account ? 'Sync' : 'Connect'}
+          {progress?.running ? t`Syncing` : account ? t`Sync` : t`Connect`}
         </Button>
       </div>
 

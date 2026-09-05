@@ -9,6 +9,8 @@
  * zero on a continuation only the opponent played (`owner_moves === 0`) and the table
  * shows a dash there too: never having played a move is not having played it well.
  */
+import { t } from '@lingui/core/macro'
+
 import type { ExplorerMove, GameSummary } from '@/lib/api/types'
 import { MINUS } from '@/lib/chess/evaluation'
 
@@ -130,21 +132,21 @@ export function worstContinuation(
 export function bookReason(reason: string | null | undefined): string {
   switch (reason) {
     case 'novelty':
-      return 'you have only played the next move once'
+      return t`you have only played the next move once`
     case 'line not played':
-      return 'no two games of yours played the whole line'
+      return t`no two games of yours played the whole line`
     case 'no continuation':
-      return 'no game of yours goes further'
+      return t`no game of yours goes further`
     case 'depth limit':
-      return 'the walk hit its depth limit'
+      return t`the walk hit its depth limit`
     case 'unknown position':
-      return 'the next position is not in the database'
+      return t`the next position is not in the database`
     case 'unplayable continuation':
-      return 'the stored continuation is not legal here'
+      return t`the stored continuation is not legal here`
     case 'no games':
-      return 'you have never reached this position'
+      return t`you have never reached this position`
     default:
-      return reason ?? 'unknown'
+      return reason ?? t`unknown`
   }
 }
 

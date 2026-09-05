@@ -11,6 +11,8 @@
  * it, and the cause (a proxy stripping COOP/COEP) is not something the owner would ever
  * guess from a run that is merely slow.
  */
+import { plural, t } from '@lingui/core/macro'
+
 import type { BrowserRunnerState } from '@/lib/runner'
 
 export type BrowserTone = 'connected' | 'working' | 'degraded' | 'away' | 'bad'
@@ -24,19 +26,25 @@ export interface BrowserStatus {
 export function statusLabel(state: BrowserRunnerState): BrowserStatus {
   switch (state.phase) {
     case 'off':
-      return { label: 'not running', tone: 'away' }
+      return { label: t`not running`, tone: 'away' }
     case 'starting':
-      return { label: 'loading the engine', tone: 'working' }
+      return { label: t`loading the engine`, tone: 'working' }
     case 'connecting':
-      return { label: 'connecting', tone: 'working' }
+      return { label: t`connecting`, tone: 'working' }
     case 'retrying':
-      return { label: 'reconnecting', tone: 'degraded' }
+      return { label: t`reconnecting`, tone: 'degraded' }
     case 'refused':
-      return { label: 'stopped', tone: 'bad' }
+      return { label: t`stopped`, tone: 'bad' }
     default:
       return state.activeRuns > 0
-        ? { label: `analysing ${state.activeRuns === 1 ? 'a game' : `${state.activeRuns} games`}`, tone: 'connected' }
-        : { label: 'connected · idle', tone: 'connected' }
+        ? {
+            label: plural(state.activeRuns, {
+              one: 'analysing a game',
+              other: 'analysing # games',
+            }),
+            tone: 'connected',
+          }
+        : { label: t`connected · idle`, tone: 'connected' }
   }
 }
 
@@ -49,8 +57,12 @@ export function statusLabel(state: BrowserRunnerState): BrowserStatus {
  */
 export function engineLabel(state: BrowserRunnerState): string {
   const name = state.engineName ?? 'Stockfish'
-  const threads = `${state.threads} ${state.threads === 1 ? 'thread' : 'threads'}`
-  return `${name} · browser · ${threads}${state.isolated ? '' : ' (not isolated)'}`
+  const threads = plural(state.threads, { one: '# thread', other: '# threads' })
+  // Two whole sentences rather than one plus an appended fragment: "(not isolated)" is the
+  // half a translator most needs to see attached to what it qualifies.
+  return state.isolated
+    ? t`${name} · browser · ${threads}`
+    : t`${name} · browser · ${threads} (not isolated)`
 }
 
 /** Whether the row can say anything about an engine yet. */

@@ -6,6 +6,7 @@
  * It lives under `src/routes/stats/` because Stats is the analytics home; the Dashboard
  * imports it. If a third screen ever needs it, promote the file to `src/lib/stats/`.
  */
+import { t } from '@lingui/core/macro'
 import { useQuery } from '@tanstack/react-query'
 
 import * as api from '@/lib/api/endpoints'
@@ -24,21 +25,45 @@ export const WINDOW_DAYS: Record<Exclude<WindowKey, 'all'>, number> = {
   '1y': 365,
 }
 
+/**
+ * The words on the segmented control.
+ *
+ * Getters rather than plain values: the labels are translated, and a table filled in at
+ * import time would freeze them in whichever language the tab was opened in. Read as
+ * `WINDOW_LABELS[key]` either way, so nothing at a call site has to know.
+ */
 export const WINDOW_LABELS: Record<WindowKey, string> = {
-  '7d': '7d',
-  '30d': '30d',
-  '90d': '90d',
-  '1y': '1y',
-  all: 'All',
+  get '7d'() {
+    return t`7d`
+  },
+  get '30d'() {
+    return t`30d`
+  },
+  get '90d'() {
+    return t`90d`
+  },
+  get '1y'() {
+    return t`1y`
+  },
+  get all() {
+    return t`All`
+  },
 }
 
 /** How a window reads in prose when it ends now. */
-const WINDOW_PROSE_NOW: Record<WindowKey, string> = {
-  '7d': 'the last 7 days',
-  '30d': 'the last 30 days',
-  '90d': 'the last 90 days',
-  '1y': 'the last 12 months',
-  all: 'all time',
+function windowProseNow(window: WindowKey): string {
+  switch (window) {
+    case '7d':
+      return t`the last 7 days`
+    case '30d':
+      return t`the last 30 days`
+    case '90d':
+      return t`the last 90 days`
+    case '1y':
+      return t`the last 12 months`
+    case 'all':
+      return t`all time`
+  }
 }
 
 export interface Period {
@@ -74,15 +99,16 @@ export function windowProse(
   anchor: Date = new Date(),
   now: Date = new Date(),
 ): string {
-  if (window === 'all') return WINDOW_PROSE_NOW.all
+  if (window === 'all') return windowProseNow('all')
   // A day of slack, so "yesterday evening" still reads as the last N days.
-  if (now.getTime() - anchor.getTime() <= DAY_MS) return WINDOW_PROSE_NOW[window]
+  if (now.getTime() - anchor.getTime() <= DAY_MS) return windowProseNow(window)
   const to = anchor.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   })
-  return `the ${WINDOW_DAYS[window]} days to ${to}`
+  const days = WINDOW_DAYS[window]
+  return t`the ${days} days to ${to}`
 }
 
 export const DEFAULT_WINDOWS: WindowKey[] = ['all', '1y', '90d', '30d']

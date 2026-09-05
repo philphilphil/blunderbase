@@ -13,6 +13,7 @@
  * mutation: the studio re-renders on every engine tick, and the pending and error states of
  * "Add to library" belong to the button rather than to the page that places it.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useImportReferenceGame } from '@/lib/api/queries'
@@ -44,7 +45,7 @@ export function StudioActions({
           to={backTo}
           className={cn(BUTTON, 'border-edge bg-elevated text-soft hover:text-ink')}
         >
-          ← Back to explorer
+          <Trans>← Back to explorer</Trans>
         </Link>
       ) : null}
     </div>
@@ -70,6 +71,7 @@ function AddToLibrary({
   id: string
   backTo: string | null
 }) {
+  const { t } = useLingui()
   const navigate = useNavigate()
   const add = useImportReferenceGame({
     onSuccess: (result) =>
@@ -86,7 +88,7 @@ function AddToLibrary({
       disabled={add.isPending}
       title={
         add.error?.message ??
-        'Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic.'
+        t`Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic.`
       }
       // Teal-tinted, the row's vocabulary for the one control that is doing something rather
       // than showing something. It is the only affirmative act on a model game's screen.
@@ -97,7 +99,13 @@ function AddToLibrary({
           : 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal hover:border-accent-teal/50',
       )}
     >
-      {add.isPending ? 'Adding…' : add.isError ? 'Could not add — retry' : '+ Add to library'}
+      {add.isPending ? (
+        <Trans>Adding…</Trans>
+      ) : add.isError ? (
+        <Trans>Could not add — retry</Trans>
+      ) : (
+        <Trans>+ Add to library</Trans>
+      )}
     </button>
   )
 }

@@ -7,6 +7,7 @@
  * conditionally rendered: every cell is in the DOM at both sizes and the breakpoint only
  * decides where it sits, so the row stays one thing to reason about — and to test.
  */
+import { useLingui } from '@lingui/react/macro'
 import { X } from 'lucide-react'
 import type * as React from 'react'
 import { memo } from 'react'
@@ -58,6 +59,7 @@ export const GameRow = memo(function GameRow({
   onDelete,
   analysing,
 }: GameRowProps) {
+  const { t } = useLingui()
   const tier = tierOf(game)
   const drop = worstDrop(game)
   const flags = flagCounts(game)
@@ -65,6 +67,7 @@ export const GameRow = memo(function GameRow({
   // game of theirs whose side is not yet known has none either. Their name is set bold
   // under its column, which is how the row says which side was theirs — the same fact
   // the old `Col` disc carried, now told by the name it belongs to.
+  const id = game.id
   const ownerSide = game.is_owner_game === false ? null : (game.color ?? null)
   const nameClass = (side: 'white' | 'black') =>
     cn(
@@ -100,7 +103,7 @@ export const GameRow = memo(function GameRow({
           type="button"
           role="checkbox"
           aria-checked={selected}
-          aria-label={`Select game ${game.id}`}
+          aria-label={t`Select game ${id}`}
           onClick={(event) => {
             event.stopPropagation()
             onToggle(game.id, event)
@@ -134,7 +137,7 @@ export const GameRow = memo(function GameRow({
         {...cell('opening', 'truncate font-sans text-[0.78125rem] text-body')}
         title={[game.opening, game.eco].filter(Boolean).join(' · ') || undefined}
       >
-        {game.opening ?? 'Unknown opening'}{' '}
+        {game.opening ?? t`Unknown opening`}{' '}
         {game.eco ? <span className="font-mono text-dim">{game.eco}</span> : null}
       </span>
 
@@ -181,7 +184,7 @@ export const GameRow = memo(function GameRow({
             disabled={analysing}
             className="text-[0.65625rem] text-accent-teal hover:text-accent-link disabled:text-dim max-md:rounded-md max-md:border max-md:border-edge max-md:px-2 max-md:py-1"
           >
-            {analysing ? 'queueing…' : 'analyse'}
+            {analysing ? t`queueing…` : t`analyse`}
           </button>
         )}
 
@@ -193,8 +196,8 @@ export const GameRow = memo(function GameRow({
             selection plus the footer's Delete is the same act with a bigger target. */}
         <button
           type="button"
-          aria-label={`Delete game ${game.id}`}
-          title="Delete this game"
+          aria-label={t`Delete game ${id}`}
+          title={t`Delete this game`}
           onClick={(event) => {
             event.stopPropagation()
             onDelete(game.id)

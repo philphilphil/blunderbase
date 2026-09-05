@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, Pause, Play } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -34,12 +35,17 @@ export function QueueIndicator({ className }: { className?: string }) {
   const paused = data?.paused ?? false
   const idle = total === 0 && !paused
   const destinations = data?.destinations ?? []
+  const { t } = useLingui()
 
+  // Whole sentences rather than a stem with a clause appended: what is bolted on in
+  // English is a different word order elsewhere.
   const summary = paused
-    ? `${queued} queued, ${running} running — the queue is paused`
-    : data
-      ? `${queued} queued, ${running} running${data.workers ? '' : ' — workers are not draining the queue'}`
-      : 'analysis queue'
+    ? t`${queued} queued, ${running} running — the queue is paused`
+    : !data
+      ? t`analysis queue`
+      : data.workers
+        ? t`${queued} queued, ${running} running`
+        : t`${queued} queued, ${running} running — workers are not draining the queue`
 
   return (
     <div className="flex items-center gap-1.5">
@@ -62,7 +68,7 @@ export function QueueIndicator({ className }: { className?: string }) {
                 paused ? 'text-mistake' : idle ? 'text-dim-2' : 'text-soft',
               )}
             >
-              {paused ? 'Paused' : idle ? 'Idle' : 'Analysing'}
+              {paused ? t`Paused` : idle ? t`Idle` : t`Analysing`}
             </span>
             <QueueMeter
               queued={queued}
@@ -84,12 +90,16 @@ export function QueueIndicator({ className }: { className?: string }) {
           <p>{summary}</p>
           {paused ? (
             <p className="mt-1 text-faint">
-              Nothing new is claimed while it is paused; a run already started finishes.
+              <Trans>
+                Nothing new is claimed while it is paused; a run already started finishes.
+              </Trans>
             </p>
           ) : null}
           {queued > 0 ? (
             <p className="mt-1 text-faint">
-              Clear drops what is still queued; a run already being worked finishes.
+              <Trans>
+                Clear drops what is still queued; a run already being worked finishes.
+              </Trans>
             </p>
           ) : null}
           <QueueDestinations destinations={destinations} dense className="mt-1.5" />
@@ -117,7 +127,8 @@ export function QueueIndicator({ className }: { className?: string }) {
 function PauseQueueButton({ paused }: { paused: boolean }) {
   const setPaused = useSetQueuePaused()
   const pending = setPaused.isPending
-  const label = paused ? 'Resume the analysis queue' : 'Pause the analysis queue'
+  const { t } = useLingui()
+  const label = paused ? t`Resume the analysis queue` : t`Pause the analysis queue`
 
   return (
     <button
@@ -158,6 +169,7 @@ const ARMED_MS = 4000
 function ClearQueueButton({ queued }: { queued: number }) {
   const [armed, setArmed] = useState(false)
   const clear = useClearQueue({ onSettled: () => setArmed(false) })
+  const { t } = useLingui()
 
   useEffect(() => {
     if (!armed) return
@@ -171,8 +183,8 @@ function ClearQueueButton({ queued }: { queued: number }) {
       type="button"
       data-testid="clear-queue"
       disabled={pending}
-      aria-label={armed ? `Clear ${queued} queued runs` : 'Clear the analysis queue'}
-      title={armed ? undefined : 'Drop everything still queued'}
+      aria-label={armed ? t`Clear ${queued} queued runs` : t`Clear the analysis queue`}
+      title={armed ? undefined : t`Drop everything still queued`}
       onClick={() => {
         if (!armed) {
           setArmed(true)
@@ -188,7 +200,7 @@ function ClearQueueButton({ queued }: { queued: number }) {
       )}
     >
       {pending ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-      {armed ? `Clear ${queued}?` : 'Clear'}
+      {armed ? t`Clear ${queued}?` : t`Clear`}
     </button>
   )
 }

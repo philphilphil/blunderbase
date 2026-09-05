@@ -11,6 +11,7 @@
  * The chevron leads the summary because it must advertise the disclosure before the owner
  * reads the row; it stays `aria-hidden` so the enclosing button remains the only control.
  */
+import { Plural } from '@lingui/react/macro'
 import { ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -109,7 +110,9 @@ export function MachineRow({
             <span className="flex-none text-right">
               <span className="block font-mono text-[0.6875rem] text-soft">{slots}</span>
               <span className="block text-[0.59375rem] text-faint">
-                {engines} engine{engines === '1' ? '' : 's'}
+                {/* The count arrives as the string the column shows; the plural rule needs
+                    the number behind it, so it is read back rather than threaded through. */}
+                <Plural value={Number(engines)} one="# engine" other="# engines" />
               </span>
             </span>
           </button>

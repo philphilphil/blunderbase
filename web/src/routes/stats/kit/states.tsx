@@ -6,6 +6,7 @@
  * a 12/12.5px semibold title, and a hairline-topped footer for the one dry sentence each
  * card ends on.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import type { CSSProperties, ReactNode } from 'react'
 
 import type { StatsResponse } from '@/lib/api/types'
@@ -167,6 +168,7 @@ export function ErrorBlock({
   onRetry?: () => void
   className?: string
 }) {
+  const { t } = useLingui()
   return (
     <div
       className={cn(
@@ -176,9 +178,11 @@ export function ErrorBlock({
       data-testid="error"
       role="alert"
     >
-      <p className="text-[0.71875rem] font-medium text-blunder">Could not load this.</p>
+      <p className="text-[0.71875rem] font-medium text-blunder">
+        <Trans>Could not load this.</Trans>
+      </p>
       <p className="max-w-[38ch] font-mono text-[0.65625rem] leading-relaxed break-words text-dim-2">
-        {error?.message ?? 'the request failed'}
+        {error?.message ?? t`the request failed`}
       </p>
       {onRetry ? (
         <button
@@ -186,7 +190,7 @@ export function ErrorBlock({
           onClick={onRetry}
           className="rounded-md border border-edge-strong px-2.5 py-1 text-[0.6875rem] text-soft transition-colors hover:border-edge-hover hover:text-ink"
         >
-          Try again
+          <Trans>Try again</Trans>
         </button>
       ) : null}
     </div>
@@ -218,7 +222,8 @@ export function Async({
 }) {
   if (query.isPending) return <>{loading ?? <LoadingRows />}</>
   if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
-  if (empty) return <EmptyBlock>{emptyMessage ?? 'Nothing here for this window yet.'}</EmptyBlock>
+  if (empty)
+    return <EmptyBlock>{emptyMessage ?? <Trans>Nothing here for this window yet.</Trans>}</EmptyBlock>
   return <>{children}</>
 }
 

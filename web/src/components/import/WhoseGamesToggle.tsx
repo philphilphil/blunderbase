@@ -10,18 +10,22 @@
  * The default is Mine because the common PGN really is one's own export — this is a
  * question put where it can be seen and changed, not a modal in the way of the usual case.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { useLingui } from '@lingui/react/macro'
+
 import { cn } from '@/lib/utils'
 
-const OPTIONS: { label: string; mine: boolean; title: string }[] = [
+const OPTIONS: { label: MessageDescriptor; mine: boolean; title: MessageDescriptor }[] = [
   {
-    label: 'Mine',
+    label: msg`Mine`,
     mine: true,
-    title: 'Games you played. They count in every statistic, and the sides are attributed to your accounts.',
+    title: msg`Games you played. They count in every statistic, and the sides are attributed to your accounts.`,
   },
   {
-    label: 'Not mine',
+    label: msg`Not mine`,
     mine: false,
-    title: "Somebody else's games — a master collection, a friend's export. Analysed and annotated like any other game, and counted in no statistic.",
+    title: msg`Somebody else's games — a master collection, a friend's export. Analysed and annotated like any other game, and counted in no statistic.`,
   },
 ]
 
@@ -36,10 +40,11 @@ export function WhoseGamesToggle({
   disabled?: boolean
   className?: string
 }) {
+  const { t, i18n } = useLingui()
   return (
     <div
       role="group"
-      aria-label="Whose games this PGN holds"
+      aria-label={t`Whose games this PGN holds`}
       className={cn(
         'flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.65625rem]',
         disabled && 'opacity-50',
@@ -48,11 +53,11 @@ export function WhoseGamesToggle({
     >
       {OPTIONS.map((option, index) => (
         <button
-          key={option.label}
+          key={option.mine ? 'mine' : 'not-mine'}
           type="button"
           disabled={disabled}
           aria-pressed={mine === option.mine}
-          title={option.title}
+          title={i18n._(option.title)}
           onClick={() => onChange(option.mine)}
           className={cn(
             'px-2 py-[0.1875rem] transition-colors',
@@ -60,7 +65,7 @@ export function WhoseGamesToggle({
             mine === option.mine ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
           )}
         >
-          {option.label}
+          {i18n._(option.label)}
         </button>
       ))}
     </div>

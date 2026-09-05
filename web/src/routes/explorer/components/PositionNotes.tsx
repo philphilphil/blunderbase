@@ -46,6 +46,7 @@
  * explorer as well as `['notes']` (`lib/api/queries`, `lib/events/invalidation`), since the
  * tree payload carries these same notes on its rows.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -130,10 +131,12 @@ export function PositionNotes({ fen }: { fen: string }) {
       className="flex flex-none flex-col gap-[0.4375rem] rounded-[0.5625rem] border border-line bg-panel p-[0.8125rem]"
     >
       <div className="flex items-center gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">Your notes on this position</span>
+        <span className="text-[0.75rem] font-semibold text-ink">
+          <Trans>Your notes on this position</Trans>
+        </span>
         {flash ? (
           <span role="status" className="text-[0.625rem] text-good">
-            saved
+            <Trans>saved</Trans>
           </span>
         ) : null}
         <div className="flex-1" />
@@ -143,7 +146,7 @@ export function PositionNotes({ fen }: { fen: string }) {
             onClick={() => open({ id: null, text: '', saved: '' })}
             className="rounded-md border border-edge px-2 py-[0.1875rem] text-[0.6875rem] text-soft hover:border-edge-hover hover:text-ink"
           >
-            Add note
+            <Trans>Add note</Trans>
           </button>
         ) : null}
       </div>
@@ -188,7 +191,7 @@ export function PositionNotes({ fen }: { fen: string }) {
             onClick={() => open({ id: null, text: '', saved: '' })}
             className="rounded-md border border-dashed border-edge-strong px-2.5 py-2.5 text-left text-[0.75rem] text-dim hover:border-edge-hover hover:text-soft"
           >
-            Nothing written about this position yet. What is worth remembering here?
+            <Trans>Nothing written about this position yet. What is worth remembering here?</Trans>
           </button>
         ) : null}
       </div>
@@ -216,6 +219,7 @@ function Written({
   const move = originLabel(note)
   const from = typeof note.game_id === 'number' ? gameLabel(note.game, note.game_id) : null
   const model = note.game?.is_owner_game === false
+  const { t } = useLingui()
   return (
     <div
       className={cn(
@@ -235,13 +239,12 @@ function Written({
       {origin ? (
         <Link
           to={origin}
-          title={move ? `Open ${from} at ${move}` : `Open ${from}`}
+          title={move ? t`Open ${from} at ${move}` : t`Open ${from}`}
           className="flex min-w-0 items-baseline gap-1.5 text-[0.6875rem] text-dim transition-colors hover:text-accent-teal"
         >
           {move ? <span className="flex-none font-mono tabular text-soft-2">{move}</span> : null}
           <span className="truncate">
-            {model ? 'in the model game ' : 'in '}
-            {from}
+            {model ? <Trans>in the model game {from}</Trans> : <Trans>in {from}</Trans>}
           </span>
         </Link>
       ) : null}
@@ -250,10 +253,10 @@ function Written({
         {viaMcp ? (
           <span
             className="inline-flex items-center gap-[0.3125rem] rounded-sm border border-edge px-1.5 py-px text-[0.625rem] text-soft"
-            title={`written over MCP by ${MCP_SERVER_NAME}`}
+            title={t`written over MCP by ${MCP_SERVER_NAME}`}
           >
             <span className="size-[0.3125rem] rounded-full bg-good" />
-            note via MCP
+            <Trans>note via MCP</Trans>
           </span>
         ) : null}
         <span className="font-mono text-[0.625rem] text-faint">{relative(note.created_at)}</span>
@@ -261,8 +264,8 @@ function Written({
         <button
           type="button"
           onClick={onEdit}
-          aria-label="Edit this note"
-          title="Edit this note"
+          aria-label={t`Edit this note`}
+          title={t`Edit this note`}
           className="px-0.5 text-faint hover:text-ink"
         >
           <Pencil className="size-3" aria-hidden />
@@ -271,8 +274,8 @@ function Written({
         <button
           type="button"
           onClick={onDelete}
-          aria-label="Delete this note"
-          title="Delete this note"
+          aria-label={t`Delete this note`}
+          title={t`Delete this note`}
           className="px-0.5 text-faint hover:text-blunder"
         >
           <Trash2 className="size-3" aria-hidden />
@@ -295,6 +298,7 @@ function Composer({
   /** Escape: throw the edit away and close it. */
   onAbandon: () => void
 }) {
+  const { t } = useLingui()
   return (
     <textarea
       value={draft.text}
@@ -308,8 +312,8 @@ function Composer({
           onAbandon()
         }
       }}
-      placeholder="What is worth remembering about this position? It saves when you click away."
-      aria-label="Note text"
+      placeholder={t`What is worth remembering about this position? It saves when you click away.`}
+      aria-label={t`Note text`}
       className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-[0.78125rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
     />
   )

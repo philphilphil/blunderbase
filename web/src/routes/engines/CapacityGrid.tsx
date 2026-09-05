@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Info, Plus } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -42,6 +43,7 @@ export function CapacityGrid({
   onOpenDetail: (detail: string | null) => void
   onEngineAdded: (engine: EngineResponse) => void
 }) {
+  const { t } = useLingui()
   const browser = useBrowserRunner()
   const browserRunner = status?.runners.find((runner) => runner.id === browser.runnerId)
   const remoteRunners = (status?.runners ?? []).filter((runner) => runner.id !== browser.runnerId)
@@ -51,11 +53,15 @@ export function CapacityGrid({
     <section className="flex flex-col gap-3">
       <div className="flex items-start gap-3 max-md:flex-wrap">
         <div className="min-w-0">
-          <h2 className="text-xs font-semibold text-ink">Compute capacity</h2>
+          <h2 className="text-xs font-semibold text-ink">
+            <Trans>Compute capacity</Trans>
+          </h2>
           <p className="mt-1 text-[0.6875rem] leading-[1.5] text-dim">
-            {remoteRunnersEnabled
-              ? 'This server, this browser, and remote machines that can take engine work.'
-              : 'The engines and analysis capacity on this computer.'}
+            {remoteRunnersEnabled ? (
+              <Trans>This server, this browser, and remote machines that can take engine work.</Trans>
+            ) : (
+              <Trans>The engines and analysis capacity on this computer.</Trans>
+            )}
           </p>
         </div>
         <div className="flex-1" />
@@ -65,8 +71,8 @@ export function CapacityGrid({
               type="button"
               size="icon"
               variant="outline"
-              aria-label="How remote runners work"
-              title="How remote runners work"
+              aria-label={t`How remote runners work`}
+              title={t`How remote runners work`}
               aria-expanded={openDetail === 'remote-info'}
               onClick={() => toggle('remote-info')}
             >
@@ -79,7 +85,7 @@ export function CapacityGrid({
               aria-expanded={openDetail === 'add-remote-runner'}
             >
               <Plus aria-hidden />
-              Remote runner
+              <Trans>Remote runner</Trans>
             </Button>
           </>
         ) : null}
@@ -87,10 +93,12 @@ export function CapacityGrid({
 
       {error ? (
         <div className="rounded-lg border border-blunder/28 bg-blunder/5 px-4 py-5 text-center">
-          <p className="text-[0.78125rem] text-blunder">Compute capacity could not be read.</p>
+          <p className="text-[0.78125rem] text-blunder">
+            <Trans>Compute capacity could not be read.</Trans>
+          </p>
           <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">{error.message}</p>
           <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onRetry}>
-            Try again
+            <Trans>Try again</Trans>
           </Button>
         </div>
       ) : isLoading || !status ? (
@@ -163,7 +171,9 @@ export function CapacityGrid({
 
       {remoteRunnersEnabled && !isLoading && !error && remoteRunners.length === 0 ? (
         <p className="text-[0.6875rem] text-dim-2">
-          No remote runners are registered. This server and browser still work independently.
+          <Trans>
+            No remote runners are registered. This server and browser still work independently.
+          </Trans>
         </p>
       ) : null}
     </section>
@@ -186,36 +196,53 @@ function ServerCard({
   adding: boolean
   onAdd: () => void
 }) {
+  const { t } = useLingui()
   const used = local.busy + local.streams
   const total = local.slots ?? null
+  const queued = local.queued
+  const running = local.running
   return (
     <MachineRow
       tone={local.workers ? 'connected' : 'degraded'}
-      name={localOnly ? 'This computer' : 'This server'}
-      caption={local.workers ? 'ready for queued work' : 'not draining the queue'}
-      type={localOnly ? 'Computer' : 'Server'}
+      name={localOnly ? t`This computer` : t`This server`}
+      caption={local.workers ? t`ready for queued work` : t`not draining the queue`}
+      type={localOnly ? t`Computer` : t`Server`}
       slots={total === null ? String(used) : `${used}/${total}`}
       engines={String(local.engines.length)}
       expanded={expanded}
       onToggleExpand={onToggle}
-      ariaLabel={`${expanded ? 'Collapse' : 'Expand'} ${localOnly ? 'this computer' : 'this server'}`}
+      // Spelled out rather than assembled from a verb and a noun: which words a
+      // translator may join, and in what order, is not this file's to guess.
+      ariaLabel={
+        localOnly
+          ? expanded
+            ? t`Collapse this computer`
+            : t`Expand this computer`
+          : expanded
+            ? t`Collapse this server`
+            : t`Expand this server`
+      }
       layout="card"
       actions={
         <Button type="button" size="sm" variant="ghost" onClick={onAdd} aria-expanded={adding}>
           <Plus aria-hidden />
-          Engine
+          <Trans context="button">Engine</Trans>
         </Button>
       }
       detail={
         <div className="flex flex-col gap-3">
           {local.workers ? (
             <p className="text-[0.6875rem] leading-[1.6] text-dim">
-              {local.queued} queued and {local.running} running here. Paths and options for
-              these engines are editable in the inventory above.
+              <Trans>
+                {queued} queued and {running} running here. Paths and options for these engines
+                are editable in the inventory above.
+              </Trans>
             </p>
           ) : (
             <p className="text-[0.6875rem] leading-[1.6] text-mistake">
-              This process is not draining the queue. Runs wait until a worker picks them up.
+              <Trans>
+                This process is not draining the queue. Runs wait until a worker picks them up.
+              </Trans>
             </p>
           )}
           <MachineEngineList engines={local.engines} streamable connected />
@@ -233,17 +260,24 @@ function ServerCard({
 function RemoteRunnerInfo() {
   return (
     <div className="order-1 col-span-full rounded-lg border border-edge-strong bg-elevated px-3.5 py-3">
-      <h3 className="text-[0.75rem] font-medium text-ink">How remote runners work</h3>
+      <h3 className="text-[0.75rem] font-medium text-ink">
+        <Trans>How remote runners work</Trans>
+      </h3>
       <p className="mt-1.5 text-[0.6875rem] leading-[1.6] text-dim">
-        A runner is a small process on another machine that connects outward to this
-        Blunderbase deployment. Registering one mints a token shown once and a paste-ready{' '}
-        <span className="font-mono text-soft">runner.yaml</span>. Copy both to that machine,
-        set its engine paths in the yaml, and start the runner. Its advertised engines then
-        appear in the inventory above; their paths and options remain read-only here because
-        the yaml on that machine is the source of truth.
+        <Trans>
+          A runner is a small process on another machine that connects outward to this
+          Blunderbase deployment. Registering one mints a token shown once and a paste-ready{' '}
+          <span className="font-mono text-soft">runner.yaml</span>. Copy both to that machine,
+          set its engine paths in the yaml, and start the runner. Its advertised engines then
+          appear in the inventory above; their paths and options remain read-only here because
+          the yaml on that machine is the source of truth.
+        </Trans>
       </p>
       <p className="mt-2 text-[0.65625rem] text-faint">
-        A longer setup and troubleshooting guide will be linked here when the documentation is ready.
+        <Trans>
+          A longer setup and troubleshooting guide will be linked here when the documentation is
+          ready.
+        </Trans>
       </p>
     </div>
   )

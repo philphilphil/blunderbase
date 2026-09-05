@@ -2,6 +2,8 @@
  * Design 2c's line breadcrumb: `1.c4 › e5 › 2.Nc3 › …` with the current move highlighted.
  * Every crumb walks the tree back to that point.
  */
+import { Trans } from '@lingui/react/macro'
+
 import { cn } from '@/lib/utils'
 
 import { plyLabel, type LineStep } from '../line'
@@ -26,7 +28,9 @@ export function LineBreadcrumb({
             : 'border-edge bg-raised text-soft hover:text-ink',
         )}
       >
-        start
+        <Trans comment="Breadcrumb crumb for the position the line is replayed from.">
+          start
+        </Trans>
       </button>
       {steps.map((step, index) => {
         const last = index === steps.length - 1

@@ -7,6 +7,7 @@
  * the same two clicks otherwise — and it names what goes with them, because the analysis
  * and the notes are the part nobody expects to lose.
  */
+import { Plural, Trans } from '@lingui/react/macro'
 import { Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, type FormEvent } from 'react'
 
@@ -37,8 +38,6 @@ export function DeleteGamesDialog({
     if (!pending) onConfirm()
   }
 
-  const games = count === 1 ? '1 game' : `${count.toLocaleString('en-US')} games`
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh] max-md:overflow-y-auto max-md:px-4 max-md:pt-6 max-md:pb-6"
@@ -56,13 +55,17 @@ export function DeleteGamesDialog({
             className="flex items-center gap-2 text-[0.875rem] font-semibold text-ink"
           >
             <TriangleAlert className="size-3.5 text-blunder" aria-hidden />
-            Delete {games}
+            <Plural value={count} one="Delete 1 game" other="Delete # games" />
           </h2>
           <p className="text-[0.75rem] leading-[1.65] text-dim">
-            {count === 1 ? 'The game goes' : 'They go'} with their analysis, the notes written
-            about them and the variations kept off them. Notes about a position stay, and so
-            does the sync history — a source you sync again will not fetch{' '}
-            {count === 1 ? 'it' : 'them'} back. There is no undo.
+            {/* One message per form rather than two words swapped inside a shared frame:
+                which noun the rest of the sentence agrees with is a per-language decision,
+                and a language with more than two forms has nowhere to put them otherwise. */}
+            <Plural
+              value={count}
+              one="The game goes with their analysis, the notes written about them and the variations kept off them. Notes about a position stay, and so does the sync history — a source you sync again will not fetch it back. There is no undo."
+              other="They go with their analysis, the notes written about them and the variations kept off them. Notes about a position stay, and so does the sync history — a source you sync again will not fetch them back. There is no undo."
+            />
           </p>
         </div>
         <form onSubmit={submit} className="flex flex-col gap-4">
@@ -73,11 +76,11 @@ export function DeleteGamesDialog({
           ) : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             <Button type="submit" variant="destructive" autoFocus disabled={pending}>
               {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              {count === 1 ? 'Delete it' : 'Delete them'}
+              <Plural value={count} one="Delete it" other="Delete them" />
             </Button>
           </div>
         </form>

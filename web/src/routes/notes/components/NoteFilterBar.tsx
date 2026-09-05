@@ -6,10 +6,12 @@
  * The free-text box sits outside the chips because it is what the screen is usually used
  * with: a note is prose, and prose is searched, not faceted.
  */
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useNoteTags } from '@/lib/api/queries'
-import { NOTE_SCOPES } from '@/lib/api/types'
+import { NOTE_SCOPES, type NoteScope } from '@/lib/api/types'
 import { DebouncedInput } from '@/routes/games/components/FilterBar'
 import {
   FilterPopover,
@@ -52,6 +54,7 @@ export interface NoteFilterBarProps {
 }
 
 export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarProps) {
+  const { t, i18n } = useLingui()
   const active = filterCount(filters)
   const patch = (next: Partial<NoteFilters>) => onChange(prune({ ...filters, ...next }))
 
@@ -62,8 +65,8 @@ export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarPro
     // screen is searched by, so it is the last thing to give up width.
     <div className={cn('flex flex-wrap items-center gap-[0.4375rem] max-md:relative', className)}>
       <DebouncedInput
-        aria-label="Search the notes"
-        placeholder="Search what you wrote…"
+        aria-label={t`Search the notes`}
+        placeholder={t`Search what you wrote…`}
         value={filters.text ?? ''}
         onCommit={(value) => patch({ text: value || undefined })}
         className="h-7 w-[16rem] text-[0.71875rem] max-md:w-full"
@@ -72,7 +75,7 @@ export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarPro
       {NOTE_FILTER_GROUPS.map((group) => (
         <FilterPopover
           key={group}
-          label={GROUP_LABELS[group]}
+          label={i18n._(GROUP_LABELS[group])}
           value={groupSummary(group, filters)}
           onClear={() => onChange(clearGroup(filters, group))}
           width={group === 'date' ? '15.625rem' : '14.5rem'}
@@ -87,7 +90,7 @@ export function NoteFilterBar({ filters, onChange, className }: NoteFilterBarPro
           onClick={() => onChange({})}
           className="px-1 text-[0.71875rem] text-accent-teal transition-colors hover:text-accent-link"
         >
-          Clear {active}
+          <Trans>Clear {active}</Trans>
         </button>
       ) : null}
     </div>
@@ -105,36 +108,53 @@ function GroupPanel({
   patch: (next: Partial<NoteFilters>) => void
   onChange: (next: NoteFilters) => void
 }) {
+  const { t, i18n } = useLingui()
   switch (group) {
     case 'tags':
       return <TagPanel filters={filters} onChange={onChange} />
 
-    case 'scope':
+    case 'scope': {
+      // `OptionRow` takes plain strings, so the descriptors are resolved here rather than
+      // handed over — the row draws labels, it does not know about catalogs.
+      const scopeLabels = NOTE_SCOPES.reduce<Partial<Record<NoteScope, string>>>(
+        (labels, scope) => {
+          labels[scope] = i18n._(SCOPE_LABELS[scope])
+          return labels
+        },
+        {},
+      )
       return (
         <>
-          <PopoverLabel>The note is about</PopoverLabel>
+          <PopoverLabel>
+            <Trans>The note is about</Trans>
+          </PopoverLabel>
           <OptionRow
             options={NOTE_SCOPES}
             value={filters.scope}
             onChange={(scope) => patch({ scope })}
-            labels={SCOPE_LABELS}
+            labels={scopeLabels}
           />
           <span className="text-[0.6875rem] leading-snug text-dim">
-            A variation note is pinned to a line off a game; a loose note is pinned to
-            nothing at all.
+            <Trans>
+              A variation note is pinned to a line off a game; a loose note is pinned to
+              nothing at all.
+            </Trans>
           </span>
         </>
       )
+    }
 
     case 'game':
       return (
         <>
-          <PopoverLabel>Game id</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Game id</Trans>
+          </PopoverLabel>
           <Input
             type="number"
             min={1}
-            aria-label="Game id"
-            placeholder="e.g. 412"
+            aria-label={t`Game id`}
+            placeholder={t`e.g. 412`}
             value={filters.game_id ?? ''}
             onChange={(event) => {
               const parsed = Number(event.target.value)
@@ -143,8 +163,10 @@ function GroupPanel({
             className="h-7 font-mono text-[0.71875rem]"
           />
           <span className="text-[0.6875rem] leading-snug text-dim">
-            Usually arrived at by following a note into its game and back — the id is the
-            one in the game's address.
+            <Trans>
+              Usually arrived at by following a note into its game and back — the id is the
+              one in the game's address.
+            </Trans>
           </span>
         </>
       )
@@ -152,11 +174,13 @@ function GroupPanel({
     case 'date':
       return (
         <>
-          <PopoverLabel>Written between</PopoverLabel>
+          <PopoverLabel>
+            <Trans>Written between</Trans>
+          </PopoverLabel>
           <div className="flex items-center gap-1.5">
             <Input
               type="date"
-              aria-label="Written from"
+              aria-label={t`Written from`}
               value={filters.since ?? ''}
               onChange={(event) => patch({ since: event.target.value || undefined })}
               className="h-7 text-[0.71875rem]"
@@ -164,7 +188,7 @@ function GroupPanel({
             <span className="text-faint">→</span>
             <Input
               type="date"
-              aria-label="Written until"
+              aria-label={t`Written until`}
               value={filters.until ?? ''}
               onChange={(event) => patch({ until: event.target.value || undefined })}
               className="h-7 text-[0.71875rem]"
@@ -195,16 +219,19 @@ function TagPanel({
   filters: NoteFilters
   onChange: (next: NoteFilters) => void
 }) {
+  const { t } = useLingui()
   const tags = useNoteTags()
   const chosen = filters.tags ?? []
   const rows = tags.data ?? []
 
   return (
     <>
-      <PopoverLabel>Carrying every tag</PopoverLabel>
+      <PopoverLabel>
+        <Trans>Carrying every tag</Trans>
+      </PopoverLabel>
       {rows.length === 0 ? (
         <span className="text-[0.6875rem] text-dim">
-          {tags.isPending ? 'Reading the tags…' : 'Nothing is tagged yet.'}
+          {tags.isPending ? t`Reading the tags…` : t`Nothing is tagged yet.`}
         </span>
       ) : (
         <div className="flex max-h-[13rem] flex-col gap-0.5 overflow-y-auto">

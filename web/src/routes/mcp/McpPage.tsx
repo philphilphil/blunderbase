@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Bot } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -54,6 +55,7 @@ function codexCommands(origin: string, token: string): string {
 }
 
 export function McpPage() {
+  const { t } = useLingui()
   const [minted, setMinted] = useState<McpKeyCreated | null>(null)
   const token = minted?.token ?? PLACEHOLDER
   const origin = window.location.origin
@@ -61,11 +63,11 @@ export function McpPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: 'Assistant' }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Assistant` }]} />
       <div className="flex max-w-4xl flex-col gap-4">
         <PageHeader
-          title="Connect your assistant"
-          description="Every game you import is a fact the coach can query over MCP."
+          title={t`Connect your assistant`}
+          description={t`Every game you import is a fact the coach can query over MCP.`}
         />
 
         <McpKeys minted={minted} onMinted={setMinted} onDismiss={() => setMinted(null)} />
@@ -73,47 +75,65 @@ export function McpPage() {
         <section data-tour="assistant" className="flex flex-col rounded-xl border border-line bg-panel">
           <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-3">
             <Bot className="size-3.5 text-faint" aria-hidden />
-            <h2 className="text-xs font-semibold text-ink">Connect a client</h2>
+            <h2 className="text-xs font-semibold text-ink">
+              <Trans>Connect a client</Trans>
+            </h2>
             <div className="flex-1" />
-            <span className="font-mono text-[0.625rem] text-dim">streamable HTTP at /mcp</span>
+            <span className="font-mono text-[0.625rem] text-dim">
+              <Trans>streamable HTTP at /mcp</Trans>
+            </span>
           </div>
 
           <div className="flex flex-col gap-4 px-3.5 py-3.5">
             <p className="text-[0.71875rem] leading-[1.5] text-dim">
-              {minted
-                ? 'These carry the key you just minted; copy them before you press Done.'
-                : 'Mint a key above and these fill in with it; until then the secret is a placeholder to replace.'}{' '}
-              Every client reads this database over the same URL your browser is on.
+              {minted ? (
+                <Trans>These carry the key you just minted; copy them before you press Done.</Trans>
+              ) : (
+                <Trans>
+                  Mint a key above and these fill in with it; until then the secret is a
+                  placeholder to replace.
+                </Trans>
+              )}{' '}
+              <Trans>Every client reads this database over the same URL your browser is on.</Trans>
             </p>
 
             <Snippet
               title="Claude Code"
               text={claudeCodeCommand(origin, token)}
-              copyLabel="Copy command"
+              copyLabel={t`Copy command`}
             />
 
-            <Snippet title="Codex" text={codexCommands(origin, token)} copyLabel="Copy commands">
-              Codex only takes the secret from an environment variable, never from the command
-              line, so the first line sets one and the second names it.
+            <Snippet title="Codex" text={codexCommands(origin, token)} copyLabel={t`Copy commands`}>
+              <Trans>
+                Codex only takes the secret from an environment variable, never from the command
+                line, so the first line sets one and the second names it.
+              </Trans>
             </Snippet>
 
-            <Snippet title="Any MCP client" text={config} copyLabel="Copy config">
-              Drop this into the client&rsquo;s JSON config.
+            <Snippet title={t`Any MCP client`} text={config} copyLabel={t`Copy config`}>
+              <Trans>Drop this into the client&rsquo;s JSON config.</Trans>
             </Snippet>
 
             <p className="text-[0.6875rem] leading-[1.5] text-faint">
-              Where the deployment sets{' '}
-              <span className="font-mono text-soft-2">BLUNDERBASE_MCP_BEARER_KEY</span> that key
-              is accepted too, and so is your own password — a minted key is just the one that
-              belongs in a file. <span className="font-mono text-soft-2">make mcp-key</span>{' '}
-              prints the local URL and header.
+              <Trans>
+                Where the deployment sets{' '}
+                <span className="font-mono text-soft-2">BLUNDERBASE_MCP_BEARER_KEY</span> that key
+                is accepted too, and so is your own password — a minted key is just the one that
+                belongs in a file. <span className="font-mono text-soft-2">make mcp-key</span>{' '}
+                prints the local URL and header.
+              </Trans>
             </p>
           </div>
         </section>
 
         <p className="text-[0.6875rem] leading-[1.5] text-faint">
-          Nothing to query yet? <Link to="/library/import" className="text-accent-teal hover:text-accent-link">Import some games</Link> first — the
-          coach only knows what the database holds.
+          <Trans>
+            Nothing to query yet?{' '}
+            <Link to="/library/import" className="text-accent-teal hover:text-accent-link">
+              Import some games
+            </Link>{' '}
+            first — the coach only knows what the database holds.
+          </Trans>
         </p>
       </div>
     </PageBody>

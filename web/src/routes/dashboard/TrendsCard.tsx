@@ -6,6 +6,9 @@
  * and the score. Movement comes from `/stats/compare` against the equally long window
  * before this one.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg, plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useMemo, useState } from 'react'
 
 import { SectionHead } from '@/components/shell/Section'
@@ -45,31 +48,45 @@ interface Metric {
   digits: number
 }
 
-function sentence(metrics: Metric[]): string | null {
+/**
+ * The line under the numbers, chosen rather than composed: the reading only makes sense as
+ * a whole sentence, so each of the five is one message a translator sees entire.
+ */
+function sentence(metrics: Metric[]): MessageDescriptor | null {
   const [blunders, , score] = metrics
   if (blunders.delta === null || score.delta === null) return null
   const fewer = blunders.delta < 0
   const better = score.delta > 0
   if (Math.abs(blunders.delta) < 0.05 && Math.abs(score.delta) < 1) {
-    return 'Nothing has moved either way. A flat window is still a window.'
+    return msg`Nothing has moved either way. A flat window is still a window.`
   }
-  if (fewer && better) return 'Fewer blunders and more points. Whatever you changed, keep it.'
+  if (fewer && better) return msg`Fewer blunders and more points. Whatever you changed, keep it.`
   if (fewer && !better) {
-    return 'Fewer blunders, fewer points. You are losing the game in smaller pieces now.'
+    return msg`Fewer blunders, fewer points. You are losing the game in smaller pieces now.`
   }
-  if (!fewer && better) return 'More blunders and more points. You are getting away with it.'
-  return 'More blunders and fewer points. The two usually travel together.'
+  if (!fewer && better) return msg`More blunders and more points. You are getting away with it.`
+  return msg`More blunders and fewer points. The two usually travel together.`
 }
 
+/** A day of slack, matching `windowProse`'s — see the detail line below. */
+const DAY_MS = 86_400_000
+
 export function TrendsCard({ className }: { className?: string }) {
+  const { t, i18n } = useLingui()
   const profile = useProfile()
   const lastGame =
     typeof profile.data?.volume?.last_game === 'string' ? profile.data.volume.last_game : null
   const [windowKey, setWindowKey] = useState<WindowKey>('30d')
 
   // Anchored on the newest game rather than on the clock, so "the last 30 days" means the
-  // last 30 days of play even when the archive stops years ago. See `anchorOf`.
-  const anchor = useMemo(() => anchorOf(lastGame), [lastGame])
+  // last 30 days of play even when the archive stops years ago. See `anchorOf`. Whether
+  // that anchor is effectively now is decided against the same clock reading, on
+  // `windowProse`'s own day of slack — the detail line below needs the answer.
+  const { anchor, endsToday } = useMemo(() => {
+    const now = new Date()
+    const at = anchorOf(lastGame, now)
+    return { anchor: at, endsToday: now.getTime() - at.getTime() <= DAY_MS }
+  }, [lastGame])
   const filters = useMemo<GameFilters>(() => windowRange(windowKey, anchor), [windowKey, anchor])
   const speed = useStats('performance_by_speed', filters)
   const phase = useStats('blunders_by_phase', filters)
@@ -88,21 +105,21 @@ export function TrendsCard({ className }: { className?: string }) {
 
   const metrics: Metric[] = [
     {
-      label: 'Blunders per game',
+      label: t`Blunders per game`,
       value: perGame === null ? '—' : perGame.toFixed(1),
       delta: num(speedDelta?.total, 'blunders_per_game'),
       lowerIsBetter: true,
       digits: 1,
     },
     {
-      label: 'Win % given away',
+      label: t`Win % given away`,
       value: winLoss === null ? '—' : winLoss.toFixed(1),
       delta: num(phaseDelta?.total, 'avg_win_loss'),
       lowerIsBetter: true,
       digits: 1,
     },
     {
-      label: 'Score',
+      label: t`Score`,
       value: score === null ? '—' : `${score.toFixed(0)}%`,
       delta: asPercent(num(speedDelta?.total, 'score')),
       lowerIsBetter: false,
@@ -111,23 +128,34 @@ export function TrendsCard({ className }: { className?: string }) {
   ]
 
   const dry = sentence(metrics)
+  const days = WINDOW_DAYS[windowKey as Exclude<WindowKey, 'all'>]
+
+  // The detail line wants only the end of the window, where `windowProse` gives the whole
+  // of it — "to today" or "to 7 Dec 2016". It used to be that prose with the front cut off
+  // by a regex, which stopped matching the moment the prose could arrive in another
+  // language; the two halves are built here instead.
+  const until = anchor.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+  const ending = endsToday ? t`to today` : t`to ${until}`
+  const played = plural(games, { one: '# game', other: '# games' })
+  const period = windowProse(windowKey, anchor)
 
   return (
     <section className={cn('flex flex-col gap-2', className)}>
       <SectionHead
-        title={`Last ${WINDOW_DAYS[windowKey as Exclude<WindowKey, 'all'>]} days`}
+        title={t`Last ${days} days`}
         detail={
           <span className="font-mono text-[0.625rem] tabular text-dim-2">
-            {speed.isPending ? '…' : `${games} game${games === 1 ? '' : 's'}`} ·{' '}
-            {windowProse(windowKey, anchor)
-              .replace(/^the last \d+ days$/, 'to today')
-              .replace(/^the \d+ days /, '')}
+            {speed.isPending ? '…' : played} · {ending}
           </span>
         }
         end={
           <Segmented
             className="shrink-0"
-            label="Trend window"
+            label={t`Trend window`}
             value={windowKey}
             onChange={setWindowKey}
             options={WINDOWS.map((key) => ({
@@ -152,7 +180,7 @@ export function TrendsCard({ className }: { className?: string }) {
         </div>
       ) : games === 0 ? (
         <EmptyBlock className="flex-none">
-          No games in {windowProse(windowKey, anchor)}. Widen the window, or play some chess.
+          <Trans>No games in {period}. Widen the window, or play some chess.</Trans>
         </EmptyBlock>
       ) : (
         <>
@@ -174,7 +202,7 @@ export function TrendsCard({ className }: { className?: string }) {
             ))}
           </div>
           <p className="border-t border-hairline pt-2.5 text-[0.6875rem] leading-relaxed text-dim-2">
-            {dry ?? `Against the ${windowKey} before this one, once there is one to compare.`}
+            {dry ? i18n._(dry) : t`Against the ${windowKey} before this one, once there is one to compare.`}
           </p>
         </>
       )}

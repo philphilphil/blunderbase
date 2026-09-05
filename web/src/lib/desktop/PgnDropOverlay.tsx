@@ -1,3 +1,5 @@
+import { plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { FileUp } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -29,6 +31,7 @@ function carriesFiles(event: DragEvent): boolean {
  * put a toggle in, and a drop that has already imported is too late to be asked.
  */
 export function PgnDropOverlay() {
+  const { t } = useLingui()
   const [over, setOver] = useState(false)
   const [asking, setAsking] = useState<File[] | null>(null)
   const [mine, setMine] = useState(true)
@@ -85,12 +88,13 @@ export function PgnDropOverlay() {
     void Promise.all(files.map((file) => file.text()))
       .then((texts) => {
         const pgn = texts.join('\n\n')
-        if (!pgn.trim()) throw new Error('That file carried no PGN.')
+        // Read by the reader, not by a log: this message is what the toast below shows.
+        if (!pgn.trim()) throw new Error(t`That file carried no PGN.`)
         return mutateAsync({ pgn, mine: mine ? undefined : false })
       })
-      .then(() => toast.success('PGN import started.'))
+      .then(() => toast.success(t`PGN import started.`))
       .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : 'The PGN could not be imported.'),
+        toast.error(error instanceof Error ? error.message : t`The PGN could not be imported.`),
       )
   }
 
@@ -115,7 +119,9 @@ export function PgnDropOverlay() {
     >
       <div className="flex flex-col items-center gap-3 text-accent-teal">
         <FileUp className="size-8" aria-hidden />
-        <span className="text-sm font-semibold">Drop to import PGN</span>
+        <span className="text-sm font-semibold">
+          <Trans>Drop to import PGN</Trans>
+        </span>
       </div>
     </div>
   )
@@ -140,13 +146,16 @@ function WhoseGamesDialog({
   onClose: () => void
   onImport: () => void
 }) {
+  const { t } = useLingui()
   useEffect(() => {
     const key = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
     document.addEventListener('keydown', key)
     return () => document.removeEventListener('keydown', key)
   }, [onClose])
 
-  const named = files.length === 1 ? files[0]!.name : `${files.length} files`
+  const count = files.length
+  const named =
+    count === 1 ? files[0]!.name : t`${plural(count, { one: '# file', other: '# files' })}`
 
   return (
     <div
@@ -161,11 +170,13 @@ function WhoseGamesDialog({
       >
         <div className="flex flex-col gap-1.5">
           <h2 id="pgn-drop-title" className="text-sm font-semibold text-ink">
-            Whose games are these?
+            <Trans>Whose games are these?</Trans>
           </h2>
           <p className="text-xs text-dim">
-            <span className="font-mono text-soft">{named}</span>. Games that are not yours are
-            stored and analysed like any other, and counted in no statistic.
+            <Trans>
+              <span className="font-mono text-soft">{named}</span>. Games that are not yours are
+              stored and analysed like any other, and counted in no statistic.
+            </Trans>
           </p>
         </div>
 
@@ -173,10 +184,10 @@ function WhoseGamesDialog({
 
         <div className="flex justify-end gap-2">
           <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button type="button" size="sm" onClick={onImport}>
-            Import
+            <Trans context="button">Import</Trans>
           </Button>
         </div>
       </div>

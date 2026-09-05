@@ -56,6 +56,10 @@
  * which read better than the design's 38px rows; the cap is fifteen of them, so the table
  * takes about the space it did before.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ExplorerMove, ExplorerResponse } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
@@ -65,17 +69,23 @@ import { sharePercent } from '../reference'
 import { dropTone, formatAvgDrop, scorePercent, scoreTone, splitOf } from '../stats'
 import { SPLIT_WIDTH, ScoreBar } from './ScoreBar'
 
-const COLUMNS = [
-  { id: 'move', label: 'Move', width: 78 },
-  { id: 'games', label: 'Games', width: 46, align: 'right' as const },
-  { id: 'share', label: 'Share', width: 44, align: 'right' as const },
-  { id: 'split', label: 'Score', width: SPLIT_WIDTH },
-  { id: 'score', label: 'Score%', width: 52, align: 'right' as const },
-  { id: 'drop', label: 'Avg drop', width: 66, align: 'right' as const },
-  { id: 'blunders', label: 'Blund', width: 44, align: 'right' as const },
-  { id: 'opening', label: 'Opening', width: 'flex' as const },
-  { id: 'note', label: 'Note', width: 'flex' as const },
-]
+const COLUMNS: { id: string; label: MessageDescriptor; width: number | 'flex'; align?: 'right' }[] =
+  [
+    { id: 'move', label: msg`Move`, width: 78 },
+    { id: 'games', label: msg`Games`, width: 46, align: 'right' },
+    { id: 'share', label: msg`Share`, width: 44, align: 'right' },
+    { id: 'split', label: msg`Score`, width: SPLIT_WIDTH },
+    { id: 'score', label: msg`Score%`, width: 52, align: 'right' },
+    { id: 'drop', label: msg`Avg drop`, width: 66, align: 'right' },
+    {
+      id: 'blunders',
+      label: msg({ message: 'Blund', comment: 'Column heading, short for “blunders”.' }),
+      width: 44,
+      align: 'right',
+    },
+    { id: 'opening', label: msg`Opening`, width: 'flex' },
+    { id: 'note', label: msg`Note`, width: 'flex' },
+  ]
 
 function style(width: number | 'flex') {
   return width === 'flex' ? { flex: 1, minWidth: 0 } : { width, flex: 'none' as const }
@@ -128,12 +138,13 @@ export function MoveTreeTable({
   const moves = tree?.moves ?? []
   const total = tree?.totals?.games ?? 0
   const mainLine = tree?.main_line?.[0]?.uci
+  const { i18n, t } = useLingui()
 
   return (
     <div
       className="flex flex-col gap-3.5 max-md:overflow-x-auto"
       role="table"
-      aria-label="Continuations"
+      aria-label={t`Continuations`}
     >
       <div
         role="row"
@@ -148,7 +159,7 @@ export function MoveTreeTable({
             style={style(column.width)}
             className={cn(column.align === 'right' && 'text-right')}
           >
-            {column.label}
+            {i18n._(column.label)}
           </span>
         ))}
       </div>
@@ -179,7 +190,7 @@ export function MoveTreeTable({
           className="flex items-center justify-center rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-3 text-center"
         >
           <p className="text-[0.78125rem] text-dim">
-            No game of yours goes any further than this position.
+            <Trans>No game of yours goes any further than this position.</Trans>
           </p>
         </div>
       ) : (

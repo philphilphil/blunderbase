@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { RotateCcw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
@@ -28,15 +29,17 @@ function Field({
   onChange: (next: string) => void
   invalid: boolean
 }) {
+  const { t } = useLingui()
   if (!isEditable(option)) {
     return (
       <span className={cn(VALUE_WIDTH, 'text-right font-mono text-[0.6875rem] text-faint')}>
-        {option.managed ? 'set per analysis' : 'action'}
+        {option.managed ? t`set per analysis` : t`action`}
       </span>
     )
   }
 
   if (option.type === 'check') {
+    const fallback = option.default || 'false'
     return (
       <select
         aria-label={option.name}
@@ -45,7 +48,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">default ({option.default || 'false'})</option>
+        <option value="">{t`default (${fallback})`}</option>
         <option value="true">true</option>
         <option value="false">false</option>
       </select>
@@ -53,6 +56,7 @@ function Field({
   }
 
   if (option.type === 'combo' && option.choices.length > 0) {
+    const fallback = option.default || '—'
     return (
       <select
         aria-label={option.name}
@@ -61,7 +65,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">default ({option.default || '—'})</option>
+        <option value="">{t`default (${fallback})`}</option>
         {option.choices.map((choice) => (
           <option key={choice} value={choice}>
             {choice}
@@ -77,7 +81,7 @@ function Field({
       aria-invalid={invalid}
       className={cn(VALUE_WIDTH, 'font-mono')}
       inputMode={option.type === 'spin' ? 'numeric' : undefined}
-      placeholder={option.default || 'default'}
+      placeholder={option.default || t`default`}
       value={value}
       onChange={(event) => onChange(event.target.value)}
     />
@@ -101,6 +105,7 @@ export function OptionsEditor({
   errors: Record<string, string>
   onChange: (draft: OptionDraft) => void
 }) {
+  const { t } = useLingui()
   const [filter, setFilter] = useState('')
   const [onlySet, setOnlySet] = useState(false)
 
@@ -130,13 +135,14 @@ export function OptionsEditor({
   const orphans = Object.keys(draft.values).filter(
     (name) => !declared.some((option) => option.name === name),
   )
+  const total = declared.length
 
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2 max-md:flex-wrap">
         <Input
           value={filter}
-          placeholder="Filter options"
+          placeholder={t`Filter options`}
           className="h-7 w-48 max-md:w-36"
           onChange={(event) => setFilter(event.target.value)}
         />
@@ -150,17 +156,19 @@ export function OptionsEditor({
               : 'border-edge bg-elevated text-soft hover:text-ink',
           )}
         >
-          Only set
+          <Trans>Only set</Trans>
         </button>
         <div className="flex-1" />
         <span className="font-mono text-[0.6875rem] text-dim tabular">
-          {set} of {declared.length} set
+          <Trans>
+            {set} of {total} set
+          </Trans>
         </span>
       </div>
 
       {declared.length === 0 ? (
         <p className="rounded-md border border-dashed border-edge-strong px-3 py-4 text-center text-[0.71875rem] text-dim">
-          This binary declared no options.
+          <Trans>This binary declared no options.</Trans>
         </p>
       ) : null}
 
@@ -173,12 +181,12 @@ export function OptionsEditor({
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate font-mono text-[0.75rem] text-blunder">{name}</span>
               <span className="text-[0.65625rem] text-blunder">
-                {errors[name] ?? 'this engine does not declare that option'}
+                {errors[name] ?? t`this engine does not declare that option`}
               </span>
             </div>
             <button
               type="button"
-              aria-label={`Remove ${name}`}
+              aria-label={t`Remove ${name}`}
               onClick={() => update(name, '')}
               className="text-faint hover:text-ink"
             >
@@ -190,6 +198,8 @@ export function OptionsEditor({
         {rows.map((option) => {
           const value = draft.values[option.name] ?? ''
           const problem = errors[option.name]
+          const optionName = option.name
+          const optionDefault = option.default
           return (
             <li
               key={option.name}
@@ -207,8 +217,8 @@ export function OptionsEditor({
                 <span className="flex items-center gap-2 text-[0.65625rem] text-faint">
                   <span className="uppercase">{option.type}</span>
                   {range(option) ? <span className="font-mono tabular">{range(option)}</span> : null}
-                  {option.default ? (
-                    <span className="truncate font-mono">default {option.default}</span>
+                  {optionDefault ? (
+                    <span className="truncate font-mono">{t`default ${optionDefault}`}</span>
                   ) : null}
                 </span>
               </div>
@@ -223,7 +233,7 @@ export function OptionsEditor({
               />
               <button
                 type="button"
-                aria-label={`Reset ${option.name}`}
+                aria-label={t`Reset ${optionName}`}
                 disabled={value === ''}
                 onClick={() => update(option.name, '')}
                 className="text-faint transition-colors hover:text-ink disabled:opacity-30"

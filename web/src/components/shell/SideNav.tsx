@@ -18,6 +18,9 @@
  * than each keeping their own copy of the nav model: a second copy is a second place to
  * forget a route.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import {
   ChartNoAxesColumn,
   Cpu,
@@ -52,6 +55,7 @@ import { useEvents } from '@/lib/events/EventsProvider'
 import { REPO_URL } from '@/lib/links'
 import { paramsFromFilters, toGameQuery } from '@/routes/games/filters'
 import {
+  filterLabel,
   removeSavedFilter,
   useSavedFilters,
   type SavedFilter,
@@ -65,32 +69,32 @@ import { ThemeToggle } from './ThemeToggle'
 
 interface NavItem {
   to: string
-  label: string
+  label: MessageDescriptor
   icon: ComponentType<{ className?: string }>
   end?: boolean
 }
 
 const WORKSPACE: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/games', label: 'Games', icon: Library },
-  { to: '/explorer', label: 'Explorer', icon: Network },
+  { to: '/', label: msg`Dashboard`, icon: LayoutDashboard, end: true },
+  { to: '/games', label: msg`Games`, icon: Library },
+  { to: '/explorer', label: msg`Explorer`, icon: Network },
   // The repertoire page (`/repertoire`) is routed but not listed: its base version is in
   // the code and still needs work before it is offered (issue #4). When it returns it goes
   // here, next to Openings and not under it — the explorer says what the owner *has*
   // played and the repertoire what they *mean* to play, a destination of its own rather
   // than a cut of the explorer's tree.
-  { to: '/stats', label: 'Stats', icon: ChartNoAxesColumn },
-  { to: '/notes', label: 'Notes', icon: StickyNote },
-  { to: '/live', label: 'Live', icon: Radio },
+  { to: '/stats', label: msg`Stats`, icon: ChartNoAxesColumn },
+  { to: '/notes', label: msg`Notes`, icon: StickyNote },
+  { to: '/live', label: msg`Live`, icon: Radio },
 ]
 
 /**
  * The data itself, what has been run over it, and what runs it — in that order.
  */
 const DATA: NavItem[] = [
-  { to: '/library', label: 'Library', icon: Database },
-  { to: '/analysis', label: 'Analysis', icon: Gauge },
-  { to: '/engines', label: 'Engines', icon: Cpu },
+  { to: '/library', label: msg`Library`, icon: Database },
+  { to: '/analysis', label: msg`Analysis`, icon: Gauge },
+  { to: '/engines', label: msg`Engines`, icon: Cpu },
 ]
 
 /**
@@ -106,15 +110,15 @@ const DATA: NavItem[] = [
  * and a destination made "Analysis" mean two different things depending on whether you
  * clicked the word or the row under it.
  */
-const SUBPAGES: Record<string, { to: string; label: string }[]> = {
+const SUBPAGES: Record<string, { to: string; label: MessageDescriptor }[]> = {
   '/library': [
-    { to: '/library/import', label: 'Import' },
-    { to: '/library/manage', label: 'Manage' },
+    { to: '/library/import', label: msg`Import` },
+    { to: '/library/manage', label: msg`Manage` },
   ],
   '/analysis': [
-    { to: '/analysis/coverage', label: 'Coverage' },
-    { to: '/analysis/engine', label: 'Engine passes' },
-    { to: '/analysis/maia', label: 'Maia' },
+    { to: '/analysis/coverage', label: msg`Coverage` },
+    { to: '/analysis/engine', label: msg`Engine passes` },
+    { to: '/analysis/maia', label: msg`Maia` },
   ],
 }
 
@@ -175,14 +179,16 @@ function Item({
 }) {
   const Icon = item.icon
   const collapsed = useCollapsed()
+  const { i18n } = useLingui()
+  const label = i18n._(item.label)
   return (
     <NavLink
       to={item.to}
       end={item.end}
       // Folded, the icon is the whole row, so the name it would have read has to be said
       // some other way or the link has no accessible name at all.
-      aria-label={collapsed ? item.label : undefined}
-      title={collapsed ? item.label : undefined}
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
       className={({ isActive }) =>
         cn(
           // The selected row is a filled row and nothing else. It used to carry an accent
@@ -197,7 +203,7 @@ function Item({
       {({ isActive }) => (
         <>
           <Icon className={cn('size-3.5 flex-none', isActive ? 'text-body-3' : 'text-faint')} />
-          {collapsed ? null : item.label}
+          {collapsed ? null : label}
           {trailing && !collapsed ? (
             <>
               <span className="flex-1" />
@@ -219,7 +225,8 @@ function Item({
  * still reads as one list of destinations with one of them opened rather than as two
  * levels competing for the eye.
  */
-function SubPages({ pages }: { pages: { to: string; label: string }[] }) {
+function SubPages({ pages }: { pages: { to: string; label: MessageDescriptor }[] }) {
+  const { i18n } = useLingui()
   return (
     <>
       {pages.map((page) => (
@@ -233,7 +240,7 @@ function SubPages({ pages }: { pages: { to: string; label: string }[] }) {
             )
           }
         >
-          {page.label}
+          {i18n._(page.label)}
         </NavLink>
       ))}
     </>
@@ -289,7 +296,9 @@ function EngineRoster() {
   const engines = useEngines()
   return (
     <>
-      <SectionLabel>Engines</SectionLabel>
+      <SectionLabel>
+        <Trans>Engines</Trans>
+      </SectionLabel>
       {(engines.data ?? []).slice(0, 6).map((engine) => (
         <div
           key={engine.id}
@@ -301,7 +310,9 @@ function EngineRoster() {
         </div>
       ))}
       {engines.data?.length === 0 ? (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">No engines configured</div>
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">
+          <Trans>No engines configured</Trans>
+        </div>
       ) : null}
     </>
   )
@@ -320,6 +331,10 @@ function SavedFilterRow({
   builtin,
   search,
 }: SavedFilter & { search: string }) {
+  const { t, i18n } = useLingui()
+  // The three shipped cuts are named by the catalog; a cut the owner saved keeps the words
+  // they typed. See `filterLabel`.
+  const name = filterLabel(i18n, { id, label, filters, dotClass, builtin })
   const params = paramsFromFilters(filters)
   const count = useGames({ ...toGameQuery(filters), limit: 1 })
   const current = new URLSearchParams(search)
@@ -336,13 +351,13 @@ function SavedFilterRow({
         dotClass={dotClass}
         trailing={count.data === undefined ? '' : count.data.total.toLocaleString()}
       >
-        {label}
+        {name}
       </DotRow>
       {builtin ? null : (
         <button
           type="button"
-          aria-label={`Forget the saved filter “${label}”`}
-          title="Forget this filter"
+          aria-label={t`Forget the saved filter “${name}”`}
+          title={t`Forget this filter`}
           onClick={() => removeSavedFilter(id)}
           className="absolute inset-y-0 right-0 hidden items-center bg-raised px-1 text-faint hover:text-blunder group-hover/saved:flex"
         >
@@ -359,12 +374,16 @@ function SavedFilters({ search }: { search: string }) {
     <>
       {/* Named, the way "Your lines" and "Reports" are: without it the cuts read as more
           destinations under Games rather than as one list of ways to slice the one below. */}
-      <FoldLabel>Filters</FoldLabel>
+      <FoldLabel>
+        <Trans>Filters</Trans>
+      </FoldLabel>
       {filters.map((filter) => (
         <SavedFilterRow key={filter.id} {...filter} search={search} />
       ))}
       {filters.length === 0 ? (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">No saved filters yet</div>
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">
+          <Trans>No saved filters yet</Trans>
+        </div>
       ) : null}
     </>
   )
@@ -375,24 +394,30 @@ function YourLines({ search }: { search: string }) {
   const scope = (new URLSearchParams(search).get('color') as Color | null) ?? undefined
   const games = useGames({ limit: LINE_SAMPLE, ...(scope ? { color: scope } : {}) })
   const lines = topLines(games.data?.games, ROWS)
+  const { t } = useLingui()
+  const scopeLabel =
+    scope === 'white' ? t`white` : scope === 'black' ? t`black` : t`both colours`
+  const sample = LINE_SAMPLE
 
   return (
     <>
-      <FoldLabel>{`Your lines · ${scope ?? 'both colours'}`}</FoldLabel>
-      {lines.map((line) => (
+      <FoldLabel>{t`Your lines · ${scopeLabel}`}</FoldLabel>
+      {lines.map(({ eco, name, games: played, score }) => (
         <DotRow
-          key={line.eco}
-          to={`/games?eco=${line.eco}${scope ? `&color=${scope}` : ''}`}
-          title={`${line.name} — ${line.games} of your last ${LINE_SAMPLE} games`}
-          leading={<span className="font-mono text-[0.625rem] text-dim">{line.eco}</span>}
-          trailing={`${Math.round(line.score)}%`}
-          trailingClass={scoreTone(line.score)}
+          key={eco}
+          to={`/games?eco=${eco}${scope ? `&color=${scope}` : ''}`}
+          title={t`${name} — ${played} of your last ${sample} games`}
+          leading={<span className="font-mono text-[0.625rem] text-dim">{eco}</span>}
+          trailing={`${Math.round(score)}%`}
+          trailingClass={scoreTone(score)}
         >
-          {line.name}
+          {name}
         </DotRow>
       ))}
       {games.isPending || lines.length > 0 ? null : (
-        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">No openings on record yet</div>
+        <div className="px-2 py-[0.4375rem] text-[0.75rem] text-faint">
+          <Trans>No openings on record yet</Trans>
+        </div>
       )}
     </>
   )
@@ -401,6 +426,7 @@ function YourLines({ search }: { search: string }) {
 /** Design 2d's "Reports": which aggregation the stats screen is showing. */
 function Reports({ search }: { search: string }) {
   const current = reportFrom(search)
+  const { i18n } = useLingui()
   return (
     <>
       {REPORTS.map((report) => (
@@ -408,9 +434,9 @@ function Reports({ search }: { search: string }) {
           key={report.key}
           to={`/stats?report=${report.key}`}
           active={report.key === current}
-          title={report.hint}
+          title={i18n._(report.hint)}
         >
-          {report.label}
+          {i18n._(report.label)}
         </DotRow>
       ))}
     </>
@@ -445,12 +471,15 @@ function Github({ className }: { className?: string }) {
 /** Whether `/events` is carrying anything — a dot, because a word would crowd the row. */
 function ConnectionDot() {
   const { status, reconnects } = useEvents()
+  const { t } = useLingui()
   const label =
     status === 'open'
-      ? `live${reconnects > 0 ? ` · reconnected ${reconnects}×` : ''}`
+      ? reconnects > 0
+        ? t`live · reconnected ${reconnects}×`
+        : t`live`
       : status === 'connecting'
-        ? 'connecting to /events'
-        : 'offline — retrying'
+        ? t`connecting to /events`
+        : t`offline — retrying`
   return (
     <span
       title={label}
@@ -482,13 +511,15 @@ function ConnectionDot() {
  * one thing that must stay reachable is the way back out.
  */
 function NavFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const { t } = useLingui()
+  const foldLabel = collapsed ? t`Expand the navigation` : t`Collapse the navigation`
   const fold = (
     <button
       type="button"
       onClick={onToggle}
-      aria-label={collapsed ? 'Expand the navigation' : 'Collapse the navigation'}
+      aria-label={foldLabel}
       aria-expanded={!collapsed}
-      title={collapsed ? 'Expand the navigation' : 'Collapse the navigation'}
+      title={foldLabel}
       className="flex items-center rounded-md px-0.5 py-1 text-dim transition-colors hover:bg-raised hover:text-ink"
     >
       {collapsed ? (
@@ -521,8 +552,8 @@ function NavFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () =
           href={REPO}
           target="_blank"
           rel="noreferrer"
-          aria-label="Blunderbase on GitHub"
-          title="Blunderbase on GitHub"
+          aria-label={t`Blunderbase on GitHub`}
+          title={t`Blunderbase on GitHub`}
           className="flex items-center px-0.5 text-dim transition-colors hover:text-ink"
         >
           <Github className="size-3.5" />
@@ -534,7 +565,7 @@ function NavFooter({ collapsed, onToggle }: { collapsed: boolean; onToggle: () =
           target="_blank"
           rel="noreferrer"
           className="font-mono text-[0.625rem] text-dim-2 transition-colors hover:text-ink"
-          title={`Blunderbase ${VERSION_LABEL} — what changed`}
+          title={t`Blunderbase ${VERSION_LABEL} — what changed`}
         >
           {VERSION_LABEL}
         </a>
@@ -578,6 +609,7 @@ function Folded({ to, pathname, search }: { to: string; pathname: string; search
  */
 function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { pathname, search } = useLocation()
+  const { t } = useLingui()
   const games = useGames({ limit: 1 })
   const live = useLiveState()
 
@@ -595,20 +627,24 @@ function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
 
   return (
     <>
-      <SectionLabel>Workspace</SectionLabel>
+      <SectionLabel>
+        <Trans>Workspace</Trans>
+      </SectionLabel>
       {WORKSPACE.map((item) =>
         entry(
           item,
           item.to === '/games' && total !== undefined
             ? total.toLocaleString()
             : item.to === '/live' && liveActive
-              ? 'on air'
+              ? t`on air`
               : undefined,
         ),
       )}
 
       <div className="h-3.5" />
-      <SectionLabel>Data &amp; compute</SectionLabel>
+      <SectionLabel>
+        <Trans>Data &amp; compute</Trans>
+      </SectionLabel>
       {DATA.map((item) => entry(item))}
 
       <div className="flex-1" />
@@ -646,10 +682,12 @@ export function SideNav() {
     })
   }, [])
 
+  const { t } = useLingui()
+
   return (
     <Collapsed.Provider value={collapsed}>
       <nav
-        aria-label="Sections"
+        aria-label={t`Sections`}
         className={cn(
           'flex flex-none flex-col gap-px border-r border-edge-strong bg-panel py-2.5 max-md:hidden',
           collapsed ? 'w-[3.25rem] px-1.5' : 'w-50 px-2',
@@ -678,6 +716,7 @@ export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   const here = `${pathname}${search}`
   const wasHere = useRef(here)
   const panel = useRef<HTMLElement>(null)
+  const { t } = useLingui()
 
   useEffect(() => {
     if (wasHere.current === here) return
@@ -713,7 +752,7 @@ export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => voi
       <nav
         ref={panel}
         tabIndex={-1}
-        aria-label="Sections"
+        aria-label={t`Sections`}
         className="relative flex h-full w-[17rem] max-w-[85vw] flex-col gap-px overflow-y-auto border-r border-edge-strong bg-panel shadow-[0_0_2rem_var(--bb-shadow)] outline-none duration-200 animate-in slide-in-from-left pt-[max(0.875rem,env(safe-area-inset-top,0rem))] pr-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0rem))] pl-[max(0.625rem,env(safe-area-inset-left,0rem))]"
       >
         <div className="flex flex-none items-center justify-between pb-1">
@@ -723,7 +762,7 @@ export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => voi
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close the navigation"
+            aria-label={t`Close the navigation`}
             className="rounded-md p-1 text-dim transition-colors hover:bg-raised hover:text-ink"
           >
             <X className="size-4" />

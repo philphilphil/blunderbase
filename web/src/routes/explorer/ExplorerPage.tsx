@@ -37,6 +37,7 @@
  * you went — while playing a move is history.
  */
 import type { Api } from '@lichess-org/chessground/api'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -99,6 +100,7 @@ const NO_DESTS: LinePosition['dests'] = new Map()
 export function ExplorerPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const { t } = useLingui()
   /**
    * The game whose Book tab sent the reader here, if one did (`GamePage`'s `openInExplorer`
    * puts it in router state, the mirror of what `ModelGames` does going the other way).
@@ -299,6 +301,10 @@ export function ExplorerPage() {
   const opening = booked ?? (reference ? null : tagged)
   const orientation = flipped ? (scope === 'black' ? 'white' : 'black') : (scope ?? 'white')
   const totalGames = (tree.data?.totals.games as number | undefined) ?? 0
+  // Named rather than inlined so the sentence under the board is one message with two
+  // placeholders a translator can move, instead of English glued around two expressions.
+  const turn = line.turn === 'white' ? t`white` : t`black`
+  const ply = line.ply
 
   // Deliberately the tagged code and not the book's: `/games?eco=` filters on the codes the
   // owner's own games carry, and a book code none of them was tagged with lands on an empty
@@ -315,7 +321,7 @@ export function ExplorerPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: 'Explorer', to: '/explorer' }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Explorer`, to: '/explorer' }]} />
 
       {/*
         Below `md` the two panels become one column that scrolls as a whole: the board and
@@ -329,7 +335,8 @@ export function ExplorerPage() {
           <div className="flex flex-col gap-[0.4375rem]">
             <div className="flex items-baseline gap-2">
               <h1 className="text-[0.9375rem] font-semibold text-ink">
-                {opening?.name ?? (line.steps.length === 0 ? 'The initial position' : 'This line')}
+                {opening?.name ??
+                  (line.steps.length === 0 ? t`The initial position` : t`This line`)}
               </h1>
               {opening?.eco ? (
                 <span className="font-mono text-[0.6875rem] text-dim">{opening.eco}</span>
@@ -363,7 +370,7 @@ export function ExplorerPage() {
             <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
               <button
                 type="button"
-                aria-label="Back one move"
+                aria-label={t`Back one move`}
                 onClick={back}
                 disabled={line.steps.length === 0}
                 className="border-r border-edge px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
@@ -372,7 +379,7 @@ export function ExplorerPage() {
               </button>
               <button
                 type="button"
-                aria-label="Forward one move"
+                aria-label={t`Forward one move`}
                 onClick={forward}
                 className="px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink"
               >
@@ -384,7 +391,7 @@ export function ExplorerPage() {
               onClick={() => setFlipped((current) => !current)}
               className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
             >
-              ⇅ Flip
+              <Trans>⇅ Flip</Trans>
             </button>
             {line.steps.length > 0 ? (
               <button
@@ -392,7 +399,7 @@ export function ExplorerPage() {
                 onClick={() => setLine([])}
                 className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
               >
-                Reset
+                <Trans>Reset</Trans>
               </button>
             ) : null}
             {/*
@@ -405,12 +412,14 @@ export function ExplorerPage() {
                 to={backToGame}
                 className="rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-1 text-xs text-brilliant transition-colors hover:border-brilliant/50"
               >
-                ← Back to game
+                <Trans>← Back to game</Trans>
               </Link>
             ) : null}
             <div className="flex-1" />
             <span className="font-mono text-[0.6875rem] tabular text-dim">
-              {line.turn} to move · ply {line.ply}
+              <Trans>
+                {turn} to move · ply {ply}
+              </Trans>
             </span>
           </div>
 
@@ -433,10 +442,10 @@ export function ExplorerPage() {
             <div className="flex items-center gap-2.5 max-md:flex-wrap">
               <span className="text-[0.75rem] font-semibold text-ink">
                 {source === 'mine'
-                  ? 'Your move tree from here'
+                  ? t`Your move tree from here`
                   : source === 'masters'
-                    ? 'What masters play from here'
-                    : 'What lichess plays from here'}
+                    ? t`What masters play from here`
+                    : t`What lichess plays from here`}
               </span>
             </div>
             {/*
@@ -468,8 +477,8 @@ export function ExplorerPage() {
               <ReferenceTokenCard reason={tokenReason} />
             ) : book.isError ? (
               <Failure
-                title="Could not read that database"
-                message={book.error?.message ?? 'Lichess did not answer.'}
+                title={t`Could not read that database`}
+                message={book.error?.message ?? t`Lichess did not answer.`}
                 onRetry={() => void book.refetch()}
               />
             ) : (
@@ -491,8 +500,8 @@ export function ExplorerPage() {
             )
           ) : tree.isError ? (
             <Failure
-              title="Could not read the tree"
-              message={tree.error?.message ?? 'The backend did not answer.'}
+              title={t`Could not read the tree`}
+              message={tree.error?.message ?? t`The backend did not answer.`}
               onRetry={() => void tree.refetch()}
             />
           ) : (
@@ -535,6 +544,7 @@ function SourceToggle({
   source: ExplorerSource
   onChange: (next: ExplorerSource) => void
 }) {
+  const { i18n } = useLingui()
   return (
     <div className="flex overflow-hidden rounded-md border border-edge bg-elevated font-mono text-[0.75rem]">
       {SOURCES.map((option, index) => (
@@ -549,7 +559,7 @@ function SourceToggle({
             source === option ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
           )}
         >
-          {SOURCE_LABELS[option]}
+          {i18n._(SOURCE_LABELS[option])}
         </button>
       ))}
     </div>
@@ -575,7 +585,7 @@ function Failure({
         onClick={onRetry}
         className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
       >
-        Try again
+        <Trans>Try again</Trans>
       </button>
     </div>
   )
@@ -595,10 +605,11 @@ function ScopeToggle({
   onChange: (next: Color | undefined) => void
   disabled?: boolean
 }) {
+  const { t } = useLingui()
   const options: { label: string; value: Color | undefined }[] = [
-    { label: 'both', value: undefined },
-    { label: 'as white', value: 'white' },
-    { label: 'as black', value: 'black' },
+    { label: t`both`, value: undefined },
+    { label: t`as white`, value: 'white' },
+    { label: t`as black`, value: 'black' },
   ]
   return (
     <div
@@ -609,7 +620,9 @@ function ScopeToggle({
     >
       {options.map((option, index) => (
         <button
-          key={option.label}
+          // Keyed on the scope rather than the label: the label is translated now, and two
+          // languages are free to write it differently or to collide.
+          key={option.value ?? 'both'}
           type="button"
           aria-pressed={!disabled && scope === option.value}
           disabled={disabled}

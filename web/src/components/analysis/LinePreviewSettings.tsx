@@ -13,6 +13,9 @@
  * device), so there is no draft and no Save: every control reads `useLinePreviewPrefs()`
  * and writes straight through `setLinePreviewPrefs`.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { useLingui } from '@lingui/react/macro'
 import { Eye, EyeOff } from 'lucide-react'
 
 import { Label } from '@/components/ui/label'
@@ -25,12 +28,12 @@ export const SETTINGS_SELECT =
   'h-8 rounded-md border border-input bg-elevated px-2 text-xs text-soft outline-none'
 const SELECT = SETTINGS_SELECT
 
-const MODES: { value: RowPreview; label: string }[] = [
-  { value: 'arrows', label: 'Layered arrows' },
-  { value: 'overlay', label: 'Plan overlay' },
-  { value: 'play', label: 'Playthrough' },
-  { value: 'peek', label: 'Peek board' },
-  { value: 'off', label: 'Nothing' },
+const MODES: { value: RowPreview; label: MessageDescriptor }[] = [
+  { value: 'arrows', label: msg`Layered arrows` },
+  { value: 'overlay', label: msg`Plan overlay` },
+  { value: 'play', label: msg`Playthrough` },
+  { value: 'peek', label: msg`Peek board` },
+  { value: 'off', label: msg`Nothing` },
 ]
 
 /** The one slider shape the board's settings dialog uses throughout, like `SettingsCheck`. */
@@ -74,13 +77,28 @@ export function SettingsCheck({ id, label, checked, disabled, onChange }: {
 
 const ROW_MODES: RowPreview[] = ['arrows', 'overlay', 'play', 'peek', 'off']
 
-/** What each mode does, for the chip's `title` — the words, not the vocabulary. */
-const ROW_SAYS: Record<RowPreview, string> = {
-  arrows: 'draws the whole line as layered arrows',
-  overlay: 'shows where the pieces end up',
-  play: 'plays the line out on the board',
-  peek: 'opens a small board beside the row',
-  off: 'draws nothing',
+/**
+ * What each mode does, for the chip's `title` — the words, not the vocabulary.
+ *
+ * Whole sentences rather than the tail of one glued onto a shared opener: a language that
+ * is not English does not necessarily put the clause in that order, and a translator given
+ * "draws nothing" on its own has nothing to place it against.
+ */
+const ROW_SAYS: Record<RowPreview, MessageDescriptor> = {
+  arrows: msg`Hovering a line draws the whole line as layered arrows. Click to cycle.`,
+  overlay: msg`Hovering a line shows where the pieces end up. Click to cycle.`,
+  play: msg`Hovering a line plays the line out on the board. Click to cycle.`,
+  peek: msg`Hovering a line opens a small board beside the row. Click to cycle.`,
+  off: msg`Hovering a line draws nothing. Click to cycle.`,
+}
+
+/** The mode's own name, as the chip spells it beside the eye. */
+const ROW_SHORT: Record<RowPreview, MessageDescriptor> = {
+  arrows: msg`arrows`,
+  overlay: msg`overlay`,
+  play: msg`play`,
+  peek: msg`peek`,
+  off: msg`off`,
 }
 
 /**
@@ -100,14 +118,16 @@ const ROW_SAYS: Record<RowPreview, string> = {
  * same on/off vocabulary the compare toggle in the pane beside it uses.
  */
 export function LinePreviewRowChip() {
+  const { t, i18n } = useLingui()
   const prefs = useLinePreviewPrefs()
   const on = prefs.row !== 'off'
   const Icon = on ? Eye : EyeOff
-  const says = `Hovering a line ${ROW_SAYS[prefs.row]}. Click to cycle.`
+  const says = i18n._(ROW_SAYS[prefs.row])
+  const mode = i18n._(ROW_SHORT[prefs.row])
   return (
     <button
       type="button"
-      aria-label={`Line preview: ${prefs.row}`}
+      aria-label={t`Line preview: ${mode}`}
       onClick={() =>
         setLinePreviewPrefs({
           row: ROW_MODES[(ROW_MODES.indexOf(prefs.row) + 1) % ROW_MODES.length]!,
@@ -122,7 +142,7 @@ export function LinePreviewRowChip() {
       )}
     >
       <Icon className="size-2.5 flex-none" aria-hidden />
-      {prefs.row}
+      {mode}
     </button>
   )
 }
@@ -132,52 +152,53 @@ export function LinePreviewRowChip() {
  * settings dialog (`components/board/BoardSettings`) rather than a dialog in its own right.
  */
 export function LinePreviewFields() {
+  const { t, i18n } = useLingui()
   const prefs = useLinePreviewPrefs()
   const set = (patch: Partial<Omit<LinePreviewPrefs, 'play' | 'overlay'>>) => setLinePreviewPrefs(patch)
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="preview-mode">Row hover</Label>
+        <Label htmlFor="preview-mode">{t`Row hover`}</Label>
         <select id="preview-mode" value={prefs.row} onChange={(event) => set({ row: event.target.value as RowPreview })} className={cn(SELECT, 'w-56')}>
-          {MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+          {MODES.map((mode) => <option key={mode.value} value={mode.value}>{i18n._(mode.label)}</option>)}
         </select>
       </div>
 
       <div className="flex flex-wrap gap-4">
-        <SettingsCheck id="preview-scrub" label="Hover a move to show its position" checked={prefs.scrub} onChange={(scrub) => set({ scrub })} />
-        <SettingsCheck id="preview-badges" label="Move badges" checked={prefs.badges} onChange={(badges) => set({ badges })} />
-        <SettingsCheck id="preview-sides" label="Colour arrows by side" checked={prefs.bySide} onChange={(bySide) => set({ bySide })} />
-        <SettingsCheck id="preview-fade" label="Fade with depth" checked={prefs.fade} onChange={(fade) => set({ fade })} />
+        <SettingsCheck id="preview-scrub" label={t`Hover a move to show its position`} checked={prefs.scrub} onChange={(scrub) => set({ scrub })} />
+        <SettingsCheck id="preview-badges" label={t`Move badges`} checked={prefs.badges} onChange={(badges) => set({ badges })} />
+        <SettingsCheck id="preview-sides" label={t`Colour arrows by side`} checked={prefs.bySide} onChange={(bySide) => set({ bySide })} />
+        <SettingsCheck id="preview-fade" label={t`Fade with depth`} checked={prefs.fade} onChange={(fade) => set({ fade })} />
       </div>
 
       <div className="flex flex-wrap gap-5">
-        <Range id="preview-depth" label="Plies drawn" value={prefs.depth} min={1} max={18} onChange={(depth) => set({ depth })} />
-        {prefs.scrub ? <Range id="preview-lookahead" label="Look-ahead" value={prefs.lookahead} min={0} max={4} onChange={(lookahead) => set({ lookahead: lookahead as LinePreviewPrefs['lookahead'] })} /> : null}
+        <Range id="preview-depth" label={t`Plies drawn`} value={prefs.depth} min={1} max={18} onChange={(depth) => set({ depth })} />
+        {prefs.scrub ? <Range id="preview-lookahead" label={t`Look-ahead`} value={prefs.lookahead} min={0} max={4} onChange={(lookahead) => set({ lookahead: lookahead as LinePreviewPrefs['lookahead'] })} /> : null}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="preview-labels">Badge label</Label>
+        <Label htmlFor="preview-labels">{t`Badge label`}</Label>
         <select id="preview-labels" value={prefs.labels} disabled={!prefs.badges} onChange={(event) => set({ labels: event.target.value as LinePreviewPrefs['labels'] })} className={cn(SELECT, 'w-48')}>
-          <option value="move">Move number</option>
-          <option value="ply">Ply count</option>
+          <option value="move">{t`Move number`}</option>
+          <option value="ply">{t`Ply count`}</option>
         </select>
       </div>
 
       {prefs.row === 'play' ? (
         <div className="flex flex-col gap-4 border-t border-hairline pt-4">
           <div className="flex flex-wrap gap-5">
-            <Range id="preview-tempo" label="Tempo" value={prefs.play.tempo} min={100} max={2000} step={50} suffix=" ms" onChange={(tempo) => setLinePreviewPrefs({ play: { tempo } })} />
-            <Range id="preview-delay" label="Start delay" value={prefs.play.delay} min={0} max={2000} step={50} suffix=" ms" onChange={(delay) => setLinePreviewPrefs({ play: { delay } })} />
+            <Range id="preview-tempo" label={t`Tempo`} value={prefs.play.tempo} min={100} max={2000} step={50} suffix=" ms" onChange={(tempo) => setLinePreviewPrefs({ play: { tempo } })} />
+            <Range id="preview-delay" label={t`Start delay`} value={prefs.play.delay} min={0} max={2000} step={50} suffix=" ms" onChange={(delay) => setLinePreviewPrefs({ play: { delay } })} />
           </div>
           <div className="flex flex-wrap gap-4">
-            <SettingsCheck id="preview-loop" label="Loop" checked={prefs.play.loop} onChange={(loop) => setLinePreviewPrefs({ play: { loop } })} />
-            <SettingsCheck id="preview-ahead" label="Arrow one move ahead" checked={prefs.play.ahead} onChange={(ahead) => setLinePreviewPrefs({ play: { ahead } })} />
+            <SettingsCheck id="preview-loop" label={t`Loop`} checked={prefs.play.loop} onChange={(loop) => setLinePreviewPrefs({ play: { loop } })} />
+            <SettingsCheck id="preview-ahead" label={t`Arrow one move ahead`} checked={prefs.play.ahead} onChange={(ahead) => setLinePreviewPrefs({ play: { ahead } })} />
           </div>
         </div>
       ) : null}
 
-      {prefs.row === 'overlay' ? <SettingsCheck id="preview-dim" label="Dim current pieces" checked={prefs.overlay.dim} onChange={(dim) => setLinePreviewPrefs({ overlay: { dim } })} /> : null}
+      {prefs.row === 'overlay' ? <SettingsCheck id="preview-dim" label={t`Dim current pieces`} checked={prefs.overlay.dim} onChange={(dim) => setLinePreviewPrefs({ overlay: { dim } })} /> : null}
     </div>
   )
 }

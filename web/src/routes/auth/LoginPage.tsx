@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
@@ -6,6 +7,9 @@ import { useLogin } from '@/lib/api/queries'
 
 import { AuthScreen, FormError, PasswordField } from './AuthScreen'
 import { authErrorMessage } from './password'
+
+/** What resets a forgotten password from a shell — a command, so it stays untranslated. */
+const RESET_COMMAND = 'uv run blunderbase set-password'
 
 /**
  * The door. One field, because there is one user — the form still carries a real `<form>`
@@ -18,6 +22,7 @@ import { authErrorMessage } from './password'
 export function LoginPage() {
   const [password, setPassword] = useState('')
   const login = useLogin()
+  const { t } = useLingui()
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -27,13 +32,18 @@ export function LoginPage() {
 
   return (
     <AuthScreen
-      title="Sign in"
-      description="This Blunderbase is behind the owner's password — the one the deployment was set up with."
+      title={t`Sign in`}
+      description={
+        <Trans>
+          This Blunderbase is behind the owner's password — the one the deployment was set
+          up with.
+        </Trans>
+      }
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <PasswordField
           id="password"
-          label="Password"
+          label={t`Password`}
           value={password}
           onChange={(value) => {
             setPassword(value)
@@ -48,13 +58,15 @@ export function LoginPage() {
 
         <Button type="submit" disabled={!password || login.isPending}>
           {login.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-          Sign in
+          <Trans>Sign in</Trans>
         </Button>
       </form>
 
       <p className="text-[0.6875rem] leading-[1.55] text-dim-2">
-        Lost it? <code className="font-mono text-dim">uv run blunderbase set-password</code> resets
-        it from a shell on the host.
+        <Trans>
+          Lost it? <code className="font-mono text-dim">{RESET_COMMAND}</code> resets it from
+          a shell on the host.
+        </Trans>
       </p>
     </AuthScreen>
   )

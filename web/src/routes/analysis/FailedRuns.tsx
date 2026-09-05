@@ -1,3 +1,6 @@
+import type { I18n, MessageDescriptor } from '@lingui/core'
+import { msg, plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -39,11 +42,22 @@ interface Group {
   tiers: Tier[]
 }
 
-/** One row per distinct error message, in the order the messages were first seen. */
-function groupByError(runs: RunResponse[]): Group[] {
+/**
+ * One row per distinct error message, in the order the messages were first seen.
+ *
+ * The engine's own text is passed through untranslated; only the stand-in for a run that
+ * recorded nothing is ours to say, which is why the resolver comes in.
+ */
+/** The tier as the lowercase chip word; `TIER_STYLES` carries the capitalised label. */
+const TIER_WORDS: Record<Tier, MessageDescriptor> = {
+  quick: msg`quick`,
+  deep: msg`deep`,
+}
+
+function groupByError(runs: RunResponse[], i18n: I18n): Group[] {
   const groups = new Map<string, Group>()
   for (const run of runs) {
-    const message = run.error?.trim() || 'no message was recorded'
+    const message = run.error?.trim() || i18n._(msg`no message was recorded`)
     const group = groups.get(message) ?? { message, runs: [], tiers: [] }
     group.runs.push(run)
     if (!group.tiers.includes(run.tier)) group.tiers.push(run.tier)
@@ -59,14 +73,14 @@ function RetryError({ error }: { error: Error }) {
   return (
     <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
       {unavailable ? (
-        <>
+        <Trans>
           Nothing was queued: the tier these runs failed under still has no engine that can
           take them, so a retry would fail the same way.{' '}
           <Link to="/engines" className="text-accent-teal hover:text-accent-link">
             Register or enable an engine
           </Link>{' '}
           for it first.
-        </>
+        </Trans>
       ) : (
         error.message
       )}
@@ -75,12 +89,18 @@ function RetryError({ error }: { error: Error }) {
 }
 
 export function FailedRuns({ failed }: { failed: number }) {
+  const { i18n, t } = useLingui()
   // Coverage has already counted them, so a library with no failures asks for no listing.
   const runs = useFailedRuns(undefined, { enabled: failed > 0 })
   const retry = useRetryFailed()
-  const groups = groupByError(runs.data ?? [])
+  const groups = groupByError(runs.data ?? [], i18n)
   const receipt = retry.data ?? null
   const listed = runs.data?.length ?? 0
+  // Named locals: the identifier is what a translator sees as the placeholder.
+  const shown = formatCount(listed)
+  const failures = formatCount(failed)
+  const queuedCount = formatCount(receipt?.queued ?? 0)
+  const skippedCount = formatCount(receipt?.skipped ?? 0)
 
   return (
     <section
@@ -89,7 +109,7 @@ export function FailedRuns({ failed }: { failed: number }) {
     >
       <header className="flex flex-wrap items-center gap-2">
         <h2 id="failed-runs-title" className="text-xs font-semibold text-ink">
-          Failed runs
+          <Trans>Failed runs</Trans>
         </h2>
         <span className="font-mono text-[0.6875rem] tabular text-blunder">
           {formatCount(failed)}
@@ -107,25 +127,30 @@ export function FailedRuns({ failed }: { failed: number }) {
           ) : (
             <RotateCcw aria-hidden />
           )}
-          Retry them all
+          <Trans>Retry them all</Trans>
         </Button>
       </header>
 
       {receipt ? (
         <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
           {receipt.queued === 0
-            ? `Nothing queued — all ${formatCount(receipt.skipped)} of them are over games that have since been analysed, or over a position rather than a game.`
-            : `Queued ${formatCount(receipt.queued)} ${receipt.queued === 1 ? 'game' : 'games'}; skipped ${formatCount(receipt.skipped)}.`}
+            ? t`Nothing queued — all ${skippedCount} of them are over games that have since been analysed, or over a position rather than a game.`
+            : t`Queued ${queuedCount} ${plural(receipt.queued, {
+                one: 'game',
+                other: 'games',
+              })}; skipped ${skippedCount}.`}
         </p>
       ) : null}
       {retry.isError ? <RetryError error={retry.error} /> : null}
 
       {failed === 0 ? (
         <p className="text-[0.6875rem] leading-[1.5] text-dim-2">
-          Nothing has failed. A run that does will be listed here until it is retried.
+          <Trans>Nothing has failed. A run that does will be listed here until it is retried.</Trans>
         </p>
       ) : runs.isPending ? (
-        <p className="text-[0.6875rem] text-dim-2">Reading the failures…</p>
+        <p className="text-[0.6875rem] text-dim-2">
+          <Trans>Reading the failures…</Trans>
+        </p>
       ) : (
         <>
           <ul className="flex flex-col gap-px">
@@ -146,7 +171,7 @@ export function FailedRuns({ failed }: { failed: number }) {
                         TIER_STYLES[tier].chipClass,
                       )}
                     >
-                      {tier}
+                      {i18n._(TIER_WORDS[tier])}
                     </span>
                   ))}
                   <span className="flex-1 text-[0.6875rem] leading-[1.45] text-body-3">
@@ -163,7 +188,10 @@ export function FailedRuns({ failed }: { failed: number }) {
 
           {failed > listed ? (
             <p className="text-[0.625rem] text-dim-2">
-              {`Showing the newest ${formatCount(listed)} of ${formatCount(failed)}. Retrying takes on every one of them, not only the ones listed.`}
+              <Trans>
+                Showing the newest {shown} of {failures}. Retrying takes on every one of them, not
+                only the ones listed.
+              </Trans>
             </p>
           ) : null}
         </>
@@ -184,12 +212,13 @@ function GameList({ runs }: { runs: RunResponse[] }) {
   if (games.length === 0) {
     return (
       <span className="text-[0.625rem] text-dim-2">
-        Over a position rather than a game — nothing to re-analyse.
+        <Trans>Over a position rather than a game — nothing to re-analyse.</Trans>
       </span>
     )
   }
   const named = games.slice(0, NAMED_GAMES)
   const rest = games.length - named.length
+  const more = formatCount(rest)
   return (
     <span className="flex flex-wrap items-center gap-1.5 text-[0.625rem] text-dim-2">
       {named.map((id) => (
@@ -201,7 +230,11 @@ function GameList({ runs }: { runs: RunResponse[] }) {
           {`#${id}`}
         </Link>
       ))}
-      {rest > 0 ? <span>{`and ${formatCount(rest)} more`}</span> : null}
+      {rest > 0 ? (
+        <span>
+          <Trans>and {more} more</Trans>
+        </span>
+      ) : null}
     </span>
   )
 }

@@ -1,3 +1,5 @@
+import { Trans } from '@lingui/react/macro'
+
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
@@ -19,10 +21,12 @@ export function CoachComment({
   return (
     <section className={cn('flex flex-col rounded-xl border border-line bg-panel', className)}>
       <div className="flex items-center gap-2 border-b border-hairline px-3.5 py-2.5">
-        <span className="text-xs font-semibold text-ink">Coach</span>
+        <span className="text-xs font-semibold text-ink">
+          <Trans>Coach</Trans>
+        </span>
         <span className="inline-flex items-center gap-1.5 rounded-sm border border-edge px-1.5 py-px text-[0.625rem] text-soft">
           <span className="size-[0.3125rem] rounded-full bg-good" />
-          via MCP
+          <Trans>via MCP</Trans>
         </span>
         <div className="flex-1" />
         <span className="font-mono text-[0.625rem] text-dim">{relative(updatedAt)}</span>
@@ -35,9 +39,11 @@ export function CoachComment({
           </p>
         ) : (
           <p className="text-[0.71875rem] leading-[1.5] text-dim">
-            Nothing said yet. Whatever your assistant writes with{' '}
-            <span className="font-mono text-soft-2">annotate</span> appears here as it types
-            it.
+            <Trans>
+              Nothing said yet. Whatever your assistant writes with{' '}
+              <span className="font-mono text-soft-2">annotate</span> appears here as it types
+              it.
+            </Trans>
           </p>
         )}
       </div>

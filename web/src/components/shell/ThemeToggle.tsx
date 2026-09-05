@@ -1,6 +1,14 @@
+import { type MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { useLingui } from '@lingui/react/macro'
 import { Monitor, Moon, Sun } from 'lucide-react'
 
-import { useTheme, THEME_PREFERENCES, type ThemePreference } from '@/lib/ui/theme'
+import {
+  useTheme,
+  THEME_PREFERENCES,
+  type ResolvedTheme,
+  type ThemePreference,
+} from '@/lib/ui/theme'
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<ThemePreference, typeof Moon> = {
@@ -9,11 +17,16 @@ const ICONS: Record<ThemePreference, typeof Moon> = {
   system: Monitor,
 }
 
-const LABELS: Record<ThemePreference, string> = {
-  dark: 'Dark',
-  light: 'Light',
-  system: 'Match the system',
-}
+const LABELS = {
+  dark: msg`Dark`,
+  light: msg`Light`,
+  system: msg`Match the system`,
+} satisfies Record<ThemePreference, MessageDescriptor>
+
+const RESOLVED = {
+  dark: msg`dark`,
+  light: msg`light`,
+} satisfies Record<ResolvedTheme, MessageDescriptor>
 
 /**
  * The three-state theme control, built in the same segmented idiom as the window/colour
@@ -28,11 +41,12 @@ const LABELS: Record<ThemePreference, string> = {
  */
 export function ThemeToggle({ className }: { className?: string }) {
   const { preference, resolved, setPreference } = useTheme()
+  const { t, i18n } = useLingui()
 
   return (
     <div
       role="group"
-      aria-label="Theme"
+      aria-label={t`Theme`}
       className={cn(
         'flex flex-none overflow-hidden rounded-md border border-edge bg-elevated',
         className,
@@ -41,16 +55,16 @@ export function ThemeToggle({ className }: { className?: string }) {
       {THEME_PREFERENCES.map((option, index) => {
         const Icon = ICONS[option]
         const active = option === preference
+        const label = i18n._(LABELS[option])
+        const current = i18n._(RESOLVED[resolved])
         return (
           <button
             key={option}
             type="button"
             aria-pressed={active}
-            aria-label={LABELS[option]}
+            aria-label={label}
             title={
-              option === 'system'
-                ? `Match the system — currently ${resolved}`
-                : `${LABELS[option]} theme`
+              option === 'system' ? t`Match the system — currently ${current}` : t`${label} theme`
             }
             onClick={() => setPreference(option)}
             className={cn(

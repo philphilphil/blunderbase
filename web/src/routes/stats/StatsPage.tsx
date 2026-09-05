@@ -14,6 +14,9 @@
  * given away` (`avg_win_loss`, the average a move costs) and `Blunder rate` (the share of
  * moves that were one). Same question — how expensive are your moves — in real units.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -61,12 +64,24 @@ interface DeltaPayload {
 }
 
 /** Chip labels. "correspondence" is twice the width of the bar's other five put together. */
-const SPEED_LABELS: Record<Speed, string> = {
-  bullet: 'bullet',
-  blitz: 'blitz',
-  rapid: 'rapid',
-  classical: 'classical',
-  correspondence: 'corr.',
+/** The same speeds as words in a sentence, where "corr." would not do. */
+const SPEED_WORDS: Record<Speed, MessageDescriptor> = {
+  bullet: msg`bullet`,
+  blitz: msg`blitz`,
+  rapid: msg`rapid`,
+  classical: msg`classical`,
+  correspondence: msg`correspondence`,
+}
+
+const SPEED_LABELS: Record<Speed, MessageDescriptor> = {
+  bullet: msg`bullet`,
+  blitz: msg`blitz`,
+  rapid: msg`rapid`,
+  classical: msg`classical`,
+  correspondence: msg({
+    message: 'corr.',
+    comment: 'Short for "correspondence", the speed of a game played over days',
+  }),
 }
 
 const WINDOW_DAYS: Record<WindowKey, number | undefined> = {
@@ -93,7 +108,8 @@ function dimensionQuery(
 export function StatsPage() {
   const [params] = useSearchParams()
   const report = reportFrom(params)
-  const reportLabel = REPORTS.find((entry) => entry.key === report)!.label
+  const { i18n, t } = useLingui()
+  const reportLabel = i18n._(REPORTS.find((entry) => entry.key === report)!.label)
   const [windowKey, setWindowKey] = useState<WindowKey>('90d')
   const [color, setColor] = useState<ColorChoice>('both')
   // Every speed on is the same question as no speed filter, so that is what it is sent as:
@@ -156,6 +172,19 @@ export function StatsPage() {
   const winLoss = num(phaseTotal, 'avg_win_loss')
   const blunderRate = asPercent(num(phaseTotal, 'blunder_rate'))
 
+  // The subtitle is what the page counted; a speed left out changes that and has to be
+  // said, while the untouched bar leaves the sentence as it was. Both readings are whole
+  // sentences rather than a stem with a clause appended, so the order is a translator's to
+  // choose; the locals are named because an identifier is what they see as a placeholder.
+  const analysedCount = formatCount(analysed)
+  const gameCount = formatCount(games)
+  const period = windowProse(windowKey, anchor)
+  const colours = color === 'both' ? t`both colours` : color === 'white' ? t`as white` : t`as black`
+  const speedList = speeds.map((speed) => i18n._(SPEED_WORDS[speed])).join(', ')
+  const subtitle = allSpeeds
+    ? t`${analysedCount} analysed of ${gameCount} games · ${period} · ${colours}`
+    : t`${analysedCount} analysed of ${gameCount} games · ${period} · ${colours} · ${speedList} only`
+
   function download() {
     const csv = toCsv(
       exportRows([
@@ -204,9 +233,9 @@ export function StatsPage() {
    */
   const scope = (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-      <Field label="Window">
+      <Field label={t`Window`}>
         <Segmented
-          label="Window"
+          label={t`Window`}
           value={windowKey}
           onChange={setWindowKey}
           options={DEFAULT_WINDOWS.map((key) => ({
@@ -215,29 +244,32 @@ export function StatsPage() {
           }))}
         />
       </Field>
-      <Field label="Colour">
+      <Field label={t`Colour`}>
         <Segmented
-          label="Colour"
+          label={t`Colour`}
           value={color}
           onChange={setColor}
           options={[
-            { value: 'both', label: 'both' },
-            { value: 'white', label: 'white' },
-            { value: 'black', label: 'black' },
+            { value: 'both', label: t`both` },
+            { value: 'white', label: t`white` },
+            { value: 'black', label: t`black` },
           ]}
         />
       </Field>
-      <Field label="Speed">
-        {SPEEDS.map((value) => (
-          <FilterChip
-            key={value}
-            label={SPEED_LABELS[value]}
-            name={value}
-            title={`Count ${value} games`}
-            on={speeds.includes(value)}
-            onClick={() => setSpeeds(toggleFilter(speeds, value, SPEEDS))}
-          />
-        ))}
+      <Field label={t`Speed`}>
+        {SPEEDS.map((speedName) => {
+          const speedWord = i18n._(SPEED_WORDS[speedName])
+          return (
+            <FilterChip
+              key={speedName}
+              label={i18n._(SPEED_LABELS[speedName])}
+              name={speedName}
+              title={t`Count ${speedWord} games`}
+              on={speeds.includes(speedName)}
+              onClick={() => setSpeeds(toggleFilter(speeds, speedName, SPEEDS))}
+            />
+          )
+        })}
       </Field>
     </div>
   )
@@ -247,24 +279,13 @@ export function StatsPage() {
       <SetPageChrome
         breadcrumb={
           report === 'overview'
-            ? [{ label: 'Stats' }]
-            : [{ label: 'Stats', to: '/stats' }, { label: reportLabel }]
+            ? [{ label: t`Stats` }]
+            : [{ label: t`Stats`, to: '/stats' }, { label: reportLabel }]
         }
       />
       <PageHeader
-        title="Stats"
-        description={
-          speed.isPending
-            ? 'Reading the aggregations…'
-            : `${formatCount(analysed)} analysed of ${formatCount(games)} games · ${windowProse(
-                windowKey,
-                anchor,
-              )} · ${color === 'both' ? 'both colours' : `as ${color}`}${
-                // The subtitle is what the page counted; a speed left out changes that and
-                // has to be said, while the untouched bar leaves the sentence as it was.
-                allSpeeds ? '' : ` · ${speeds.join(', ')} only`
-              }`
-        }
+        title={t`Stats`}
+        description={speed.isPending ? t`Reading the aggregations…` : subtitle}
         actions={
           <div className="flex items-center gap-2">
             <button
@@ -274,8 +295,8 @@ export function StatsPage() {
               onClick={() => setComparing((on) => !on)}
               title={
                 canCompare
-                  ? 'Show every number against the equally long window before this one'
-                  : 'All time has nothing before it to compare against'
+                  ? t`Show every number against the equally long window before this one`
+                  : t`All time has nothing before it to compare against`
               }
               className={cn(
                 'rounded-md border px-2.5 py-[0.3125rem] text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40',
@@ -284,7 +305,7 @@ export function StatsPage() {
                   : 'border-input text-soft hover:border-edge-hover hover:text-ink',
               )}
             >
-              vs previous
+              <Trans>vs previous</Trans>
             </button>
             <button
               type="button"
@@ -292,7 +313,7 @@ export function StatsPage() {
               disabled={!speed.data}
               className="rounded-md border border-input px-2.5 py-[0.3125rem] text-xs text-soft transition-colors hover:border-edge-hover hover:text-ink disabled:opacity-40"
             >
-              Export CSV
+              <Trans>Export CSV</Trans>
             </button>
           </div>
         }
@@ -305,39 +326,34 @@ export function StatsPage() {
           would otherwise sit alone in half a row — takes the whole last one. */}
       <div className="grid flex-none grid-cols-2 gap-2.5 md:flex md:gap-3">
         <StatTile
-          label="Games"
+          label={<Trans>Games</Trans>}
           value={speed.isPending ? '—' : formatCount(games)}
           // The number is every game in the window; the caption is how many of them an
           // engine has been over, which is what the four tiles beside it are computed from.
           // It read "analysed" alone, which named the big number as the analysed count and
           // made the tile disagree with the coverage on the dashboard for no reason.
-          suffix={suffix(
-            num(speedDelta?.total, 'games'),
-            `${formatCount(analysed)} analysed`,
-            false,
-            0,
-          )}
+          suffix={suffix(num(speedDelta?.total, 'games'), t`${analysedCount} analysed`, false, 0)}
         />
         <StatTile
-          label="Score"
+          label={<Trans>Score</Trans>}
           value={score === null ? '—' : `${score.toFixed(1)}%`}
-          suffix={suffix(asPercent(num(speedDelta?.total, 'score')), 'of the point', false)}
+          suffix={suffix(asPercent(num(speedDelta?.total, 'score')), t`of the point`, false)}
         />
         <StatTile
-          label="Blunders per game"
+          label={<Trans>Blunders per game</Trans>}
           value={perGame === null ? '—' : perGame.toFixed(1)}
           tone={perGame !== null && perGame > 1 ? 'blunder' : 'ink'}
-          suffix={suffix(num(speedDelta?.total, 'blunders_per_game'), 'per game', true)}
+          suffix={suffix(num(speedDelta?.total, 'blunders_per_game'), t`per game`, true)}
         />
         <StatTile
-          label="Win % given away"
+          label={<Trans>Win % given away</Trans>}
           value={winLoss === null ? '—' : winLoss.toFixed(1)}
-          suffix={suffix(num(phaseDelta?.total, 'avg_win_loss'), 'per move', true)}
+          suffix={suffix(num(phaseDelta?.total, 'avg_win_loss'), t`per move`, true)}
         />
         <StatTile
-          label="Blunder rate"
+          label={<Trans>Blunder rate</Trans>}
           value={blunderRate === null ? '—' : `${blunderRate.toFixed(1)}%`}
-          suffix={suffix(asPercent(num(phaseDelta?.total, 'blunder_rate')), 'of your moves', true)}
+          suffix={suffix(asPercent(num(phaseDelta?.total, 'blunder_rate')), t`of your moves`, true)}
           className="max-md:col-span-2"
         />
       </div>

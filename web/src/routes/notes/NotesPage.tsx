@@ -27,6 +27,9 @@
  * one note: `/notes?note=12` is where the command palette sends a note that has no game to
  * open, and it rings itself and scrolls into view.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg, plural } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Download, FileText, LayoutGrid, Loader2, Rows3, StickyNote } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -80,6 +83,7 @@ const STREAM = 'grid items-start gap-2.5 max-w-[46rem] lg:max-w-[93rem] lg:grid-
 const SHEET = 'grid items-start gap-2.5 sm:grid-cols-2 xl:grid-cols-3 min-[110rem]:grid-cols-4'
 
 export function NotesPage() {
+  const { t } = useLingui()
   const [params, setParams] = useSearchParams()
 
   const filters = useMemo(() => filtersFromParams(params), [params])
@@ -119,20 +123,27 @@ export function NotesPage() {
 
   const list = view === 'sheet' ? SHEET : STREAM
 
+  // A full page is worth saying so, and it is one sentence rather than a count with a
+  // parenthesis appended: the two are different things to translate.
+  const counted =
+    total === LIMIT
+      ? t`${plural(total, { one: '# note', other: '# notes' })} (the newest page)`
+      : t`${plural(total, { one: '# note', other: '# notes' })}`
+
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: 'Notes' }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Notes` }]} />
 
       <PageHeader
-        title="Notes"
+        title={t`Notes`}
         description={
           notes.isSuccess
             ? total === 0
               ? filterCount(filters) > 0
-                ? 'Nothing written matches that.'
-                : 'Nothing written down yet.'
-              : `${total} note${total === 1 ? '' : 's'}${total === LIMIT ? ' (the newest page)' : ''}`
-            : 'What you and the coach have written down.'
+                ? t`Nothing written matches that.`
+                : t`Nothing written down yet.`
+              : counted
+            : t`What you and the coach have written down.`
         }
         actions={<ExportButtons filters={filters} disabled={total === 0} />}
       />
@@ -163,7 +174,9 @@ export function NotesPage() {
         </div>
       ) : notes.isError ? (
         <div className="rounded-xl border border-blunder/28 bg-blunder/5 px-4 py-5">
-          <p className="text-[0.78125rem] text-blunder">The notes could not be read.</p>
+          <p className="text-[0.78125rem] text-blunder">
+            <Trans>The notes could not be read.</Trans>
+          </p>
           <p className="mt-1 font-mono text-[0.6875rem] text-blunder/80">{notes.error.message}</p>
         </div>
       ) : (
@@ -174,7 +187,7 @@ export function NotesPage() {
           */}
           {linked.data ? (
             <section className="flex flex-col gap-1.5">
-              <DateRule label="The note you followed" note="outside the filters below" />
+              <DateRule label={t`The note you followed`} note={t`outside the filters below`} />
               <div className={list}>
                 <NoteItem
                   note={linked.data}
@@ -212,9 +225,19 @@ export function NotesPage() {
   )
 }
 
-const VIEWS: { id: NoteView; label: string; icon: typeof Rows3; hint: string }[] = [
-  { id: 'stream', label: 'Stream', icon: Rows3, hint: 'One column, every note in full' },
-  { id: 'sheet', label: 'Sheet', icon: LayoutGrid, hint: 'A grid of positions, text clamped' },
+const VIEWS: {
+  id: NoteView
+  label: MessageDescriptor
+  icon: typeof Rows3
+  hint: MessageDescriptor
+}[] = [
+  { id: 'stream', label: msg`Stream`, icon: Rows3, hint: msg`One column, every note in full` },
+  {
+    id: 'sheet',
+    label: msg`Sheet`,
+    icon: LayoutGrid,
+    hint: msg`A grid of positions, text clamped`,
+  },
 ]
 
 /**
@@ -225,10 +248,11 @@ const VIEWS: { id: NoteView; label: string; icon: typeof Rows3; hint: string }[]
  * carry it on a phone, where the row is already tight.
  */
 function ViewToggle({ view }: { view: NoteView }) {
+  const { t, i18n } = useLingui()
   return (
     <div
       role="radiogroup"
-      aria-label="How to show the notes"
+      aria-label={t`How to show the notes`}
       className="flex items-center rounded-md border border-edge bg-elevated p-px"
     >
       {VIEWS.map((option) => {
@@ -239,7 +263,7 @@ function ViewToggle({ view }: { view: NoteView }) {
             type="button"
             role="radio"
             aria-checked={on}
-            title={option.hint}
+            title={i18n._(option.hint)}
             onClick={() => setNoteView(option.id)}
             className={cn(
               'flex items-center gap-1.5 rounded-[0.3125rem] px-2 py-[0.1875rem] text-[0.6875rem] transition-colors',
@@ -247,7 +271,7 @@ function ViewToggle({ view }: { view: NoteView }) {
             )}
           >
             <option.icon className="size-3.5" aria-hidden />
-            <span className="max-sm:sr-only">{option.label}</span>
+            <span className="max-sm:sr-only">{i18n._(option.label)}</span>
           </button>
         )
       })}
@@ -282,9 +306,14 @@ function Empty({ filtered }: { filtered: boolean }) {
     <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-edge-strong bg-panel/60 p-10 text-center max-md:p-6">
       <StickyNote className="size-5 text-faint" aria-hidden />
       <p className="max-w-md text-[0.78125rem] leading-relaxed text-dim">
-        {filtered
-          ? 'No note matches those filters. Clear one and try again.'
-          : 'Nothing here yet. Write a note from a game, or ask your assistant to — anything it saves over MCP lands on this page.'}
+        {filtered ? (
+          <Trans>No note matches those filters. Clear one and try again.</Trans>
+        ) : (
+          <Trans>
+            Nothing here yet. Write a note from a game, or ask your assistant to — anything
+            it saves over MCP lands on this page.
+          </Trans>
+        )}
       </p>
     </div>
   )
@@ -295,6 +324,7 @@ function Empty({ filtered }: { filtered: boolean }) {
  * screen, so what is exported is what is being read.
  */
 function ExportButtons({ filters, disabled }: { filters: NoteFilters; disabled: boolean }) {
+  const { t } = useLingui()
   const exporting = useExportNotes({ onSuccess: (download) => saveDownload(download) })
   const pending = exporting.isPending ? exporting.variables?.format : undefined
 
@@ -314,7 +344,7 @@ function ExportButtons({ filters, disabled }: { filters: NoteFilters; disabled: 
         variant="outline"
         disabled={disabled || exporting.isPending}
         onClick={() => run('md')}
-        title="Every note these filters show, as Markdown"
+        title={t`Every note these filters show, as Markdown`}
       >
         {pending === 'md' ? (
           <Loader2 className="size-3 animate-spin" aria-hidden />
@@ -328,7 +358,7 @@ function ExportButtons({ filters, disabled }: { filters: NoteFilters; disabled: 
         variant="outline"
         disabled={disabled || exporting.isPending}
         onClick={() => run('pgn')}
-        title="The same notes as PGN comments and variations"
+        title={t`The same notes as PGN comments and variations`}
       >
         {pending === 'pgn' ? (
           <Loader2 className="size-3 animate-spin" aria-hidden />

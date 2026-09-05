@@ -1,5 +1,6 @@
 import type { Api } from '@lichess-org/chessground/api'
 import type { DrawShape } from '@lichess-org/chessground/draw'
+import { Trans, useLingui } from '@lingui/react/macro'
 import {
   Check,
   ChevronLeft,
@@ -222,6 +223,7 @@ export function BoardPanel({
   actions,
   className,
 }: BoardPanelProps) {
+  const { t } = useLingui()
   // Both analysis buttons disable together — only one run is ever live over a game — but
   // the spinner belongs to whichever button matches it. An unknown tier (a request just
   // sent, before the run list catches up; a fill run that is neither) falls back to Deep
@@ -317,6 +319,10 @@ export function BoardPanel({
   const inLine = (analysis?.moves.length ?? 0) > 0
   const exploring = (analysis?.cursor ?? 0) > 0
   const shown = exploring && analysis ? analysis.position : position
+
+  // Named for the readout below, because each becomes the placeholder a translator reads.
+  const lineDepth = analysis?.cursor ?? 0
+  const ply = cursor + 1
 
   // A previewed position is not on the board's own line at all — it is a line being read,
   // not one being walked — so the board is that position, unannotated: no marks, no engine
@@ -542,17 +548,18 @@ export function BoardPanel({
           <button
             type="button"
             onClick={onFlip}
-            title="Flip the board (F)"
+            title={t`Flip the board (F)`}
             className="flex-none rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
           >
-            ⇅ Flip
+            {/* The arrow is the icon and stays put; only the word is language. */}
+            ⇅ <Trans>Flip</Trans>
           </button>
 
           <button
             type="button"
             onClick={() => onHintsChange(!hints)}
             aria-pressed={hints}
-            title="Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+            title={t`Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first.`}
             className={cn(
               'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
               hints
@@ -560,7 +567,7 @@ export function BoardPanel({
                 : 'border-edge bg-elevated text-dim hover:text-ink',
             )}
           >
-            Hints
+            <Trans>Hints</Trans>
           </button>
         </div>
 
@@ -602,7 +609,7 @@ export function BoardPanel({
             type="button"
             onClick={onNote}
             aria-pressed={noting}
-            title="Write a note about this position (N)"
+            title={t`Write a note about this position (N)`}
             className={cn(
               'flex flex-none items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
               noting
@@ -611,7 +618,7 @@ export function BoardPanel({
             )}
           >
             <StickyNote className="size-3" aria-hidden />
-            Note
+            <Trans comment="Button in the transport row that opens the note composer">Note</Trans>
           </button>
         ) : null}
 
@@ -619,11 +626,11 @@ export function BoardPanel({
           <button
             type="button"
             onClick={onExitAnalysis}
-            title="Leave the analysis line and go back to the game (Esc)"
+            title={t`Leave the analysis line and go back to the game (Esc)`}
             className="flex flex-none items-center gap-1 rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-[0.3125rem] text-xs text-brilliant max-md:py-1.5"
           >
             <Undo2 className="size-3" aria-hidden />
-            Back to game
+            <Trans>Back to game</Trans>
           </button>
         ) : null}
 
@@ -640,14 +647,16 @@ export function BoardPanel({
             line of its own: the two readouts are read together and they move together. */}
         <div className="flex flex-none items-center gap-2 max-md:hidden">
           <span className="font-mono text-[0.6875rem] tabular whitespace-nowrap text-dim">
-            {inLine && analysis
-              ? `analysis +${analysis.cursor}`
-              : `ply ${cursor + 1} / ${plyCount}`}
+            {inLine && analysis ? (
+              <Trans>analysis +{lineDepth}</Trans>
+            ) : (
+              <Trans>ply {ply} / {plyCount}</Trans>
+            )}
           </span>
           <span
             title={
               scoreAlongLine
-                ? 'The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it'
+                ? t`The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it`
                 : undefined
             }
             className={cn(
@@ -669,7 +678,7 @@ export function BoardPanel({
         <div className="flex flex-none items-center gap-2 max-md:order-first max-md:gap-1.5">
           <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
             <TransportButton
-              label="First"
+              label={t`First`}
               hint="Home"
               disabled={cursor < 0}
               onClick={() => onSeek(-1)}
@@ -677,7 +686,7 @@ export function BoardPanel({
               ⏮
             </TransportButton>
             <TransportButton
-              label="Previous"
+              label={t`Previous`}
               hint="←"
               disabled={cursor < 0}
               onClick={() => onSeek(cursor - 1)}
@@ -685,7 +694,7 @@ export function BoardPanel({
               ◀
             </TransportButton>
             <TransportButton
-              label="Next"
+              label={t`Next`}
               hint="→"
               disabled={cursor >= plyCount - 1}
               onClick={() => onSeek(cursor + 1)}
@@ -693,7 +702,7 @@ export function BoardPanel({
               ▶
             </TransportButton>
             <TransportButton
-              label="Last"
+              label={t`Last`}
               hint="End"
               last={!onToggleAutoplay}
               disabled={cursor >= plyCount - 1}
@@ -706,7 +715,7 @@ export function BoardPanel({
                 them for the sake of a control that is pressed once a game. */}
             {onToggleAutoplay ? (
               <TransportButton
-                label={playing ? 'Stop playing through' : 'Play the game through'}
+                label={playing ? t`Stop playing through` : t`Play the game through`}
                 hint="Space"
                 last
                 // Spent at the end of the game, like the ⏭ beside it: there is nothing left
@@ -737,7 +746,7 @@ export function BoardPanel({
           */}
           <div className="flex flex-none overflow-hidden rounded-md border border-edge bg-elevated">
             <TransportButton
-              label="Previous flagged move"
+              label={t`Previous flagged move`}
               hint="↑"
               disabled={previousFlagged == null}
               onClick={() => previousFlagged != null && onSeek(previousFlagged)}
@@ -748,7 +757,7 @@ export function BoardPanel({
               </span>
             </TransportButton>
             <TransportButton
-              label="Next flagged move"
+              label={t`Next flagged move`}
               hint="↓"
               last
               disabled={nextFlagged == null}
@@ -801,6 +810,7 @@ function PlayerRow({
   game: GameSummary | null | undefined
   material: MaterialBalance
 }) {
+  const { t } = useLingui()
   if (!game) return null
 
   const name = side === 'white' ? game.white : game.black
@@ -809,6 +819,8 @@ function PlayerRow({
   // two rows read `♗ +3` and `−3` rather than the same number twice with the reader doing
   // the flip. Equal takings have already cancelled there: only the surplus is drawn.
   const { captured, advantage } = side === 'white' ? material.white : material.black
+  // The shortfall as a positive number, so the title reads "Down 3" and not "Down −3".
+  const deficit = -advantage
   const owner = game.color === side
 
   return (
@@ -824,7 +836,7 @@ function PlayerRow({
       <span
         className={cn('min-w-0 truncate text-[0.75rem]', owner ? 'font-medium text-ink' : 'text-soft')}
       >
-        {name ?? 'unknown'}
+        {name ?? t({ message: 'unknown', comment: 'Stands in for a player the game does not name' })}
       </span>
       <span className="flex-none font-mono text-[0.6875rem] tabular text-dim">{rating ?? '—'}</span>
       {captured.length > 0 ? (
@@ -841,7 +853,7 @@ function PlayerRow({
             'flex-none font-mono text-[0.6875rem] tabular',
             advantage > 0 ? 'text-soft' : 'text-faint',
           )}
-          title={advantage > 0 ? `Up ${advantage} in material` : `Down ${-advantage} in material`}
+          title={advantage > 0 ? t`Up ${advantage} in material` : t`Down ${deficit} in material`}
         >
           {advantage > 0 ? `+${advantage}` : `−${-advantage}`}
         </span>
@@ -881,32 +893,43 @@ function AnalysisTierButton({
   error: Error | null
   onRequest: () => void
 }) {
+  const { t } = useLingui()
   const percent =
     spinning && progress && progress.total > 0
       ? Math.round((progress.done / progress.total) * 100)
       : null
 
+  // `label` stays the tier's own name — it is what the caller names the button by, and what
+  // the two tooltips below are picked with. Only what is drawn and read is translated, and
+  // each sentence is whole rather than assembled around a translated word.
+  const tierName = label === 'Quick' ? t`Quick` : t`Deep`
+
   const buttonLabel = spinning ? (
     <>
       <Loader2 className="size-3 animate-spin" aria-hidden />
-      {percent !== null ? `${percent}%` : label}
+      {percent !== null ? `${percent}%` : tierName}
     </>
   ) : finishedRun ? (
     <>
       <Check className="size-3" aria-hidden />
-      {label}
+      {tierName}
     </>
   ) : (
-    label
+    tierName
   )
 
+  const state = activeRun?.status === 'running' ? t`Analysing` : t`Queued`
   const tooltip = spinning
-    ? `${activeRun?.status === 'running' ? 'Analysing' : 'Queued'}${activeRun ? ` · ${activeRun.tier}` : ''}`
+    ? `${state}${activeRun ? ` · ${activeRun.tier}` : ''}`
     : error
       ? error.message
       : finishedRun
-        ? `${label} analysis complete — click to re-run`
-        : `Queue a ${label.toLowerCase()} analysis pass over this game`
+        ? label === 'Quick'
+          ? t`Quick analysis complete — click to re-run`
+          : t`Deep analysis complete — click to re-run`
+        : label === 'Quick'
+          ? t`Queue a quick analysis pass over this game`
+          : t`Queue a deep analysis pass over this game`
 
   return (
     <Tooltip>

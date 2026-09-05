@@ -1,3 +1,5 @@
+import { Trans, useLingui } from '@lingui/react/macro'
+
 import { EvalText } from '@/components/badges/EvalText'
 import type { EngineLine, SampleResponse } from '@/lib/api/types'
 import { formatNodes } from '@/lib/chess/evaluation'
@@ -38,7 +40,11 @@ function Pv({ line }: { line: EngineLine }) {
  * differently — purple, per the palette.
  */
 export function SampleResult({ sample }: { sample: SampleResponse }) {
+  const { t } = useLingui()
   const lines = sample.lines ?? []
+  const elapsed = sample.elapsed_ms
+  const nodes = formatNodes(sample.nodes)
+  const depth = sample.depth ? `d${sample.depth}` : '—'
   const policy = policyEntries(sample.policy as Record<string, unknown> | null | undefined)
 
   return (
@@ -56,18 +62,22 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
           {sample.kind}
         </span>
         <div className="flex-1" />
-        <span className="font-mono text-[0.65625rem] text-dim tabular">{sample.elapsed_ms} ms</span>
+        <span className="font-mono text-[0.65625rem] text-dim tabular">
+          <Trans>{elapsed} ms</Trans>
+        </span>
       </div>
 
       {sample.kind === 'maia' ? (
         <div className="flex flex-col gap-2">
           {policy.length === 0 ? (
-            <p className="text-[0.71875rem] text-dim">The model returned no policy.</p>
+            <p className="text-[0.71875rem] text-dim">
+              <Trans>The model returned no policy.</Trans>
+            </p>
           ) : null}
           {policy.map(([level, moves]) => (
             <div key={level} className="flex flex-col gap-1">
               <span className="font-mono text-[0.65625rem] text-dim">
-                {level === 'any' ? 'policy' : `rating ${level}`}
+                {level === 'any' ? t`policy` : t`rating ${level}`}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {moves.slice(0, 5).map((move, index) => (
@@ -95,7 +105,9 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
               className="text-[1.25rem] font-semibold"
             />
             <span className="font-mono text-[0.6875rem] text-dim tabular">
-              {sample.depth ? `d${sample.depth}` : '—'} · {formatNodes(sample.nodes)} nodes
+              <Trans>
+                {depth} · {nodes} nodes
+              </Trans>
             </span>
             <div className="flex-1" />
             {sample.best_move ? (

@@ -12,13 +12,14 @@
  * reverse proxy in front of the container can strip them, and a button that simply vanishes
  * when that happens leaves the owner with no cause to look at. So a page with no isolation
  * still gets the button, still gets `threadPlan().threads === 1`, and — if the module then
- * refuses to start for want of shared memory — gets `ISOLATION_HINT` as the reason, which
+ * refuses to start for want of shared memory — gets `isolationHint()` as the reason, which
  * names the proxy rather than blaming the browser. Being told what to fix beats being shown
  * nothing.
  *
  * Everything takes its environment as an argument so a test can state one instead of
  * standing up a DOM.
  */
+import { t } from '@lingui/core/macro'
 
 export interface RunnerSupport {
   supported: boolean
@@ -47,11 +48,13 @@ export const THREAD_CAP = 8
  * Quoted by `client.ts` when the module will not start and the page is not isolated: the
  * build is a pthread build, so without a `SharedArrayBuffer` it cannot allocate its memory
  * at all — not even single-threaded. The cause is almost never the browser.
+ *
+ * A function rather than a constant now that it is a translated sentence: a constant would
+ * be resolved at import, in whatever language happened to be loaded then.
  */
-export const ISOLATION_HINT =
-  'this page is not cross-origin isolated, so the browser will not give it the shared ' +
-  'memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse ' +
-  'proxy in front of it is most likely stripping them — see docs/deploy.md'
+export function isolationHint(): string {
+  return t`this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md`
+}
 
 /** The little of `globalThis` this file reads. */
 export interface RunnerEnvironment {
@@ -73,19 +76,19 @@ export function browserRunnerSupport(env: RunnerEnvironment = globalThis): Runne
   if (typeof env.WebAssembly === 'undefined') {
     return {
       supported: false,
-      reason: 'this browser has no WebAssembly, so it cannot run an engine',
+      reason: t`this browser has no WebAssembly, so it cannot run an engine`,
     }
   }
   if (typeof env.Worker === 'undefined') {
     return {
       supported: false,
-      reason: 'this browser has no web workers, so the engine has nothing to run on',
+      reason: t`this browser has no web workers, so the engine has nothing to run on`,
     }
   }
   if (typeof env.WebSocket === 'undefined') {
     return {
       supported: false,
-      reason: 'this browser has no WebSocket, so it cannot be dispatched work',
+      reason: t`this browser has no WebSocket, so it cannot be dispatched work`,
     }
   }
   return { supported: true, reason: null }

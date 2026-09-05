@@ -34,6 +34,9 @@
  * somebody deletes a branch they meant to visit. Deleting takes two clicks on the same
  * button rather than a `window.confirm`, which the rest of the app does not use either.
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import type { Api } from '@lichess-org/chessground/api'
 import { MessageSquare } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -75,7 +78,17 @@ const FLASH_MS = 2000
 /** One indent step per sideline depth, in rem. */
 const INDENT_REM = 0.875
 
+/**
+ * The two sides as the colour toggle writes them: lower case, in the mono face, the way
+ * the explorer's segmented control sets its own options.
+ */
+const COLOR_WORDS: Record<Color, MessageDescriptor> = {
+  white: msg({ message: 'white', context: 'repertoire toggle' }),
+  black: msg({ message: 'black', context: 'repertoire toggle' }),
+}
+
 export function RepertoirePage() {
+  const { t } = useLingui()
   const [params, setParams] = useSearchParams()
 
   const color: Color = params.get('color') === 'black' ? 'black' : 'white'
@@ -226,11 +239,12 @@ export function RepertoirePage() {
 
   const orientation = flipped ? (color === 'white' ? 'black' : 'white') : color
   const writeError = add.error ?? update.error ?? remove.error
+  const ply = line.ply
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome
-        breadcrumb={[{ label: 'Explorer', to: '/explorer' }, { label: 'Repertoire' }]}
+        breadcrumb={[{ label: t`Explorer`, to: '/explorer' }, { label: t`Repertoire` }]}
       />
 
       {/*
@@ -242,8 +256,15 @@ export function RepertoirePage() {
         <div className="flex w-[31.25rem] flex-none flex-col gap-3.5 max-md:w-full">
           <div className="flex flex-col gap-[0.4375rem]">
             <div className="flex items-center gap-2.5">
+              {/* The two repertoires are named whole rather than by a colour dropped into
+                  a shared frame: an adjective before a noun agrees with it in most
+                  languages, and there are only ever two of these. */}
               <h1 className="text-[0.9375rem] font-semibold text-ink">
-                {color === 'white' ? 'White repertoire' : 'Black repertoire'}
+                {color === 'white' ? (
+                  <Trans>White repertoire</Trans>
+                ) : (
+                  <Trans>Black repertoire</Trans>
+                )}
               </h1>
               <div className="flex-1" />
               <ColorToggle color={color} onChange={setColor} />
@@ -270,7 +291,7 @@ export function RepertoirePage() {
             <div className="flex overflow-hidden rounded-md border border-edge bg-elevated">
               <button
                 type="button"
-                aria-label="Back one move"
+                aria-label={t`Back one move`}
                 onClick={back}
                 disabled={line.steps.length === 0}
                 className="border-r border-edge px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink disabled:text-faint-2 disabled:hover:bg-transparent"
@@ -279,7 +300,7 @@ export function RepertoirePage() {
               </button>
               <button
                 type="button"
-                aria-label="Forward one move"
+                aria-label={t`Forward one move`}
                 onClick={forward}
                 className="px-2.5 py-1 text-xs text-soft transition-colors hover:bg-selected hover:text-ink"
               >
@@ -291,7 +312,7 @@ export function RepertoirePage() {
               onClick={() => setFlipped((was) => !was)}
               className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
             >
-              ⇅ Flip
+              ⇅ <Trans>Flip</Trans>
             </button>
             {line.steps.length > 0 ? (
               <button
@@ -299,12 +320,16 @@ export function RepertoirePage() {
                 onClick={() => setLine([])}
                 className="rounded-md border border-edge bg-elevated px-2.5 py-1 text-xs text-soft transition-colors hover:text-ink"
               >
-                Reset
+                <Trans>Reset</Trans>
               </button>
             ) : null}
             <div className="flex-1" />
             <span className="font-mono text-[0.6875rem] tabular text-dim">
-              {line.turn} to move · ply {line.ply}
+              {line.turn === 'white' ? (
+                <Trans>white to move · ply {ply}</Trans>
+              ) : (
+                <Trans>black to move · ply {ply}</Trans>
+              )}
             </span>
           </div>
 
@@ -324,14 +349,18 @@ export function RepertoirePage() {
           {tree.isSuccess && !onBook && writes === 0 && !tree.isFetching ? (
             <div className="flex items-center gap-2.5 rounded-[0.5625rem] border border-mistake/28 bg-mistake/5 px-3 py-2.5">
               <p className="flex-1 text-[0.78125rem] leading-relaxed text-soft">
-                This line is not in your {color} repertoire yet.
+                {color === 'white' ? (
+                  <Trans>This line is not in your white repertoire yet.</Trans>
+                ) : (
+                  <Trans>This line is not in your black repertoire yet.</Trans>
+                )}
               </p>
               <button
                 type="button"
                 onClick={() => store(ucis)}
                 className="flex-none rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
               >
-                Add this line
+                <Trans>Add this line</Trans>
               </button>
             </div>
           ) : null}
@@ -364,36 +393,50 @@ export function RepertoirePage() {
         <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto max-md:flex-none max-md:overflow-visible">
           <div className="flex flex-none items-center gap-2.5">
             <span className="text-[0.75rem] font-semibold text-ink">
-              Your {color} repertoire
+              {color === 'white' ? (
+                <Trans>Your white repertoire</Trans>
+              ) : (
+                <Trans>Your black repertoire</Trans>
+              )}
             </span>
             <div className="flex-1" />
             <span className="font-mono text-[0.6875rem] tabular text-dim">
-              {total} {total === 1 ? 'move' : 'moves'}
+              <Plural value={total} one="# move" other="# moves" />
             </span>
           </div>
 
           {tree.isError ? (
             <div className="flex flex-col items-start gap-2.5 rounded-xl border border-blunder/28 bg-blunder/5 p-5">
               <span className="text-[0.75rem] font-semibold text-blunder">
-                Could not read the repertoire
+                <Trans>Could not read the repertoire</Trans>
               </span>
               <p className="text-[0.78125rem] leading-relaxed text-soft">
-                {tree.error?.message ?? 'The backend did not answer.'}
+                {tree.error?.message ?? t`The backend did not answer.`}
               </p>
               <button
                 type="button"
                 onClick={() => void tree.refetch()}
                 className="rounded-md border border-edge-input px-2.5 py-1 text-[0.71875rem] text-soft hover:border-edge-hover hover:text-ink"
               >
-                Try again
+                <Trans>Try again</Trans>
               </button>
             </div>
           ) : rows.length === 0 ? (
             <div className="rounded-[0.5625rem] border border-dashed border-edge-strong bg-panel/60 px-5 py-8 text-center">
               <p className="text-[0.78125rem] leading-relaxed text-dim">
-                {tree.isPending
-                  ? 'Reading your repertoire…'
-                  : `Nothing here yet. Play moves on the board to start your ${color} repertoire — every move you play is saved as you go.`}
+                {tree.isPending ? (
+                  <Trans>Reading your repertoire…</Trans>
+                ) : color === 'white' ? (
+                  <Trans>
+                    Nothing here yet. Play moves on the board to start your white repertoire —
+                    every move you play is saved as you go.
+                  </Trans>
+                ) : (
+                  <Trans>
+                    Nothing here yet. Play moves on the board to start your black repertoire —
+                    every move you play is saved as you go.
+                  </Trans>
+                )}
               </p>
             </div>
           ) : (
@@ -424,6 +467,7 @@ function continuationIsMain(
 
 /** Which repertoire is on screen. The explorer's segmented control, with two options. */
 function ColorToggle({ color, onChange }: { color: Color; onChange: (next: Color) => void }) {
+  const { i18n } = useLingui()
   const options: Color[] = ['white', 'black']
   return (
     <div className="flex overflow-hidden rounded-md border border-edge font-mono text-[0.6875rem]">
@@ -439,7 +483,7 @@ function ColorToggle({ color, onChange }: { color: Color; onChange: (next: Color
             color === option ? 'bg-selected text-ink' : 'text-dim hover:text-ink',
           )}
         >
-          {option}
+          {i18n._(COLOR_WORDS[option])}
         </button>
       ))}
     </div>
@@ -470,6 +514,7 @@ function NodeEditor({
   onPromote: () => void
   onDelete: () => void
 }) {
+  const { t } = useLingui()
   const [text, setText] = useState('')
   const [flash, setFlash] = useState(0)
   const [confirming, setConfirming] = useState(false)
@@ -494,13 +539,18 @@ function NodeEditor({
   if (!node) {
     return (
       <div className="flex flex-none flex-col gap-[0.4375rem] rounded-[0.5625rem] border border-line bg-panel p-[0.8125rem]">
-        <span className="text-[0.75rem] font-semibold text-ink">No move selected</span>
+        <span className="text-[0.75rem] font-semibold text-ink">
+          <Trans>No move selected</Trans>
+        </span>
         <p className="text-[0.78125rem] leading-relaxed text-dim">
-          Play a move on the board, or pick one from the tree, to comment on it.
+          <Trans>Play a move on the board, or pick one from the tree, to comment on it.</Trans>
         </p>
       </div>
     )
   }
+
+  // Named, because the identifier is the placeholder a translator sees.
+  const san = node.san
 
   function commit() {
     if (abandoned.current) {
@@ -521,11 +571,13 @@ function NodeEditor({
     <div className="flex flex-none flex-col gap-[0.4375rem] rounded-[0.5625rem] border border-line bg-panel p-[0.8125rem]">
       <div className="flex items-center gap-2">
         <span className="text-[0.75rem] font-semibold text-ink">
-          <span className="font-mono">{node.san}</span> — your note on this move
+          <Trans>
+            <span className="font-mono">{san}</span> — your note on this move
+          </Trans>
         </span>
         {flash ? (
           <span role="status" className="text-[0.625rem] text-good">
-            saved
+            <Trans>saved</Trans>
           </span>
         ) : null}
       </div>
@@ -543,8 +595,8 @@ function NodeEditor({
             event.currentTarget.blur()
           }
         }}
-        placeholder="Why this move? It saves when you click away."
-        aria-label={`Comment on ${node.san}`}
+        placeholder={t`Why this move? It saves when you click away.`}
+        aria-label={t`Comment on ${san}`}
         className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-[0.78125rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
       />
 
@@ -555,7 +607,7 @@ function NodeEditor({
             onClick={onPromote}
             className="rounded-md border border-edge px-2 py-[0.1875rem] text-[0.6875rem] text-soft hover:border-edge-hover hover:text-ink"
           >
-            Promote to main
+            <Trans>Promote to main</Trans>
           </button>
         )}
         <div className="flex-1" />
@@ -578,7 +630,7 @@ function NodeEditor({
               : 'border-edge text-soft hover:border-edge-hover hover:text-blunder',
           )}
         >
-          {confirming ? 'Confirm — delete branch' : 'Delete branch'}
+          {confirming ? <Trans>Confirm — delete branch</Trans> : <Trans>Delete branch</Trans>}
         </button>
       </div>
     </div>
@@ -603,11 +655,12 @@ function MoveTree({
   selected: number | null
   onJump: (path: string[]) => void
 }) {
+  const { t } = useLingui()
   return (
     <div
       className="flex flex-col gap-px font-mono text-[0.78125rem]"
       role="tree"
-      aria-label="Repertoire moves"
+      aria-label={t`Repertoire moves`}
     >
       {rows.map((row) => {
         const active = row.node.id === selected
@@ -636,7 +689,7 @@ function MoveTree({
             {row.node.comment ? (
               <MessageSquare
                 role="img"
-                aria-label="has a comment"
+                aria-label={t`has a comment`}
                 className="size-2.5 flex-none text-accent-teal"
               />
             ) : null}

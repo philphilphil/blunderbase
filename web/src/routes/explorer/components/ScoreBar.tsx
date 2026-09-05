@@ -1,5 +1,7 @@
 /** The win / draw / loss bar and its reference twin, one skeleton at one size.
  *  Heights are `rem` so the bars grow with the app's scale. */
+import { useLingui } from '@lingui/react/macro'
+
 import { cn } from '@/lib/utils'
 
 import type { Split } from '../stats'
@@ -73,9 +75,11 @@ export function ScoreBar({
   className?: string
   height?: string
 }) {
+  const { t } = useLingui()
+  const { wins, draws, losses } = split
   return (
     <LabeledBar
-      label={`${split.wins} wins, ${split.draws} draws, ${split.losses} losses`}
+      label={t`${wins} wins, ${draws} draws, ${losses} losses`}
       segments={[
         { share: split.winPercent, className: 'bg-good text-good-ink' },
         { share: split.drawPercent, className: 'bg-faint text-side-black' },
@@ -118,11 +122,12 @@ export function SidesBar({
   className?: string
   height?: string
 }) {
+  const { t } = useLingui()
   const total = white + draws + black
   const share = (value: number) => (total > 0 ? (value / total) * 100 : 0)
   return (
     <LabeledBar
-      label={`${white} white wins, ${draws} draws, ${black} black wins`}
+      label={t`${white} white wins, ${draws} draws, ${black} black wins`}
       segments={[
         { share: share(white), className: 'bg-side-white text-side-black' },
         { share: share(draws), className: 'bg-faint text-side-black' },

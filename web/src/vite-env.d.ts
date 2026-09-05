@@ -13,3 +13,9 @@ interface ImportMeta {
 
 /** `web/package.json`'s version, substituted at build time by `define` in vite.config.ts. */
 declare const __APP_VERSION__: string
+
+/** A message catalog, compiled on import by `@lingui/vite-plugin`. */
+declare module '*.po' {
+  import type { Messages } from '@lingui/core'
+  export const messages: Messages
+}

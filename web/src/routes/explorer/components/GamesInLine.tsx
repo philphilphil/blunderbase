@@ -2,6 +2,7 @@
  * Design 2c's "games in this line": the games that actually reached this position, from
  * `/explorer/positions`, each one a link into the game view.
  */
+import { Trans } from '@lingui/react/macro'
 import { useNavigate } from 'react-router-dom'
 
 import { Skeleton } from '@/components/ui/skeleton'
@@ -27,7 +28,9 @@ export function GamesInLine({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 max-md:flex-none">
       <div className="flex items-baseline gap-2">
-        <span className="text-[0.75rem] font-semibold text-ink">Games in this line</span>
+        <span className="text-[0.75rem] font-semibold text-ink">
+          <Trans>Games in this line</Trans>
+        </span>
         <div className="flex-1" />
         {onOpenLibrary && total > 0 ? (
           <button
@@ -35,7 +38,7 @@ export function GamesInLine({
             onClick={onOpenLibrary}
             className="text-[0.6875rem] text-accent-teal hover:text-accent-link"
           >
-            open in library
+            <Trans>open in library</Trans>
           </button>
         ) : null}
       </div>
@@ -48,7 +51,7 @@ export function GamesInLine({
         </div>
       ) : games.length === 0 ? (
         <p className="rounded-[0.3125rem] border border-dashed border-edge-strong px-3 py-5 text-center text-[0.75rem] text-dim">
-          Nothing has reached this position yet.
+          <Trans>Nothing has reached this position yet.</Trans>
         </p>
       ) : (
         // The list scrolls inside the right-hand pane on desktop; below `md` the page is

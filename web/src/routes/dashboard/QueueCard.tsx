@@ -2,13 +2,16 @@
  * Design 2a, "Analysis queue" — the counts from `/analysis/queue` over the per-run rows
  * the `/events` socket carries (see `useRunActivity`).
  */
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from 'react-router-dom'
 
 import { QueueDestinations } from '@/components/shell/QueueDestinations'
 import { QueueMeter } from '@/components/shell/QueueMeter'
 import { SectionHead } from '@/components/shell/Section'
 import { useGames, useMaiaFill, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
-import type { RunStatus } from '@/lib/api/types'
+import type { RunStatus, Tier } from '@/lib/api/types'
 import { TIER_STYLES } from '@/lib/chess/classification'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -38,6 +41,23 @@ const DOT: Record<RunStatus, string> = {
   failed: 'bg-blunder',
 }
 
+/**
+ * A row's own words for a tier and a status. Lower case and one word each, because they are
+ * chips in a 10.5px column rather than headings — `TIER_STYLES.label` is the sentence-case
+ * name the rest of the app uses and would read as a different control here.
+ */
+const TIER_WORD: Record<Tier, MessageDescriptor> = {
+  quick: msg`quick`,
+  deep: msg`deep`,
+}
+
+const STATUS_WORD: Record<RunStatus, MessageDescriptor> = {
+  queued: msg`queued`,
+  running: msg`running`,
+  done: msg`done`,
+  failed: msg`failed`,
+}
+
 function RunRow({
   run,
   label,
@@ -50,6 +70,7 @@ function RunRow({
   retrying: boolean
 }) {
   const style = TIER_STYLES[run.tier]
+  const { t, i18n } = useLingui()
   return (
     <div
       className={cn(
@@ -67,18 +88,18 @@ function RunRow({
         {label}
       </span>
       <span
-        title={run.maiaOnly ? 'the missing Maia levels only; nothing is searched' : undefined}
+        title={run.maiaOnly ? t`the missing Maia levels only; nothing is searched` : undefined}
         className={cn(
           'rounded-sm border px-1.5 py-px text-[0.59375rem]',
           run.maiaOnly ? MAIA_CHIP : style.chipClass,
         )}
       >
-        {run.maiaOnly ? 'maia' : run.tier}
+        {run.maiaOnly ? 'maia' : i18n._(TIER_WORD[run.tier])}
       </span>
       {run.status === 'failed' ? (
         <>
           <span className="font-mono text-[0.65625rem] text-blunder" title={run.error ?? undefined}>
-            failed
+            <Trans>failed</Trans>
           </span>
           <button
             type="button"
@@ -86,7 +107,7 @@ function RunRow({
             disabled={retrying || run.gameId === null}
             className="text-[0.65625rem] text-accent-teal hover:text-accent-link disabled:opacity-50"
           >
-            {retrying ? 'queued' : 'retry'}
+            {retrying ? t`queued` : t`retry`}
           </button>
         </>
       ) : (
@@ -102,9 +123,9 @@ function RunRow({
         >
           {run.status === 'running'
             ? run.progress === null
-              ? 'running'
+              ? i18n._(STATUS_WORD.running)
               : `${run.progress}%`
-            : run.status}
+            : i18n._(STATUS_WORD[run.status])}
         </span>
       )}
     </div>
@@ -112,6 +133,7 @@ function RunRow({
 }
 
 export function QueueCard() {
+  const { t } = useLingui()
   const queue = useQueueStatus()
   const activity = useRunActivity()
   // Only to put a name on a run's game; the rows stand without it.
@@ -130,22 +152,25 @@ export function QueueCard() {
   const workersOff = queue.data?.workers === false
   const destinations = queue.data?.destinations ?? []
 
+  /** What a run is called when nothing knows the opponent — the id, and the word for it. */
+  const gameLabel = (id: number) => t`Game #${id}`
+
   const names = new Map<number, string>(
-    (games.data?.games ?? []).map((game) => [game.id, game.opponent ?? `Game #${game.id}`]),
+    (games.data?.games ?? []).map((game) => [game.id, game.opponent ?? gameLabel(game.id)]),
   )
   const shown = activity.slice(0, ROWS)
   const hidden = Math.max(0, queued - shown.filter((run) => run.status === 'queued').length)
 
   const state = workersOff
-    ? { label: 'workers idle', tone: 'text-mistake', dot: 'bg-mistake' }
+    ? { label: t`workers idle`, tone: 'text-mistake', dot: 'bg-mistake' }
     : running > 0
-      ? { label: 'running', tone: 'text-accent-teal', dot: 'bg-accent-teal' }
-      : { label: 'idle', tone: 'text-dim-2', dot: 'bg-faint' }
+      ? { label: t`running`, tone: 'text-accent-teal', dot: 'bg-accent-teal' }
+      : { label: t`idle`, tone: 'text-dim-2', dot: 'bg-faint' }
 
   return (
     <section className="flex flex-none flex-col gap-2">
       <SectionHead
-        title="Analysis queue"
+        title={t`Analysis queue`}
         detail={
           <span className={cn('inline-flex items-center gap-1.5', state.tone)}>
             <span className={cn('size-[0.3125rem] rounded-full', state.dot)} />
@@ -190,8 +215,8 @@ export function QueueCard() {
                   run={run}
                   label={
                     run.gameId === null
-                      ? 'ad-hoc position'
-                      : (names.get(run.gameId) ?? `Game #${run.gameId}`)
+                      ? t`ad-hoc position`
+                      : (names.get(run.gameId) ?? gameLabel(run.gameId))
                   }
                   retrying={run.maiaOnly ? refill.isPending : retry.isPending}
                   onRetry={() => {
@@ -202,28 +227,36 @@ export function QueueCard() {
                 />
               ))}
               {hidden > 0 ? (
-                <div className="px-1 py-1.5 text-[0.6875rem] text-dim-2">+ {hidden} more queued</div>
+                <div className="px-1 py-1.5 text-[0.6875rem] text-dim-2">
+                  <Trans>+ {hidden} more queued</Trans>
+                </div>
               ) : null}
             </div>
           ) : outstanding > 0 ? (
             <p className="text-[0.6875rem] leading-relaxed text-dim-2">
-              {queued} queued and {running} running. Individual runs appear here as the socket
-              reports them.
+              <Trans>
+                {queued} queued and {running} running. Individual runs appear here as the
+                socket reports them.
+              </Trans>
             </p>
           ) : (
             <p className="text-[0.6875rem] leading-relaxed text-dim-2">
-              Nothing outstanding.{' '}
-              <Link to="/games" className="text-accent-teal hover:text-accent-link">
-                Pick a game
-              </Link>{' '}
-              to put something in.
+              <Trans>
+                Nothing outstanding.{' '}
+                <Link to="/games" className="text-accent-teal hover:text-accent-link">
+                  Pick a game
+                </Link>{' '}
+                to put something in.
+              </Trans>
             </p>
           )}
 
           {workersOff ? (
             <p className="border-t border-hairline pt-2.5 text-[0.6875rem] leading-relaxed text-mistake">
-              This process is not draining the queue. Runs will sit there until a worker picks them
-              up.
+              <Trans>
+                This process is not draining the queue. Runs will sit there until a worker
+                picks them up.
+              </Trans>
             </p>
           ) : null}
         </>

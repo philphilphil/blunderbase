@@ -1,3 +1,4 @@
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, Loader2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 
@@ -20,6 +21,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   const [confirm, setConfirm] = useState('')
   const [invalid, setInvalid] = useState<string | null>(null)
   const change = useChangePassword()
+  const { t } = useLingui()
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -32,7 +34,9 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault()
     if (change.isPending) return
-    const problem = current ? passwordProblem(next, confirm) : 'the current password is missing'
+    const problem = current
+      ? passwordProblem(next, confirm)
+      : t`the current password is missing`
     setInvalid(problem)
     if (problem) return
     change.mutate({ current, next })
@@ -58,11 +62,13 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
       >
         <div className="flex flex-col gap-1.5">
           <h2 id="change-password-title" className="text-[0.875rem] font-semibold text-ink">
-            Change the password
+            <Trans>Change the password</Trans>
           </h2>
           <p className="text-[0.75rem] leading-[1.65] text-dim">
-            Every other browser is signed out, and the MCP bearer key changes with it — the
-            coach reconnects with the new one. This browser stays signed in.
+            <Trans>
+              Every other browser is signed out, and the MCP bearer key changes with it —
+              the coach reconnects with the new one. This browser stays signed in.
+            </Trans>
           </p>
         </div>
 
@@ -71,18 +77,18 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
             <div className="flex items-center gap-2.5 rounded-md border border-good/30 bg-good/8 px-3 py-2.5">
               <Check className="size-3.5 flex-none text-good" aria-hidden />
               <span className="text-[0.71875rem] text-good">
-                Changed. You are still signed in here.
+                <Trans>Changed. You are still signed in here.</Trans>
               </span>
             </div>
             <Button type="button" onClick={onClose}>
-              Close
+              <Trans>Close</Trans>
             </Button>
           </>
         ) : (
           <form onSubmit={submit} className="flex flex-col gap-4">
             <PasswordField
               id="current-password"
-              label="Current password"
+              label={t`Current password`}
               value={current}
               onChange={(value) => {
                 setCurrent(value)
@@ -95,7 +101,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
             />
             <PasswordField
               id="next-password"
-              label="New password"
+              label={t`New password`}
               value={next}
               onChange={(value) => {
                 setNext(value)
@@ -107,7 +113,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
             />
             <PasswordField
               id="next-password-confirm"
-              label="Repeat the new one"
+              label={t`Repeat the new one`}
               value={confirm}
               onChange={(value) => {
                 setConfirm(value)
@@ -122,11 +128,11 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
 
             <div className="flex items-center justify-end gap-2">
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                <Trans>Cancel</Trans>
               </Button>
               <Button type="submit" disabled={change.isPending}>
                 {change.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-                Change it
+                <Trans>Change it</Trans>
               </Button>
             </div>
           </form>
