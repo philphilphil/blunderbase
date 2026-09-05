@@ -10,11 +10,12 @@ from sqlalchemy import inspect, select
 
 from backend.api.app import create_app
 from backend.config import Settings
-from backend.db.enums import Color, Result, RunStatus, Source, Tier
+from backend.db.enums import Color, JobStatus, Result, RunStatus, Source, Tier
 from backend.db.migrate import upgrade_to_head
-from backend.db.models import AnalysisRun, Game, MoveEval
+from backend.db.models import AnalysisRun, Game, ImportJob, MoveEval
 from backend.db.session import get_engine, get_sessionmaker
-from tests.conftest import running_app
+from backend.services import import_service
+from tests.conftest import OWNER_PASSWORD, running_app
 
 INDEX = "<!doctype html><title>Blunderbase</title><div id=root></div>"
 ASSET = "console.log('blunderbase')"
@@ -39,6 +40,54 @@ def test_health_is_served_and_the_database_is_migrated(settings: Settings) -> No
     with running_app(create_app(settings)) as client:
         assert client.get("/health").json() == {"status": "ok"}
     assert inspect(get_engine(settings)).has_table("games")
+
+
+def test_startup_recovers_interrupted_imports_and_keeps_their_games(settings: Settings) -> None:
+    settings.analysis_workers = False
+    upgrade_to_head(settings)
+    pgn = '[White "Alice"]\n[Black "Bob"]\n[Result "1-0"]\n\n1. e4 e5 1-0\n'
+    with get_sessionmaker(settings)() as session:
+        completed = ImportJob(source=Source.PGN, status=JobStatus.DONE, cursor="safe")
+        session.add(completed)
+        session.commit()
+        job = import_service.run_import(session, "pgn", text=pgn, analyze=False)
+        assert job.games_imported == 1
+        job.status = JobStatus.RUNNING
+        job.finished_at = None
+        job.cursor = "unfinished"
+        session.commit()
+        job_id, completed_id = job.id, completed.id
+
+    with running_app(create_app(settings)) as client:
+        recovered = client.get(f"/api/import/jobs/{job_id}").json()
+        assert recovered["status"] == "failed"
+        assert recovered["finished_at"] is not None
+        assert "interrupted" in recovered["message"].lower()
+        assert recovered["games_imported"] == 1
+        with get_sessionmaker(settings)() as session:
+            assert session.get(ImportJob, completed_id).status == JobStatus.DONE
+            assert import_service.latest_cursor(session, "pgn") == "safe"
+        retry = client.post("/api/import/pgn/upload?wait=true&analyze=false", content=pgn)
+        assert retry.status_code == 200
+        assert retry.json()["job"]["games_skipped"] == 1
+        assert retry.json()["job"]["games_failed"] == 0
+
+    with running_app(create_app(settings), password=None) as client:
+        assert client.post("/auth/login", json={"password": OWNER_PASSWORD}).status_code == 200
+        assert client.get(f"/api/import/jobs/{job_id}").json() == recovered
+
+
+def test_demo_startup_does_not_rewrite_import_history(settings: Settings) -> None:
+    settings.runtime_mode = "demo"
+    upgrade_to_head(settings)
+    with get_sessionmaker(settings)() as session:
+        job = ImportJob(source=Source.PGN, status=JobStatus.RUNNING)
+        session.add(job)
+        session.commit()
+        job_id = job.id
+    with TestClient(create_app(settings)):
+        with get_sessionmaker(settings)() as session:
+            assert session.get(ImportJob, job_id).status == JobStatus.RUNNING
 
 
 def test_health_is_answered_on_the_event_loop(settings: Settings) -> None:

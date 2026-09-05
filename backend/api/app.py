@@ -21,7 +21,7 @@ from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_engine, get_sessionmaker
 from backend.runtime import capabilities_for
-from backend.services import explorer, maia_live, stats
+from backend.services import explorer, import_service, maia_live, stats
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers
@@ -66,6 +66,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("database pool ready: %s", get_engine(settings).pool.status())
     _clear_stale_connections(settings)
     capabilities = capabilities_for(settings)
+    if not capabilities.read_only:
+        with get_sessionmaker(settings)() as session:
+            recovered = import_service.recover_interrupted_jobs(session)
+        if recovered:
+            logger.info("recovered %s interrupted import(s)", recovered)
     if capabilities.mcp:
         _mount_mcp(app, settings)
     app.state.loop = asyncio.get_running_loop()

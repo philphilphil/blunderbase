@@ -23,11 +23,15 @@ UV_CACHE_DIR="$repo_dir/.uv-desktop-cache" uv run --with pyinstaller pyinstaller
   --paths "$repo_dir" \
   --collect-submodules backend \
   --add-data "$repo_dir/backend/migrations:backend/migrations" \
+  --add-data "$repo_dir/backend/data:backend/data" \
   --add-data "$repo_dir/web/dist:web/dist" \
   --distpath "$pyinstaller_dir/dist" \
   --workpath "$pyinstaller_dir/work" \
   --specpath "$pyinstaller_dir/spec" \
   "$desktop_dir/backend_entry.py"
+
+UV_CACHE_DIR="$repo_dir/.uv-desktop-cache" uv run python "$desktop_dir/scripts/smoke-backend.py" \
+  "$pyinstaller_dir/dist/blunderbase-desktop/blunderbase-desktop"
 
 cd "$desktop_dir"
 pnpm exec tauri icon "$repo_dir/docs/design/brand/logo.png" --output "$tauri_dir/icons"

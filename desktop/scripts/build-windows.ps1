@@ -28,6 +28,7 @@ New-Item -ItemType Directory -Force -Path $buildDirectories | Out-Null
 
 $env:UV_CACHE_DIR = Join-Path $repoDir ".uv-desktop-cache"
 $migrationData = "$(Join-Path $repoDir 'backend/migrations');backend/migrations"
+$openingData = "$(Join-Path $repoDir 'backend/data');backend/data"
 $webData = "$(Join-Path $repoDir 'web/dist');web/dist"
 
 Push-Location $repoDir
@@ -41,11 +42,15 @@ try {
         --paths $repoDir `
         --collect-submodules backend `
         --add-data $migrationData `
+        --add-data $openingData `
         --add-data $webData `
         --distpath (Join-Path $pyinstallerDir "dist") `
         --workpath (Join-Path $pyinstallerDir "work") `
         --specpath (Join-Path $pyinstallerDir "spec") `
         (Join-Path $desktopDir "backend_entry.py")
+
+    uv run python (Join-Path $PSScriptRoot "smoke-backend.py") `
+        (Join-Path $pyinstallerDir "dist/blunderbase-desktop/blunderbase-desktop.exe")
 }
 finally {
     Pop-Location

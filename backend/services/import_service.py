@@ -10,7 +10,7 @@ from datetime import datetime
 from importlib import import_module
 from typing import Any, Protocol
 
-from sqlalchemy import func, insert, select
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.orm import Session
 
 from backend.adapters import openings
@@ -280,6 +280,26 @@ def _forget_cancel(job_id: int | None) -> None:
         return
     with _cancel_lock:
         _cancelling.discard(job_id)
+
+
+def recover_interrupted_jobs(session: Session) -> int:
+    """Close imports left running by the previous installation process at startup.
+
+    Games commit individually and survive the interruption. Keep their counts and errors;
+    a retry deduplicates those games and uses only the last DONE job's cursor. Run before
+    accepting imports or starting scheduled syncs, never as a sweep over live workers.
+    """
+    recovered = session.execute(
+        update(ImportJob)
+        .where(ImportJob.status == JobStatus.RUNNING)
+        .values(
+            status=JobStatus.FAILED,
+            finished_at=utcnow(),
+            message="Import interrupted by a restart. Imported games were kept; retry the import.",
+        )
+    ).rowcount
+    session.commit()
+    return recovered
 
 
 def run_import(
