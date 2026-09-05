@@ -515,9 +515,8 @@ msgid "Assistant"
 msgstr "Assistent"
 
 #: src/components/shell/AccountMenu.tsx
-#: src/routes/help/HelpPage.tsx
-msgid "How analysis works"
-msgstr "Wie die Analyse funktioniert"
+msgid "Manual"
+msgstr "Handbuch"
 
 #: src/components/shell/AccountMenu.tsx
 msgid "Show the tour again"
@@ -1041,6 +1040,10 @@ msgid "· read-only"
 msgstr "· schreibgeschützt"
 
 #: src/components/shell/TopBar.tsx
+msgid "Open the manual for this page"
+msgstr "Das Handbuch zu dieser Seite öffnen"
+
+#: src/components/shell/TopBar.tsx
 msgid "Search everything (⌘K)"
 msgstr "Alles durchsuchen (⌘K)"
 
@@ -1260,8 +1263,8 @@ msgid "the engine did not come up in time"
 msgstr "Die Engine wurde nicht rechtzeitig bereit"
 
 #: src/lib/runner/support.ts
-msgid "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md"
-msgstr "diese Seite ist nicht cross-origin-isoliert, deshalb gibt ihr der Browser den gemeinsamen Speicher nicht, den die Engine braucht. Blunderbase liefert die Header aus, die ihn anfordern, also entfernt sie höchstwahrscheinlich ein vorgelagerter Reverse Proxy – siehe docs/deploy.md"
+msgid "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see the manual at /manual/operate/deploy/"
+msgstr "diese Seite ist nicht cross-origin-isoliert, deshalb gibt ihr der Browser den gemeinsamen Speicher nicht, den die Engine braucht. Blunderbase liefert die Header aus, die ihn anfordern, also entfernt sie höchstwahrscheinlich ein vorgelagerter Reverse Proxy – siehe das Handbuch unter /manual/operate/deploy/"
 
 #: src/lib/runner/support.ts
 msgid "this browser has no WebAssembly, so it cannot run an engine"
@@ -4587,90 +4590,6 @@ msgstr "Grobe Patzer"
 #: src/routes/games/savedFilters.ts
 msgid "No deep pass"
 msgstr "Ohne Tiefenanalyse"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Help"
-msgstr "Hilfe"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Two engines"
-msgstr "Zwei Engines"
-
-#: src/routes/help/HelpPage.tsx
-msgid "asks"
-msgstr "fragt"
-
-#: src/routes/help/HelpPage.tsx
-msgid "what's best"
-msgstr "was am besten ist"
-
-#: src/routes/help/HelpPage.tsx
-msgid "what a 2000 would play"
-msgstr "was ein 2000er spielen würde"
-
-#: src/routes/help/HelpPage.tsx
-msgid "spends"
-msgstr "verbraucht"
-
-#: src/routes/help/HelpPage.tsx
-msgid "250k – 2M nodes"
-msgstr "250k – 2M Knoten"
-
-#: src/routes/help/HelpPage.tsx
-msgid "one look, no search"
-msgstr "ein Blick, keine Suche"
-
-#: src/routes/help/HelpPage.tsx
-msgid "gives"
-msgstr "liefert"
-
-#: src/routes/help/HelpPage.tsx
-msgid "1 line quick, 4 deep"
-msgstr "schnell 1 Variante, tief 4"
-
-#: src/routes/help/HelpPage.tsx
-msgid "5 moves, each with odds"
-msgstr "5 Züge, jeder mit Wahrscheinlichkeit"
-
-#: src/routes/help/HelpPage.tsx
-msgid "lines?"
-msgstr "Varianten?"
-
-#: src/routes/help/HelpPage.tsx
-msgid "yes"
-msgstr "ja"
-
-#: src/routes/help/HelpPage.tsx
-msgid "never — <0>why?</0>"
-msgstr "nie – <0>warum?</0>"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Quick vs deep"
-msgstr "Schnellanalyse gegen Tiefenanalyse"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Quick runs on import. Deep is the one you ask for, and it jumps the queue."
-msgstr "Die Schnellanalyse läuft beim Import. Die Tiefenanalyse forderst du selbst an, und sie kommt in der Warteschlange nach vorn."
-
-#: src/routes/help/HelpPage.tsx
-msgid "Why Maia never shows a line"
-msgstr "Warum Maia nie eine Variante zeigt"
-
-#: src/routes/help/HelpPage.tsx
-msgid "One look, no search. Instinct is a spread of moves, not a continuation."
-msgstr "Ein Blick, keine Suche. Intuition ist eine Verteilung über Züge, keine Fortsetzung."
-
-#: src/routes/help/HelpPage.tsx
-msgid "What a move cost"
-msgstr "Was ein Zug gekostet hat"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Win% before minus after. 5, 10 and 15 are an inaccuracy, a mistake and a blunder."
-msgstr "Gewinnchance davor minus danach. 5, 10 und 15 sind Ungenauigkeit, Fehler und grober Patzer."
-
-#: src/routes/help/HelpPage.tsx
-msgid "Change these numbers under <0>Engine passes</0>."
-msgstr "Diese Zahlen änderst du unter <0>Engine-Durchläufe</0>."
 
 #: src/routes/import/AccountCard.tsx
 msgid "Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes."

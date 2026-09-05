@@ -8,6 +8,8 @@ import { saveDownload, saveUrlDownload } from '@/lib/api/client'
 import { preparedBackupUrl } from '@/lib/api/endpoints'
 import { useBackupEstimate, useExportLibrary, useGames, usePrepareBackup } from '@/lib/api/queries'
 import type { GamesDeleted } from '@/lib/api/types'
+import { useLocale } from '@/lib/i18n/I18nProvider'
+import { manualUrl } from '@/lib/manual'
 
 import { DeleteAllGamesDialog } from './DeleteAllGamesDialog'
 import { DeletedGamesCard } from './DeletedGamesCard'
@@ -31,6 +33,7 @@ function fileSize(bytes: number): string {
  */
 export function LibraryManagement() {
   const { t } = useLingui()
+  const { locale } = useLocale()
   const games = useGames({ limit: 1 })
   const [asking, setAsking] = useState(false)
   const [deleted, setDeleted] = useState<GamesDeleted | null>(null)
@@ -103,7 +106,7 @@ export function LibraryManagement() {
               A lossless SQLite copy including analysis, accounts and settings. Restoring it
               requires the CLI while Blunderbase is stopped.{' '}
               <a
-                href="https://github.com/philphilphil/blunderbase/blob/main/docs/reference.md#export-backup-and-restore"
+                href={manualUrl(locale, 'operate/backup')}
                 target="_blank"
                 rel="noreferrer"
                 className="text-accent-teal hover:text-accent-link"

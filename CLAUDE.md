@@ -1,9 +1,10 @@
 # Blunderbase — project instructions
 
-A personal chess database with an AI coach: games are imported, Stockfish (and Maia) run
+A personal chess database: games are imported, Stockfish (and Maia) run
 over every one as it arrives, and a web app and an MCP server read the same store. One
-owner, one password, one container. `README.md` is the front page; the docs under `docs/`
-are the detail (see "Where things are").
+owner, one password, one container. `README.md` is the front page, `manual/` is the manual
+for everyone using or running Blunderbase, and the docs under `docs/` are how the code is
+built (see "Where things are").
 
 ## Stack
 
@@ -25,6 +26,8 @@ make install          # uv sync + pnpm install
 make run              # migrate, backend on :8765 (API + /events + /mcp), Vite on :5273
 make engines          # this machine's Stockfish/Maia as local engine rows, holding the roles
 make test             # uv run pytest + pnpm test
+make docs             # build the manual (mkdocs.yml, manual/) into manual-site/, --strict
+make docs-serve       # the manual with live reload on :8000
 uv run ruff check backend tests           # what CI lints
 cd web && pnpm lint && pnpm typecheck     # what CI checks on the frontend
 uv run pytest -m engine                   # tests that want a real Stockfish/Maia binary (not in CI)
@@ -42,7 +45,7 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 - **`backend/services/` is the only place business logic lives.** A "blunder", a "recent
   game", a stat — defined once, there. `api/` and `mcp/` are thin wrappers over services
   and never import `backend.db.models`, write a query or open their own Session. That is
-  what keeps the browser and the coach from disagreeing.
+  what keeps the browser and an MCP client from disagreeing.
 - Nothing in `services/` imports FastAPI or the MCP SDK; every service function takes an
   explicit `Session` as its first argument.
 - `backend/adapters/` (Lichess, chess.com, PGN, UCI engines, Maia) knows nothing about the
@@ -65,7 +68,7 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 - **Every string a person reads goes through Lingui.** `<Trans>` for JSX text, `useLingui()`'s
   `t` for props and toasts, `msg` for labels in module-level tables, the global `t` only in
   helpers with no React. English is the source text; `pnpm i18n` refreshes the catalogs under
-  `web/src/locales/` and CI fails when they are stale. Details in `docs/reference.md`.
+  `web/src/locales/` and CI fails when they are stale. Details in `docs/contributing.md`.
 - `web/src/lib/api/` is the typed client; `web/src/lib/events/` handles the `/events`
   WebSocket and query invalidation.
 - `web/src/lib/board/linePreview.ts` is the only place engine-line-preview shapes are
@@ -75,10 +78,10 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 
 | Need | Look in |
 |------|---------|
+| Using the app — importing, analysis, the explorer, notes, stats, the AI assistant, settings | `manual/en/guide/` (and `manual/de/guide/`) |
+| Operating it — install, reverse proxy / TLS, engines, remote runners, every setting, every command, backup | `manual/en/operate/` |
+| The manual's build, i18n, opening names, releases, testing | `docs/contributing.md` |
 | Code shape, invariants, why sync SQLAlchemy | `docs/ARCHITECTURE.md` |
-| Auth, engines, configuration, CLI, releases, testing | `docs/reference.md` |
-| Reverse proxy / TLS in front of the container | `docs/deploy.md` |
-| Remote engine runners (yaml, container, troubleshooting) | `docs/runners.md` |
 | Design tokens, layout decisions, brand assets | `docs/design/README.md` |
 | Image, compose files, entrypoint (the public demo is `docker-compose.demo.yml`) | `docker/` |
 | CI and the release-to-deploy pipeline | `.github/workflows/` |
@@ -88,6 +91,18 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 
 - Small, whole changes. Do not leave TODOs for the next agent; either do the thing or say
   in the reply what was left out and why.
+- **Anything a person can see or configure updates the manual in the same change.** A
+  screen, a setting, a keyboard shortcut, a CLI flag, a yaml key, an environment variable:
+  if the change alters what someone sees or how they run it, `manual/` moves with it.
+  The Guide mirrors the app's rail one to one: one chapter per rail entry, in the rail's
+  order, and a chapter's H2s follow that screen's sections in the order they appear on it.
+  Every page is written in both languages, as German rather than as translated English,
+  with the same headings in the same order and every German heading pinned to the English
+  slug (`{ #slug }`) so anchors work in both. `docs/` says how the code is built and never
+  how the app is used.
+  `tests/test_manual_content.py` fails when a setting or a command is undocumented, and
+  `make docs` (`--strict`) fails on a broken link. A page also carries a `manual` on its
+  `SetPageChrome`, which is the (?) in the titlebar — a new screen names its chapter.
 - Edit files with the Edit tool; never rewrite an existing file with a script. Development
   is mostly on macOS and sometimes on a Windows checkout with `core.autocrlf=true`, where a
   whole-file rewrite flips line endings and shows up as a bogus diff. `*.sh` is forced to

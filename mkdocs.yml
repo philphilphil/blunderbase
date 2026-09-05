@@ -1,0 +1,161 @@
+# The manual: markdown in, a static site with a sidebar, a table of contents and search out.
+#
+# Built twice from one source — into blunderbase.org/manual/ by `scripts/site.sh`, and into
+# the image and the desktop bundle, where the backend serves it at `/manual/` without a
+# login so it matches the running version and works offline.
+#
+#   make docs         # build into manual-site/
+#   make docs-serve    # the same with a live-reloading server
+#
+# English is the default language and lives at the root of the site (`/manual/guide/…`);
+# German is a second build under `/de/` (`/manual/de/guide/…`) and falls back to the English
+# page wherever a translation is missing. Both come out of `manual/`, whose `en/` and `de/`
+# folders are what `docs_structure: folder` means.
+#
+# `site_dir` is `manual-site/` rather than `manual/site/` because MkDocs refuses an output
+# directory inside its own `docs_dir` — it would copy the build into itself. The backend,
+# the image and the desktop bundle all read the same name.
+
+site_name: Blunderbase manual
+site_description: How to use and operate Blunderbase.
+site_url: https://blunderbase.org/manual/
+site_author: Blunderbase
+copyright: AGPL-3.0-or-later
+
+repo_url: https://github.com/philphilphil/blunderbase
+repo_name: philphilphil/blunderbase
+edit_uri: ""
+
+docs_dir: manual
+site_dir: manual-site
+# Directory URLs, so a page is `/manual/guide/analysis/` and every link and asset the
+# templates write is relative to it. That is what lets the same build answer at
+# blunderbase.org/manual/ and at `/manual/` on whatever host the app is running on.
+use_directory_urls: true
+
+# A link to a heading that does not exist is a broken link; `--strict` turns this warning
+# into a failed build, which is what keeps the (?) in the app landing on a real section.
+validation:
+  anchors: warn
+
+# The pin file is not a page. It sits here because `manual/` is the whole of the manual,
+# but MkDocs would otherwise copy it into the site.
+exclude_docs: |
+  requirements.txt
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  # No Google Fonts request. The manual is served offline inside the container and the
+  # desktop app, so a webfont that has to be fetched is a webfont that is not there; the
+  # stack is set in `manual/en/assets/manual.css` instead.
+  font: false
+  palette:
+    # Dark first, which makes it the default — the app's own.
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to the light theme
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to the dark theme
+  features:
+    # Guide and Operate are rendered as labelled groups rather than collapsible trees, so
+    # the whole manual is visible in the sidebar at once.
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+    - toc.follow
+
+extra_css:
+  - assets/manual.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+plugins:
+  - search:
+      lang:
+        - en
+        - de
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          name: English
+          build: true
+          default: true
+        - locale: de
+          name: Deutsch
+          build: true
+          nav_translations:
+            Overview: Überblick
+            Guide: Anleitung
+            Getting started: Erste Schritte
+            Dashboard: Übersicht
+            Games: Partien
+            Analysing a game: Eine Partie analysieren
+            Explorer: Explorer
+            Statistics: Statistiken
+            Notes: Notizen
+            Live: Live
+            Library: Bibliothek
+            Analysis: Analyse
+            AI assistant: KI-Assistent
+            Settings: Einstellungen
+            Operate: Betrieb
+            Installing: Installieren
+            Behind a proxy: Hinter einem Proxy
+            Engines: Engines
+            Remote runners: Remote Runner
+            Configuration: Konfiguration
+            Command line: Kommandozeile
+            Backup and restore: Sichern und wiederherstellen
+
+# One chapter per entry in the app's rail, in the rail's order, so a reader looking at a
+# screen has one place to look it up. Getting started is the exception in front of them,
+# and the assistant and the settings come after, since both are reached from the account
+# menu rather than the rail. Engines is a rail entry written up under Operate.
+nav:
+  - Overview: index.md
+  - Guide:
+      - Getting started: guide/getting-started.md
+      - Dashboard: guide/dashboard.md
+      - Games: guide/games.md
+      - Analysing a game: guide/game.md
+      - Explorer: guide/explorer.md
+      - Statistics: guide/stats.md
+      - Notes: guide/notes.md
+      - Live: guide/live.md
+      - Library: guide/library.md
+      - Analysis: guide/analysis.md
+      - AI assistant: guide/coach.md
+      - Settings: guide/settings.md
+  - Operate:
+      - Installing: operate/install.md
+      - Behind a proxy: operate/deploy.md
+      - Engines: operate/engines.md
+      - Remote runners: operate/runners.md
+      - Configuration: operate/configuration.md
+      - Command line: operate/cli.md
+      - Backup and restore: operate/backup.md

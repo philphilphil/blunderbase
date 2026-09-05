@@ -1,4 +1,5 @@
-# The public demo at demo.blunderbase.org. Setup is "A public demo" in docs/deploy.md.
+# The public demo at demo.blunderbase.org. Setup is "A read-only public demo" in
+# https://blunderbase.org/manual/operate/deploy/.
 services:
   blunderbase-demo:
     image: ghcr.io/philphilphil/blunderbase:latest

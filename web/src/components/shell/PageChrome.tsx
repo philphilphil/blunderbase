@@ -19,6 +19,12 @@ export interface PageChromeValue {
   breadcrumb: Crumb[]
   /** Buttons pinned into the titlebar, left of the queue widget. */
   actions: ReactNode
+  /**
+   * The manual page this screen is written up in — `guide/analysis`, or
+   * `guide/explorer#build-a-repertoire` for a heading inside one. The titlebar turns it
+   * into the (?) beside the breadcrumb; a page that sets nothing simply has no (?).
+   */
+  manual: string | null
 }
 
 interface ChromeStore extends PageChromeValue {
@@ -28,7 +34,11 @@ interface ChromeStore extends PageChromeValue {
 const PageChromeContext = createContext<ChromeStore | null>(null)
 
 export function PageChromeProvider({ children }: { children: ReactNode }) {
-  const [value, setValue] = useState<PageChromeValue>({ breadcrumb: [], actions: null })
+  const [value, setValue] = useState<PageChromeValue>({
+    breadcrumb: [],
+    actions: null,
+    manual: null,
+  })
   const store = useMemo<ChromeStore>(
     () => ({
       ...value,
@@ -47,15 +57,18 @@ function useChromeStore(): ChromeStore {
 
 /** What the titlebar should render right now. Used by the shell, not by pages. */
 export function usePageChrome(): PageChromeValue {
-  const { breadcrumb, actions } = useChromeStore()
-  return { breadcrumb, actions }
+  const { breadcrumb, actions, manual } = useChromeStore()
+  return { breadcrumb, actions, manual }
 }
 
 /**
  * Declared by a page to fill in the titlebar without touching the shell:
  *
  * ```tsx
- * <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }, { label: title }]} />
+ * <SetPageChrome
+ *   breadcrumb={[{ label: 'Library', to: '/games' }, { label: title }]}
+ *   manual="guide/game"
+ * />
  * ```
  *
  * Renders nothing; the shell reads it out of context.
@@ -63,9 +76,11 @@ export function usePageChrome(): PageChromeValue {
 export function SetPageChrome({
   breadcrumb,
   actions,
+  manual,
 }: {
   breadcrumb?: Crumb[]
   actions?: ReactNode
+  manual?: string
 }) {
   const { set } = useChromeStore()
   // The identity of `breadcrumb` changes every render for an inline array, so the effect
@@ -75,10 +90,10 @@ export function SetPageChrome({
   )
 
   useEffect(() => {
-    set({ breadcrumb: breadcrumb ?? [], actions: actions ?? null })
-    return () => set({ breadcrumb: [], actions: null })
+    set({ breadcrumb: breadcrumb ?? [], actions: actions ?? null, manual: manual ?? null })
+    return () => set({ breadcrumb: [], actions: null, manual: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, actions])
+  }, [signature, actions, manual])
 
   return null
 }

@@ -266,7 +266,7 @@ export function GamesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: t`Games`, to: '/games' }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Games`, to: '/games' }]} manual="guide/games" />
 
       <div className="flex flex-none flex-col gap-3 border-b border-hairline px-5 pt-4 pb-3 max-md:px-3 max-md:pt-3">
         {/* Below `md` the search box takes a line of its own: at 375px it and the title

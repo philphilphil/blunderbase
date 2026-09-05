@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="https://blunderbase.org">blunderbase.org</a> ·
+  <a href="https://blunderbase.org/manual/">manual</a> ·
   <a href="https://demo.blunderbase.org">try the demo</a>
 </p>
 
@@ -47,65 +48,43 @@
   </picture>
 </p>
 
-## Roadmap
-- Desktop app for Linux, Mac and Windows
-- Mobile companion app for iOS and Android
-- Sync-Service to keep multiple blunderbase's in sync
-- Multi-Engine-Analysis on the same game, for the engine nerds
-- Puzzles out of your games
-- Import games of others for study and analysis 
-
-## Tech Stack
-
-| Layer | Tech |
-|-------|------|
-| Backend | Python 3.12, FastAPI, SQLAlchemy + Alembic |
-| Frontend | React 19 + TypeScript + Vite, shadcn/Radix, Tailwind CSS 4 |
-| Database | SQLite in WAL mode — one file, `BLUNDERBASE_DB_PATH` |
-| Chess | Stockfish (any UCI engine), Maia via lc0, chessground + chessops |
-| MCP | Built into the backend — stdio for local clients, streamable HTTP at `/mcp` |
-
 ## Quick Start
-
-Prerequisites: Python 3.12+, uv, Node 22+, pnpm
-
-```bash
-make install          # uv sync + pnpm install
-make run              # migrations, API + /mcp on :8765, Vite on :5273
-make engines          # register this machine's Stockfish (and Maia) as local engines
-```
-
-Or as a container:
 
 ```bash
 docker run -d --name blunderbase -p 8765:8765 -v blunderbase-data:/data \
   ghcr.io/philphilphil/blunderbase:latest
 ```
 
-The first person to open a fresh deployment chooses the password; that password is also
-an MCP bearer token, until you mint per-client keys on Assistant. The
-[verified backup and restore workflow](docs/reference.md#export-backup-and-restore) safely
-copies the live SQLite database, including committed WAL data.
-For TLS termination and reverse-proxy examples see [docs/deploy.md](docs/deploy.md).
+Open <http://localhost:8765>, choose a password, connect an account. There are desktop
+installers on the [releases page](https://github.com/philphilphil/blunderbase/releases)
+too.
 
-## Project Structure
+## Documentation
 
-```
-backend/
-  api/              — FastAPI routes, auth, SPA serving
-  mcp/              — MCP server (stdio + streamable HTTP)
-  services/         — the only place a "blunder" or a stat is defined
-  adapters/         — Lichess, Chess.com, FICS, UCI engines, Maia
-web/                — React SPA
-site/               — the landing page at blunderbase.org (GitHub Pages)
-tests/              — pytest
-docs/               — deploy.md, runners.md, reference.md, ARCHITECTURE.md
-```
+Everything else — importing, analysis, the explorer, the coach, engines, remote runners,
+reverse proxies, configuration, the CLI, backup and restore — is in the manual:
 
-`api/` and `mcp/` never touch the database: both are thin wrappers over `services/`,
-which is what stops the browser and the coach from disagreeing. Details in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); auth, engines, configuration, the CLI,
-releases and testing are in [docs/reference.md](docs/reference.md).
+**[blunderbase.org/manual](https://blunderbase.org/manual/)** ·
+[auf Deutsch](https://blunderbase.org/manual/de/)
+
+Your own installation serves the same manual at `/manual/`, so it matches the version you
+are running. How the code is built is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+[docs/contributing.md](docs/contributing.md).
+
+## Roadmap
+- Desktop app for Linux, Mac and Windows
+- Mobile companion app for iOS and Android
+- Sync-Service to keep multiple blunderbase's in sync
+- Multi-Engine-Analysis on the same game, for the engine nerds
+- Puzzles out of your games
+- Import games of others for study and analysis
+
+## Tech Stack
+
+- **Backend** Python 3.12, FastAPI, SQLAlchemy + Alembic, SQLite in WAL mode — one file.
+- **Frontend** React 19 + TypeScript + Vite, shadcn/Radix, Tailwind CSS 4, chessground.
+- **Chess and MCP** Stockfish (any UCI engine) and Maia via lc0; MCP is built into the
+  backend, stdio for local clients and streamable HTTP at `/mcp`.
 
 ## License
 

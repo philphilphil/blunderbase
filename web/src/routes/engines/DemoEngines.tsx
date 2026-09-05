@@ -39,7 +39,7 @@ export function DemoEngines() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Engines` }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Engines` }]} manual="operate/engines" />
       <PageHeader
         className="max-w-2xl"
         title={t`Engines`}

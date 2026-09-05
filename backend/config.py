@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # to `<root>/web/dist`; a directory that was never built simply is not served, which
     # is the normal case in development (the Vite dev server has the page instead).
     web_dist: Path | None = None
+    # The built manual, served at `/manual` beside the page and without a login, so the
+    # instructions match the version that is running and are there on a machine with no way
+    # out to the internet. Defaults to `<root>/manual-site` — beside `manual/` rather than
+    # inside it, because MkDocs refuses an output directory within its own docs_dir. A
+    # directory that was never built is simply not served, exactly like `web_dist`.
+    manual_dir: Path | None = None
     # Whether the page is served cross-origin isolated (`Cross-Origin-Opener-Policy:
     # same-origin` plus `Cross-Origin-Embedder-Policy: require-corp`). That is the browser's
     # price for `SharedArrayBuffer`, which a multi-threaded WASM engine cannot run without —
@@ -115,6 +121,7 @@ class Settings(BaseSettings):
         self.data_dir = self._resolve(self.data_dir, self.root / "data")
         self.database_path = self._resolve(self.database_path, self.data_dir / "blunderbase.db")
         self.web_dist = self._resolve(self.web_dist, self.root / "web" / "dist")
+        self.manual_dir = self._resolve(self.manual_dir, self.root / "manual-site")
         if self.runtime_mode == "desktop":
             token = self.desktop_token.get_secret_value()
             if len(token) != 64 or any(character not in "0123456789abcdef" for character in token):

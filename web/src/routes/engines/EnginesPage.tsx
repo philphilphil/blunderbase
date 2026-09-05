@@ -44,7 +44,7 @@ export function EnginesPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Engines` }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Engines` }]} manual="operate/engines" />
       <PageHeader
         className="max-w-5xl"
         title={t`Engines`}

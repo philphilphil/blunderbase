@@ -94,6 +94,13 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      // The built manual, so `make run` shows the same `/manual/` link the container does.
+      // It is there only once `make docs` has built it; before that the backend has no
+      // such mount and the proxy passes a 404 through.
+      '/manual': {
+        target: BACKEND,
+        changeOrigin: true,
+      },
     },
   },
   test: {

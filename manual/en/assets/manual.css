@@ -1,0 +1,297 @@
+/*
+ * The manual wearing the app's clothes.
+ *
+ * Material's own palettes are branded — indigo header, saturated links — and a manual that
+ * arrives in them reads as a different product from the page it is served next to. So both
+ * schemes below are built from the app's design tokens (`web/src/index.css`): the same
+ * neutral grey ramp, the same muted blue accent, the same greys for chrome against canvas.
+ * The `--bb-*` names are copied rather than imported because the manual is a static site
+ * with no build step of its own — when a token changes over there, change it here too.
+ *
+ * `slate` is Material's dark scheme and the default; `default` is the light one behind the
+ * header toggle. The token names match the app's so the two files can be read side by side.
+ */
+
+/* --- dark: the app's `:root` ------------------------------------------- */
+
+[data-md-color-scheme="slate"] {
+  --bb-void: #1d1e1f;
+  --bb-panel: #292a2a;
+  --bb-surface: #232424;
+  --bb-elevated: #303131;
+  --bb-raised: #343535;
+  --bb-cell: #2b2c2c;
+
+  --bb-hairline: #3a3c3b;
+  --bb-line: #3e4040;
+  --bb-edge: #474949;
+  --bb-edge-strong: #555756;
+
+  --bb-text-bright: #f8f8f4;
+  --bb-text: #eeeeea;
+  --bb-body: #d8d8d3;
+  --bb-muted: #b6b5b0;
+  --bb-dim: #a3a29c;
+  --bb-faint: #8b8a82;
+
+  --bb-accent: #83b7e3;
+  --bb-accent-hover: #9cc7ea;
+  --bb-accent-link: #a8d0ef;
+  --bb-accent-ink: #10202c;
+  --bb-good: #78b98c;
+  --bb-mistake: #dda05a;
+  --bb-blunder: #ee766e;
+  --bb-info: #8fb6c9;
+  --bb-brilliant: #b098d7;
+}
+
+/* --- light: the app's `:root.light` ------------------------------------ */
+
+[data-md-color-scheme="default"] {
+  --bb-void: #e7e7e4;
+  --bb-panel: #f2f2f0;
+  --bb-surface: #fafaf8;
+  --bb-elevated: #f4f4f1;
+  --bb-raised: #ebebe8;
+  --bb-cell: #f2f2ef;
+
+  --bb-hairline: #dcdcd8;
+  --bb-line: #d1d1cd;
+  --bb-edge: #c5c5c0;
+  --bb-edge-strong: #b6b6b1;
+
+  --bb-text-bright: #101010;
+  --bb-text: #202020;
+  --bb-body: #3b3b39;
+  --bb-muted: #5c5c59;
+  --bb-dim: #71716e;
+  --bb-faint: #8a8a86;
+
+  --bb-accent: #245f9e;
+  --bb-accent-hover: #1d4e83;
+  --bb-accent-link: #1d4e83;
+  --bb-accent-ink: #ffffff;
+  --bb-good: #34724a;
+  --bb-mistake: #9b6819;
+  --bb-blunder: #bb3e35;
+  --bb-info: #3a6274;
+  --bb-brilliant: #7054a5;
+}
+
+/* --- Material's names, resolved through the app's ----------------------- */
+
+[data-md-color-scheme="slate"],
+[data-md-color-scheme="default"] {
+  /* The header and the footer are chrome, so they are the app's chrome grey rather than a
+     brand colour. `primary` is what Material paints them with. */
+  --md-primary-fg-color: var(--bb-panel);
+  --md-primary-fg-color--light: var(--bb-elevated);
+  --md-primary-fg-color--dark: var(--bb-void);
+  --md-primary-bg-color: var(--bb-text);
+  --md-primary-bg-color--light: var(--bb-muted);
+
+  --md-accent-fg-color: var(--bb-accent-hover);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--bb-accent) 10%, transparent);
+  --md-accent-bg-color: var(--bb-accent-ink);
+  --md-accent-bg-color--light: var(--bb-accent-ink);
+
+  --md-default-bg-color: var(--bb-surface);
+  --md-default-fg-color: var(--bb-text);
+  --md-default-fg-color--light: var(--bb-muted);
+  --md-default-fg-color--lighter: var(--bb-dim);
+  --md-default-fg-color--lightest: var(--bb-faint);
+
+  --md-typeset-color: var(--bb-body);
+  --md-typeset-a-color: var(--bb-accent-link);
+  --md-typeset-mark-color: color-mix(in srgb, var(--bb-accent) 25%, transparent);
+
+  --md-code-bg-color: var(--bb-cell);
+  --md-code-fg-color: var(--bb-text);
+  --md-code-hl-comment-color: var(--bb-faint);
+  --md-code-hl-string-color: var(--bb-good);
+  --md-code-hl-number-color: var(--bb-mistake);
+  --md-code-hl-keyword-color: var(--bb-brilliant);
+  --md-code-hl-name-color: var(--bb-body);
+  --md-code-hl-function-color: var(--bb-accent);
+  --md-code-hl-constant-color: var(--bb-info);
+  --md-code-hl-operator-color: var(--bb-dim);
+  --md-code-hl-punctuation-color: var(--bb-dim);
+
+  --md-footer-bg-color: var(--bb-panel);
+  --md-footer-bg-color--dark: var(--bb-void);
+  --md-footer-fg-color: var(--bb-text);
+  --md-footer-fg-color--light: var(--bb-muted);
+  --md-footer-fg-color--lighter: var(--bb-dim);
+
+  --md-shadow-z1: none;
+  --md-shadow-z2: none;
+  --md-shadow-z3: none;
+
+  /* No Google Fonts request — the manual is served offline inside the container and the
+     desktop app, so the stack has to be one the machine already has. `font: false` in
+     mkdocs.yml is the other half of this. */
+  --md-text-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --md-code-font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* --- the few places the flat look has to be asked for ------------------- */
+
+/* The header sits against the page rather than floating over a shadow. */
+.md-header {
+  border-bottom: 1px solid var(--bb-edge-strong);
+}
+
+.md-tabs {
+  border-bottom: 1px solid var(--bb-edge-strong);
+}
+
+/* Sidebar and table-of-contents rails, the way the app's nav reads: quiet until active. */
+.md-nav__link--active,
+.md-nav__link:focus,
+.md-nav__link:hover {
+  color: var(--bb-accent-link);
+}
+
+.md-nav__title {
+  color: var(--bb-muted);
+}
+
+/* A section label in the sidebar is chrome, not a heading to compete with the page's. */
+.md-nav--secondary .md-nav__title {
+  box-shadow: none;
+  border-bottom: 1px solid var(--bb-hairline);
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  color: var(--bb-text-bright);
+  font-weight: 600;
+}
+
+.md-typeset h2 {
+  border-bottom: 1px solid var(--bb-hairline);
+  padding-bottom: 0.3em;
+}
+
+/* Tables carry most of the Operate chapters, so they get the app's own row treatment
+   rather than Material's card with a drop shadow. */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--bb-line);
+  box-shadow: none;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--bb-panel);
+  color: var(--bb-text);
+  font-weight: 600;
+}
+
+.md-typeset table:not([class]) td {
+  border-top: 1px solid var(--bb-hairline);
+}
+
+.md-typeset code {
+  border: 1px solid var(--bb-hairline);
+}
+
+.md-typeset pre > code {
+  border: 1px solid var(--bb-line);
+}
+
+.md-typeset blockquote {
+  color: var(--bb-muted);
+  border-left: 2px solid var(--bb-edge);
+}
+
+.md-typeset hr {
+  border-bottom-color: var(--bb-hairline);
+}
+
+/* Admonitions in the classification colours the app already uses for the same weights:
+   info blue for a note, green for a tip, amber for a warning, red for a danger. */
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid var(--bb-line);
+  border-left-width: 3px;
+  box-shadow: none;
+  background-color: var(--bb-cell);
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  background-color: transparent;
+  color: var(--bb-text);
+}
+
+.md-typeset .note,
+.md-typeset .info,
+.md-typeset .abstract {
+  border-left-color: var(--bb-info);
+}
+
+.md-typeset .note > .admonition-title::before,
+.md-typeset .info > .admonition-title::before,
+.md-typeset .abstract > .admonition-title::before {
+  background-color: var(--bb-info);
+}
+
+.md-typeset .tip,
+.md-typeset .success,
+.md-typeset .example {
+  border-left-color: var(--bb-good);
+}
+
+.md-typeset .tip > .admonition-title::before,
+.md-typeset .success > .admonition-title::before,
+.md-typeset .example > .admonition-title::before {
+  background-color: var(--bb-good);
+}
+
+.md-typeset .warning,
+.md-typeset .caution {
+  border-left-color: var(--bb-mistake);
+}
+
+.md-typeset .warning > .admonition-title::before,
+.md-typeset .caution > .admonition-title::before {
+  background-color: var(--bb-mistake);
+}
+
+.md-typeset .danger,
+.md-typeset .failure,
+.md-typeset .bug {
+  border-left-color: var(--bb-blunder);
+}
+
+.md-typeset .danger > .admonition-title::before,
+.md-typeset .failure > .admonition-title::before,
+.md-typeset .bug > .admonition-title::before {
+  background-color: var(--bb-blunder);
+}
+
+/* Search: the overlay is a pane, so it gets the pane border rather than a shadow. */
+.md-search__form,
+.md-search__output {
+  background-color: var(--bb-elevated);
+  border: 1px solid var(--bb-edge-input, var(--bb-edge));
+  box-shadow: none;
+}
+
+.md-search-result__meta {
+  background-color: var(--bb-panel);
+  color: var(--bb-muted);
+}
+
+.md-search-result__article:hover,
+.md-search-result__more summary:hover {
+  background-color: var(--bb-raised);
+}
+
+/* The logo in the header is the app's mark; at header size the padding it ships with
+   would shrink it to nothing. */
+.md-header__button.md-logo img {
+  height: 1.6rem;
+  width: auto;
+}

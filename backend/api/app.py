@@ -16,7 +16,7 @@ from backend.api.events import EventBroker
 from backend.api.readonly import install_read_only
 from backend.api.routes import CORE_ROUTERS, MCP_ROUTERS, REMOTE_RUNNER_ROUTERS
 from backend.api.routes.imports import wait_for_imports
-from backend.api.web import install_web
+from backend.api.web import install_manual, install_web
 from backend.config import Settings, get_settings
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import get_engine, get_sessionmaker
@@ -323,6 +323,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # paths, and it answers before a handler could have touched anything.
     if capabilities.read_only:
         install_read_only(app)
+    # The manual is a mounted route rather than middleware, and independent of whether the
+    # page was built: in development the Vite dev server proxies `/manual` here.
+    app.state.manual = install_manual(app, settings.manual_dir)
     app.state.web = install_web(
         app, settings.web_dist, isolate=settings.cross_origin_isolation
     )

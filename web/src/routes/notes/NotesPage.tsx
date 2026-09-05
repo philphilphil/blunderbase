@@ -132,7 +132,7 @@ export function NotesPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Notes` }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Notes` }]} manual="guide/notes" />
 
       <PageHeader
         title={t`Notes`}

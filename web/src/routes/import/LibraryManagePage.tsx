@@ -16,6 +16,7 @@ export function LibraryManagePage() {
     <PageBody>
       <SetPageChrome
         breadcrumb={[{ label: t`Library`, to: '/library' }, { label: t`Manage` }]}
+        manual="guide/library#manage"
       />
       <PageHeader
         title={t`Manage Library`}

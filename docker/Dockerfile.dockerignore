@@ -8,6 +8,8 @@
 !backend/
 !web/
 !docker/
+!manual/
+!mkdocs.yml
 !alembic.ini
 !pyproject.toml
 !uv.lock

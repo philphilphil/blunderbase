@@ -14,7 +14,11 @@ there is no such file — a client-side route, reached by a reload or a shared l
 
 Both are ASGI middleware rather than routes, because a route would be matched after the
 routers and `/games` would answer a page reload with JSON. `RESERVED` is what keeps the
-API, the socket, the health check and the transport in front of the page regardless.
+API, the socket, the health check, the transport and the manual in front of the page
+regardless.
+
+`install_manual` is the one static tree that *is* a route: the built manual at `/manual`,
+served without a login and without the isolation headers below.
 
 **Cross-origin isolation.** The document is served with `Cross-Origin-Opener-Policy:
 same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, which is what a browser
@@ -51,9 +55,20 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 INDEX = "index.html"
 API_PREFIX = "/api"
+# The built manual. `/docs` is FastAPI's Swagger page and is never going to be anything
+# else, which is why the manual is at `/manual`.
+MANUAL_PREFIX = "/manual"
 # Paths that are never the page's, whatever the browser asks for. Everything under
 # `/api`, plus the endpoints a client reaches by their bare name.
-RESERVED: tuple[str, ...] = (API_PREFIX, "/health", "/events", "/mcp", "/docs", "/redoc")
+RESERVED: tuple[str, ...] = (
+    API_PREFIX,
+    "/health",
+    "/events",
+    "/mcp",
+    MANUAL_PREFIX,
+    "/docs",
+    "/redoc",
+)
 RESERVED_EXACT: frozenset[str] = frozenset({"/openapi.json"})
 SERVED_METHODS = frozenset({"GET", "HEAD"})
 
@@ -178,4 +193,29 @@ def install_web(app: FastAPI, directory: Path | None, *, isolate: bool = False) 
     if directory is None or not (directory / INDEX).is_file():
         return False
     app.add_middleware(WebApp, directory=directory, isolate=isolate)
+    return True
+
+
+def install_manual(app: FastAPI, directory: Path | None) -> bool:
+    """Mount the built manual at `/manual`, if it was built. Says whether it was.
+
+    A mounted route rather than middleware, because unlike the page the manual claims a
+    prefix and nothing else: `/manual` is in `RESERVED`, so `WebApp` hands it straight
+    through, and `install_auth`'s exemption is what lets it be read without signing in —
+    instructions for choosing a first password are no use behind the password.
+
+    `html=True` is what makes `mkdocs`'s directory URLs work: `/manual/guide/analysis/` is
+    a folder holding an `index.html`, and a path that is no file at all is answered with
+    the build's `404.html`. A request for `/manual` without the slash is redirected to it
+    by the router, which is what every relative asset on the page needs.
+
+    It is deliberately independent of `install_web`: the manual is served in development
+    too, where the page comes from the Vite dev server (which proxies `/manual` here).
+
+    No cross-origin isolation headers. The manual is plain HTML with no engine in it, and
+    `require-corp` would only be a way for it to stop loading something one day.
+    """
+    if directory is None or not (directory / INDEX).is_file():
+        return False
+    app.mount(MANUAL_PREFIX, StaticFiles(directory=directory, html=True), name="manual")
     return True

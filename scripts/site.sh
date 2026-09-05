@@ -28,4 +28,23 @@ cp "$root"/docs/screenshots/*.png "$out"/assets/
 cp "$root"/docs/design/brand/logo.png "$root"/docs/design/brand/favicon.png \
    "$root"/docs/design/brand/apple-touch-icon.png "$out"/assets/
 
+# The manual goes under /manual/ on the same host, built from the same mkdocs.yml the app's
+# own copy is built from — one source, two places it is published.
+#
+# uv is what a developer and CI have; the Cloudflare Workers Builds image that publishes
+# blunderbase.org has python3 and pip but no uv, which is the reason manual/requirements.txt
+# is pinned separately from the `docs` dependency group. `--site-dir` is given as an absolute
+# path because mkdocs resolves a relative one against the config file, not the caller.
+manual_out="$(cd "$out" && pwd)/manual"
+if command -v uv >/dev/null 2>&1; then
+  uv run --project "$root" --group docs \
+    mkdocs build --strict -f "$root/mkdocs.yml" --site-dir "$manual_out"
+else
+  # `--break-system-packages` is the retry for an image whose python is marked
+  # externally managed (PEP 668); pip refuses the plain form there.
+  python3 -m pip install --quiet -r "$root/manual/requirements.txt" \
+    || python3 -m pip install --quiet --break-system-packages -r "$root/manual/requirements.txt"
+  python3 -m mkdocs build --strict -f "$root/mkdocs.yml" --site-dir "$manual_out"
+fi
+
 echo "site assembled in $out"

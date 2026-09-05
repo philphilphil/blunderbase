@@ -282,6 +282,7 @@ export function StatsPage() {
             ? [{ label: t`Stats` }]
             : [{ label: t`Stats`, to: '/stats' }, { label: reportLabel }]
         }
+        manual="guide/stats"
       />
       <PageHeader
         title={t`Stats`}

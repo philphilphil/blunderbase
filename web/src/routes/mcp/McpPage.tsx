@@ -63,7 +63,7 @@ export function McpPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Assistant` }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Assistant` }]} manual="guide/coach" />
       <div className="flex max-w-4xl flex-col gap-4">
         <PageHeader
           title={t`Connect your assistant`}

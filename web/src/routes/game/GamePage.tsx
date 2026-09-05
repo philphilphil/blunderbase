@@ -1770,6 +1770,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
               { label: players },
             ]
       }
+      // A model game is read in the same studio but arrived from the explorer, so the (?)
+      // answers the question that brought the reader here rather than the one about their
+      // own games.
+      manual={readOnly ? 'guide/explorer#open-a-model-game' : 'guide/game'}
     />
   )
 

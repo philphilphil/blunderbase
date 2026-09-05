@@ -1,7 +1,8 @@
+import { i18n } from '@lingui/core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { SERVER_CAPABILITIES } from '@/lib/api/types'
 import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
@@ -20,7 +21,11 @@ vi.mock('./AccountMenu', () => ({
   AccountMenu: () => <div data-testid="account" />,
 }))
 
-function draw({ crumbs = false, demo = false }: { crumbs?: boolean; demo?: boolean } = {}) {
+function draw({
+  crumbs = false,
+  demo = false,
+  manual,
+}: { crumbs?: boolean; demo?: boolean; manual?: string } = {}) {
   const onOpenNav = vi.fn()
   const capabilities = demo
     ? { ...SERVER_CAPABILITIES, password_auth: false, mcp: false, remote_runners: false, read_only: true }
@@ -31,7 +36,12 @@ function draw({ crumbs = false, demo = false }: { crumbs?: boolean; demo?: boole
         <MemoryRouter>
           <PageChromeProvider>
             <CommandPaletteProvider>
-              {crumbs ? <SetPageChrome breadcrumb={[{ label: 'Library', to: '/games' }]} /> : null}
+              {crumbs || manual ? (
+                <SetPageChrome
+                  breadcrumb={crumbs ? [{ label: 'Library', to: '/games' }] : undefined}
+                  manual={manual}
+                />
+              ) : null}
               <TopBar onOpenNav={onOpenNav} />
             </CommandPaletteProvider>
           </PageChromeProvider>
@@ -81,6 +91,39 @@ describe('the titlebar', () => {
     draw({ crumbs: true })
 
     expect(screen.getByRole('link', { name: 'Library' }).parentElement).toHaveClass('max-md:hidden')
+  })
+})
+
+describe('the manual link', () => {
+  afterEach(() => {
+    i18n.loadAndActivate({ locale: 'en', messages: {} })
+  })
+
+  it('points at the chapter the page named, in a tab of its own', () => {
+    draw({ manual: 'guide/analysis' })
+
+    const link = screen.getByRole('link', { name: 'Open the manual for this page' })
+    expect(link).toHaveAttribute('href', '/manual/guide/analysis/')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer')
+  })
+
+  it('follows the language the app is in', () => {
+    i18n.loadAndActivate({ locale: 'de', messages: {} })
+    draw({ manual: 'guide/explorer#build-a-repertoire' })
+
+    expect(screen.getByRole('link', { name: 'Open the manual for this page' })).toHaveAttribute(
+      'href',
+      '/manual/de/guide/explorer/#build-a-repertoire',
+    )
+  })
+
+  it('is absent on a page that names no chapter', () => {
+    draw({ crumbs: true })
+
+    expect(
+      screen.queryByRole('link', { name: 'Open the manual for this page' }),
+    ).not.toBeInTheDocument()
   })
 })
 

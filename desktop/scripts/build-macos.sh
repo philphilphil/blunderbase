@@ -1,5 +1,10 @@
 #!/bin/sh
 # Build the web UI, frozen backend, and native macOS bundles.
+#
+# The manual is not built here: `make desktop-macos` builds it first (`make docs`), and the
+# `--add-data` below freezes `manual-site/` into the bundle so `/manual/` works offline in
+# the desktop app. `config.py` resolves `root` to the unpacked bundle directory, which is
+# where PyInstaller puts both `web/dist` and `manual-site`.
 set -eu
 
 desktop_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -25,6 +30,7 @@ UV_CACHE_DIR="$repo_dir/.uv-desktop-cache" uv run --with pyinstaller pyinstaller
   --add-data "$repo_dir/backend/migrations:backend/migrations" \
   --add-data "$repo_dir/backend/data:backend/data" \
   --add-data "$repo_dir/web/dist:web/dist" \
+  --add-data "$repo_dir/manual-site:manual-site" \
   --distpath "$pyinstaller_dir/dist" \
   --workpath "$pyinstaller_dir/work" \
   --specpath "$pyinstaller_dir/spec" \

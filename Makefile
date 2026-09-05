@@ -1,4 +1,4 @@
-.PHONY: run run-demo backend web desktop desktop-macos desktop-windows ios ios-test install test migrate engines mcp mcp-http mcp-key release publish site
+.PHONY: run run-demo backend web desktop desktop-macos desktop-windows ios ios-test install test migrate engines mcp mcp-http mcp-key release publish site docs docs-serve
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -38,12 +38,12 @@ web:
 # workflow run is started first and collected last so it overlaps the local build instead of
 # following it. `make desktop-macos` is the same local half without GitHub in the way.
 # Both installers end up under desktop/dist — the .dmg in mac/, the .exe in windows/.
-desktop:
+desktop: docs
 	sh desktop/scripts/windows-ci.sh dispatch
 	cd desktop && pnpm build
 	sh desktop/scripts/windows-ci.sh collect
 
-desktop-macos:
+desktop-macos: docs
 	cd desktop && pnpm build
 
 desktop-windows:
@@ -148,6 +148,21 @@ v%: ; @:
 # blunderbase.org (site/README.md, "Hosting").
 site:
 	@sh scripts/site.sh
+
+# The manual (mkdocs.yml at the root): markdown under manual/en and manual/de, a static
+# site in manual-site/. `--strict` is the point of the target — it fails on a cross-link
+# to a page or an anchor that is not there, which is the only thing that catches a manual
+# rotting as the app moves.
+#
+# `--group docs` rather than a default group: `uv sync --no-dev` in the Dockerfile drops
+# the `dev` group and nothing else, so a docs group installed by default would put MkDocs
+# and Material in the production image.
+docs:
+	uv run --group docs mkdocs build --strict
+
+# The same with a live-reloading server on :8000, for writing.
+docs-serve:
+	uv run --group docs mkdocs serve
 
 # The public demo, locally: `demo create` on this checkout's own library, then the same two
 # processes as `run`, on the same two ports — localhost:5273 is the address to look at the

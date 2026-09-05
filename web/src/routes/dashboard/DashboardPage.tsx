@@ -59,7 +59,7 @@ export function DashboardPage() {
 
   return (
     <PageBody className="gap-[1.1875rem]">
-      <SetPageChrome breadcrumb={[{ label: t`Overview` }]} />
+      <SetPageChrome breadcrumb={[{ label: t`Overview` }]} manual="guide/dashboard" />
       <PageHeader
         title={t`Overview`}
         description={subtitle}

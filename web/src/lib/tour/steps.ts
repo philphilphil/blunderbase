@@ -6,7 +6,7 @@
  * the public demo, who has read only the landing page. So this is a short orientation and
  * deliberately not a manual: where games come from, the engines that have to be registered
  * before anything runs over them, the gear under the board, what a note is pinned to, and
- * the MCP door onto the same database. Anything longer is `/help`.
+ * the MCP door onto the same database. Anything longer is the manual.
  *
  * Every step has to say something the reader could not have guessed by clicking. Not chess
  * — they know what an eval bar is — and not the name of a screen they are already standing

@@ -67,6 +67,7 @@ export function ImportPage() {
     <PageBody>
       <SetPageChrome
         breadcrumb={[{ label: t`Library`, to: '/library' }, { label: t`Import` }]}
+        manual="guide/library#import"
       />
       <PageHeader
         title={t`Import`}

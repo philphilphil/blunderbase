@@ -245,6 +245,7 @@ export function RepertoirePage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <SetPageChrome
         breadcrumb={[{ label: t`Explorer`, to: '/explorer' }, { label: t`Repertoire` }]}
+        manual="guide/explorer#build-a-repertoire"
       />
 
       {/*

@@ -98,10 +98,9 @@ describe('AccountMenu', () => {
       'href',
       '/assistant',
     )
-    expect(screen.getByRole('menuitem', { name: /how analysis works/i })).toHaveAttribute(
-      'href',
-      '/help',
-    )
+    const manual = screen.getByRole('menuitem', { name: /^manual$/i })
+    expect(manual).toHaveAttribute('href', '/manual/')
+    expect(manual).toHaveAttribute('target', '_blank')
     expect(screen.getByRole('menuitem', { name: /show the tour again/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /change password/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument()

@@ -123,7 +123,7 @@ describe('LibraryManagement', () => {
     expect(screen.getByText(/Restoring it requires the CLI/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Restore guide/ })).toHaveAttribute(
       'href',
-      expect.stringContaining('docs/reference.md#export-backup-and-restore'),
+      '/manual/operate/backup/',
     )
     expect(await screen.findByText(/Estimated backup size: about 1.4 GB/)).toBeInTheDocument()
 

@@ -3,16 +3,20 @@ name: ci
 # Code changes are linted and tested here. The production image is built once, by the
 # release workflow; rebuilding it for every commit spends runner time without publishing
 # anything.
+# `manual/**` is deliberately not ignored even though it is all markdown: the `manual` job
+# below is what catches a cross-link to a page or an anchor that is not there, and a job
+# that never runs on a documentation change catches nothing. `docs/` is code-behind material
+# nothing builds, so it stays ignored, and so do the markdown files at the root.
 on:
   push:
     branches: [main]
     paths-ignore:
-      - '**/*.md'
+      - '*.md'
       - 'LICENSE'
       - 'docs/**'
   pull_request:
     paths-ignore:
-      - '**/*.md'
+      - '*.md'
       - 'LICENSE'
       - 'docs/**'
 
@@ -41,6 +45,19 @@ jobs:
       # `slow` is deselected from the default run — seven tests that wait out reconnect
       # windows and shutdown grace periods. CI opts into them once here.
       - run: uv run pytest -m slow
+
+  manual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --group docs
+      # `--strict` fails on a cross-link to a page or an anchor that does not exist, which
+      # is the whole reason this job is here: the manual is the app's own documentation and
+      # nothing else notices when it rots.
+      - run: uv run --group docs mkdocs build --strict
 
   web:
     runs-on: ubuntu-latest

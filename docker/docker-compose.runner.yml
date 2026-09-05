@@ -1,4 +1,5 @@
-# A machine that runs engines for a Blunderbase somewhere else. Setup is docs/runners.md.
+# A machine that runs engines for a Blunderbase somewhere else. Setup is
+# https://blunderbase.org/manual/operate/runners/.
 services:
   blunderbase-runner:
     image: ghcr.io/philphilphil/blunderbase:latest

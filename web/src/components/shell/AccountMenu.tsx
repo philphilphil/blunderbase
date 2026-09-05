@@ -7,6 +7,7 @@ import { useLogout, useProfile } from '@/lib/api/queries'
 import type { AccountSummary } from '@/lib/api/types'
 import { useLocale } from '@/lib/i18n/I18nProvider'
 import { LOCALE_NAMES, LOCALES } from '@/lib/i18n/locale'
+import { manualUrl } from '@/lib/manual'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { useTour } from '@/lib/tour/TourProvider'
 import { cn } from '@/lib/utils'
@@ -35,9 +36,9 @@ const ITEM =
  * The chip is a plain person icon — initials read as an identity the app does not have,
  * and the accessible name already says whose installation this is. The menu it opens
  * heads with every connected account, then the deployment's own settings, the MCP config an
- * assistant is handed, the page explaining what the engines are doing, the language,
- * signing out and changing the password: everything an owner does to or asks about their
- * installation rather than about their games.
+ * assistant is handed, the manual, the language, signing out and changing the password:
+ * everything an owner does to or asks about their installation rather than about their
+ * games.
  *
  * The language sits here rather than beside the theme control because it is not a thing
  * you toggle while reading — it is set once, like a password, and the menu is where the
@@ -152,13 +153,26 @@ export function AccountMenu() {
               <Trans>Assistant</Trans>
             </Link>
           ) : null}
-          <Link to="/help" role="menuitem" className={ITEM} onClick={() => setOpen(false)}>
+          {/*
+            The manual's front page, in the language the app is in. The titlebar's (?) goes
+            to the chapter for the screen you are on; this is the way in when the question
+            is not about the screen in front of you. A new tab, because the manual is a
+            separate site served beside the app and the reader is mid-task.
+          */}
+          <a
+            href={manualUrl(locale)}
+            target="_blank"
+            rel="noreferrer"
+            role="menuitem"
+            className={ITEM}
+            onClick={() => setOpen(false)}
+          >
             <CircleHelp className="size-3.5" aria-hidden />
-            <Trans>How analysis works</Trans>
-          </Link>
+            <Trans>Manual</Trans>
+          </a>
           {/*
             Beside it, because it answers the same kind of question one screen earlier: the
-            page explains what the engines do, the tour says what the screens are. The tour
+            manual explains what the engines do, the tour says what the screens are. The tour
             runs once by itself on a fresh installation and this is the only way back to it.
           */}
           <button

@@ -515,9 +515,8 @@ msgid "Assistant"
 msgstr "Assistant"
 
 #: src/components/shell/AccountMenu.tsx
-#: src/routes/help/HelpPage.tsx
-msgid "How analysis works"
-msgstr "How analysis works"
+msgid "Manual"
+msgstr "Manual"
 
 #: src/components/shell/AccountMenu.tsx
 msgid "Show the tour again"
@@ -1041,6 +1040,10 @@ msgid "· read-only"
 msgstr "· read-only"
 
 #: src/components/shell/TopBar.tsx
+msgid "Open the manual for this page"
+msgstr "Open the manual for this page"
+
+#: src/components/shell/TopBar.tsx
 msgid "Search everything (⌘K)"
 msgstr "Search everything (⌘K)"
 
@@ -1260,8 +1263,8 @@ msgid "the engine did not come up in time"
 msgstr "the engine did not come up in time"
 
 #: src/lib/runner/support.ts
-msgid "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md"
-msgstr "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md"
+msgid "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see the manual at /manual/operate/deploy/"
+msgstr "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see the manual at /manual/operate/deploy/"
 
 #: src/lib/runner/support.ts
 msgid "this browser has no WebAssembly, so it cannot run an engine"
@@ -4587,90 +4590,6 @@ msgstr "Blunders"
 #: src/routes/games/savedFilters.ts
 msgid "No deep pass"
 msgstr "No deep pass"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Help"
-msgstr "Help"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Two engines"
-msgstr "Two engines"
-
-#: src/routes/help/HelpPage.tsx
-msgid "asks"
-msgstr "asks"
-
-#: src/routes/help/HelpPage.tsx
-msgid "what's best"
-msgstr "what's best"
-
-#: src/routes/help/HelpPage.tsx
-msgid "what a 2000 would play"
-msgstr "what a 2000 would play"
-
-#: src/routes/help/HelpPage.tsx
-msgid "spends"
-msgstr "spends"
-
-#: src/routes/help/HelpPage.tsx
-msgid "250k – 2M nodes"
-msgstr "250k – 2M nodes"
-
-#: src/routes/help/HelpPage.tsx
-msgid "one look, no search"
-msgstr "one look, no search"
-
-#: src/routes/help/HelpPage.tsx
-msgid "gives"
-msgstr "gives"
-
-#: src/routes/help/HelpPage.tsx
-msgid "1 line quick, 4 deep"
-msgstr "1 line quick, 4 deep"
-
-#: src/routes/help/HelpPage.tsx
-msgid "5 moves, each with odds"
-msgstr "5 moves, each with odds"
-
-#: src/routes/help/HelpPage.tsx
-msgid "lines?"
-msgstr "lines?"
-
-#: src/routes/help/HelpPage.tsx
-msgid "yes"
-msgstr "yes"
-
-#: src/routes/help/HelpPage.tsx
-msgid "never — <0>why?</0>"
-msgstr "never — <0>why?</0>"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Quick vs deep"
-msgstr "Quick vs deep"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Quick runs on import. Deep is the one you ask for, and it jumps the queue."
-msgstr "Quick runs on import. Deep is the one you ask for, and it jumps the queue."
-
-#: src/routes/help/HelpPage.tsx
-msgid "Why Maia never shows a line"
-msgstr "Why Maia never shows a line"
-
-#: src/routes/help/HelpPage.tsx
-msgid "One look, no search. Instinct is a spread of moves, not a continuation."
-msgstr "One look, no search. Instinct is a spread of moves, not a continuation."
-
-#: src/routes/help/HelpPage.tsx
-msgid "What a move cost"
-msgstr "What a move cost"
-
-#: src/routes/help/HelpPage.tsx
-msgid "Win% before minus after. 5, 10 and 15 are an inaccuracy, a mistake and a blunder."
-msgstr "Win% before minus after. 5, 10 and 15 are an inaccuracy, a mistake and a blunder."
-
-#: src/routes/help/HelpPage.tsx
-msgid "Change these numbers under <0>Engine passes</0>."
-msgstr "Change these numbers under <0>Engine passes</0>."
 
 #: src/routes/import/AccountCard.tsx
 msgid "Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes."

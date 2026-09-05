@@ -1,0 +1,11 @@
+# What builds the manual. Pinned, because a docs build that changes under you is a docs
+# build you cannot reproduce — `--strict` turns a plugin's new warning into a red CI job.
+#
+# These three are declared twice on purpose, here and in the `docs` dependency group of
+# `pyproject.toml`, and the two must stay in step. `uv` is what a developer and CI have,
+# so `make docs` and the CI job resolve from the lockfile; the Cloudflare Workers Builds
+# image that publishes blunderbase.org and the manual stage of the Docker image have
+# python3 and pip but no uv, and this file is what they install from.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+mkdocs-static-i18n==1.3.1

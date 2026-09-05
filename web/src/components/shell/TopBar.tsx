@@ -1,9 +1,11 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Menu, Search } from 'lucide-react'
+import { CircleHelp, Menu, Search } from 'lucide-react'
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 
+import { useLocale } from '@/lib/i18n/I18nProvider'
 import { SITE_URL } from '@/lib/links'
+import { manualUrl } from '@/lib/manual'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { cn } from '@/lib/utils'
 
@@ -38,11 +40,22 @@ import { ThemeToggle } from './ThemeToggle'
  * is in the titlebar because that is the one strip every screen shares, and it is a link
  * rather than a banner because a visitor who has understood it should not have to keep
  * reading it.
+ *
+ * The (?) sits with the breadcrumb rather than on a screen, because it is the same
+ * question on every screen — "what is this page for" — and the breadcrumb is already the
+ * bar's answer to "where am I". A page names its chapter (`SetPageChrome`'s `manual`) and
+ * this turns it into the link; a page that names none has no (?), so the button never
+ * points at something that does not answer the question in front of the reader.
+ *
+ * It opens a new tab. The manual is a separate site served beside the app, not a screen
+ * of it, and the reader is mid-task: they are looking something up about the page they
+ * are standing on and want to come back to it, not navigate away from it.
  */
 export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
-  const { breadcrumb, actions } = usePageChrome()
+  const { breadcrumb, actions, manual } = usePageChrome()
   const palette = useCommandPalette()
   const capabilities = useRuntimeCapabilities()
+  const { locale } = useLocale()
   const { t } = useLingui()
 
   return (
@@ -112,6 +125,18 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
             </Fragment>
           ))}
         </div>
+      ) : null}
+      {manual ? (
+        <a
+          href={manualUrl(locale, manual)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t`Open the manual for this page`}
+          title={t`Open the manual for this page`}
+          className="flex flex-none items-center rounded-md p-1 text-faint transition-colors hover:bg-raised hover:text-ink"
+        >
+          <CircleHelp className="size-3.5" aria-hidden />
+        </a>
       ) : null}
 
       <div className="flex-1" />

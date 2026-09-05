@@ -47,6 +47,7 @@ export function AnalysisPage() {
     <PageBody>
       <SetPageChrome
         breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: t`Coverage` }]}
+        manual="guide/analysis#what-is-left-to-analyse"
       />
       <PageHeader
         title={t`Analysis`}

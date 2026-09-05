@@ -53,7 +53,7 @@ export const THREAD_CAP = 8
  * be resolved at import, in whatever language happened to be loaded then.
  */
 export function isolationHint(): string {
-  return t`this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md`
+  return t`this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see the manual at /manual/operate/deploy/`
 }
 
 /** The little of `globalThis` this file reads. */

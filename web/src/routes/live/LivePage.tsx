@@ -119,7 +119,11 @@ export function LivePage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SetPageChrome breadcrumb={[{ label: t`Live` }]} actions={<ConnectionPill />} />
+      <SetPageChrome
+        breadcrumb={[{ label: t`Live` }]}
+        actions={<ConnectionPill />}
+        manual="guide/live"
+      />
 
       {/*
         The heading wraps below `md`: "Save this moment" and the flip control are the two

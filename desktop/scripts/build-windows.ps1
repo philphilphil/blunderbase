@@ -1,4 +1,8 @@
 # Build the web UI, frozen backend, and native Windows installer.
+#
+# The manual is not built here: the `desktop-windows` workflow builds it first (mkdocs), and
+# the `--add-data` below freezes `manual-site\` into the bundle so `/manual/` works offline
+# in the desktop app.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
@@ -30,6 +34,7 @@ $env:UV_CACHE_DIR = Join-Path $repoDir ".uv-desktop-cache"
 $migrationData = "$(Join-Path $repoDir 'backend/migrations');backend/migrations"
 $openingData = "$(Join-Path $repoDir 'backend/data');backend/data"
 $webData = "$(Join-Path $repoDir 'web/dist');web/dist"
+$manualData = "$(Join-Path $repoDir 'manual-site');manual-site"
 
 Push-Location $repoDir
 try {
@@ -44,6 +49,7 @@ try {
         --add-data $migrationData `
         --add-data $openingData `
         --add-data $webData `
+        --add-data $manualData `
         --distpath (Join-Path $pyinstallerDir "dist") `
         --workpath (Join-Path $pyinstallerDir "work") `
         --specpath (Join-Path $pyinstallerDir "spec") `

@@ -35,5 +35,10 @@ coverage.json
 # The assembled landing page (`make site`); the source is site/index.html.
 /site/dist/
 
+# The built manual (`make docs`); the source is manual/en and manual/de. It sits beside
+# `manual/` rather than inside it because MkDocs refuses an output directory within its
+# own docs_dir.
+/manual-site/
+
 # wrangler state from `npx wrangler dev` in site/
 /site/.wrangler/

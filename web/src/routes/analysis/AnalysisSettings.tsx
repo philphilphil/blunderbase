@@ -161,7 +161,10 @@ export function EnginePassesPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: t`Engine passes` }]} />
+      <SetPageChrome
+        breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: t`Engine passes` }]}
+        manual="guide/analysis#how-much-work-does-a-pass-do"
+      />
       <PageHeader
         title={t`Engine passes`}
         description={t`How much work quick and deep passes do, and how their results become move labels.`}
@@ -294,7 +297,10 @@ export function MaiaSettingsPage() {
   if (!settings.data) {
     return (
       <PageBody>
-        <SetPageChrome breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: 'Maia' }]} />
+        <SetPageChrome
+          breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: 'Maia' }]}
+          manual="guide/analysis#what-is-maia-asked"
+        />
         <PageHeader title="Maia" description={t`Which human levels the analysis asks about and when it asks them.`} />
         <LoadingOrError pending={settings.isPending} error={settings.error} retry={() => void settings.refetch()} />
       </PageBody>
@@ -324,7 +330,10 @@ export function MaiaSettingsPage() {
 
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: 'Maia' }]} />
+      <SetPageChrome
+        breadcrumb={[{ label: t`Analysis`, to: '/analysis' }, { label: 'Maia' }]}
+        manual="guide/analysis#what-is-maia-asked"
+      />
       <PageHeader title="Maia" description={t`Which human levels the analysis asks about and when it asks them.`} />
       <form noValidate onSubmit={submit} className="flex max-w-3xl flex-col gap-3">
         <Card>

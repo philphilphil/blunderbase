@@ -5,7 +5,8 @@ services:
     restart: unless-stopped
     ports:
       # On a machine other people can reach, bind to loopback ("127.0.0.1:8765:8765") and
-      # put a TLS terminator in front — docs/deploy.md has a Caddyfile and an nginx site.
+      # put a TLS terminator in front — https://blunderbase.org/manual/operate/deploy/ has
+      # a Caddyfile and an nginx site.
       - "8765:8765"
     volumes:
       # The database, uploaded PGNs and any engine binary downloaded from the UI.

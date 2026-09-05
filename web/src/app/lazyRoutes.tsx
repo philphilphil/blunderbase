@@ -24,9 +24,6 @@ export const GamePage = lazy(() =>
 export const GamesPage = lazy(() =>
   import('@/routes/games').then((route) => ({ default: route.GamesPage })),
 )
-export const HelpPage = lazy(() =>
-  import('@/routes/help').then((route) => ({ default: route.HelpPage })),
-)
 export const ImportPage = lazy(() =>
   import('@/routes/import').then((route) => ({ default: route.ImportPage })),
 )

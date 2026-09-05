@@ -15,7 +15,7 @@ taking `board.epd()` — the same spelling `services.explorer.normalize_fen` wri
 The pinned default is what makes a regeneration reproducible: `master` moves, and a
 rebuild that quietly picked up thirty new openings would be a data change nobody asked
 for in a diff nobody reads. Bump `UPSTREAM_REF` deliberately when refreshing the book,
-and update the provenance line in `docs/reference.md` with it.
+and update the provenance line in `docs/contributing.md` with it.
 """
 
 from __future__ import annotations

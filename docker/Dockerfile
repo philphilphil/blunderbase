@@ -30,6 +30,21 @@ RUN node scripts/engine-assets.mjs fetch
 # breaks a hosted instance — the page would call the visitor's own machine.
 RUN pnpm build
 
+# The manual, built into the image so `/manual/` is there on an instance with no way out to
+# the internet and always matches the version that is running. pip rather than uv: nothing
+# else in this stage needs a resolver, and `manual/requirements.txt` is pinned for exactly
+# this — the Cloudflare build that publishes blunderbase.org/manual/ installs from the same
+# file. Keep it in step with the `docs` dependency group in pyproject.toml.
+FROM python:3.12-slim-bookworm AS manual-build
+WORKDIR /app
+# The pins alone decide the dependency layer, so editing a page does not reinstall MkDocs.
+COPY manual/requirements.txt ./manual/requirements.txt
+RUN pip install --no-cache-dir -r manual/requirements.txt
+COPY mkdocs.yml ./
+COPY manual ./manual
+# `--strict`, so a dead cross-link fails the image build rather than shipping.
+RUN mkdocs build --strict
+
 FROM python:3.12-slim-bookworm AS python-deps
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
@@ -54,6 +69,7 @@ ENV PYTHONUNBUFFERED=1 \
     BLUNDERBASE_DATA_DIR=/data \
     BLUNDERBASE_DB_PATH=/data/blunderbase.db \
     BLUNDERBASE_WEB_DIST=/app/web/dist \
+    BLUNDERBASE_MANUAL_DIR=/app/manual-site \
     BLUNDERBASE_HOST=0.0.0.0 \
     BLUNDERBASE_PORT=8765
 
@@ -74,6 +90,7 @@ RUN set -eux; \
 WORKDIR /app
 COPY --from=python-deps /app/.venv ./.venv
 COPY --from=web-build /app/web/dist ./web/dist
+COPY --from=manual-build /app/manual-site ./manual-site
 COPY backend ./backend
 COPY docker ./docker
 COPY alembic.ini pyproject.toml README.md ./
