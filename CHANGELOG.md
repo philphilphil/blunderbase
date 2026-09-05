@@ -4,6 +4,17 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.13.0 — 2026-09-05
+
+- Added a manual in English and German, served in the app and on the site
+- Added a queue of live positions the assistant can push, with next and previous
+- Added a game replay board to the live position view
+- Added a per-account switch to leave a source out of automatic sync
+- Changed the demo to refuse whole-library downloads
+- Changed the release installers to carry their version in the file name
+- Fixed the desktop app packaging its opening data
+- Fixed an import interrupted by a restart never finishing
+
 ## v0.12.0 — 2026-09-05
 
 - Added an iOS companion app for the games list and game screen
