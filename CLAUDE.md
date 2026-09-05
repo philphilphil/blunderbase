@@ -82,7 +82,7 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
 | Design tokens, layout decisions, brand assets | `docs/design/README.md` |
 | Image, compose files, entrypoint (the public demo is `docker-compose.demo.yml`) | `docker/` |
 | CI and the release-to-deploy pipeline | `.github/workflows/` |
-| The landing page at blunderbase.org (static, GitHub Pages, `make site` to assemble) | `site/`, `scripts/site.sh` |
+| The landing page at blunderbase.org (static, Cloudflare Workers Builds, `make site` to assemble) | `site/`, `scripts/site.sh` |
 
 ## Working here
 
