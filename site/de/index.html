@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blunderbase – persönliche Schachdatenbank</title>
+<title>Blunderbase - persönliche Schachdatenbank</title>
 <meta name="description" content="Eine kostenlose, quelloffene Schachdatenbank für deine eigenen Partien. Importiert deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien, analysiert jede einzelne mit Stockfish und Maia und lässt einen KI-Trainer dieselbe Bibliothek lesen. Desktop-App, Docker-Image, iOS-Begleit-App.">
 <meta property="og:title" content="Blunderbase">
 <meta property="og:description" content="Eine persönliche Schachdatenbank, die jede Partie analysiert, die du spielst. Kostenlos, Open Source, läuft auf deinem eigenen Rechner.">
@@ -279,7 +279,7 @@
       Open Source, läuft auf deinem eigenen Rechner.
     </p>
     <div class="cta">
-      <a class="btn primary" id="dl" href="#download">
+      <a class="btn primary" href="#download">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 11l6 6 6-6M4 21h16"/></svg>
         <span>Download</span>
       </a>
@@ -382,17 +382,23 @@
       <div>
         <h3>Desktop</h3>
         <p style="margin-top:0">Eine einzige App für macOS und Windows, mit dem Backend darin. Kein Terminal, kein Container, kein Konto. Deine Bibliothek liegt im üblichen Ordner für Anwendungsdaten. Gib ihr den Pfad zu einem Stockfish auf deinem Rechner, oder lass die WebAssembly-Version im Browser die Arbeit machen.</p>
+        <!--
+          Both buttons land on the same release page, because the installers carry the
+          version in their file names and /latest/download/ can only redirect to a name
+          known in advance. Two buttons rather than one anyway: the pair is what says,
+          without a sentence, that there is a build for the machine you are on.
+        -->
         <p class="dl-row">
-          <a class="btn" href="https://github.com/philphilphil/blunderbase/releases/latest/download/Blunderbase-macOS-arm64.dmg" download>
+          <a class="btn" href="https://github.com/philphilphil/blunderbase/releases/latest">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.6-1-2.6-3.8zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.9-1 2.9 1.1.1 2.1-.5 2.8-1.3z"/></svg>
             macOS (Apple Silicon)
           </a>
-          <a class="btn" href="https://github.com/philphilphil/blunderbase/releases/latest/download/Blunderbase-Windows-x64-setup.exe" download>
+          <a class="btn" href="https://github.com/philphilphil/blunderbase/releases/latest">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zm8.5-1.2L21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zm8.5 0H21V21l-9.5-1.3z"/></svg>
             Windows (x64)
           </a>
         </p>
-        <p class="fine">Die Builds sind vorerst nicht signiert: macOS verlangt, dass du die App in den Systemeinstellungen freigibst, Windows zeigt einen SmartScreen-Hinweis. Intel-Macs und Linux stehen auf der Roadmap.</p>
+        <p class="fine">Auf der Release-Seite liegen die .dmg und die .exe, jeweils benannt nach ihrer Version. Die Builds sind vorerst nicht signiert: macOS verlangt, dass du die App in den Systemeinstellungen freigibst, Windows zeigt einen SmartScreen-Hinweis. Intel-Macs und Linux stehen auf der Roadmap.</p>
       </div>
       <div>
         <h3>Docker</h3>
@@ -513,21 +519,6 @@ docker run -d --name blunderbase -p 8765:8765 \
       root.classList.toggle('light', e.matches);
       apply();
     });
-  })();
-
-  // The big button downloads the installer for the machine it is pressed on, straight
-  // from the release asset (the /latest/download/ URL redirects to the file, no GitHub
-  // page in between). Anything else, Linux and phones included, goes to the list below.
-  (function () {
-    var a = document.getElementById('dl'), ua = navigator.userAgent;
-    var base = 'https://github.com/philphilphil/blunderbase/releases/latest/download/';
-    if (/Mac/.test(ua) && !/iPhone|iPad/.test(ua)) {
-      a.href = base + 'Blunderbase-macOS-arm64.dmg'; a.setAttribute('download', '');
-      a.lastElementChild.textContent = 'Für macOS herunterladen';
-    } else if (/Windows/.test(ua)) {
-      a.href = base + 'Blunderbase-Windows-x64-setup.exe'; a.setAttribute('download', '');
-      a.lastElementChild.textContent = 'Für Windows herunterladen';
-    }
   })();
 </script>
 </body>

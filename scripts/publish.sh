@@ -37,23 +37,27 @@ changelog_section() {
 }
 
 # The desktop installers `make desktop` left under desktop/dist go up with the release,
-# under names that do not carry the version: blunderbase.org links
-# releases/latest/download/<name>, which redirects straight to the file, and that link
-# only stays good if every release ships the same names. The versioned file name is
-# checked against the tag so a stale build from the last release cannot ride along.
-mac_asset=Blunderbase-macOS-arm64.dmg
-win_asset=Blunderbase-Windows-x64-setup.exe
-
+# renamed to carry the version and the platform in one readable name — a file that says
+# which Blunderbase it is once it is sitting in somebody's Downloads folder, and does not
+# collide with the last one they kept. Nothing links a fixed name any more: the site's
+# buttons go to the release page, because `releases/latest/download/<name>` can only
+# redirect to a name known in advance, which a versioned one is not. The name is built
+# from the tag, and the file it is built from is found by version, so a stale build from
+# the last release cannot ride along under this release's name.
 find_installer() {
 	set -- "desktop/dist/$1/Blunderbase_${version}_$2"
 	[ -f "$1" ] && echo "$1"
 }
 
+# Called once `version` is known, which is why the two names are set here and not at the
+# top of the file: under `set -u` they would abort the script before the tag is read.
 find_installers() {
+	mac_asset="Blunderbase-${version}-macOS-arm64.dmg"
+	win_asset="Blunderbase-${version}-Windows-x64-setup.exe"
 	mac=$(find_installer mac aarch64.dmg || true)
 	win=$(find_installer windows x64-setup.exe || true)
 	if [ -z "$mac" ] || [ -z "$win" ]; then
-		[ -n "${BB_SKIP_DESKTOP:-}" ] || die "desktop/dist has no $version installers for both platforms — run \`make desktop\` first, or BB_SKIP_DESKTOP=1 to release without them (the site's download buttons will 404)"
+		[ -n "${BB_SKIP_DESKTOP:-}" ] || die "desktop/dist has no $version installers for both platforms — run \`make desktop\` first, or BB_SKIP_DESKTOP=1 to release without them (the site's download section will have nothing to offer)"
 	fi
 }
 
