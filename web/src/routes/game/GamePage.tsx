@@ -469,7 +469,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     writeMovesWidth(null)
   }, [])
 
-  const detail = readOnly ? referenceDetailValue : library.data
+  const detail = readOnly ? referenceDetailValue : analysisRequest.demoDetail ?? library.data
   const moves = useMemo<MoveRow[]>(() => detail?.moves ?? [], [detail])
   const plyCount = moves.length
 
@@ -1777,6 +1777,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     return (
       <>
         {chrome}
+        {analysisRequest.setupDialog}
         <MobileGameView
           game={detail.game}
           best={best}
@@ -1806,6 +1807,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   return (
     <>
       {chrome}
+      {analysisRequest.setupDialog}
 
       {/*
         The screen's own heading, across the whole workspace: what the game is, and what has

@@ -196,15 +196,18 @@ page then works exactly as it did before, on one thread.
 
 demo.blunderbase.org is the same image, serving a library `blunderbase demo create` built,
 to everyone, read-only. It is a second stack beside the owner's own — never the same one,
-because demo mode has no password and must never be pointed at a real library. What makes
-it safe is in `docs/reference.md` under "Signing in"; what makes it run is three things:
+because demo mode has no password and must never be pointed at a real library. Nothing on
+that machine ever searches: every game arrives with its analysis copied in, and a visitor
+who wants a live board sets up Stockfish in their own tab from the Engines page or from the
+dialog Quick, Deep and continuous analysis offer. What makes it safe is in
+`docs/reference.md` under "Signing in"; what makes it run is three things:
 
-1. **Build the library on a machine that has your real one.** The engine row it writes has
-   to point at the Stockfish of the machine that will *serve* it, or the analysis board
-   in the game view has nothing to run:
+1. **Build the library on a machine that has your real one.** Every game in it arrives
+   analysed and it carries no engine row, so the container never starts a binary and there
+   is nothing on it for a stranger to keep busy:
 
    ```bash
-   uv run blunderbase demo create --games 72 --stockfish /usr/local/bin/stockfish
+   uv run blunderbase demo create --games 3000
    ```
 
 2. **Run the stack and put the file in its volume.** `docker/docker-compose.demo.yml` is
@@ -221,13 +224,15 @@ it safe is in `docs/reference.md` under "Signing in"; what makes it run is three
 
    The same two commands refresh it after a new `demo create`.
 
-3. **Give it a hostname.** The compose file's labels do that for Traefik; with another
-   proxy, publish the port on loopback and add one more site to the Caddyfile or nginx
-   config above. Everything the three rules say applies unchanged. There is no `/mcp` on
-   a demo. `/runner` is there, for the one case where the library
-   was built with `demo create --runners` and one of your own runners should serve the
-   demo's analysis board; a proxy that only forwards `/`, `/api` and `/events` is
-   otherwise forwarding everything there is.
+3. **Give it a hostname, and keep the isolation headers.** The compose file's labels do
+   the hostname for Traefik; with another proxy, publish the port on loopback and add one
+   more site to the Caddyfile or nginx config above. Everything the three rules say
+   applies unchanged, and the cross-origin isolation headers above matter more here than
+   anywhere else: browser Stockfish is the *only* engine a visitor can have, so a proxy
+   that strips `Cross-Origin-Opener-Policy` or `Cross-Origin-Embedder-Policy` leaves the
+   demo's analysis board with nothing to run. There is no `/mcp` on a demo, and no
+   `/runner` worth forwarding — nothing in the demo asks the server for an engine, so a
+   proxy that forwards `/`, `/api` and `/events` is forwarding everything there is.
 
 A release then keeps it current on its own. `release.yml`'s deploy job names both stacks,
 `blunderbase` and `blunderbase-demo`, so the demo pulls the same new `latest` the owner's

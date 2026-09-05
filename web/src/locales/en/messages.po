@@ -226,6 +226,52 @@ msgstr "Arrow one move ahead"
 msgid "Dim current pieces"
 msgstr "Dim current pieces"
 
+#: src/components/analysis/useEngineSetup.tsx
+msgid "Browser Stockfish did not register an engine."
+msgstr "Browser Stockfish did not register an engine."
+
+#: src/components/analysis/useEngineSetup.tsx
+msgid "No engine is set up"
+msgstr "No engine is set up"
+
+#: src/components/analysis/useEngineSetup.tsx
+msgid "Stockfish will run in this tab. Analysis results stay in your browser."
+msgstr "Stockfish will run in this tab. Analysis results stay in your browser."
+
+#: src/components/analysis/useEngineSetup.tsx
+msgid "Set up browser Stockfish to start this analysis without leaving the page."
+msgstr "Set up browser Stockfish to start this analysis without leaving the page."
+
+#: src/components/analysis/useEngineSetup.tsx
+msgid "Go to engine page"
+msgstr "Go to engine page"
+
+#: src/components/analysis/useEngineSetup.tsx
+#: src/routes/engines/DemoEngines.tsx
+msgid "Setting up Stockfish…"
+msgstr "Setting up Stockfish…"
+
+#: src/components/analysis/useEngineSetup.tsx
+#: src/routes/engines/DemoEngines.tsx
+msgid "Set up browser engine"
+msgstr "Set up browser engine"
+
+#: src/components/analysis/useEngineSetup.tsx
+#: src/lib/desktop/PgnDropOverlay.tsx
+#: src/routes/auth/ChangePasswordDialog.tsx
+#: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/engines/EngineDetail.tsx
+#: src/routes/engines/RunnerCard.tsx
+#: src/routes/games/components/DeleteGamesDialog.tsx
+#: src/routes/import/DeleteAllGamesDialog.tsx
+#: src/routes/live/SaveMoment.tsx
+#: src/routes/mcp/McpKeys.tsx
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Cancel"
+msgstr "Cancel"
+
 #: src/components/badges/SideDot.tsx
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/games/components/FilterBar.tsx
@@ -623,6 +669,7 @@ msgstr "coverage, backfills and what they cost"
 
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
+#: src/routes/engines/DemoEngines.tsx
 #: src/routes/engines/EnginesPage.tsx
 msgid "Engines"
 msgstr "Engines"
@@ -1159,21 +1206,6 @@ msgid "<0>{named}</0>. Games that are not yours are stored and analysed like any
 msgstr "<0>{named}</0>. Games that are not yours are stored and analysed like any other, and counted in no statistic."
 
 #: src/lib/desktop/PgnDropOverlay.tsx
-#: src/routes/auth/ChangePasswordDialog.tsx
-#: src/routes/engines/AddEngineForm.tsx
-#: src/routes/engines/BrowserRunnerSection.tsx
-#: src/routes/engines/CreateRunnerForm.tsx
-#: src/routes/engines/EngineDetail.tsx
-#: src/routes/engines/RunnerCard.tsx
-#: src/routes/games/components/DeleteGamesDialog.tsx
-#: src/routes/import/DeleteAllGamesDialog.tsx
-#: src/routes/live/SaveMoment.tsx
-#: src/routes/mcp/McpKeys.tsx
-#: src/routes/notes/components/NoteEditor.tsx
-msgid "Cancel"
-msgstr "Cancel"
-
-#: src/lib/desktop/PgnDropOverlay.tsx
 msgctxt "button"
 msgid "Import"
 msgstr "Import"
@@ -1218,6 +1250,14 @@ msgstr "{hours}h ago"
 #: src/lib/mcp/status.ts
 msgid "{days}d ago"
 msgstr "{days}d ago"
+
+#: src/lib/runner/install.ts
+msgid "the engine could not be started"
+msgstr "the engine could not be started"
+
+#: src/lib/runner/install.ts
+msgid "the engine did not come up in time"
+msgstr "the engine did not come up in time"
 
 #: src/lib/runner/support.ts
 msgid "this page is not cross-origin isolated, so the browser will not give it the shared memory the engine needs. Blunderbase serves the headers that ask for it, so a reverse proxy in front of it is most likely stripping them — see docs/deploy.md"
@@ -2498,6 +2538,42 @@ msgstr "Register remote runner"
 #: src/routes/mcp/CopyButton.tsx
 msgid "Copied"
 msgstr "Copied"
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "The demo server runs none. Analysis happens in your tab."
+msgstr "The demo server runs none. Analysis happens in your tab."
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "Browser Stockfish"
+msgstr "Browser Stockfish"
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "Quick, Deep and continuous analysis, all in this tab. Nothing is saved."
+msgstr "Quick, Deep and continuous analysis, all in this tab. Nothing is saved."
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "Stockfish is ready in this browser."
+msgstr "Stockfish is ready in this browser."
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "In your own Blunderbase"
+msgstr "In your own Blunderbase"
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "<0>Local engines</0> — a Stockfish or Maia binary by path."
+msgstr "<0>Local engines</0> — a Stockfish or Maia binary by path."
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "<0>Remote runners</0> — other machines, dialling in."
+msgstr "<0>Remote runners</0> — other machines, dialling in."
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "<0>Roles</0> — which engine does Quick, Deep and human moves."
+msgstr "<0>Roles</0> — which engine does Quick, Deep and human moves."
+
+#: src/routes/engines/DemoEngines.tsx
+msgid "Free and self-hosted — <0>run your own</0>."
+msgstr "Free and self-hosted — <0>run your own</0>."
 
 #: src/routes/engines/EngineBadges.tsx
 msgid "Human"

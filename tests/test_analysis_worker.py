@@ -1082,19 +1082,20 @@ def test_a_bad_fen_never_reaches_an_engine(db: sessionmaker[Session], tmp_path: 
         analysis.analyze_position(session, "banana", 1000)
 
 
-def test_the_demo_clamps_what_one_position_may_be_asked_to_cost(
+def test_the_demo_never_starts_a_local_position_engine(
     db: sessionmaker[Session], tmp_path: Path
 ) -> None:
-    """On the demo the caller names the budget and the deployment names the ceiling: the
-    route answers a stranger with no password, and 50M nodes on four threads is a machine."""
+    """Even a stale demo with a local engine row must never start that binary."""
+    from backend.services.engines import TierUnavailableError
+
     log = tmp_path / "demo-commands.jsonl"
     _register(db, tmp_path, go_default=QUICK_REPLIES[0], log=str(log))
     demo = Settings(root=tmp_path, runtime_mode="demo")
 
-    with db() as session:
+    with db() as session, pytest.raises(TierUnavailableError, match="does not run engines"):
         analysis.analyze_position(session, START_FEN, 50_000_000, settings=demo)
 
-    assert commands(log, "go nodes") == [f"go nodes {analysis.DEMO_POSITION_NODES}"]
+    assert not log.exists()
 
 
 def test_an_owner_spends_the_budget_they_asked_for(

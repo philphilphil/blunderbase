@@ -31,6 +31,9 @@
 import { useLingui } from '@lingui/react/macro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
+import { useDemoStream } from '@/lib/demo/useDemoStream'
+
 import { ApiError } from '@/lib/api/client'
 import { closeStream, listStreams, openStream, restartStream } from '@/lib/api/endpoints'
 import { useRunnersStatus } from '@/lib/api/queries'
@@ -132,7 +135,27 @@ function asError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value))
 }
 
-export function useStreamSession({
+/**
+ * The board a session runs on, chosen by the deployment rather than by the caller.
+ *
+ * A read-only deployment — the public demo — runs no engine of its own, so the only board
+ * a visitor can have is Stockfish in their own tab; `useDemoStream` answers the identical
+ * `StreamSessionApi` from there, and the panel above never learns which one it got.
+ * `read_only` cannot change while the app is mounted (it comes from the process's startup
+ * contract), so calling both hooks unconditionally is safe — and it is the only way to
+ * call them at all, since one of them cannot be skipped by a branch. The one that is not
+ * chosen is handed `fen: null`, which is how each of them says "there is nothing to
+ * analyse": no session is opened and no search is started.
+ */
+export function useStreamSession(options: UseStreamSessionOptions): StreamSessionApi {
+  const capabilities = useRuntimeCapabilities()
+  const demo = capabilities.read_only
+  const remote = useServerStreamSession({ ...options, fen: demo ? null : options.fen })
+  const local = useDemoStream({ ...options, fen: demo ? options.fen : null })
+  return demo ? local : remote
+}
+
+function useServerStreamSession({
   surface,
   fen,
   gameId = null,
@@ -141,7 +164,10 @@ export function useStreamSession({
 }: UseStreamSessionOptions): StreamSessionApi {
   const { t } = useLingui()
   const { reconnects } = useEvents()
-  const status = useRunnersStatus()
+  // Not on a demo: `useStreamSession` has already handed the board to the tab's own engine,
+  // so the server's runner roster is a poll every visitor would pay for and nothing reads.
+  const { read_only: demo } = useRuntimeCapabilities()
+  const status = useRunnersStatus({ enabled: !demo })
   const engines = useMemo(() => engineHosts(status.data), [status.data])
 
   const [enabled, setEnabledState] = useState(false)

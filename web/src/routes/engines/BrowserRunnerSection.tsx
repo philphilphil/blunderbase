@@ -9,10 +9,11 @@ import { useCreateRunner, useDeleteRunner } from '@/lib/api/queries'
 import type { RunnerResponse } from '@/lib/api/types'
 import {
   browserRunner,
-  browserRunnerName,
   browserRunnerSupport,
   useBrowserRunner,
 } from '@/lib/runner'
+
+import { installBrowserRunner } from '@/lib/runner/install'
 
 import { engineLabel, hasEngine, statusLabel } from './browserRunner'
 import { MachineRow } from './MachineRow'
@@ -68,19 +69,10 @@ export function BrowserRunnerSection({
 
   async function install() {
     setFailure(null)
-    const proposed = browserRunnerName(
-      typeof navigator === 'undefined' ? undefined : navigator.userAgent,
-    )
     try {
-      const created = await mintRunner(proposed, (name) =>
-        create.mutateAsync({ name, slots: 1 }),
-      )
-      browserRunner.start({
-        runnerId: created.runner.id,
-        // The server's own name, not the one we asked for: it may have held us to something
-        // else, and the engine this tab advertises is named after it.
-        runnerName: created.runner.name,
-        token: created.token,
+      await installBrowserRunner({
+        create: (body) => create.mutateAsync(body),
+        start: (credential) => browserRunner.start(credential),
       })
     } catch (cause) {
       setFailure(message(cause))
@@ -252,32 +244,6 @@ export function BrowserRunnerSection({
       }
     />
   )
-}
-
-/** How many names to try before giving up and letting the duplicate error through. */
-const NAME_ATTEMPTS = 5
-
-/**
- * Register the runner, working around a name this deployment already has.
- *
- * `POST /runners` answers 409 `duplicate_runner` for a name in use — two Chromes on two
- * machines is the ordinary case, not an edge one — so the second one becomes
- * `Chrome on macOS (2)`. Only that one status is retried; anything else is the owner's to
- * see.
- */
-async function mintRunner<T>(
-  proposed: string,
-  create: (name: string) => Promise<T>,
-): Promise<T> {
-  for (let attempt = 1; ; attempt += 1) {
-    const name = attempt === 1 ? proposed : `${proposed} (${attempt})`
-    try {
-      return await create(name)
-    } catch (cause) {
-      const taken = cause instanceof ApiError && cause.status === 409
-      if (!taken || attempt >= NAME_ATTEMPTS) throw cause
-    }
-  }
 }
 
 function message(cause: unknown): string {

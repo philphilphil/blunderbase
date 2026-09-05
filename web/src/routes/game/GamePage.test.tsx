@@ -848,6 +848,22 @@ describe('GamePage', () => {
     )
   })
 
+  it.each(['q', 'd'])('offers inline setup when %s has no engine assigned', async (key) => {
+    const user = userEvent.setup()
+    refusePost = { status: 409, body: { error: 'tier_unavailable', detail: 'no engine is assigned' } }
+    vi.stubGlobal('fetch', stubFetch({ '/engines/roles': { roles: [
+      { role: 'quick', configured: false, available: false },
+      { role: 'deep', configured: false, available: false },
+    ] } }))
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard(key)
+    expect(await screen.findByRole('dialog')).toHaveTextContent('No engine is set up')
+    expect(screen.getByRole('link', { name: 'Go to engine page' })).toHaveAttribute('href', '/engines')
+    expect(screen.getByRole('button', { name: 'Set up browser engine' })).toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
   it('toasts the engine sentence when the deep run is refused', async () => {
     // Nothing falls back: if the engine assigned to Deep is on a machine that is away, the
     // press is refused with a sentence naming it, and the button's only trace of that is a

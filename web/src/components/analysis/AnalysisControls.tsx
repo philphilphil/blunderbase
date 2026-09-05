@@ -1,3 +1,8 @@
+import { useEffect } from 'react'
+import { ApiError } from '@/lib/api/client'
+import { listEngineRoles } from '@/lib/api/endpoints'
+import { useEngineSetup } from './useEngineSetup'
+
 import { Plural, useLingui } from '@lingui/react/macro'
 
 import type { StreamSessionApi } from '@/lib/analysis'
@@ -89,6 +94,33 @@ export function AnalysisControls({
   className?: string
 }) {
   const { t } = useLingui()
+  const setup = useEngineSetup()
+  const { error, resume } = stream
+  const { show } = setup
+  // Switching the board on with no engine behind it is a missing step, not a failure, so
+  // it opens the same setup dialog Quick and Deep do and turns the board on once Stockfish
+  // is there. Two refusals reach here. `browser_engine_missing` is this tab's own — the
+  // demo's board never asked a server — and needs no confirming. `stream_unavailable` is
+  // the server's, and is the *same* status whether the deep role has no engine or its
+  // engine is simply away, so the roles are read to tell which; only the first is
+  // something a browser engine fixes, and the second stays the sentence the panel shows.
+  useEffect(() => {
+    if (!(error instanceof ApiError)) return
+    if (error.error === 'browser_engine_missing') return show('deep', resume)
+    if (error.error !== 'stream_unavailable') return
+    let cancelled = false
+    void listEngineRoles()
+      .then((roles) => {
+        if (cancelled) return
+        if (roles.roles.some((role) => role.role === 'deep' && !role.configured)) {
+          show('deep', resume)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [error, resume, show])
   const idle = fen === null || fen === ''
   // The name the server resolved "the deep tier" to. It is only knowable from a session
   // that is actually open, so before the first one the option says what it does, not who.
@@ -98,6 +130,7 @@ export function AnalysisControls({
     // The switch leads: it is the one control that decides whether the other two matter, and
     // on a narrow rail it is the one that must never be the thing that wraps away.
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
+      {setup.dialog}
       <Toggle
         checked={stream.enabled}
         onChange={stream.setEnabled}

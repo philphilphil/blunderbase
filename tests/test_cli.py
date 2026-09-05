@@ -43,6 +43,7 @@ from backend.db.session import session_scope
 from backend.services import auth as auth_service
 from backend.services import engines as engines_service
 from backend.services import explorer, import_service
+from backend.services.demo import DEFAULT_GAME_COUNT
 
 
 def test_every_prewired_source_is_a_cli_choice(settings: Settings) -> None:
@@ -128,7 +129,7 @@ def test_demo_create_defaults_to_a_second_database(settings: Settings) -> None:
     args = build_parser(settings).parse_args(["demo", "create"])
     assert args.source_path == settings.database_path
     assert args.output == settings.data_dir / "demo.db"
-    assert args.games == 72
+    assert args.games == DEFAULT_GAME_COUNT
     assert args.force is False
 
 

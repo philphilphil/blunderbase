@@ -65,11 +65,14 @@ export function AppShell() {
   // If a browser runner is installed in this browser, this is where it comes back: the
   // shell is what a signed-in tab mounts, and the link has to be alive on every page rather
   // than only while somebody is looking at `/engines`. A no-op when nothing is installed,
-  // and safe to call again — the client ignores a resume it is already connected for.
+  // and safe to call again — the client ignores a resume it is already connected for. Not
+  // on a read-only deployment: registering a runner is a write the demo refuses, and its
+  // browser Stockfish is a private one that never dials in (`lib/demo/analysis.ts`), so a
+  // credential left over from another deployment must not try to reconnect here.
   useEffect(() => {
-    if (capabilities.remote_runners) browserRunner.resume()
+    if (capabilities.remote_runners && !capabilities.read_only) browserRunner.resume()
     else browserRunner.stop()
-  }, [capabilities.remote_runners])
+  }, [capabilities.remote_runners, capabilities.read_only])
 
   // The demo refusing a write is said here, once, whichever button was pressed — see
   // `lib/api/readOnly.ts`. One toast id, so a visitor who keeps trying reads one sentence

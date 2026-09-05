@@ -4,8 +4,10 @@ services:
     image: ghcr.io/philphilphil/blunderbase:latest
     container_name: blunderbase-demo
     restart: unless-stopped
-    # The app bounds what a stranger can ask an engine for; these bound what the host can
-    # lose if that is ever wrong, since Traefik and everything behind it share this machine.
+    # The demo library has no engine of its own, so nothing here searches: every game comes
+    # analysed and an analysis board only runs when one of the owner's runners is dialled
+    # in. These bound what the host can lose if that is ever wrong, since Traefik and
+    # everything behind it share this machine.
     cpus: 2.0
     mem_limit: 3g
     networks:

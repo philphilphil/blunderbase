@@ -149,22 +149,19 @@ v%: ; @:
 site:
 	@sh scripts/site.sh
 
-# The public demo, locally: the same two processes as `run`, on a library `demo create`
-# built from this checkout's own database, with `BLUNDERBASE_RUNTIME_MODE=demo` — no
-# password, every write refused, the analysis board on this machine's Stockfish. The demo
-# database is built once and kept; delete data/demo.db to rebuild it from newer games.
-# `--runners` copies this checkout's runner tokens across, so a runner that dials into
-# `make run` dials into this the same way and its engine shows up in the board's picker.
-# `migrate` is order-only (after the `|`): it is phony, so as a normal prerequisite it
-# would make the file look stale on every run and `demo create` refuses to overwrite.
+# The public demo, locally: `demo create` on this checkout's own library, then the same two
+# processes as `run`, on the same two ports — localhost:5273 is the address to look at the
+# demo in, so this replaces `make run` rather than sitting beside it, and scripts/run_demo.py
+# says so if one is already up. Every game in it arrives analysed and the library holds no
+# engine, so nothing searches on this machine's behalf — the analysis board is browser
+# Stockfish, in the tab, writing nothing back. The database is built once and kept; delete
+# data/demo.db to rebuild it from newer games. `migrate` is order-only (after the `|`): it
+# is phony, so as a normal prerequisite it would make the file look stale on every run and
+# `demo create` refuses to overwrite.
 DEMO_DB := data/demo.db
 
 $(DEMO_DB): | migrate
-	uv run blunderbase demo create --output $(DEMO_DB) --stockfish "$(SF)" --runners
+	uv run blunderbase demo create --output $(DEMO_DB)
 
 run-demo: $(DEMO_DB)
-	@trap 'kill 0' EXIT INT TERM; \
-	BLUNDERBASE_DB_PATH=$(DEMO_DB) BLUNDERBASE_RUNTIME_MODE=demo BLUNDERBASE_ANALYSIS_WORKERS=false \
-		uv run blunderbase serve & \
-	cd web && pnpm dev & \
-	wait
+	uv run python scripts/run_demo.py

@@ -1,4 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { ApiError } from '@/lib/api/client'
+import type { ReactElement } from 'react'
+import { Providers } from '@/app/Providers'
+import { MemoryRouter } from 'react-router-dom'
+import { act, fireEvent, render as renderDom, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,6 +15,10 @@ import {
   InfiniteAnalysisPanel,
   type InfiniteAnalysisPanelProps,
 } from './InfiniteAnalysisPanel'
+
+function render(ui: ReactElement) {
+  return renderDom(<Providers><MemoryRouter>{ui}</MemoryRouter></Providers>)
+}
 
 /** After 1.e4 c5 2.Nf3 — Black to move, ply 3. */
 const SICILIAN = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
@@ -161,6 +169,49 @@ describe('InfiniteAnalysisPanel', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     resetLinePreviewPrefs()
+  })
+
+  it('offers setup after continuous analysis is refused for an unassigned deep role', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ roles: [
+      { role: 'deep', configured: false, available: false },
+    ] }), { status: 200, headers: { 'content-type': 'application/json' } })))
+    render(<InfiniteAnalysisPanel fen={SICILIAN} ply={3} stream={streamApi({
+      phase: 'error',
+      error: new ApiError(409, { error: 'stream_unavailable', detail: 'no engine is assigned' }),
+    })} />)
+    expect(await screen.findByRole('dialog')).toHaveTextContent('No engine is set up')
+  })
+
+  it('offers setup when the tab itself has no engine, without asking the server', async () => {
+    // The demo's own refusal: the board never reached the server, so the roles it would
+    // have asked about are not a question worth a round trip.
+    const fetched = vi.fn()
+    vi.stubGlobal('fetch', fetched)
+    render(<InfiniteAnalysisPanel fen={SICILIAN} ply={3} stream={streamApi({
+      phase: 'error',
+      error: new ApiError(409, { error: 'browser_engine_missing', detail: 'No engine is set up' }),
+    })} />)
+    expect(await screen.findByRole('dialog')).toHaveTextContent('No engine is set up')
+    expect(fetched).not.toHaveBeenCalled()
+  })
+
+  it('leaves an engine that is merely away to the toast that names it', async () => {
+    // Deep *is* assigned — the engine holding it is on a machine that is not connected.
+    // Browser Stockfish is not what that deployment is missing, so no dialog is offered.
+    const roles = vi.fn(async () => new Response(JSON.stringify({ roles: [
+      { role: 'deep', configured: true, available: false },
+    ] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', roles)
+    render(<InfiniteAnalysisPanel fen={SICILIAN} ply={3} stream={streamApi({
+      phase: 'error',
+      error: new ApiError(409, {
+        error: 'stream_unavailable',
+        detail: "'sf-nuc' runs on 'nuc', which is not connected",
+      }),
+    })} />)
+    await waitFor(() => expect(roles).toHaveBeenCalled())
+    await act(async () => {})
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('offers the search rather than starting one', async () => {

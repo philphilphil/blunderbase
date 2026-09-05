@@ -2522,6 +2522,10 @@ def analyze_position(
     from backend.services.explorer import read_fen
 
     resolved = settings or get_settings()
+    if resolved.demo:
+        raise engines_service.TierUnavailableError(
+            Tier.QUICK, "the demo does not run engines on the server; use browser Stockfish"
+        )
     engine = engines_service.require_engine_for_tier(session, Tier.QUICK, local_only=True)
     text = (fen or "").strip()
     try:

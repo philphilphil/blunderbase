@@ -42,10 +42,12 @@ DESKTOP_CAPABILITIES = RuntimeCapabilities(
 )
 # The public demo: no password because there is nothing to protect, no coach because it
 # would be a stranger's way to make the process do work, and no writes because the
-# library is the exhibit. Runners stay: one dials *in*, with a token only the owner
-# minted (`demo create --runners` copies the hashes over), and minting a new one is a
-# write the demo refuses — so the door is there but only the owner's machines have a key.
-# It is what lets the owner's remote engine serve the demo's analysis board.
+# library is the exhibit. Nothing a visitor does reaches an engine on this machine — the
+# analysis board and both tiers run on Stockfish in their own tab — and the demo's games
+# arrive already analysed, so there is nothing here to keep busy. `remote_runners` stays
+# true only so the door a token opens is the same door in every mode: one dials *in* with
+# a hash `demo create --runners` copied over, and minting a new one is a write the demo
+# refuses, so only the owner's own machines have a key.
 DEMO_CAPABILITIES = RuntimeCapabilities(
     password_auth=False,
     mcp=False,

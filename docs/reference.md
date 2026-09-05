@@ -191,6 +191,25 @@ to fix it, rather than failing.
 override the search engine the same way. `MAIA_MODELS` becomes `--cache-dir …
 --local-files-only`, so a machine with the weights cached answers with no network.
 
+Nothing here is a prerequisite the owner has to have satisfied before pressing a button.
+When Quick, Deep or the continuous-analysis switch is refused because that role has no
+engine assigned, the refusal is not a toast — the game opens a dialog offering **Go to
+engine page** and **Set up browser engine**. The second one never leaves the board: it
+installs this browser as a runner (reusing one already installed), waits for Stockfish to
+register, gives it the role if that role is still empty, and then runs the pass or opens
+the board that was asked for in the first place. Any other refusal — an engine that is
+switched off, or on a machine that is not connected — is still a toast naming it, because
+a browser engine is not what that deployment is missing.
+
+The public demo is the same dialog with a shorter path behind it. It is read-only, so
+nothing is registered and nothing is saved: Stockfish starts in the tab, Quick and Deep and
+the analysis board all run there, and the results live in that tab until it is reloaded.
+The stored Quick pass every demo game already carries needs no engine at all. Its Engines
+page is its own screen (`routes/engines/DemoEngines.tsx`): browser Stockfish, then three
+lines naming what the real page holds — local engines, remote runners, roles. The real page
+shown empty would read as "Blunderbase has no engines" rather than "this demo has none of
+its own", which is the one impression it must not leave.
+
 ## Opening names
 
 The explorer names a position from a vendored copy of
@@ -437,21 +456,22 @@ the same repair for every account; it is idempotent, and never revises a game wh
 is already known.
 
 `demo create` reads a varied sample of analyzed games from `BLUNDERBASE_DB_PATH` and writes
-`<data-dir>/demo.db`. Use `--games N` to size it, `--as-of YYYY-MM-DD` to pin the fake date
-range, `--from` or `--output` to choose either file, and `--force` to explicitly replace an
-old output. It reconstructs PGNs without comments and fabricates all identifying metadata;
-credentials and personal notes are never copied. The engine rows it writes point nowhere,
-which is right for screenshots: the analysis is copied in, so nothing needs to run. A demo
-that is going to be *served* wants a live engine behind its analysis board — `--stockfish
-PATH` is what its Stockfish row points at on the machine that will serve it (the image has
-one at `/usr/local/bin/stockfish`). `--runners` copies the runner rows — name, slots and
-the token's hash, nothing else — so a runner that dials into the source library dials into
-the demo with the token it has and its engines appear in the board's picker once it says
-hello; `make run-demo` passes it. Run the result as an ordinary deployment, or as the
-public demo:
+`<data-dir>/demo.db`. It takes 3,000 games unless `--games N` says otherwise; `--as-of
+YYYY-MM-DD` pins the fake date range, `--from` or `--output` chooses either file, and
+`--force` explicitly replaces an old output. It reconstructs PGNs without comments and
+fabricates all identifying metadata; credentials and personal notes are never copied.
+
+It writes no engine row and assigns no role: every game arrives with a completed Quick
+pass, the numbers copied in, so nothing ever needs to run on the machine serving it. In
+demo mode that is the whole story — the analysis board, Quick and Deep all run on browser
+Stockfish in the visitor's own tab and are never sent to the server. `--runners` copies the
+runner rows — name, slots and the token's hash, nothing else — so a runner that dials into
+the source library dials into the demo with the token it has; that is for serving the demo
+library as an *ordinary* deployment, where server engines are used as usual. Run the result
+either way:
 
 ```bash
-uv run blunderbase demo create --games 72
+uv run blunderbase demo create --games 3000
 BLUNDERBASE_DB_PATH=data/demo.db uv run blunderbase serve                              # yours, with a password
 BLUNDERBASE_DB_PATH=data/demo.db BLUNDERBASE_RUNTIME_MODE=demo uv run blunderbase serve  # everyone's, read-only
 ```

@@ -15,7 +15,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from backend.api.deps import SessionDep
+from backend.api.deps import SessionDep, SettingsDep
 from backend.api.schemas import MaiaPolicyRequest, MaiaPolicyResponse
 from backend.services import maia_live as maia_live_service
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/maia", tags=["maia"])
 
 
 @router.post("/policy", response_model=MaiaPolicyResponse, summary="Ask Maia about a position")
-def policy(session: SessionDep, body: MaiaPolicyRequest) -> Any:
+def policy(session: SessionDep, settings: SettingsDep, body: MaiaPolicyRequest) -> Any:
     """One position's policy per level, and optionally the line two humans would play.
 
     Every level the deployment is configured for in one call — `levels` keyed by the level,
@@ -35,6 +35,10 @@ def policy(session: SessionDep, body: MaiaPolicyRequest) -> Any:
     to a subprocess, and a debounced board must not be able to stall the loop while it
     waits its turn.
     """
+    if settings.demo:
+        raise maia_live_service.LiveMaiaUnavailableError(
+            "the demo does not run engines on the server"
+        )
     return maia_live_service.live_policy(
         session,
         fen=body.fen,

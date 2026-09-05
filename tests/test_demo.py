@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from backend.cli import main
 from backend.config import Settings
-from backend.db.enums import EngineKind, Platform, RunStatus, Tier
+from backend.db.enums import EngineKind, EngineRole, Platform, RunStatus, Tier
 from backend.db.models import (
     Account,
     AnalysisRun,
@@ -20,6 +20,7 @@ from backend.db.models import (
     Runner,
 )
 from backend.db.session import session_scope
+from backend.services import engines as engines_service
 from backend.services import runners as runners_service
 from backend.services.demo import DEMO_NAME, DemoDataError, create_demo_database
 
@@ -156,35 +157,28 @@ def test_demo_cli_reports_the_created_library(
 
 
 
-def test_demo_stockfish_row_points_where_the_serving_machine_is_told(
+def test_demo_owns_no_engine_and_every_game_arrives_analyzed(
     settings: Settings, fixtures_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A demo built for screenshots needs no engine; one that will be served wants the
-    binary of the machine serving it behind the analysis board."""
+    """Nothing runs on the machine serving the demo: no engine row, no role assigned, and
+    no game left for one to catch up with. A runner that dials in takes the empty roles."""
     _analyzed_source(settings, fixtures_dir / "query_games.pgn")
     capsys.readouterr()
     output = tmp_path / "served-demo.db"
 
-    assert main(
-        [
-            "demo",
-            "create",
-            "--games",
-            "1",
-            "--output",
-            str(output),
-            "--stockfish",
-            "/usr/local/bin/stockfish",
-        ]
-    ) == 0
+    assert main(["demo", "create", "--games", "1", "--output", str(output)]) == 0
 
     demo_settings = Settings(
         root=tmp_path, data_dir=tmp_path, BLUNDERBASE_DB_PATH=output, analysis_workers=False
     )
     with session_scope(demo_settings) as session:
-        paths = {engine.kind: engine.path for engine in session.scalars(select(Engine))}
-    assert paths[EngineKind.UCI] == "/usr/local/bin/stockfish"
-    assert paths[EngineKind.MAIA] == "/demo/maia"
+        assert session.scalars(select(Engine)).all() == []
+        for role in EngineRole:
+            assert not engines_service.role_status(session, role).configured
+        runs = session.scalars(select(AnalysisRun)).all()
+        assert [run.engine_id for run in runs] == [None]
+        assert all(run.tier is Tier.QUICK and run.status is RunStatus.DONE for run in runs)
+        assert {run.game_id for run in runs} == {game.id for game in session.scalars(select(Game))}
     assert "BLUNDERBASE_RUNTIME_MODE=demo" in capsys.readouterr().out
 
 

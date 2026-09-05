@@ -560,6 +560,10 @@ class StreamBroker:
                     )
             else:
                 engine = engines_service.require_engine(session, engine_id)
+            if self.settings.demo and engine.runner_id is None:
+                raise StreamUnavailableError(
+                    "the demo does not run engines on the server; use browser Stockfish"
+                )
             if engine.kind is EngineKind.MAIA:
                 raise StreamRequestError(
                     f"{engine.name!r} is a human-move model, which answers with a policy "

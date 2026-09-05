@@ -27,4 +27,7 @@ export { clearCredential, readCredential, writeCredential } from './credential'
 export type { RunnerSupport, ThreadPlan } from './support'
 export { browserRunnerName, browserRunnerSupport, threadPlan } from './support'
 
+export type { InstallBrowserRunnerOptions, RunnerStateSource } from './install'
+export { installBrowserRunner, whenBrowserEngineReady } from './install'
+
 export { browserRunner, useBrowserRunner } from './store'

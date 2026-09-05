@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     events.start()
     workers = AnalysisWorkers(settings=settings)
     app.state.workers = workers
-    if settings.analysis_workers:
+    if settings.analysis_workers and not settings.demo:
         await workers.start()
     gateway = RunnerGateway(settings=settings) if capabilities.remote_runners else None
     app.state.gateway = gateway

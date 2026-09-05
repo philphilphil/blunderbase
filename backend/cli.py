@@ -248,7 +248,7 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
         default=settings.data_dir / "demo.db",
         help="new demo database; defaults to <data-dir>/demo.db",
     )
-    create_demo.add_argument("--games", type=_positive_int, default=72, metavar="N")
+    create_demo.add_argument("--games", type=_positive_int, default=3_000, metavar="N")
     create_demo.add_argument(
         "--as-of", type=_date, help="newest fake game date; defaults to today"
     )
@@ -256,17 +256,11 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
         "--force", action="store_true", help="replace an existing output database"
     )
     create_demo.add_argument(
-        "--stockfish",
-        metavar="PATH",
-        help="what the demo's Stockfish row points at on the machine that will serve it, "
-        "so the analysis board has a live engine (the image has one at /usr/local/bin/"
-        "stockfish); defaults to a path that exists nowhere, which is fine for screenshots",
-    )
-    create_demo.add_argument(
         "--runners",
         action="store_true",
         help="copy the runner rows (name, slots, token hash) so a runner that dials into "
-        "the source library can dial into the demo with the token it already has",
+        "the source library can dial into the demo with the token it already has; the "
+        "demo has no engine of its own, so this is what puts one behind its analysis board",
     )
 
     return parser
@@ -696,7 +690,7 @@ def command_db(args: argparse.Namespace, settings: Settings) -> int:
 
 def command_demo(args: argparse.Namespace, settings: Settings) -> int:
     """Build the isolated library used for screenshots and the public demo."""
-    from backend.services.demo import DEMO_STOCKFISH_PATH, DemoDataError, create_demo_database
+    from backend.services.demo import DemoDataError, create_demo_database
 
     try:
         summary = create_demo_database(
@@ -705,7 +699,6 @@ def command_demo(args: argparse.Namespace, settings: Settings) -> int:
             game_count=args.games,
             as_of=args.as_of,
             force=args.force,
-            stockfish_path=args.stockfish or DEMO_STOCKFISH_PATH,
             runners=args.runners,
         )
     except DemoDataError as exc:

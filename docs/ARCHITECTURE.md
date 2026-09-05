@@ -82,14 +82,24 @@ filter to the personal library. This preserves the one-file invariant: each runn
 still has one database, every existing service remains unaware of demo data, and fake ratings
 cannot leak into real stats. The command reads analyzed standard games from the source and
 retains only chess facts (moves and evaluations). It rebuilds PGNs and replaces identities,
-ratings, dates, source IDs, accounts, engine configuration, Maia policies and notes.
+ratings, dates, source IDs, accounts and notes, and drops engine configuration entirely.
 
-The resulting file is the seed for screenshots and for the public demo. Read-only behavior
-and the open door do not belong in the seed generator; they are a runtime mode
-(`BLUNDERBASE_RUNTIME_MODE=demo`) and live at the two seams a request passes on its way in —
-the auth guard lets everyone through, and `api/readonly.py` beside it refuses every write.
-A locally served seed without that mode therefore behaves like a normal deployment, password
-and all; with it, the same file is what demo.blunderbase.org serves.
+**The seed holds no engine, and every game in it is already analyzed.** Those two facts are
+one invariant: nothing a visitor does can make the machine serving the demo start a search.
+The evaluations are copied in and the runs that carry them name no engine row, so the
+Engines page has nothing to show and no role is assigned for a run to claim. In demo mode
+the browser does not fall back to the server either — the analysis board and both tiers run
+on Stockfish in the visitor's own tab (`web/src/lib/demo/`), and what it computes stays
+there. Both server guards stay in place regardless: `analyze_position` and the stream broker
+refuse a local engine under `settings.demo`, because a seed that predates this is a file the
+owner may still have on disk.
+
+Read-only behavior and the open door do not belong in the seed generator; they are a runtime
+mode (`BLUNDERBASE_RUNTIME_MODE=demo`) and live at the two seams a request passes on its way
+in — the auth guard lets everyone through, and `api/readonly.py` beside it refuses every
+write. A locally served seed without that mode therefore behaves like a normal deployment,
+password and all — server engines and runners included; with it, the same file is what
+demo.blunderbase.org serves.
 
 WAL, `foreign_keys=ON` and a busy timeout are set by a `connect` event installed in
 `backend.db.session.create_db_engine`. They are per-connection pragmas, so they have to be

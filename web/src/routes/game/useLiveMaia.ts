@@ -9,12 +9,15 @@
  *
  * A deployment with no backend-local Maia answers `409`. That is a standing fact rather
  * than a failure, so it is reported as `unavailable` and the caller renders nothing at all
- * — the spec's "degrade, don't error".
+ * — the spec's "degrade, don't error". The demo is that fact known in advance: it runs no
+ * engine on its server, so the question is not asked at all rather than debounced into one
+ * refusal per position.
  */
 import { useEffect, useState } from 'react'
 
 import { ApiError } from '@/lib/api/client'
 import { useMaiaPolicy } from '@/lib/api/queries'
+import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import { maiaLiveLevels, nearestLevel, type MaiaLiveView } from './gameModel'
 
@@ -58,9 +61,10 @@ export function useLiveMaia(
   elos: number | readonly number[] | null,
   pick: number | null = null,
 ): LiveMaia {
+  const capabilities = useRuntimeCapabilities()
   const wanted = typeof elos === 'number' ? [elos] : elos === null ? null : [...elos]
   const settled = useDebounced(fen, LIVE_DEBOUNCE_MS)
-  const asked = fen === null ? null : settled
+  const asked = fen === null || capabilities.read_only ? null : settled
   const query = useMaiaPolicy({ fen: asked, elos: wanted, rolloutPlies: ROLLOUT_PLIES })
   // What the cache holds answers for `asked`, which lags the board by the debounce window
   // (and answers instantly, from cache, for a position walked back to). A policy for the
@@ -70,7 +74,8 @@ export function useLiveMaia(
   // the question has caught up with the board, and `pending` says why the column is bare.
   const current = asked === fen
 
-  const unavailable = query.error instanceof ApiError && query.error.status === 409
+  const unavailable =
+    capabilities.read_only || (query.error instanceof ApiError && query.error.status === 409)
   const views = unavailable || !current ? [] : maiaLiveLevels(query.data)
   const picked = nearestLevel(
     views.map((view) => view.level),
@@ -79,7 +84,7 @@ export function useLiveMaia(
   return {
     views,
     view: views.find((view) => view.level === picked) ?? views[0] ?? null,
-    pending: fen !== null && (!current || query.isFetching),
+    pending: !unavailable && fen !== null && (!current || query.isFetching),
     unavailable,
   }
 }

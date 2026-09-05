@@ -4,6 +4,13 @@ The source library contributes chess only: legal move lists and stored engine fa
 ratings, dates, source identifiers, notes, credentials and configuration are all replaced.
 Keeping the demo in another database means the rest of Blunderbase needs no ``is_demo``
 condition and there is no route by which fabricated stats can enter the owner's archive.
+
+The demo owns no engine. Every game arrives already analysed — the evaluations are copied
+in, the runs point at no engine row — so nothing ever has to start a binary on the machine
+serving it, and nothing there is for a stranger to keep busy. A visitor who wants a live
+board runs Stockfish in their own tab; in demo mode the browser never asks the server for
+an engine at all. ``runners=True`` is for the other way this library gets served — as an
+ordinary deployment, with a password — where the owner's own runners work as usual.
 """
 
 from __future__ import annotations
@@ -24,8 +31,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.config import Settings
 from backend.db.enums import (
     Color,
-    EngineKind,
-    EngineRole,
     JobStatus,
     NoteSource,
     Platform,
@@ -35,7 +40,7 @@ from backend.db.enums import (
     Tier,
 )
 from backend.db.migrate import upgrade_to_head
-from backend.db.models import Account, AnalysisRun, Engine, Game, ImportJob, MoveEval, Runner
+from backend.db.models import Account, AnalysisRun, Game, ImportJob, MoveEval, Runner
 from backend.db.session import create_db_engine, get_sessionmaker, reset_engines
 from backend.services import analysis as analysis_service
 from backend.services import app_settings as app_settings_service
@@ -44,13 +49,7 @@ from backend.services import notes as notes_service
 from backend.services.accounts import AccountIndex
 from backend.services.import_service import ParsedGame, ingest_game
 
-DEFAULT_GAME_COUNT = 72
-# Where the demo's engine rows point when nobody says otherwise: nowhere. The stored
-# analysis is copied in, so a demo built for screenshots never needs to start an engine;
-# a demo that is going to be *served* wants the real thing behind its analysis board, which
-# is what `stockfish_path` is for.
-DEMO_STOCKFISH_PATH = "/demo/stockfish"
-DEMO_MAIA_PATH = "/demo/maia"
+DEFAULT_GAME_COUNT = 3_000
 DEMO_SEED = 0xB1D3
 # The fake dates cover this many days at most, about four years for a full-sized library.
 # A small demo is squeezed into fewer, so that 72 games still look like a season rather
@@ -134,7 +133,6 @@ def create_demo_database(
     game_count: int = DEFAULT_GAME_COUNT,
     as_of: date | None = None,
     force: bool = False,
-    stockfish_path: str = DEMO_STOCKFISH_PATH,
     runners: bool = False,
 ) -> DemoSummary:
     """Create an anonymous demo database, returning what was written.
@@ -143,15 +141,12 @@ def create_demo_database(
     must not exist unless ``force`` was explicitly requested. Selection and fake values are
     deterministic for a given source and ``as_of`` date, which keeps screenshots stable.
 
-    ``stockfish_path`` is what the demo's Stockfish row points at — a real binary on the
-    machine that will serve the demo gives its analysis board a live engine; the default
-    points nowhere and is right for screenshots.
-
     ``runners`` copies the source's runner rows — name, slots and the token's hash — so a
     runner already dialling into the source library dials into the demo with the token it
-    has. Only the rows: the engines a runner advertises are written when it says hello.
-    Off by default, because a token hash is the one credential a demo otherwise never
-    carries, and a demo built for screenshots has no reason to.
+    has. Only the rows: the engines a runner advertises are written when it says hello, and
+    the first search engine to do so takes the quick and deep roles, which nothing else in
+    the demo holds. Off by default, because a token hash is the one credential a demo
+    otherwise never carries, and a demo built for screenshots has no reason to.
     """
     source = source_path.expanduser().resolve()
     target = target_path.expanduser().resolve()
@@ -191,9 +186,7 @@ def create_demo_database(
                 raise DemoDataError(
                     "the source has no analyzed standard games attributed to an owner"
                 )
-            summary = _seed(
-                source_session, target_session, candidates, target, anchor, stockfish_path
-            )
+            summary = _seed(source_session, target_session, candidates, target, anchor)
             if runners:
                 _runners(source_session, target_session)
             target_session.commit()
@@ -283,11 +276,9 @@ def _seed(
     candidates: list[Candidate],
     path: Path,
     anchor: date,
-    stockfish_path: str,
 ) -> DemoSummary:
     accounts = _accounts(target)
-    stockfish, maia = _engines(target, stockfish_path)
-    _settings(target, stockfish, maia)
+    _settings(target)
     total = len(candidates)
     span = _span_days(total)
     curves = _rating_curves(span)
@@ -322,13 +313,11 @@ def _seed(
         source_runs.append(original_run)
 
     target.flush()
-    analyzed = max(1, round(len(imported) * 0.84))
+    # Every game has a Quick pass copied from the source library.
+    analyzed = len(imported)
     deep = 0
-    paired = zip(imported[:analyzed], source_runs[:analyzed], strict=True)
-    for index, (game, original_run) in enumerate(paired):
-        tier = Tier.DEEP if index % 4 == 1 else Tier.QUICK
-        deep += int(tier is Tier.DEEP)
-        _analysis(target, source, game, original_run, stockfish, tier)
+    for game, original_run in zip(imported, source_runs, strict=True):
+        _analysis(target, source, game, original_run, Tier.QUICK)
 
     for job in jobs.values():
         job.status = JobStatus.DONE
@@ -368,28 +357,6 @@ def _accounts(session: Session) -> AccountIndex:
     return AccountIndex.load(session)
 
 
-def _engines(session: Session, stockfish_path: str) -> tuple[Engine, Engine]:
-    stockfish = Engine(
-        name="Stockfish 18",
-        kind=EngineKind.UCI,
-        path=stockfish_path,
-        version="18",
-        options={"Threads": 4, "Hash": 512},
-        enabled=True,
-    )
-    maia = Engine(
-        name="Maia",
-        kind=EngineKind.MAIA,
-        path=DEMO_MAIA_PATH,
-        version="2",
-        options={},
-        enabled=True,
-    )
-    session.add_all((stockfish, maia))
-    session.flush()
-    return stockfish, maia
-
-
 def _runners(source: Session, target: Session) -> int:
     """Copy the runner rows, so the same tokens open the demo. Nothing else about them:
     `connected` and `last_seen_at` are facts about the source process, not this one."""
@@ -402,11 +369,11 @@ def _runners(source: Session, target: Session) -> int:
     return len(rows)
 
 
-def _settings(session: Session, stockfish: Engine, maia: Engine) -> None:
+def _settings(session: Session) -> None:
+    # The levels the copied policies are filed under, so the panel knows which to show.
+    # No role is assigned: there is no engine row to assign, and a runner that dials in
+    # takes the empty ones itself (`engines.assign_default_roles`).
     app_settings_service.set_maia_elos(session, list(MAIA_ELOS))
-    app_settings_service.set_role_engine_id(session, EngineRole.QUICK, stockfish.id)
-    app_settings_service.set_role_engine_id(session, EngineRole.DEEP, stockfish.id)
-    app_settings_service.set_role_engine_id(session, EngineRole.HUMAN, maia.id)
 
 
 def _span_days(total: int) -> int:
@@ -592,12 +559,13 @@ def _analysis(
     source: Session,
     game: Game,
     original_run: AnalysisRun,
-    engine: Engine,
     tier: Tier,
 ) -> None:
+    # No engine row: the numbers were computed elsewhere, and a run that named an engine
+    # the demo does not have would be a run the Engines page could not account for.
     run = AnalysisRun(
         game_id=game.id,
-        engine_id=engine.id,
+        engine_id=None,
         tier=tier,
         status=RunStatus.RUNNING,
         depth=max(original_run.depth or 18, 18 if tier is Tier.QUICK else 24),

@@ -10,6 +10,8 @@ import { useEngineRoles, useEngines, useRunnersStatus } from '@/lib/api/queries'
 import { hostByEngineId } from '@/lib/engines/hosts'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
+import { DemoEngines } from './DemoEngines'
+
 import { CapacityGrid } from './CapacityGrid'
 import { EngineInventory } from './EngineInventory'
 import { RolesForm } from './RolesForm'
@@ -37,6 +39,8 @@ export function EnginesPage() {
   // The assignment is read once for the page: the inventory and the form use the same map,
   // so one engine can never be described two ways in two sections.
   const byRole = useMemo(() => engineRoles(roles.data), [roles.data])
+
+  if (capabilities.read_only) return <DemoEngines />
 
   return (
     <PageBody>
