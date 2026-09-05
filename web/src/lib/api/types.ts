@@ -530,6 +530,7 @@ export interface ImportRequest {
  * Null is off. The number is minutes, floored at one by the backend.
  */
 export interface SyncSchedule {
+  disabled_sources?: ('lichess' | 'chesscom' | 'fics')[]
   minutes: number | null
 }
 
@@ -1498,6 +1499,9 @@ export interface LiveSquare {
 }
 
 export interface LiveState extends Extra {
+  position_index?: number
+  position_count?: number
+  game_positions?: { ply: number; fen: string; san: string | null; uci: string | null }[]
   active: boolean
   game_id?: number | null
   ply?: number | null

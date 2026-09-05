@@ -222,12 +222,12 @@ def api(settings: Settings) -> Iterator[TestClient]:
 
 
 def test_the_schedule_is_read_set_and_cleared_over_http(api: TestClient) -> None:
-    assert api.get("/import/schedule").json() == {"minutes": None}
+    assert api.get("/import/schedule").json() == {"minutes": None, "disabled_sources": []}
 
-    assert api.put("/import/schedule", json={"minutes": 30}).json() == {"minutes": 30}
-    assert api.get("/import/schedule").json() == {"minutes": 30}
+    assert api.put("/import/schedule", json={"minutes": 30}).json() == {"minutes": 30, "disabled_sources": []}
+    assert api.get("/import/schedule").json() == {"minutes": 30, "disabled_sources": []}
 
-    assert api.put("/import/schedule", json={"minutes": None}).json() == {"minutes": None}
+    assert api.put("/import/schedule", json={"minutes": None}).json() == {"minutes": None, "disabled_sources": []}
     assert api.put("/import/schedule", json={"minutes": 0}).status_code == 422
 
 
@@ -240,3 +240,19 @@ def test_the_serve_process_runs_the_scheduler_except_in_the_demo(settings: Setti
     settings.runtime_mode = "demo"
     with TestClient(create_app(settings)) as client:
         assert client.app.state.auto_sync is None
+
+
+def test_disabled_sources_are_skipped_until_enabled(session: Session) -> None:
+    account(session, Platform.FICS, "rare")
+    account(session, Platform.LICHESS, "daily")
+    app_settings_service.set_disabled_sync_sources(session, ["fics"])
+    assert [item.source for item in due_syncs(session, 30, NOW)] == ["lichess"]
+    app_settings_service.set_disabled_sync_sources(session, [])
+    assert len(due_syncs(session, 30, NOW)) == 2
+
+
+def test_source_preferences_survive_schedule_changes(api: TestClient) -> None:
+    assert api.put("/import/schedule", json={"disabled_sources": ["fics"]}).json()["disabled_sources"] == ["fics"]
+    assert api.put("/import/schedule", json={"minutes": 30}).json()["disabled_sources"] == ["fics"]
+    assert api.put("/import/schedule", json={"disabled_sources": []}).json()["minutes"] == 30
+    assert api.put("/import/schedule", json={"disabled_sources": ["invalid"]}).status_code == 422

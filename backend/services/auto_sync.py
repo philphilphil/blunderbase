@@ -50,7 +50,12 @@ def due_syncs(session: Session, minutes: int, now: datetime) -> list[DueSync]:
         .where(Account.is_owner.is_(True), Account.platform.in_(SYNCABLE))
         .order_by(Account.id)
     )
+    from backend.services.app_settings import get_disabled_sync_sources
+
+    disabled = get_disabled_sync_sources(session)
     for account in accounts:
+        if str(account.platform) in disabled:
+            continue
         started = _last_started(session, account)
         if started is None or now - started >= interval:
             source = str(Source(str(account.platform)))

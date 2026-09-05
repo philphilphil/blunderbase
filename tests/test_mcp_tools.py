@@ -982,3 +982,9 @@ async def test_driving_the_live_board_never_touches_a_stored_game(
     stored = session.get(Game, game.id)
     assert stored is not None
     assert stored.moves_uci == moves
+
+
+async def test_show_positions_pushes_a_batch(coach: MCPServer) -> None:
+    payload = await call(coach, "show_positions", positions=[{"fen": START_FEN}, {"fen": FRENCH, "text": "Second"}])
+    assert payload["position_count"] == 2
+    assert live_service.select_position(1)["text"] == "Second"

@@ -351,3 +351,25 @@ def test_clearing_the_board_does_not_disconnect_anybody() -> None:
         assert live.clear()["viewer_count"] == 1
     finally:
         live.viewer_left()
+
+
+def test_batch_navigation_preserves_annotations_and_rejects_partial_batch(session: Session) -> None:
+    state = live.show_positions(session, [{"fen": START, "text": "First"}, {"fen": FRENCH}])
+    assert state["position_count"] == 2
+    live.annotate(arrows=["e2e4"])
+    assert live.select_position(1)["fen"] == FRENCH
+    assert live.select_position(0)["arrows"][0]["from"] == "e2"
+    before = live.get_state()
+    with pytest.raises(live.LiveFenError):
+        live.show_positions(session, [{"fen": FRENCH}, {"fen": "invalid"}])
+    assert live.get_state() == before
+    with pytest.raises(live.LiveRequestError):
+        live.select_position(2)
+    assert live.clear()["position_count"] == 0
+
+
+def test_batch_game_reference_contains_replay(session: Session, game: Game) -> None:
+    state = live.show_positions(session, [{"game_id": game.id, "ply": 2}])
+    assert state["game_positions"][2]["fen"] == state["fen"]
+    assert len(state["game_positions"]) == len(game.moves_uci) + 1
+    assert state["game_positions"][1]["san"]

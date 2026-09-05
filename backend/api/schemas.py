@@ -13,7 +13,7 @@ browser), so every documented field carries a default.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -492,12 +492,14 @@ class SyncSchedule(BaseModel):
     """How often every connected account is synced on its own. Null: never."""
 
     minutes: int | None
+    disabled_sources: list[Literal["lichess", "chesscom", "fics"]] = Field(default_factory=list)
 
 
 class SyncScheduleUpdate(Input):
     """The same, as the import page posts it: a number to switch on, null to switch off."""
 
     minutes: int | None = Field(default=None, ge=1)
+    disabled_sources: list[Literal["lichess", "chesscom", "fics"]] | None = None
 
 
 class ImportRequest(Input):
@@ -1824,6 +1826,13 @@ class LiveSquare(BaseModel):
     color: str
 
 
+class LiveGamePosition(BaseModel):
+    ply: int
+    fen: str
+    san: str | None = None
+    uci: str | None = None
+
+
 class LiveState(Payload):
     """`services.live.get_state`: the board the coach is driving, whole.
 
@@ -1831,6 +1840,9 @@ class LiveState(Payload):
     which is why every field the socket carries is documented here too.
     """
 
+    position_index: int = 0
+    position_count: int = 0
+    game_positions: list[LiveGamePosition] = Field(default_factory=list)
     active: bool = False
     game_id: int | None = None
     ply: int | None = None

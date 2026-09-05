@@ -56,9 +56,7 @@ def list_jobs(
     return ImportJobList(
         jobs=[
             ImportJobResponse.model_validate(job)
-            for job in import_service.list_jobs(
-                session, source=source, limit=limit, offset=offset
-            )
+            for job in import_service.list_jobs(session, source=source, limit=limit, offset=offset)
         ],
         total=import_service.count_jobs(session, source=source),
         limit=limit,
@@ -93,14 +91,21 @@ def cancel_job(session: SessionDep, job_id: int) -> ImportCancelling:
 
 @router.get("/schedule", response_model=SyncSchedule, summary="How often accounts sync alone")
 def get_schedule(session: SessionDep) -> SyncSchedule:
-    return SyncSchedule(minutes=app_settings_service.get_auto_sync_minutes(session))
+    return SyncSchedule(
+        minutes=app_settings_service.get_auto_sync_minutes(session),
+        disabled_sources=app_settings_service.get_disabled_sync_sources(session),
+    )
 
 
 @router.put("/schedule", response_model=SyncSchedule, summary="Sync every N minutes, or never")
 def put_schedule(session: SessionDep, body: SyncScheduleUpdate) -> SyncSchedule:
     """Every connected account, from its last cursor, on this clock — the Sync button
     pressed for you (`workers/auto_sync.py`). Answers with what is in force."""
-    return SyncSchedule(minutes=app_settings_service.set_auto_sync_minutes(session, body.minutes))
+    if "minutes" in body.model_fields_set:
+        app_settings_service.set_auto_sync_minutes(session, body.minutes)
+    if body.disabled_sources is not None:
+        app_settings_service.set_disabled_sync_sources(session, body.disabled_sources)
+    return get_schedule(session)
 
 
 @router.post(
@@ -211,16 +216,12 @@ async def _in_background(
     tasks.add(task)
     task.add_done_callback(_forget(tasks))
 
-    await asyncio.wait(
-        {started, task}, timeout=JOB_ID_TIMEOUT, return_when=asyncio.FIRST_COMPLETED
-    )
+    await asyncio.wait({started, task}, timeout=JOB_ID_TIMEOUT, return_when=asyncio.FIRST_COMPLETED)
     _settle(started, None)
     return started.result()
 
 
-def _run(
-    settings: Settings, source: str, options: dict[str, Any], progress: ProgressHook
-) -> Any:
+def _run(settings: Settings, source: str, options: dict[str, Any], progress: ProgressHook) -> Any:
     """One sync, in its own transaction. Runs in a worker thread."""
     with session_scope(settings) as session:
         return import_service.run_import(session, source, progress=progress, **options)

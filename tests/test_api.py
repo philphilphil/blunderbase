@@ -1851,3 +1851,11 @@ def _drain(socket: Any, until: str, limit: int = 20) -> list[dict[str, Any]]:
         if frame["event"] == until:
             return events
     raise AssertionError(f"never saw {until}: {events}")
+
+
+def test_live_navigation_and_reset_are_shared(api: TestClient) -> None:
+    live_service.show_position(FRENCH)
+    assert api.post("/live/positions/0").json()["fen"] == FRENCH
+    assert api.post("/live/positions/1").status_code == 422
+    assert api.post("/live/reset").json()["active"] is False
+    assert live_service.get_state()["position_count"] == 0

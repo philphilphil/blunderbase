@@ -1,3 +1,8 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { resetLive, selectLivePosition } from '@/lib/api/endpoints'
+import { queryKeys } from '@/lib/api/keys'
+import { MiniBoard } from '@/components/board/MiniBoard'
+import { Button } from '@/components/ui/button'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { FlipVertical2, Radio } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -67,8 +72,16 @@ function ConnectionPill() {
  * reconfigured rather than rebuilt.
  */
 export function LivePage() {
+  const client = useQueryClient()
+  const control = useMutation({
+    mutationFn: (index: number | null) => index === null ? resetLive() : selectLivePosition(index),
+    onSuccess: (data) => client.setQueryData(queryKeys.live(), data),
+  })
+  const [replayPly, setReplayPly] = useState(0)
   const live = useLiveState()
   const state = live.data
+  useEffect(() => setReplayPly(state?.ply ?? 0), [state?.game_id, state?.ply, state?.position_index])
+  const replay = state?.game_positions?.[replayPly]
   const [flipped, setFlipped] = useState(false)
   const [flash, setFlash] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -127,6 +140,12 @@ export function LivePage() {
           <p className="text-[0.78125rem] text-dim">{describeSession(state, game)}</p>
         </div>
         <div className="flex-1" />
+        {(state?.position_count ?? 0) > 1 ? <div className="flex items-center gap-2">
+          <Button size="sm" disabled={control.isPending || !state?.position_index} onClick={() => control.mutate((state?.position_index ?? 0) - 1)}><Trans>Prev</Trans></Button>
+          <span className="text-xs tabular-nums">{(state?.position_index ?? 0) + 1} / {state?.position_count}</span>
+          <Button size="sm" disabled={control.isPending || (state?.position_index ?? 0) >= (state?.position_count ?? 0) - 1} onClick={() => control.mutate((state?.position_index ?? 0) + 1)}><Trans>Next</Trans></Button>
+        </div> : null}
+        <Button size="sm" disabled={!active || control.isPending} onClick={() => control.mutate(null)}><Trans>Reset</Trans></Button>
         <SaveMoment active={active} />
         <button
           type="button"
@@ -139,6 +158,7 @@ export function LivePage() {
         </button>
       </header>
 
+      {control.isError ? <p role="alert" className="px-5 text-sm text-blunder">{control.error.message}</p> : null}
       {/*
         Board over rail below `md`, in one scroller. The desktop shape is a board sized to
         the viewport height beside a rail that scrolls on its own; on a phone the height
@@ -209,6 +229,18 @@ export function LivePage() {
             // strip it is when it hangs off the bottom of the game page's move list.
             className="rounded-xl border border-line"
           />
+          {active && replay ? <section className="flex flex-col gap-3 rounded-xl border border-line p-3">
+            <h2 className="text-sm font-semibold"><Trans>Game replay</Trans></h2>
+            <MiniBoard fen={replay.fen} lastMove={replay.uci} orientation={orientation} size="100%" label={t`Referenced game position`} />
+            <div className="flex items-center justify-between gap-2">
+              <Button size="sm" aria-label={t`Previous game move`} disabled={replayPly === 0} onClick={() => setReplayPly((ply) => ply - 1)}><Trans>Prev</Trans></Button>
+              <span className="text-xs"><Trans>Ply {replayPly}</Trans></span>
+              <Button size="sm" aria-label={t`Next game move`} disabled={replayPly >= (state?.game_positions?.length ?? 1) - 1} onClick={() => setReplayPly((ply) => ply + 1)}><Trans>Next</Trans></Button>
+            </div>
+            <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto" aria-label={t`Game moves`}>
+              {state?.game_positions?.map((position) => <button type="button" key={position.ply} aria-current={position.ply === replayPly ? 'step' : undefined} className={cn('rounded px-1.5 py-1 text-xs', position.ply === replayPly ? 'bg-accent-teal/20 text-ink' : 'text-soft hover:bg-elevated')} onClick={() => setReplayPly(position.ply)}>{position.ply === 0 ? t`Start` : `${Math.ceil(position.ply / 2)}${position.ply % 2 ? '.' : '…'} ${position.san}`}</button>)}
+            </div>
+          </section> : null}
           <CoachComment text={state?.text} updatedAt={state?.updated_at} />
           {state && active ? <SessionMeta state={state} game={game} /> : null}
           {followed.isError ? (

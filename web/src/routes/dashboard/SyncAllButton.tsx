@@ -8,12 +8,12 @@
  * username survives a reload. Nothing synced yet — nothing to press, so the button becomes
  * a link to the page that can connect an account.
  */
-import { Trans, useLingui } from '@lingui/react/macro'
+import { useLingui } from '@lingui/react/macro'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useImportJobs, useStartImport } from '@/lib/api/queries'
+import { useSyncSchedule, useImportJobs, useStartImport } from '@/lib/api/queries'
 import type { ImportJob, Source } from '@/lib/api/types'
 import { useImportProgress } from '@/routes/import/useImportProgress'
 import { cn } from '@/lib/utils'
@@ -73,13 +73,14 @@ export function syncTargets(jobs: ImportJob[] | undefined): SyncTarget[] {
 
 export function SyncAllButton() {
   const { t } = useLingui()
+  const schedule = useSyncSchedule()
   const jobs = useImportJobs({ limit: JOB_LIMIT })
   const progress = useImportProgress()
   const start = useStartImport()
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
-  const targets = syncTargets(jobs.data?.jobs)
+  const targets = syncTargets(jobs.data?.jobs).filter((target) => !schedule.data?.disabled_sources?.includes(target.source))
   // `/events` is the only thing that knows a sync is still walking the archive: the POST
   // has long since answered with a job id by then.
   const syncing = pending || targets.some((target) => progress[target.source]?.running === true)
@@ -107,7 +108,7 @@ export function SyncAllButton() {
   if (!jobs.isPending && targets.length === 0) {
     return (
       <Link to="/library/import" className={BUTTON}>
-        <Trans>Connect account</Trans>
+        {syncTargets(jobs.data?.jobs).length ? t`Enable sources` : t`Connect account`}
       </Link>
     )
   }
@@ -122,7 +123,7 @@ export function SyncAllButton() {
       <button
         type="button"
         onClick={() => void syncAll()}
-        disabled={jobs.isPending || syncing}
+        disabled={jobs.isPending || !schedule.data || syncing}
         aria-busy={syncing}
         title={
           targets.length === 0

@@ -677,3 +677,17 @@ def set_auto_sync_minutes(session: Session, minutes: int | None) -> int | None:
         row.value = wanted
     session.commit()
     return wanted
+
+
+def get_disabled_sync_sources(session: Session) -> list[str]:
+    row = session.get(AppSetting, "disabled_sync_sources")
+    return list(row.value) if row is not None and isinstance(row.value, list) else []
+
+
+def set_disabled_sync_sources(session: Session, sources: list[str]) -> None:
+    row = session.get(AppSetting, "disabled_sync_sources")
+    if row is None:
+        session.add(AppSetting(key="disabled_sync_sources", value=sorted(set(sources))))
+    else:
+        row.value = sorted(set(sources))
+    session.commit()

@@ -693,3 +693,6 @@ export const maiaPolicy = (body: MaiaPolicyRequest) =>
 // --- live -----------------------------------------------------------------
 
 export const getLiveState = () => http.get<LiveState>('/live')
+
+export const resetLive = () => http.post<LiveState>('/live/reset')
+export const selectLivePosition = (index: number) => http.post<LiveState>(`/live/positions/${index}`)

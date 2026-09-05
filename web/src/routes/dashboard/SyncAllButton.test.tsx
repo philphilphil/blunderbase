@@ -8,11 +8,12 @@ import type { ImportJob, ImportJobList } from '@/lib/api/types'
 
 import { SyncAllButton, syncTargets } from './SyncAllButton'
 
+const useSyncSchedule = vi.hoisted(() => vi.fn(() => ({ data: { minutes: null, disabled_sources: [] as string[] } })))
 const useImportJobs = vi.hoisted(() => vi.fn())
 const useStartImport = vi.hoisted(() => vi.fn())
 const useImportProgress = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/api/queries', () => ({ useImportJobs, useStartImport }))
+vi.mock('@/lib/api/queries', () => ({ useImportJobs, useStartImport, useSyncSchedule }))
 vi.mock('@/routes/import/useImportProgress', () => ({ useImportProgress }))
 
 function job(over: Partial<ImportJob> & Pick<ImportJob, 'id' | 'source'>): ImportJob {
@@ -143,4 +144,15 @@ describe('SyncAllButton', () => {
 
     expect(await screen.findByText('lichess said no')).toBeInTheDocument()
   })
+})
+
+
+it('skips disabled sources when syncing all', async () => {
+  mutateAsync.mockClear()
+  mutateAsync.mockResolvedValue({})
+  useSyncSchedule.mockReturnValue({ data: { minutes: null, disabled_sources: ['fics'] } })
+  draw({ data: page([job({ id: 1, source: 'lichess' }), job({ id: 2, source: 'fics' })]) })
+  await userEvent.click(screen.getByRole('button', { name: /Sync all/i }))
+  await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ source: 'lichess', body: { username: 'phib' } }))
+  expect(mutateAsync.mock.calls.some(([request]) => request.source === 'fics')).toBe(false)
 })

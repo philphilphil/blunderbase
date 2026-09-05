@@ -988,6 +988,16 @@ def _register_runners(server: MCPServer, coach: Coach) -> None:
 def _register_live(server: MCPServer, coach: Coach) -> None:
     @server.tool()
     @guarded
+    def show_positions(positions: list[dict[str, Any]]) -> TextContent:
+        """Push 1–100 positions at once, replacing the live queue. Each object has either
+        fen or game_id and optional ply (default 0), plus optional text, arrows, squares.
+        The first appears immediately; the user can browse with Next/Prev. A game reference
+        also shows its moves and a smaller replay board. Invalid batches change nothing."""
+        with coach.session() as session:
+            return payloads.result(live_service.show_positions(session, positions))
+
+    @server.tool()
+    @guarded
     def show_game(game_id: int, ply: int = 0) -> TextContent:
         """Put one of the owner's games on the board they are watching, `ply` half-moves
         in (0 is the starting position). Use this instead of describing a position in

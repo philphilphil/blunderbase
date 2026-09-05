@@ -314,3 +314,35 @@ describe('LivePage', () => {
     expect(screen.getByText('the session is gone')).toBeInTheDocument()
   })
 })
+
+it('navigates queued positions and resets the shared session', async () => {
+  const first = { ...SHOWING, position_index: 0, position_count: 2 }
+  stubFetch({ '/api/live': first, '/api/games/7': GAME,
+    '/api/live/positions/1': { ...first, position_index: 1 },
+    '/api/live/positions/0': first, '/api/live/reset': IDLE })
+  renderPage(<LivePage />)
+  expect(await screen.findByText('1 / 2')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Prev' })).toBeDisabled()
+  await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(await screen.findByText('2 / 2')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  await userEvent.click(screen.getByRole('button', { name: 'Prev' }))
+  expect(await screen.findByText('1 / 2')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Reset' }))
+  expect(await screen.findByText('Nothing is on the board.')).toBeInTheDocument()
+})
+
+it('replays game moves on a second board without changing the live position', async () => {
+  stubFetch({ '/api/live': { ...SHOWING, game_positions: [
+    { ply: 0, fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', san: null, uci: null },
+    { ply: 1, fen: SHOWING.fen, san: 'e4', uci: 'e2e4' },
+  ] }, '/api/games/7': GAME })
+  renderPage(<LivePage />)
+  expect(await screen.findByText('Game replay')).toBeInTheDocument()
+  expect(screen.getAllByTestId('board')).toHaveLength(2)
+  await userEvent.click(screen.getByRole('button', { name: 'Previous game move' }))
+  expect(screen.getByText('Ply 0')).toBeInTheDocument()
+  expect(screen.getByText('kn1ghtmare — phib · ply 1')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '1. e4' }))
+  expect(screen.getByText('Ply 1')).toBeInTheDocument()
+})

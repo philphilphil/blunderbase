@@ -21,11 +21,12 @@ import { SourceBadge } from '@/components/badges/SourceBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useStartImport } from '@/lib/api/queries'
+import { useSyncSchedule, useUpdateSyncSchedule, useStartImport } from '@/lib/api/queries'
 import type { AccountSummary, ImportJob, Source } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
+import { SyncCheckbox } from './SyncCheckbox'
 import { JobProgress, progressChrome } from './JobProgress'
 import type { SyncOptions } from './SourcesPanel'
 import type { SourceProgress } from './useImportProgress'
@@ -90,6 +91,8 @@ export function AccountCard({
     if (!edited.current && suggested) setUsername(suggested)
   }, [suggested])
 
+  const schedule = useSyncSchedule()
+  const updateSchedule = useUpdateSyncSchedule()
   const start = useStartImport()
   const running = progress?.running === true || start.isPending
   const when = lastJob ? relative(lastJob.finished_at ?? lastJob.created_at) : null
@@ -146,6 +149,19 @@ export function AccountCard({
         )}
       </div>
 
+      <SyncCheckbox
+        label={t`Include in sync`}
+        title={t`Include this source in automatic sync and Sync all. You can still sync it manually.`}
+        checked={!schedule.data?.disabled_sources?.includes(source)}
+        disabled={!schedule.data || updateSchedule.isPending}
+        onChange={(enabled) => updateSchedule.mutate({
+          minutes: schedule.data?.minutes ?? null,
+          disabled_sources: enabled
+            ? (schedule.data?.disabled_sources ?? []).filter((value) => value !== source)
+            : [...(schedule.data?.disabled_sources ?? []), source],
+        })}
+      />
+      {schedule.isError || updateSchedule.isError ? <p role="alert" className="text-xs text-blunder">{schedule.error?.message ?? updateSchedule.error?.message}</p> : null}
       <Label htmlFor={`${source}-username`} className="sr-only">
         <Trans>Username</Trans>
       </Label>

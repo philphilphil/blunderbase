@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -99,9 +100,12 @@ class LiveState:
     # tell "the game's next move" from a departure without opening a Session.
     board: chess.Board | None = None
     line: tuple[str, ...] = ()
+    game_positions: list[dict[str, Any]] = field(default_factory=list)
 
 
 _STATE = LiveState()
+_POSITIONS: list[LiveState] = []
+_POSITION_INDEX = 0
 # Mutations arrive from MCP tool threads and reads from request threads, so the state is
 # only ever touched under this. Events are published outside it: a subscriber that came
 # back in here would deadlock on a plain lock and re-enter on a reentrant one.
@@ -119,45 +123,80 @@ def show_game(session: Session, game_id: int, ply: int = 0) -> dict[str, Any]:
     from the initial array — chess960, an OTB fragment — arrives on the board it was
     actually played on.
     """
-    game = games_service.get_game(session, int(game_id))
-    if game is None:
-        raise UnknownLiveGameError(f"no game with id {game_id}")
+    return show_positions(session, [{"game_id": game_id, "ply": ply}])
 
-    moves = tuple(game.moves_uci or ())
-    target = int(ply)
-    if target < 0 or target > len(moves):
-        raise LiveRequestError(
-            f"ply {target} is outside game {game.id}, which has {len(moves)} half-moves"
-        )
 
-    board = _board_at(session, game, target)
+def show_position(fen: str) -> dict[str, Any]:
+    return _show_states([_position_state({"fen": fen}, None)])
+
+
+def _position_state(entry: Mapping[str, Any], session: Session | None) -> LiveState:
+    from backend.services.explorer import read_fen
+
+    state = LiveState()
+    if entry.get("game_id") is not None:
+        if entry.get("fen") is not None:
+            raise LiveRequestError("use either game_id or fen for each position")
+        game = games_service.get_game(session, int(entry["game_id"]))
+        if game is None:
+            raise UnknownLiveGameError(f"no game with id {entry['game_id']}")
+        target = int(entry.get("ply", 0))
+        moves = tuple(game.moves_uci or ())
+        if target < 0 or target > len(moves):
+            raise LiveRequestError(f"ply {target} is outside game {game.id}")
+        board = _board_at(session, game, 0)
+        state.game_positions = [{"ply": 0, "fen": board.fen(), "san": None, "uci": None}]
+        for ply, uci in enumerate(moves, 1):
+            move = board.parse_uci(uci)
+            san = board.san(move)
+            board.push(move)
+            state.game_positions.append({"ply": ply, "fen": board.fen(), "san": san, "uci": uci})
+        state.board = _board_at(session, game, target)
+        state.game_id, state.ply, state.line = game.id, target, moves
+        state.last_move = moves[target - 1] if target else None
+    else:
+        fen = str(entry.get("fen") or "").strip()
+        if not fen:
+            raise LiveFenError("a FEN is required")
+        try:
+            state.board = read_fen(fen)
+        except ValueError as exc:
+            raise LiveFenError(str(exc)) from None
+    state.text = _comment(entry.get("text") or "") or None
+    state.arrows = [_arrow(value) for value in _marks(entry.get("arrows") or [], "arrows")]
+    state.squares = [_square(value) for value in _marks(entry.get("squares") or [], "squares")]
+    return state
+
+
+def show_positions(session: Session, positions: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Replace the queue atomically; each entry is a FEN or game_id/ply with annotations."""
+    if not isinstance(positions, (list, tuple)) or not 1 <= len(positions) <= 100:
+        raise LiveRequestError("provide between 1 and 100 positions")
+    if any(not isinstance(entry, Mapping) for entry in positions):
+        raise LiveRequestError("each position must be an object")
+    return _show_states([_position_state(entry, session) for entry in positions])
+
+
+def _show_states(states: list[LiveState]) -> dict[str, Any]:
+    global _STATE, _POSITIONS, _POSITION_INDEX
     with _LOCK:
-        _reset()
-        _STATE.game_id = game.id
-        _STATE.ply = target
-        _STATE.board = board
-        _STATE.line = moves
-        _STATE.last_move = moves[target - 1] if target else None
+        _POSITIONS, _POSITION_INDEX = states, 0
+        _STATE = deepcopy(states[0])
+        _touch()
         payload = _payload()
     return _published(payload)
 
 
-def show_position(fen: str) -> dict[str, Any]:
-    """Put an ad-hoc position on the live board. Accepts a FEN, an EPD, or either of the
-    two with chess960 castling rights — the same spellings every other surface takes."""
-    from backend.services.explorer import read_fen
-
-    text = (fen or "").strip()
-    if not text:
-        raise LiveFenError("a FEN is required")
-    try:
-        board = read_fen(text)
-    except ValueError as exc:
-        raise LiveFenError(str(exc)) from None
-
+def select_position(index: int) -> dict[str, Any]:
+    """Select a queued position, preserving edits when the user returns to it."""
+    global _STATE, _POSITION_INDEX
     with _LOCK:
-        _reset()
-        _STATE.board = board
+        if index < 0 or index >= len(_POSITIONS):
+            raise LiveRequestError("position index is outside the queue")
+        _POSITIONS[_POSITION_INDEX] = deepcopy(_STATE)
+        _POSITION_INDEX = index
+        _STATE = deepcopy(_POSITIONS[index])
+        _touch()
         payload = _payload()
     return _published(payload)
 
@@ -282,6 +321,10 @@ def viewer_count() -> int:
 
 def _reset() -> None:
     """Back to an empty board. Called under `_LOCK`; the viewer count is not state."""
+    global _POSITION_INDEX
+    _POSITIONS.clear()
+    _POSITION_INDEX = 0
+    _STATE.game_positions = []
     _STATE.game_id = None
     _STATE.ply = None
     _STATE.moves = []
@@ -303,6 +346,9 @@ def _payload() -> dict[str, Any]:
     board = _STATE.board
     return {
         "active": board is not None,
+        "position_index": _POSITION_INDEX,
+        "position_count": len(_POSITIONS),
+        "game_positions": deepcopy(_STATE.game_positions),
         "game_id": _STATE.game_id,
         "ply": _STATE.ply,
         "fen": board.fen() if board is not None else None,
