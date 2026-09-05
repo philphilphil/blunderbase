@@ -4,6 +4,35 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v0.12.0 — 2026-09-05
+
+- Added an iOS companion app for the games list and game screen
+- Added German throughout the app and the landing page
+- Added browser Stockfish setup when no engine is assigned
+- Added a guided tour of what a new installation has to set up
+- Added a worst moments panel for the last thirty days
+- Added keyboard shortcuts throughout, and a ? sheet listing them
+- Added an opening book pane to the iOS game screen
+- Added a light theme to the iOS app
+- Changed the demo to analyse in your browser, not on its server
+- Changed the licence to AGPL-3.0-or-later
+- Changed the analysis board to keep the run's line
+- Changed the game's book to open in the explorer
+- Changed the Maia column to name the human move
+- Changed the line-preview cycler to read as a setting
+- Changed the capture and check sounds
+- Fixed the phone evicting the browser's analysis board
+- Fixed a locked database losing a Lichess or FICS game
+- Fixed guessing at /mcp locking the owner out
+- Fixed owner setup and event sessions being guessable
+- Fixed Windows engine arguments being dropped
+- Fixed learning your colour not refolding the stored game card
+- Fixed a Maia fill counting as a game's analysis run
+- Fixed the analysis board hanging on a finished game
+- Fixed a zero blunder tally losing its colour
+- Fixed the macOS app not finding a Homebrew engine
+- Fixed the iOS book and analysis drifting from the board
+
 ## v0.11.0 — 2026-09-03
 
 - Added a public demo mode for serving a read-only library
