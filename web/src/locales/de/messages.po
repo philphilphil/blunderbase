@@ -1061,6 +1061,7 @@ msgstr "Zurück"
 
 #: src/components/tour/TourCoachmark.tsx
 #: src/routes/game/components/BoardPanel.tsx
+#: src/routes/live/LivePage.tsx
 msgid "Next"
 msgstr "Weiter"
 
@@ -2148,6 +2149,10 @@ msgid "the sync did not start"
 msgstr "die Synchronisierung ist nicht gestartet"
 
 #: src/routes/dashboard/SyncAllButton.tsx
+msgid "Enable sources"
+msgstr "Quellen aktivieren"
+
+#: src/routes/dashboard/SyncAllButton.tsx
 msgid "Connect account"
 msgstr "Konto verbinden"
 
@@ -2363,6 +2368,7 @@ msgid "Revoke and uninstall"
 msgstr "Widerrufen und deinstallieren"
 
 #: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/live/LivePage.tsx
 msgid "Start"
 msgstr "Starten"
 
@@ -3157,6 +3163,7 @@ msgid "⇅ Flip"
 msgstr "⇅ Drehen"
 
 #: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/live/LivePage.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "Reset"
 msgstr "Zurücksetzen"
@@ -4620,6 +4627,14 @@ msgid "a {platform} sync needs the username whose games to read"
 msgstr "eine {platform}-Synchronisierung braucht den Benutzernamen, dessen Partien gelesen werden sollen"
 
 #: src/routes/import/AccountCard.tsx
+msgid "Include in sync"
+msgstr "Mit synchronisieren"
+
+#: src/routes/import/AccountCard.tsx
+msgid "Include this source in automatic sync and Sync all. You can still sync it manually."
+msgstr "Diese Quelle bei der automatischen Synchronisierung und bei „Alle synchronisieren“ mitnehmen. Manuell geht es weiterhin."
+
+#: src/routes/import/AccountCard.tsx
 msgid "Username"
 msgstr "Benutzername"
 
@@ -4989,6 +5004,10 @@ msgid "Nothing said yet. Whatever your assistant writes with <0>annotate</0> app
 msgstr "Noch nichts gesagt. Was dein Assistent mit <0>annotate</0> schreibt, erscheint hier, während er es tippt."
 
 #: src/routes/live/LivePage.tsx
+msgid "Prev"
+msgstr "Zurück"
+
+#: src/routes/live/LivePage.tsx
 msgid "The live session could not be read."
 msgstr "Die Live-Sitzung konnte nicht gelesen werden."
 
@@ -4999,6 +5018,30 @@ msgstr "Es ist nichts auf dem Brett."
 #: src/routes/live/LivePage.tsx
 msgid "Ask your assistant to put a game on it — <0>show_game</0> for a stored game, <1>show_position</1> for a FEN. It appears here the moment it does, no refresh."
 msgstr "Bitte deinen Assistenten, eine Partie darauf zu legen – <0>show_game</0> für eine gespeicherte Partie, <1>show_position</1> für eine FEN-Stellung. Die Partie erscheint hier in dem Moment, in dem er es tut, ohne Neuladen."
+
+#: src/routes/live/LivePage.tsx
+msgid "Game replay"
+msgstr "Partie nachspielen"
+
+#: src/routes/live/LivePage.tsx
+msgid "Referenced game position"
+msgstr "Stellung aus der verwiesenen Partie"
+
+#: src/routes/live/LivePage.tsx
+msgid "Previous game move"
+msgstr "Vorheriger Zug der Partie"
+
+#: src/routes/live/LivePage.tsx
+msgid "Ply {replayPly}"
+msgstr "Halbzug {replayPly}"
+
+#: src/routes/live/LivePage.tsx
+msgid "Next game move"
+msgstr "Nächster Zug der Partie"
+
+#: src/routes/live/LivePage.tsx
+msgid "Game moves"
+msgstr "Züge der Partie"
 
 #: src/routes/live/LivePage.tsx
 msgid "The followed game could not be read — {followedError}"

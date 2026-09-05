@@ -32,6 +32,7 @@ from tests.conftest import running_app
 
 NOW = datetime(2026, 9, 2, 12, 0, tzinfo=UTC)
 
+
 def fake_run(session: Session, job: ImportJob, **options: Any) -> ImportResult:
     """An adapter that stores nothing and writes what it was told on the job row.
 
@@ -224,10 +225,16 @@ def api(settings: Settings) -> Iterator[TestClient]:
 def test_the_schedule_is_read_set_and_cleared_over_http(api: TestClient) -> None:
     assert api.get("/import/schedule").json() == {"minutes": None, "disabled_sources": []}
 
-    assert api.put("/import/schedule", json={"minutes": 30}).json() == {"minutes": 30, "disabled_sources": []}
+    assert api.put("/import/schedule", json={"minutes": 30}).json() == {
+        "minutes": 30,
+        "disabled_sources": [],
+    }
     assert api.get("/import/schedule").json() == {"minutes": 30, "disabled_sources": []}
 
-    assert api.put("/import/schedule", json={"minutes": None}).json() == {"minutes": None, "disabled_sources": []}
+    assert api.put("/import/schedule", json={"minutes": None}).json() == {
+        "minutes": None,
+        "disabled_sources": [],
+    }
     assert api.put("/import/schedule", json={"minutes": 0}).status_code == 422
 
 
@@ -252,7 +259,9 @@ def test_disabled_sources_are_skipped_until_enabled(session: Session) -> None:
 
 
 def test_source_preferences_survive_schedule_changes(api: TestClient) -> None:
-    assert api.put("/import/schedule", json={"disabled_sources": ["fics"]}).json()["disabled_sources"] == ["fics"]
+    assert api.put("/import/schedule", json={"disabled_sources": ["fics"]}).json()[
+        "disabled_sources"
+    ] == ["fics"]
     assert api.put("/import/schedule", json={"minutes": 30}).json()["disabled_sources"] == ["fics"]
     assert api.put("/import/schedule", json={"disabled_sources": []}).json()["minutes"] == 30
     assert api.put("/import/schedule", json={"disabled_sources": ["invalid"]}).status_code == 422

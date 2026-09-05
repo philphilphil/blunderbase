@@ -269,7 +269,13 @@ async def test_get_last_games_carries_the_curve_and_the_worst_moments(
     payload = await call(coach, "get_last_games", amount=6)
     berlin = next(game for game in payload["games"] if game["id"] == analysed["qg000001"].id)
     assert berlin["eval_curve"] == [
-        [0, 52.0], [1, 51.0], [2, 39.0], [3, 60.0], [4, 8.0], [5, 92.0], [6, 70.0]
+        [0, 52.0],
+        [1, 51.0],
+        [2, 39.0],
+        [3, 60.0],
+        [4, 8.0],
+        [5, 92.0],
+        [6, 70.0],
     ]
     moments = berlin["worst_moments"]
     assert [moment["ply"] for moment in moments] == [4, 6, 2]
@@ -454,9 +460,7 @@ async def test_get_game_leaves_the_engine_lines_out_until_they_are_asked_for(
 ) -> None:
     without = await call(coach, "get_game", game_id=analysed["qg000001"].id)
     assert all("best_lines" not in move for move in without["moves"])
-    with_lines = await call(
-        coach, "get_game", game_id=analysed["qg000001"].id, include_lines=True
-    )
+    with_lines = await call(coach, "get_game", game_id=analysed["qg000001"].id, include_lines=True)
     lines = [move for move in with_lines["moves"] if "best_lines" in move]
     assert lines and lines[0]["best_lines"][0]["pv"] == ["d2d4", "d7d5", "g1f3"]
 
@@ -985,6 +989,8 @@ async def test_driving_the_live_board_never_touches_a_stored_game(
 
 
 async def test_show_positions_pushes_a_batch(coach: MCPServer) -> None:
-    payload = await call(coach, "show_positions", positions=[{"fen": START_FEN}, {"fen": FRENCH, "text": "Second"}])
+    payload = await call(
+        coach, "show_positions", positions=[{"fen": START_FEN}, {"fen": FRENCH, "text": "Second"}]
+    )
     assert payload["position_count"] == 2
     assert live_service.select_position(1)["text"] == "Second"

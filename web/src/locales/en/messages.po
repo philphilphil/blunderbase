@@ -1061,6 +1061,7 @@ msgstr "Back"
 
 #: src/components/tour/TourCoachmark.tsx
 #: src/routes/game/components/BoardPanel.tsx
+#: src/routes/live/LivePage.tsx
 msgid "Next"
 msgstr "Next"
 
@@ -2148,6 +2149,10 @@ msgid "the sync did not start"
 msgstr "the sync did not start"
 
 #: src/routes/dashboard/SyncAllButton.tsx
+msgid "Enable sources"
+msgstr "Enable sources"
+
+#: src/routes/dashboard/SyncAllButton.tsx
 msgid "Connect account"
 msgstr "Connect account"
 
@@ -2363,6 +2368,7 @@ msgid "Revoke and uninstall"
 msgstr "Revoke and uninstall"
 
 #: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/live/LivePage.tsx
 msgid "Start"
 msgstr "Start"
 
@@ -3157,6 +3163,7 @@ msgid "⇅ Flip"
 msgstr "⇅ Flip"
 
 #: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/live/LivePage.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "Reset"
 msgstr "Reset"
@@ -4620,6 +4627,14 @@ msgid "a {platform} sync needs the username whose games to read"
 msgstr "a {platform} sync needs the username whose games to read"
 
 #: src/routes/import/AccountCard.tsx
+msgid "Include in sync"
+msgstr "Include in sync"
+
+#: src/routes/import/AccountCard.tsx
+msgid "Include this source in automatic sync and Sync all. You can still sync it manually."
+msgstr "Include this source in automatic sync and Sync all. You can still sync it manually."
+
+#: src/routes/import/AccountCard.tsx
 msgid "Username"
 msgstr "Username"
 
@@ -4989,6 +5004,10 @@ msgid "Nothing said yet. Whatever your assistant writes with <0>annotate</0> app
 msgstr "Nothing said yet. Whatever your assistant writes with <0>annotate</0> appears here as it types it."
 
 #: src/routes/live/LivePage.tsx
+msgid "Prev"
+msgstr "Prev"
+
+#: src/routes/live/LivePage.tsx
 msgid "The live session could not be read."
 msgstr "The live session could not be read."
 
@@ -4999,6 +5018,30 @@ msgstr "Nothing is on the board."
 #: src/routes/live/LivePage.tsx
 msgid "Ask your assistant to put a game on it — <0>show_game</0> for a stored game, <1>show_position</1> for a FEN. It appears here the moment it does, no refresh."
 msgstr "Ask your assistant to put a game on it — <0>show_game</0> for a stored game, <1>show_position</1> for a FEN. It appears here the moment it does, no refresh."
+
+#: src/routes/live/LivePage.tsx
+msgid "Game replay"
+msgstr "Game replay"
+
+#: src/routes/live/LivePage.tsx
+msgid "Referenced game position"
+msgstr "Referenced game position"
+
+#: src/routes/live/LivePage.tsx
+msgid "Previous game move"
+msgstr "Previous game move"
+
+#: src/routes/live/LivePage.tsx
+msgid "Ply {replayPly}"
+msgstr "Ply {replayPly}"
+
+#: src/routes/live/LivePage.tsx
+msgid "Next game move"
+msgstr "Next game move"
+
+#: src/routes/live/LivePage.tsx
+msgid "Game moves"
+msgstr "Game moves"
 
 #: src/routes/live/LivePage.tsx
 msgid "The followed game could not be read — {followedError}"
