@@ -85,13 +85,31 @@ jobs:
       KOMODO_URL: ${{ secrets.KOMODO_URL }}
       KOMODO_API_KEY: ${{ secrets.KOMODO_API_KEY }}
       KOMODO_API_SECRET: ${{ secrets.KOMODO_API_SECRET }}
-      KOMODO_STACK: blunderbase
+      # Both stacks on the host run the same `latest` image — the owner's library and the
+      # public demo beside it — so a release that moves `latest` has to move both, or the
+      # demo quietly serves the previous version until someone notices. Each stack keeps
+      # its own volume, so redeploying the demo pulls the new image and migrates the
+      # library already in it; it never replaces that library.
+      KOMODO_STACKS: blunderbase blunderbase-demo
     steps:
-      - name: Redeploy stack
+      - name: Redeploy stacks
+        # One stack failing must not skip the other: the demo being unreachable is no
+        # reason to leave the owner's library on the old image, or the other way round.
+        # Both are attempted, and the job still fails if either did.
         run: |
-          curl -fsS --show-error --max-time 600 \
-            -X POST "$KOMODO_URL/execute/DeployStack" \
-            -H 'Content-Type: application/json' \
-            -H "X-Api-Key: $KOMODO_API_KEY" \
-            -H "X-Api-Secret: $KOMODO_API_SECRET" \
-            -d "{\"stack\":\"$KOMODO_STACK\"}"
+          failed=
+          for stack in $KOMODO_STACKS; do
+            echo "::group::$stack"
+            curl -fsS --show-error --max-time 600 \
+              -X POST "$KOMODO_URL/execute/DeployStack" \
+              -H 'Content-Type: application/json' \
+              -H "X-Api-Key: $KOMODO_API_KEY" \
+              -H "X-Api-Secret: $KOMODO_API_SECRET" \
+              -d "{\"stack\":\"$stack\"}" || failed="$failed $stack"
+            echo
+            echo '::endgroup::'
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Komodo refused to deploy:$failed"
+            exit 1
+          fi
