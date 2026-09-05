@@ -144,7 +144,7 @@ class AuthGuard:
             return
         await error_response(401, state, DETAIL[state])(scope, receive, send)
 
-    def state(self, token: str | None) -> str:
+    def state(self, token: str | None, *, cached: bool = True) -> str:
         """Whether this cookie gets in, and if not, which of the two reasons it is.
 
         A cookie confirmed moments ago answers without a Session at all; anything else —
@@ -161,7 +161,7 @@ class AuthGuard:
                 if token is not None and secrets.compare_digest(token, expected)
                 else UNAUTHORIZED
             )
-        if auth_service.token_recently_validated(token):
+        if cached and auth_service.token_recently_validated(token):
             return AUTHENTICATED
         with get_sessionmaker(self.settings)() as session:
             if auth_service.setup_required(session):

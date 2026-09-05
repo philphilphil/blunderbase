@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Float,
     ForeignKey,
     Index,
@@ -66,8 +67,9 @@ class Credential(Base):
     """
 
     __tablename__ = "credentials"
+    __table_args__ = (CheckConstraint("id = 1", name="singleton"),)
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     algorithm: Mapped[str] = mapped_column(String(16), nullable=False, default="scrypt")
     salt: Mapped[str] = mapped_column(String(64), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)

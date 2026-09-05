@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from subprocess import list2cmdline
 from typing import Any
 
 import chess
@@ -17,6 +18,7 @@ from fake_uci import (
     option,
 )
 
+from backend.adapters import stockfish
 from backend.adapters.maia import (
     HumanModelUnavailableError,
     MaiaAdapter,
@@ -76,6 +78,43 @@ def test_a_command_line_is_split_into_its_arguments() -> None:
 def test_an_empty_command_is_refused() -> None:
     with pytest.raises(EngineStartError):
         command_for("   ")
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        (r"C:\engines\lc0.exe --weights=C:\models\maia.pb.gz",
+         [r"C:\engines\lc0.exe", r"--weights=C:\models\maia.pb.gz"]),
+        ('"C:\\Program Files\\lc0.exe" --weights="C:\\My Models\\maia.pb.gz"',
+         [r"C:\Program Files\lc0.exe", r"--weights=C:\My Models\maia.pb.gz"]),
+        (r"lc0 --cache=C:\models\ --quiet", ["lc0", "--cache=C:\\models\\", "--quiet"]),
+        ("lc0 --name=O'Brien", ["lc0", "--name=O'Brien"]),
+        ('lc0 ""', ["lc0", ""]),
+    ],
+)
+def test_windows_engine_commands_preserve_paths_and_arguments(
+    monkeypatch: pytest.MonkeyPatch, command: str, expected: list[str],
+) -> None:
+    monkeypatch.setattr(stockfish, "IS_WINDOWS", True)
+    assert command_for(command) == expected
+
+
+@pytest.mark.parametrize("argument", [
+    "", "ordinary", "two words", "trailing slash \\", 'a"quote',
+    'a\\"quote', "C:\\models\\", "\twith a tab", '"quoted"',
+])
+def test_windows_arguments_round_trip_python_process_quoting(
+    monkeypatch: pytest.MonkeyPatch, argument: str,
+) -> None:
+    monkeypatch.setattr(stockfish, "IS_WINDOWS", True)
+    argv = [r"C:\Program Files\lc0.exe", argument, "--last"]
+    assert command_for(list2cmdline(argv)) == argv
+
+
+def test_unterminated_windows_quotes_are_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(stockfish, "IS_WINDOWS", True)
+    with pytest.raises(EngineStartError, match="unterminated"):
+        command_for('lc0 --weights="C:\\My Models\\maia.pb.gz')
 
 
 # --- probing --------------------------------------------------------------

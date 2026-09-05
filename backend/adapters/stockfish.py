@@ -48,6 +48,7 @@ STDERR_TAIL = 4000
 # handshake never finishes, and `chess.engine.EngineError` (which `EngineTerminatedError`
 # extends) when the process answers with something other than UCI.
 START_ERRORS = (OSError, ValueError, TimeoutError, chess.engine.EngineError)
+IS_WINDOWS = os.name == "nt"
 
 
 class EngineError(RuntimeError):
@@ -263,12 +264,58 @@ def command_for(path: str | Sequence[str]) -> list[str]:
                 f"runner, and only that runner can start it"
             )
         candidate = Path(path).expanduser()
-        command = [str(candidate)] if candidate.is_file() else shlex.split(path)
+        if candidate.is_file():
+            command = [str(candidate)]
+        else:
+            command = _windows_command(path) if IS_WINDOWS else shlex.split(path)
     else:
         command = [str(part) for part in path]
     if not command:
         raise EngineStartError("no engine command configured")
     return command
+
+
+def _windows_command(command: str) -> list[str]:
+    """Parse Windows argv quoting, the inverse of subprocess.list2cmdline.
+
+    Backslashes are literal except immediately before a double quote; single quotes
+    are ordinary characters. No shell expansion or command execution is involved.
+    """
+    args: list[str] = []
+    index = 0
+    while index < len(command):
+        while index < len(command) and command[index] in " \t":
+            index += 1
+        if index == len(command):
+            break
+        arg: list[str] = []
+        quoted = False
+        while index < len(command):
+            if command[index] in " \t" and not quoted:
+                break
+            slashes = 0
+            while index < len(command) and command[index] == "\\":
+                slashes += 1
+                index += 1
+            if index < len(command) and command[index] == '"':
+                arg.append("\\" * (slashes // 2))
+                if slashes % 2:
+                    arg.append('"')
+                elif quoted and command[index + 1:index + 2] == '"':
+                    arg.append('"')
+                    index += 1
+                else:
+                    quoted = not quoted
+                index += 1
+            else:
+                arg.append("\\" * slashes)
+                if index < len(command) and (quoted or command[index] not in " \t"):
+                    arg.append(command[index])
+                    index += 1
+        if quoted:
+            raise EngineStartError("unterminated double quote in engine command")
+        args.append("".join(arg))
+    return args
 
 
 def _path_hint(program: str, exc: BaseException) -> str:

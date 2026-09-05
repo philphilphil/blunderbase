@@ -8,7 +8,9 @@ browser will read off it.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Barrier
 
 import pytest
 from alembic import command
@@ -27,7 +29,7 @@ from backend.db.types import utcnow
 from backend.services import app_settings as app_settings_service
 from backend.services import auth as auth_service
 from backend.services import mcp_keys as mcp_keys_service
-from tests.conftest import OWNER_PASSWORD, running_app
+from tests.conftest import API_BASE_URL, OWNER_PASSWORD, running_app, socket_headers
 
 PASSWORD = "correct-horse-battery"
 OTHER = "a-different-password"
@@ -115,6 +117,36 @@ def test_a_second_setup_is_refused(session: Session) -> None:
         auth_service.set_password(session, OTHER)
 
     assert auth_service.verify_password(session, PASSWORD) is True
+
+
+def test_concurrent_setup_has_exactly_one_owner_and_session(
+    unconfigured: TestClient, settings: Settings, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    barrier = Barrier(2)
+    derive = auth_service._derive
+
+    def simultaneous(*args: object) -> bytes:
+        barrier.wait(timeout=10)
+        return derive(*args)
+
+    # The fixture owns the lifespan; concurrent callers must not start it again.
+    def request_setup(password: str):
+        client = TestClient(unconfigured.app, base_url=API_BASE_URL)
+        return client.post("/auth/setup", json={"password": password})
+
+    with monkeypatch.context() as patcher:
+        patcher.setattr(auth_service, "_derive", simultaneous)
+        with ThreadPoolExecutor(2) as pool:
+            responses = list(pool.map(request_setup, (PASSWORD, OTHER)))
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    winner = next(i for i, response in enumerate(responses) if response.status_code == 200)
+    assert COOKIE_NAME not in responses[1 - winner].cookies
+    with get_sessionmaker(settings)() as session:
+        assert len(list(session.scalars(select(Credential)))) == 1
+        assert auth_service.open_session_count(session) == 1
+        assert auth_service.verify_password(session, (PASSWORD, OTHER)[winner])
+        assert not auth_service.verify_password(session, (PASSWORD, OTHER)[1 - winner])
+        assert auth_service.validate_session(session, responses[winner].cookies[COOKIE_NAME])
 
 
 def test_a_password_shorter_than_the_minimum_is_refused(session: Session) -> None:
@@ -577,6 +609,49 @@ def test_the_events_socket_is_refused_without_a_cookie(signed_in: TestClient) ->
 
 
 # --- the shortcut past re-reading a cookie ---------------------------------
+
+
+@pytest.mark.parametrize("revoke", ["logout", "password", "expire", "cli"])
+def test_revoked_event_socket_cannot_receive_another_event(
+    signed_in: TestClient, settings: Settings, revoke: str,
+) -> None:
+    with signed_in.websocket_connect("/events", headers=socket_headers(signed_in)) as socket:
+        signed_in.app.state.events.publish({"event": "before"})
+        assert socket.receive_json() == {"event": "before"}
+        if revoke == "logout":
+            assert signed_in.post("/auth/logout").status_code == 204
+        elif revoke == "password":
+            assert signed_in.post(
+                "/auth/password", json={"current": OWNER_PASSWORD, "new": OTHER}
+            ).status_code == 200
+        else:
+            with get_sessionmaker(settings)() as session:
+                if revoke == "cli":
+                    auth_service.reset_password(session, OTHER)
+                else:
+                    # Bypass the in-process cache, as a separate process or expiry would.
+                    row = session.scalars(select(AuthSession)).one()
+                    row.expires_at = utcnow() - timedelta(seconds=1)
+                    session.commit()
+        signed_in.app.state.events.publish({"event": "private-after-revocation"})
+        with pytest.raises(WebSocketDisconnect) as caught:
+            socket.receive_json()
+        assert caught.value.code == WS_CLOSE_UNAUTHORIZED
+
+
+def test_an_idle_event_socket_observes_revocation(
+    signed_in: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.api.routes import events
+
+    monkeypatch.setattr(events, "PING_SECONDS", 0.01)
+    with signed_in.websocket_connect("/events", headers=socket_headers(signed_in)) as socket:
+        assert socket.receive_json() == {"event": "ping"}
+        assert signed_in.post("/auth/logout").status_code == 204
+        with pytest.raises(WebSocketDisconnect) as caught:
+            while True:  # A ping already sent before logout may still be buffered.
+                assert socket.receive_json() == {"event": "ping"}
+        assert caught.value.code == WS_CLOSE_UNAUTHORIZED
 
 
 def counting_validate(monkeypatch: pytest.MonkeyPatch) -> list[str | None]:

@@ -37,6 +37,7 @@ from collections import deque
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from backend.db.models import AuthSession, Credential
@@ -116,7 +117,19 @@ def set_password(session: Session, password: str) -> None:
     """
     if _credential(session) is not None:
         raise AlreadyConfiguredError("a password has already been set")
-    reset_password(session, password)
+    # A fixed primary key makes this create-only even across processes. In particular,
+    # never fall through to reset_password after another request wins the first insert.
+    result = session.execute(
+        insert(Credential).values(id=1, **_password_values(password)).on_conflict_do_nothing(
+            index_elements=[Credential.id]
+        )
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise AlreadyConfiguredError("a password has already been set")
+    session.commit()
+    forget_valid_tokens()
+    reset_bearer_limiter()
 
 
 def reset_password(session: Session, password: str) -> None:
@@ -125,29 +138,37 @@ def reset_password(session: Session, password: str) -> None:
     This is what `blunderbase set-password` and a password change both do; only the
     first-run route needs the "there must be none yet" guard `set_password` adds.
     """
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise WeakPasswordError(
-            f"the password has to be at least {MIN_PASSWORD_LENGTH} characters"
-        )
-    salt = secrets.token_bytes(SALT_BYTES)
+    values = _password_values(password)
     credential = _credential(session)
     if credential is None:
         credential = Credential()
         session.add(credential)
-    credential.algorithm = ALGORITHM
-    credential.salt = salt.hex()
-    credential.password_hash = _derive(password, salt, SCRYPT_N, SCRYPT_R, SCRYPT_P).hex()
-    credential.scrypt_n = SCRYPT_N
-    credential.scrypt_r = SCRYPT_R
-    credential.scrypt_p = SCRYPT_P
-    credential.updated_at = utcnow()
-    credential.failed_attempts = 0
-    credential.locked_until = None
+    for name, value in values.items():
+        setattr(credential, name, value)
     session.execute(delete(AuthSession))
     session.commit()
     forget_valid_tokens()
     # The guesses the bearer door refused were guesses at a password that no longer exists.
     reset_bearer_limiter()
+
+
+def _password_values(password: str) -> dict[str, object]:
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise WeakPasswordError(
+            f"the password has to be at least {MIN_PASSWORD_LENGTH} characters"
+        )
+    salt = secrets.token_bytes(SALT_BYTES)
+    return {
+        "algorithm": ALGORITHM,
+        "salt": salt.hex(),
+        "password_hash": _derive(password, salt, SCRYPT_N, SCRYPT_R, SCRYPT_P).hex(),
+        "scrypt_n": SCRYPT_N,
+        "scrypt_r": SCRYPT_R,
+        "scrypt_p": SCRYPT_P,
+        "updated_at": utcnow(),
+        "failed_attempts": 0,
+        "locked_until": None,
+    }
 
 
 def verify_password(session: Session, password: str) -> bool:
