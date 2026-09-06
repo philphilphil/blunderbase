@@ -44,7 +44,8 @@ def test_metadata_comes_off_the_headers(fixtures_dir: Path) -> None:
     assert game.source is Source.PGN
     assert game.source_id == "abcd1234"
     assert (game.white_name, game.black_name) == ("blunderbase", "opponent1")
-    assert (game.white_rating, game.black_rating) == (1712, 1688)
+    # The Elo tags say what the players brought; the RatingDiff tags what the game did.
+    assert (game.white_rating, game.black_rating) == (1720, 1681)
     assert game.result is Result.WHITE_WIN
     assert game.termination == "Normal"
     assert game.rated is True

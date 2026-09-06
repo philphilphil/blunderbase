@@ -321,8 +321,8 @@ def parse_game(payload: dict[str, Any], *, variant: str | None = None) -> Parsed
     increment = _number(clock.get("increment"))
     clocks = _clocks(payload.get("clocks"), len(moves))
     opening = payload.get("opening") or {}
-    white_name, white_rating = _player(payload, "white")
-    black_name, black_rating = _player(payload, "black")
+    white_name, white_rating, white_diff = _player(payload, "white")
+    black_name, black_rating, black_diff = _player(payload, "black")
     speed = SPEEDS.get(str(payload.get("speed") or "").casefold())
     rated = payload.get("rated") if isinstance(payload.get("rated"), bool) else None
     result = _result(payload)
@@ -356,6 +356,8 @@ def parse_game(payload: dict[str, Any], *, variant: str | None = None) -> Parsed
             black_name=black_name,
             white_rating=white_rating,
             black_rating=black_rating,
+            white_diff=white_diff,
+            black_diff=black_diff,
             result=result,
             speed=speed,
             rated=rated,
@@ -381,6 +383,8 @@ def build_pgn(
     black_name: str,
     white_rating: int | None,
     black_rating: int | None,
+    white_diff: int | None = None,
+    black_diff: int | None = None,
     result: Result,
     speed: Speed | None,
     rated: bool | None,
@@ -392,6 +396,9 @@ def build_pgn(
 
     The Event line matters beyond decoration: it is where the speed and the rated flag live
     in a PGN, so re-importing this text through the PGN adapter reads back the same game.
+    The same goes for the ratings: `white_rating` is the rating after the game, and a PGN
+    spells that as the Elo before it plus a `WhiteRatingDiff`, which is how Lichess writes
+    it and how the PGN adapter adds it back up.
     """
     game = chess.pgn.Game()
     game.setup(start)
@@ -405,8 +412,10 @@ def build_pgn(
         game.headers["UTCDate"] = played_at.strftime("%Y.%m.%d")
         game.headers["UTCTime"] = played_at.strftime("%H:%M:%S")
     for tag, value in (
-        ("WhiteElo", white_rating),
-        ("BlackElo", black_rating),
+        ("WhiteElo", white_rating - white_diff if white_diff is not None else white_rating),
+        ("BlackElo", black_rating - black_diff if black_diff is not None else black_rating),
+        ("WhiteRatingDiff", white_diff),
+        ("BlackRatingDiff", black_diff),
         ("TimeControl", time_control),
         ("ECO", opening.get("eco")),
         ("Opening", opening.get("name")),
@@ -475,14 +484,23 @@ def stored_cursor(session: Session, player: str) -> str | None:
     return None
 
 
-def _player(payload: dict[str, Any], color: str) -> tuple[str, int | None]:
-    """Who played this side. An anonymous opponent and a bot both still need a name."""
+def _player(payload: dict[str, Any], color: str) -> tuple[str, int | None, int | None]:
+    """Who played this side, their rating as the game left it, and what the game did to it.
+
+    Lichess's `rating` is the rating the player brought to the game; `ratingDiff` is what
+    the game did to it (absent for a casual game, a bot, or a game still running). The
+    rating stored is the sum — the rating after the game — because that is what chess.com
+    reports, and the progress chart draws both sources on one line. An anonymous opponent
+    and a bot both still need a name.
+    """
     entry = (payload.get("players") or {}).get(color) or {}
     name = str((entry.get("user") or {}).get("name") or "").strip()
     if not name:
         level = entry.get("aiLevel")
         name = f"lichess AI level {level}" if level is not None else "Anonymous"
-    return name, _number(entry.get("rating"))
+    rating = _number(entry.get("rating"))
+    diff = _number(entry.get("ratingDiff")) if rating is not None else None
+    return name, rating + diff if rating is not None and diff is not None else rating, diff
 
 
 def _result(payload: dict[str, Any]) -> Result:

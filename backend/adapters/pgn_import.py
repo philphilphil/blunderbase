@@ -162,8 +162,8 @@ def parse_game(
         source_id=_source_id(headers),
         white_name=headers.get("White") or "?",
         black_name=headers.get("Black") or "?",
-        white_rating=_rating(headers.get("WhiteElo")),
-        black_rating=_rating(headers.get("BlackElo")),
+        white_rating=_rating(headers.get("WhiteElo"), headers.get("WhiteRatingDiff")),
+        black_rating=_rating(headers.get("BlackElo"), headers.get("BlackRatingDiff")),
         result=_result(headers.get("Result")),
         termination=headers.get("Termination"),
         variant=variant if variant is not None else _variant(headers),
@@ -204,11 +204,22 @@ def _result(value: str | None) -> Result:
         return Result.UNKNOWN
 
 
-def _rating(value: str | None) -> int | None:
+def _rating(value: str | None, diff: str | None = None) -> int | None:
+    """The rating after the game, as far as the headers say.
+
+    `WhiteElo` is the rating a player brought to the game. Lichess exports also carry a
+    `WhiteRatingDiff` with what the game did to it; adding the two gives the rating after
+    the game, which is what chess.com reports and what the store keeps for every source.
+    A file without the diff keeps the Elo as written.
+    """
     try:
-        return int(str(value).strip())
+        rating = int(str(value).strip())
     except (TypeError, ValueError):
         return None
+    try:
+        return rating + int(str(diff).strip())
+    except (TypeError, ValueError):
+        return rating
 
 
 def _rated(event: str | None) -> bool | None:

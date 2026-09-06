@@ -9,6 +9,8 @@
 [UTCTime "18:04:11"]
 [WhiteElo "1712"]
 [BlackElo "1688"]
+[WhiteRatingDiff "+8"]
+[BlackRatingDiff "-7"]
 [TimeControl "300+3"]
 [ECO "C50"]
 [Opening "Italian Game: Anti-Fried Liver Defense"]

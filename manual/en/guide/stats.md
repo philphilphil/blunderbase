@@ -11,6 +11,11 @@
 | **Clock behaviour** | time trouble and time of day |
 | **Progress** | rating over the window |
 
+The rating a game carries is the one you had when it ended. Lichess and chess.com both say
+what a game did to your rating, and a PGN that carries `WhiteRatingDiff` tags does too, so
+each point on the Progress line already includes that game's result. A casual game, or a
+PGN without those tags, keeps the rating you brought to it.
+
 ## Which games are counted?
 
 Your own games, and only those an engine has been over — the line under the title says how

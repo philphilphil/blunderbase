@@ -475,7 +475,8 @@ def test_metadata_comes_off_the_export_record(records: list[dict[str, Any]]) -> 
     assert game.source is Source.LICHESS
     assert game.source_id == "zzDanish"
     assert (game.white_name, game.black_name) == ("ExamplePlayer", "OpponentAlpha")
-    assert (game.white_rating, game.black_rating) == (1500, 1523)
+    # The rating after the game: what the player brought plus what the game did to it.
+    assert (game.white_rating, game.black_rating) == (1506, 1517)
     assert game.result is Result.WHITE_WIN
     assert game.termination == "resign"
     assert game.variant == "standard"
@@ -523,6 +524,7 @@ def test_the_written_pgn_reads_back_as_the_same_game(records: list[dict[str, Any
     assert again.eco == game.eco
     assert again.source_id == game.source_id
     assert again.played_at == game.played_at
+    assert (again.white_rating, again.black_rating) == (game.white_rating, game.black_rating)
     # A PGN spells the clock in hundredths of a second, so it comes back a rounding apart.
     assert again.clocks == pytest.approx(game.clocks)
 
@@ -559,6 +561,21 @@ def test_an_anonymous_opponent_and_a_bot_still_get_names(records: list[dict[str,
 
     assert (game.white_name, game.black_name) == ("lichess AI level 5", "Anonymous")
     assert (game.white_rating, game.black_rating) == (None, None)
+
+
+def test_a_casual_game_keeps_the_rating_the_player_brought(
+    records: list[dict[str, Any]],
+) -> None:
+    payload = dict(records[0])
+    payload["players"] = {
+        "white": {"user": {"name": "a"}, "rating": 1500},
+        "black": {"user": {"name": "b"}, "rating": 1523},
+    }
+
+    game = lichess.parse_game(payload)
+
+    assert (game.white_rating, game.black_rating) == (1500, 1523)
+    assert "RatingDiff" not in game.pgn
 
 
 def test_ultrabullet_is_stored_as_bullet(records: list[dict[str, Any]]) -> None:
