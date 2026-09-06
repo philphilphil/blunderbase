@@ -2,8 +2,7 @@
 
 This document defines the target architecture for Desktop, Docker, mobile companionship,
 and synchronization. It describes ownership and operating modes, not an implementation
-plan. Canonical terms are defined in [the domain glossary](../CONTEXT.md), and the topology
-decision is recorded in
+plan. The topology decision is recorded in
 [ADR 0001](adr/0001-local-first-installations-sync-through-a-home.md). The current code
 architecture remains documented in [ARCHITECTURE.md](ARCHITECTURE.md).
 
