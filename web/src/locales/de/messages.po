@@ -535,12 +535,13 @@ msgid "Sign out"
 msgstr "Abmelden"
 
 #: src/components/shell/AppShell.tsx
-msgid "This is the read-only demo. Nothing you do here is saved."
-msgstr "Das ist die schreibgeschützte Demo. Nichts, was du hier tust, wird gespeichert."
+#: src/lib/api/readOnly.ts
+msgid "This is a read-only demo."
+msgstr "Das ist eine schreibgeschützte Demo."
 
 #: src/components/shell/AppShell.tsx
-msgid "Run your own Blunderbase to import, analyse and annotate your games."
-msgstr "Betreibe dein eigenes Blunderbase, um deine Partien zu importieren, zu analysieren und zu kommentieren."
+msgid "Nothing you do here is saved. Run your own Blunderbase to import, analyse and annotate your games."
+msgstr "Nichts, was du hier tust, wird gespeichert. Betreibe dein eigenes Blunderbase, um deine Partien zu importieren, zu analysieren und zu kommentieren."
 
 #: src/components/shell/AppShell.tsx
 msgid "Get it"

@@ -238,6 +238,21 @@ describe('the tour', () => {
     expect(calls.some((call) => call.key === 'PUT /api/settings/tour')).toBe(true)
   })
 
+  it('leaves the engines out of the demo, which has none to set up', async () => {
+    draw({ demo: true })
+    // The coachmark is only on screen once the anchor is, which is after the library has
+    // answered — so that is when the counter is read.
+    await waitFor(() => expect(screen.getByTestId('anchor')).toHaveTextContent('found'))
+    expect(step()).toBe('library')
+    expect(screen.getByTestId('counter')).toHaveTextContent('1 of 4')
+
+    await press('next')
+
+    // Straight past the engines: the demo's page has nothing to register on it.
+    await waitFor(() => expect(step()).toBe('board-settings'))
+    expect(screen.getByTestId('counter')).toHaveTextContent('2 of 4')
+  })
+
   it('keeps the demo out of the deployment, and remembers in the browser instead', async () => {
     draw({ demo: true })
     await waitFor(() => expect(step()).toBe('library'))

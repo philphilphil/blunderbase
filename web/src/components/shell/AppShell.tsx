@@ -25,10 +25,13 @@ import { TopBar } from './TopBar'
 const TOAST_CLASSES = {
   toast:
     'flex items-center gap-2.5 rounded-md border border-edge-strong bg-panel px-3.5 py-3 text-[0.78125rem] text-ink shadow-[0_0.5rem_1.5rem_var(--bb-shadow)]',
+  // The text column gives way and the action does not: a toast with an action is a row,
+  // and the button is the one thing in it that must not wrap its label into two lines.
+  content: 'min-w-0 flex-1',
   title: 'text-ink',
   description: 'text-dim',
   icon: 'flex-none',
-  actionButton: 'rounded-md bg-accent-teal px-2 py-1 text-accent-ink',
+  actionButton: 'flex-none whitespace-nowrap rounded-md bg-accent-teal px-2 py-1 text-accent-ink',
   cancelButton: 'rounded-md bg-raised px-2 py-1 text-dim',
   closeButton: 'border-edge bg-elevated text-dim hover:text-ink',
   success: 'border-good/30',
@@ -81,8 +84,8 @@ export function AppShell() {
   // The three strings are resolved during the render rather than inside the callback, so
   // the subscription depends on plain values: it is renewed when the language changes and
   // at no other time.
-  const refusedTitle = t`This is the read-only demo. Nothing you do here is saved.`
-  const refusedDetail = t`Run your own Blunderbase to import, analyse and annotate your games.`
+  const refusedTitle = t`This is a read-only demo.`
+  const refusedDetail = t`Nothing you do here is saved. Run your own Blunderbase to import, analyse and annotate your games.`
   const refusedAction = t`Get it`
   useEffect(
     () =>

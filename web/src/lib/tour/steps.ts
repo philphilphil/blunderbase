@@ -26,6 +26,11 @@
  * Every anchor here is one that exists at every window width. A step whose anchor only
  * appears on a wide screen would leave the tour on a phone as two coachmarks and a
  * counter that says five.
+ *
+ * The public demo has no engines to set up — its Engines page is prose about what the
+ * page holds elsewhere (`routes/engines/DemoEngines`), with nothing on it the step could
+ * point at — so that step is left out there the way the assistant step is left out of a
+ * deployment without MCP, and the counter counts the steps that remain.
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
@@ -38,6 +43,8 @@ export interface TourContext {
   latestGameId: number | null
   /** Whether this installation serves MCP at all; without it there is no page to visit. */
   mcp: boolean
+  /** The read-only demo, which has no engines of its own and nothing to register. */
+  demo: boolean
 }
 
 export interface TourStep {
@@ -70,7 +77,7 @@ export const TOUR_STEPS: TourStep[] = [
     title: msg`Set up your engines`,
     body: msg`Register Stockfish and Maia here and give each job one. Nothing is analysed until you do.`,
     anchor: 'engines',
-    route: '/engines',
+    route: ({ demo }) => (demo ? null : '/engines'),
     side: 'right',
   },
   {
@@ -102,4 +109,9 @@ export const TOUR_STEPS: TourStep[] = [
 /** Where a step wants to be shown: a path, null when it cannot be shown, or undefined. */
 export function routeFor(step: TourStep, context: TourContext): string | null | undefined {
   return typeof step.route === 'function' ? step.route(context) : step.route
+}
+
+/** The steps this deployment can show at all — what the "2 of 5" counter is over. */
+export function shownSteps(context: TourContext): TourStep[] {
+  return TOUR_STEPS.filter((step) => routeFor(step, context) !== null)
 }

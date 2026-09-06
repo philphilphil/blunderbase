@@ -8,9 +8,21 @@
  * mutation site would be forty copies of one sentence. So the fetch wrapper reports it here
  * and the shell, which is mounted exactly once, says it once — the same shape as
  * `lib/auth/session.ts`, and for the same reason: the wrapper is outside React's tree.
+ *
+ * The refusal's own text is replaced on the way through as well. The backend's detail is
+ * written for a curl or an MCP client, in English, and each mutation site renders whatever
+ * message its error carries in red under the control that failed — so the message every
+ * one of them shows is the one short sentence below, in the visitor's language, rather
+ * than a server sentence the shell's toast is about to say again.
  */
+import { t } from '@lingui/core/macro'
 
 export const READ_ONLY = 'read_only'
+
+/** What a refused write says wherever its error is rendered. */
+export function readOnlyMessage(): string {
+  return t`This is a read-only demo.`
+}
 
 const listeners = new Set<() => void>()
 

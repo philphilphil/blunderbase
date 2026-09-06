@@ -33,7 +33,7 @@ import { useGames, useSetTourSeen, useTourState } from '@/lib/api/queries'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import { readDemoTourSeen, writeDemoTourSeen } from './demoSeen'
-import { routeFor, TOUR_STEPS, type TourStep } from './steps'
+import { routeFor, shownSteps, TOUR_STEPS, type TourStep } from './steps'
 
 /**
  * How long a step waits for its element before giving up on it.
@@ -91,9 +91,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const games = useGames({ limit: 1 }, { enabled: running })
   const latestGameId = games.data?.games[0]?.id ?? null
   // Everything a step needs to answer "can I be shown here, and where". A deployment with
-  // MCP switched off has no assistant page, which is a step skipped rather than a route
-  // that redirects out from under the coachmark.
-  const context = useMemo(() => ({ latestGameId, mcp }), [latestGameId, mcp])
+  // MCP switched off has no assistant page, and the demo has no engines page worth the
+  // name: each is a step skipped rather than a route that redirects out from under the
+  // coachmark.
+  const context = useMemo(() => ({ latestGameId, mcp, demo }), [latestGameId, mcp, demo])
   // A step is only resolved once the library has answered; otherwise the board step would
   // be skipped for an empty library before the first page of games had landed.
   const contextReady = !running || !games.isPending
@@ -240,19 +241,23 @@ export function TourProvider({ children }: { children: ReactNode }) {
     setIndex((current) => (current === null || current === 0 ? current : current - 1))
   }, [])
 
-  const value = useMemo<TourValue>(
-    () => ({
+  // The counter is over the steps this deployment can show, not over the list: a demo
+  // visitor walking four coachmarks should not be told there are five. A step dropped for
+  // a missing anchor is still counted — that is a surprise, not a fact about the deployment.
+  const value = useMemo<TourValue>(() => {
+    const shown = shownSteps(context)
+    const position = step ? shown.indexOf(step) + 1 : 0
+    return {
       step,
-      position: (index ?? 0) + 1,
-      total: TOUR_STEPS.length,
+      position: position > 0 ? position : 1,
+      total: shown.length,
       anchor,
       next,
       back,
       dismiss,
       replay,
-    }),
-    [step, index, anchor, next, back, dismiss, replay],
-  )
+    }
+  }, [step, context, anchor, next, back, dismiss, replay])
 
   return <TourContext.Provider value={value}>{children}</TourContext.Provider>
 }

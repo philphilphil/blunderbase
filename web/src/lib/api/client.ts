@@ -1,6 +1,6 @@
 import { isSessionLoss, reportSessionLost } from '@/lib/auth/session'
 
-import { isReadOnlyRefusal, reportWriteRefused } from './readOnly'
+import { isReadOnlyRefusal, readOnlyMessage, reportWriteRefused } from './readOnly'
 import type { ErrorBody } from './types'
 
 /**
@@ -117,8 +117,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       reportSessionLost(failure.error)
     }
     // The demo refusing a write is likewise the deployment's answer rather than this
-    // caller's: the shell says so once, and the caller still gets its error.
+    // caller's: the shell says so once, and the caller still gets its error — carrying
+    // the one sentence every refusal shows rather than the backend's own wording.
     if (isReadOnlyRefusal(failure.status, failure.error)) {
+      failure.message = readOnlyMessage()
       reportWriteRefused()
     }
     throw failure

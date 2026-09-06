@@ -535,12 +535,13 @@ msgid "Sign out"
 msgstr "Sign out"
 
 #: src/components/shell/AppShell.tsx
-msgid "This is the read-only demo. Nothing you do here is saved."
-msgstr "This is the read-only demo. Nothing you do here is saved."
+#: src/lib/api/readOnly.ts
+msgid "This is a read-only demo."
+msgstr "This is a read-only demo."
 
 #: src/components/shell/AppShell.tsx
-msgid "Run your own Blunderbase to import, analyse and annotate your games."
-msgstr "Run your own Blunderbase to import, analyse and annotate your games."
+msgid "Nothing you do here is saved. Run your own Blunderbase to import, analyse and annotate your games."
+msgstr "Nothing you do here is saved. Run your own Blunderbase to import, analyse and annotate your games."
 
 #: src/components/shell/AppShell.tsx
 msgid "Get it"
