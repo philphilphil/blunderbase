@@ -165,7 +165,7 @@ See [Your AI assistant](../guide/coach.md).
 
 ## set-password
 
-Set or replace the owner's password, which is also an accepted MCP bearer token. Asked
+Set or replace the owner's browser password. Asked
 twice, never echoed.
 
 ```console

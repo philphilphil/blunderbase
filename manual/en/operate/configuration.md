@@ -29,7 +29,7 @@ They take effect on the next thing you click, not on the next restart. See
 |---|---|---|
 | `BLUNDERBASE_RUNTIME_MODE` | `server` | `server`, `desktop` or `demo`. `desktop` is the native shell's mode and needs `BLUNDERBASE_DESKTOP_TOKEN`. `demo` is the public, read-only mode: no password, no `/mcp`, every write answers `403 read_only`, and runners only with tokens the source library already had. Only ever for a database `blunderbase demo create` built |
 | `BLUNDERBASE_DESKTOP_TOKEN` | empty | The per-launch secret the desktop shell authenticates its own window with. 64 lowercase hexadecimal characters, and required in `desktop` mode. The native application sets it; you do not |
-| `BLUNDERBASE_MCP_BEARER_KEY` | empty | One more token `/mcp` accepts, beside the keys minted on Assistant and the owner's password. For compose files and automation |
+| `BLUNDERBASE_MCP_BEARER_KEY` | empty | One more token `/mcp` accepts, alongside keys minted on Assistant. For compose files and automation |
 | `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` | `true` | Serve the page with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, which is what a browser wants before it gives a tab a `SharedArrayBuffer` — and without one an engine running in the browser is single-threaded. The cost is that every cross-origin subresource must opt in with `Cross-Origin-Resource-Policy` or be blocked; the build loads none. Turn it off behind a proxy that rewrites those headers, or for a page that has to load an asset from somewhere else |
 
 ## Network

@@ -126,7 +126,7 @@ server {
 ## Check it
 
 The MCP endpoint through the proxy is `https://<your host>/mcp`, and the header is
-`Authorization: Bearer <a key from Assistant, or your password>`. Two curls say whether the
+`Authorization: Bearer <a key from Assistant>`. Two curls say whether the
 proxy got out of the way.
 
 ```console
@@ -162,7 +162,7 @@ Then add it to a client:
 
 ```bash
 claude mcp add --transport http blunderbase https://blunderbase.example.com/mcp \
-  --header "Authorization: Bearer <a key from Assistant, or your password>"
+  --header "Authorization: Bearer <a key from Assistant>"
 ```
 
 ## Settings worth knowing

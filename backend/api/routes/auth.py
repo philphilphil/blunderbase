@@ -138,8 +138,7 @@ def change_password(
 ) -> AuthStatus:
     """Every other browser is signed out, and this one is handed a fresh cookie.
 
-    The MCP bearer key is the same password, so a change invalidates that too — which is
-    the point of saying so in the docs rather than only here.
+    Dedicated MCP keys remain valid across password changes.
     """
     _require_password_auth(settings)
     _require_setup(session)

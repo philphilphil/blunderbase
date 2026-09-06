@@ -49,7 +49,7 @@ def remote_settings(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> Settings:
 
 @pytest.fixture()
 def keyless_settings(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> Settings:
-    """Settings with no environment key, so the owner's password is the bearer key."""
+    """Settings with no environment key, so only minted keys authenticate."""
     monkeypatch.delenv("BLUNDERBASE_MCP_BEARER_KEY", raising=False)
     return Settings(root=tmp_path)
 
@@ -142,17 +142,17 @@ async def test_the_scheme_is_read_case_insensitively() -> None:
 
 
 async def test_the_transport_refuses_to_exist_without_a_key(tmp_path: Any) -> None:
-    """Neither an environment key nor a password: a door that refuses everyone is a mistake."""
+    """Standalone HTTP requires setup or an environment key."""
     with pytest.raises(TransportDisabledError):
         BearerGuard(echo, "   ")
     with pytest.raises(TransportDisabledError):
         create_http_app(Settings(root=tmp_path, mcp_bearer_key=""))
 
 
-# --- the bearer key is the owner's password --------------------------------
+# --- browser passwords are refused --------------------------------
 
 
-async def test_the_owners_password_is_the_bearer_key(
+async def test_the_owners_password_is_refused(
     keyless_settings: Settings, sessions: sessionmaker[Session]
 ) -> None:
     with sessions() as session:
@@ -166,11 +166,11 @@ async def test_the_owners_password_is_the_bearer_key(
             headers={**MCP_HEADERS, "authorization": f"Bearer {PASSWORD}"},
         )
 
-    assert response.status_code == 200
-    assert response.json()["result"]["serverInfo"]["name"] == "blunderbase"
+    assert response.status_code == 401
+    assert "serverInfo" not in response.text
 
 
-async def test_a_token_that_is_not_the_password_is_refused(
+async def test_an_unknown_token_is_refused(
     keyless_settings: Settings, sessions: sessionmaker[Session]
 ) -> None:
     with sessions() as session:
@@ -186,11 +186,10 @@ async def test_a_token_that_is_not_the_password_is_refused(
     assert "serverInfo" not in response.text
 
 
-async def test_the_environment_key_works_alongside_the_password(
+async def test_the_environment_key_works_but_the_password_is_refused(
     remote_settings: Settings, sessions: sessionmaker[Session]
 ) -> None:
-    """Set, it is one more accepted token: the compose files keep working, and so does the
-    owner's own password. What it does not do is turn a wrong token into a right one."""
+    """The automation key works; the password remains restricted to browser login."""
     with sessions() as session:
         auth_service.set_password(session, PASSWORD)
     app = create_http_app(remote_settings, sessions=sessions, json_response=True)
@@ -207,7 +206,7 @@ async def test_the_environment_key_works_alongside_the_password(
         )
 
     assert with_key.status_code == 200
-    assert with_password.status_code == 200
+    assert with_password.status_code == 401
     assert with_neither.status_code == 401
 
 
@@ -364,8 +363,8 @@ def test_the_transport_is_mounted_for_a_password_with_no_key_configured(
             json=INITIALIZE,
             headers={**MCP_HEADERS, "authorization": f"Bearer {PASSWORD}"},
         )
-    assert response.status_code == 200
-    assert '"blunderbase"' in response.text
+    assert response.status_code == 401
+    assert "serverInfo" not in response.text
 
 
 def test_the_transport_refuses_everyone_before_first_run_setup(settings: Settings) -> None:
@@ -407,10 +406,10 @@ def test_guessing_at_mcp_does_not_lock_the_owner_out_of_the_browser(
     assert signed_in.status_code == 200
 
 
-def test_a_password_set_through_the_ui_reaches_mcp_without_a_restart(
+def test_a_key_minted_through_the_ui_reaches_mcp_without_a_restart(
     settings: Settings,
 ) -> None:
-    """The whole point: first-run setup in the browser, then `/mcp` works in the same process."""
+    """Setup alone cannot open MCP; minting a key does, without restarting."""
     settings.analysis_workers = False
     app = create_app(settings)
     with TestClient(app, base_url=BASE_URL) as client:
@@ -421,8 +420,14 @@ def test_a_password_set_through_the_ui_reaches_mcp_without_a_restart(
 
         assert client.post("/auth/setup", json={"password": PASSWORD}).status_code == 200
 
-        after = client.post(
+        assert client.post(
             "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {PASSWORD}"}
+        ).status_code == 401
+        created = client.post("/api/mcp-keys", json={"name": "assistant"})
+        assert created.status_code == 201
+        token = created.json()["token"]
+        after = client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "authorization": f"Bearer {token}"}
         )
     assert after.status_code == 200
     assert '"blunderbase"' in after.text

@@ -17,11 +17,9 @@ Three decisions worth keeping in mind:
 - **Failures are counted per client address.** Five consecutive wrong passwords shut
   that client's door for a few seconds, doubling up to `LOCKOUT_MAX`. A stranger cannot
   lock the owner's other addresses out. The bounded, process-local counter reserves an
-  attempt before hashing, so concurrent guesses spend the same budget. The MCP bearer
-  check has a separate limiter.
+  attempt before hashing, so concurrent guesses spend the same budget.
 
-The MCP bearer check also accepts the keys the owner mints in `services/mcp_keys.py`; see
-`verify_bearer` for the order.
+The MCP bearer check accepts only keys minted in `services/mcp_keys.py`.
 """
 
 from __future__ import annotations
@@ -31,7 +29,7 @@ import hmac
 import secrets
 import threading
 import time
-from collections import OrderedDict, deque
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -65,12 +63,6 @@ LOCKOUT_THRESHOLD = 5
 LOCKOUT_BASE = timedelta(seconds=5)
 LOCKOUT_MAX = timedelta(minutes=5)
 LOGIN_MAX_CLIENTS = 4096
-
-# What the `/mcp` bearer door will spend on the password fall-through: ten wrong passwords
-# a minute, and then no scrypt derivation at all until the oldest of them ages out. A rate
-# rather than a backoff, for the reason `_password_opens_bearer` gives.
-BEARER_ATTEMPT_LIMIT = 10
-BEARER_ATTEMPT_WINDOW = timedelta(seconds=60)
 
 # How long a token that has just been checked against the database is taken on trust; see
 # `remember_valid_token`.
@@ -129,7 +121,6 @@ def set_password(session: Session, password: str) -> None:
         raise AlreadyConfiguredError("a password has already been set")
     session.commit()
     forget_valid_tokens()
-    reset_bearer_limiter()
     reset_login_limiter()
 
 
@@ -149,8 +140,6 @@ def reset_password(session: Session, password: str) -> None:
     session.execute(delete(AuthSession))
     session.commit()
     forget_valid_tokens()
-    # The guesses the bearer door refused were guesses at a password that no longer exists.
-    reset_bearer_limiter()
     reset_login_limiter()
 
 
@@ -204,24 +193,8 @@ def change_password(session: Session, current: str, new: str, *, source: str = "
 
 
 def verify_bearer(session: Session, token: str) -> bool:
-    """Whether an MCP bearer token opens the door: a minted key first, else the password.
-
-    Keys (`services/mcp_keys.py`) are tried first because they are the cheap check — one
-    hash and one indexed read — and because a matching key must not cost a failed attempt
-    on any limiter. Anything that is not a key falls through to the password, which is what
-    a fresh deployment has and what a `bb_mcp_`-less token can only be.
-
-    That fall-through is bounded by this door's own budget rather than by the credential
-    row's lockout; `_password_opens_bearer` is where that decision is written down.
-
-    Never raises. The transport has one thing to say to a caller it does not recognise,
-    and it is 401 — a refusal for want of budget looks exactly like a wrong password.
-    """
-    if not token:
-        return False
-    if mcp_keys.authenticate(session, token):
-        return True
-    return _password_opens_bearer(session, token)
+    """Accept only a dedicated MCP key; browser passwords never authenticate MCP."""
+    return bool(token) and mcp_keys.authenticate(session, token)
 
 
 # --- the client-address login limiter --------------------------------------
@@ -273,71 +246,6 @@ def _reserve_login_attempt(source: str) -> _LoginAttempts:
         if attempt.failures >= LOCKOUT_THRESHOLD:
             attempt.locked_until = now + _backoff(attempt.failures).total_seconds()
         return attempt
-
-
-# --- the bearer door's own limiter -----------------------------------------
-
-# The monotonic moments of the password guesses `/mcp` has refused lately. Module state,
-# process-local and lost on restart, which is what a bearer-token limiter wants: it is
-# about a door standing open right now, not about an account.
-_BEARER_FAILURES: deque[float] = deque()
-_BEARER_LIMITER_LOCK = threading.Lock()
-
-
-def _password_opens_bearer(session: Session, token: str) -> bool:
-    """Whether this bearer token is the owner's password, on the bearer door's own budget.
-
-    Deliberately not `verify_password`: the MCP budget is separate from the browser's
-    per-address backoff. A client guessing at this transport cannot spend login attempts.
-
-    **It is keyed on the door, not on the presented token.** The secret being guessed is
-    one password, so a per-token counter would be free to defeat by varying the token —
-    what has to be bounded is how often anybody at all may have a password derived for
-    them. Hence a rolling rate: at most `BEARER_ATTEMPT_LIMIT` wrong passwords per
-    `BEARER_ATTEMPT_WINDOW`, refused *before* the scrypt derivation, which bounds the
-    guessing and the CPU it would cost together. Rolling and not doubling, so unlike the
-    row's lockout it cannot be renewed for ever: guesses that stop are forgotten a window
-    later, with nothing left behind.
-
-    Sustained guessing does shut this fall-through for as long as it lasts. That is the
-    trade, and the two tokens the door tries first are the way round it — a minted key and
-    `BLUNDERBASE_MCP_BEARER_KEY` never touch this budget. The browser login is untouched
-    either way, which is the whole point.
-
-    No column is written on the way through, so an MCP client is neither a login nor a
-    commit per request.
-    """
-    now = time.monotonic()
-    if not _bearer_attempt_allowed(now):
-        return False
-    credential = _credential(session)
-    if credential is None:
-        return False
-    if _matches(credential, token):
-        return True
-    _note_bearer_failure(now)
-    return False
-
-
-def reset_bearer_limiter() -> None:
-    """Forget the guesses this door has refused. A password change and the tests call this."""
-    with _BEARER_LIMITER_LOCK:
-        _BEARER_FAILURES.clear()
-
-
-def _bearer_attempt_allowed(now: float) -> bool:
-    """Whether the door still has room for one more derivation, ageing out what has expired."""
-    cutoff = now - BEARER_ATTEMPT_WINDOW.total_seconds()
-    with _BEARER_LIMITER_LOCK:
-        while _BEARER_FAILURES and _BEARER_FAILURES[0] <= cutoff:
-            _BEARER_FAILURES.popleft()
-        return len(_BEARER_FAILURES) < BEARER_ATTEMPT_LIMIT
-
-
-def _note_bearer_failure(now: float) -> None:
-    """Spend one of the window's attempts on a password that was not the owner's."""
-    with _BEARER_LIMITER_LOCK:
-        _BEARER_FAILURES.append(now)
 
 
 # --- sessions --------------------------------------------------------------

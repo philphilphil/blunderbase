@@ -1,10 +1,7 @@
-"""MCP bearer keys: the owner's revocable alternative to pasting the password into a client.
+"""Dedicated, individually revocable MCP bearer keys.
 
-An `McpKey` row is one client's way through the `/mcp` bearer guard. The password still
-works there — a fresh deployment needs nothing else — but a key is what the owner reaches
-for once more than one coach configuration wants in, because it can be deleted without
-signing every browser out. The design is `services/runners.py`'s token, not
-`services/auth.py`'s password:
+An `McpKey` row is one client's credential for `/mcp`. Browser passwords do not work
+there. The design follows `services/runners.py`'s random tokens:
 
 - **The token is the identity, the name is a label.** `bb_mcp_` and 32 random bytes,
   shown exactly once; the name is for the list on the Assistant page and for knowing which
@@ -12,10 +9,8 @@ signing every browser out. The design is `services/runners.py`'s token, not
 - **Stored as a SHA-256, compared in constant time.** There is nothing to brute-force in
   32 random bytes, so no scrypt, and the hash is what the lookup keys on — the token itself
   never appears in a query.
-- **`authenticate` answers yes or no, never a stack trace.** The guard has one thing to
-  say to a caller it does not recognise, and `verify_bearer` in `services/auth.py` tries
-  a key before falling back to the password, so a wrong key still ends at the password
-  limiter rather than bypassing it.
+- **`authenticate` answers yes or no, never a stack trace.** Unknown keys are refused;
+  the bearer check never falls back to password authentication.
 - **`last_used_at` is stamped sparingly.** An MCP client makes many requests a second;
   writing on each would be a write per request for a number the owner reads at a
   minute's granularity at best. Older than `LAST_USED_GRANULARITY`, or never set, is

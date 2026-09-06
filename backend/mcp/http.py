@@ -31,23 +31,15 @@ Verifier = Callable[[str], bool]
 
 
 class TransportDisabledError(RuntimeError):
-    """The remote transport was asked for with neither a bearer key nor a password."""
+    """The remote transport was asked for with neither a configured key nor a key verifier."""
 
 
 class BearerGuard:
     """ASGI middleware demanding a bearer token of every HTTP request.
 
-    Three things open it, tried in this order. `BLUNDERBASE_MCP_BEARER_KEY`, when set, is
-    compared first and in constant time — it costs no database read, and it is what keeps
-    the compose files and existing automation working while everything else changes
-    underneath. Then `verify`, which is `services.auth.verify_bearer`: a key the owner
-    minted on the Assistant page, else the owner's password, checked against the same hash
-    the web session is. The environment key is one more accepted token rather than the
-    only one, so a deployment that pins one for automation can still hand a coach a key it
-    can revoke on its own. Only the password fall-through is rate limited, on a budget
-    belonging to this door and never to the owner's browser login — see
-    `services.auth._password_opens_bearer`, which is where a stranger reaching this
-    unauthenticated path stops being able to cost the owner anything.
+    Dedicated keys open it: `BLUNDERBASE_MCP_BEARER_KEY` is compared first in constant
+    time, then `verify` checks keys minted on the Assistant page. Browser passwords
+    are never accepted. Each minted key can be revoked independently.
 
     It sits outside the MCP app so an unauthenticated caller never reaches the protocol at
     all — not even to be told which tools exist. Lifespan and any other scope pass through
@@ -60,7 +52,7 @@ class BearerGuard:
         self.verify = verify
         if not self.key and verify is None:
             raise TransportDisabledError(
-                "the MCP HTTP transport needs a password set or BLUNDERBASE_MCP_BEARER_KEY"
+                "the MCP HTTP transport needs setup for MCP keys or BLUNDERBASE_MCP_BEARER_KEY"
             )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -83,8 +75,7 @@ class BearerGuard:
             return True
         if self.verify is None:
             return False
-        # A key lookup is a database read and a password check a scrypt derivation on top;
-        # neither belongs on the event loop.
+        # Key lookups belong off the event loop.
         return await to_thread.run_sync(self.verify, token)
 
     async def reject(self, send: Send) -> None:
@@ -117,11 +108,9 @@ def create_http_app(
     Stateless: every request carries everything it needs, so the owner's client can
     reconnect, or reach a restarted server, without a session to resume.
 
-    Raises `TransportDisabledError` when there is neither an environment key nor a
-    password to check one against: a transport that would refuse every caller is a
-    configuration mistake, not a service. `before_setup=True` turns that off — see
-    `password_verifier` — for the copy mounted inside the API app, which has to exist
-    before the owner has chosen anything so it can start serving the moment they do.
+    Raises `TransportDisabledError` without an environment key or initialized setup.
+    `before_setup=True` keeps the API route available before setup so newly minted
+    keys work without restarting the transport.
     """
     resolved = settings or get_settings()
     # The bind host decides the SDK's DNS-rebinding policy, and this app is the one
@@ -133,33 +122,21 @@ def create_http_app(
         stateless_http=True,
         host=resolved.host,
     )
-    verify = password_verifier(resolved, sessions, before_setup=before_setup)
+    verify = key_verifier(resolved, sessions, before_setup=before_setup)
     return BearerGuard(app, resolved.mcp_bearer_key, verify=verify)
 
 
-def password_verifier(
+def key_verifier(
     settings: Settings,
     sessions: sessionmaker[Session] | None = None,
     *,
     before_setup: bool = False,
 ) -> Verifier | None:
-    """Check a presented bearer token against the owner's keys and password, or None if
-    there is no password yet.
+    """Check a dedicated MCP key against the database on every request.
 
-    No password means no keys either — a key is minted through a route only a signed-in
-    owner reaches — so "setup required" is the whole test for whether a verifier can say
-    yes to anything.
-
-    Resolved once, at the point the transport is built, so a database that has never been
-    migrated — `blunderbase mcp --transport http` pointed at nothing — is a refusal to
-    start rather than a 500 per request. The check itself reads the row every time, so a
-    password change takes effect without a restart.
-
-    `before_setup=True` skips that resolution and always hands back a verifier: it answers
-    "no" to everything until a password exists, and yes the moment one does. That is what
-    lets the API app mount `/mcp` at startup on a deployment that has never been set up —
-    the transport's sessions live in a task group only the lifespan can open, so a route
-    added later would have nowhere to run.
+    Standalone transports require initialized setup unless an environment key is set.
+    The API uses `before_setup=True` to mount the route before setup; keys created
+    later become usable immediately, and revocation takes effect on the next request.
     """
     factory = sessions or get_sessionmaker(settings)
     if not before_setup:
@@ -176,7 +153,7 @@ def password_verifier(
             with factory() as session:
                 return auth_service.verify_bearer(session, token)
         except SQLAlchemyError:
-            # A database with no credentials table yet: no token can be the owner's.
+            # A database without the key table cannot authenticate a key.
             return False
 
     return verify
@@ -199,10 +176,9 @@ def mount_http_app(
     no sub-paths of its own: mounted, `/mcp` would answer with a redirect to `/mcp/` that
     a client posting JSON-RPC has no reason to follow.
 
-    The route exists whether or not the deployment has been set up yet: with no bearer key
-    and no password the guard answers 401 to everyone, and starts accepting the password
-    the moment one is chosen in the browser — no restart, because the route and its task
-    group are already there.
+    The route exists before setup. Without a configured or minted key the guard answers
+    401 to everyone. A key minted on Assistant works immediately because the route and
+    its task group are already there.
 
     The caller keeps `server.session_manager.run()` open for as long as it serves. The
     transport runs its sessions in a task group that context opens, and the host app

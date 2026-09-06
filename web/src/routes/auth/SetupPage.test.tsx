@@ -37,7 +37,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('SetupPage', () => {
   it('says what the password is for before anything is typed', () => {
     draw()
-    expect(screen.getByText(/MCP bearer key/)).toBeInTheDocument()
+    expect(screen.getByText(/separate MCP key/)).toBeInTheDocument()
   })
 
   it('refuses a password shorter than the server would accept, without asking it', async () => {

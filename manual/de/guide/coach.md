@@ -11,8 +11,8 @@ wie die App: deine Partien, keine Allgemeinplätze.
 
 Gib unter **Bearer-Schlüssel** einen Namen ein und erzeuge den Schlüssel. Das Geheimnis
 wird nur einmal angezeigt, kopiere es also, bevor du **Fertig** drückst. Erzeuge einen
-Schlüssel pro Client; **Widerrufen** zieht einen einzelnen zurück. Dein Passwort wird auch
-akzeptiert, aber ein Passwort in einer Konfigurationsdatei liegt im Klartext auf der Platte.
+Schlüssel pro Client; **Widerrufen** zieht einen einzelnen zurück. Dein Browser-Passwort
+wird für MCP nicht akzeptiert.
 
 ## Einen Client verbinden
 

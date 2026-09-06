@@ -202,7 +202,7 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
 
     commands.add_parser(
         "set-password",
-        help="set or replace the owner's password (which is also the MCP bearer key)",
+        help="set or replace the owner's browser password",
     )
 
     db = commands.add_parser("db", help="database maintenance")

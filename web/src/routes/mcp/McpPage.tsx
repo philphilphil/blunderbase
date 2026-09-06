@@ -118,8 +118,8 @@ export function McpPage() {
               <Trans>
                 Where the deployment sets{' '}
                 <span className="font-mono text-soft-2">BLUNDERBASE_MCP_BEARER_KEY</span> that key
-                is accepted too, and so is your own password — a minted key is just the one that
-                belongs in a file. <span className="font-mono text-soft-2">make mcp-key</span>{' '}
+                is accepted too. Your password cannot be used to connect an MCP client.{' '}
+                <span className="font-mono text-soft-2">make mcp-key</span>{' '}
                 prints the local URL and header.
               </Trans>
             </p>

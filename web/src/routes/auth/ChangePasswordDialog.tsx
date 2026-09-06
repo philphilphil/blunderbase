@@ -66,8 +66,8 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
           </h2>
           <p className="text-[0.75rem] leading-[1.65] text-dim">
             <Trans>
-              Every other browser is signed out, and the MCP bearer key changes with it —
-              the coach reconnects with the new one. This browser stays signed in.
+              Every other browser is signed out. This browser stays signed in, and your MCP
+              keys keep working.
             </Trans>
           </p>
         </div>

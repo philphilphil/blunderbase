@@ -259,13 +259,10 @@ def _clear_stale_connections(settings: Settings) -> None:
 def _mount_mcp(app: FastAPI, settings: Settings) -> None:
     """Serve `/mcp` for as long as we serve anything, key or no key, password or none yet.
 
-    The key and the password are one credential, so a deployment set up through the web UI
-    has a remote transport without anyone exporting an environment variable — and it has
-    it *immediately*, because the route and the task group its sessions live in are opened
-    here, before anyone has chosen a password. Until one exists the bearer guard answers
-    401 to every caller; the first request after first-run setup is the first one it lets
-    through. Mounting on demand is not an option: the lifespan is the only place that can
-    open the session manager's task group, and it runs exactly once.
+    The route and its session task group are opened before setup. Without a configured
+    or minted key the guard refuses every caller. Keys created later on Assistant work
+    immediately. Mounting on demand is not an option: only the lifespan can open the
+    session manager's task group, and it runs exactly once.
 
     Which is why this is the only place that mounts, key or no key. A transport built in
     `create_app` would be one whose sessions nothing ever runs.

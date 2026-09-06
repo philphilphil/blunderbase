@@ -168,8 +168,7 @@ Siehe [Dein KI-Assistent](../guide/coach.md).
 
 ## set-password { #set-password }
 
-Setzt oder ersetzt das Passwort des Besitzers, das zugleich als MCP-Bearer-Token akzeptiert
-wird. Wird zweimal abgefragt und nie angezeigt.
+Setzt oder ersetzt das Browser-Passwort des Besitzers. Wird zweimal abgefragt und nie angezeigt.
 
 ```console
 $ blunderbase set-password

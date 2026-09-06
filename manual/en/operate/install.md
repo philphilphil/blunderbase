@@ -88,8 +88,8 @@ chosen the app shows the setup screen instead of the login one, and every API ca
 `401 setup_required`. There is no registration and no second account: one owner, one
 password.
 
-The password must be at least eight characters. It is also the bearer token `/mcp` accepts
-until you mint keys, so choose it accordingly.
+The password must be at least eight characters. For MCP access, create a separate key
+on the **Assistant** page after setup.
 
 Then work through [Getting started](../guide/getting-started.md): connect an account,
 import, register an engine.
@@ -130,8 +130,7 @@ for a password.
 
 Account menu → **Change password**. It asks for the current one and the new one twice.
 
-A password change signs every other browser out and invalidates the password as an MCP
-bearer token. Minted keys keep working.
+A password change signs every other browser out. MCP keys keep working.
 
 ## How an MCP client authenticates
 
@@ -140,18 +139,14 @@ bearer token. Minted keys keep working.
 1. `BLUNDERBASE_MCP_BEARER_KEY`, when the installation sets it — an extra accepted token,
    for automation and compose files.
 2. A key you minted on the **Assistant** page.
-3. The owner's password.
 
-So a password chosen in the browser works at `/mcp` immediately, with no restart.
-
-Once more than one client wants in, mint a key per client on **Assistant**. Keys look like
+The owner’s password is not accepted. Mint a key per client on **Assistant**; it works
+immediately, with no restart. Keys look like
 `bb_mcp_…`, are stored as a SHA-256 hash, are shown exactly once, and are revoked
 individually — deleting one signs out that client and nothing else. The list shows when
 each key was last used.
 
-Guessing the password at `/mcp` is rate limited on its own budget of ten attempts a
-minute, so it never costs your browser login its lockout, and a minted key is never slowed
-down by somebody else's guesses.
+MCP checks only keys, so failed MCP authentication never spends browser login attempts.
 
 Connecting a client is [Your AI assistant](../guide/coach.md).
 

@@ -114,12 +114,12 @@ def test_a_revoked_key_stops_working(session: Session) -> None:
 # --- through the bearer check the transport uses ------------------------------
 
 
-def test_verify_bearer_accepts_a_key_and_still_the_password(session: Session) -> None:
+def test_verify_bearer_accepts_only_a_key(session: Session) -> None:
     auth_service.set_password(session, PASSWORD)
     _key, token = mcp_keys_service.create_key(session, "laptop")
 
     assert auth_service.verify_bearer(session, token) is True
-    assert auth_service.verify_bearer(session, PASSWORD) is True
+    assert auth_service.verify_bearer(session, PASSWORD) is False
     assert auth_service.verify_bearer(session, "bb_mcp_wrong") is False
 
 

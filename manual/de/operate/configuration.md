@@ -31,7 +31,7 @@ nicht ab dem nächsten Neustart. Siehe [Analyse](../guide/analysis.md) und
 |---|---|---|
 | `BLUNDERBASE_RUNTIME_MODE` | `server` | `server`, `desktop` oder `demo`. `desktop` ist der Modus der Desktop-Anwendung und braucht `BLUNDERBASE_DESKTOP_TOKEN`. `demo` ist der öffentliche, schreibgeschützte Modus: kein Passwort, kein `/mcp`, jeder Schreibzugriff antwortet `403 read_only`, und Runner nur mit Token, die die Quellbibliothek schon hatte. Immer nur für eine Datenbank, die `blunderbase demo create` gebaut hat |
 | `BLUNDERBASE_DESKTOP_TOKEN` | leer | Das Geheimnis, mit dem die Desktop-Anwendung ihr eigenes Fenster anmeldet, bei jedem Start ein neues. 64 hexadezimale Kleinbuchstaben, im Modus `desktop` Pflicht. Die native Anwendung setzt es, du nicht |
-| `BLUNDERBASE_MCP_BEARER_KEY` | leer | Ein weiteres Token, das `/mcp` akzeptiert, neben den unter Assistent erzeugten Schlüsseln und dem Passwort des Besitzers. Für Compose-Dateien und Automatisierung |
+| `BLUNDERBASE_MCP_BEARER_KEY` | leer | Ein weiteres Token, das `/mcp` akzeptiert, neben den unter Assistent erzeugten Schlüsseln. Für Compose-Dateien und Automatisierung |
 | `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` | `true` | Die Seite mit `Cross-Origin-Opener-Policy: same-origin` und `Cross-Origin-Embedder-Policy: require-corp` ausliefern. Das will ein Browser sehen, bevor er einem Tab einen `SharedArrayBuffer` gibt – und ohne den läuft eine Engine im Browser mit einem Thread. Der Preis ist, dass jede Cross-Origin-Subressource per `Cross-Origin-Resource-Policy` zustimmen muss oder blockiert wird; der Build lädt keine. Schalt es aus hinter einem Proxy, der diese Header umschreibt, oder für eine Seite, die eine Ressource von woanders laden muss |
 
 ## Netzwerk { #network }

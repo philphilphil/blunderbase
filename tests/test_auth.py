@@ -294,7 +294,7 @@ def test_login_attempt_history_expires_and_has_a_size_bound(
 
 
 def test_a_stranger_at_the_mcp_door_cannot_lock_the_owner_out(session: Session) -> None:
-    """The two limiters are deliberately separate: `/mcp` is unauthenticated by design, so
+    """MCP never checks passwords: `/mcp` is unauthenticated by design, so
     guessing bearer tokens there must not cost the owner their own browser."""
     auth_service.set_password(session, PASSWORD)
 
@@ -307,54 +307,27 @@ def test_a_stranger_at_the_mcp_door_cannot_lock_the_owner_out(session: Session) 
     assert auth_service.verify_password(session, PASSWORD) is True
 
 
-def test_the_bearer_door_stops_deriving_once_its_window_is_spent(session: Session) -> None:
-    """Guessing the password over `/mcp` is bounded on the door, not on the token: what
-    runs out is how often anybody at all may have a password derived for them."""
-    auth_service.set_password(session, PASSWORD)
-
-    for guess in range(auth_service.BEARER_ATTEMPT_LIMIT):
-        assert auth_service.verify_bearer(session, f"{OTHER}-{guess}") is False
-
-    # Every token now, the right one included: the refusal is in front of the derivation.
-    assert auth_service.verify_bearer(session, PASSWORD) is False
-    # And it is still the owner's own browser login that has cost nothing.
-    assert auth_service.verify_password(session, PASSWORD) is True
-
-
-def test_the_bearer_doors_window_rolls_rather_than_renewing(
-    session: Session, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The bug this replaced: a lockout every further failure renewed. A rolling window
-    forgets, so guessing that stops leaves nothing behind."""
-    auth_service.set_password(session, PASSWORD)
-    for guess in range(auth_service.BEARER_ATTEMPT_LIMIT):
-        assert auth_service.verify_bearer(session, f"{OTHER}-{guess}") is False
-    assert auth_service.verify_bearer(session, PASSWORD) is False
-
-    monkeypatch.setattr(auth_service, "BEARER_ATTEMPT_WINDOW", timedelta(0))
-
-    assert auth_service.verify_bearer(session, PASSWORD) is True
-
-
-def test_a_matching_key_costs_nothing_at_either_door(session: Session) -> None:
+def test_mcp_never_derives_a_password(session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     auth_service.set_password(session, PASSWORD)
     _key, token = mcp_keys_service.create_key(session, "laptop")
 
-    for _ in range(auth_service.BEARER_ATTEMPT_LIMIT * 2):
-        assert auth_service.verify_bearer(session, token) is True
+    def unexpected_derivation(*args: object) -> bool:
+        pytest.fail("MCP must not check the browser password")
 
-    assert auth_service.verify_bearer(session, PASSWORD) is True
-    assert auth_service.verify_password(session, PASSWORD) is True
+    monkeypatch.setattr(auth_service, "_matches", unexpected_derivation)
+    assert auth_service.verify_bearer(session, PASSWORD) is False
+    assert auth_service.verify_bearer(session, OTHER) is False
+    assert auth_service.verify_bearer(session, token) is True
 
 
-def test_a_password_change_forgets_the_guesses_at_the_old_one(session: Session) -> None:
+def test_password_changes_leave_mcp_keys_working(session: Session) -> None:
     auth_service.set_password(session, PASSWORD)
-    for guess in range(auth_service.BEARER_ATTEMPT_LIMIT):
-        assert auth_service.verify_bearer(session, f"{OTHER}-{guess}") is False
-
+    _key, token = mcp_keys_service.create_key(session, "laptop")
     auth_service.reset_password(session, OTHER)
-
-    assert auth_service.verify_bearer(session, OTHER) is True
+    assert auth_service.verify_bearer(session, PASSWORD) is False
+    assert auth_service.verify_bearer(session, OTHER) is False
+    assert auth_service.verify_bearer(session, token) is True
+    assert auth_service.verify_password(session, OTHER) is True
 
 
 # --- sessions --------------------------------------------------------------

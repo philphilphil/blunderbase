@@ -11,10 +11,6 @@ import { authErrorMessage, passwordProblem } from './password'
 /**
  * First run. Nobody has chosen a password yet, so whoever is here is the owner — there is
  * no registration to complete and no second account to create afterwards.
- *
- * The copy has to carry one thing the form cannot: this password is also the MCP bearer
- * key (README, "Signing in"). An owner who picks something throwaway here has picked it
- * for the coach's connection too.
  */
 export function SetupPage() {
   const [password, setPassword] = useState('')
@@ -81,9 +77,8 @@ export function SetupPage() {
 
       <p className="rounded-md border border-line bg-elevated px-3 py-2.5 text-[0.6875rem] leading-[1.6] text-dim">
         <Trans>
-          This is also the <span className="text-body-3">MCP bearer key</span>: the coach
-          connects with exactly what you type here, so there is nothing else to configure.
-          Changing the password later changes the key.
+          This password signs you into Blunderbase. To connect an assistant, create a
+          separate MCP key on the Assistant page after setup.
         </Trans>
       </p>
     </AuthScreen>

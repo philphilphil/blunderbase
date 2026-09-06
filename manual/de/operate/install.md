@@ -90,8 +90,8 @@ ist, zeigt die App den Einrichtungsbildschirm statt der Anmeldung, und jeder API
 antwortet `401 setup_required`. Es gibt keine Registrierung und kein zweites Konto: ein
 Besitzer, ein Passwort.
 
-Das Passwort muss mindestens acht Zeichen haben. Es ist auch das Bearer-Token, das `/mcp`
-akzeptiert, solange du keine Schlüssel erzeugt hast – wähl es entsprechend.
+Das Passwort muss mindestens acht Zeichen haben. Erzeuge für MCP nach der Einrichtung
+einen separaten Schlüssel auf der Seite **Assistent**.
 
 Arbeite dann [Erste Schritte](../guide/getting-started.md) durch: ein Konto verbinden,
 importieren, eine Engine registrieren.
@@ -134,8 +134,7 @@ fragt nie nach einem Passwort.
 Kontomenü → **Passwort ändern**. Gefragt wird nach dem aktuellen und zweimal nach dem
 neuen.
 
-Eine Passwortänderung meldet jeden anderen Browser ab und macht das Passwort als
-MCP-Bearer-Token ungültig. Erzeugte Schlüssel funktionieren weiter.
+Eine Passwortänderung meldet jeden anderen Browser ab. MCP-Schlüssel funktionieren weiter.
 
 ## Wie sich ein MCP-Client authentifiziert { #how-an-mcp-client-authenticates }
 
@@ -144,18 +143,14 @@ MCP-Bearer-Token ungültig. Erzeugte Schlüssel funktionieren weiter.
 1. `BLUNDERBASE_MCP_BEARER_KEY`, wenn die Installation es setzt – ein zusätzlich
    akzeptiertes Token, für Automatisierung und Compose-Dateien.
 2. Einen Schlüssel, den du auf der Seite **Assistent** erzeugt hast.
-3. Das Passwort des Besitzers.
 
-Ein im Browser gewähltes Passwort funktioniert an `/mcp` also sofort, ohne Neustart.
-
-Sobald mehr als ein Client hinein will, erzeug unter **Assistent** je Client einen
-Schlüssel. Schlüssel sehen aus wie `bb_mcp_…`, werden als SHA-256-Hash gespeichert, genau
+Das Passwort des Besitzers wird nicht akzeptiert. Erzeuge unter **Assistent** je Client
+einen Schlüssel; er funktioniert sofort, ohne Neustart. Schlüssel sehen aus wie `bb_mcp_…`, werden als SHA-256-Hash gespeichert, genau
 einmal angezeigt und einzeln widerrufen – einen zu löschen meldet diesen Client ab und
 sonst nichts. Die Liste zeigt, wann jeder Schlüssel zuletzt benutzt wurde.
 
-Passwortraten an `/mcp` hat ein eigenes Limit von zehn Versuchen pro Minute. Es kostet
-deine Browser-Anmeldung deshalb nie ihre Sperre, und ein erzeugter Schlüssel wird nie durch
-fremde Rateversuche gebremst.
+MCP prüft ausschließlich Schlüssel. Fehlgeschlagene MCP-Anmeldungen verbrauchen keine
+Anmeldeversuche im Browser.
 
 Einen Client anzuschließen steht unter [Dein KI-Assistent](../guide/coach.md).
 

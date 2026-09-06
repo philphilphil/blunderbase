@@ -10,8 +10,8 @@ your games, not generalities.
 ## Mint a key
 
 Under **Bearer keys**, give a key a name and mint it. The secret is shown once, so copy it
-before pressing **Done**. Mint one per client, and **Revoke** takes a single one back. Your own password
-is accepted too, but a password in a config file is a password on disk.
+before pressing **Done**. Mint one per client, and **Revoke** takes a single one back.
+Your browser password is not accepted for MCP.
 
 ## Connect a client
 

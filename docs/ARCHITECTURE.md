@@ -811,12 +811,11 @@ chosen a password the body says `setup_required` rather than `unauthorized`, whi
 the UI knows which screen to show. The check is a database read, so it goes out to a
 worker thread rather than blocking the loop, the same place a `def` handler's queries run.
 
-**The MCP bearer token is the password, or a key minted for the client.** One credential,
-two front doors: a deployment set up through the browser has a remote transport without
-anyone exporting anything. Keys (`services/mcp_keys.py`, the `mcp_keys` table) follow the
-runner-token design — SHA-256 stored, shown once, a row per client so revoking one does not
-sign out every browser — and `services.auth.verify_bearer` tries a key before the
-password so a key never spends a failed attempt on the password's limiter.
+**MCP accepts dedicated keys, never the owner's password.** Create a key per client on
+Assistant. Keys (`services/mcp_keys.py`, the `mcp_keys` table) follow the runner-token
+design: SHA-256 stored, shown once, and individually revocable. Password changes leave
+these keys valid. `services.auth.verify_bearer` checks only minted keys, without password
+derivation or spending browser login attempts.
 `BLUNDERBASE_MCP_BEARER_KEY` is one more accepted token, checked first and without a
 database read, which is what keeps existing automation working while the rest changes
 underneath. `/mcp` is
@@ -824,6 +823,5 @@ mounted unconditionally — key or no key, password or none yet — because "is 
 password" is a row rather than a setting, and a row can change while the server is serving.
 The route is added in the lifespan (after the migration) rather than in `create_app`, since
 the lifespan is the only place that can open the task group the transport's sessions live
-in and it runs exactly once. Until a password exists the bearer guard answers 401 to
-everyone; the first request after first-run setup is the first one it lets through, with no
-restart.
+in and it runs exactly once. Without a configured or minted key the bearer guard answers 401. A key created on
+Assistant works immediately, with no restart.

@@ -1861,8 +1861,8 @@ msgid "Change the password"
 msgstr "Change the password"
 
 #: src/routes/auth/ChangePasswordDialog.tsx
-msgid "Every other browser is signed out, and the MCP bearer key changes with it — the coach reconnects with the new one. This browser stays signed in."
-msgstr "Every other browser is signed out, and the MCP bearer key changes with it — the coach reconnects with the new one. This browser stays signed in."
+msgid "Every other browser is signed out. This browser stays signed in, and your MCP keys keep working."
+msgstr "Every other browser is signed out. This browser stays signed in, and your MCP keys keep working."
 
 #: src/routes/auth/ChangePasswordDialog.tsx
 msgid "Changed. You are still signed in here."
@@ -1918,8 +1918,8 @@ msgid "Set the password and sign in"
 msgstr "Set the password and sign in"
 
 #: src/routes/auth/SetupPage.tsx
-msgid "This is also the <0>MCP bearer key</0>: the coach connects with exactly what you type here, so there is nothing else to configure. Changing the password later changes the key."
-msgstr "This is also the <0>MCP bearer key</0>: the coach connects with exactly what you type here, so there is nothing else to configure. Changing the password later changes the key."
+msgid "This password signs you into Blunderbase. To connect an assistant, create a separate MCP key on the Assistant page after setup."
+msgstr "This password signs you into Blunderbase. To connect an assistant, create a separate MCP key on the Assistant page after setup."
 
 #: src/routes/auth/password.ts
 msgid "a password has to be at least {minimum} characters"
@@ -5263,8 +5263,8 @@ msgid "Drop this into the client’s JSON config."
 msgstr "Drop this into the client’s JSON config."
 
 #: src/routes/mcp/McpPage.tsx
-msgid "Where the deployment sets <0>BLUNDERBASE_MCP_BEARER_KEY</0> that key is accepted too, and so is your own password — a minted key is just the one that belongs in a file. <1>make mcp-key</1> prints the local URL and header."
-msgstr "Where the deployment sets <0>BLUNDERBASE_MCP_BEARER_KEY</0> that key is accepted too, and so is your own password — a minted key is just the one that belongs in a file. <1>make mcp-key</1> prints the local URL and header."
+msgid "Where the deployment sets <0>BLUNDERBASE_MCP_BEARER_KEY</0> that key is accepted too. Your password cannot be used to connect an MCP client. <1>make mcp-key</1> prints the local URL and header."
+msgstr "Where the deployment sets <0>BLUNDERBASE_MCP_BEARER_KEY</0> that key is accepted too. Your password cannot be used to connect an MCP client. <1>make mcp-key</1> prints the local URL and header."
 
 #: src/routes/mcp/McpPage.tsx
 msgid "Nothing to query yet? <0>Import some games</0> first — the coach only knows what the database holds."
