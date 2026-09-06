@@ -52,7 +52,9 @@ file carries its version in the name: `Blunderbase-<version>-macOS-arm64.dmg` an
 `Blunderbase-<version>-Windows-x64-setup.exe`.
 
 The application bundles the web app and the backend. It needs no Python, no container and
-no terminal, and it runs entirely on that computer.
+no terminal, and it runs entirely on that computer. The **(?)** in the title bar opens this
+manual in a second window; links to other sites — lichess, chess.com, GitHub — open in your
+browser.
 
 | Platform | Notes |
 |---|---|

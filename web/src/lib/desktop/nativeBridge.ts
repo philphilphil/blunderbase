@@ -47,6 +47,14 @@ export function desktopBootstrapHeaders(): Record<string, string> {
   return config ? { 'x-blunderbase-desktop-token': config.token } : {}
 }
 
+/**
+ * A link that leaves the page. The shell opens the manual in a second window of the app
+ * and anything else in the person's browser — see `links.ts` for why the page asks.
+ */
+export function openNatively(url: string): Promise<void> {
+  return send('open', { url })
+}
+
 export function sendNativeNotification(title: string, body: string): Promise<void> {
   return send('notify', { title, body })
 }

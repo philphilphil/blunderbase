@@ -10,11 +10,13 @@ use std::{
 
 use tauri::{
     menu::{AboutMetadataBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
+    webview::NewWindowResponse,
     window::{ProgressBarState, ProgressBarStatus},
-    AppHandle, Manager, RunEvent, Runtime, Url, WebviewWindow,
+    AppHandle, Manager, RunEvent, Runtime, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_opener::OpenerExt;
 
 #[derive(serde::Deserialize)]
 struct NotificationRequest {
@@ -28,8 +30,14 @@ struct ProgressRequest {
     progress: Option<u64>,
 }
 
+#[derive(serde::Deserialize)]
+struct OpenRequest {
+    url: String,
+}
+
 const BACKEND_READY_ATTEMPTS: usize = 240;
 const BACKEND_READY_DELAY: Duration = Duration::from_millis(100);
+const MANUAL_WINDOW: &str = "manual";
 
 struct BackendChild(Mutex<Option<Child>>);
 
@@ -106,9 +114,11 @@ fn respond(stream: &mut TcpStream, status: &str, origin: &str) {
 fn run_feedback_bridge<R: Runtime>(
     listener: TcpListener,
     token: String,
-    allowed_origin: String,
+    port: u16,
+    log: PathBuf,
     app: AppHandle<R>,
 ) {
+    let allowed_origin = format!("http://127.0.0.1:{port}");
     for incoming in listener.incoming() {
         let Ok(mut stream) = incoming else {
             continue;
@@ -159,6 +169,19 @@ fn run_feedback_bridge<R: Runtime>(
             continue;
         }
 
+        if target == format!("/native/open?token={token}") {
+            let Some(url) = serde_json::from_slice::<OpenRequest>(&body)
+                .ok()
+                .and_then(|payload| payload.url.parse::<Url>().ok())
+            else {
+                respond(&mut stream, "400 Bad Request", &allowed_origin);
+                continue;
+            };
+            open_link(&app, port, &log, url);
+            respond(&mut stream, "204 No Content", &allowed_origin);
+            continue;
+        }
+
         respond(&mut stream, "404 Not Found", &allowed_origin);
     }
 }
@@ -166,6 +189,33 @@ fn run_feedback_bridge<R: Runtime>(
 fn unused_loopback_port() -> Result<u16, Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     Ok(listener.local_addr()?.port())
+}
+
+/// The backend's port, kept from one launch to the next. The page's origin is
+/// `http://127.0.0.1:<port>`, and the browser engine keys `localStorage` by origin: the
+/// theme, the language and the folded rail all live there, and a port drawn fresh on every
+/// launch meant every launch started over in dark English. So the port that worked last
+/// time is written down beside the database and asked for first. Only the first time, or
+/// when something else holds it, does the system pick — and that pick is written down in
+/// turn, since it is the origin the page's preferences are about to be saved under.
+fn backend_port(data_dir: &Path, log: &Path) -> Result<u16, Box<dyn std::error::Error>> {
+    let record = data_dir.join("backend-port");
+    let remembered = fs::read_to_string(&record)
+        .ok()
+        .and_then(|text| text.trim().parse::<u16>().ok())
+        .filter(|port| *port != 0);
+    if let Some(port) = remembered {
+        if TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return Ok(port);
+        }
+        append_log(
+            log,
+            &format!("port {port} is taken; the page's saved preferences start over on a new one"),
+        );
+    }
+    let port = unused_loopback_port()?;
+    fs::write(&record, port.to_string())?;
+    Ok(port)
 }
 
 fn append_log(path: &Path, line: &str) {
@@ -221,6 +271,78 @@ fn backend_is_ready(port: u16) -> bool {
     }
     let mut response = [0_u8; 64];
     matches!(stream.read(&mut response), Ok(read) if String::from_utf8_lossy(&response[..read]).contains(" 200 "))
+}
+
+fn is_ours(url: &Url, port: u16) -> bool {
+    url.host_str() == Some("127.0.0.1") && url.port() == Some(port)
+}
+
+fn open_in_browser<R: Runtime>(app: &AppHandle<R>, log: &Path, url: &Url) {
+    if let Err(error) = app.opener().open_url(url.as_str(), None::<&str>) {
+        append_log(
+            log,
+            &format!("could not open {url} in the browser: {error}"),
+        );
+    }
+}
+
+/// A link that leaves the page. A webview has no tabs, so a `target="_blank"` link is a
+/// question for the shell, and the page asks it over the bridge (`/native/open`, see the
+/// web's `lib/desktop/links.ts`) because on macOS WebKit never put the request to the
+/// webview's own new-window handler below. Two answers. A URL on our own backend is the
+/// manual, and gets a second window of the app so it can sit beside the game it explains;
+/// one manual window, reused, because every (?) after the first would otherwise pile up
+/// windows. Anything else is somebody else's site and belongs in the person's browser,
+/// where they are signed in to lichess and chess.com. The manual window keeps the same
+/// rule for links inside it: a manual page linking out to GitHub goes to the browser, not
+/// into the app.
+fn open_link<R: Runtime>(app: &AppHandle<R>, port: u16, log: &Path, url: Url) {
+    if !is_ours(&url, port) {
+        open_in_browser(app, log, &url);
+        return;
+    }
+    if let Some(existing) = app.get_webview_window(MANUAL_WINDOW) {
+        let _ = existing.navigate(url);
+        let _ = existing.show();
+        let _ = existing.unminimize();
+        let _ = existing.set_focus();
+        return;
+    }
+    let for_navigation = (app.clone(), log.to_path_buf());
+    let for_new_window = (app.clone(), log.to_path_buf());
+    let built = WebviewWindowBuilder::new(app, MANUAL_WINDOW, WebviewUrl::External(url))
+        .title("Blunderbase Manual")
+        .inner_size(1100.0, 820.0)
+        .min_inner_size(640.0, 480.0)
+        .on_navigation(move |url| {
+            if is_ours(url, port) {
+                return true;
+            }
+            open_in_browser(&for_navigation.0, &for_navigation.1, url);
+            false
+        })
+        .on_new_window(move |url, _features| {
+            open_link(&for_new_window.0, port, &for_new_window.1, url);
+            NewWindowResponse::Deny
+        })
+        .build();
+    if let Err(error) = built {
+        append_log(log, &format!("could not open the manual window: {error}"));
+    }
+}
+
+/// The webview's own answer to a new-window request, for whatever reaches it. The page
+/// takes its links over before they get here (`links.ts`), and on macOS this was never
+/// called for them anyway; it stays so that a `window.open` from somewhere the page's
+/// handler does not cover — an extension, a future library — is not silently dropped.
+fn open_requested<R: Runtime>(
+    app: &AppHandle<R>,
+    port: u16,
+    log: &Path,
+    url: Url,
+) -> NewWindowResponse<R> {
+    open_link(app, port, log, url);
+    NewWindowResponse::Deny
 }
 
 fn navigate<R: Runtime>(window: &WebviewWindow<R>, path: &str) {
@@ -358,18 +480,19 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .menu(build_menu)
         .on_menu_event(|app, event| handle_menu(app, event.id().as_ref()))
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let resource_dir = app.path().resource_dir()?;
             fs::create_dir_all(&data_dir)?;
-            let port = unused_loopback_port()?;
+            let log = data_dir.join("desktop.log");
+            let port = backend_port(&data_dir, &log)?;
             let feedback_listener = TcpListener::bind(("127.0.0.1", 0))?;
             let feedback_port = feedback_listener.local_addr()?.port();
             let feedback_token = feedback_token();
             let database_path = data_dir.join("blunderbase.db");
-            let log = data_dir.join("desktop.log");
             let executable = backend_executable(&resource_dir);
 
             append_log(&log, "starting bundled backend");
@@ -385,18 +508,33 @@ pub fn run() {
 
             let feedback_app = app.handle().clone();
             let feedback_token_for_server = feedback_token.clone();
+            let feedback_log = log.clone();
             std::thread::spawn(move || {
                 run_feedback_bridge(
                     feedback_listener,
                     feedback_token_for_server,
-                    format!("http://127.0.0.1:{port}"),
+                    port,
+                    feedback_log,
                     feedback_app,
                 );
             });
 
-            let window = app
-                .get_webview_window("main")
-                .ok_or("desktop window was not created")?;
+            // The window is built here rather than by tauri from the config (`"create":
+            // false` in tauri.conf.json), because a new-window handler can only be
+            // attached to a builder, and without one every `target="_blank"` link in the
+            // app is silently dropped.
+            let main_config = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|window| window.label == "main")
+                .cloned()
+                .ok_or("desktop window is not configured")?;
+            let links = (app.handle().clone(), log.clone());
+            let window = WebviewWindowBuilder::from_config(app.handle(), &main_config)?
+                .on_new_window(move |url, _features| open_requested(&links.0, port, &links.1, url))
+                .build()?;
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 for _ in 0..BACKEND_READY_ATTEMPTS {

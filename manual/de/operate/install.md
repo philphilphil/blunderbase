@@ -53,7 +53,9 @@ Jede Datei trägt ihre Version im Namen: `Blunderbase-<version>-macOS-arm64.dmg`
 `Blunderbase-<version>-Windows-x64-setup.exe`.
 
 Die Anwendung bringt die Web-App und das Backend mit. Sie braucht kein Python, keinen
-Container und kein Terminal und läuft vollständig auf diesem Rechner.
+Container und kein Terminal und läuft vollständig auf diesem Rechner. Das **(?)** in der
+Titelleiste öffnet dieses Handbuch in einem zweiten Fenster; Links auf andere Seiten –
+lichess, chess.com, GitHub – öffnen sich in deinem Browser.
 
 | Plattform | Hinweise |
 |---|---|
