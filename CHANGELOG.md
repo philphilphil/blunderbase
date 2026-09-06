@@ -7,6 +7,7 @@ One line per change, newest first. Written by hand when a release is cut — see
 ## v1.0.0 — 2026-09-06
 
 - Added a signed and notarized macOS app
+- Changed the assistant to accept only minted keys, never the password
 - Added a changelog page to the site
 - Changed the site's download buttons to link the installers directly
 - Fixed a stranger guessing the password locking the owner out
