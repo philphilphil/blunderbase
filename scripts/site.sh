@@ -15,12 +15,21 @@ set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$root/site/dist}"
 
+# The download buttons link the installers by name, and the names carry the version
+# (scripts/publish.sh uploads them that way), so the version has to be written into the
+# page. It is read from pyproject.toml, the manifest `make release` moves, anchored to the
+# [project] table because the file has other `version =` keys under other tables. The push
+# of a release commit is what rebuilds the site, so the buttons move with the version.
+version=$(perl -0ne 'print $1 if /\[project\][^\[]*\nversion = "([^"]*)"/' "$root/pyproject.toml")
+[ -n "$version" ] || { echo "site: could not read the version from pyproject.toml" >&2; exit 1; }
+
 rm -rf "$out"
 mkdir -p "$out/assets" "$out/de"
-cp "$root"/site/index.html "$root"/site/404.html "$out"/
+sed "s/__BB_VERSION__/$version/g" "$root"/site/index.html > "$out"/index.html
+cp "$root"/site/404.html "$root"/site/_redirects "$out"/
 # The German page is a second copy of the page, not a template: `site/de/index.html` is
 # translated by hand and served at /de/. It reaches the shared assets by absolute path.
-cp "$root"/site/de/index.html "$out"/de/
+sed "s/__BB_VERSION__/$version/g" "$root"/site/de/index.html > "$out"/de/index.html
 # The sample compose file the page links; the one under docker/ has no build block for
 # exactly this reason.
 cp "$root"/docker/docker-compose.yml "$out"/

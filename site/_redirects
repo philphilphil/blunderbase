@@ -1,0 +1,4 @@
+# Redirect rules for the static-assets Worker (developers.cloudflare.com/workers/static-assets/redirects/).
+# The changelog is one file in the repository and is read there; the site only owns a
+# short address for it.
+/changelog https://github.com/philphilphil/blunderbase/blob/main/CHANGELOG.md 302

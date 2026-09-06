@@ -132,11 +132,17 @@ Publishing pushes main and the tag, waits for that commit's main CI, then create
 GitHub release and uploads the desktop installers `make desktop` left under `desktop/dist`
 as `Blunderbase-<version>-macOS-arm64.dmg` and `Blunderbase-<version>-Windows-x64-setup.exe`.
 The version is in the name so a downloaded file still says which Blunderbase it is, and does
-not collide with the last one somebody kept; the cost is that nothing can link a fixed URL,
-since `releases/latest/download/<name>` only redirects to a name known in advance — so
-blunderbase.org's two download buttons go to the release page instead of straight at a file.
+not collide with the last one somebody kept. blunderbase.org's two download buttons link
+those names directly: `scripts/site.sh` writes the version from `pyproject.toml` into the
+page (the `__BB_VERSION__` placeholder in `site/index.html` and `site/de/index.html`), and
+the push of the release commit is what rebuilds the site, so the buttons move with every
+release without anyone editing the page. They point at nothing for the few minutes between
+that push and the upload at the end of `make publish`. `/changelog` on the site is a
+redirect to `CHANGELOG.md` on GitHub, declared in `site/_redirects`.
 Publishing refuses to run without both installers for the version being released unless
-`BB_SKIP_DESKTOP=1` is set, so the sequence is `make desktop`, then `make publish`. The release builds the image once and publishes
+`BB_SKIP_DESKTOP=1` is set, so the sequence is `make desktop`, then `make publish`. The macOS
+build is signed and notarized when the Apple credentials from `desktop/README.md`
+("Signing") are set, and ad-hoc signed otherwise. The release builds the image once and publishes
 `ghcr.io/philphilphil/blunderbase:0.2.0`, `:0.2`, `latest`, and `sha-<short>`.
 If that build fails, dispatch `release.yml` with the existing tag to rebuild and deploy it;
 dispatching it without a tag only redeploys the current `latest`. Deploying tells Komodo to
