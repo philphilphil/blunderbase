@@ -45,7 +45,7 @@ rm -rf "$pyinstaller_dir"
 mkdir -p "$pyinstaller_dir/dist" "$pyinstaller_dir/work" "$pyinstaller_dir/spec"
 
 cd "$repo_dir"
-UV_CACHE_DIR="$repo_dir/.uv-desktop-cache" uv run --with pyinstaller pyinstaller \
+UV_CACHE_DIR="$repo_dir/.uv-desktop-cache" uv run --frozen --group desktop-build pyinstaller \
   --noconfirm \
   --clean \
   --onedir \

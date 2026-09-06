@@ -113,8 +113,12 @@ request you make pushes the expiry out again. The cookie carries `Secure` on any
 is not loopback, so an installation reached by name over plain HTTP will not keep you
 signed in — put TLS in front of it.
 
-Five wrong passwords in a row lock the door for a few seconds, and each further failure
-doubles that up to five minutes.
+Five wrong passwords in a row pause password checks from that client address for five
+seconds, and each further failure doubles that up to five minutes. Other addresses can
+still sign in. Devices sharing a public address share the limit; five minutes without an
+admitted attempt clears its history. Behind a reverse proxy, configure
+[trusted proxy forwarding](deploy.md#settings-worth-knowing) so visitors are
+identified by their own addresses.
 
 Only hashes are stored, of the password and of the session tokens alike, so a copy of the
 database is not a way in.

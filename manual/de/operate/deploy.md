@@ -186,7 +186,10 @@ Siehe [Remote Runner](runners.md).
 `FORWARDED_ALLOW_IPS` ist eine Variable von uvicorn, keine von Blunderbase. Sie vertraut
 `X-Forwarded-Proto` und seinen Geschwistern standardmäßig nur von `127.0.0.1`. Ein Proxy in
 einem anderen Container braucht deshalb seine Adresse – oder `*` in einem Netz, das nur der
-Proxy erreicht –, damit die App weiß, dass die Anfrage über TLS kam.
+Proxy erreicht –, damit die App weiß, dass die Anfrage über TLS kam. Darüber kommt auch
+die Client-Adresse für das Anmeldelimit an. Ohne vertrauenswürdige Weiterleitung teilen
+sich alle Besucher das Limit des Proxys. Vertraue nur deinem Proxy; er muss
+`X-Forwarded-For` anhand des tatsächlichen Clients setzen.
 
 `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` ist voreingestellt an und das Einzige hier, was ein
 Proxy stillschweigend kaputt machen kann. Die Seite wird mit

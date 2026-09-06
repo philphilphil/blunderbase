@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 
+from backend.api.auth import password_source
 from backend.api.deps import FiltersDep, SessionDep, SettingsDep, not_found, ply_range
 from backend.api.errors import ApiError
 from backend.api.schemas import (
@@ -80,7 +81,7 @@ def list_games(
 
 @router.post("/delete-all", response_model=GamesDeleted, summary="Delete every game")
 def delete_all_games(
-    session: SessionDep, settings: SettingsDep, body: GamesWipe
+    session: SessionDep, settings: SettingsDep, body: GamesWipe, request: Request
 ) -> GamesDeleted:
     """Empty the library, rechecking the owner password when this runtime has one.
 
@@ -96,7 +97,8 @@ def delete_all_games(
     see `services.games.delete_all_games`.
     """
     if capabilities_for(settings).password_auth and (
-        body.password is None or not auth_service.verify_password(session, body.password)
+        body.password is None
+        or not auth_service.verify_password(session, body.password, source=password_source(request))
     ):
         raise ApiError(
             status.HTTP_401_UNAUTHORIZED, "invalid_password", "that is not the password"

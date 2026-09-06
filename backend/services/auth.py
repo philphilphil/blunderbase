@@ -14,13 +14,11 @@ Three decisions worth keeping in mind:
   `hmac.compare_digest`, so a wrong password tells nobody how wrong it was.
 - **A session token is stored hashed too.** The cookie carries 32 random bytes; the
   database carries their SHA-256. A copy of the database is therefore not a way in.
-- **Failures are counted, not thrown away.** Five consecutive wrong passwords shut the
-  door for a few seconds, and each further failure doubles that up to `LOCKOUT_MAX`. That
-  counter is the browser login's alone. The MCP bearer check has its own, a few functions
-  down: the row's counter only ever climbs, so a stranger hammering `/mcp` — a door that
-  is unauthenticated by design, because the bearer check *is* its authentication — would
-  otherwise be able to keep the owner locked out of their own browser for good, one guess
-  per backoff window.
+- **Failures are counted per client address.** Five consecutive wrong passwords shut
+  that client's door for a few seconds, doubling up to `LOCKOUT_MAX`. A stranger cannot
+  lock the owner's other addresses out. The bounded, process-local counter reserves an
+  attempt before hashing, so concurrent guesses spend the same budget. The MCP bearer
+  check has a separate limiter.
 
 The MCP bearer check also accepts the keys the owner mints in `services/mcp_keys.py`; see
 `verify_bearer` for the order.
@@ -33,7 +31,8 @@ import hmac
 import secrets
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, select
@@ -65,6 +64,7 @@ SESSION_REFRESH_AFTER = timedelta(days=1)
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_BASE = timedelta(seconds=5)
 LOCKOUT_MAX = timedelta(minutes=5)
+LOGIN_MAX_CLIENTS = 4096
 
 # What the `/mcp` bearer door will spend on the password fall-through: ten wrong passwords
 # a minute, and then no scrypt derivation at all until the oldest of them ages out. A rate
@@ -130,6 +130,7 @@ def set_password(session: Session, password: str) -> None:
     session.commit()
     forget_valid_tokens()
     reset_bearer_limiter()
+    reset_login_limiter()
 
 
 def reset_password(session: Session, password: str) -> None:
@@ -150,6 +151,7 @@ def reset_password(session: Session, password: str) -> None:
     forget_valid_tokens()
     # The guesses the bearer door refused were guesses at a password that no longer exists.
     reset_bearer_limiter()
+    reset_login_limiter()
 
 
 def _password_values(password: str) -> dict[str, object]:
@@ -171,26 +173,32 @@ def _password_values(password: str) -> dict[str, object]:
     }
 
 
-def verify_password(session: Session, password: str) -> bool:
-    """Whether this is the owner's password, counting the failure if it is not.
+def verify_password(session: Session, password: str, *, source: str = "local") -> bool:
+    """Verify a password within the requesting client's budget.
 
-    Raises `LockedOutError` while the backoff from earlier failures is still running —
-    the answer then is neither yes nor no, and the caller has to say so.
+    HTTP callers supply the ASGI client address, after the server's trusted-proxy
+    handling. Never take an arbitrary forwarded header as the source. Legacy credential
+    lockout columns are no longer consulted: upgrading must also free existing lockouts.
     """
     credential = _credential(session)
     if credential is None:
         return False
-    now = utcnow()
-    if credential.locked_until is not None and credential.locked_until > now:
-        raise LockedOutError(_seconds_until(credential.locked_until, now))
+    attempt = _reserve_login_attempt(source)
     matched = _matches(credential, password)
-    _record_attempt(session, credential, matched=matched, now=now)
+    if matched:
+        with _LOGIN_LIMITER_LOCK:
+            if _LOGIN_ATTEMPTS.get(source) is attempt:
+                del _LOGIN_ATTEMPTS[source]
+        credential.failed_attempts = 0
+        credential.locked_until = None
+        credential.last_login_at = utcnow()
+        session.commit()
     return matched
 
 
-def change_password(session: Session, current: str, new: str) -> None:
+def change_password(session: Session, current: str, new: str, *, source: str = "local") -> None:
     """Swap the password, ending every session that was opened with the old one."""
-    if not verify_password(session, current):
+    if not verify_password(session, current, source=source):
         raise InvalidPasswordError("the current password is not right")
     reset_password(session, new)
 
@@ -216,6 +224,57 @@ def verify_bearer(session: Session, token: str) -> bool:
     return _password_opens_bearer(session, token)
 
 
+# --- the client-address login limiter --------------------------------------
+
+
+@dataclass
+class _LoginAttempts:
+    failures: int = 0
+    locked_until: float = 0.0
+    last_attempt: float = 0.0
+
+
+_LOGIN_ATTEMPTS: OrderedDict[str, _LoginAttempts] = OrderedDict()
+_LOGIN_LIMITER_LOCK = threading.Lock()
+
+
+def reset_login_limiter() -> None:
+    """Clear process-local attempts on setup, password reset, and between tests."""
+    with _LOGIN_LIMITER_LOCK:
+        _LOGIN_ATTEMPTS.clear()
+
+
+def _reserve_login_attempt(source: str) -> _LoginAttempts:
+    """Reserve before deriving, including in-flight guesses in the backoff.
+
+    Five minutes without an admitted attempt forgets a client's history. Refusals do not
+    extend that time. Oldest entries are evicted at the cap so the address map cannot grow
+    without bound; the budget is per process, matching the single-process server.
+    """
+    now = time.monotonic()
+    with _LOGIN_LIMITER_LOCK:
+        cutoff = now - LOCKOUT_MAX.total_seconds()
+        while _LOGIN_ATTEMPTS:
+            oldest = next(iter(_LOGIN_ATTEMPTS))
+            if _LOGIN_ATTEMPTS[oldest].last_attempt > cutoff:
+                break
+            del _LOGIN_ATTEMPTS[oldest]
+        attempt = _LOGIN_ATTEMPTS.get(source)
+        if attempt is not None and attempt.locked_until > now:
+            raise LockedOutError(max(1, int(attempt.locked_until - now + 0.999)))
+        if attempt is None:
+            if len(_LOGIN_ATTEMPTS) >= LOGIN_MAX_CLIENTS:
+                _LOGIN_ATTEMPTS.popitem(last=False)
+            attempt = _LoginAttempts()
+            _LOGIN_ATTEMPTS[source] = attempt
+        _LOGIN_ATTEMPTS.move_to_end(source)
+        attempt.last_attempt = now
+        attempt.failures += 1
+        if attempt.failures >= LOCKOUT_THRESHOLD:
+            attempt.locked_until = now + _backoff(attempt.failures).total_seconds()
+        return attempt
+
+
 # --- the bearer door's own limiter -----------------------------------------
 
 # The monotonic moments of the password guesses `/mcp` has refused lately. Module state,
@@ -228,11 +287,8 @@ _BEARER_LIMITER_LOCK = threading.Lock()
 def _password_opens_bearer(session: Session, token: str) -> bool:
     """Whether this bearer token is the owner's password, on the bearer door's own budget.
 
-    Deliberately not `verify_password`. That counts onto the `Credential` row, whose
-    counter only ever climbs and whose lockout is renewed by every further failure, so an
-    unauthenticated caller at `/mcp` could hold the owner's browser login shut indefinitely
-    with one guess per window. This is `services/runners.py`'s answer in the shape that
-    fits here: a limiter of the door's own, which no login route ever reads.
+    Deliberately not `verify_password`: the MCP budget is separate from the browser's
+    per-address backoff. A client guessing at this transport cannot spend login attempts.
 
     **It is keyed on the door, not on the presented token.** The secret being guessed is
     one password, so a per-token counter would be free to defeat by varying the token —
@@ -436,29 +492,10 @@ def _matches(credential: Credential, password: str) -> bool:
     return hmac.compare_digest(derived, bytes.fromhex(credential.password_hash))
 
 
-def _record_attempt(
-    session: Session, credential: Credential, *, matched: bool, now: datetime
-) -> None:
-    """A success clears the counter; a failure moves it, and may close the door."""
-    if matched:
-        credential.failed_attempts = 0
-        credential.locked_until = None
-        credential.last_login_at = now
-    else:
-        credential.failed_attempts += 1
-        if credential.failed_attempts >= LOCKOUT_THRESHOLD:
-            credential.locked_until = now + _backoff(credential.failed_attempts)
-    session.commit()
-
-
 def _backoff(failures: int) -> timedelta:
     """Doubling from `LOCKOUT_BASE` at the threshold, and never past `LOCKOUT_MAX`."""
     steps = min(failures - LOCKOUT_THRESHOLD, 20)
     return min(LOCKOUT_BASE * (2**steps), LOCKOUT_MAX)
-
-
-def _seconds_until(moment: datetime, now: datetime) -> int:
-    return max(1, int((moment - now).total_seconds() + 0.999))
 
 
 def _token_hash(token: str) -> str:

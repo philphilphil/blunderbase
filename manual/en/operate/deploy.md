@@ -178,7 +178,9 @@ from it. See [Remote runners](runners.md).
 `FORWARDED_ALLOW_IPS` is uvicorn's own variable, not a Blunderbase one. It trusts
 `X-Forwarded-Proto` and its siblings only from `127.0.0.1` by default, so a proxy running in
 another container needs its address — or `*` on a network only the proxy can reach — for
-the app to know the request arrived over TLS.
+the app to know the request arrived over TLS. This also supplies the client address for
+login throttling. Without trusted forwarding, all visitors share the proxy's login
+budget. Trust only your proxy, and have it set `X-Forwarded-For` from the real client.
 
 `BLUNDERBASE_CROSS_ORIGIN_ISOLATION` is on by default and is the one thing here a proxy can
 silently break. The page is served with `Cross-Origin-Opener-Policy: same-origin` and

@@ -780,10 +780,14 @@ stolen database is not a stolen session and there is nothing in `auth_sessions` 
 reading. Expiry is 30 days, sliding, but the write only happens once a day: a slide per
 request would be a write per request.
 
-**Failures are counted.** Five consecutive wrong passwords lock the credential for five
-seconds, doubling per further failure to a five-minute cap. The cap is the interesting
-part: the counter is shared with the MCP bearer check, so a stranger hammering `/mcp`
-must not be able to lock the owner out of their own browser indefinitely.
+**Failures are counted per client address.** Five consecutive wrong passwords pause that
+address for five seconds, doubling per further failure to a five-minute cap. HTTP callers
+use the ASGI peer after Uvicorn's trusted-proxy handling, never raw forwarded headers.
+Attempts are reserved under a lock before hashing, so concurrent guesses share the budget.
+The process-local map keeps at most 4,096 addresses and forgets history after five minutes
+without an admitted attempt; a success clears only that address. The legacy credential
+lockout columns are ignored, so upgrading also frees an already locked account. The MCP
+password fallback has its own limiter, independent of browser login.
 
 **One guard, in front of everything.** `api/auth.py` is ASGI middleware rather than a
 dependency, so a route added later is guarded by having been added and the `/events`

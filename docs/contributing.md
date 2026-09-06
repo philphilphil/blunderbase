@@ -172,3 +172,16 @@ backend suite from about 140 seconds to under 20. Use `-n0` when you want a brea
 CI runs both: the default suite and `-m slow`. `make publish` waits for both before opening
 the release, so the tag that ships is a tag both passed on. `engine` runs nowhere but your
 machine.
+
+The `dependency audit` workflow checks every push to main, pull request, Monday, and
+manual dispatch against current advisory databases. It scans all Python lockfile groups
+and platforms (including documentation and desktop build tools), both pnpm lockfiles,
+and the desktop Cargo lockfile. Vulnerabilities fail the job; Rust maintenance notices
+remain warnings. The sole vulnerability exception is `RUSTSEC-2024-0429` in Linux-only
+GTK3 `glib`, which our macOS/Windows desktop releases do not use. Remove that exception
+before adding Linux desktop support. These checks cover package advisories, not Docker
+OS packages or bundled engine binaries.
+
+Both desktop build scripts use the locked `desktop-build` group, including the exact
+PyInstaller version in `pyproject.toml`. To update it, change that pin and regenerate
+`uv.lock`; no separate platform-specific PyInstaller versions are needed.

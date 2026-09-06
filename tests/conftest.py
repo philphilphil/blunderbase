@@ -17,7 +17,7 @@ from backend.config import Settings, get_settings
 from backend.db import models  # noqa: F401  (importing registers every table on Base.metadata)
 from backend.db.base import Base
 from backend.db.session import create_db_engine, reset_engines
-from backend.services.auth import forget_valid_tokens, reset_bearer_limiter
+from backend.services.auth import forget_valid_tokens, reset_bearer_limiter, reset_login_limiter
 from backend.services.stats import reset_stats_cache
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -52,14 +52,16 @@ def _fresh_auth_cache() -> Iterator[None]:
     the stats cache above, closed in the same place. Tokens are random, so this is belt and
     braces; a test that reaches into `auth_sessions` itself is where it would not be.
 
-    The bearer door's limiter is module state for the same reason and is cleared here too,
-    so that a test spending the `/mcp` password budget cannot refuse the next test's.
+    Login and bearer limiters are module state for the same reason and are cleared here
+    too, so one test's password guesses cannot refuse the next test's.
     """
     forget_valid_tokens()
     reset_bearer_limiter()
+    reset_login_limiter()
     yield
     forget_valid_tokens()
     reset_bearer_limiter()
+    reset_login_limiter()
 
 
 @pytest.fixture()

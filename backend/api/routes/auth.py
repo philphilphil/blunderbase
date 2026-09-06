@@ -16,6 +16,7 @@ from backend.api.auth import (
     COOKIE_NAME,
     DESKTOP_TOKEN_HEADER,
     clear_session_cookie,
+    password_source,
     set_session_cookie,
 )
 from backend.api.deps import SessionDep, SettingsDep
@@ -111,7 +112,7 @@ def login(
 ) -> AuthStatus:
     _require_password_auth(settings)
     _require_setup(session)
-    if not auth_service.verify_password(session, body.password):
+    if not auth_service.verify_password(session, body.password, source=password_source(request)):
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_password", "that is not the password")
     _sign_in(session, request, response)
     return signed_in(session, settings)
@@ -142,7 +143,7 @@ def change_password(
     """
     _require_password_auth(settings)
     _require_setup(session)
-    auth_service.change_password(session, body.current, body.new)
+    auth_service.change_password(session, body.current, body.new, source=password_source(request))
     _sign_in(session, request, response)
     return signed_in(session, settings)
 

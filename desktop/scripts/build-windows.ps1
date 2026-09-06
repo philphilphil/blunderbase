@@ -38,7 +38,7 @@ $manualData = "$(Join-Path $repoDir 'manual-site');manual-site"
 
 Push-Location $repoDir
 try {
-    uv run --with pyinstaller pyinstaller `
+    uv run --frozen --group desktop-build pyinstaller `
         --noconfirm `
         --clean `
         --onedir `

@@ -1,0 +1,67 @@
+name: dependency audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: 0.12.3
+      - name: Export every locked package, including other platforms and build tools
+        run: |
+          uv export --locked --all-groups --all-extras --no-emit-project --no-hashes --no-annotate --no-header --output-file /tmp/audit-export.txt
+          # With dependency resolution disabled, markers would silently skip Windows/macOS
+          # packages on this Linux runner. Audit each locked name/version regardless of host.
+          sed 's/;.*//' /tmp/audit-export.txt | sort -u > /tmp/audit-requirements.txt
+      - name: Audit Python dependencies
+        run: uv tool run pip-audit==2.10.1 --no-deps --disable-pip --requirement /tmp/audit-requirements.txt
+
+  javascript:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [web, desktop]
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Audit reads the lockfile; installing packages or running lifecycle scripts is unnecessary.
+      - run: pnpm audit
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust audit tool
+        run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Audit desktop Rust dependencies
+        # glib 0.18 is in Tauri's Linux GTK3 tree, absent from our macOS/Windows
+        # releases. Remove this exception before supporting Linux desktop builds.
+        # https://rustsec.org/advisories/RUSTSEC-2024-0429.html
+        # Maintenance/yanked notices remain visible warnings, not blocking vulnerabilities.
+        run: cargo audit --file desktop/src-tauri/Cargo.lock --ignore RUSTSEC-2024-0429

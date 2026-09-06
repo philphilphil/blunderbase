@@ -27,6 +27,8 @@ blunderbase = "backend.cli:main"
 blunderbase-runner = "backend.runners.entrypoint:main"
 
 [dependency-groups]
+# Both desktop bundlers use this group so PyInstaller and its build dependencies are locked.
+desktop-build = ["pyinstaller==6.22.2"]
 # The manual (`make docs`). Pinned to the same three versions as `manual/requirements.txt`,
 # and the two must stay in step: this group is what a developer and CI resolve through uv,
 # that file is what the Cloudflare build and the Docker manual stage — neither of which has

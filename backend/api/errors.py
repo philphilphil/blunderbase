@@ -157,8 +157,8 @@ def install_error_handlers(app: FastAPI) -> None:
     for exception, status_code, name in MAPPINGS:
         app.add_exception_handler(exception, _typed_handler(status_code, name))
     # Registered after the loop, so it replaces the plain handler the table above installed
-    # for the same class: a limiter's answer is worth a header, and this is the one refusal
-    # from a service that carries one. The row stays in the table because that is where the
+    # for the same class: the upstream limiter supplies an optional wait. The row stays
+    # in the table because that is where the
     # status and the name of every failure are read.
     app.add_exception_handler(reference_service.ReferenceRateLimitedError, _rate_limited_handler)
     # Starlette's, not FastAPI's: an unmatched route and a 405 are raised by the router
@@ -170,7 +170,10 @@ def install_error_handlers(app: FastAPI) -> None:
 
 def _typed_handler(status_code: int, name: str) -> Handler:
     async def handle(_request: Request, exc: Exception) -> JSONResponse:
-        return error_response(status_code, name, str(exc) or name)
+        response = error_response(status_code, name, str(exc) or name)
+        if isinstance(exc, auth_service.LockedOutError):
+            response.headers["Retry-After"] = str(exc.retry_after)
+        return response
 
     return handle
 

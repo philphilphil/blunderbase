@@ -115,8 +115,13 @@ gleitet: jede Anfrage schiebt den Ablauf wieder nach hinten. Das Cookie trägt `
 jedem Host, der nicht Loopback ist. Eine Installation, die über einfaches HTTP unter einem
 Namen erreicht wird, hält dich deshalb nicht angemeldet – setz TLS davor.
 
-Fünf falsche Passwörter hintereinander sperren die Tür für ein paar Sekunden, und jeder
-weitere Fehlversuch verdoppelt das bis auf fünf Minuten.
+Fünf falsche Passwörter hintereinander pausieren Passwortprüfungen von dieser
+Client-Adresse für fünf Sekunden. Jeder weitere Fehlversuch verdoppelt die Pause bis auf
+fünf Minuten. Von anderen Adressen aus bleibt die Anmeldung möglich. Geräte mit derselben
+öffentlichen Adresse teilen das Limit; nach fünf Minuten ohne zugelassenen Versuch wird
+der Zähler zurückgesetzt. Hinter einem Reverse Proxy muss die
+[Weiterleitung vertrauenswürdiger Proxys](deploy.md#settings-worth-knowing)
+eingerichtet sein, damit die tatsächlichen Client-Adressen ankommen.
 
 Gespeichert werden nur Hashes, vom Passwort wie von den Sitzungs-Token. Eine Kopie der
 Datenbank ist also kein Weg hinein.

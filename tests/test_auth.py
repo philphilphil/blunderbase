@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
-from threading import Barrier
+from threading import Barrier, Event
 
 import pytest
 from alembic import command
@@ -208,18 +208,86 @@ def test_a_success_clears_the_counter(session: Session) -> None:
     assert credential.failed_attempts == 0
     assert credential.locked_until is None
     assert credential.last_login_at is not None
+    for _ in range(auth_service.LOCKOUT_THRESHOLD):
+        assert auth_service.verify_password(session, OTHER) is False
 
 
-def test_the_door_opens_again_when_the_backoff_has_run_out(session: Session) -> None:
+def test_the_door_opens_again_when_the_backoff_has_run_out(
+    session: Session, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     auth_service.set_password(session, PASSWORD)
+    monkeypatch.setattr(auth_service.time, "monotonic", lambda: 100.0)
     for _ in range(auth_service.LOCKOUT_THRESHOLD):
         auth_service.verify_password(session, OTHER)
 
+    monkeypatch.setattr(auth_service.time, "monotonic", lambda: 105.0)
+    assert auth_service.verify_password(session, PASSWORD) is True
+
+
+def test_a_legacy_account_lockout_does_not_block_login(session: Session) -> None:
+    auth_service.set_password(session, PASSWORD)
     credential = session.scalars(select(Credential)).one()
-    credential.locked_until = utcnow() - timedelta(seconds=1)
+    credential.failed_attempts = 20
+    credential.locked_until = utcnow() + timedelta(minutes=5)
     session.commit()
 
     assert auth_service.verify_password(session, PASSWORD) is True
+    assert credential.locked_until is None
+
+
+def test_concurrent_guesses_reserve_their_budget_before_hashing(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Real separate connections: the in-memory fixture shares one connection across
+    # sessions and is not a valid concurrent-request database.
+    upgrade_to_head(settings)
+    sessions = get_sessionmaker(settings)
+    with sessions() as session:
+        auth_service.set_password(session, PASSWORD)
+    deriving: list[bool] = []
+    full = Event()
+    release = Event()
+
+    def slow_match(*_: object) -> bool:
+        deriving.append(True)
+        if len(deriving) == auth_service.LOCKOUT_THRESHOLD:
+            full.set()
+        assert release.wait(timeout=5)
+        return False
+
+    def guess() -> bool:
+        with sessions() as other_session:
+            return auth_service.verify_password(other_session, OTHER)
+
+    monkeypatch.setattr(auth_service, "_matches", slow_match)
+    with ThreadPoolExecutor(max_workers=auth_service.LOCKOUT_THRESHOLD + 1) as pool:
+        pending = [pool.submit(guess) for _ in range(auth_service.LOCKOUT_THRESHOLD)]
+        try:
+            assert full.wait(timeout=5)
+            with pytest.raises(auth_service.LockedOutError):
+                pool.submit(guess).result(timeout=2)
+        finally:
+            release.set()
+        assert all(future.result(timeout=2) is False for future in pending)
+    assert len(deriving) == auth_service.LOCKOUT_THRESHOLD
+
+
+def test_login_attempt_history_expires_and_has_a_size_bound(
+    session: Session, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auth_service.set_password(session, PASSWORD)
+    monkeypatch.setattr(auth_service, "LOGIN_MAX_CLIENTS", 2)
+    monkeypatch.setattr(auth_service.time, "monotonic", lambda: 100.0)
+    for _ in range(auth_service.LOCKOUT_THRESHOLD):
+        assert auth_service.verify_password(session, OTHER, source="first") is False
+    auth_service.verify_password(session, OTHER, source="second")
+    auth_service.verify_password(session, OTHER, source="third")
+    assert len(auth_service._LOGIN_ATTEMPTS) == 2
+    assert "first" not in auth_service._LOGIN_ATTEMPTS
+
+    monkeypatch.setattr(auth_service.time, "monotonic", lambda: 401.0)
+    auth_service.verify_password(session, OTHER, source="fourth")
+    assert list(auth_service._LOGIN_ATTEMPTS) == ["fourth"]
 
 
 # --- the bearer door -------------------------------------------------------
@@ -491,6 +559,35 @@ def test_enough_wrong_passwords_close_the_door(signed_in: TestClient) -> None:
 
     assert response.status_code == 429
     assert response.json()["error"] == "locked_out"
+
+
+def test_wrong_passwords_cannot_lock_out_another_client(signed_in: TestClient) -> None:
+    for _ in range(auth_service.LOCKOUT_THRESHOLD):
+        assert signed_in.post("/auth/login", json={"password": OTHER}).status_code == 401
+
+    owner = TestClient(
+        signed_in.app, base_url=API_BASE_URL, client=("198.51.100.2", 12345)
+    )
+    try:
+        assert owner.post("/auth/login", json={"password": OWNER_PASSWORD}).status_code == 200
+        assert owner.get("/games").status_code == 200
+        # A successful login elsewhere must not forgive the guessing client's budget.
+        assert signed_in.post("/auth/login", json={"password": OTHER}).status_code == 429
+    finally:
+        owner.close()
+
+
+def test_untrusted_forwarded_headers_cannot_change_the_login_budget(
+    signed_in: TestClient,
+) -> None:
+    for _ in range(auth_service.LOCKOUT_THRESHOLD):
+        assert signed_in.post("/auth/login", json={"password": OTHER}).status_code == 401
+    response = signed_in.post(
+        "/auth/login", json={"password": OWNER_PASSWORD},
+        headers={"X-Forwarded-For": "198.51.100.2", "X-Real-IP": "198.51.100.3"},
+    )
+    assert response.status_code == 429
+    assert int(response.headers["retry-after"]) > 0
 
 
 def test_logging_out_clears_the_cookie_and_the_session(signed_in: TestClient) -> None:

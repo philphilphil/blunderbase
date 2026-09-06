@@ -91,6 +91,11 @@ def cookie_secure(request: Request) -> bool:
     return (request.url.hostname or "").lower() not in LOOPBACK_HOSTS
 
 
+def password_source(request: Request) -> str:
+    """Use only the peer address resolved by the server's trusted-proxy handling."""
+    return request.client.host if request.client is not None else "unknown"
+
+
 def set_session_cookie(response: Response, request: Request, token: str) -> None:
     """Hand the browser its session. HTTP-only, so no script of any origin can read it."""
     response.set_cookie(
