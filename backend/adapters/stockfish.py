@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import shlex
 import shutil
+import subprocess
 import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -361,6 +362,11 @@ def open_engine(
 ) -> chess.engine.SimpleEngine:
     command = command_for(path)
     extra: dict[str, Any] = {} if stderr is None else {"stderr": stderr.fileno()}
+    if os.name == "nt":
+        # The desktop backend is a windowless process; a console binary it starts would
+        # otherwise get a console window of its own, one per engine. python-chess ORs its
+        # own process-group flag onto whatever is passed here.
+        extra["creationflags"] = subprocess.CREATE_NO_WINDOW
     try:
         engine = chess.engine.SimpleEngine.popen_uci(command, timeout=timeout, **extra)
     except START_ERRORS as exc:
