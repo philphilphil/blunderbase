@@ -4,6 +4,17 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.0.0 — 2026-09-06
+
+- Added a signed and notarized macOS app
+- Added a changelog page to the site
+- Changed the site's download buttons to link the installers directly
+- Fixed a stranger guessing the password locking the owner out
+- Fixed desktop links to the manual and the browser going nowhere
+- Fixed the desktop app forgetting its theme and language between launches
+- Fixed a console window opening behind the Windows app
+- Fixed the demo's tour asking to set up engines
+
 ## v0.13.0 — 2026-09-05
 
 - Added a manual in English and German, served in the app and on the site
