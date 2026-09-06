@@ -24,6 +24,8 @@ coverage.json
 # The Windows installer downloaded from CI, and the id of the run it came from.
 /desktop/dist/
 /desktop/.windows-ci-run
+# Apple signing and notarization credentials, sourced by desktop/scripts/build-macos.sh
+/desktop/.signing.env
 /desktop/src-tauri/binaries/
 /desktop/src-tauri/gen/
 /desktop/src-tauri/icons/

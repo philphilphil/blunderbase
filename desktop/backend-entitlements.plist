@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for the frozen backend under the hardened runtime, which a signed build
+  turns on for every binary PyInstaller collects (desktop/scripts/build-macos.sh). Only the
+  backend gets these; the Tauri shell around it is signed with none.
+
+  The interpreter loads its extension modules and libpython at run time and hands memory
+  to native code the way any CPython does; without these two the hardened runtime kills
+  the process on start, which is the failure every PyInstaller notarization guide begins
+  with. The shell that spawns the backend is not weakened by them.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
