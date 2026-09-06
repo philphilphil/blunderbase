@@ -74,6 +74,7 @@ are running. How the code is built is in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 ## Roadmap
 - Desktop app for Linux, Mac and Windows
 - Mobile companion app for iOS and Android
+- Correspondence games with long ongoing calculations
 - Sync-Service to keep multiple blunderbase's in sync
 - Multi-Engine-Analysis on the same game, for the engine nerds
 - Puzzles out of your games
