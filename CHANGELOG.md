@@ -8,6 +8,7 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 - Added German move letters and figurines as notation choices
 - Added ⇧E to hide every engine verdict
+- Changed the captured material beside each player to larger figurines
 - Fixed the Lichess rating chart lagging one game behind
 
 ## v1.0.0 — 2026-09-06

@@ -810,14 +810,20 @@ export function BoardPanel({
 }
 
 /**
- * A captured man, as a glyph, keyed by the side that *took* it: White's captures are black
- * men and are drawn as the black figurines, Black's as the white ones. `materialBalance`
- * hands back roles — a lib utility has no business choosing characters — so the mapping
- * lives here, which is also where a later switch to real piece sprites would happen.
+ * A captured man, as a glyph. The filled figurines for both sides, the same set the move
+ * list writes (`lib/chess/notation.ts`) and for the same reason: the outlined white pieces
+ * thin out to scratches at row height, and whose men they are the row already says — they
+ * are always the opponent's. `index.css` pins the chess-only face to these code points, so
+ * the strip draws from the same glyphs as a `♞c3`. `materialBalance` hands back roles — a
+ * lib utility has no business choosing characters — so the mapping lives here, which is
+ * also where a later switch to real piece sprites would happen.
  */
-const CAPTURED_GLYPH: Record<Color, Record<CapturedRole, string>> = {
-  white: { queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' },
-  black: { queen: '♕', rook: '♖', bishop: '♗', knight: '♘', pawn: '♙' },
+const CAPTURED_GLYPH: Record<CapturedRole, string> = {
+  queen: '♛',
+  rook: '♜',
+  bishop: '♝',
+  knight: '♞',
+  pawn: '♟',
 }
 
 /**
@@ -850,7 +856,7 @@ function PlayerRow({
   const name = side === 'white' ? game.white : game.black
   const rating = side === 'white' ? game.white_rating : game.black_rating
   // `materialBalance` states each side's own surplus and its own signed advantage, so the
-  // two rows read `♗ +3` and `−3` rather than the same number twice with the reader doing
+  // two rows read `♝ +3` and `−3` rather than the same number twice with the reader doing
   // the flip. Equal takings have already cancelled there: only the surplus is drawn.
   const { captured, advantage } = side === 'white' ? material.white : material.black
   // The shortfall as a positive number, so the title reads "Down 3" and not "Down −3".
@@ -874,11 +880,11 @@ function PlayerRow({
       </span>
       <span className="flex-none font-mono text-[0.6875rem] tabular text-dim">{rating ?? '—'}</span>
       {captured.length > 0 ? (
-        <span
-          aria-hidden
-          className="flex-none text-[0.8125rem] leading-none tracking-tighter text-dim-3"
-        >
-          {captured.map((role) => CAPTURED_GLYPH[side][role]).join('')}
+        // A size up from the text beside it: a figurine reads by its silhouette, and at
+        // the rating's size the queen and the bishop are the same blob. `leading-none` keeps
+        // the taller glyph inside the row's `h-6`.
+        <span aria-hidden className="flex-none text-[1.0625rem] leading-none tracking-tight text-dim-2">
+          {captured.map((role) => CAPTURED_GLYPH[role]).join('')}
         </span>
       ) : null}
       {advantage !== 0 ? (
