@@ -40,3 +40,35 @@ if (!globalThis.matchMedia) {
     })),
   })
 }
+
+/**
+ * A `localStorage` that works, for the tests that read one.
+ *
+ * Not a convenience: it is what makes a local run and CI the same run. jsdom's own storage
+ * is there on the CI runner and *missing* under a newer Node, which starts its own
+ * `localStorage` global and then refuses to use it without `--localstorage-file`. So a
+ * preference written in one test survived into the next on CI and evaporated on a laptop —
+ * and a suite that only fails in one of the two places is a suite nobody can trust.
+ *
+ * One store per test file, since vitest gives each file its own module registry, and it
+ * keeps its contents between the tests in that file exactly as a browser would. The prefs
+ * tests still stub their own over the top of it; `vi.unstubAllGlobals` puts this back.
+ */
+{
+  const values = new Map<string, string>()
+  const store: Storage = {
+    get length() {
+      return values.size
+    },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    removeItem: (key: string) => void values.delete(key),
+    setItem: (key: string, value: string) => void values.set(key, String(value)),
+  }
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    writable: true,
+    value: store,
+  })
+}

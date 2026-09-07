@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { GameCard } from '@/lib/api/types'
-import { resetEngineHidden, setEngineHidden } from '@/lib/ui/engineVisibility'
+import { setEngineHidden } from '@/lib/ui/engineVisibility'
 
 import { DEFAULT_SORT } from '../sorting'
 import { GamesTable, type GamesTableProps } from './GamesTable'
@@ -54,9 +54,10 @@ function setup(over: Partial<GamesTableProps> = {}) {
   return props
 }
 
-// ⇧E is a mode that outlives a route, so it outlives a test unless it is put back.
+// ⇧E is a mode that outlives a route, and it is written down — so it outlives a test, and
+// a whole test file, unless it is put back.
 afterEach(() => {
-  resetEngineHidden()
+  setEngineHidden(false)
 })
 
 describe('GamesTable states', () => {

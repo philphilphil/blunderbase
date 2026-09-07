@@ -17,7 +17,7 @@ import { EventsProvider } from '@/lib/events/EventsProvider'
 import { rememberTrail, resetTrail } from '@/routes/games/gameTrail'
 
 import { toast } from '@/lib/toast'
-import { resetEngineHidden, setEngineHidden } from '@/lib/ui/engineVisibility'
+import { setEngineHidden } from '@/lib/ui/engineVisibility'
 import { MOBILE_QUERY } from '@/lib/ui/media'
 
 import { COMPOSER_TEXT_ID } from './components/NoteComposer'
@@ -361,15 +361,18 @@ beforeEach(() => {
   // game nobody has read yet.
   resetSessionVariations()
   resetTrail()
-  // ⇧E is a mode that outlives a route, so it outlives a test too unless it is put back.
-  resetEngineHidden()
+  // ⇧E is a mode that outlives a route, and it is written down — so it outlives a test, and
+  // a whole test file, unless it is put back. Written rather than forgotten: forgetting the
+  // cache only re-reads whatever the last test stored, which is how this leaked into the
+  // phone-layout tests on CI while passing on a machine whose jsdom has no storage at all.
+  setEngineHidden(false)
   vi.stubGlobal('WebSocket', SilentSocket)
   vi.stubGlobal('fetch', stubFetch())
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
-  resetEngineHidden()
+  setEngineHidden(false)
 })
 
 describe('GamePage', () => {
