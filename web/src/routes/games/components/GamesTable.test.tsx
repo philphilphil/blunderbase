@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { GameCard } from '@/lib/api/types'
+import { resetEngineHidden, setEngineHidden } from '@/lib/ui/engineVisibility'
 
 import { DEFAULT_SORT } from '../sorting'
 import { GamesTable, type GamesTableProps } from './GamesTable'
@@ -52,6 +53,11 @@ function setup(over: Partial<GamesTableProps> = {}) {
   render(<GamesTable {...props} />)
   return props
 }
+
+// ⇧E is a mode that outlives a route, so it outlives a test unless it is put back.
+afterEach(() => {
+  resetEngineHidden()
+})
 
 describe('GamesTable states', () => {
   it('shows skeleton rows while the first page is in flight', () => {
@@ -179,5 +185,42 @@ describe('GamesTable rows', () => {
     expect(props.onDelete).toHaveBeenCalledWith(12)
     // The row's own delete must not also open the game.
     expect(props.onOpen).not.toHaveBeenCalled()
+  })
+})
+
+describe('GamesTable with the engine hidden', () => {
+  it('drops the Worst column and the flag badges, and keeps the game', () => {
+    setEngineHidden(true)
+    setup()
+
+    // The two things on a row that are the engine's verdict on how it was played.
+    expect(screen.queryByRole('button', { name: /Worst/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('−80%')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('1 blunder')).not.toBeInTheDocument()
+
+    // Everything that is the game, or the app's own bookkeeping about it, stays.
+    expect(screen.getByText('chillzone')).toBeInTheDocument()
+    expect(screen.getByText('Alekhine Defense')).toBeInTheDocument()
+    expect(screen.getByText('Quick')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete game 12' })).toBeInTheDocument()
+  })
+
+  it('still offers to analyse a game nothing has looked at', async () => {
+    setEngineHidden(true)
+    const props = setup({
+      games: [{ ...GAME, analyzed: false, deep: false, worst_moments: [] } as GameCard],
+    })
+    // The whole point of reading a game unaided is checking yourself against a pass
+    // afterwards, so the way to queue one never goes away.
+    await userEvent.click(screen.getByRole('button', { name: 'analyse' }))
+    expect(props.onAnalyse).toHaveBeenCalledWith(12)
+  })
+
+  it('lays the header, the rows and the skeleton out over the same columns', () => {
+    setEngineHidden(true)
+    setup({ status: 'pending', games: [] })
+    const header = screen.getAllByRole('row')[0]
+    const skeletonRow = screen.getByTestId('games-loading').firstElementChild!
+    expect(skeletonRow.children).toHaveLength(header.children.length)
   })
 })

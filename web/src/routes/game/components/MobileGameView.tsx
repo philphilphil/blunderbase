@@ -31,6 +31,13 @@ export type MobileTab = MoveTab | 'eval' | 'engine' | 'notes'
  */
 const MOBILE_TABS: readonly MobileTab[] = ['moves', 'eval', 'engine', 'notes']
 
+/**
+ * The strip with the engine hidden (⇧E): two of the four tabs are the engine and nothing
+ * else, so they go rather than open onto an empty pane. Moves and Notes are what a game
+ * read unaided is made of, and they are what is left.
+ */
+const UNAIDED_TABS: readonly MobileTab[] = ['moves', 'notes']
+
 const TAB_LABEL: Record<MobileTab, MessageDescriptor> = {
   moves: msg`Moves`,
   flagged: msg`Flagged`,
@@ -62,6 +69,12 @@ export interface MobileGameViewProps {
    */
   flaggedCount: number
   noteCount: number
+  /**
+   * The engine is hidden everywhere (⇧E, `lib/ui/engineVisibility`). Two tabs go with it,
+   * and so do the two readouts in the header that are evaluations rather than facts about
+   * the game. Everything else on this screen was emptied upstream.
+   */
+  engineHidden?: boolean
   tab: MobileTab
   onTabChange: (tab: MobileTab) => void
   /** `BoardPanel`, whole — eval bar, board and the transport row under it. */
@@ -109,6 +122,7 @@ export function MobileGameView({
   score,
   flaggedCount,
   noteCount,
+  engineHidden = false,
   tab,
   onTabChange,
   board,
@@ -119,6 +133,12 @@ export function MobileGameView({
   infinite,
   notesTrack,
 }: MobileGameViewProps) {
+  // The strip is told which tabs exist; which one is *shown* is the page's state, and it can
+  // name a tab that has just gone (⇧E pressed while Engine was open). Resolved here rather
+  // than pushed back up as a state change: the page's tab is still the reader's choice and
+  // it comes back the moment the engine does.
+  const tabs = engineHidden ? UNAIDED_TABS : MOBILE_TABS
+  const shown: MobileTab = tabs.includes(tab) ? tab : 'moves'
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <CompactHeader
@@ -129,6 +149,7 @@ export function MobileGameView({
         cursor={cursor}
         plyCount={plyCount}
         score={score}
+        engineHidden={engineHidden}
       />
 
       {/*
@@ -140,7 +161,8 @@ export function MobileGameView({
       <div className="flex-none px-2 py-2">{board}</div>
 
       <TabStrip
-        tab={tab}
+        tabs={tabs}
+        tab={shown}
         onTabChange={onTabChange}
         flaggedCount={flaggedCount}
         noteCount={noteCount}
@@ -160,7 +182,7 @@ export function MobileGameView({
         data-testid="mobile-tab-pane"
         className="flex min-h-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0rem)]"
       >
-        {tab === 'eval' ? (
+        {shown === 'eval' ? (
           /*
             The story of the game: the shape on top, the moves that made it underneath.
 
@@ -181,12 +203,12 @@ export function MobileGameView({
             <div className="px-2 py-1.5">{evalGraph}</div>
             <div className="border-t border-hairline">{flaggedMoments}</div>
           </div>
-        ) : tab === 'engine' ? (
+        ) : shown === 'engine' ? (
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
             {maiaPanel}
             {infinite}
           </div>
-        ) : tab === 'notes' ? (
+        ) : shown === 'notes' ? (
           /*
             The desktop's notes track, whole: Book when the position has one, the game's
             notes otherwise, and the composer pinned underneath like a message box. Reading
@@ -225,6 +247,7 @@ function CompactHeader({
   cursor,
   plyCount,
   score,
+  engineHidden,
 }: {
   game: GameSummary
   best: GameRunSummary | null
@@ -233,6 +256,7 @@ function CompactHeader({
   cursor: number
   plyCount: number
   score: Score | null
+  engineHidden: boolean
 }) {
   const winner = game.result === '1-0' ? 'white' : game.result === '0-1' ? 'black' : null
   const plyNumber = cursor + 1
@@ -254,10 +278,16 @@ function CompactHeader({
           {/*
             The evaluation of the position on the board, in the brightest tone on the line:
             it is the only thing here that changes as the game is walked, and the one number
-            the eval bar beside the board can only draw as a picture.
+            the eval bar beside the board can only draw as a picture. Gone with the bar while
+            the engine is hidden — this line is the phone's copy of the readouts the desktop
+            transport row gives up below `md`, and it hides what that row hides.
           */}
-          <span className="flex-none font-mono tabular text-ink">{formatScore(score)}</span>
-          <span className="flex-none text-faint-2">·</span>
+          {engineHidden ? null : (
+            <>
+              <span className="flex-none font-mono tabular text-ink">{formatScore(score)}</span>
+              <span className="flex-none text-faint-2">·</span>
+            </>
+          )}
           <span className="flex-none font-mono tabular">{formatResult(game.result)}</span>
           <span className="flex-none text-faint-2">·</span>
           {/* The ply readout the transport row gives up below `md`; free here. */}
@@ -349,11 +379,14 @@ function Name({
  * mistakes in this game" is the reason to open that tab at all.
  */
 function TabStrip({
+  tabs,
   tab,
   onTabChange,
   flaggedCount,
   noteCount,
 }: {
+  /** Which tabs this reading has — four, or the two that survive ⇧E. */
+  tabs: readonly MobileTab[]
   tab: MobileTab
   onTabChange: (tab: MobileTab) => void
   flaggedCount: number
@@ -367,7 +400,7 @@ function TabStrip({
       aria-label={t`Game panels`}
       className="flex h-[2.5rem] flex-none items-stretch border-y border-hairline"
     >
-      {MOBILE_TABS.map((name) => {
+      {tabs.map((name) => {
         const count = name === 'eval' ? flaggedCount : name === 'notes' ? noteCount : 0
         const selected = tab === name
         return (

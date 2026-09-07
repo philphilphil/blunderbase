@@ -27,6 +27,7 @@ import { useMoveSound } from '@/lib/board/moveSound'
 import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
 import { whiteWinPercent } from '@/lib/chess/evaluation'
+import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
 import { ReferenceTokenCard } from '@/routes/explorer/components/ReferenceTokenCard'
@@ -76,6 +77,7 @@ import {
   scoreAfter,
   scoreBefore,
   sortNotes,
+  withoutEngine,
   type EngineLineView,
   type GameNote,
   type Side,
@@ -470,7 +472,27 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   }, [])
 
   const detail = readOnly ? referenceDetailValue : analysisRequest.demoDetail ?? library.data
-  const moves = useMemo<MoveRow[]>(() => detail?.moves ?? [], [detail])
+  /**
+   * Whether the engine is allowed to speak at all (`lib/ui/engineVisibility`, ⇧E).
+   *
+   * The whole of this screen is derived from `moves`, so the mode is applied *there* rather
+   * than at the two dozen places a verdict eventually reaches the glass: the rows are handed
+   * over with every engine field stripped, and the eval curve, the glyphs, the flagged
+   * jumps, the annotation box, the stored lines, the board's arrow and Maia's prediction all
+   * come out empty on their own. What the page draws while it is on is exactly what it draws
+   * for a game nobody has analysed yet — a state every one of those components already
+   * handles, which is why this costs one substitution instead of a flag in each of them.
+   *
+   * The panels that are engine and nothing else (the engine band, the eval curve, the live
+   * search) would still keep their headers and their empty frames, and a row of empty frames
+   * is not "read this game unaided" — it is a screen with holes in it. Those are left out of
+   * the layout entirely further down.
+   */
+  const engineHidden = useEngineHidden()
+  const moves = useMemo<MoveRow[]>(
+    () => (engineHidden ? withoutEngine(detail?.moves ?? []) : (detail?.moves ?? [])),
+    [detail, engineHidden],
+  )
   const plyCount = moves.length
 
   const line = useMemo(() => buildGameLine(moves), [moves])
@@ -1163,6 +1185,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   }, [line, played])
 
   const finishedRuns = useMemo(() => detail?.runs ?? [], [detail])
+  // Untouched by ⇧E, on both sides of the screen: which run has looked at this game, how
+  // deep it went and when, is what the app has *done* rather than what it found. Hiding it
+  // would tell a reader their analysis had gone missing, and hiding the two tier buttons
+  // with it would take away the pass they are about to queue to check themselves.
   const best = useMemo(() => bestRun(finishedRuns), [finishedRuns])
   const deepRun = useMemo(
     () => bestRun(finishedRuns.filter((run) => run.tier === 'deep')),
@@ -1198,6 +1224,22 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     ply: analysisPly,
   })
 
+  // Hiding the engine closes the live search as well as its panel. Leaving it running out
+  // of sight would keep an engine busy for a reader who has just said they do not want to
+  // be told, and its answer would still reach the board through `boardEngineBest`.
+  const setStreamEnabled = stream.setEnabled
+  useEffect(() => {
+    if (engineHidden) setStreamEnabled(false)
+  }, [engineHidden, setStreamEnabled])
+  /**
+   * What the last search said, or nothing at all while the engine is hidden. The session is
+   * closed above, but a session that has been closed still remembers its final snapshot —
+   * and that snapshot is what feeds the board's arrow, the eval bar and ↵. Read through this
+   * rather than off `stream` directly, so there is one place the mode is applied and not
+   * three that have to agree.
+   */
+  const snapshot = engineHidden ? null : stream.snapshot
+
   /**
    * Every line on offer for the position the board is standing on, best first, in UCI.
    *
@@ -1209,12 +1251,11 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    */
   const boardPvs = useMemo(() => {
     const fen = boardPosition?.fen ?? null
-    const snapshot = stream.snapshot
     if (snapshot && fen && snapshot.fen === fen) {
       return [...snapshot.lines].sort((a, b) => a.multipv - b.multipv).map((row) => row.pv)
     }
     return exploring ? [] : lines.map((row) => row.pv).filter((pv) => pv.length > 0)
-  }, [boardPosition, exploring, lines, stream.snapshot])
+  }, [boardPosition, exploring, lines, snapshot])
 
   /**
    * The run's own lines, re-read from a board that has walked into one of them.
@@ -1285,7 +1326,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * own box and its header reports whose numbers those are.
    */
   const boardEngineBest =
-    liveBest(stream.snapshot, boardPosition?.fen ?? null) ??
+    liveBest(snapshot, boardPosition?.fen ?? null) ??
     (exploring ? (alongLine?.next ?? null) : engineBest)
 
   /**
@@ -1297,7 +1338,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * Off all three the readouts empty rather than keep showing the game position's number
    * under a board that has left it — a stale claim is worse than an empty one.
    */
-  const boardLiveScore = liveScore(stream.snapshot, boardPosition?.fen ?? null)
+  const boardLiveScore = liveScore(snapshot, boardPosition?.fen ?? null)
   const boardScore = boardLiveScore ?? (exploring ? (alongLine?.score ?? null) : score)
   const boardWin = boardLiveScore
     ? whiteWinPercent(boardLiveScore)
@@ -1424,10 +1465,15 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         if (previousFlagged !== null) seek(previousFlagged)
       },
       flip: () => setFlipped((value) => !value),
+      // Still bound while ⇧E is on: what is left for it to switch is the arrow for the move
+      // the game itself played next, which is the game rather than a verdict about it.
       toggleHints: () => setHints((value) => !value),
       // The same switch the panel's footer carries, and the same guard it draws disabled
       // under: with nothing on the board there is nothing to search.
-      toggleEngine: boardPosition?.fen ? () => stream.setEnabled(!stream.enabled) : undefined,
+      toggleEngine:
+        boardPosition?.fen && !engineHidden
+          ? () => stream.setEnabled(!stream.enabled)
+          : undefined,
       // A note hangs off a game row, so a model game nobody has added has none to write.
       note: readOnly ? undefined : focusComposer,
       // Only while there is a line to leave: off one, Escape is the browser's again — and,
@@ -1493,7 +1539,13 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   // state, one `useLinePreview`, and the namespaced ids (`run:1` here, `live:1` there) are
   // what keeps the two boxes' line 1 from being the same row. `onHoverMove` stays for the
   // human column, the compare grid and the rollout, which offer single moves.
-  const maiaPanel = (
+  //
+  // Three panels are engine and nothing else — this band, the eval curve and the live
+  // search — so while ⇧E is on they are not drawn at all. Emptied in place they would keep
+  // their headers, their rules and their heights, and a column of labelled empty boxes is
+  // not a game read unaided: it is the same screen with the answers cut out of it. Gone,
+  // the move table and the notes take the room, which is what this reading is for.
+  const maiaPanel = engineHidden ? null : (
     <MaiaPanel
       rating={maia?.rating ?? null}
       human={human}
@@ -1580,6 +1632,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       plyCount={plyCount}
       hints={hints}
       onHintsChange={setHints}
+      // Everything above is already empty while ⇧E is on — the rows were stripped. This is
+      // what the panel cannot work out for itself: that the eval bar and the score chip are
+      // to go rather than stand there reading 0.00, which is a claim of its own.
+      engineHidden={engineHidden}
       readOnly={readOnly}
       onFlip={() => setFlipped((value) => !value)}
       onSeek={seek}
@@ -1606,7 +1662,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
-  const evalGraph = (
+  const evalGraph = engineHidden ? null : (
     <EvalGraph
       points={curve}
       plyCount={plyCount}
@@ -1741,7 +1797,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
-  const infinite = (
+  const infinite = engineHidden ? null : (
     <InfiniteAnalysisPanel
       stream={stream}
       fen={boardPosition.fen}
@@ -1794,6 +1850,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           score={boardScore}
           flaggedCount={flaggedCount}
           noteCount={noteList.length}
+          // The strip loses Eval and Engine with it; `evalGraph` and `infinite` above are
+          // already null, and a tab onto nothing is worse than no tab.
+          engineHidden={engineHidden}
           tab={mobileTab}
           onTabChange={setMobileTab}
           board={board}

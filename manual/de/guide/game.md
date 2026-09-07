@@ -41,6 +41,15 @@ Das Maia-Feld zeigt fünf Züge mit ihrer jeweiligen Wahrscheinlichkeit auf der 
 Spielstärke, nicht den besten Zug. Eine Variante gibt es dazu nicht; warum, steht unter
 [Analyse](analysis.md).
 
+## Eine Partie ohne Engine lesen { #read-a-game-without-the-engine }
+
+`⇧E` oder der Computer in der Titelleiste nimmt jedes Engine-Urteil von diesem Bildschirm: den
+Bewertungsbalken und die Bewertung, die `??`-Markierungen und die eingefärbten Zeilen, den
+Verlauf, die Bereiche von Engine und Maia. Die Züge, die Uhren und deine Notizen bleiben,
+und ebenso die Schaltflächen **Schnell** und **Tief**: Schreib erst auf, was deiner Meinung
+nach schiefging, dann drück eine davon und sieh nach. Der Modus bleibt an, bis du ihn wieder
+ausschaltest; alles dazu steht unter [Einstellungen](settings.md#hide-the-engine).
+
 ## Eine Notiz schreiben
 
 `N` öffnet eine Notiz zur Stellung auf dem Brett. Notizen erscheinen in jeder Partie, die

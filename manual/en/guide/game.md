@@ -38,6 +38,15 @@ line** keeps one with the game, so it is there next time and in the PGN export.
 The Maia panel gives five moves with the odds of each at the level you pick, not the best
 move. It shows no line; see [Analysis](analysis.md).
 
+## Read a game without the engine
+
+`⇧E`, or the computer in the title bar, takes every engine verdict off this screen: the
+evaluation bar and the score, the `??` badges and the tinted rows, the graph, the engine
+and Maia panels. The moves, the clocks and your notes stay, and so do the **Quick** and
+**Deep** buttons — write down what you think went wrong, then press one and see. The mode
+holds until you press it again; the whole of it is under
+[Settings](settings.md#hide-the-engine).
+
 ## Write a note
 
 `N` writes a note about the position on the board. Notes come back in every game that

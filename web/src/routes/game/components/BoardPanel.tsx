@@ -97,6 +97,16 @@ export interface BoardPanelProps {
   hints: boolean
   onHintsChange: (hints: boolean) => void
   /**
+   * The engine is hidden everywhere (⇧E, `lib/ui/engineVisibility`).
+   *
+   * The page hands this panel a game with every engine field stripped, so the arrows, the
+   * marks and the glyph are already gone by the time they get here. The two things that are
+   * not are the eval bar and the score chip: an empty bar still draws a half-and-half column
+   * beside the board and an empty chip still reads `0.00`, and both of those are evaluations
+   * — so they are left out of the layout entirely rather than emptied.
+   */
+  engineHidden?: boolean
+  /**
    * A game that is not a row in the library — a model game out of one of the reference
    * books. There is nothing on the server to queue a run against, so the two analysis
    * buttons are left out rather than shown refusing; the way to get them is "Add to
@@ -202,6 +212,7 @@ export function BoardPanel({
   plyCount,
   hints,
   onHintsChange,
+  engineHidden = false,
   readOnly,
   onFlip,
   onSeek,
@@ -358,8 +369,16 @@ export function BoardPanel({
       // means these two numbers move whenever the budget below does. Below `md` there is no
       // width here at all: the column is the board's width already.) `GameHeaderBar` is
       // outside this panel and still spans the column, exactly as the design draws it.
+      //
+      // With the engine hidden there is no bar and no gap to add back, so the panel is the
+      // board's own cap exactly — otherwise the player rows and the transport row would
+      // stand 1.5rem wider than the board they belong to, which is the misalignment this
+      // width exists to prevent.
       className={cn(
-        'flex flex-col gap-2 md:w-[min(100%,calc(100vh-11.3125rem))]',
+        'flex flex-col gap-2',
+        engineHidden
+          ? 'md:w-[min(100%,calc(100vh-12.8125rem))]'
+          : 'md:w-[min(100%,calc(100vh-11.3125rem))]',
         className,
       )}
     >
@@ -419,8 +438,12 @@ export function BoardPanel({
       */}
       <div className="flex items-start justify-start gap-2.5 max-md:justify-center">
         {/* The bar mirrors the board: the side at the bottom of one is at the bottom of the
-            other, so the reader's own side always grows towards them. */}
-        <EvalBar win={win} score={score} orientation={orientation} className="self-stretch" />
+            other, so the reader's own side always grows towards them. Gone while the engine
+            is hidden — the board takes the 1.5rem, which is the one place on this screen
+            where hiding something makes the thing worth looking at bigger. */}
+        {engineHidden ? null : (
+          <EvalBar win={win} score={score} orientation={orientation} className="self-stretch" />
+        )}
         {/* Nothing floats over the squares: Maia's prediction is a panel of its own, under
             the engine lines, and only its target square is marked here. */}
         <Board
@@ -555,11 +578,19 @@ export function BoardPanel({
             ⇅ <Trans>Flip</Trans>
           </button>
 
+          {/* While the engine is hidden the button's own title is a promise the screen has
+              already kept twice over, and the columns it names are not on the page — but
+              the standing arrow for the move the game played next is still its business, so
+              it stays and only its tooltip narrows. */}
           <button
             type="button"
             onClick={() => onHintsChange(!hints)}
             aria-pressed={hints}
-            title={t`Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first.`}
+            title={
+              engineHidden
+                ? t`Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E).`
+                : t`Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first.`
+            }
             className={cn(
               'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
               hints
@@ -653,24 +684,27 @@ export function BoardPanel({
               <Trans>ply {ply} / {plyCount}</Trans>
             )}
           </span>
-          <span
-            title={
-              scoreAlongLine
-                ? t`The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it`
-                : undefined
-            }
-            className={cn(
-              'rounded-sm border px-1.5 py-0.5 font-mono text-[0.6875rem] tabular',
-              // The analysis board's own purple, the colour "Back to game" is drawn in a
-              // few controls to the left: the reader is inside a line, and this number
-              // belongs to the line rather than to the game.
-              scoreAlongLine
-                ? 'border-brilliant/35 bg-brilliant/10 text-brilliant'
-                : 'border-edge bg-chip-info text-ink',
-            )}
-          >
-            {formatScore(score)}
-          </span>
+          {/* The ply readout beside it stays: where you are in the game is the game. */}
+          {engineHidden ? null : (
+            <span
+              title={
+                scoreAlongLine
+                  ? t`The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it`
+                  : undefined
+              }
+              className={cn(
+                'rounded-sm border px-1.5 py-0.5 font-mono text-[0.6875rem] tabular',
+                // The analysis board's own purple, the colour "Back to game" is drawn in a
+                // few controls to the left: the reader is inside a line, and this number
+                // belongs to the line rather than to the game.
+                scoreAlongLine
+                  ? 'border-brilliant/35 bg-brilliant/10 text-brilliant'
+                  : 'border-edge bg-chip-info text-ink',
+              )}
+            >
+              {formatScore(score)}
+            </span>
+          )}
         </div>
 
         <Rule />

@@ -48,6 +48,14 @@ export interface GameRowProps {
   /** Delete this one game, through the same confirmation a selection goes through. */
   onDelete: (id: number) => void
   analysing: boolean
+  /**
+   * The engine is hidden (⇧E, `lib/ui/engineVisibility`), so this row says nothing about
+   * how the game was played: no `Worst` cell — the table has dropped that column and the
+   * header with it — and no flag badges. What stays is what the engine did not decide: the
+   * tier chip (a run happened, at this depth), the "analyse" affordance where none has, and
+   * the delete button that shares the flags cell.
+   */
+  engineHidden?: boolean
 }
 
 export const GameRow = memo(function GameRow({
@@ -58,6 +66,7 @@ export const GameRow = memo(function GameRow({
   onAnalyse,
   onDelete,
   analysing,
+  engineHidden = false,
 }: GameRowProps) {
   const { t } = useLingui()
   const tier = tierOf(game)
@@ -149,7 +158,9 @@ export const GameRow = memo(function GameRow({
 
       <span {...cell('moves', 'text-right text-soft')}>{moveCount(game.ply_count)}</span>
 
-      <span {...cell('worst', cn('text-right', dropTone(drop)))}>{formatDrop(drop)}</span>
+      {engineHidden ? null : (
+        <span {...cell('worst', cn('text-right', dropTone(drop)))}>{formatDrop(drop)}</span>
+      )}
 
       <span {...cell('source')}>
         <SourceBadge source={game.source} size="sm" />
@@ -164,7 +175,7 @@ export const GameRow = memo(function GameRow({
       </span>
 
       <span {...cell('flags', 'flex items-center gap-1 overflow-hidden')}>
-        {tier ? (
+        {tier && engineHidden ? null : tier ? (
           flags.map((flag) => (
             <ClassificationBadge
               key={flag.glyph}

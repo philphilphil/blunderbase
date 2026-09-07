@@ -38,6 +38,16 @@ Sortiert wird die ganze gefilterte Liste, nicht nur die sichtbare Seite. Die Fu�
 die Zeilen pro Seite fest – **Fit** sind so viele, wie ins Fenster passen – und blättert mit
 den Pfeilen neben der Zahl.
 
+## Die Liste ohne Engine lesen { #read-the-list-without-the-engine }
+
+`⇧E` oder der Computer in der Titelleiste nimmt jeder Zeile die Spalte **Verlust** und die
+Symbole. Die Tabelle sagt dann, was du gespielt hast, und nicht, wie gut. Eine Liste, die
+nach **Verlust** sortiert war, fällt solange auf „neueste zuerst“ zurück. Die Chips unter
+**Analyse** wirken weiter – eine Frage, die du gestellt hast, ist keine Antwort, die dir
+jemand gegeben hat – und **analysieren** steht bei einer Partie, die noch niemand
+angesehen hat, weiterhin da. Alles zum Modus steht unter
+[Einstellungen](settings.md#hide-the-engine).
+
 ## Mehrere Partien auf einmal bearbeiten
 
 Hake Zeilen an, oder das Kästchen im Kopf für die ganze Seite. Die Fußzeile bietet dann

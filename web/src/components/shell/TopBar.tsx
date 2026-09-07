@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 import { AccountMenu } from './AccountMenu'
 import { useCommandPalette } from './CommandPalette'
+import { EngineToggle } from './EngineToggle'
 import { QueueIndicator } from './QueueIndicator'
 import { usePageChrome } from './PageChrome'
 import { ShortcutsButton } from './ShortcutsOverlay'
@@ -143,6 +144,13 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
 
       {actions}
       <QueueIndicator />
+      {/*
+        Whether the engine is allowed to speak at all. In the titlebar because it is a mode
+        rather than a screen's control — it has to be reachable *before* a game is opened,
+        which is the only moment at which hiding a verdict is worth anything — and it keeps
+        its place at every width, since the two screens it changes are the two a phone reads.
+      */}
+      <EngineToggle />
       {/*
         The theme control lives on the toolbar, beside the window's other odds and ends,
         because that is where a desktop app keeps it and where it is found without hunting.

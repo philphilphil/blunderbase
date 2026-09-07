@@ -19,11 +19,20 @@ import { useEffect, useRef } from 'react'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import type { GameCard } from '@/lib/api/types'
+import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
 import { nextSort, type Sort } from '../sorting'
-import { cellClass, cellStyle, COLUMNS, PHONE_CARD, remWidth, ROW_HEIGHT } from './columns'
+import {
+  cellClass,
+  cellStyle,
+  columnsFor,
+  PHONE_CARD,
+  remWidth,
+  ROW_HEIGHT,
+  type Column,
+} from './columns'
 import { GameRow } from './GameRow'
 
 /** The keys that move along the rows. Home and End reach past whatever has focus. */
@@ -70,6 +79,11 @@ export function GamesTable({
   empty,
 }: GamesTableProps) {
   const { t, i18n } = useLingui()
+  // Whether the engine may speak here at all (⇧E). The table loses the `Worst` column with
+  // it, and each row loses its flag badges — read once, at the top, so the header, the rows
+  // and the skeleton are laid out from the same answer.
+  const engineHidden = useEngineHidden()
+  const columns = columnsFor(engineHidden)
   const body = useRef<HTMLDivElement>(null)
   const report = useRef(onCapacityChange)
   useEffect(() => {
@@ -146,7 +160,7 @@ export function GamesTable({
         // the padding stays at `px-3`, so the chips still line up with the cards below.
         className="flex h-[2.125rem] flex-none items-center gap-2.5 border-b border-hairline bg-panel px-5 text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase max-md:h-auto max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-1.5 max-md:px-3 max-md:py-2"
       >
-        {COLUMNS.map((col) => {
+        {columns.map((col) => {
           const active = col.sort === sort.key
           const arrow = active ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''
           if (col.id === 'select') {
@@ -213,7 +227,7 @@ export function GamesTable({
         )}
       >
         {status === 'pending' ? (
-          <LoadingRows />
+          <LoadingRows columns={columns} />
         ) : status === 'error' ? (
           <ErrorState error={error} onRetry={onRetry} />
         ) : games.length === 0 ? (
@@ -229,6 +243,7 @@ export function GamesTable({
               onAnalyse={onAnalyse}
               onDelete={onDelete}
               analysing={analysing.has(game.id)}
+              engineHidden={engineHidden}
             />
           ))
         )}
@@ -238,10 +253,11 @@ export function GamesTable({
 }
 
 /**
- * The skeleton body: the same 13 columns, so the layout does not jump when rows land — and
- * below `md` the same card grid, for the same reason.
+ * The skeleton body: the same columns the rows will have, so the layout does not jump when
+ * they land — and below `md` the same card grid, for the same reason. Which columns those
+ * are is the caller's, since ⇧E takes one of them away.
  */
-function LoadingRows({ rows = 14 }: { rows?: number }) {
+function LoadingRows({ columns, rows = 14 }: { columns: Column[]; rows?: number }) {
   return (
     <div aria-busy data-testid="games-loading">
       {Array.from({ length: rows }, (_, index) => (
@@ -256,7 +272,7 @@ function LoadingRows({ rows = 14 }: { rows?: number }) {
             'max-md:gap-x-2 max-md:gap-y-1 max-md:px-3 max-md:py-2',
           )}
         >
-          {COLUMNS.map((col) => (
+          {columns.map((col) => (
             <span key={col.id} style={cellStyle(col)} className={cellClass(col)}>
               {col.id === 'select' ? null : (
                 <Skeleton

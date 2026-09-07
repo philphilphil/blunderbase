@@ -19,6 +19,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { ApiError } from '@/lib/api/client'
 import { useDeleteGames, useRequestAnalysisBatch } from '@/lib/api/queries'
+import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
@@ -74,8 +75,22 @@ export function GamesPage() {
   const [doomed, setDoomed] = useState<number[] | null>(null)
   const lastClicked = useRef<number | null>(null)
 
+  /**
+   * The sort the table is actually read under.
+   *
+   * Hiding the engine takes the `Worst` column away (`columns.ts`), and the header that
+   * sorted by it goes with the column — so a library left sorted worst-first would go on
+   * being ordered by a verdict, with nothing on screen saying so and no header left to
+   * change it back. It falls back to the default while the engine is hidden.
+   *
+   * Derived rather than written back over `sort`: the reader's own choice is still their
+   * choice, and it is standing again the moment the engine is.
+   */
+  const engineHidden = useEngineHidden()
+  const readSort = engineHidden && sort.key === 'worst' ? DEFAULT_SORT : sort
+
   const rowsPerPage = resolvePageSize(pageSize, fitRows)
-  const library = useGameLibrary({ filters, sort, page, pageSize: rowsPerPage })
+  const library = useGameLibrary({ filters, sort: readSort, page, pageSize: rowsPerPage })
   const rows = library.games
   // The row button queues one game through the same call: one id is a batch of one, and
   // one path here is one receipt and one set of spinning rows. Deleting works the same way.
@@ -97,14 +112,18 @@ export function GamesPage() {
       const at = rows.findIndex((game) => game.id === id)
       if (at !== -1) {
         rememberTrail({
-          query: { ...toGameQuery(filters), order: sort.key, direction: sort.direction },
+          query: {
+            ...toGameQuery(filters),
+            order: readSort.key,
+            direction: readSort.direction,
+          },
           offset: (Math.max(page, 1) - 1) * rowsPerPage + at,
           gameId: id,
         })
       }
       navigate(`/games/${id}`)
     },
-    [rows, filters, sort, page, rowsPerPage, navigate],
+    [rows, filters, readSort, page, rowsPerPage, navigate],
   )
 
   useEffect(() => {
@@ -130,7 +149,7 @@ export function GamesPage() {
   // one filter says nothing about where to stand in another. Adjusted during the render
   // that notices rather than in an effect — React re-runs this render before it commits
   // anything, so the table is never painted showing page 7 of a library that has three.
-  const queryKey = `${params.toString()}|${sort.key}|${sort.direction}|${rowsPerPage}`
+  const queryKey = `${params.toString()}|${readSort.key}|${readSort.direction}|${rowsPerPage}`
   const [lastQueryKey, setLastQueryKey] = useState(queryKey)
   if (lastQueryKey !== queryKey) {
     setLastQueryKey(queryKey)
@@ -334,7 +353,7 @@ export function GamesPage() {
 
       <GamesTable
         games={rows}
-        sort={sort}
+        sort={readSort}
         onSortChange={setSort}
         selected={selectedVisible}
         onToggle={toggle}

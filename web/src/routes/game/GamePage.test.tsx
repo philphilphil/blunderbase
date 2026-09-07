@@ -17,6 +17,7 @@ import { EventsProvider } from '@/lib/events/EventsProvider'
 import { rememberTrail, resetTrail } from '@/routes/games/gameTrail'
 
 import { toast } from '@/lib/toast'
+import { resetEngineHidden, setEngineHidden } from '@/lib/ui/engineVisibility'
 import { MOBILE_QUERY } from '@/lib/ui/media'
 
 import { COMPOSER_TEXT_ID } from './components/NoteComposer'
@@ -360,12 +361,15 @@ beforeEach(() => {
   // game nobody has read yet.
   resetSessionVariations()
   resetTrail()
+  // ⇧E is a mode that outlives a route, so it outlives a test too unless it is put back.
+  resetEngineHidden()
   vi.stubGlobal('WebSocket', SilentSocket)
   vi.stubGlobal('fetch', stubFetch())
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  resetEngineHidden()
 })
 
 describe('GamePage', () => {
@@ -1406,6 +1410,50 @@ describe('GamePage', () => {
     expect(within(panel()).queryByText('played')).not.toBeInTheDocument()
     expect(within(panel()).getByText('stockfish')).toBeInTheDocument()
     expect(panel()).toHaveTextContent('Maia 1500')
+  })
+
+  /*
+   * ⇧E, the mode Hints is the momentary version of (`lib/ui/engineVisibility`).
+   *
+   * Every one of these assertions is about a different route a verdict takes to the glass —
+   * the rows, the bar, the chip, the panels — and they are in one test because the claim is
+   * that *none* of them gets through, which is only true of all of them together.
+   */
+  it('says nothing the engine said while it is hidden', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // The fixture's second move is a blunder, and the game carries a finished deep run.
+    expect(document.querySelector('[data-classification="blunder"]')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Evaluation:/)).toBeInTheDocument()
+    expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('evaluation-plot')).toBeInTheDocument()
+
+    act(() => setEngineHidden(true))
+
+    expect(document.querySelector('[data-classification]')).toBeNull()
+    expect(screen.queryByLabelText(/^Evaluation:/)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('evaluation-plot')).not.toBeInTheDocument()
+    // The move table is still the game: the moves, and the note somebody wrote about one.
+    expect(screen.getByText('d5')).toBeInTheDocument()
+    // And so is what the app has *done* — the run happened, whatever it found. (Two of
+    // them: the tier chip in the header, and the button that queues another pass.)
+    expect(screen.getAllByText(/deep/i).length).toBeGreaterThan(0)
+
+    act(() => setEngineHidden(false))
+    expect(document.querySelector('[data-classification="blunder"]')).toBeInTheDocument()
+    expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
+  })
+
+  it('leaves the live search alone while the engine is hidden', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    act(() => setEngineHidden(true))
+    await user.keyboard('e')
+    expect(streamCalls).toEqual([])
   })
 })
 

@@ -38,6 +38,15 @@ whole filtered library, not to the page in front of you. The footer sets the row
 — **Fit** is as many as the window has room for — and pages with the arrows beside the
 count.
 
+## Read the list without the engine
+
+`⇧E`, or the computer in the title bar, drops the **Worst** column and the flag badges from
+every row, so the table says what you played and not how well. A list left sorted by
+**Worst** falls back to newest first while it is on. The **Analysis** filter chips still
+work — a question you asked is not an answer you were handed — and **analyse** is still
+there on a game nothing has looked at. The whole of the mode is under
+[Settings](settings.md#hide-the-engine).
+
 ## Act on several games at once
 
 Tick rows, or the box in the header for the whole page, and the footer offers **Queue quick

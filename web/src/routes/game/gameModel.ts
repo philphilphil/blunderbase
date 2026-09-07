@@ -393,6 +393,37 @@ export function barLayout(plotWidth: number, plies: number): BarLayout {
   return { width, gap, rim: width >= 3.5 }
 }
 
+/**
+ * The same game with everything an engine said about it taken off (⇧E,
+ * `lib/ui/engineVisibility`).
+ *
+ * The moves, the clocks and who played them stay: those are the game, and they are what is
+ * left to read when the verdicts are gone. Everything else on a row was put there by a run
+ * — the evaluations either side of the move, the loss it cost, the class it was filed
+ * under, the engine's own move, its lines, Maia's policy — and it goes.
+ *
+ * Written as a whitelist of what is dropped rather than a rebuild of what is kept, so a
+ * field added to `MoveRow` by a future run type arrives *visible* and is noticed, instead
+ * of being silently thrown away by a hidden-mode nobody thought to update. `run_id` stays
+ * for the same reason it is not a verdict: it says a run happened, not what it found.
+ */
+export function withoutEngine(moves: MoveRow[]): MoveRow[] {
+  return moves.map((move) => ({
+    ...move,
+    win_before: null,
+    win_after: null,
+    win_loss: null,
+    classification: null,
+    best_move_uci: null,
+    best_lines: null,
+    maia: null,
+    eval_before_cp: null,
+    eval_before_mate: null,
+    eval_after_cp: null,
+    eval_after_mate: null,
+  }))
+}
+
 // --- move list ------------------------------------------------------------
 
 export interface MovePair {

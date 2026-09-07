@@ -10,6 +10,20 @@ ordinary arrangement. The page reloads under you, so save an open note first.
 
 Also in the account menu: **Dark**, **Light** or **Match the system**. Dark is the default.
 
+## Hide the engine
+
+The lit computer in the title bar, or `⇧E` from anywhere, hides everything an engine has
+said about your games — so you can annotate a game yourself first and check afterwards. It
+stays on until you press it again, on every game and after a reload, and it is a setting of
+this browser.
+
+Hidden, the game screen loses the evaluation bar and the score, the `??` badges and the
+tinted rows, the evaluation graph, the engine and Maia panels and the live engine; the
+games list loses its **Worst** column and its flag badges. What stays is the game itself —
+the moves, the clocks, your notes — and what Blunderbase has *done*: which pass has run and
+how deep it went, and the buttons that queue another one, which is what you press once you
+have written your own verdict down.
+
 ## Set up the board
 
 The gear under the board, or `S`, opens **Board settings**. They apply in this browser
@@ -44,6 +58,7 @@ are on.
 | Key | Does |
 |---|---|
 | `⌘K` | Search games, opponents, openings and notes |
+| `⇧E` | Hide every engine verdict — read the game unaided |
 | `?` | This list |
 | `⌘1` … `⌘5` | Dashboard, Games, Explorer, Notes, Stats |
 | `⌘⇧I` | Import |

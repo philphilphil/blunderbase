@@ -16,9 +16,10 @@
  * arrow does not, and one spelling for both is what stops that difference leaking into
  * every handler.
  *
- * The shell's own bindings (⌘K, ⌘1–5) are listed but not dispatched from here: they live
- * in the components that own the dialogs and the router, and lifting them out would move
- * code that works to serve a list. What this table owes them is an accurate line.
+ * The shell's own bindings (⌘K, ⌘1–5, ⇧E) are listed but not dispatched from here: they
+ * live in the components that own the dialogs, the router and the engine switch, and
+ * lifting them out would move code that works to serve a list. What this table owes them
+ * is an accurate line.
  *
  * Every word a reader sees is a `MessageDescriptor` rather than a string. These tables are
  * module-level constants: a sentence resolved where it is written would be frozen at import
@@ -322,6 +323,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     name: msg`Anywhere`,
     shortcuts: [
       { keys: ['⌘K'], label: msg`Search games, opponents, openings and notes` },
+      { keys: ['⇧E'], label: msg`Hide the engine's evaluations, flags and panels` },
       { keys: ['?'], label: msg`This list` },
       { keys: ['⌘1'], label: msg`Dashboard` },
       { keys: ['⌘2'], label: msg`Games` },

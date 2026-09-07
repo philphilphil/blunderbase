@@ -782,6 +782,30 @@ msgstr "↵ open"
 msgid "type two letters to search the library"
 msgstr "type two letters to search the library"
 
+#: src/components/shell/EngineToggle.tsx
+msgid "Engine hidden. Nothing gives the game away."
+msgstr "Engine hidden. Nothing gives the game away."
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Engine back. Evaluations and flags are on again."
+msgstr "Engine back. Evaluations and flags are on again."
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Show the engine (⇧E)"
+msgstr "Show the engine (⇧E)"
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Hide the engine (⇧E)"
+msgstr "Hide the engine (⇧E)"
+
+#: src/components/shell/EngineToggle.tsx
+msgid "The engine is hidden. Press to show it again (⇧E)."
+msgstr "The engine is hidden. Press to show it again (⇧E)."
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Hide the engine's evaluations, flags and panels (⇧E)"
+msgstr "Hide the engine's evaluations, flags and panels (⇧E)"
+
 #: src/components/shell/QueueDestinations.tsx
 msgid "nothing will drain this until the machine connects"
 msgstr "nothing will drain this until the machine connects"
@@ -1429,6 +1453,10 @@ msgstr "Anywhere"
 #: src/lib/ui/shortcuts.ts
 msgid "Search games, opponents, openings and notes"
 msgstr "Search games, opponents, openings and notes"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Hide the engine's evaluations, flags and panels"
+msgstr "Hide the engine's evaluations, flags and panels"
 
 #: src/lib/ui/shortcuts.ts
 msgid "This list"
@@ -3568,6 +3596,10 @@ msgstr "Flip the board (F)"
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "Flip"
 msgstr "Flip"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
+msgstr "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
 
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."

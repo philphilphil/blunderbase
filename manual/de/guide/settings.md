@@ -11,6 +11,21 @@ also kein Problem. Die Seite lädt dabei neu, speichere eine offene Notiz vorher
 Ebenfalls im Kontomenü: **Dunkel**, **Hell** oder **Dem System folgen**. Dunkel ist die
 Voreinstellung.
 
+## Die Engine ausblenden { #hide-the-engine }
+
+Der leuchtende Computer in der Titelleiste, oder `⇧E` von überall, blendet alles aus, was
+eine Engine über deine Partien gesagt hat – damit du eine Partie erst selbst kommentierst
+und dich danach überprüfst. Der Modus bleibt an, bis du ihn wieder ausschaltest, gilt für
+jede Partie und übersteht das Neuladen. Er gehört zu diesem Browser.
+
+Ausgeblendet verliert die Partieansicht den Bewertungsbalken und die Bewertung, die
+`??`-Markierungen und die eingefärbten Zeilen, den Bewertungsverlauf, die Bereiche von
+Engine und Maia und die Live-Engine; die Partienliste verliert die Spalte **Verlust** und
+ihre Symbole. Es bleibt die Partie selbst – die Züge, die Uhren, deine Notizen – und das,
+was Blunderbase *getan* hat: welcher Durchlauf gelaufen ist und wie tief, samt den
+Schaltflächen, die den nächsten einreihen. Genau die drückst du, wenn dein eigenes Urteil
+geschrieben ist.
+
 ## Das Brett einstellen
 
 Das Zahnrad unter dem Brett oder `S` öffnet die **Bretteinstellungen**. Sie gelten nur in
@@ -45,6 +60,7 @@ aktuellen Bildschirm gelten.
 | Taste | Wirkung |
 |---|---|
 | `⌘K` | Partien, Gegner, Eröffnungen und Notizen suchen |
+| `⇧E` | Jedes Engine-Urteil ausblenden – die Partie ohne Hilfe lesen |
 | `?` | Diese Liste |
 | `⌘1` … `⌘5` | Übersicht, Partien, Explorer, Notizen, Statistiken |
 | `⌘⇧I` | Importieren |

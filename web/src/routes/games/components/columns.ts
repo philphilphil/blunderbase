@@ -108,6 +108,23 @@ export const COLUMNS: Column[] = [
 ]
 
 /**
+ * The columns this reading of the table has.
+ *
+ * With the engine hidden (⇧E, `lib/ui/engineVisibility`) `Worst` goes: it is the largest
+ * win percentage the owner gave away in the game, which is the engine's verdict on it in a
+ * single number, and a column of dashes is not hidden — it is a column advertising what it
+ * will not tell you. The header, the rows and the loading skeleton all lay themselves out
+ * from this one list, so they cannot disagree about how many cells a row has.
+ *
+ * `Flags` stays in the list because the cell is not only flags: it also carries the
+ * "analyse" affordance and the row's delete button. `GameRow` empties what is engine about
+ * it and keeps the rest.
+ */
+export function columnsFor(engineHidden: boolean): Column[] {
+  return engineHidden ? COLUMNS.filter((column) => column.id !== 'worst') : COLUMNS
+}
+
+/**
  * The inline style one cell gets. A fixed column hands its width over as a custom property
  * rather than setting it, because an inline `width` outranks every class and the phone card
  * needs the cells to size themselves; `cellClass` is what spends it, from `md` up. The last

@@ -782,6 +782,30 @@ msgstr "↵ öffnen"
 msgid "type two letters to search the library"
 msgstr "tippe zwei Buchstaben, um die Bibliothek zu durchsuchen"
 
+#: src/components/shell/EngineToggle.tsx
+msgid "Engine hidden. Nothing gives the game away."
+msgstr "Engine ausgeblendet. Nichts verrät dir jetzt etwas."
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Engine back. Evaluations and flags are on again."
+msgstr "Engine zurück. Bewertungen und Symbole sind wieder da."
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Show the engine (⇧E)"
+msgstr "Engine einblenden (⇧E)"
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Hide the engine (⇧E)"
+msgstr "Engine ausblenden (⇧E)"
+
+#: src/components/shell/EngineToggle.tsx
+msgid "The engine is hidden. Press to show it again (⇧E)."
+msgstr "Die Engine ist ausgeblendet. Klicken, um sie wieder einzublenden (⇧E)."
+
+#: src/components/shell/EngineToggle.tsx
+msgid "Hide the engine's evaluations, flags and panels (⇧E)"
+msgstr "Bewertungen, Symbole und Engine-Bereiche ausblenden (⇧E)"
+
 #: src/components/shell/QueueDestinations.tsx
 msgid "nothing will drain this until the machine connects"
 msgstr "das wird erst abgearbeitet, wenn sich der Rechner verbindet"
@@ -1429,6 +1453,10 @@ msgstr "Überall"
 #: src/lib/ui/shortcuts.ts
 msgid "Search games, opponents, openings and notes"
 msgstr "Partien, Gegner, Eröffnungen und Notizen durchsuchen"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Hide the engine's evaluations, flags and panels"
+msgstr "Bewertungen, Symbole und Engine-Bereiche ausblenden"
 
 #: src/lib/ui/shortcuts.ts
 msgid "This list"
@@ -3568,6 +3596,10 @@ msgstr "Brett drehen (F)"
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "Flip"
 msgstr "Drehen"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
+msgstr "Hinweise (H): die festen Pfeile auf dem Brett. Die Engine ist ohnehin ausgeblendet (⇧E)."
 
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
