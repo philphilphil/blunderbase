@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.1.0 — 2026-09-07
+
+- Added German move letters and figurines as notation choices
+- Added ⇧E to hide every engine verdict
+- Fixed the Lichess rating chart lagging one game behind
+
 ## v1.0.0 — 2026-09-06
 
 - Added a signed and notarized macOS app
