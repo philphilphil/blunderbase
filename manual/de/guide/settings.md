@@ -36,6 +36,7 @@ diesem Browser.
 | **Pfeile** | Die Vorschläge der Engine auf der gezeigten Stellung einzeichnen oder nicht |
 | **Bewertungsverlauf** | Gefüllte Kurve, Balken, Punkte oder keiner; und welche Markierungen er trägt |
 | **Variantenvorschau** | Was beim Überfahren einer Engine-Variante passiert: Pfeile, Geisterfiguren, Abspielen auf dem Brett, ein kleines Brett neben der Variante oder nichts |
+| **Notation** | Wie die Figuren geschrieben werden, auf jeder Seite: deutsche Buchstaben (`Sc3`), englische Buchstaben (`Nc3`) oder Figurinen (`♞c3`) |
 | **Ton** | Ein Klick bei jedem Zug, und wie laut |
 
 ## Die Tour wiederholen

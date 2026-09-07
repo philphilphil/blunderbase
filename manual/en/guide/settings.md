@@ -34,6 +34,7 @@ only.
 | **Arrows** | Draw the engine's suggestions on the position shown, or not |
 | **Evaluation graph** | Filled curve, bars, dots or none; and which marks it carries |
 | **Line preview** | What pointing at an engine line does: arrows, ghost pieces, a replay on the board, a small board beside the line, or nothing |
+| **Notation** | How the pieces are written, on every screen: letters in the language of the app (`Nc3` in English, `Sc3` in German), English letters whatever the language, or figurines (`♞c3`) |
 | **Sound** | A click as each move lands, and how loud |
 
 ## Replay the tour

@@ -19,6 +19,7 @@ import type { Color } from '@/lib/api/types'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import { GLYPHS, glyphFor } from '@/lib/chess/classification'
 import { formatScore } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { useWheelStep } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 import { useEvalGraphPrefs, type EvalGraphMarks } from '@/lib/ui/evalGraphPrefs'
@@ -429,6 +430,7 @@ const TALLY_LAYOUT: readonly TallyField[] = ['blunder', 'inaccuracy', 'mistake']
  */
 function CurveReadout({ payload }: { payload?: { payload?: SeriesPoint }[] }) {
   const { t } = useLingui()
+  const notate = useNotation()
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
   const mark = glyphFor(point.classification)
@@ -437,8 +439,9 @@ function CurveReadout({ payload }: { payload?: { payload?: SeriesPoint }[] }) {
     <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-[0.65625rem] whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
       <span className="font-mono tabular text-dim">{plyLabel(point.ply)}</span>{' '}
       <span className={cn('font-mono', glyph ? glyph.textClass : 'text-ink')}>
-        {point.san ??
-          t({ message: 'start', comment: 'Stands in for a move at the starting position' })}
+        {point.san
+          ? notate(point.san)
+          : t({ message: 'start', comment: 'Stands in for a move at the starting position' })}
         {glyph ? <span className="ml-[0.125rem] font-bold opacity-75">{glyph.glyph}</span> : null}
       </span>{' '}
       <span className="font-mono tabular text-body-3">{formatScore(point.score)}</span>

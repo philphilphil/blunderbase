@@ -39,6 +39,8 @@ import { SectionHead } from '@/components/shell/Section'
 import { useWorstMoments } from '@/lib/api/queries'
 import type { MomentResponse } from '@/lib/api/types'
 import { formatWinLoss } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
+import type { Notate } from '@/lib/chess/notation'
 import { cn } from '@/lib/utils'
 
 import { Bar, EmptyBlock, ErrorBlock } from '@/routes/stats/kit/states'
@@ -73,10 +75,10 @@ function arrowsOf(uci: string | null | undefined): BoardArrow[] {
 }
 
 /** `96` + `49` -> `49…`, the way the design labels the move. */
-function moveLabel(moment: MomentResponse): string {
+function moveLabel(moment: MomentResponse, notate: Notate): string {
   const number = moment.move_number ?? Math.floor(moment.ply / 2) + 1
   const suffix = moment.ply % 2 === 0 ? '.' : '…'
-  return `${number}${suffix}${moment.san ?? ''}`
+  return `${number}${suffix}${moment.san ? notate(moment.san) : ''}`
 }
 
 /** The tile's own metrics, shared with the skeleton so the grid never changes shape. */
@@ -88,10 +90,11 @@ function MomentCard({ moment }: { moment: MomentResponse }) {
   const squares = useMemo(() => squaresOf(moment.uci), [moment.uci])
   const arrows = useMemo(() => arrowsOf(moment.best_move_uci), [moment.best_move_uci])
 
-  const move = moveLabel(moment)
+  const notate = useNotation()
+  const move = moveLabel(moment, notate)
   const opponent = moment.game.opponent ?? t`unknown`
   const cost = formatWinLoss(moment.win_loss)
-  const better = moment.best_move_san
+  const better = moment.best_move_san ? notate(moment.best_move_san) : null
   // Two whole sentences rather than one with a clause bolted on: the engine's move is only
   // there when there is one, and a translator needs to see either line entire.
   const title = better

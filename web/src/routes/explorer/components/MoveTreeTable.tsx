@@ -62,6 +62,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ExplorerMove, ExplorerResponse } from '@/lib/api/types'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../line'
@@ -139,6 +140,7 @@ export function MoveTreeTable({
   const total = tree?.totals?.games ?? 0
   const mainLine = tree?.main_line?.[0]?.uci
   const { i18n, t } = useLingui()
+  const notate = useNotation()
 
   return (
     <div
@@ -234,7 +236,7 @@ export function MoveTreeTable({
                   className={cn('text-[0.84375rem]', main ? 'text-bright' : 'text-body')}
                 >
                   {plyLabel(ply)}
-                  {move.san}
+                  {notate(move.san)}
                 </span>
                 <span style={style(46)} className="text-right text-body">
                   {move.games}

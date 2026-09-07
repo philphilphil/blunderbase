@@ -21,6 +21,8 @@
 import type { DrawShape } from '@lichess-org/chessground/draw'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { useNotation } from '@/lib/chess/notationPrefs'
+
 import {
   cachedReplay,
   previewCaption,
@@ -155,6 +157,8 @@ export function useLinePreview(
     setWheeled({ key: id, ply: Math.min(end, Math.max(0, (from ?? 0) + delta)) })
   }, [])
 
+  const notate = useNotation()
+
   return useMemo(() => {
     if (replay === null || line === null) return { ...EMPTY, step }
     const state = { line, ply: at }
@@ -162,7 +166,7 @@ export function useLinePreview(
       fen: previewFen(replay, prefs, state),
       lastMove: previewLastMove(replay, prefs, state),
       shapes: previewShapes(replay, prefs, state, startPly),
-      caption: previewCaption(replay, prefs, state, startPly),
+      caption: previewCaption(replay, prefs, state, startPly, notate),
       line,
       ply: at,
       // The ghosts are the point of the overlay and the pieces standing in the way are not
@@ -171,5 +175,5 @@ export function useLinePreview(
       dim: prefs.row === 'overlay' && prefs.overlay.dim && at === null,
       step,
     }
-  }, [replay, prefs, line, at, startPly, step])
+  }, [replay, prefs, line, at, startPly, step, notate])
 }

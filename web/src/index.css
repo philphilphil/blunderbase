@@ -8,6 +8,28 @@
 @import '@lichess-org/chessground/assets/chessground.cburnett.css';
 
 /*
+ * Figurine notation (`lib/chess/notation.ts`): `♞c3` needs a glyph a reader can make out
+ * at move-list size, and neither Geist has one — the browser falls back to whichever
+ * system font owns U+265E, which on a Mac is small, thin and sits under the baseline. This
+ * face is Noto Sans Symbols 2 (SIL OFL, the same glyphs lichess ships for its figurines)
+ * pinned to the twelve chess pieces and nothing else: the browser fetches the file only
+ * once a figurine is actually on screen, and no other character in the app changes font.
+ * It goes first in both stacks below for the same reason — a face holding twelve glyphs
+ * cannot steal a letter. `size-adjust` is the one knob: a piece wants to read at about the
+ * height of the digits beside it, and Noto draws them a touch small for Geist's x-height.
+ */
+@font-face {
+  font-family: 'Blunderbase Figurines';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2')
+    format('woff2');
+  unicode-range: U+2654-265F;
+  size-adjust: 115%;
+}
+
+/*
  * Theming (docs/design/README.md, "Themes"). The root carries a resolved theme class —
  * `dark` or `light` — written by the pre-hydration script in index.html and kept in sync
  * by `lib/ui/theme.tsx`. `:root` alone holds the dark palette so that any context without
@@ -294,8 +316,13 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist Variable', 'Geist', ui-sans-serif, 'Helvetica Neue', Helvetica, sans-serif;
-  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+  /* `Blunderbase Figurines` holds only the chess pieces — see its @font-face above. */
+  --font-sans:
+    'Blunderbase Figurines', 'Geist Variable', 'Geist', ui-sans-serif, 'Helvetica Neue',
+    Helvetica, sans-serif;
+  --font-mono:
+    'Blunderbase Figurines', 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular,
+    monospace;
 
   /*
    * Radii in rem so they grow with the root scale like everything else.

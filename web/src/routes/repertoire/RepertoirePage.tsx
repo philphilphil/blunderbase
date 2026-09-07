@@ -51,6 +51,7 @@ import {
   useUpdateRepertoireMove,
 } from '@/lib/api/queries'
 import type { Color, RepertoireNode } from '@/lib/api/types'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 import { LineBreadcrumb } from '@/routes/explorer/components/LineBreadcrumb'
@@ -516,6 +517,7 @@ function NodeEditor({
   onDelete: () => void
 }) {
   const { t } = useLingui()
+  const notate = useNotation()
   const [text, setText] = useState('')
   const [flash, setFlash] = useState(0)
   const [confirming, setConfirming] = useState(false)
@@ -551,7 +553,7 @@ function NodeEditor({
   }
 
   // Named, because the identifier is the placeholder a translator sees.
-  const san = node.san
+  const san = notate(node.san)
 
   function commit() {
     if (abandoned.current) {
@@ -657,6 +659,7 @@ function MoveTree({
   onJump: (path: string[]) => void
 }) {
   const { t } = useLingui()
+  const notate = useNotation()
   return (
     <div
       className="flex flex-col gap-px font-mono text-[0.78125rem]"
@@ -685,7 +688,7 @@ function MoveTree({
           >
             <span className={cn(row.depth > 0 && 'text-[0.71875rem]')}>
               {plyLabel(row.ply)}
-              {row.node.san}
+              {notate(row.node.san)}
             </span>
             {row.node.comment ? (
               <MessageSquare

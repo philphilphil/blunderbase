@@ -4,6 +4,7 @@ import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import type { MoveRow } from '@/lib/api/types'
 import { isFlagged } from '@/lib/chess/classification'
 import { formatWinLoss } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../gameModel'
@@ -38,6 +39,7 @@ export function FlaggedMoments({
   onSelect: (cursor: number) => void
   className?: string
 }) {
+  const notate = useNotation()
   const flagged = moves.filter((move) => isFlagged(move.classification))
 
   if (flagged.length === 0) {
@@ -73,7 +75,7 @@ export function FlaggedMoments({
               {plyLabel(move.ply)}
             </span>
             <span className="min-w-0 flex-1 truncate font-mono text-[0.78125rem] text-ink">
-              {move.san}
+              {move.san ? notate(move.san) : null}
             </span>
             {/*
               What it cost, which is the number that orders these by how much they matter.

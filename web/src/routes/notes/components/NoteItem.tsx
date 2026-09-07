@@ -36,6 +36,7 @@ import { Link } from 'react-router-dom'
 import { MiniBoard } from '@/components/board/MiniBoard'
 import { Badge } from '@/components/ui/badge'
 import type { NoteResponse } from '@/lib/api/types'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
@@ -277,7 +278,8 @@ function Provenance({ note, move }: { note: NoteResponse; move: string | null })
   const from = typeof note.game_id === 'number' ? gameLabel(note.game, note.game_id) : null
   const explorer = explorerHref(note.fen)
   const reach = reachLabel(note)
-  const line = note.line ? lineText(note.line) : null
+  const notate = useNotation()
+  const line = note.line ? lineText(note.line, notate) : null
 
   if (!line && !origin && !explorer) return null
 

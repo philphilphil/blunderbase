@@ -1,10 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { i18n } from '@lingui/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BOARD_ARROW_KEY, resetBoardArrowPrefs } from '@/lib/board/arrowPrefs'
 import { LINE_PREVIEW_KEY, resetLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import { MOVE_SOUND_KEY, resetMoveSoundPrefs } from '@/lib/board/moveSoundPrefs'
+import { NOTATION_KEY, resetNotationPrefs } from '@/lib/chess/notationPrefs'
 import { EVAL_GRAPH_KEY, resetEvalGraphPrefs } from '@/lib/ui/evalGraphPrefs'
 
 import { playMoveSound } from '@/lib/board/moveSound'
@@ -34,6 +36,7 @@ beforeEach(() => {
   resetLinePreviewPrefs()
   resetMoveSoundPrefs()
   resetEvalGraphPrefs()
+  resetNotationPrefs()
 })
 
 afterEach(() => {
@@ -43,6 +46,8 @@ afterEach(() => {
   resetLinePreviewPrefs()
   resetMoveSoundPrefs()
   resetEvalGraphPrefs()
+  resetNotationPrefs()
+  i18n.loadAndActivate({ locale: 'en', messages: {} })
 })
 
 describe('BoardSettingsButton', () => {
@@ -155,6 +160,41 @@ describe('BoardSettingsButton', () => {
     vi.advanceTimersByTime(200)
     expect(playMoveSound).toHaveBeenCalledTimes(1)
     expect(playMoveSound).toHaveBeenCalledWith('move', 60)
+  })
+
+  // English has no piece letters of its own, so the choice is letters or figurines and the
+  // English-letters row would be a duplicate. What is stored is still `local`, which is what
+  // makes this same browser read `Sc3` the day it is switched to German.
+  it('offers letters or figurines, and writes the figurines', async () => {
+    render(<BoardSettingsButton />)
+    await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+
+    const pieces = screen.getByLabelText('Pieces')
+    expect(pieces).toHaveValue('local')
+    expect(within(pieces).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Letters (Nc3)',
+      'Figurines (♞c3)',
+    ])
+
+    await userEvent.selectOptions(pieces, 'figurines')
+    expect(JSON.parse(window.localStorage.getItem(NOTATION_KEY) ?? '{}')).toMatchObject({
+      style: 'figurines',
+    })
+  })
+
+  // German writes its pieces differently, so the English letters become a third choice —
+  // the lichess and chess.com convention, which a German reader may well be used to.
+  it('offers English letters as well where the language has its own', async () => {
+    i18n.loadAndActivate({ locale: 'de', messages: {} })
+    render(<BoardSettingsButton />)
+    await userEvent.click(screen.getByRole('button', { name: 'Board settings' }))
+
+    const pieces = screen.getByLabelText('Pieces')
+    expect(within(pieces).getAllByRole('option')).toHaveLength(3)
+    await userEvent.selectOptions(pieces, 'english')
+    expect(JSON.parse(window.localStorage.getItem(NOTATION_KEY) ?? '{}')).toMatchObject({
+      style: 'english',
+    })
   })
 
   // The glyphs are the loud mark, so all three are offered rather than one switch: the tab,

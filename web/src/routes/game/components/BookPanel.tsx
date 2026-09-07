@@ -25,6 +25,7 @@
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 import { ScoreBar } from '@/routes/explorer/components/ScoreBar'
 import { dropTone, formatAvgDrop, splitOf } from '@/routes/explorer/stats'
@@ -88,6 +89,7 @@ const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-[0.
 
 export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPanelProps) {
   const { t } = useLingui()
+  const notate = useNotation()
 
   if (moves.length === 0) {
     return (
@@ -136,7 +138,7 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
               {plyLabel(ply)}
               {/* SAN is optional on the payload; the UCI is never missing and is still a
                   move somebody can read, which beats a blank cell. */}
-              {move.san ?? move.uci}
+              {move.san ? notate(move.san) : move.uci}
             </span>
             <span className="text-right text-dim">{move.games ?? 0}</span>
             <ScoreBar split={split} className="w-full" />

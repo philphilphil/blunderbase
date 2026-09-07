@@ -38,6 +38,7 @@ const DOM_LOGIC_TESTS = [
   'src/lib/analysis/enginePreference.test.ts',
   'src/lib/board/linePreviewPrefs.test.ts',
   'src/lib/board/moveSoundPrefs.test.ts',
+  'src/lib/chess/notationPrefs.test.ts',
   'src/lib/desktop/links.test.ts',
   'src/lib/ui/engineVisibility.test.ts',
   'src/lib/ui/evalGraphPrefs.test.ts',

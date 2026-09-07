@@ -27,6 +27,7 @@ import { useMoveSound } from '@/lib/board/moveSound'
 import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { isFlagged } from '@/lib/chess/classification'
 import { whiteWinPercent } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
@@ -520,9 +521,12 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     }
     return [...byId.values()]
   }, [notes, persisted])
+  // The reader's notation, for every label this page builds out of a move. The move list
+  // and the panels apply it themselves; this one is for the note rows and the composer.
+  const notate = useNotation()
   const noteList = useMemo<NoteRow[]>(
-    () => noteRows(allNotes, persisted, moves),
-    [allNotes, persisted, moves],
+    () => noteRows(allNotes, persisted, moves, notate),
+    [allNotes, persisted, moves, notate],
   )
   /** Every tag the owner has ever used, for the composer's suggestions. */
   const tagNames = useMemo(() => (tags.data ?? []).map((row) => row.tag), [tags.data])
@@ -955,6 +959,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         moves,
         boardIndex,
         fen: boardPosition.fen,
+        notate,
         branch:
           analysis && analysis.cursor > 0
             ? {
@@ -965,7 +970,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
               }
             : null,
       }),
-    [analysis, boardIndex, boardPosition, gameId, moves],
+    [analysis, boardIndex, boardPosition, gameId, moves, notate],
   )
 
   /**

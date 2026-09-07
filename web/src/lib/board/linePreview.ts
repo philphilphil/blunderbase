@@ -21,6 +21,8 @@ import type { Key } from '@lichess-org/chessground/types'
 import { Chess, castlingSide, normalizeMove } from 'chessops/chess'
 import { makeFen, parseFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
+
+import { notateEnglish, type Notate } from '@/lib/chess/notation'
 import { isNormal, type NormalMove, type Role } from 'chessops/types'
 import {
   defined,
@@ -340,15 +342,21 @@ export function previewLastMove(
   return move ? [move.from, move.to] : null
 }
 
-/** `after 10.O-O-O` for the hairline label over a scrubbed board; null when the board is real. */
+/**
+ * `after 10.O-O-O` for the hairline label over a scrubbed board; null when the board is real.
+ *
+ * `notate` is the reader's notation (`useNotation`), applied to the move before it goes
+ * into the sentence: the sentence is translated and may hold capitals of its own.
+ */
 export function previewCaption(
   replay: LineReplay,
   prefs: LinePreviewPrefs,
   state: PreviewState,
   startPly: number,
+  notate: Notate = notateEnglish,
 ): string | null {
   const at = scrubPly(replay, prefs, state)
-  return at === null ? null : caption(replay, at, startPly)
+  return at === null ? null : caption(replay, at, startPly, notate)
 }
 
 /** The position the peek popover shows: `fens[ply]`, or the depth-capped end of the line. */
@@ -367,9 +375,10 @@ export function peekCaption(
   prefs: LinePreviewPrefs,
   state: PreviewState,
   startPly: number,
+  notate: Notate = notateEnglish,
 ): string | null {
   if (prefs.row !== 'peek') return null
-  return caption(replay, peekPly(replay, prefs, state), startPly)
+  return caption(replay, peekPly(replay, prefs, state), startPly, notate)
 }
 
 /**
@@ -394,10 +403,15 @@ function peekPly(replay: LineReplay, prefs: LinePreviewPrefs, state: PreviewStat
 }
 
 /** `after 24…Rfe8`, numbered the way the move list numbers a variation. */
-function caption(replay: LineReplay, ply: number, startPly: number): string | null {
+function caption(
+  replay: LineReplay,
+  ply: number,
+  startPly: number,
+  notate: Notate,
+): string | null {
   const move = replay.moves[ply - 1]
   if (!move) return null
-  const at = formatVariation(halfMove(ply, startPly), [move.san])
+  const at = notate(formatVariation(halfMove(ply, startPly), [move.san]))
   return t`after ${at}`
 }
 

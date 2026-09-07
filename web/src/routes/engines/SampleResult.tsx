@@ -3,6 +3,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { EvalText } from '@/components/badges/EvalText'
 import type { EngineLine, SampleResponse } from '@/lib/api/types'
 import { formatNodes } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 /** How much of a principal variation is worth showing next to a test run. */
@@ -24,10 +25,11 @@ function policyEntries(policy: Record<string, unknown> | null | undefined): [str
 }
 
 function Pv({ line }: { line: EngineLine }) {
+  const notate = useNotation()
   const moves = (line.san ?? line.pv ?? []).slice(0, PV_MOVES)
   return (
     <span className="min-w-0 flex-1 truncate font-mono text-[0.71875rem] text-soft-2">
-      {moves.join(' ') || '—'}
+      {notate(moves.join(' ')) || '—'}
     </span>
   )
 }
@@ -41,6 +43,7 @@ function Pv({ line }: { line: EngineLine }) {
  */
 export function SampleResult({ sample }: { sample: SampleResponse }) {
   const { t } = useLingui()
+  const notate = useNotation()
   const lines = sample.lines ?? []
   const elapsed = sample.elapsed_ms
   const nodes = formatNodes(sample.nodes)
@@ -85,7 +88,7 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
                     key={`${level}-${move.uci ?? index}`}
                     className="inline-flex items-center gap-1.5 rounded-sm border border-deep/28 bg-deep/10 px-1.5 py-px font-mono text-[0.6875rem] text-deep"
                   >
-                    {move.san ?? move.uci ?? '—'}
+                    {move.san ? notate(move.san) : (move.uci ?? '—')}
                     {typeof move.p === 'number' ? (
                       <span className="tabular text-[0.625rem] text-deep/70">
                         {(move.p * 100).toFixed(0)}%
@@ -112,7 +115,7 @@ export function SampleResult({ sample }: { sample: SampleResponse }) {
             <div className="flex-1" />
             {sample.best_move ? (
               <span className="font-mono text-[0.75rem] text-accent-teal">
-                {sample.best_move.san ?? sample.best_move.uci}
+                {sample.best_move.san ? notate(sample.best_move.san) : sample.best_move.uci}
               </span>
             ) : null}
           </div>

@@ -15,6 +15,7 @@ import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import type { HoveredLine } from '@/lib/board/useLinePreview'
 import { glyphStyle, isFlagged } from '@/lib/chess/classification'
 import { formatNodes, formatScore } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import {
@@ -215,6 +216,7 @@ export function MaiaPanel({
   const canCompare = onCompareChange !== undefined && (comparison.length > 1 || compare)
 
   const prefs = useLinePreviewPrefs()
+  const notate = useNotation()
   // Which engine row the pointer is in. The preview's own position comes back from the
   // surface, but the wheel and the peek board need to know where the pointer *is* right now.
   const [hovered, setHovered] = useState<string | null>(null)
@@ -272,7 +274,7 @@ export function MaiaPanel({
     ply: previewLine === hovered ? (previewPly ?? null) : null,
   }
   const peek = peekReplay ? peekFen(peekReplay, prefs, peekState) : null
-  const peekLabel = peekReplay ? peekCaption(peekReplay, prefs, peekState, ply) : null
+  const peekLabel = peekReplay ? peekCaption(peekReplay, prefs, peekState, ply, notate) : null
 
   return (
     <div
@@ -690,9 +692,10 @@ function CompareRow({
   onPlay?: () => void
 }) {
   const { t } = useLingui()
+  const notate = useNotation()
   const verdict = glyphStyle(move.classification)
   const hue = verdict?.color ?? MAIA_HUE
-  const san = move.san
+  const san = notate(move.san)
 
   return (
     <button
@@ -719,7 +722,7 @@ function CompareRow({
           verdict ? verdict.textClass : 'text-soft',
         )}
       >
-        {move.san}
+        {san}
       </span>
       <span className="relative flex-none font-mono text-[0.59375rem] tabular text-dim">
         {move.probability === null ? '—' : `${Math.round(move.probability * 100)}%`}
@@ -770,11 +773,12 @@ function HumanRow({
   onPlay?: () => void
 }) {
   const { t } = useLingui()
+  const notate = useNotation()
   const verdict = glyphStyle(move.classification)
   const hue = verdict?.color ?? MAIA_HUE
   const share = Math.min(100, Math.max(0, (move.probability ?? 0) * 100))
   const stop = `${share.toFixed(1)}%`
-  const san = move.san
+  const san = notate(move.san)
 
   return (
     <button
@@ -804,7 +808,7 @@ function HumanRow({
           verdict ? verdict.textClass : 'text-soft',
         )}
       >
-        {move.san}
+        {san}
       </span>
       {/* The card's only quantity now, so it carries the weight the loss chip used to. */}
       <span className="w-[1.75rem] flex-none text-right font-mono text-[0.6875rem] tabular text-ink">
@@ -1066,6 +1070,7 @@ function MoveButton({
   onHoverPly?: (at: number | null) => void
   onPlay?: () => void
 }) {
+  const notate = useNotation()
   const onMouseEnter = onHoverPly && ply !== undefined ? () => onHoverPly(ply) : undefined
   // Off a token and back into the row: the row's own state, not the row's `mouseleave`,
   // which only fires when the pointer leaves the row entirely.
@@ -1078,7 +1083,7 @@ function MoveButton({
         onMouseLeave={onMouseLeave}
         className={cn('font-mono text-[0.6875rem] text-soft', className)}
       >
-        {san}
+        {notate(san)}
       </span>
     )
   }
@@ -1094,7 +1099,7 @@ function MoveButton({
         className,
       )}
     >
-      {san}
+      {notate(san)}
     </button>
   )
 }

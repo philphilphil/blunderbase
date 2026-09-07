@@ -13,6 +13,7 @@ import { SetPageChrome } from '@/components/shell/PageChrome'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useStreamSession } from '@/lib/analysis'
 import { useGame, useLiveState } from '@/lib/api/queries'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import type { BoardOrientation } from '@/components/board/Board'
 import { useEvents, useLiveUpdates } from '@/lib/events/EventsProvider'
 import { cn } from '@/lib/utils'
@@ -86,6 +87,7 @@ export function LivePage() {
   const [flash, setFlash] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { t } = useLingui()
+  const notate = useNotation()
 
   const followed = useGame(state?.game_id ?? 0, {}, { enabled: Boolean(state?.game_id) })
   const game = followed.data?.game
@@ -242,7 +244,7 @@ export function LivePage() {
               <Button size="sm" aria-label={t`Next game move`} disabled={replayPly >= (state?.game_positions?.length ?? 1) - 1} onClick={() => setReplayPly((ply) => ply + 1)}><Trans>Next</Trans></Button>
             </div>
             <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto" aria-label={t`Game moves`}>
-              {state?.game_positions?.map((position) => <button type="button" key={position.ply} aria-current={position.ply === replayPly ? 'step' : undefined} className={cn('rounded px-1.5 py-1 text-xs', position.ply === replayPly ? 'bg-accent-teal/20 text-ink' : 'text-soft hover:bg-elevated')} onClick={() => setReplayPly(position.ply)}>{position.ply === 0 ? t`Start` : `${Math.ceil(position.ply / 2)}${position.ply % 2 ? '.' : '…'} ${position.san}`}</button>)}
+              {state?.game_positions?.map((position) => <button type="button" key={position.ply} aria-current={position.ply === replayPly ? 'step' : undefined} className={cn('rounded px-1.5 py-1 text-xs', position.ply === replayPly ? 'bg-accent-teal/20 text-ink' : 'text-soft hover:bg-elevated')} onClick={() => setReplayPly(position.ply)}>{position.ply === 0 ? t`Start` : `${Math.ceil(position.ply / 2)}${position.ply % 2 ? '.' : '…'} ${notate(position.san ?? '')}`}</button>)}
             </div>
           </section> : null}
           <CoachComment text={state?.text} updatedAt={state?.updated_at} />

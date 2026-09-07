@@ -17,6 +17,7 @@ import { msg, plural, t } from '@lingui/core/macro'
 
 import type { LineResponse, NoteGameBrief, NoteResponse, NoteScope } from '@/lib/api/types'
 import { moveNumberLabel } from '@/lib/chess/evaluation'
+import { notateEnglish, type Notate } from '@/lib/chess/notation'
 
 /** Which anchors a note has, the same four names `GET /notes?scope=` uses. */
 export function scopeOf(note: NoteResponse): NoteScope {
@@ -60,16 +61,20 @@ export function notePlyLabel(ply: number | null | undefined): string | null {
  * A kept variation in SAN with move numbers — `13… Nd7 14. Bg5 h6`.
  *
  * `base_ply` is how many half-moves of the mainline come first, so the variation's first
- * move is half-move `base_ply` and gets a `12…` when it is Black's.
+ * move is half-move `base_ply` and gets a `12…` when it is Black's. `notate` is the
+ * reader's notation (`useNotation`); the moves are English SAN until it says otherwise.
  */
-export function lineText(line: Pick<LineResponse, 'base_ply' | 'sans' | 'moves'>): string {
+export function lineText(
+  line: Pick<LineResponse, 'base_ply' | 'sans' | 'moves'>,
+  notate: Notate = notateEnglish,
+): string {
   const moves = line.sans.length ? line.sans : line.moves
   const parts: string[] = []
   moves.forEach((move, index) => {
     const ply = line.base_ply + index
     if (ply % 2 === 0) parts.push(`${Math.floor(ply / 2) + 1}.`)
     else if (index === 0) parts.push(`${Math.floor(ply / 2) + 1}…`)
-    parts.push(move)
+    parts.push(notate(move))
   })
   return parts.join(' ')
 }

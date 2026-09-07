@@ -13,6 +13,7 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ExplorerResponse } from '@/lib/api/types'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../line'
@@ -37,6 +38,7 @@ export function LineSummary({
   loading: boolean
 }) {
   const { t } = useLingui()
+  const notate = useNotation()
 
   if (loading || !tree) {
     return (
@@ -111,7 +113,7 @@ export function LineSummary({
                 </span>
                 <span className={cn('font-mono text-[0.8125rem]', dropTone(worst.avg_win_loss))}>
                   {plyLabel(ply)}
-                  {worst.san}
+                  {notate(worst.san)}
                 </span>
               </div>
             ) : null}

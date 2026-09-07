@@ -16,6 +16,7 @@
 import { t } from '@lingui/core/macro'
 
 import type { LineResponse, MoveRow, NoteSource } from '@/lib/api/types'
+import { notateEnglish, type Notate } from '@/lib/chess/notation'
 import { gameLabel } from '@/routes/notes/presentation'
 
 import { plyLabel, type GameNote } from './gameModel'
@@ -77,20 +78,28 @@ export function noteAnchor(note: GameNote, lines: readonly LineResponse[]): Note
   return count === null ? { kind: 'loose' } : { kind: 'mainline', count }
 }
 
-/** `2…d5` — the move that produced the position a note is about. */
-function moveContext(moves: readonly MoveRow[], count: number): string | null {
+/**
+ * `2…d5` — the move that produced the position a note is about. `notate` is the reader's
+ * notation (`useNotation`): the label is read, never stored, so it follows the reader.
+ */
+function moveContext(moves: readonly MoveRow[], count: number, notate: Notate): string | null {
   if (count <= 0) return t`start`
   const move = moves[count - 1]
   if (!move?.san) return null
-  return `${plyLabel(count - 1)}${move.san}`
+  return `${plyLabel(count - 1)}${notate(move.san)}`
 }
 
 /** The same, inside a variation: SAN comes off the line rather than off the game. */
-function lineContext(line: LineResponse | undefined, base: number, index: number): string | null {
+function lineContext(
+  line: LineResponse | undefined,
+  base: number,
+  index: number,
+  notate: Notate,
+): string | null {
   if (index <= 0) return t`branch`
   const san = line?.sans[index - 1]
   if (!san) return null
-  return `${plyLabel(base + index - 1)}${san}`
+  return `${plyLabel(base + index - 1)}${notate(san)}`
 }
 
 /**
@@ -109,17 +118,19 @@ export function noteRows(
   notes: readonly GameNote[],
   lines: readonly LineResponse[],
   moves: readonly MoveRow[],
+  notate: Notate = notateEnglish,
 ): NoteRow[] {
   const rows: NoteRow[] = notes.map((note) => {
     const anchor = noteAnchor(note, lines)
     const context =
       anchor.kind === 'mainline'
-        ? moveContext(moves, anchor.count)
+        ? moveContext(moves, anchor.count, notate)
         : anchor.kind === 'line'
           ? lineContext(
               lines.find((entry) => entry.id === anchor.lineId),
               anchor.base,
               anchor.index,
+              notate,
             )
           : null
     // `scope: 'position'` is the backend saying this note was written somewhere else and
@@ -250,13 +261,15 @@ export function noteTarget(input: {
   fen: string
   /** The variation being walked, or null while the board is on the game. */
   branch: WalkedLine | null
+  /** The reader's notation for the label; English SAN when absent. */
+  notate?: Notate
 }): NoteTarget {
-  const { gameId, moves, boardIndex, fen, branch } = input
+  const { gameId, moves, boardIndex, fen, branch, notate = notateEnglish } = input
   if (branch && branch.cursor > 0) {
     const index = Math.min(branch.cursor, branch.sans.length)
     const san = branch.sans[index - 1]
     const ply = branch.base + index
-    const move = san ? `${plyLabel(ply - 1)}${san}` : null
+    const move = san ? `${plyLabel(ply - 1)}${notate(san)}` : null
     return {
       kind: 'line',
       gameId,
@@ -274,7 +287,9 @@ export function noteTarget(input: {
     fen,
     line: null,
     label:
-      count === 0 ? t`the starting position` : (moveContext(moves, count) ?? t`ply ${count}`),
+      count === 0
+        ? t`the starting position`
+        : (moveContext(moves, count, notate) ?? t`ply ${count}`),
   }
 }
 

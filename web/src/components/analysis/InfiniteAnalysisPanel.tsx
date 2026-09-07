@@ -16,6 +16,7 @@ import {
 import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import type { HoveredLine } from '@/lib/board/useLinePreview'
 import { formatNodes, formatScore } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { WHEEL_STEP } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 
@@ -100,6 +101,7 @@ function LineTokens({
   onHoverPly?: (at: number | null) => void
   onPlay?: (index: number) => void
 }) {
+  const notate = useNotation()
   const start = typeof ply === 'number' && ply >= 0 ? ply : 0
   return (
     <>
@@ -147,7 +149,7 @@ function LineTokens({
                   onPlay ? 'cursor-pointer hover:text-ink' : null,
                 )}
               >
-                {san}
+                {notate(san)}
               </span>
             </span>
           </Fragment>
@@ -257,6 +259,7 @@ export function InfiniteAnalysisPanel({
   const { phase, snapshot, session, offer, error, note } = stream
   const lines: StreamLine[] = [...(snapshot?.lines ?? [])].sort((a, b) => a.multipv - b.multipv)
   const prefs = useLinePreviewPrefs()
+  const notate = useNotation()
 
   // Which row the pointer is in. The preview's own position comes back from the surface,
   // but the wheel and the peek popover need to know where the pointer *is* right now, and
@@ -462,7 +465,7 @@ export function InfiniteAnalysisPanel({
             // A position chessops will not replay still has something true to show: the
             // engine's own UCI. Better a row of `e2e4 e7e5` than a blank one — and no
             // tokens, because there is no ply behind them to point at.
-            const text = sans.length > 0 ? formatVariation(ply, sans) : line.pv.join(' ')
+            const text = sans.length > 0 ? notate(formatVariation(ply, sans)) : line.pv.join(' ')
             // The preview's ply counts for this row only where the preview is on this row;
             // on any other it stands nowhere, and the tokens say so by staying plain.
             const id = lineId(line.multipv)
@@ -475,7 +478,7 @@ export function InfiniteAnalysisPanel({
                 ? replay
                 : null
             const peek = peeking ? peekFen(peeking, prefs, state) : null
-            const caption = peeking ? peekCaption(peeking, prefs, state, ply ?? 0) : null
+            const caption = peeking ? peekCaption(peeking, prefs, state, ply ?? 0, notate) : null
             return (
               <div
                 key={line.multipv}

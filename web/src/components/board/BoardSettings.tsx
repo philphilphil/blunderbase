@@ -8,12 +8,18 @@
  * board while you change them), so they are one dialog, opened from the transport row
  * where the reader's hand already is for Flip and the step buttons.
  *
- * Four sections, in the order the reader meets them: what the board says about *this*
- * position — the standing arrows — then the click it makes as a move lands, then the shape
- * the evaluation pane draws the game in, and then what the board does when a line in a panel
- * is pointed at. The first two are the board itself, the last two the panels around it. The
- * graph joined them for the same reason the others are here: it is judged by looking at it,
- * and the gear that opens this is the nearest control to it. None of them has a Save: every store
+ * Five sections, in the order the reader meets them: how a move is written, then what the
+ * board says about *this* position — the standing arrows — then the click it makes as a
+ * move lands, then the shape the evaluation pane draws the game in, and then what the board
+ * does when a line in a panel is pointed at. The arrows and the sound are the board itself,
+ * the last two the panels around it. The graph joined them for the same reason the others
+ * are here: it is judged by looking at it, and the gear that opens this is the nearest
+ * control to it. Notation is the odd one out — it reaches every screen that prints a move,
+ * not just this one — and it is here rather than on a settings page of its own because the
+ * move list beside this gear is where the choice is judged, and because one dialog of
+ * per-browser reading preferences is one thing to find, where a general settings page would
+ * be a second. It comes first because it is the one choice most readers make exactly once.
+ * None of them has a Save: every store
  * writes straight through, so what is behind the dialog changes as the controls are used.
  * The dialog is deliberately not modal-looking on its left edge for that reason — it is
  * narrow and centred, and closing it is Escape, the X, or a click on the backdrop.
@@ -44,6 +50,9 @@ import {
   setMoveSoundPrefs,
   useMoveSoundPrefs,
 } from '@/lib/board/moveSoundPrefs'
+import { hasLocalLetters, type NotationStyle } from '@/lib/chess/notation'
+import { setNotationPrefs, useNotationPrefs } from '@/lib/chess/notationPrefs'
+import { DEFAULT_LOCALE, isLocale } from '@/lib/i18n/locale'
 import {
   setEvalGraphPrefs,
   useEvalGraphPrefs,
@@ -65,6 +74,20 @@ const ARROWS: { key: 'engine' | 'maia' | 'played'; label: MessageDescriptor; swa
   { key: 'engine', label: msg`Engine move`, swatch: 'var(--bb-arrow-engine)' },
   { key: 'maia', label: msg`Maia move`, swatch: 'var(--bb-arrow-maia)' },
   { key: 'played', label: msg`Played move`, swatch: 'var(--bb-arrow-played)' },
+]
+
+/**
+ * The ways a move can be written, with the example doing the explaining. `local` is the
+ * letters of the UI's own language, and in a language whose letters are English that is
+ * the only kind of letters there is: the list then drops the English row and calls the
+ * local one plain `Letters`, since a choice between two identical things is a puzzle.
+ */
+const NOTATIONS: { value: NotationStyle; label: MessageDescriptor; onlyLocal?: boolean }[] = [
+  { value: 'english', label: msg`English letters (Nc3)`, onlyLocal: true },
+  { value: 'local', label: msg`Letters in your language`, onlyLocal: true },
+  { value: 'local', label: msg`Letters (Nc3)`, onlyLocal: false },
+  // No flag: figurines are figurines in every language.
+  { value: 'figurines', label: msg`Figurines (♞c3)` },
 ]
 
 /** The two shapes the evaluation pane can draw. The option names are the explanation. */
@@ -95,6 +118,14 @@ export function BoardSettingsButton({ className }: { className?: string }) {
   const arrows = useBoardArrowPrefs()
   const sound = useMoveSoundPrefs()
   const graph = useEvalGraphPrefs()
+  const notation = useNotationPrefs()
+  // Whether the UI's language writes its pieces differently from English — which rows of
+  // `NOTATIONS` to offer, and what a stored `english` is called when it does not.
+  const localLetters = hasLocalLetters(isLocale(i18n.locale) ? i18n.locale : DEFAULT_LOCALE)
+  const notationRows = NOTATIONS.filter(
+    (row) => row.onlyLocal === undefined || row.onlyLocal === localLetters,
+  )
+  const notationValue = !localLetters && notation.style === 'english' ? 'local' : notation.style
 
   useEffect(() => {
     if (!open) return
@@ -137,7 +168,7 @@ export function BoardSettingsButton({ className }: { className?: string }) {
         id={BOARD_SETTINGS_ID}
         data-tour="board-settings"
         aria-label={t`Board settings`}
-        title={t`Board settings — arrows, sound, the eval graph and line preview (S)`}
+        title={t`Board settings — notation, arrows, sound, the eval graph and line preview (S)`}
         onClick={() => setOpen(true)}
         className={cn(
           'flex-none rounded-md border border-edge bg-elevated px-2 py-[0.3125rem] text-dim transition-colors hover:text-ink max-md:py-1.5',
@@ -178,7 +209,37 @@ export function BoardSettingsButton({ className }: { className?: string }) {
               </Button>
             </header>
 
+            {/* The one setting here that is not about the board: it is what every screen
+                writes a move as. See the file comment for why it lives in this dialog. */}
             <section className="flex flex-col gap-3 px-4 py-4">
+              <div className="flex flex-col gap-0.5">
+                <h3 className="text-[0.75rem] font-semibold text-ink">
+                  <Trans>Notation</Trans>
+                </h3>
+                <p className="text-[0.6875rem] text-dim">
+                  <Trans>How a move is written, here and on every other screen.</Trans>
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="notation-style">{t`Pieces`}</Label>
+                <select
+                  id="notation-style"
+                  value={notationValue}
+                  onChange={(event) =>
+                    setNotationPrefs({ style: event.target.value as NotationStyle })
+                  }
+                  className={cn(SETTINGS_SELECT, 'w-56')}
+                >
+                  {notationRows.map((row) => (
+                    <option key={row.value} value={row.value}>
+                      {i18n._(row.label)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </section>
+
+            <section className="flex flex-col gap-3 border-t border-hairline px-4 py-4">
               <div className="flex flex-col gap-0.5">
                 <h3 className="text-[0.75rem] font-semibold text-ink">
                   <Trans>Arrows</Trans>

@@ -27,6 +27,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ReferenceExplorerResponse, ReferenceMove } from '@/lib/api/types'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { plyLabel } from '../line'
@@ -83,6 +84,7 @@ export function ReferenceMoveTable({
   const moves = data?.moves ?? []
   const total = data?.totals.games ?? 0
   const { i18n, t } = useLingui()
+  const notate = useNotation()
 
   return (
     <div
@@ -164,7 +166,7 @@ export function ReferenceMoveTable({
               >
                 <span style={style(78)} className="text-[0.84375rem] text-body">
                   {plyLabel(ply)}
-                  {move.san}
+                  {notate(move.san)}
                 </span>
                 <span
                   style={style(62)}

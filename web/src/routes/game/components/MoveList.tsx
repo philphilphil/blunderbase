@@ -6,6 +6,7 @@ import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import type { Classification, MoveRow } from '@/lib/api/types'
 import { GLYPHS, glyphFor, isFlagged } from '@/lib/chess/classification'
 import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
+import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { plyLabel, type MovePair } from '../gameModel'
@@ -518,13 +519,15 @@ function MoveCell({
   onSelectPly: (ply: number) => void
 }) {
   const { t } = useLingui()
+  const notate = useNotation()
   if (!move?.san) return <span className="min-w-0 flex-1 px-1" />
+  const san = notate(move.san)
   const glyph = glyphFor(move.classification)
   const flagged = isFlagged(move.classification)
   const active = move.ply === cursor
   // The number and the move are one unit — `1…d5` — so the title is one message with that
   // unit in it rather than a translated tail glued onto an untranslated head.
-  const moveLabel = `${plyLabel(move.ply)}${move.san}`
+  const moveLabel = `${plyLabel(move.ply)}${san}`
 
   return (
     <button
@@ -543,7 +546,7 @@ function MoveCell({
             : 'text-body hover:text-bright',
       )}
     >
-      <span className="truncate">{move.san}</span>
+      <span className="truncate">{san}</span>
       <ClassificationBadge classification={move.classification} size="md" />
       {noted ? <NoteMark /> : null}
     </button>
@@ -611,6 +614,7 @@ function Variation({
   onUnpin?: (lineId: number) => void
 }) {
   const { t } = useLingui()
+  const notate = useNotation()
   const cursor = variation.cursor ?? 0
   const lineId = variation.lineId ?? null
   const pinnedThrough = variation.pinnedThrough ?? 0
@@ -641,7 +645,7 @@ function Variation({
           const active = !quiet && cursor === index + 1
           // Four whole sentences rather than a stem with two tails bolted on: what a line is
           // and whether it carries a note are one statement, and a translator needs it whole.
-          const moveLabel = `${plyLabel(ply)}${san}`
+          const moveLabel = `${plyLabel(ply)}${notate(san)}`
           const title = quiet
             ? noted.has(index)
               ? t`${moveLabel} — kept line, noted`
@@ -673,7 +677,7 @@ function Variation({
                         : 'text-soft-2',
                 )}
               >
-                {san}
+                {notate(san)}
                 {noted.has(index) ? <NoteMark /> : null}
               </button>
             </span>
@@ -756,6 +760,7 @@ function PinButton({
 
 /** The italic aside under a flagged move: which move, the swing it cost, and what beat it. */
 function Annotation({ annotation }: { annotation: MoveAnnotation }) {
+  const notate = useNotation()
   const glyph = glyphFor(annotation.classification)
   const color = glyph ? GLYPHS[glyph].color : 'var(--bb-blunder)'
   const winLoss = formatWinLoss(annotation.winLoss)
@@ -767,7 +772,7 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
             read as belonging to one half of the pair above it rather than to the row. */}
         {annotation.san ? (
           <span className="font-mono not-italic" style={{ color }}>
-            {plyLabel(annotation.ply)} {annotation.san}
+            {plyLabel(annotation.ply)} {notate(annotation.san)}
             {glyph ? GLYPHS[glyph].glyph : ''}{' '}
           </span>
         ) : null}
@@ -778,7 +783,7 @@ function Annotation({ annotation }: { annotation: MoveAnnotation }) {
             <span className="not-italic">
               <Trans>Best was</Trans>{' '}
             </span>
-            <span className="font-mono not-italic text-ink">{annotation.bestSan}</span>
+            <span className="font-mono not-italic text-ink">{notate(annotation.bestSan)}</span>
             <span className="not-italic">. </span>
           </>
         ) : null}

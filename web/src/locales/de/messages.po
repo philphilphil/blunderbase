@@ -346,6 +346,22 @@ msgid "Played move"
 msgstr "Gespielter Zug"
 
 #: src/components/board/BoardSettings.tsx
+msgid "English letters (Nc3)"
+msgstr "Englische Buchstaben (Nc3)"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Letters in your language"
+msgstr "Deutsche Buchstaben (Sc3)"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Letters (Nc3)"
+msgstr "Buchstaben (Nc3)"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Figurines (♞c3)"
+msgstr "Figurinen (♞c3)"
+
+#: src/components/board/BoardSettings.tsx
 msgid "Bars — one per move"
 msgstr "Balken – einer pro Zug"
 
@@ -370,8 +386,8 @@ msgid "Board settings"
 msgstr "Bretteinstellungen"
 
 #: src/components/board/BoardSettings.tsx
-msgid "Board settings — arrows, sound, the eval graph and line preview (S)"
-msgstr "Bretteinstellungen – Pfeile, Ton, Bewertungsverlauf und Variantenvorschau (S)"
+msgid "Board settings — notation, arrows, sound, the eval graph and line preview (S)"
+msgstr "Bretteinstellungen – Notation, Pfeile, Ton, Bewertungsverlauf und Variantenvorschau (S)"
 
 #: src/components/board/BoardSettings.tsx
 #: src/routes/live/SessionMeta.tsx
@@ -386,6 +402,18 @@ msgstr "Nur in diesem Browser."
 #: src/routes/auth/ChangePasswordDialog.tsx
 msgid "Close"
 msgstr "Schließen"
+
+#: src/components/board/BoardSettings.tsx
+msgid "Notation"
+msgstr "Notation"
+
+#: src/components/board/BoardSettings.tsx
+msgid "How a move is written, here and on every other screen."
+msgstr "Wie ein Zug geschrieben wird, hier und auf jeder anderen Seite."
+
+#: src/components/board/BoardSettings.tsx
+msgid "Pieces"
+msgstr "Figuren"
 
 #: src/components/board/BoardSettings.tsx
 msgid "Arrows"
