@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy - Blunderbase</title>
+<meta name="description" content="What Blunderbase, blunderbase.org, the demo and the iOS app do with your data. Short version: nothing reaches us.">
+<meta name="robots" content="noindex">
+<link rel="alternate" hreflang="en" href="https://blunderbase.org/privacy">
+<link rel="alternate" hreflang="de" href="https://blunderbase.org/de/privacy">
+<meta name="theme-color" content="#1d1e1f">
+<link rel="icon" href="/assets/favicon.png">
+<script>
+  (function () {
+    var choice = null;
+    try { choice = localStorage.getItem('bb-theme'); } catch (e) {}
+    var light = choice ? choice === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
+    document.documentElement.classList.toggle('light', light);
+  })();
+</script>
+<style>
+  /*
+   * A legal page, not a product page: the landing page's palette and type, a narrow
+   * column, nothing else. The tokens are the same ones site/index.html carries; a page this
+   * small does not earn a shared stylesheet.
+   */
+  :root {
+    color-scheme: dark;
+    --void: #1d1e1f; --panel: #292a2a; --raised: #343535; --hairline: #3a3c3b; --edge-strong: #555756;
+    --text: #eeeeea; --body: #d8d8d3; --muted: #b6b5b0; --dim: #a3a29c;
+    --accent: #83b7e3; --accent-hover: #9cc7ea; --logo-filter: invert(1) hue-rotate(180deg);
+  }
+  :root.light {
+    color-scheme: light;
+    --void: #f4f6f8; --panel: #e9ecef; --raised: #e4e7ea; --hairline: #dde1e5; --edge-strong: #bcc5cf;
+    --text: #12161c; --body: #262c34; --muted: #4d5560; --dim: #626a75;
+    --accent: #245f9e; --accent-hover: #1c4d82; --logo-filter: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--void); color: var(--body);
+    font: 16px/1.55 Geist, "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.005em;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); }
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+  header { position: sticky; top: 0; z-index: 10; background: var(--panel); border-bottom: 1px solid var(--edge-strong); }
+  header .wrap { display: flex; align-items: center; gap: 0.75rem; height: 2.75rem; }
+  .brand { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-weight: 600; font-size: 0.9375rem; }
+  .brand img { width: 1.25rem; height: 1.25rem; filter: var(--logo-filter); }
+  nav { margin-left: auto; display: flex; gap: 0.25rem; align-items: center; }
+  nav a { color: var(--dim); font-size: 0.8125rem; padding: 0.3rem 0.6rem; border-radius: 0.25rem; }
+  nav a:hover { color: var(--text); background: var(--raised); }
+  main { max-width: 42rem; padding: 3rem 1.25rem 5rem; margin: 0 auto; }
+  h1 { margin: 0 0 0.25rem; font-size: 2rem; line-height: 1.1; letter-spacing: -0.02em; color: var(--text); font-weight: 650; }
+  .updated { margin: 0 0 2.5rem; color: var(--dim); font-size: 0.875rem; }
+  h2 { margin: 2.25rem 0 0.625rem; font-size: 1.125rem; color: var(--text); font-weight: 600; }
+  p, li { color: var(--muted); font-size: 0.9375rem; }
+  p { margin: 0.625rem 0; }
+  ul { margin: 0.625rem 0; padding-left: 1.25rem; }
+  li { margin: 0.25rem 0; }
+  address { font-style: normal; color: var(--muted); font-size: 0.9375rem; line-height: 1.5; }
+  .lede { color: var(--body); font-size: 1.0625rem; }
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--hairline); color: var(--dim); font-size: 0.8125rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/assets/logo.png" alt="">Blunderbase</a>
+    <nav>
+      <a href="/manual/">Docs</a>
+      <a href="https://github.com/philphilphil/blunderbase">GitHub</a>
+      <a href="/de/privacy" lang="de" hreflang="de">Deutsch</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>Privacy policy</h1>
+  <p class="updated">Last updated: 9 September 2026</p>
+
+  <p class="lede">
+    Blunderbase is software you run yourself. The desktop app, the Docker image and the iOS
+    app send nothing to us: no analytics, no crash reports, no tracking, and there is no
+    account with us. What we do process is limited to this website and the public demo, and
+    is described below.
+  </p>
+
+  <h2>1. Controller</h2>
+  <p>The controller responsible for data processing on this website and the demo is:</p>
+  <address>
+    Philipp Baum<br>
+    c/o Webix Solutions GmbH<br>
+    Zuckerfabrik 14<br>
+    70376 Stuttgart, Germany<br>
+    Email: <a href="mailto:info@blunderbase.org">info@blunderbase.org</a>
+  </address>
+
+  <h2>2. Your own Blunderbase</h2>
+  <p>
+    When you install Blunderbase, everything it holds stays on the machine or server you run
+    it on: the games it imports, the Stockfish and Maia analysis, your notes, repertoires,
+    settings and the password you set. We have no access to that installation and no
+    knowledge of its existence. For that data you are the controller, not us.
+  </p>
+  <p>
+    Your installation talks to third parties only when you ask it to: Lichess, Chess.com or
+    FICS when you import games from an account there, and an AI assistant of your choice if
+    you connect one over MCP. Each of those providers processes what your installation sends
+    under its own privacy policy, which we do not control. Please read theirs.
+  </p>
+
+  <h2>3. The iOS app</h2>
+  <p>
+    The app is a client for a Blunderbase server you name. It sends your requests, and the
+    password you enter, to that server and nowhere else, and keeps the server address and a
+    session cookie on the device so you stay signed in. It contains no analytics, advertising
+    or tracking code and no third-party SDKs. The app collects no data within the meaning of
+    Apple's App Privacy disclosure.
+  </p>
+  <p>
+    If you tap <em>Try the demo</em>, the app connects to the demo described in section 5.
+    Apple may process crash and usage diagnostics according to the sharing settings on your
+    device; that processing is Apple's and is governed by Apple's privacy policy.
+  </p>
+
+  <h2>4. This website</h2>
+  <p>
+    blunderbase.org, including the manual under /manual/, is a static site delivered through
+    Cloudflare. When you open a page, Cloudflare and our server process the technical data a
+    browser sends with every request: IP address, time, requested URL, referrer and user
+    agent. This is needed to deliver the page and protect the site against abuse (Art.
+    6(1)(f) GDPR). We set no cookies. Your light/dark theme choice is stored in your
+    browser's local storage and never leaves it.
+  </p>
+
+  <h2>5. The demo</h2>
+  <p>
+    demo.blunderbase.org is a read-only Blunderbase we operate, filled with anonymised games,
+    so that anyone can look at the software before hosting their own. It has no accounts and
+    no password, and nothing you do there is stored: the library is read-only. The server
+    keeps ordinary access logs (IP address, time, requested URL, user agent) for a short time
+    for security and operations, on the basis of our legitimate interest in running a stable
+    service (Art. 6(1)(f) GDPR), and is delivered through Cloudflare like the website.
+  </p>
+
+  <h2>6. What we do not do</h2>
+  <ul>
+    <li>No analytics, advertising or tracking on the website, the demo or in any app.</li>
+    <li>No accounts, no email addresses, no newsletters.</li>
+    <li>No sale or sharing of personal data with anyone.</li>
+    <li>No processing of your games, notes or chess accounts: they never reach us.</li>
+  </ul>
+
+  <h2>7. Recipients and international transfers</h2>
+  <p>
+    The only processor we use is Cloudflare, Inc., which delivers the website and the demo
+    and protects them against attacks. Cloudflare may process the request data above outside
+    the EU/EEA, including in the United States; for that it relies on the EU adequacy decision
+    for the EU-U.S. Data Privacy Framework and Standard Contractual Clauses. Contact us for
+    more information on the safeguards.
+  </p>
+
+  <h2>8. Retention</h2>
+  <p>
+    Access logs of the website and the demo are kept only as long as necessary for security,
+    abuse prevention and troubleshooting, and are then deleted. We hold no other personal data.
+  </p>
+
+  <h2>9. Your rights</h2>
+  <p>Under the GDPR you have the right to:</p>
+  <ul>
+    <li>access your personal data (Art. 15),</li>
+    <li>rectification of inaccurate data (Art. 16),</li>
+    <li>erasure (Art. 17),</li>
+    <li>restriction of processing (Art. 18),</li>
+    <li>data portability (Art. 20),</li>
+    <li>object to processing based on legitimate interest (Art. 21).</li>
+  </ul>
+  <p>
+    You can exercise these rights by writing to
+    <a href="mailto:info@blunderbase.org">info@blunderbase.org</a>. Since the only data we
+    hold are short-lived access logs, there is usually nothing to hand over or delete. We do
+    not use automated decision-making within the meaning of Art. 22 GDPR.
+  </p>
+  <p>
+    You also have the right to lodge a complaint with a supervisory authority. The competent
+    authority is the Landesbeauftragte für den Datenschutz und die Informationsfreiheit
+    Baden-Württemberg (<a href="https://www.baden-wuerttemberg.datenschutz.de">www.baden-wuerttemberg.datenschutz.de</a>).
+  </p>
+
+  <h2>10. Security</h2>
+  <p>
+    The website and the demo are served over encrypted connections only. For your own
+    installation, the <a href="/manual/">manual</a> describes how to put it behind TLS and
+    how to back it up; the security of that installation is in your hands.
+  </p>
+
+  <h2>11. Children</h2>
+  <p>
+    The website, the demo and the app are not directed at children under 16, and we do not
+    knowingly collect data from them.
+  </p>
+
+  <h2>12. Changes</h2>
+  <p>
+    We may update this policy from time to time. Changes are posted on this page with a new
+    date at the top.
+  </p>
+
+  <h2>13. Contact</h2>
+  <p>
+    Questions about this policy or your data:
+    <a href="mailto:info@blunderbase.org">info@blunderbase.org</a>.
+  </p>
+
+  <footer>Blunderbase is free software under the AGPL-3.0. <a href="/">Back to the front page</a></footer>
+</main>
+
+</body>
+</html>

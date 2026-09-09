@@ -30,6 +30,10 @@ cp "$root"/site/404.html "$root"/site/_redirects "$out"/
 # The German page is a second copy of the page, not a template: `site/de/index.html` is
 # translated by hand and served at /de/. It reaches the shared assets by absolute path.
 sed "s/__BB_VERSION__/$version/g" "$root"/site/de/index.html > "$out"/de/index.html
+# The privacy policy, one page per language, served at /privacy and /de/privacy: the App
+# Store listing links the English one, and both are static copies with no version in them.
+cp "$root"/site/privacy.html "$out"/privacy.html
+cp "$root"/site/de/privacy.html "$out"/de/privacy.html
 # The sample compose file the page links; the one under docker/ has no build block for
 # exactly this reason.
 cp "$root"/docker/docker-compose.yml "$out"/

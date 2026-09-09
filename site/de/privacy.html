@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datenschutzerklärung - Blunderbase</title>
+<meta name="description" content="Was Blunderbase, blunderbase.org, die Demo und die iOS-App mit deinen Daten machen. Kurzfassung: nichts davon erreicht uns.">
+<meta name="robots" content="noindex">
+<link rel="alternate" hreflang="en" href="https://blunderbase.org/privacy">
+<link rel="alternate" hreflang="de" href="https://blunderbase.org/de/privacy">
+<meta name="theme-color" content="#1d1e1f">
+<link rel="icon" href="/assets/favicon.png">
+<script>
+  (function () {
+    var choice = null;
+    try { choice = localStorage.getItem('bb-theme'); } catch (e) {}
+    var light = choice ? choice === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
+    document.documentElement.classList.toggle('light', light);
+  })();
+</script>
+<style>
+  /* Die deutsche Kopie von site/privacy.html: dieselben Tokens, dieselbe Spalte. */
+  :root {
+    color-scheme: dark;
+    --void: #1d1e1f; --panel: #292a2a; --raised: #343535; --hairline: #3a3c3b; --edge-strong: #555756;
+    --text: #eeeeea; --body: #d8d8d3; --muted: #b6b5b0; --dim: #a3a29c;
+    --accent: #83b7e3; --accent-hover: #9cc7ea; --logo-filter: invert(1) hue-rotate(180deg);
+  }
+  :root.light {
+    color-scheme: light;
+    --void: #f4f6f8; --panel: #e9ecef; --raised: #e4e7ea; --hairline: #dde1e5; --edge-strong: #bcc5cf;
+    --text: #12161c; --body: #262c34; --muted: #4d5560; --dim: #626a75;
+    --accent: #245f9e; --accent-hover: #1c4d82; --logo-filter: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--void); color: var(--body);
+    font: 16px/1.55 Geist, "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.005em;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); }
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+  header { position: sticky; top: 0; z-index: 10; background: var(--panel); border-bottom: 1px solid var(--edge-strong); }
+  header .wrap { display: flex; align-items: center; gap: 0.75rem; height: 2.75rem; }
+  .brand { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-weight: 600; font-size: 0.9375rem; }
+  .brand img { width: 1.25rem; height: 1.25rem; filter: var(--logo-filter); }
+  nav { margin-left: auto; display: flex; gap: 0.25rem; align-items: center; }
+  nav a { color: var(--dim); font-size: 0.8125rem; padding: 0.3rem 0.6rem; border-radius: 0.25rem; }
+  nav a:hover { color: var(--text); background: var(--raised); }
+  main { max-width: 42rem; padding: 3rem 1.25rem 5rem; margin: 0 auto; }
+  h1 { margin: 0 0 0.25rem; font-size: 2rem; line-height: 1.1; letter-spacing: -0.02em; color: var(--text); font-weight: 650; }
+  .updated { margin: 0 0 2.5rem; color: var(--dim); font-size: 0.875rem; }
+  h2 { margin: 2.25rem 0 0.625rem; font-size: 1.125rem; color: var(--text); font-weight: 600; }
+  p, li { color: var(--muted); font-size: 0.9375rem; }
+  p { margin: 0.625rem 0; }
+  ul { margin: 0.625rem 0; padding-left: 1.25rem; }
+  li { margin: 0.25rem 0; }
+  address { font-style: normal; color: var(--muted); font-size: 0.9375rem; line-height: 1.5; }
+  .lede { color: var(--body); font-size: 1.0625rem; }
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--hairline); color: var(--dim); font-size: 0.8125rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="/de/"><img src="/assets/logo.png" alt="">Blunderbase</a>
+    <nav>
+      <a href="/manual/de/">Doku</a>
+      <a href="https://github.com/philphilphil/blunderbase">GitHub</a>
+      <a href="/privacy" lang="en" hreflang="en">English</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>Datenschutzerklärung</h1>
+  <p class="updated">Stand: 9. September 2026</p>
+
+  <p class="lede">
+    Blunderbase ist Software, die du selbst betreibst. Die Desktop-App, das Docker-Image und
+    die iOS-App senden nichts an uns: keine Analytik, keine Absturzberichte, kein Tracking,
+    und ein Konto bei uns gibt es nicht. Was wir verarbeiten, beschränkt sich auf diese
+    Website und die öffentliche Demo und ist unten beschrieben.
+  </p>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>Verantwortlich für die Datenverarbeitung auf dieser Website und in der Demo ist:</p>
+  <address>
+    Philipp Baum<br>
+    c/o Webix Solutions GmbH<br>
+    Zuckerfabrik 14<br>
+    70376 Stuttgart<br>
+    E-Mail: <a href="mailto:info@blunderbase.org">info@blunderbase.org</a>
+  </address>
+
+  <h2>2. Dein eigenes Blunderbase</h2>
+  <p>
+    Wenn du Blunderbase installierst, bleibt alles, was es enthält, auf dem Rechner oder
+    Server, auf dem es läuft: die importierten Partien, die Analyse von Stockfish und Maia,
+    deine Notizen, Repertoires, Einstellungen und das Passwort, das du vergibst. Wir haben
+    keinen Zugriff auf diese Installation und wissen nicht, dass es sie gibt. Für diese Daten
+    bist du der Verantwortliche, nicht wir.
+  </p>
+  <p>
+    Deine Installation spricht nur dann mit Dritten, wenn du sie darum bittest: mit Lichess,
+    Chess.com oder FICS, wenn du Partien von einem Konto dort importierst, und mit einem
+    KI-Assistenten deiner Wahl, wenn du einen über MCP anbindest. Jeder dieser Anbieter
+    verarbeitet das, was deine Installation ihm sendet, nach seiner eigenen
+    Datenschutzerklärung, auf die wir keinen Einfluss haben. Bitte lies diese dort nach.
+  </p>
+
+  <h2>3. Die iOS-App</h2>
+  <p>
+    Die App ist ein Client für einen Blunderbase-Server, den du angibst. Sie sendet deine
+    Anfragen und das eingegebene Passwort an diesen Server und an niemanden sonst und
+    speichert die Serveradresse und ein Sitzungs-Cookie auf dem Gerät, damit du angemeldet
+    bleibst. Sie enthält keinen Analyse-, Werbe- oder Tracking-Code und keine SDKs Dritter.
+    Die App erhebt keine Daten im Sinne von Apples App-Privacy-Angaben.
+  </p>
+  <p>
+    Wenn du auf <em>Demo ausprobieren</em> tippst, verbindet sich die App mit der Demo aus
+    Abschnitt 5. Apple kann Absturz- und Nutzungsdiagnosen nach den Freigabeeinstellungen
+    deines Geräts verarbeiten; das ist Apples Verarbeitung und unterliegt Apples
+    Datenschutzerklärung.
+  </p>
+
+  <h2>4. Diese Website</h2>
+  <p>
+    blunderbase.org, einschließlich des Handbuchs unter /manual/, ist eine statische Seite,
+    die über Cloudflare ausgeliefert wird. Beim Aufruf einer Seite verarbeiten Cloudflare und
+    unser Server die technischen Daten, die ein Browser mit jeder Anfrage sendet:
+    IP-Adresse, Zeitpunkt, aufgerufene URL, Referrer und User-Agent. Das ist nötig, um die
+    Seite auszuliefern und vor Missbrauch zu schützen (Art. 6 Abs. 1 lit. f DSGVO). Wir setzen
+    keine Cookies. Deine Wahl zwischen hellem und dunklem Design liegt im lokalen Speicher
+    deines Browsers und verlässt ihn nicht.
+  </p>
+
+  <h2>5. Die Demo</h2>
+  <p>
+    demo.blunderbase.org ist ein schreibgeschütztes Blunderbase, das wir betreiben, gefüllt
+    mit anonymisierten Partien, damit jeder sich die Software ansehen kann, bevor er sie
+    selbst hostet. Es gibt dort keine Konten und kein Passwort, und nichts, was du dort tust,
+    wird gespeichert: die Bibliothek ist schreibgeschützt. Der Server führt gewöhnliche
+    Zugriffsprotokolle (IP-Adresse, Zeitpunkt, aufgerufene URL, User-Agent) für kurze Zeit zu
+    Sicherheits- und Betriebszwecken, auf Grundlage unseres berechtigten Interesses an einem
+    stabilen Dienst (Art. 6 Abs. 1 lit. f DSGVO), und wird wie die Website über Cloudflare
+    ausgeliefert.
+  </p>
+
+  <h2>6. Was wir nicht tun</h2>
+  <ul>
+    <li>Keine Analytik, Werbung oder Tracking auf der Website, in der Demo oder in einer App.</li>
+    <li>Keine Konten, keine E-Mail-Adressen, kein Newsletter.</li>
+    <li>Kein Verkauf und keine Weitergabe personenbezogener Daten.</li>
+    <li>Keine Verarbeitung deiner Partien, Notizen oder Schachkonten: sie erreichen uns nie.</li>
+  </ul>
+
+  <h2>7. Empfänger und Drittlandtransfer</h2>
+  <p>
+    Der einzige Auftragsverarbeiter, den wir einsetzen, ist Cloudflare, Inc., das die Website
+    und die Demo ausliefert und vor Angriffen schützt. Cloudflare kann die oben genannten
+    Anfragedaten außerhalb der EU/des EWR verarbeiten, auch in den USA; dafür stützt es sich
+    auf den Angemessenheitsbeschluss der EU zum EU-U.S. Data Privacy Framework und auf
+    Standardvertragsklauseln. Für weitere Informationen zu den Garantien schreib uns.
+  </p>
+
+  <h2>8. Speicherdauer</h2>
+  <p>
+    Zugriffsprotokolle der Website und der Demo werden nur so lange aufbewahrt, wie es für
+    Sicherheit, Missbrauchsabwehr und Fehlersuche nötig ist, und dann gelöscht. Andere
+    personenbezogene Daten halten wir nicht.
+  </p>
+
+  <h2>9. Deine Rechte</h2>
+  <p>Nach der DSGVO hast du das Recht auf:</p>
+  <ul>
+    <li>Auskunft über deine personenbezogenen Daten (Art. 15),</li>
+    <li>Berichtigung unrichtiger Daten (Art. 16),</li>
+    <li>Löschung (Art. 17),</li>
+    <li>Einschränkung der Verarbeitung (Art. 18),</li>
+    <li>Datenübertragbarkeit (Art. 20),</li>
+    <li>Widerspruch gegen eine Verarbeitung auf Grundlage berechtigter Interessen (Art. 21).</li>
+  </ul>
+  <p>
+    Du kannst diese Rechte per E-Mail an
+    <a href="mailto:info@blunderbase.org">info@blunderbase.org</a> ausüben. Da wir nur
+    kurzlebige Zugriffsprotokolle halten, gibt es in der Regel nichts herauszugeben oder zu
+    löschen. Eine automatisierte Entscheidungsfindung im Sinne von Art. 22 DSGVO findet nicht
+    statt.
+  </p>
+  <p>
+    Du hast außerdem das Recht, dich bei einer Aufsichtsbehörde zu beschweren. Zuständig ist
+    der Landesbeauftragte für den Datenschutz und die Informationsfreiheit Baden-Württemberg
+    (<a href="https://www.baden-wuerttemberg.datenschutz.de">www.baden-wuerttemberg.datenschutz.de</a>).
+  </p>
+
+  <h2>10. Sicherheit</h2>
+  <p>
+    Website und Demo werden ausschließlich über verschlüsselte Verbindungen ausgeliefert. Für
+    deine eigene Installation beschreibt das <a href="/manual/de/">Handbuch</a>, wie du sie
+    hinter TLS betreibst und sicherst; die Sicherheit dieser Installation liegt in deiner Hand.
+  </p>
+
+  <h2>11. Kinder</h2>
+  <p>
+    Website, Demo und App richten sich nicht an Kinder unter 16 Jahren, und wir erheben
+    wissentlich keine Daten von ihnen.
+  </p>
+
+  <h2>12. Änderungen</h2>
+  <p>
+    Wir können diese Erklärung von Zeit zu Zeit anpassen. Änderungen erscheinen auf dieser
+    Seite mit neuem Datum oben.
+  </p>
+
+  <h2>13. Kontakt</h2>
+  <p>
+    Fragen zu dieser Erklärung oder zu deinen Daten:
+    <a href="mailto:info@blunderbase.org">info@blunderbase.org</a>.
+  </p>
+
+  <footer>Blunderbase ist freie Software unter der AGPL-3.0. <a href="/de/">Zurück zur Startseite</a></footer>
+</main>
+
+</body>
+</html>
