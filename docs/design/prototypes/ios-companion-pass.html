@@ -1,0 +1,544 @@
+<!doctype html>
+<!-- PROTOTYPE — a second visual pass over the iOS Companion, drawn against the 2026-09-10 screens. Delete or absorb after review. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Companion Second Pass</title>
+<style>
+  :root {
+    color-scheme: light;
+    /* Theme.swift, light column */
+    --void:#e7e7e4; --panel:#f2f2f0; --surface:#fafaf8; --elevated:#f4f4f1; --raised:#ebebe8;
+    --selected:#dbe6f2; --hairline:#dcdcd8; --line:#d1d1cd; --edge:#c5c5c0; --edge-strong:#b6b6b1;
+    --text-bright:#101010; --text:#202020; --body:#3b3b39; --muted:#5c5c59; --dim:#71716e; --faint:#8a8a86;
+    --accent:#245f9e; --blunder:#bb3e35; --mistake:#9b6819; --inaccuracy:#7d6a12; --good:#34724a; --purple:#7054a5;
+    --side-white:#ffffff; --side-white-edge:#b0b0ab; --side-black:#3a3b3b;
+    --board-light:#d8dde0; --board-dark:#8f9da5; --graph-grid:#c6c6c1; --graph-tick:#7a7a76; --track:#dededa;
+    --chip-good:#e8f0ea; --chip-good-edge:#b6ccbc; --chip-bad:#f5e4e2; --chip-bad-edge:#e0b5b1;
+    --page:#eeeeeb; --ink:#202020; --prose:#3b3b39; --quiet:#71716e; --rule:#c5c5c0; --card:#fafaf8;
+    --shot-light:block; --shot-dark:none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --void:#1d1e1f; --panel:#292a2a; --surface:#232424; --elevated:#303131; --raised:#343535;
+      --selected:#29445b; --hairline:#3a3c3b; --line:#3e4040; --edge:#474949; --edge-strong:#555756;
+      --text-bright:#f8f8f4; --text:#eeeeea; --body:#d8d8d3; --muted:#b6b5b0; --dim:#a3a29c; --faint:#8b8a82;
+      --accent:#83b7e3; --blunder:#ee766e; --mistake:#dda05a; --inaccuracy:#cbb96a; --good:#78b98c; --purple:#b098d7;
+      --side-white:#e6e6e1; --side-white-edge:#b8b8b3; --side-black:#232424;
+      --board-light:#a9b2b8; --board-dark:#616d75; --graph-grid:#4e5150; --graph-tick:#98978f; --track:#3a3c3b;
+      --chip-good:#2b332e; --chip-good-edge:#47584d; --chip-bad:#3a2a29; --chip-bad-edge:#5c3f3c;
+      --page:#161718; --ink:#eeeeea; --prose:#d0d0cb; --quiet:#a3a29c; --rule:#3e4040; --card:#1f2021;
+      --shot-light:none; --shot-dark:block;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --void:#1d1e1f; --panel:#292a2a; --surface:#232424; --elevated:#303131; --raised:#343535;
+    --selected:#29445b; --hairline:#3a3c3b; --line:#3e4040; --edge:#474949; --edge-strong:#555756;
+    --text-bright:#f8f8f4; --text:#eeeeea; --body:#d8d8d3; --muted:#b6b5b0; --dim:#a3a29c; --faint:#8b8a82;
+    --accent:#83b7e3; --blunder:#ee766e; --mistake:#dda05a; --inaccuracy:#cbb96a; --good:#78b98c; --purple:#b098d7;
+    --side-white:#e6e6e1; --side-white-edge:#b8b8b3; --side-black:#232424;
+    --board-light:#a9b2b8; --board-dark:#616d75; --graph-grid:#4e5150; --graph-tick:#98978f; --track:#3a3c3b;
+    --chip-good:#2b332e; --chip-good-edge:#47584d; --chip-bad:#3a2a29; --chip-bad-edge:#5c3f3c;
+    --page:#161718; --ink:#eeeeea; --prose:#d0d0cb; --quiet:#a3a29c; --rule:#3e4040; --card:#1f2021;
+    --shot-light:none; --shot-dark:block;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, .m { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 28px 96px; }
+
+  header.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; padding-bottom: 18px; border-bottom: 1px solid var(--rule); margin-bottom: 36px; }
+  header.top h1 { margin: 0 0 6px; font-size: 30px; line-height: 1.05; letter-spacing: -.02em; font-weight: 650; text-wrap: balance; }
+  header.top p { margin: 0; color: var(--quiet); max-width: 62ch; }
+  .themes { display: flex; gap: 2px; }
+  .themes button { font: 12px/1 inherit; font-family: inherit; padding: 6px 10px; border: 1px solid var(--edge-strong); background: var(--card); color: var(--quiet); cursor: pointer; }
+  .themes button:first-child { border-radius: 4px 0 0 4px; } .themes button:last-child { border-radius: 0 4px 4px 0; }
+  .themes button[aria-pressed="true"] { color: var(--ink); background: var(--selected); }
+  .themes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .prose { max-width: 66ch; color: var(--prose); }
+  .prose p { margin: 0 0 12px; }
+  .prose strong { color: var(--ink); font-weight: 600; }
+  h2 { margin: 0; font-size: 20px; letter-spacing: -.015em; font-weight: 650; line-height: 1.2; }
+  h3 { margin: 0 0 8px; font-size: 15px; font-weight: 650; }
+  section.block { padding: 36px 0 12px; border-top: 1px solid var(--rule); margin-top: 28px; }
+  .head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+  .head .eyebrow { color: var(--quiet); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .verdict { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .verdict.rec { background: var(--chip-good); color: var(--good); border: 1px solid var(--chip-good-edge); }
+  .verdict.opt { background: var(--elevated); color: var(--quiet); border: 1px solid var(--edge); }
+
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 28px; margin: 24px 0 8px; border-top: 1px solid var(--rule); }
+  .principles div { padding: 14px 0 18px; border-bottom: 1px solid var(--rule); }
+  .principles b { display: block; font-weight: 650; margin-bottom: 4px; }
+  .principles p { margin: 0; color: var(--prose); font-size: 14px; }
+
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; align-items: start; margin: 18px 0 8px; }
+  .compare > figure { margin: 0; min-width: 0; }
+  figcaption { color: var(--quiet); font-size: 12px; margin-bottom: 8px; display: flex; gap: 8px; align-items: baseline; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  .shot { position: relative; width: 100%; max-width: 402px; }
+  .shot img { display: none; width: 100%; height: auto; border-radius: 22px; border: 1px solid var(--edge); }
+  .shot img.light { display: var(--shot-light); } .shot img.dark { display: var(--shot-dark); }
+  .notes { margin: 14px 0 0; padding: 0; list-style: none; max-width: 66ch; color: var(--prose); font-size: 14px; }
+  .notes li { padding: 8px 0; border-top: 1px solid var(--rule); display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: baseline; }
+  .notes li > i { font-style: normal; color: var(--quiet); font-size: 11px; font-weight: 600; }
+  .notes li > small { color: var(--quiet); font-size: 11px; white-space: nowrap; }
+  .notes code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--ink); background: var(--elevated); padding: 1px 5px; border-radius: 3px; }
+
+  /* ---------- the phone ---------- */
+  .phone { width: 402px; max-width: 100%; background: var(--void); border-radius: 22px; border: 1px solid var(--edge); overflow: hidden; color: var(--text); position: relative; font-size: 15px; line-height: 1.25; }
+  .phone.crop { max-height: 872px; }
+  .phone.crop::after { content: ""; position: absolute; inset: auto 0 0 0; height: 90px; background: linear-gradient(to bottom, transparent, var(--void)); pointer-events: none; }
+  .status { display: flex; justify-content: space-between; padding: 14px 26px 0 30px; font-weight: 600; font-size: 14px; }
+  .status .island { width: 118px; height: 34px; border-radius: 20px; background: #000; margin-top: -8px; }
+  .status .sig { font-size: 11px; letter-spacing: 1px; }
+  .large { padding: 22px 16px 0; }
+  .large h1 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
+  .large .under { margin-top: 4px; font-size: 12px; color: var(--dim); }
+  .large .under b { color: var(--body); font-weight: 500; }
+  .large .row { display: flex; align-items: flex-end; justify-content: space-between; }
+  .glass { width: 42px; height: 42px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); display: grid; place-items: center; color: var(--accent); flex: none; }
+  .glass.wide { width: auto; padding: 0 12px; gap: 14px; grid-auto-flow: column; border-radius: 21px; }
+  .glass svg { width: 22px; height: 22px; }
+  .glass .dim { color: var(--dim); }
+
+  .sec { padding: 22px 16px 0; }
+  .sec-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--edge-strong); }
+  .sec-head b { font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .sec-head .segs { margin-left: auto; display: flex; gap: 2px; }
+  .segs span { font-size: 12px; padding: 2px 7px; color: var(--dim); border-radius: 4px; }
+  .segs span.on { color: var(--text); background: var(--elevated); }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--dim); padding: 8px 0 2px; }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+  .speed { padding-top: 12px; }
+  .speed .line { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 4px; border-bottom: 1px solid var(--hairline); }
+  .speed .line b { font-size: 15px; font-weight: 600; }
+  .speed .line .m { font-size: 13px; color: var(--body); }
+  .speed .line .m i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 0 10px; }
+  .speed .line .m em { font-style: normal; font-size: 11px; }
+  .speed svg { display: block; width: 100%; height: 120px; margin-top: 2px; }
+  .up { color: var(--good); } .down { color: var(--blunder); }
+
+  .moments { display: flex; gap: 10px; overflow: hidden; padding-top: 10px; }
+  .moment { flex: none; width: 176px; background: var(--surface); border-radius: 6px; padding: 9px 10px 8px; border: 1px solid var(--line); }
+  .moment .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .moment .glyph { color: var(--blunder); font-weight: 700; font-size: 15px; margin-right: 6px; }
+  .moment .mv { font-size: 15px; color: var(--text); }
+  .moment .drop { color: var(--blunder); font-size: 13px; }
+  .moment .who { font-size: 12px; color: var(--dim); margin-top: 3px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding-top: 10px; }
+  .stat small { display: block; font-size: 10px; color: var(--faint); letter-spacing: .04em; text-transform: uppercase; }
+  .stat b { font-size: 20px; font-weight: 500; color: var(--text-bright); }
+  .stat em { font-style: normal; font-size: 11px; margin-left: 4px; }
+
+  .tabbar { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 74px; border-radius: 37px; background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; padding: 0 6px; font-size: 11px; font-weight: 500; color: var(--text); text-align: center; backdrop-filter: blur(8px); }
+  .tabbar span { display: grid; gap: 4px; justify-items: center; padding: 8px 0; border-radius: 30px; }
+  .tabbar span.on { color: var(--accent); background: var(--raised); }
+  .tabbar svg { width: 24px; height: 24px; }
+
+  .search { margin: 10px 16px 0; height: 40px; border-radius: 10px; background: var(--elevated); border: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--dim); font-size: 15px; }
+  .chips { display: flex; gap: 6px; padding: 10px 16px 12px; overflow: hidden; }
+  .chip { font-size: 13px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--edge); color: var(--body); white-space: nowrap; }
+  .chip.on { background: var(--selected); border-color: var(--accent); color: var(--text); }
+  .daterule { display: flex; align-items: center; gap: 10px; padding: 8px 16px 4px; font-size: 11px; color: var(--faint); background: var(--void); }
+  .daterule::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
+  .grow { display: flex; align-items: center; gap: 10px; padding: 9px 16px; background: var(--surface); border-bottom: 1px solid var(--hairline); }
+  .grow .l { flex: 1; min-width: 0; }
+  .grow .names { display: flex; align-items: baseline; gap: 6px; font-size: 15px; white-space: nowrap; overflow: hidden; }
+  .grow .names b { font-weight: 600; }
+  .grow .names .m { font-size: 12px; color: var(--dim); }
+  .grow .qual { margin-top: 3px; font-size: 12px; color: var(--dim); }
+  .grow .r { text-align: right; }
+  .grow .res { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+  .res.w { background: var(--chip-good); color: var(--good); border: 1px solid var(--chip-good-edge); }
+  .res.l { background: var(--chip-bad); color: var(--blunder); border: 1px solid var(--chip-bad-edge); }
+  .res.d { background: var(--elevated); color: var(--muted); border: 1px solid var(--edge); }
+  .grow .drop { margin-top: 3px; font-size: 12px; }
+  .grow .drop .c { color: var(--blunder); } .grow .drop .q { color: var(--mistake); }
+  .grow svg.spark { width: 46px; height: 22px; flex: none; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: -1px; flex: none; }
+  .dot.w { background: var(--side-white); border: 1px solid var(--side-white-edge); }
+  .dot.b { background: var(--side-black); border: 1px solid var(--edge-strong); }
+
+  /* game header */
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 0; }
+  .nav .title { flex: 1; min-width: 0; text-align: center; padding: 0 8px; }
+  .nav .title b { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav .title span { font-size: 10px; color: var(--faint); }
+  .ghead { margin-top: 10px; padding: 8px 16px 8px; background: var(--surface); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+  .ghead .op { display: flex; align-items: baseline; gap: 10px; }
+  .ghead .op b { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ghead .eco { font-size: 11px; color: var(--body); background: var(--elevated); border: 1px solid var(--edge); padding: 1px 6px; border-radius: 4px; }
+  .ghead .meta { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .players { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-top: 8px; }
+  .players .p { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; }
+  .players .p.r { justify-content: flex-end; }
+  .players .p b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .players .p .m { font-size: 12px; color: var(--dim); }
+  .players .p .clk { font-size: 13px; font-weight: 500; color: var(--body); }
+  .players .score { font-size: 13px; font-weight: 600; padding: 1px 7px; border-radius: 4px; }
+  .ring { box-shadow: 0 0 0 1.5px var(--accent); outline: 2px solid var(--surface); }
+  .boardwrap { display: flex; gap: 6px; padding: 8px 12px 0 12px; }
+  .evalbar { width: 12px; border-radius: 3px; background: var(--side-black); overflow: hidden; }
+  .evalbar i { display: block; height: 55%; background: var(--side-white); }
+  .board { display: grid; grid-template-columns: repeat(8, 1fr); width: 100%; aspect-ratio: 1; border-radius: 3px; overflow: hidden; }
+  .board span { display: grid; place-items: center; font-size: 30px; line-height: 1; background: var(--board-light); }
+  .board span.d { background: var(--board-dark); }
+  .board span.wp { color: #fff; -webkit-text-stroke: 1px #2a2a2a; } .board span.bp { color: #151515; -webkit-text-stroke: 1px #151515; }
+  .transport { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px 0; color: var(--dim); font-size: 14px; }
+  .transport b { color: var(--body); font-weight: 500; }
+  .pane-title { display: flex; align-items: baseline; gap: 8px; margin: 12px 16px 0; padding-bottom: 6px; border-bottom: 1px solid var(--hairline); font-size: 12px; color: var(--dim); }
+  .pane-title b { color: var(--text); font-weight: 600; font-size: 13px; }
+
+  /* notes */
+  .note { padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--hairline); }
+  .note .ctx { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+  .note .ctx b { color: var(--body); font-weight: 500; }
+  .note .txt { margin-top: 4px; font-size: 15px; color: var(--text); }
+  .note .tags { display: flex; gap: 6px; margin-top: 6px; }
+  .note .tag { font-size: 11px; padding: 1px 7px; border-radius: 4px; background: var(--elevated); border: 1px solid var(--edge); color: var(--muted); }
+
+  /* settings footer + explorer bits */
+  .mini { width: 402px; max-width: 100%; background: var(--void); border-radius: 12px; border: 1px solid var(--edge); overflow: hidden; color: var(--text); }
+  .foot { display: flex; align-items: center; gap: 12px; padding: 16px; color: var(--dim); font-size: 12px; }
+  .foot img { width: 36px; height: 36px; border-radius: 8px; }
+  .foot b { display: block; color: var(--body); font-weight: 600; font-size: 13px; }
+  .foot .ok { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 5px; }
+  .xrow { display: grid; grid-template-columns: 52px 44px 1fr 56px 52px; gap: 10px; align-items: center; padding: 9px 16px; background: var(--surface); border-bottom: 1px solid var(--hairline); font-size: 15px; }
+  .xrow .m { font-size: 13px; color: var(--dim); text-align: right; }
+  .xrow .bar { height: 6px; border-radius: 3px; display: flex; overflow: hidden; background: var(--track); }
+  .xrow .bar i { display: block; height: 100%; } .xrow .bar .ww { background: var(--good); } .xrow .bar .dd { background: var(--faint); } .xrow .bar .ll { background: var(--blunder); }
+  .xhead { display: flex; gap: 14px; padding: 8px 16px; font-size: 12px; color: var(--dim); background: var(--void); border-bottom: 1px solid var(--edge-strong); }
+  .xhead b { color: var(--text); font-weight: 600; font-size: 13px; }
+  .xhead .wdl i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin: 0 3px 0 8px; }
+  .line-strip { padding: 8px 16px; font-size: 13px; color: var(--body); background: var(--surface); border-bottom: 1px solid var(--hairline); }
+  .line-strip em { font-style: normal; color: var(--faint); }
+
+  table.plan { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  table.plan th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--quiet); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--edge-strong); font-weight: 600; }
+  table.plan td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--prose); }
+  table.plan td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .size { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 3px; background: var(--elevated); border: 1px solid var(--edge); color: var(--quiet); }
+  @media (max-width: 720px) { .wrap { padding: 28px 16px 64px; } header.top { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>The Companion, a second pass</h1>
+      <p>Six screens, photographed from the simulator against the demo library, and what would make them read as Blunderbase without dressing them up. Every proposal is drawn in the app's own tokens from <code class="m">Theme.swift</code>, so nothing here needs a colour the app does not already have.</p>
+    </div>
+    <div class="themes" role="group" aria-label="Theme">
+      <button type="button" data-set="system" aria-pressed="true">System</button>
+      <button type="button" data-set="dark" aria-pressed="false">Dark</button>
+      <button type="button" data-set="light" aria-pressed="false">Light</button>
+    </div>
+  </header>
+
+  <div class="prose">
+    <p><strong>Why it reads as bland.</strong> Every screen is a stock iOS template: a centred inline title, a pill search field, a grouped form, three identical bordered cards in a row. The parts that are unmistakably Blunderbase — the drop in win percentage, the <span class="m">??</span> glyphs, the eval stamp, the scoresheet dot for a colour — are all there, but they sit at the same volume as the chrome around them. Nothing in the chrome says whose app this is.</p>
+    <p><strong>The fix is not more styling.</strong> The web app settled this a week ago with the restrained desktop pass: panes bounded by rules rather than floating cards, sections as a heading over a rule, a muted accent that means something when it appears. The phone should inherit those four habits and stop there. Below, each proposal names its size so the list can be cut.</p>
+  </div>
+
+  <div class="principles">
+    <div><b>Two voices</b><p>SF for people and prose, mono for anything that is a fact: ratings, clocks, dates, counts, moves. Already half true; make it the rule, and the mono line under a title becomes the app's signature.</p></div>
+    <div><b>Sections, not cards</b><p>A region is a heading over a rule and a change of surface. The bordered rounded card is spent only on the thing that floats, which on a phone is a worst-moment tile and nothing else.</p></div>
+    <div><b>Accent means the app is talking</b><p>Blue is for a selected filter, a to-move ring, a tab. It is not the colour of every game name on the notes screen. Fewer blues, and the one that is left reads.</p></div>
+    <div><b>Scoresheet shorthand</b><p>The filled and hollow disc for White and Black already lives on the game screen. Carry it into the rows, where the bold name currently says who you were but not which colour.</p></div>
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section class="block" id="dashboard">
+    <div class="head"><span class="eyebrow">1 · Dashboard</span><h2>Large title, sections over rules, no card borders</h2><span class="verdict rec">Recommended</span></div>
+    <div class="prose">
+      <p>The sentence under the title is the best copy in the app and it is set like a placeholder. The three rating cards are the template look: same border, same radius, chart floating in a box. Take the boxes away and each speed becomes a sub-heading over a hairline with its numbers on the same line, which is how the web draws it and how the eye already reads it. The window control turns into text segments in the section head, as in the web's Ratings section.</p>
+    </div>
+    <div class="compare">
+      <figure><figcaption><b>Now</b> simulator, demo library</figcaption><div class="shot"><img class="light" src="ios/dashboard.png" alt="The dashboard as it is: centred title, a sentence, three bordered rating cards."><img class="dark" src="ios/dashboard-dark.png" alt="The dashboard as it is, dark theme."></div></figure>
+      <figure><figcaption><b>Proposed</b></figcaption>
+        <div class="phone crop">
+          <div class="status"><span>09:41</span><span class="island"></span><span class="sig">▂▄▆ ᯤ ▮</span></div>
+          <div class="large">
+            <div class="row"><div><h1>Dashboard</h1><div class="under m"><b>4,200</b> games · <b>11,060</b> blunders</div></div>
+              <div class="glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div></div>
+          </div>
+          <div class="sec">
+            <div class="sec-head"><b>Ratings</b><span class="segs"><span>All</span><span class="on">1y</span><span>90d</span><span>30d</span></span></div>
+            <div class="legend"><span><i style="background:var(--accent)"></i>Lichess</span><span><i style="background:var(--purple)"></i>Chess.com</span></div>
+            <div class="speed">
+              <div class="line"><b>Blitz</b><span class="m"><i style="background:var(--accent)"></i>1654 <em class="up">+38</em><i style="background:var(--purple)"></i>1625 <em class="up">+31</em></span></div>
+              <svg viewBox="0 0 370 120" preserveAspectRatio="none" aria-hidden="true">
+                <g stroke="var(--graph-grid)" stroke-width="1"><line x1="34" y1="18" x2="366" y2="18"/><line x1="34" y1="60" x2="366" y2="60"/><line x1="34" y1="102" x2="366" y2="102"/></g>
+                <g class="m" fill="var(--graph-tick)" font-size="9"><text x="4" y="21">1700</text><text x="4" y="63">1600</text><text x="4" y="105">1500</text><text x="110" y="117">Jan</text><text x="210" y="117">Apr</text><text x="310" y="117">Jul</text></g>
+                <path d="M36 60 L60 52 80 58 100 50 120 62 140 54 160 66 180 58 200 48 220 44 240 52 260 40 280 46 300 38 320 44 340 40 366 42" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+                <path d="M36 66 L60 60 80 64 100 58 120 70 140 62 160 72 180 64 200 56 220 52 240 58 260 48 280 54 300 46 320 52 340 50 366 54" fill="none" stroke="var(--purple)" stroke-width="1.6"/>
+                <circle cx="366" cy="42" r="2.6" fill="var(--accent)"/><circle cx="366" cy="54" r="2.6" fill="var(--purple)"/>
+              </svg>
+            </div>
+            <div class="speed">
+              <div class="line"><b>Bullet</b><span class="m"><i style="background:var(--accent)"></i>1533 <em class="up">+38</em><i style="background:var(--purple)"></i>1519 <em class="up">+39</em></span></div>
+              <svg viewBox="0 0 370 120" preserveAspectRatio="none" aria-hidden="true">
+                <g stroke="var(--graph-grid)" stroke-width="1"><line x1="34" y1="18" x2="366" y2="18"/><line x1="34" y1="60" x2="366" y2="60"/><line x1="34" y1="102" x2="366" y2="102"/></g>
+                <g class="m" fill="var(--graph-tick)" font-size="9"><text x="4" y="21">1600</text><text x="4" y="63">1500</text><text x="4" y="105">1400</text></g>
+                <path d="M36 66 L50 58 60 64 70 60 90 61 140 60 200 58 260 55 320 52 340 34 352 40 366 38" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+                <path d="M36 72 L50 66 60 70 70 68 90 69 140 68 200 66 260 63 320 60 340 44 352 52 366 46" fill="none" stroke="var(--purple)" stroke-width="1.6"/>
+                <circle cx="366" cy="38" r="2.6" fill="var(--accent)"/><circle cx="366" cy="46" r="2.6" fill="var(--purple)"/>
+              </svg>
+            </div>
+          </div>
+          <div class="sec">
+            <div class="sec-head"><b>Worst moments</b><span class="m" style="font-size:11px;color:var(--faint)">last 30 days</span></div>
+            <div class="moments">
+              <div class="moment"><div class="top"><span class="m"><span class="glyph">??</span><span class="mv">18. Nxe6</span></span><span class="m drop">−79%</span></div><div class="who">Samir Khan · 28 Aug</div></div>
+              <div class="moment"><div class="top"><span class="m"><span class="glyph">??</span><span class="mv">9… Rxe4+</span></span><span class="m drop">−62%</span></div><div class="who">Eva Santos · 5 Sep</div></div>
+              <div class="moment"><div class="top"><span class="m"><span class="glyph">??</span><span class="mv">24… Qe7</span></span><span class="m drop">−58%</span></div><div class="who">Iris Becker</div></div>
+            </div>
+          </div>
+          <div class="sec">
+            <div class="sec-head"><b>Last 30 days</b><span class="segs"><span>7d</span><span class="on">30d</span><span>90d</span></span></div>
+            <div class="stats">
+              <div class="stat"><small>Blunders / game</small><span class="m"><b>2.6</b><em class="up">−0.5</em></span></div>
+              <div class="stat"><small>Win % given away</small><span class="m"><b>31.4</b><em class="up">−1.0</em></span></div>
+              <div class="stat"><small>Score</small><span class="m"><b>52%</b><em class="up">+10.4</em></span></div>
+            </div>
+          </div>
+          <div class="tabbar"><span class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18M4 16l5-6 4 3 7-8"/></svg>Dashboard</span><span><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>Games</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V12M12 12L6 5M12 12l6-7"/></svg>Explorer</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h8M4 12h16M4 17h16"/></svg>Notes</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>Settings</span></div>
+        </div>
+      </figure>
+    </div>
+    <ul class="notes">
+      <li><i>1a</i><span>Large left-aligned title with the count line in mono under it. <code>.navigationBarTitleDisplayMode(.large)</code> plus a two-number line replacing the sentence. The same treatment on Games, Explorer, Notes and Settings, so the five tabs share one head.</span><small><span class="size">S</span></small></li>
+      <li><i>1b</i><span>Section head as heading over an <code>edgeStrong</code> rule; the window control moves into the head as text segments; the speeds menu stays as the icon.</span><small><span class="size">S</span></small></li>
+      <li><i>1c</i><span>Per-speed: drop the card background and border, keep a <code>hairline</code> under the name-and-numbers line, emphasise the last point of each series with a dot. The chart itself is untouched.</span><small><span class="size">S</span></small></li>
+      <li><i>1d</i><span>Worst moments keep their tiles: they are the one thing on the screen that should float, and the glyph goes bold so a tile reads as a verdict. The three period numbers become one row of figures with their label above, tabular.</span><small><span class="size">S</span></small></li>
+    </ul>
+  </section>
+
+  <!-- ================= GAMES ================= -->
+  <section class="block" id="games">
+    <div class="head"><span class="eyebrow">2 · Games</span><h2>The colour dot, a result chip, and dates as rules</h2><span class="verdict rec">Recommended</span></div>
+    <div class="prose">
+      <p>The rows are right and should stay two lines with the same order as the web card. Three things would make the list feel authored rather than generated. The <strong>side dot</strong> before your name says which colour you had, which the bold name alone does not. The <strong>result</strong> becomes a small filled chip in the outcome's colour, so a scan down the right edge reads wins and losses as shapes and not only as tinted digits. And since the list is in date order and the date repeats three or four times per screen, cut it into <strong>date rules</strong> the way the notes screen does on the web, which frees line two for the time control, the length and the source. The orphan <span class="m">4.200 games</span> strip is folded into the search placeholder.</p>
+    </div>
+    <div class="compare">
+      <figure><figcaption><b>Now</b></figcaption><div class="shot"><img class="light" src="ios/games.png" alt="The games list as it is."><img class="dark" src="ios/games-dark.png" alt="The games list as it is, dark theme."></div></figure>
+      <figure><figcaption><b>Proposed</b></figcaption>
+        <div class="phone crop">
+          <div class="status"><span>09:41</span><span class="island"></span><span class="sig">▂▄▆ ᯤ ▮</span></div>
+          <div class="large"><div class="row"><div><h1>Games</h1><div class="under m"><b>4,200</b> games · <b>31</b> this month</div></div>
+            <div class="glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div></div></div>
+          <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Opponent, ECO, PGN text</div>
+          <div class="chips"><span class="chip">Result ▾</span><span class="chip on">Blunders</span><span class="chip">Analysed</span><span class="chip">Speed ▾</span><span class="chip">Source ▾</span></div>
+          <div class="daterule m">6 September</div>
+          <div class="grow"><div class="l"><div class="names"><span class="dot b"></span>Louis Park <span class="m">1700</span> <b>alex_knight</b> <span class="m">1654</span></div><div class="qual m">3+2 · 28 moves · Lichess</div></div><div class="r m"><span class="res l">1–0</span><div class="drop"><span class="c">−20%</span> <span class="c">??3</span></div></div><svg class="spark" viewBox="0 0 46 22" aria-hidden="true"><path d="M0 11 L8 10 14 12 18 9 22 13 26 10 30 8 34 14 38 12 42 16 46 15 V22 H0Z" fill="var(--elevated)"/><path d="M0 11 L8 10 14 12 18 9 22 13 26 10 30 8 34 14 38 12 42 16 46 15" fill="none" stroke="var(--faint)" stroke-width="1"/><line x1="34" y1="2" x2="34" y2="20" stroke="var(--blunder)" stroke-width="1.2"/></svg></div>
+          <div class="daterule m">5 September</div>
+          <div class="grow"><div class="l"><div class="names"><span class="dot w"></span><b>alex_knight</b> <span class="m">1655</span> Lina Rossi <span class="m">1724</span></div><div class="qual m">3+2 · 19 moves · Lichess</div></div><div class="r m"><span class="res w">1–0</span><div class="drop"><span class="c">−47%</span> <span class="c">??1</span> <span class="q">?2</span></div></div><svg class="spark" viewBox="0 0 46 22" aria-hidden="true"><path d="M0 11 L8 9 14 8 18 10 22 6 26 9 30 5 34 7 38 4 42 5 46 3 V22 H0Z" fill="var(--elevated)"/><path d="M0 11 L8 9 14 8 18 10 22 6 26 9 30 5 34 7 38 4 42 5 46 3" fill="none" stroke="var(--faint)" stroke-width="1"/><line x1="18" y1="2" x2="18" y2="20" stroke="var(--blunder)" stroke-width="1.2"/></svg></div>
+          <div class="grow"><div class="l"><div class="names"><span class="dot w"></span><b>AlexKnight</b> <span class="m">1645</span> Leon Weber <span class="m">1707</span></div><div class="qual m">10+5 · 35 moves · Chess.com</div></div><div class="r m"><span class="res w">1–0</span><div class="drop"><span class="c">−33%</span> <span class="c">??3</span></div></div><svg class="spark" viewBox="0 0 46 22" aria-hidden="true"><path d="M0 11 L8 12 14 10 18 11 22 8 26 12 30 6 34 9 38 5 42 6 46 4 V22 H0Z" fill="var(--elevated)"/><path d="M0 11 L8 12 14 10 18 11 22 8 26 12 30 6 34 9 38 5 42 6 46 4" fill="none" stroke="var(--faint)" stroke-width="1"/><line x1="26" y1="2" x2="26" y2="20" stroke="var(--blunder)" stroke-width="1.2"/></svg></div>
+          <div class="grow"><div class="l"><div class="names"><span class="dot b"></span>Eva Santos <span class="m">1745</span> <b>alex_knight</b> <span class="m">1657</span></div><div class="qual m">3+2 · 34 moves · Lichess</div></div><div class="r m"><span class="res w">0–1</span><div class="drop"><span class="c">−62%</span> <span class="c">??2</span> <span class="q">?!1</span></div></div><svg class="spark" viewBox="0 0 46 22" aria-hidden="true"><path d="M0 11 L8 13 14 15 18 12 22 16 26 13 30 17 34 14 38 18 42 15 46 19 V22 H0Z" fill="var(--elevated)"/><path d="M0 11 L8 13 14 15 18 12 22 16 26 13 30 17 34 14 38 18 42 15 46 19" fill="none" stroke="var(--faint)" stroke-width="1"/><line x1="30" y1="2" x2="30" y2="20" stroke="var(--blunder)" stroke-width="1.2"/></svg></div>
+          <div class="daterule m">4 September</div>
+          <div class="grow"><div class="l"><div class="names"><span class="dot w"></span><b>alex_knight</b> <span class="m">1650</span> Felix Martin <span class="m">1623</span></div><div class="qual m">3+2 · 67 moves · Lichess</div></div><div class="r m"><span class="res d">½–½</span><div class="drop"><span class="c">−43%</span> <span class="c">??2</span> <span class="q">?1</span></div></div><svg class="spark" viewBox="0 0 46 22" aria-hidden="true"><path d="M0 11 L8 8 14 12 18 7 22 13 26 9 30 12 34 10 38 12 42 11 46 11 V22 H0Z" fill="var(--elevated)"/><path d="M0 11 L8 8 14 12 18 7 22 13 26 9 30 12 34 10 38 12 42 11 46 11" fill="none" stroke="var(--faint)" stroke-width="1"/><line x1="10" y1="2" x2="10" y2="20" stroke="var(--blunder)" stroke-width="1.2"/></svg></div>
+          <div class="grow"><div class="l"><div class="names"><span class="dot b"></span>Maya Brooks <span class="m">1682</span> <b>AlexKnight</b> <span class="m">1625</span></div><div class="qual m">3+2 · 33 moves · Chess.com</div></div><div class="r m"><span class="res l">1–0</span><div class="drop"><span class="c">−25%</span> <span class="c">??3</span></div></div><svg class="spark" viewBox="0 0 46 22" aria-hidden="true"><path d="M0 11 L8 12 14 14 18 12 22 15 26 14 30 17 34 16 38 18 42 17 46 19 V22 H0Z" fill="var(--elevated)"/><path d="M0 11 L8 12 14 14 18 12 22 15 26 14 30 17 34 16 38 18 42 17 46 19" fill="none" stroke="var(--faint)" stroke-width="1"/><line x1="22" y1="2" x2="22" y2="20" stroke="var(--blunder)" stroke-width="1.2"/></svg></div>
+          <div class="tabbar"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18M4 16l5-6 4 3 7-8"/></svg>Dashboard</span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>Games</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V12M12 12L6 5M12 12l6-7"/></svg>Explorer</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h8M4 12h16M4 17h16"/></svg>Notes</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>Settings</span></div>
+        </div>
+      </figure>
+    </div>
+    <ul class="notes">
+      <li><i>2a</i><span>Side dot before the owner's name, the <code>PlayerRow</code> disc at 9pt. With no owner in the game (a reference game) there is no dot, which is the truth about it.</span><small><span class="size">S</span></small></li>
+      <li><i>2b</i><span>Result as a chip: <code>chipGood</code> for a win, a new <code>chipBad</code> pair for a loss (the web has none yet; add it to <code>index.css</code> at the same time so the token list stays shared), <code>elevated</code> for a draw. Same outcome colours as now, just with a ground.</span><small><span class="size">S</span></small></li>
+      <li><i>2c</i><span>Date rules: a mono day label over a hairline, sections in the <code>List</code>. Line two then reads "3+2 · 28 moves · Lichess". The stamp's area fill goes from none to <code>elevated</code> so it reads as a shape rather than a scribble.</span><small><span class="size">M</span></small></li>
+      <li><i>2d</i><span>Search field as a 10pt-radius rectangle, chips as 6pt-radius rectangles with an edge, an active chip on <code>selected</code>. The pill shapes are the template's; the web's radius scale is the app's.</span><small><span class="size">S</span></small></li>
+      <li><i>2e</i><span>The count strip goes: the total sits under the large title and, once a filter is on, in the search placeholder ("Search 312 games").</span><small><span class="size">S</span></small></li>
+    </ul>
+  </section>
+
+  <!-- ================= GAME TOP ================= -->
+  <section class="block" id="game">
+    <div class="head"><span class="eyebrow">3 · Game, the top</span><h2>Opening at full width, result with the players</h2><span class="verdict rec">Recommended</span></div>
+    <div class="prose">
+      <p>Three stacked things above the board today: the navigation bar with a centred two-line title that truncates every opening longer than "Sicilian", a players strip that floats without touching either neighbour, and then the board. The result lives in the 10pt subtitle, which is the wrong place for the one fact everyone looks for first. The glass back button and the glass pill are iOS 26's, fine, but they make a centred title between them look like a third pill.</p>
+      <p><strong>Scoresheet.</strong> Empty the bar's centre and let the two glass controls stand alone. Under it a header on <span class="m">surface</span>, rule above and below: the opening name at full width on one line with the ECO as a chip, a mono line for time control, source and date, and the players facing each other across the <strong>result</strong> instead of a hairline. The clocks stay bound to the cursor where they are. Height is within four points of today.</p>
+    </div>
+    <div class="compare">
+      <figure><figcaption><b>Now</b></figcaption><div class="shot"><img class="light" src="ios/game.png" alt="The game screen as it is: centred truncated title, players strip, board."><img class="dark" src="ios/game-dark.png" alt="The game screen as it is, dark theme."></div></figure>
+      <figure><figcaption><b>Proposed</b> Scoresheet</figcaption>
+        <div class="phone crop">
+          <div class="status"><span>09:41</span><span class="island"></span><span class="sig">▂▄▆ ᯤ ▮</span></div>
+          <div class="nav"><div class="glass" style="color:var(--text)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div><div class="title"></div><div class="glass wide"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2zM9 19h6v1.5a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 20.5z"/></svg><svg class="dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="16" cy="12" r="1" fill="currentColor"/></svg></div></div>
+          <div class="ghead">
+            <div class="op"><b>English Opening: King's English Variation</b><span class="eco m">A20</span></div>
+            <div class="meta m">3+2 · Lichess · 6 Sep 2026 · 56 moves</div>
+            <div class="players">
+              <div class="p"><span class="dot b"></span><b>alex_knight</b><span class="m">1654</span><span class="m clk">2:56</span></div>
+              <span class="score m" style="background:var(--chip-bad);color:var(--blunder);border:1px solid var(--chip-bad-edge)">1–0</span>
+              <div class="p r"><span class="m clk">2:56</span><span class="m">1700</span><b>Louis Park</b><span class="dot w ring"></span></div>
+            </div>
+          </div>
+          <div class="boardwrap"><div class="evalbar"><i></i></div>
+            <div class="board" aria-hidden="true">
+              <span class="wp">♜</span><span class="d wp">♞</span><span class="wp">♝</span><span class="d wp">♚</span><span class="wp">♛</span><span class="d wp">♝</span><span class="wp">♞</span><span class="d wp">♜</span>
+              <span class="d wp">♟</span><span class="wp">♟</span><span class="d wp">♟</span><span class="wp">♟</span><span class="d wp">♟</span><span class="wp">♟</span><span class="d wp">♟</span><span class="wp">♟</span>
+              <span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span>
+              <span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span>
+              <span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span>
+              <span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span>
+              <span class="bp">♟</span><span class="d bp">♟</span><span class="bp">♟</span><span class="d bp">♟</span><span class="bp">♟</span><span class="d bp">♟</span><span class="bp">♟</span><span class="d bp">♟</span>
+              <span class="d bp">♜</span><span class="bp">♞</span><span class="d bp">♝</span><span class="bp">♚</span><span class="d bp">♛</span><span class="bp">♝</span><span class="d bp">♞</span><span class="bp">♜</span>
+            </div></div>
+          <div class="transport"><span>⏮</span><span>‹</span><b class="m">0/56</b><span>▶</span><span>›</span><span>⏭</span></div>
+        </div>
+      </figure>
+    </div>
+    <ul class="notes">
+      <li><i>3a</i><span>Remove the <code>.principal</code> toolbar item; the two-line title becomes the header block under the bar. The header is one view, <code>GameHeader</code>, that owns <code>PlayersRow</code>.</span><small><span class="size">M</span></small></li>
+      <li><i>3b</i><span>The result chip sits between the halves, in the owner's colour: <code>chipGood</code> when they won, <code>chipBad</code> when they lost, neutral for a draw or a game they did not play.</span><small><span class="size">S</span></small></li>
+      <li><i>3c</i><span>The ECO as a chip on the right of the name line, the time control, source and date in the mono line. A game with no opening name shows "Game" and nothing else changes.</span><small><span class="size">S</span></small></li>
+      <li><i>3d</i><span>The header is a light-weight <code>surface</code> pane with a hairline above and below, so the bar, the header and the board are three distinct bands rather than one grey field with things floating in it.</span><small><span class="size">S</span></small></li>
+    </ul>
+
+    <div class="head" style="margin-top:32px"><span class="eyebrow">3 · alternative</span><h2>Lean: the players are the title</h2><span class="verdict opt">Optional</span></div>
+    <div class="prose">
+      <p>If the goal is board height rather than reading, put the players strip <em>in</em> the navigation bar's centre and move the opening down to where it belongs, as the first line of the Moves pane. The board gains 34 points and the screen is the bar and the board with nothing in between. The cost is that the names get about 190 points between the two glass controls and truncate sooner, and a two-line bar title is small. Worth trying only if the board feels cramped in practice.</p>
+    </div>
+    <div class="compare">
+      <figure><figcaption><b>Proposed</b> Lean</figcaption>
+        <div class="phone crop" style="max-height:420px">
+          <div class="status"><span>09:41</span><span class="island"></span><span class="sig">▂▄▆ ᯤ ▮</span></div>
+          <div class="nav"><div class="glass" style="color:var(--text)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></div>
+            <div class="title" style="display:flex;justify-content:center;align-items:center;gap:6px;font-size:13px"><span class="dot b"></span><b style="display:inline;font-size:13px">alex_knight</b><span class="m" style="font-size:11px;color:var(--dim)">1654</span><span class="m" style="font-size:12px;font-weight:600;color:var(--blunder);padding:0 4px">1–0</span><span class="m" style="font-size:11px;color:var(--dim)">1700</span><span style="font-size:13px">Louis Park</span><span class="dot w ring"></span></div>
+            <div class="glass wide"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2zM9 19h6v1.5a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 20.5z"/></svg><svg class="dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="16" cy="12" r="1" fill="currentColor"/></svg></div></div>
+          <div class="boardwrap" style="padding-top:12px"><div class="evalbar"><i></i></div>
+            <div class="board" aria-hidden="true">
+              <span class="wp">♜</span><span class="d wp">♞</span><span class="wp">♝</span><span class="d wp">♚</span><span class="wp">♛</span><span class="d wp">♝</span><span class="wp">♞</span><span class="d wp">♜</span>
+              <span class="d wp">♟</span><span class="wp">♟</span><span class="d wp">♟</span><span class="wp">♟</span><span class="d wp">♟</span><span class="wp">♟</span><span class="d wp">♟</span><span class="wp">♟</span>
+              <span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span>
+              <span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span><span class="d"></span><span></span>
+            </div></div>
+        </div>
+      </figure>
+      <figure><figcaption><b>…and the Moves pane</b> carries the opening</figcaption>
+        <div class="mini">
+          <div class="pane-title"><b>Moves</b><span>English Opening: King's English Variation</span><span class="m" style="margin-left:auto">A20</span></div>
+          <div class="m" style="padding:8px 16px;font-size:15px;color:var(--body);display:grid;grid-template-columns:34px 1fr 50px 1fr 50px;gap:6px 8px;line-height:1.7"><span style="color:var(--faint)">1.</span><span>c4</span><span style="color:var(--dim);font-size:12px">2:56</span><span>e5</span><span style="color:var(--dim);font-size:12px">2:56</span><span style="color:var(--faint)">2.</span><span>d4</span><span style="color:var(--dim);font-size:12px">2:58</span><span>exd4</span><span style="color:var(--dim);font-size:12px">2:57</span></div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= NOTES ================= -->
+  <section class="block" id="notes">
+    <div class="head"><span class="eyebrow">4 · Notes</span><h2>Quieter context line, date rules</h2><span class="verdict rec">Recommended</span></div>
+    <div class="prose">
+      <p>Every note opens with a line of accent-blue mono. Ten of them on a screen and the accent stops meaning anything, and the note's own words, the thing the person wrote, come second visually. Swap the voices: the context line in <span class="m">dim</span> with the disc for the colour and the move in <span class="m">body</span>, the note text in the app's text colour, the tags as edged chips. Group by date the way the web does, so a note without a game (the training plan) sits under its day instead of looking like a stray.</p>
+    </div>
+    <div class="compare">
+      <figure><figcaption><b>Now</b></figcaption><div class="shot"><img class="light" src="ios/notes.png" alt="The notes list as it is."><img class="dark" src="ios/notes-dark.png" alt="The notes list as it is, dark theme."></div></figure>
+      <figure><figcaption><b>Proposed</b></figcaption>
+        <div class="phone crop" style="max-height:560px">
+          <div class="status"><span>09:41</span><span class="island"></span><span class="sig">▂▄▆ ᯤ ▮</span></div>
+          <div class="large"><div class="row"><div><h1>Notes</h1><div class="under m"><b>38</b> notes · <b>27</b> games</div></div></div></div>
+          <div class="daterule m" style="margin-top:8px">Today</div>
+          <div class="note"><div class="ctx m"><span>General</span></div><div class="txt">Training plan: calculate forcing moves, then review rook endings twice this week.</div><div class="tags"><span class="tag">training-plan</span></div></div>
+          <div class="note"><div class="ctx m"><span class="dot b"></span><span>Maya Brooks – AlexKnight</span><b>93. Kc7</b></div><div class="txt">Review the forcing checks before committing to this capture.</div><div class="tags"><span class="tag">tactics</span><span class="tag">checks</span></div></div>
+          <div class="daterule m">Yesterday</div>
+          <div class="note"><div class="ctx m"><span class="dot b"></span><span>Noah Laurent – alex_knight</span><b>10. Qxf3</b></div><div class="txt">The pawn break was right, but the preparation was one move too slow.</div><div class="tags"><span class="tag">middlegame</span></div></div>
+          <div class="note"><div class="ctx m"><span class="dot w"></span><span>alex_knight – Clara Stein</span><b>11… O-O</b></div><div class="txt">Compare the quiet move with the immediate attack next session.</div><div class="tags"><span class="tag">calculation</span></div></div>
+          <div class="daterule m">4 September</div>
+          <div class="note"><div class="ctx m"><span class="dot b"></span><span>Leon Weber – AlexKnight</span><b>12. Bb2</b></div><div class="txt">Recurring pattern: trading the active rook relieved all the pressure.</div><div class="tags"><span class="tag">pattern</span><span class="tag">rook</span></div></div>
+        </div>
+      </figure>
+    </div>
+    <ul class="notes">
+      <li><i>4a</i><span>Context line: colour disc, names in <code>dim</code>, move in <code>body</code> semibold, all mono at 12pt. A note with no game says "General".</span><small><span class="size">S</span></small></li>
+      <li><i>4b</i><span>Date rules as on Games, with "Today" and "Yesterday" as words. Same <code>daterule</code> component in both lists.</span><small><span class="size">S</span></small></li>
+      <li><i>4c</i><span>Tags as 4pt-radius chips with an <code>edge</code>, on <code>elevated</code>; the count line under the large title.</span><small><span class="size">S</span></small></li>
+    </ul>
+  </section>
+
+  <!-- ================= EXPLORER ================= -->
+  <section class="block" id="explorer">
+    <div class="head"><span class="eyebrow">5 · Explorer</span><h2>Thinner bars, the line as a line</h2><span class="verdict opt">Small</span></div>
+    <div class="prose">
+      <p>The explorer is the screen that already looks most like its own thing, because the board is doing the work. Two small moves. The split bars are the heaviest element on the screen at 8 points and saturated green-to-red; at 6 points on the <span class="m">track</span> they read as data rather than as a progress bar. And "Starting position" is a label for a state; once moves are played, that strip should say the line in mono, which is what the web's explorer shows and what someone quotes to a friend.</p>
+    </div>
+    <div class="compare">
+      <figure><figcaption><b>Now</b></figcaption><div class="shot"><img class="light" src="ios/explorer.png" alt="The explorer as it is."><img class="dark" src="ios/explorer-dark.png" alt="The explorer as it is, dark theme."></div></figure>
+      <figure><figcaption><b>Proposed</b> the strip under the board and the table</figcaption>
+        <div class="mini">
+          <div class="line-strip m">1. e4 c5 2. Nf3 d6 3. d4 cxd4 <em>· Sicilian, Open</em></div>
+          <div class="transport" style="padding-bottom:10px"><span>⏮</span><span>‹</span><b class="m">6/6</b><span>›</span><span>⏭</span></div>
+          <div class="xhead"><span>Been here <b>212</b> times</span><span class="wdl m"><i style="background:var(--good)"></i>98<i style="background:var(--faint)"></i>21<i style="background:var(--blunder)"></i>93</span><span class="m" style="margin-left:auto"><b>51.2%</b></span></div>
+          <div class="xrow"><span>Nxd4</span><span class="m">188</span><span class="bar"><i class="ww" style="width:47%"></i><i class="dd" style="width:10%"></i><i class="ll" style="width:43%"></i></span><span class="m">52.1%</span><span class="m" style="color:var(--faint)">−0.4%</span></div>
+          <div class="xrow"><span>Qxd4</span><span class="m">19</span><span class="bar"><i class="ww" style="width:36%"></i><i class="dd" style="width:12%"></i><i class="ll" style="width:52%"></i></span><span class="m" style="color:var(--blunder)">42.1%</span><span class="m" style="color:var(--blunder)">−1.8%</span></div>
+          <div class="xrow"><span>c3</span><span class="m">5</span><span class="bar"><i class="ww" style="width:60%"></i><i class="dd" style="width:0"></i><i class="ll" style="width:40%"></i></span><span class="m">60.0%</span><span class="m" style="color:var(--faint)">—</span></div>
+        </div>
+      </figure>
+    </div>
+    <ul class="notes">
+      <li><i>5a</i><span>The strip under the board carries the moves played so far in mono, opening name after a dot in <code>faint</code>; "Starting position" only at ply 0.</span><small><span class="size">S</span></small></li>
+      <li><i>5b</i><span>Bars at 6pt on <code>track</code>; the header line's three counts get their own colour squares so the bar's legend is on the screen.</span><small><span class="size">S</span></small></li>
+    </ul>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="block" id="settings">
+    <div class="head"><span class="eyebrow">6 · Settings</span><h2>The one place for the brand</h2><span class="verdict opt">Small</span></div>
+    <div class="prose">
+      <p>Settings is a grouped form and should stay one; nobody wants a designed settings screen. It is also the only screen where the app can say its own name without it being noise. A footer with the pawn-robot mark, the app's name and version, and the server it is reading with a green dot for connected, puts the identity in the one place someone looks for it. The server row itself keeps its mono value.</p>
+    </div>
+    <div class="compare">
+      <figure><figcaption><b>Now</b></figcaption><div class="shot"><img class="light" src="ios/settings.png" alt="Settings as it is."><img class="dark" src="ios/settings.png" alt="Settings as it is."></div></figure>
+      <figure><figcaption><b>Proposed</b> footer under the last group</figcaption>
+        <div class="mini">
+          <div class="foot"><img src="../brand/logo.png" alt=""><div><b>Blunderbase Companion 0.1.0</b><span class="m"><span class="ok"></span>demo.blunderbase.org · read-only</span></div></div>
+        </div>
+      </figure>
+    </div>
+    <ul class="notes">
+      <li><i>6a</i><span>Footer: the logo from <code>docs/design/brand</code> (inverted in the dark theme as the web does), name and version from the bundle, server and access from <code>Session</code>. Large title as on the other tabs.</span><small><span class="size">S</span></small></li>
+    </ul>
+  </section>
+
+  <!-- ================= PLAN ================= -->
+  <section class="block" id="plan">
+    <div class="head"><span class="eyebrow">Order</span><h2>If it were one afternoon</h2></div>
+    <div class="prose"><p>The proposals stack. The first row changes the feel of the whole app on its own, and the game header is the one the owner asked for; everything after that is a screen at a time.</p></div>
+    <table class="plan">
+      <tr><th>Step</th><th>What</th><th>Touches</th><th>Size</th></tr>
+      <tr><td>1</td><td>Large titles with the mono count line on all five tabs; section heads over rules; chips and fields on the radius scale.</td><td>RootView, each tab's header, a shared <code class="m">SectionHead</code></td><td><span class="size">S</span></td></tr>
+      <tr><td>2</td><td>Game header: Scoresheet.</td><td>GameDetailView toolbar, PlayerRow, a new GameHeader</td><td><span class="size">M</span></td></tr>
+      <tr><td>3</td><td>Games rows: side dot, result chip, sparkline fill.</td><td>GameRowView, Sparkline, Theme (chipBad)</td><td><span class="size">S</span></td></tr>
+      <tr><td>4</td><td>Dashboard: cards to sections, endpoint dots, stats row.</td><td>DashboardView</td><td><span class="size">S</span></td></tr>
+      <tr><td>5</td><td>Date rules on Games and Notes; the notes context line.</td><td>GamesListView, NotesListView, a shared <code class="m">DateRule</code></td><td><span class="size">M</span></td></tr>
+      <tr><td>6</td><td>Explorer strip and bars; Settings footer.</td><td>ExplorerView, SettingsView</td><td><span class="size">S</span></td></tr>
+    </table>
+  </section>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement, buttons = document.querySelectorAll('.themes button');
+    function apply(v) {
+      if (v === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', v);
+      buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.set === v)); });
+      try { localStorage.setItem('bb-ios-pass-theme', v); } catch (e) {}
+    }
+    buttons.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.set); }); });
+    var saved = null; try { saved = localStorage.getItem('bb-ios-pass-theme'); } catch (e) {}
+    if (saved === 'dark' || saved === 'light') apply(saved);
+  })();
+</script>
+</body>
+</html>
