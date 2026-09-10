@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { GameCardList } from '@/lib/api/types'
+import { setEngineHidden } from '@/lib/ui/engineVisibility'
 
 import { RecentGamesList } from './RecentGamesList'
 
@@ -66,6 +67,7 @@ function draw(state: Partial<UseQueryResult<GameCardList, Error>>) {
 
 describe('RecentGamesList — component states (design 2a rail)', () => {
   beforeEach(() => useGameCards.mockReset())
+  afterEach(() => setEngineHidden(false))
 
   it('shows placeholder rows while the page is in flight', () => {
     draw({ isPending: true })
@@ -108,5 +110,19 @@ describe('RecentGamesList — component states (design 2a rail)', () => {
   it('links the whole library, counted', () => {
     draw({ data: CARDS })
     expect(screen.getByRole('link', { name: 'All 15' })).toHaveAttribute('href', '/games')
+  })
+
+  it('keeps the swing and the badge off the row while the engine is hidden', () => {
+    setEngineHidden(true)
+    draw({ data: CARDS })
+
+    const game = screen.getByRole('link', { name: /jazzoz/ })
+    // The two things on the row that are the engine's verdict.
+    expect(game).not.toHaveTextContent('−44.2%')
+    expect(screen.queryByLabelText(/blunder/i)).not.toBeInTheDocument()
+    // The game, and the app's own bookkeeping about it, stay.
+    expect(game).toHaveTextContent('L')
+    expect(game).toHaveTextContent('1272')
+    expect(game).toHaveAttribute('title', expect.stringContaining('deep'))
   })
 })

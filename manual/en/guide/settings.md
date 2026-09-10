@@ -19,7 +19,8 @@ this browser.
 
 Hidden, the game screen loses the evaluation bar and the score, the `??` badges and the
 tinted rows, the evaluation graph, the engine and Maia panels and the live engine; the
-games list loses its **Worst** column and its flag badges. What stays is the game itself —
+games list loses its **Worst** column and its flag badges, and the dashboard's recent games
+lose the swing and the badge on each row. What stays is the game itself —
 the moves, the clocks, your notes — and what Blunderbase has *done*: which pass has run and
 how deep it went, and the buttons that queue another one, which is what you press once you
 have written your own verdict down.

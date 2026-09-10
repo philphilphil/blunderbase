@@ -21,7 +21,8 @@ jede Partie und übersteht das Neuladen. Er gehört zu diesem Browser.
 Ausgeblendet verliert die Partieansicht den Bewertungsbalken und die Bewertung, die
 `??`-Markierungen und die eingefärbten Zeilen, den Bewertungsverlauf, die Bereiche von
 Engine und Maia und die Live-Engine; die Partienliste verliert die Spalte **Verlust** und
-ihre Symbole. Es bleibt die Partie selbst – die Züge, die Uhren, deine Notizen – und das,
+ihre Symbole, und die neuesten Partien auf der Startseite verlieren den Verlust und das
+Symbol in jeder Zeile. Es bleibt die Partie selbst – die Züge, die Uhren, deine Notizen – und das,
 was Blunderbase *getan* hat: welcher Durchlauf gelaufen ist und wie tief, samt den
 Schaltflächen, die den nächsten einreihen. Genau die drückst du, wenn dein eigenes Urteil
 geschrieben ist.

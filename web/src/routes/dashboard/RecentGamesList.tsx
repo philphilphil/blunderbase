@@ -14,6 +14,7 @@ import { SectionHead } from '@/components/shell/Section'
 import { useGameCards } from '@/lib/api/queries'
 import type { GameCard as GameCardRow, WorstMoment } from '@/lib/api/types'
 import { formatWinLoss } from '@/lib/chess/evaluation'
+import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { cn } from '@/lib/utils'
 
 import { Bar, EmptyBlock, ErrorBlock } from '@/routes/stats/kit/states'
@@ -72,10 +73,16 @@ function titleOf(game: GameCardRow, i18n: I18n): string {
   return `${opening} · ${game.source} · ${tier}`
 }
 
-function GameRow({ game }: { game: GameCardRow }) {
+/**
+ * One game on one line. With the engine hidden (⇧E) the row keeps its result, opponent
+ * and rating and loses the swing and the badge — those two are the engine's verdict on how
+ * the game went. The tooltip's tier word stays: which pass has run is the app's own
+ * bookkeeping, not a verdict.
+ */
+function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: boolean }) {
   const { t, i18n } = useLingui()
   const outcome = outcomeOf(game)
-  const worst = worstOf(game)
+  const worst = engineHidden ? null : worstOf(game)
   return (
     <Link
       to={`/games/${game.id}`}
@@ -95,9 +102,11 @@ function GameRow({ game }: { game: GameCardRow }) {
       <span className="font-mono text-[0.625rem] tabular text-dim">
         {game.opponent_rating ?? '—'}
       </span>
-      <span className={cn('font-mono text-[0.6875rem] tabular', worst ? 'text-body' : 'text-dim-2')}>
-        {worst ? formatWinLoss(worst.win_loss) : '—'}
-      </span>
+      {engineHidden ? null : (
+        <span className={cn('font-mono text-[0.6875rem] tabular', worst ? 'text-body' : 'text-dim-2')}>
+          {worst ? formatWinLoss(worst.win_loss) : '—'}
+        </span>
+      )}
       {worst ? <ClassificationBadge classification={worst.classification} size="sm" /> : null}
     </Link>
   )
@@ -115,6 +124,9 @@ function ListSkeleton() {
 
 export function RecentGamesList() {
   const { t } = useLingui()
+  // Read once here rather than per row, like the games table does: every row is laid out
+  // from the same answer.
+  const engineHidden = useEngineHidden()
   const query = useGameCards({ limit: LIST })
   const games = query.data?.games ?? []
   const total = query.data?.total.toLocaleString()
@@ -156,7 +168,7 @@ export function RecentGamesList() {
       ) : (
         <div className="flex flex-col border-b border-hairline">
           {games.map((game) => (
-            <GameRow key={game.id} game={game} />
+            <GameRow key={game.id} game={game} engineHidden={engineHidden} />
           ))}
         </div>
       )}
