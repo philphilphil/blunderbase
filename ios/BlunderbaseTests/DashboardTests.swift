@@ -139,7 +139,7 @@ final class DashboardTests: XCTestCase {
     }
 
     func testAYearIsTheWindowToStartWith() {
-        XCTAssertEqual(DashboardStore().ratingWindow, .year)
+        XCTAssertEqual(DashboardStore().window, .year)
     }
 
     /// A hidden speed leaves the screen but not the menu, and the choice is the phone's.

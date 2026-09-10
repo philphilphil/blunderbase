@@ -9,10 +9,10 @@ import Observation
 /// window before it. What the web shows that this does not is the analysis queue and the
 /// sync button, both of which act on the server; the phone reads.
 ///
-/// **Two windows, two controls.** The rating charts are cut on the phone, because the
-/// profile carries every point and cutting is cheap; the trends are cut on the server,
-/// because they are aggregations over games and moves, and each window is a fresh request.
-/// So `ratingWindow` changes nothing but a filter, and `trendWindow` asks again.
+/// **One window, two cuts.** The rating charts are cut on the phone, because the profile
+/// carries every point and cutting is cheap; the trends are cut on the server, because they
+/// are aggregations over games and moves, and each window is a fresh request. So moving
+/// `window` changes a filter for the charts and asks again for the trends.
 @Observable
 @MainActor
 final class DashboardStore {
@@ -24,12 +24,20 @@ final class DashboardStore {
         case failed(String)
     }
 
-    /// How far back the rating charts look. The web's four, in the web's order.
-    enum RatingWindow: String, CaseIterable, Identifiable {
+    /// How far back the screen looks: the trends and the rating charts together.
+    ///
+    /// The web has two controls, one on each card. The phone has one, at the top, because
+    /// the two questions are the same question — "how has it been going lately" — and two
+    /// controls that could disagree made the reader set the same span twice. The web's four
+    /// rating windows in the web's order, with the trends' week at the short end. For the
+    /// trends, `all` is the whole library with nothing to compare it against, so the deltas
+    /// go absent rather than being faked.
+    enum Window: String, CaseIterable, Identifiable {
         case all
         case year
         case quarter
         case month
+        case week
 
         var id: String { rawValue }
 
@@ -39,6 +47,7 @@ final class DashboardStore {
             case .year: return 365
             case .quarter: return 90
             case .month: return 30
+            case .week: return 7
             }
         }
 
@@ -48,32 +57,23 @@ final class DashboardStore {
             case .year: return String(localized: "1y")
             case .quarter: return String(localized: "90d")
             case .month: return String(localized: "30d")
+            case .week: return String(localized: "7d")
             }
         }
-    }
 
-    /// How far back the trends look — and how far back again the window they are compared
-    /// against reaches. The web's three.
-    enum TrendWindow: Int, CaseIterable, Identifiable {
-        case week = 7
-        case month = 30
-        case quarter = 90
-
-        var id: Int { rawValue }
-        var days: Int { rawValue }
-
-        var label: String {
+        /// The trends head: what span the three numbers cover.
+        var title: String {
             switch self {
-            case .week: return String(localized: "7d")
-            case .month: return String(localized: "30d")
-            case .quarter: return String(localized: "90d")
+            case .all: return String(localized: "All time")
+            case .year: return String(localized: "Last year")
+            case .quarter, .month, .week: return String(localized: "Last \(days ?? 0) days")
             }
         }
     }
 
     /// The three numbers of the trends card and how each moved against the window before.
     struct Trends: Equatable {
-        let window: TrendWindow
+        let window: Window
         /// Games in the window.
         let games: Int
         /// Where the window ends — the newest game, or now.
@@ -94,9 +94,15 @@ final class DashboardStore {
     private(set) var trends: Trends?
     private(set) var trendsState: LoadState = .idle
 
-    /// A year to start with: long enough to show a shape, short enough that a decade of
-    /// games does not flatten this season into a line along the middle.
-    var ratingWindow: RatingWindow = .year
+    /// A year to start with: long enough for the charts to show a shape, short enough that a
+    /// decade of games does not flatten this season into a line along the middle. The
+    /// charts are a filter over ratings already held; the trends are asked again.
+    var window: Window = .year {
+        didSet {
+            guard window != oldValue else { return }
+            Task { await loadTrends() }
+        }
+    }
 
     /// The speeds whose charts are switched off. Read from the phone's settings once and
     /// written back on every flip, so the choice survives a relaunch.
@@ -109,13 +115,6 @@ final class DashboardStore {
             hiddenSpeeds.insert(speed)
         }
         Preferences.hiddenRatingSpeeds = hiddenSpeeds
-    }
-
-    var trendWindow: TrendWindow = .month {
-        didSet {
-            guard trendWindow != oldValue else { return }
-            Task { await loadTrends() }
-        }
     }
 
     @ObservationIgnored private var endpoints: Endpoints?
@@ -174,7 +173,7 @@ final class DashboardStore {
     /// the same two spans.
     func loadTrends() async {
         guard let endpoints else { return }
-        let window = trendWindow
+        let window = self.window
         trendsState = .loading
         do {
             let now = try await endpoints.dashboard(days: window.days)
@@ -194,14 +193,14 @@ final class DashboardStore {
             }
             // The reader may have moved the control while this was in flight; the answer
             // to an older question is not drawn over the newer one.
-            guard window == trendWindow else { return }
+            guard window == self.window else { return }
             trends = DashboardStore.trends(
                 window: window, now: now, performanceDelta: performanceDelta, phaseDelta: phaseDelta
             )
             trendsState = .loaded
         } catch {
             session?.handle(error)
-            guard window == trendWindow else { return }
+            guard window == self.window else { return }
             trendsState = .failed((error as? LocalizedError)?.errorDescription ?? "\(error)")
         }
     }
@@ -221,7 +220,7 @@ final class DashboardStore {
     /// The trends card's numbers out of the window's aggregations and the comparison's
     /// deltas — the web's `TrendsCard` reading, field for field.
     static func trends(
-        window: TrendWindow,
+        window: Window,
         now: StatsDashboardResponse,
         performanceDelta: StatsBucket?,
         phaseDelta: StatsBucket?
@@ -252,7 +251,7 @@ final class DashboardStore {
     /// Every rating chart the window allows, hidden ones included — what the speeds menu
     /// lists, so a hidden speed stays reachable to bring back.
     var allRatingCharts: [RatingCharts.SpeedChart] {
-        RatingCharts.build(profile?.ratings ?? [], days: ratingWindow.days)
+        RatingCharts.build(profile?.ratings ?? [], days: window.days)
     }
 
     /// The rating charts on screen: one per speed the reader has not switched off, one

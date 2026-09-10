@@ -48,7 +48,7 @@ struct GamesListView: View {
                 }
                 .background(Theme.void)
                 .navigationTitle("Games")
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         EngineVisibilityButton(engineHidden: $engineHidden)
@@ -94,20 +94,36 @@ struct GamesListView: View {
         }
     }
 
+    /// The rows, cut into days.
+    ///
+    /// A `Section` per day with a `DateRule` for its header, so the date leaves the rows
+    /// (see `GameRowView`) and a screen of games from the same evening says the evening
+    /// once. The count line is a row of its own at the top, and only while a filter is on:
+    /// unfiltered, the library's size is the dashboard's line and the title's own, and a
+    /// strip repeating it over the first row was the orphan the list used to open with.
     private var rows: some View {
         List {
-            Section {
-                ForEach(store.cards) { card in
-                    row(card)
-                }
-                if !store.reachedEnd {
-                    footer
-                }
-            } header: {
+            if store.hasFilters {
                 header
+            }
+            ForEach(DayGroup.cut(store.cards, date: { $0.game.playedAt })) { day in
+                Section {
+                    ForEach(day.items) { card in
+                        row(card)
+                    }
+                } header: {
+                    DateRule(label: day.label)
+                        .modifier(BareRow())
+                }
+            }
+            if !store.reachedEnd {
+                footer
             }
         }
         .listStyle(.plain)
+        // A day's band ends where the next rule starts; the list's own gap between
+        // sections would put a strip of empty ground there, which reads as a missing row.
+        .listSectionSpacing(0)
         .scrollContentBackground(.hidden)
         .environment(\.defaultMinListRowHeight, 0)
         .refreshable {
@@ -140,19 +156,13 @@ struct GamesListView: View {
         }
     }
 
-    /// How many games there are, and whether what is on screen is all of them.
-    ///
-    /// One line, and it changes shape rather than growing: unfiltered it is a count of the
-    /// library, filtered it is how much of the library survived. The distinction matters
-    /// because "1,284 games" under a set filter would be a lie about what is below it.
+    /// How much of the library survived the filters, and whether what is on screen is all
+    /// of it. Only drawn while a filter is on — see `rows` — because "1,284 games" under a
+    /// set filter would be a lie about what is below it, and without one the number is
+    /// already under the dashboard's title.
     private var header: some View {
-        Text(headerText)
-            .font(Theme.Font.mono(11))
-            .foregroundStyle(Theme.dim)
-            .textCase(nil)
-            .padding(.horizontal, Theme.Metrics.gutter)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        TitleLine(Text(headerText))
+            .padding(.top, 4)
             .background(Theme.void)
             .modifier(BareRow())
     }

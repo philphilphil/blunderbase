@@ -52,9 +52,13 @@ struct BookTable: View {
                 .font(Theme.Font.text(12, weight: .medium))
                 .foregroundStyle(Theme.info)
 
-            Text(verbatim: "· \(split.wins) / \(split.draws) / \(split.losses)")
-                .font(Theme.Font.mono(11))
-                .foregroundStyle(Theme.body2)
+            // Each count wears the colour its bar segment has below, so the bars' legend
+            // is the header and not a thing to remember.
+            HStack(spacing: 8) {
+                count(split.wins, Theme.good)
+                count(split.draws, Theme.faint)
+                count(split.losses, Theme.blunder)
+            }
 
             Spacer(minLength: 4)
 
@@ -71,6 +75,15 @@ struct BookTable: View {
         .accessibilityLabel(
             "\(split.games) of your games reached this position: \(split.wins) wins, \(split.draws) draws, \(split.losses) losses"
         )
+    }
+
+    private func count(_ value: Int, _ color: Color) -> some View {
+        HStack(spacing: 3) {
+            RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 7, height: 7)
+            Text(verbatim: "\(value)")
+                .font(Theme.Font.mono(11))
+                .foregroundStyle(Theme.body2)
+        }
     }
 
     // MARK: Rows

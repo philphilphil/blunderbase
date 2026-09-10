@@ -76,23 +76,26 @@ a server from its command line. `ios/Blunderbase/App/LaunchState.swift` is the w
 
 ## The dashboard
 
-The web dashboard's sections in the web's order, minus the two that act on the server: the
-line under the title counts the games and the blunders; **Ratings** draws one chart per
-speed with a line per platform, a year back by default, cut by the window control at the
-newest rated game, with a legend for the sites and a speeds menu that switches charts off
-and remembers it on this phone; **Worst
-moments** is the six worst moves of the last thirty days, in words rather than boards
-because a board that size is not legible on a phone, each opening its game on the position
-the blunder was played from; **Last N days** is blunders per game, the win percentage given
-away and the score, each against the equally long window before. The sync button and the
-analysis queue stay in the browser, where a tap can do something about them, and the recent
-games are the Games tab.
+The web dashboard's sections, minus the two that act on the server, with the trends first
+because they are what the screen is for: the line under the title counts the games and the
+blunders; **Last N days** is blunders per game, the win percentage given away and the
+score, each against the equally long window before, under the screen's one window control
+— All, 1y, 90d, 30d, 7d, a year to start with — which the rating charts follow; **Ratings**
+draws one chart per speed with a line per platform, cut by that window at the newest rated
+game, with a legend for the sites and a speeds menu that switches charts off and remembers
+it on this phone; **Worst moments** is the six worst moves of the last thirty days, in
+words rather than boards because a board that size is not legible on a phone, each opening
+its game on the position the blunder was played from. The sync button and the analysis
+queue stay in the browser, where a tap can do something about them, and the recent games
+are the Games tab.
 
 ## The games list
 
 A table with filters and nothing above it: result, blunders, analysed, speed and source as
-chips under the search field, and two lines per game — names and result, then date, time
-control, length, the worst drop and the flag chips, with the eval curve as a stamp.
+chips under the search field, the rows cut into days by a rule each, and two lines per
+game — names and the result as a chip, then time control, length, source, the worst drop and
+the flag chips, with the eval curve as a stamp. The scoresheet disc before your name says
+which colour you had; the bold name says it was you.
 
 ## The explorer
 
@@ -107,8 +110,11 @@ worth carrying is your own.
 
 ## The game screen
 
-The board and the panels share one column and trade space. The players strip, the board and
-the transport are on top; Moves, Eval, Engine, Book and Notes are tabs directly underneath.
+The board and the panels share one column and trade space. The players strip — both names
+at full width, their ratings and clocks, and the result between them — the board and the
+transport are on top; Moves, Eval, Engine, Book and Notes are tabs directly underneath. The
+opening's name, its ECO code and the time control are the first line of the Moves tab,
+which is the thing they describe, so the bar over the board carries only its controls.
 Book is the owner's own history of the position on the board — how often they have been
 here, how it went, and what they played from here — and it is the same fold over the same
 table the explorer page reads, so the two agree. Tapping a continuation plays it and the

@@ -37,6 +37,19 @@ enum Format {
         return formatter(template: sameYear ? "d MMM" : "d MMM yy", locale: locale).string(from: date)
     }
 
+    /// `6 September` inside the current year, `6 September 2025` outside it: the day as a
+    /// heading rather than as a cell, so the month is spelled out — a rule across a list has
+    /// the room, and "Sep" over a band of rows reads like a column header that lost its table.
+    static func dayName(
+        _ date: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        locale: Locale = .current
+    ) -> String {
+        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
+        return formatter(template: sameYear ? "d MMMM" : "d MMMM yyyy", locale: locale).string(from: date)
+    }
+
     private static var dateFormatters: [String: DateFormatter] = [:]
 
     private static func formatter(template: String, locale: Locale) -> DateFormatter {

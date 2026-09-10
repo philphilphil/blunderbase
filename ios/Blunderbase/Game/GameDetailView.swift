@@ -373,9 +373,12 @@ struct GameDetailView: View {
     /// by default, because reviewing your own game means seeing it from where you sat, and
     /// flipping the board swaps who is where — in the strip as on the board.
     private var players: some View {
-        PlayersRow(
+        let game = store.detail?.game ?? summary
+        return PlayersRow(
             near: player(white: store.orientation == .white, mirrored: false),
-            far: player(white: store.orientation != .white, mirrored: true)
+            far: player(white: store.orientation != .white, mirrored: true),
+            result: game?.result,
+            outcome: game?.outcome
         )
     }
 
@@ -480,21 +483,11 @@ struct GameDetailView: View {
 
     // MARK: Toolbar
 
+    /// The bar carries the controls and nothing else. Its centre is empty on purpose: the
+    /// players strip under it is the header, at the full width the names need, and the
+    /// opening the bar used to name is the Moves pane's first line. See `PlayersRow`.
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            VStack(spacing: 0) {
-                Text(store.detail?.game.opening ?? summary?.opening ?? String(localized: "Game"))
-                    .font(Theme.Font.text(13, weight: .semibold))
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(Theme.Font.mono(10))
-                    .foregroundStyle(Theme.faint)
-                    .lineLimit(1)
-            }
-        }
-
         ToolbarItemGroup(placement: .topBarTrailing) {
             // The lightbulb is the arrows' switch, and with the engine hidden there are no
             // arrows to switch; a button that does nothing is worse than none.
@@ -550,14 +543,5 @@ struct GameDetailView: View {
                 Image(systemName: "ellipsis.circle").foregroundStyle(Theme.dim)
             }
         }
-    }
-
-    private var subtitle: String {
-        let game = store.detail?.game ?? summary
-        var parts: [String] = []
-        if let eco = game?.eco { parts.append(eco) }
-        if let tc = game?.timeControl { parts.append(Format.timeControl(tc)) }
-        parts.append(Format.result(game?.result))
-        return parts.joined(separator: " · ")
     }
 }

@@ -32,7 +32,7 @@ struct WorstMomentsStrip: View {
     private static let tileWidth: CGFloat = 152
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             heading
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -46,17 +46,18 @@ struct WorstMomentsStrip: View {
                 .padding(.horizontal, Theme.Metrics.gutter)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.bottom, 8)
         .background(Theme.void)
     }
 
-    /// What the row is, and what "recent" means, in one line — the web says both in its
-    /// section head and the window is the part nobody would guess.
+    /// What the row is, and what "recent" means — the web says both in its section head,
+    /// and the window is the part nobody would guess, so it rides in the head's control slot.
     private var heading: some View {
-        Text("Worst moments · last \(MomentsStore.recentDays) days")
-            .font(Theme.Font.mono(11))
-            .foregroundStyle(Theme.dim)
-            .padding(.horizontal, Theme.Metrics.gutter)
+        SectionHead("Worst moments") {
+            Text("last \(MomentsStore.recentDays) days")
+                .font(Theme.Font.mono(11))
+                .foregroundStyle(Theme.faint)
+        }
     }
 
     // MARK: A tile
@@ -75,12 +76,14 @@ struct WorstMomentsStrip: View {
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 5) {
+                    // The glyph is the tile's verdict and leads it, at the size of the move
+                    // rather than under it: a tile is a blunder first and a move second.
                     Text(moment.classification.glyph)
-                        .font(Theme.Font.mono(11, weight: .bold))
+                        .font(Theme.Font.mono(13, weight: .bold))
                         .foregroundStyle(moment.classification.color)
                     Text(Format.move(ply: moment.ply, san: moment.san))
-                        .font(Theme.Font.mono(12, weight: .medium))
-                        .foregroundStyle(Theme.body)
+                        .font(Theme.Font.mono(13, weight: .medium))
+                        .foregroundStyle(Theme.text)
                         .lineLimit(1)
                     Spacer(minLength: 2)
                     Text(Format.winLoss(moment.winLoss))

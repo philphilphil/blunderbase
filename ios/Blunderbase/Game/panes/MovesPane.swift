@@ -17,6 +17,8 @@ struct MovesPane: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
+                    opening
+
                     ForEach(pairs, id: \.number) { pair in
                         row(pair)
                             .id(pair.number)
@@ -66,6 +68,48 @@ struct MovesPane: View {
             .onAppear {
                 proxy.scrollTo(currentPairNumber, anchor: .center)
             }
+        }
+    }
+
+    /// What the moves are called, over the moves.
+    ///
+    /// The opening is a property of the move list — it is the name of its first few rows —
+    /// so this is where it lives, and not in the bar over the board, where it had a third of
+    /// the screen and truncated. It gets the full line here: the name, then the ECO code and
+    /// the time control in mono. A game the server could not name gets no line at all rather
+    /// than a line saying so.
+    @ViewBuilder
+    private var opening: some View {
+        let game = store.detail?.game
+        if let opening = game?.opening ?? game?.eco {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(opening)
+                    .font(Theme.Font.text(12, weight: .semibold))
+                    .foregroundStyle(Theme.body)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 4)
+                if game?.opening != nil, let eco = game?.eco {
+                    Text(eco)
+                        .font(Theme.Font.mono(11))
+                        .foregroundStyle(Theme.dim)
+                        .fixedSize()
+                }
+                if let tc = game?.timeControl {
+                    Text(Format.timeControl(tc))
+                        .font(Theme.Font.mono(11))
+                        .foregroundStyle(Theme.faint)
+                        .fixedSize()
+                }
+            }
+            .padding(.horizontal, Theme.Metrics.gutter)
+            .padding(.top, 6)
+            .padding(.bottom, 8)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                    .padding(.horizontal, Theme.Metrics.gutter)
+            }
+            .accessibilityElement(children: .combine)
         }
     }
 

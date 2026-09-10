@@ -1,26 +1,38 @@
 import SwiftUI
 
-/// Both players in one strip above the board: who they are, what they were rated, and what
-/// their clocks said at the position on the board.
+/// Both players in one strip above the board: who they are, what they were rated, what
+/// their clocks said at the position on the board, and how it ended.
 ///
 /// One strip rather than a row above the board and a row below it. The screen's height is
 /// the board and the panes trading one column, and a row between them was 34 points that
 /// separated the two things the reader looks between most; above the board it costs the
 /// same and separates nothing. The side whose pieces are at the bottom reads first, which
 /// is the owner unless the board is flipped, and the dot says the colour either way.
+///
+/// The strip is the game's whole header. The opening name used to sit over it in the
+/// navigation bar, centred between two glass controls that left it a third of the screen
+/// and cut every name longer than "Sicilian"; it is the Moves pane's first line now, which
+/// is the pane it describes, and the bar's centre is empty. That gives the two names the
+/// full width, which is what stops them being abbreviated, and the result sits between
+/// them where a scoresheet puts it rather than in a ten-point subtitle.
 struct PlayersRow: View {
     let near: PlayerRow
     let far: PlayerRow
+    let result: String?
+    let outcome: String?
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 8) {
             near
-            Divider().overlay(Theme.hairline).frame(height: 18).padding(.horizontal, 10)
+            ResultChip(result: result, outcome: outcome)
             far
         }
         .padding(.horizontal, Theme.Metrics.gutter)
         .frame(height: 34)
         .background(Theme.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.hairline).frame(height: 0.5)
+        }
     }
 }
 
@@ -95,19 +107,10 @@ struct PlayerRow: View {
         }
     }
 
-    /// A filled disc for White, a ringed one for Black — the same shorthand a scoresheet
-    /// uses, and readable at this size where a piece glyph would not be. It brightens for
-    /// whoever is to move, so the board's turn is legible without counting moves.
+    /// The scoresheet disc, brightened for whoever is to move so the board's turn is
+    /// legible without counting moves. `SideDot` is the same mark the lists use.
     private var sideDot: some View {
-        Circle()
-            .fill(isWhite ? Theme.sideWhite : Theme.sideBlack)
-            .overlay(Circle().strokeBorder(isWhite ? Theme.sideWhiteEdge : Theme.sideBlackEdge, lineWidth: 1))
-            .frame(width: 10, height: 10)
-            .overlay {
-                if toMove {
-                    Circle().strokeBorder(Theme.accent, lineWidth: 1.5).frame(width: 15, height: 15)
-                }
-            }
+        SideDot(isWhite: isWhite, toMove: toMove)
     }
 
     private var accessibilityLabel: String {
@@ -122,7 +125,9 @@ struct PlayerRow: View {
 #Preview {
     PlayersRow(
         near: PlayerRow(name: "phib", rating: 1690, isWhite: true, isOwner: true, clock: 238, toMove: false),
-        far: PlayerRow(name: "Hikaru", rating: 2812, isWhite: false, isOwner: false, clock: 12, toMove: true, mirrored: true)
+        far: PlayerRow(name: "Hikaru", rating: 2812, isWhite: false, isOwner: false, clock: 12, toMove: true, mirrored: true),
+        result: "0-1",
+        outcome: "loss"
     )
     .background(Theme.void)
 }

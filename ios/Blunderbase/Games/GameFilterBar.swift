@@ -229,22 +229,31 @@ struct GameFilterBar: View {
 
 /// One chip's look, and its hit target.
 ///
-/// The pill draws at 30pt because that is the height the design's chips are, but a 30pt
+/// The chip draws at 30pt because that is the height the design's chips are, but a 30pt
 /// target is under Apple's minimum, so the padding that brings the row to 44 is part of the
 /// tappable shape rather than spacing around it. Separating the two is the whole reason
 /// this is a modifier and not a `background` call at each site.
+///
+/// A rounded rectangle on the app's control radius rather than a capsule: the capsule is the
+/// system's shape, and a row of them under a pill search field is what made the screen read
+/// as a template. A chip in force sits on the selection ground with the accent as its edge
+/// — the web's selected row — instead of a solid accent fill, which shouted.
 private struct ChipStyle: ViewModifier {
     let isActive: Bool
 
     func body(content: Content) -> some View {
         content
             .font(Theme.Font.text(12, weight: .medium))
-            .foregroundStyle(isActive ? Theme.accentInk : Theme.body2)
+            .foregroundStyle(isActive ? Theme.text : Theme.body2)
             .padding(.horizontal, 10)
             .frame(height: 30)
-            .background(isActive ? Theme.accent : Theme.elevated, in: Capsule())
+            .background(
+                isActive ? Theme.selected : Theme.elevated,
+                in: RoundedRectangle(cornerRadius: Theme.Radius.control)
+            )
             .overlay(
-                Capsule().strokeBorder(isActive ? Color.clear : Theme.edgeInput, lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: Theme.Radius.control)
+                    .strokeBorder(isActive ? Theme.accent : Theme.edgeInput, lineWidth: isActive ? 1 : 0.5)
             )
             .padding(.vertical, 7)
             .contentShape(Rectangle())

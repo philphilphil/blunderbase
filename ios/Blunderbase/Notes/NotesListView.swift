@@ -11,8 +11,10 @@ import Observation
 /// A row leads with **where the note hangs**, not with the note. That is the opposite of
 /// what a message list does, and it is deliberate: a note out of its game is a sentence
 /// without a subject, and by the time you are reading the fourth one you have lost track of
-/// which game you are in. The anchor is one accent-coloured line above the text, and the
-/// text is capped at three lines so a long note cannot push the next anchor off the screen.
+/// which game you are in. The anchor is one quiet mono line above the text — quiet, because
+/// it used to be accent blue and ten of those on a screen were louder than the notes they
+/// labelled — and the text is capped at three lines so a long note cannot push the next
+/// anchor off the screen. The list is cut into days (`DateRule`), as the web's is.
 struct NotesListView: View {
     @Environment(Session.self) private var session
     @State private var store = NotesStore()
@@ -22,7 +24,7 @@ struct NotesListView: View {
             content
                 .background(Theme.void)
                 .navigationTitle("Notes")
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.large)
         }
         .task {
             guard let endpoints = session.endpoints else { return }
@@ -67,17 +69,39 @@ struct NotesListView: View {
 
     private var list: some View {
         List {
-            ForEach(store.notes) { note in
-                row(note)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
+            TitleLine(countLine)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            ForEach(DayGroup.cut(store.notes, date: \.createdAt)) { day in
+                Section {
+                    ForEach(day.items) { note in
+                        row(note)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
+                } header: {
+                    DateRule(label: day.label)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
             }
         }
         .listStyle(.plain)
+        .listSectionSpacing(0)
         .scrollContentBackground(.hidden)
         .environment(\.defaultMinListRowHeight, 0)
         .refreshable { await store.refresh() }
+    }
+
+    /// `38 notes · 27 games` — how much has been written, and across how many games. The
+    /// second number is what says whether the log is a habit or a heap on one game.
+    private var countLine: Text {
+        let notes = store.notes.count
+        let games = Set(store.notes.compactMap(\.gameID)).count
+        return Text("\(notes) notes") + Text(verbatim: " · ") + Text("\(games) games")
     }
 
     /// A note that names a game is a link into it; one that does not is just text.
@@ -115,15 +139,10 @@ private struct NoteRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            if let anchor {
-                Text(anchor)
-                    .font(Theme.Font.mono(11, weight: .medium))
-                    .foregroundStyle(Theme.accent)
-                    .lineLimit(1)
-            }
+            anchor
             Text(note.text)
-                .font(Theme.Font.text(13))
-                .foregroundStyle(Theme.body)
+                .font(Theme.Font.text(14))
+                .foregroundStyle(Theme.text)
                 .lineLimit(3)
                 .multilineTextAlignment(.leading)
             if let tags = note.tags, !tags.isEmpty {
@@ -131,10 +150,14 @@ private struct NoteRow: View {
                     ForEach(tags, id: \.self) { tag in
                         Text(tag)
                             .font(Theme.Font.text(10))
-                            .foregroundStyle(Theme.muted2)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Theme.chipNeutral, in: RoundedRectangle(cornerRadius: Theme.Radius.chip))
+                            .foregroundStyle(Theme.muted)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.elevated, in: RoundedRectangle(cornerRadius: Theme.Radius.chip))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.Radius.chip)
+                                    .strokeBorder(Theme.edge, lineWidth: 0.5)
+                            )
                     }
                 }
             }
@@ -150,20 +173,34 @@ private struct NoteRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// "phib – Hikaru · 18… gxf6", with either half omitted rather than faked.
+    /// "phib – Hikaru · 18… gxf6": the names in the quiet grey, the move a shade darker so
+    /// the eye can pick the position out of the line, and a note anchored to nothing says
+    /// "General" so its row has the same shape as the rest. Either half is omitted rather
+    /// than faked.
     ///
     /// The move label comes from the server (`MoveBrief.label`) when it is there, because
     /// the backend spells it once so every client spells it the same; `Format.move` is the
     /// fallback for a brief that carries a ply and a san but no label.
-    private var anchor: String? {
-        var parts: [String] = []
-        if let game = note.game, let players = NoteRow.players(of: game) {
-            parts.append(players)
+    private var anchor: some View {
+        HStack(spacing: 6) {
+            if let game = note.game, let players = NoteRow.players(of: game) {
+                Text(players)
+                    .foregroundStyle(Theme.dim)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(-1)
+            } else if moveLabel == nil {
+                Text("General")
+                    .foregroundStyle(Theme.faint)
+            }
+            if let move = moveLabel {
+                Text(move)
+                    .font(Theme.Font.mono(11, weight: .semibold))
+                    .foregroundStyle(Theme.body)
+                    .fixedSize()
+            }
         }
-        if let move = moveLabel {
-            parts.append(move)
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        .font(Theme.Font.mono(11))
     }
 
     private var moveLabel: String? {

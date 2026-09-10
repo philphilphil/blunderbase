@@ -4,19 +4,24 @@ import SwiftUI
 ///
 /// The web's row is thirteen columns wide and folds into a two-line card below `md`
 /// (`web/src/routes/games/components/columns.ts`). The phone starts from that card rather
-/// than from the table, and keeps its shape exactly: **names and result on top, everything
-/// that qualifies the game underneath**. Matching it is not tidiness — the same library is
-/// read in both places, and a row that put the date where the browser puts the result would
-/// have to be re-learned on every switch.
+/// than from the table, and keeps its shape: **names and result on top, everything that
+/// qualifies the game underneath**. Matching it is not tidiness — the same library is read
+/// in both places, and a row that put the date where the browser puts the result would
+/// have to be re-learned on every switch. The one departure is the date itself, which the
+/// list says once per day as a rule over the rows (`DateRule`) rather than on every row.
 ///
-/// Two things are said by weight rather than by a label, because a label would cost a column
-/// each:
+/// Two things are said by a mark rather than by a label, because a label would cost a
+/// column each:
 ///
-/// - **Which side the owner had** is the semibold name. There is no "you" marker; the bold
-///   name *is* the marker, and a reference game the owner did not play simply has neither
-///   name emphasised, which is the truth about it.
+/// - **Which side the owner had** is the scoresheet disc before the semibold name — the
+///   same `SideDot` the board's strip uses, so a colour is one shape everywhere. A reference
+///   game the owner did not play has neither name emphasised and no disc, which is the
+///   truth about it.
 /// - **How badly it went** is the colour of the worst moment's drop, on the severity ramp
 ///   the whole app shares. The number is the same one the browser shows in the ACPL column.
+///
+/// The result is a chip (`ResultChip`) rather than tinted digits: a scan down the right
+/// edge then reads wins and losses as shapes, not as two colours of the same shape.
 ///
 /// The flag chips count the *worst moments the card carries* — three at most, because that
 /// is what `GET /games?cards=true` sends. They are not a census of the game's mistakes and
@@ -64,15 +69,14 @@ struct GameRowView: View {
 
     private var players: some View {
         HStack(spacing: 6) {
+            if card.game.ownerIsWhite == true { SideDot(isWhite: true, size: 9) }
             name(card.game.white, emphasised: card.game.ownerIsWhite == true)
             rating(card.game.whiteRating)
+            if card.game.ownerIsWhite == false { SideDot(isWhite: false, size: 9) }
             name(card.game.black, emphasised: card.game.ownerIsWhite == false)
             rating(card.game.blackRating)
             Spacer(minLength: 4)
-            Text(Format.result(card.game.result))
-                .font(Theme.Font.mono(13, weight: .medium))
-                .foregroundStyle(Format.outcomeColor(card.game.outcome))
-                .fixedSize()
+            ResultChip(result: card.game.result, outcome: card.game.outcome)
         }
     }
 
@@ -97,19 +101,23 @@ struct GameRowView: View {
 
     // MARK: Line two — what kind of game it was, and what went wrong
 
+    /// Time control, length, source. The date the line used to open with is the rule over
+    /// the rows now, and the source takes its place: where a game came from is the one
+    /// fact about it the names do not carry.
     private var qualifiers: some View {
         HStack(spacing: 6) {
-            Text(Format.date(card.game.playedAt))
-                .font(Theme.Font.mono(11))
-                .foregroundStyle(Theme.dim)
-            separator
             Text(Format.timeControl(card.game.timeControl))
                 .font(Theme.Font.mono(11))
-                .foregroundStyle(Theme.faint)
+                .foregroundStyle(Theme.dim)
             separator
             Text(Format.moveCount(plyCount: card.game.plyCount))
                 .font(Theme.Font.mono(11))
                 .foregroundStyle(Theme.faint)
+            separator
+            Text(card.game.source.label)
+                .font(Theme.Font.mono(11))
+                .foregroundStyle(Theme.faint)
+                .lineLimit(1)
 
             Spacer(minLength: 4)
 

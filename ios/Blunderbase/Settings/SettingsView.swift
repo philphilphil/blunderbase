@@ -44,12 +44,13 @@ struct SettingsView: View {
                 engineSection
                 boardSection
                 aboutSection
+                footer
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Theme.void)
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 
@@ -172,7 +173,6 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section {
-            row("Version", value: SettingsView.version)
             Text("Chess rules and PGN by chesskit-swift, MIT licence.")
                 .font(Theme.Font.text(12))
                 .foregroundStyle(Theme.dim)
@@ -183,6 +183,54 @@ struct SettingsView: View {
             sectionHeader("About")
         }
         .listRowBackground(Theme.surface)
+    }
+
+    /// The one place the app says its own name.
+    ///
+    /// Every other screen is the library's; a settings screen is the app's, and its foot is
+    /// where somebody looks for what they are running. The icon's mark, the name and
+    /// version, and the server it is reading with a green dot for a live session — which
+    /// is the same fact as the Server row above, said as a status rather than an address.
+    private var footer: some View {
+        Section {
+            HStack(spacing: 12) {
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 36, height: 36)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Theme.hairline, lineWidth: 0.5)
+                    )
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Blunderbase Companion \(SettingsView.version)")
+                        .font(Theme.Font.text(13, weight: .semibold))
+                        .foregroundStyle(Theme.body)
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(session.isSignedIn ? Theme.good : Theme.faint2)
+                            .frame(width: 7, height: 7)
+                        Text(footerServer)
+                            .font(Theme.Font.mono(11))
+                            .foregroundStyle(Theme.dim)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+        }
+        .listRowBackground(Color.clear)
+    }
+
+    private var footerServer: String {
+        guard session.isSignedIn else { return String(localized: "Not connected") }
+        return session.isReadOnly
+            ? String(localized: "\(serverLabel) · read-only")
+            : serverLabel
     }
 
     /// `1.2.0 (34)` — the marketing version with the build behind it, because a TestFlight

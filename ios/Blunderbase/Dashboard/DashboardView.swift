@@ -36,7 +36,7 @@ struct DashboardView: View {
             content
                 .background(Theme.void)
                 .navigationTitle("Dashboard")
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         EngineVisibilityButton(engineHidden: $engineHidden)
@@ -73,9 +73,9 @@ struct DashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     subtitle
+                    trends
                     ratings
                     worstMoments
-                    trends
                 }
                 .padding(.bottom, 24)
             }
@@ -89,26 +89,25 @@ struct DashboardView: View {
 
     // MARK: The line under the title
 
-    /// "1,284 games in the database. 47 blunders on the record." — the web's subtitle, as
-    /// the first thing on the screen. The blunders are the engine's count and go with it.
+    /// `4,200 games · 11,060 blunders` — the web's subtitle sentence, as the numbers line
+    /// every tab has under its title. The blunders are the engine's count and go with it.
+    @ViewBuilder
     private var subtitle: some View {
-        Group {
-            if store.games == 0 {
-                Text("Nothing imported yet. Start with a sync or a PGN in the web app.")
-            } else if engineHidden {
-                Text("\(Format.count(store.games)) games in the database.")
-            } else if let blunders = store.blunders {
-                Text("\(Format.count(store.games)) games in the database.")
-                    + Text(verbatim: " ")
-                    + Text("\(blunders) blunders on the record.")
-            } else {
-                Text("\(Format.count(store.games)) games in the database.")
-            }
+        if store.games == 0 {
+            Text("Nothing imported yet. Start with a sync or a PGN in the web app.")
+                .font(Theme.Font.text(13))
+                .foregroundStyle(Theme.dim)
+                .padding(.horizontal, Theme.Metrics.gutter)
+                .padding(.vertical, 10)
+        } else if !engineHidden, let blunders = store.blunders {
+            TitleLine(
+                Text("\(Format.count(store.games)) games")
+                    + Text(verbatim: " · ")
+                    + Text("\(Format.count(blunders)) blunders")
+            )
+        } else {
+            TitleLine(Text("\(Format.count(store.games)) games"))
         }
-        .font(Theme.Font.text(13))
-        .foregroundStyle(Theme.dim)
-        .padding(.horizontal, Theme.Metrics.gutter)
-        .padding(.vertical, 10)
     }
 
     // MARK: Ratings
@@ -121,18 +120,8 @@ struct DashboardView: View {
     /// the charts rather than on each of them.
     @ViewBuilder
     private var ratings: some View {
-        sectionHead("Ratings") {
+        SectionHead("Ratings") {
             speedsMenu
-            Picker("Rating window", selection: Binding(
-                get: { store.ratingWindow },
-                set: { store.ratingWindow = $0; Haptics.selectionChanged() }
-            )) {
-                ForEach(DashboardStore.RatingWindow.allCases) { window in
-                    Text(window.label).tag(window)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 180)
         }
 
         let all = store.allRatingCharts
@@ -151,12 +140,11 @@ struct DashboardView: View {
                 .padding(.bottom, 8)
         } else {
             legend
-            VStack(spacing: 10) {
+            VStack(spacing: 4) {
                 ForEach(charts) { chart in
                     ratingChart(chart)
                 }
             }
-            .padding(.horizontal, Theme.Metrics.gutter)
         }
     }
 
@@ -180,7 +168,7 @@ struct DashboardView: View {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.system(size: 15))
                 .foregroundStyle(store.hiddenSpeeds.isEmpty ? Theme.dim : Theme.accent)
-                .frame(width: 30, height: 30)
+                .frame(width: 26, height: 22)
                 .contentShape(Rectangle())
         }
         .accessibilityLabel("Speeds")
@@ -202,21 +190,33 @@ struct DashboardView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Theme.Metrics.gutter)
-        .padding(.bottom, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
     }
 
+    /// One speed: its name and its numbers on a line over a hairline, the chart under it.
+    ///
+    /// It was a bordered card per speed. Three cards in a column with the same border and
+    /// the same radius were the template's look, not the app's; a sub-heading over a rule is
+    /// how the web's Ratings section draws the same thing, and the rule plus the gap is
+    /// enough to keep two charts from reading as one chart with a kink in it.
     private func ratingChart(_ chart: RatingCharts.SpeedChart) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(Speed(rawValue: chart.speed).label)
-                    .font(Theme.Font.text(12, weight: .medium))
-                    .foregroundStyle(Theme.body)
+                    .font(Theme.Font.text(14, weight: .semibold))
+                    .foregroundStyle(Theme.text)
                 Spacer(minLength: 4)
                 ForEach(chart.lines) { line in
                     legendEntry(line)
                 }
             }
             .padding(.horizontal, Theme.Metrics.gutter)
+            .padding(.bottom, 4)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                    .padding(.horizontal, Theme.Metrics.gutter)
+            }
 
             Chart {
                 ForEach(chart.lines) { line in
@@ -245,14 +245,8 @@ struct DashboardView: View {
             .frame(height: 110)
             .padding(.horizontal, Theme.Metrics.gutter)
         }
-        .padding(.vertical, 8)
-        // A card per speed, with air between them: two charts flush against each other
-        // read as one chart with a kink in it.
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
-        .overlay {
-            RoundedRectangle(cornerRadius: Theme.Radius.card)
-                .strokeBorder(Theme.line, lineWidth: 0.5)
-        }
+        .padding(.top, 12)
+        .padding(.bottom, 6)
         .accessibilityElement(children: .combine)
     }
 
@@ -274,10 +268,13 @@ struct DashboardView: View {
             .lineStyle(StrokeStyle(lineWidth: 1.5))
             .interpolationMethod(.monotone)
         }
-        if line.points.count == 1, let only = line.points.first {
-            PointMark(x: .value("Date", only.at), y: .value("Rating", only.rating))
+        // The last point is the rating now, which is the number in the line's legend; a
+        // dot on it is what ties the number to the place on the curve it came from. A
+        // window with a single game is a point rather than nothing, and gets the same dot.
+        if let last = line.points.last {
+            PointMark(x: .value("Date", last.at), y: .value("Rating", last.rating))
                 .foregroundStyle(color)
-                .symbolSize(20)
+                .symbolSize(22)
         }
     }
 
@@ -288,7 +285,7 @@ struct DashboardView: View {
                 .fill(DashboardView.platformColor(line.platform))
                 .frame(width: 7, height: 7)
             Text(verbatim: "\(line.last)")
-                .font(Theme.Font.mono(11, weight: .medium))
+                .font(Theme.Font.mono(12, weight: .medium))
                 .foregroundStyle(Theme.body)
             if let move = line.move {
                 Text(DashboardView.signed(Double(move), digits: 0))
@@ -336,21 +333,19 @@ struct DashboardView: View {
     // MARK: Trends
 
     /// Blunders per game, the win percentage an average move gives away, and the score,
-    /// each against the equally long window before this one. The window control moves
-    /// both halves. The first two are the engine's numbers and go with it; the score stays.
+    /// each against the equally long window before this one. First on the screen, because
+    /// it is the question the screen exists to answer, and its head carries the one window
+    /// control the whole screen has — the rating charts below follow it. The first two are
+    /// the engine's numbers and go with it; the score stays.
     @ViewBuilder
     private var trends: some View {
-        sectionHead("Last \(store.trendWindow.days) days") {
-            Picker("Trend window", selection: Binding(
-                get: { store.trendWindow },
-                set: { store.trendWindow = $0; Haptics.selectionChanged() }
-            )) {
-                ForEach(DashboardStore.TrendWindow.allCases) { window in
-                    Text(window.label).tag(window)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 150)
+        SectionHead(text: Text(store.window.title)) {
+            TextSegments(
+                options: DashboardStore.Window.allCases,
+                label: \.label,
+                selection: Binding(get: { store.window }, set: { store.window = $0 })
+            )
+            .accessibilityLabel("Window")
         }
 
         switch store.trendsState {
@@ -384,6 +379,7 @@ struct DashboardView: View {
 
     private func trendsBody(_ trends: DashboardStore.Trends) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            Spacer().frame(height: 4)
             HStack(alignment: .top, spacing: 0) {
                 if !engineHidden {
                     metric(
@@ -439,13 +435,17 @@ struct DashboardView: View {
             Text(label)
                 .font(Theme.Font.text(10))
                 .foregroundStyle(Theme.faint)
+                .textCase(.uppercase)
+                .kerning(0.4)
                 .lineLimit(1)
-            Text(value ?? Format.absent)
-                .font(Theme.Font.mono(18, weight: .medium))
-                .foregroundStyle(Theme.textBright)
-            Text(delta.map { DashboardView.signed($0, digits: digits) } ?? Format.absent)
-                .font(Theme.Font.mono(11))
-                .foregroundStyle(DashboardView.deltaTone(delta, lowerIsBetter: lowerIsBetter))
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value ?? Format.absent)
+                    .font(Theme.Font.mono(20, weight: .medium))
+                    .foregroundStyle(Theme.textBright)
+                Text(delta.map { DashboardView.signed($0, digits: digits) } ?? Format.absent)
+                    .font(Theme.Font.mono(11))
+                    .foregroundStyle(DashboardView.deltaTone(delta, lowerIsBetter: lowerIsBetter))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -483,21 +483,5 @@ struct DashboardView: View {
         case (false, false):
             return String(localized: "More blunders and fewer points. The two usually travel together.")
         }
-    }
-
-    // MARK: Section heads
-
-    private func sectionHead<Control: View>(_ title: LocalizedStringKey, @ViewBuilder control: () -> Control) -> some View {
-        HStack(spacing: 8) {
-            Text(title)
-                .font(Theme.Font.text(11, weight: .semibold))
-                .foregroundStyle(Theme.faint)
-                .textCase(.uppercase)
-            Spacer(minLength: 4)
-            control()
-        }
-        .padding(.horizontal, Theme.Metrics.gutter)
-        .padding(.top, 14)
-        .padding(.bottom, 6)
     }
 }

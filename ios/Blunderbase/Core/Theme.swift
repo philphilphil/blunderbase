@@ -149,6 +149,11 @@ enum Theme {
     static let chipInfoEdge = Color(dark: 0x46586A, light: 0xB9CDE2)
     static let chipGood = Color(dark: 0x2B332E, light: 0xE8F0EA)
     static let chipGoodEdge = Color(dark: 0x47584D, light: 0xB6CCBC)
+    /// The loss chip. The web has no such pair yet — it tints a loss's digits and leaves
+    /// the ground alone — so these are the phone's own, built the way `chipGood` was: the
+    /// blunder hue mixed down into the chip ground until it is a tint rather than a fill.
+    static let chipBad = Color(dark: 0x3A2A29, light: 0xF5E4E2)
+    static let chipBadEdge = Color(dark: 0x5C3F3C, light: 0xE0B5B1)
     static let chipOtb = Color(dark: 0x33302A, light: 0xF2EDE4)
     static let chipOtbEdge = Color(dark: 0x575047, light: 0xD6CBB4)
 
@@ -171,6 +176,9 @@ enum Theme {
         static let chip: CGFloat = 4
         static let control: CGFloat = 6
         static let card: CGFloat = 8
+        /// A text field. Larger than a control because it is taller, and a 6pt corner on a
+        /// 40pt field reads as a box.
+        static let field: CGFloat = 10
         static let sheet: CGFloat = 12
     }
 
