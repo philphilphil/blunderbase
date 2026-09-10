@@ -1,5 +1,15 @@
 import SwiftUI
 
+/// The five tabs, as a value.
+///
+/// `TabView` picks the first tab on its own and needs no help, but a selection that can be
+/// named is what lets a debug launch argument say which screen to open on — see
+/// `LaunchState`. The order of the cases is the web rail's order, which is the order the
+/// tabs are in.
+enum RootTab: Hashable {
+    case dashboard, games, explorer, notes, settings
+}
+
 /// What the app shows: the tabs, or the way in.
 ///
 /// There is no tab bar until there is a server to read, because every tab would be empty
@@ -16,6 +26,9 @@ struct RootView: View {
     @Environment(Session.self) private var session
     @Environment(EventsClient.self) private var events
     @State private var subscription: EventsSubscription?
+    /// Which tab is up. Dashboard unless the process was launched asking for another one,
+    /// which only a debug build ever is.
+    @State private var tab = LaunchState.current.tab ?? .dashboard
 
     var body: some View {
         Group {
@@ -52,21 +65,26 @@ struct RootView: View {
     }
 
     private var tabs: some View {
-        TabView {
+        TabView(selection: $tab) {
             DashboardView()
                 .tabItem { Label("Dashboard", systemImage: "chart.xyaxis.line") }
+                .tag(RootTab.dashboard)
 
-            GamesListView()
+            GamesListView(initialGameID: LaunchState.current.gameID)
                 .tabItem { Label("Games", systemImage: "square.grid.2x2") }
+                .tag(RootTab.games)
 
             ExplorerView()
                 .tabItem { Label("Explorer", systemImage: "arrow.triangle.branch") }
+                .tag(RootTab.explorer)
 
             NotesListView()
                 .tabItem { Label("Notes", systemImage: "text.quote") }
+                .tag(RootTab.notes)
 
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag(RootTab.settings)
         }
         .tint(Theme.accent)
     }

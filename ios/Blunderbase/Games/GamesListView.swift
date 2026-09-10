@@ -25,9 +25,27 @@ struct GamesListView: View {
     /// switch itself sits in the bar. See `Preferences.engineHidden`.
     @AppStorage(Preferences.Key.engineHidden) private var engineHidden = false
 
+    /// Games pushed from outside the list, by id.
+    ///
+    /// Empty on an ordinary launch, and it stays empty while the app is used: a tapped row
+    /// pushes through `RowLink` and hands `GameDetailView` the card the list is already
+    /// holding, which is why the game screen has a title before the fetch comes back. This
+    /// path is for a game named at launch — `--game <id>`, see `LaunchState` — where there
+    /// is no card to hand over and the screen fetches its own.
+    @State private var path: [Int]
+
+    init(initialGameID: Int? = nil) {
+        _path = State(initialValue: initialGameID.map { [$0] } ?? [])
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             content
+                .navigationDestination(for: Int.self) { id in
+                    if let endpoints = session.endpoints {
+                        GameDetailView(gameID: id, endpoints: endpoints)
+                    }
+                }
                 .background(Theme.void)
                 .navigationTitle("Games")
                 .navigationBarTitleDisplayMode(.inline)

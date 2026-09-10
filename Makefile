@@ -1,4 +1,4 @@
-.PHONY: run run-demo backend web desktop desktop-macos desktop-windows ios ios-test install test migrate engines mcp mcp-http mcp-key release publish site docs docs-serve
+.PHONY: run run-demo backend web desktop desktop-macos desktop-windows ios ios-test ios-run ios-shot install test migrate engines mcp mcp-http mcp-key release publish site docs docs-serve
 
 # The recipes are POSIX sh (mkdir -p, trap, &, wait). On a Windows checkout make would
 # otherwise hand them to cmd.exe, where `mkdir -p data` creates a folder called `-p`.
@@ -59,6 +59,35 @@ ios:
 ios-test:
 	cd ios && xcodegen generate
 	cd ios && xcodebuild -scheme Blunderbase -destination 'platform=iOS Simulator,name=$(IOS_SIM)' test
+
+# Run in the simulator and photograph it, without Xcode and without tapping through the app.
+# `args` goes to the process on launch: --dashboard / --games / --explorer / --notes /
+# --settings, --game <id>, --server <url>, --password <pw>. A debug build reads them, a
+# release build ignores them — ios/Blunderbase/App/LaunchState.swift is the parser.
+#
+#   make ios-run args="--game 123"
+#   make ios-shot out=/tmp/game.png
+#
+# -derivedDataPath is what makes the .app's path a constant instead of a hash under
+# ~/Library; ios/build is covered by ios/.gitignore. The app is terminated before the
+# launch because simctl only foregrounds an app that is already running, and foregrounding
+# it would keep the arguments of the previous run.
+IOS_APP := ios/build/Build/Products/Debug-iphonesimulator/Blunderbase.app
+IOS_BUNDLE_ID := org.blunderbase.companion
+out ?= ios/screenshot.png
+
+ios-run:
+	cd ios && xcodegen generate
+	cd ios && xcodebuild -scheme Blunderbase -configuration Debug -destination 'platform=iOS Simulator,name=$(IOS_SIM)' -derivedDataPath build build
+	xcrun simctl bootstatus '$(IOS_SIM)' -b
+	open -a Simulator
+	xcrun simctl install booted $(IOS_APP)
+	xcrun simctl terminate booted $(IOS_BUNDLE_ID) >/dev/null 2>&1 || true
+	xcrun simctl launch booted $(IOS_BUNDLE_ID) $(args)
+
+ios-shot:
+	xcrun simctl io booted screenshot $(out)
+	@echo "wrote $(out)"
 
 install:
 	uv sync

@@ -10,3 +10,6 @@ xcuserdata/
 
 # Layout snapshots written by the tests, for looking at rather than keeping.
 .snapshots/
+
+# Where `make ios-shot` puts a simulator screenshot by default.
+screenshot.png

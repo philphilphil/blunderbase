@@ -44,6 +44,36 @@ reviewer uses: the review notes point at that button rather than handing over cr
 Signing out of the demo offers to reconnect rather than asking for a password it does not
 have; **Use a different server** is the way back to your own.
 
+## Opening on a screen
+
+Looking at a screen means getting to it, which is a sign-in and a handful of taps every time
+the simulator is erased or the build is replaced. A debug build takes launch arguments that
+do that walk for you, so a layout can be put on screen and photographed from the terminal:
+
+```bash
+make ios-run args="--game 4200"      # build, install, launch on that game
+make ios-shot                        # ios/screenshot.png, or out=/tmp/shot.png
+```
+
+`make ios-run` regenerates the project, builds into `ios/build` so the `.app` has a fixed
+path, boots `$(IOS_SIM)` if it is not up and relaunches the app with `args`:
+
+| Argument | What it does |
+|---|---|
+| `--dashboard` `--games` `--explorer` `--notes` `--settings` | Open on that tab |
+| `--game <id>` | Open on the Games tab with that game pushed |
+| `--server <url>` | Store that address and sign in before anything is drawn |
+| `--password <pw>` | The password to sign in with, if the cookie is gone |
+
+`--server` is what makes an erased simulator usable: the address goes through the same
+normalisation a typed one does, and the password is only sent when the surviving cookie
+turns out not to be. Anything else on the command line is ignored, and with no arguments the
+app launches exactly as it does on a phone.
+
+**Only a debug build reads them.** `LaunchState.current` parses `ProcessInfo` under
+`#if DEBUG` and hands a release build an empty state, so a shipped app cannot be pointed at
+a server from its command line. `ios/Blunderbase/App/LaunchState.swift` is the whole feature.
+
 ## The dashboard
 
 The web dashboard's sections in the web's order, minus the two that act on the server: the

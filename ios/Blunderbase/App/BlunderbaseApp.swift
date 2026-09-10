@@ -36,7 +36,10 @@ struct BlunderbaseApp: App {
                 .environment(events)
                 .preferredColorScheme(appearance.colorScheme)
                 .tint(Theme.accent)
-                .task { await session.restore() }
+                // Not `session.restore()` directly: a debug launch may carry a server and a
+                // password to sign in with instead, and that has to happen in place of the
+                // restore rather than after it. `LaunchState.signIn` says why.
+                .task { await LaunchState.current.signIn(session) }
         }
     }
 }
