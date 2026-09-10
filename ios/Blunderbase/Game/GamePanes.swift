@@ -18,11 +18,19 @@ import SwiftUI
 /// even where the position has no book. A tab that appeared and disappeared as the board
 /// moved would slide Notes sideways every time the game left the opening, which is a moving
 /// target to tap at; an empty Book that says why is information, a missing one is not.
+///
+/// The one time the strip does change shape is with the engine hidden: Eval and Engine are
+/// the engine and nothing else, so they go rather than open onto an empty pane — the same
+/// cut the web's mobile strip makes. Moves, Book and Notes are what a game read unaided is
+/// made of, and they keep their order.
 struct GamePanes: View {
     @Bindable var store: GameStore
     @Bindable var live: LiveEngineStore
     @Binding var pane: Pane
     let isReadOnly: Bool
+    /// Whether the two engine panes are on the strip at all. The screen owns the flag and
+    /// moves `pane` off a tab that is going away; this only draws the strip it is given.
+    var engineHidden: Bool = false
 
     enum Pane: String, CaseIterable, Identifiable {
         case moves = "Moves"
@@ -31,6 +39,26 @@ struct GamePanes: View {
         case book = "Book"
         case notes = "Notes"
         var id: String { rawValue }
+
+        /// The strip with the engine hidden.
+        static let unaided: [Pane] = [.moves, .book, .notes]
+
+        /// What the tab says. The raw value is the English and an identifier; this is the
+        /// word in the phone's language.
+        var title: String {
+            switch self {
+            case .moves: return String(localized: "Moves")
+            case .eval: return String(localized: "Eval")
+            case .engine: return String(localized: "Engine")
+            case .book: return String(localized: "Book")
+            case .notes: return String(localized: "Notes")
+            }
+        }
+    }
+
+    /// The tabs on the strip right now.
+    private var panes: [Pane] {
+        engineHidden ? Pane.unaided : Pane.allCases
     }
 
     /// The shortest the panes are allowed to be: the tab bar plus about one row.
@@ -43,8 +71,8 @@ struct GamePanes: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("Pane", selection: $pane) {
-                ForEach(Pane.allCases) { pane in
-                    Text(pane.rawValue).tag(pane)
+                ForEach(panes) { pane in
+                    Text(pane.title).tag(pane)
                 }
             }
             .pickerStyle(.segmented)

@@ -24,6 +24,9 @@ final class GameStoreTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         store = GameStore(gameID: 1, endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!))
+        // The store starts from the phone's setting, and a simulator that crashed out of a
+        // test with the engine hidden would otherwise hand every test here an unaided game.
+        store.engineHidden = false
         store.adopt(try decodeDetail())
     }
 
@@ -312,6 +315,69 @@ final class GameStoreTests: XCTestCase {
         XCTAssertEqual(store.lineIndex, 1)
         XCTAssertEqual(store.progress(along: first), 0)
         XCTAssertEqual(store.progress(along: second), 1)
+    }
+
+    // MARK: With the engine hidden
+
+    /// The mode is one decision: the store's moves come back without their verdicts, and
+    /// everything the panes read through the store goes quiet with them. Each assertion
+    /// here is one surface the web hides (`engineVisibility.ts`), checked at the blunder,
+    /// where every one of them would otherwise have something to say.
+    func testHidingTheEngineTakesEveryVerdictOffTheGame() {
+        store.engineHidden = true
+        store.seek(to: 10)
+
+        XCTAssertNil(store.glyph, "the ?? on d5")
+        XCTAssertNil(store.playedMove?.classification)
+        XCTAssertNil(store.playedMove?.winLoss)
+        XCTAssertTrue(store.flaggedMoves.isEmpty)
+        XCTAssertFalse(store.hasPreviousFlagged)
+
+        store.seek(to: 9)
+        XCTAssertNil(store.whiteWin, "the eval bar")
+        XCTAssertNil(store.scoreLabel, "the score under it")
+        XCTAssertTrue(store.engineLines.isEmpty, "the stored lines")
+        XCTAssertTrue(store.maiaMoves.isEmpty, "Maia's distribution")
+        XCTAssertTrue(store.availableMaiaElos.isEmpty)
+        XCTAssertEqual(store.curve.count, 1, "the graph keeps only its level start")
+        XCTAssertEqual(store.arrows.map(\.kind), [.played], "the played move is a fact, the advice is not")
+    }
+
+    /// What stays is the game — the moves, the clocks, who played them — so a reader can
+    /// still walk it and write about it.
+    func testHidingTheEngineLeavesTheGameItself() {
+        let before = store.moves
+        store.engineHidden = true
+
+        XCTAssertEqual(store.moves.count, before.count)
+        XCTAssertEqual(store.moves.map(\.san), before.map(\.san))
+        XCTAssertEqual(store.moves.map(\.clock), before.map(\.clock))
+        XCTAssertEqual(store.moves.map(\.color), before.map(\.color))
+        store.seek(to: 10)
+        XCTAssertEqual(store.playedMove?.san, "Nxd5")
+        XCTAssertEqual(store.snapshot.pieces[BoardSquare(algebraic: "d5")!]?.kind, .knight)
+    }
+
+    /// Switching back is a plain flip: nothing was thrown away, so the verdicts are the
+    /// ones the server sent, not a re-fetch.
+    func testShowingTheEngineAgainBringsTheVerdictsBack() {
+        store.engineHidden = true
+        store.seek(to: 10)
+        XCTAssertNil(store.glyph)
+
+        store.engineHidden = false
+        XCTAssertEqual(store.glyph?.text, "??")
+        XCTAssertEqual(store.playedMove?.classification, .blunder)
+    }
+
+    /// A preview is an engine line drawn on the board, and one left up would outlive the
+    /// mode that is supposed to have silenced it.
+    func testHidingTheEngineDropsAPreviewLine() {
+        store.seek(to: 9)
+        store.previewLine = ["c4f7"]
+        store.engineHidden = true
+        XCTAssertNil(store.previewLine)
+        XCTAssertEqual(store.arrows.map(\.kind), [.played])
     }
 
     // MARK: Fixture

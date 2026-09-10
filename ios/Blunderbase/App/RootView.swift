@@ -8,9 +8,10 @@ import SwiftUI
 /// is good. A session that goes stale later — the cookie expired, the password changed —
 /// puts the connect screen back the same way, from wherever the user was.
 ///
-/// Three tabs, and only three. Games is the app; Notes is the reason to have written any;
-/// Settings is where the server lives. Anything else the web app does is a reason to open
-/// the web app.
+/// Five tabs, in the web rail's order. Dashboard is how it is going; Games is the library;
+/// Explorer is the owner's own openings, which the phone can read because the book already
+/// ships with every game; Notes is the reason to have written any; Settings is where the
+/// server lives. Anything else the web app does is a reason to open the web app.
 struct RootView: View {
     @Environment(Session.self) private var session
     @Environment(EventsClient.self) private var events
@@ -52,8 +53,14 @@ struct RootView: View {
 
     private var tabs: some View {
         TabView {
+            DashboardView()
+                .tabItem { Label("Dashboard", systemImage: "chart.xyaxis.line") }
+
             GamesListView()
                 .tabItem { Label("Games", systemImage: "square.grid.2x2") }
+
+            ExplorerView()
+                .tabItem { Label("Explorer", systemImage: "arrow.triangle.branch") }
 
             NotesListView()
                 .tabItem { Label("Notes", systemImage: "text.quote") }

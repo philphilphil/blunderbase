@@ -15,6 +15,7 @@ final class BookTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         store = GameStore(gameID: 1, endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!))
+        store.engineHidden = false
         store.adopt(try GameFixture.friedLiver())
     }
 

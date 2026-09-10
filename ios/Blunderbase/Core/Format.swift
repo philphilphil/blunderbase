@@ -16,28 +16,37 @@ enum Format {
 
     // MARK: Dates
 
-    private static let dayMonth: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_GB")
-        f.dateFormat = "d MMM"
-        return f
-    }()
-
-    private static let dayMonthYear: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_GB")
-        f.dateFormat = "d MMM yy"
-        return f
-    }()
-
-    /// `22 Aug` inside the current year, `7 Dec 16` outside it.
+    /// `22 Aug` inside the current year, `7 Dec 16` outside it — in the phone's own language
+    /// and order, so a German phone reads `22. Aug.` and an American one `Aug 22`.
     ///
     /// The year is the part a reader only needs when it is surprising, and a games list is
     /// mostly this year, so spending four characters on it in every row buys nothing.
-    static func date(_ date: Date?, now: Date = Date(), calendar: Calendar = .current) -> String {
+    ///
+    /// The formatter is built from a *template* rather than a pattern: the template names
+    /// the fields (day, abbreviated month, two-digit year) and the locale decides their
+    /// order and punctuation. Cached per locale, because a `DateFormatter` costs more to
+    /// make than every row of a list costs to draw.
+    static func date(
+        _ date: Date?,
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        locale: Locale = .current
+    ) -> String {
         guard let date else { return absent }
         let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
-        return sameYear ? dayMonth.string(from: date) : dayMonthYear.string(from: date)
+        return formatter(template: sameYear ? "d MMM" : "d MMM yy", locale: locale).string(from: date)
+    }
+
+    private static var dateFormatters: [String: DateFormatter] = [:]
+
+    private static func formatter(template: String, locale: Locale) -> DateFormatter {
+        let key = "\(locale.identifier)|\(template)"
+        if let cached = dateFormatters[key] { return cached }
+        let f = DateFormatter()
+        f.locale = locale
+        f.setLocalizedDateFormatFromTemplate(template)
+        dateFormatters[key] = f
+        return f
     }
 
     // MARK: Result and outcome
@@ -73,7 +82,7 @@ enum Format {
     /// a player says, so the conversion happens here rather than on screen.
     static func timeControl(_ raw: String?) -> String {
         guard let raw, !raw.isEmpty else { return absent }
-        if raw == "-" { return "correspondence" }
+        if raw == "-" { return String(localized: "correspondence") }
         let parts = raw.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false)
         guard let base = parts.first, let seconds = Int(base) else { return raw }
         let increment = parts.count > 1 ? String(parts[1]) : "0"

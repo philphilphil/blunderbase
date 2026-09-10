@@ -211,12 +211,12 @@ enum StreamEndReason: String, Sendable, Equatable {
     func message(error: String?) -> String {
         if let error, !error.isEmpty { return error }
         switch self {
-        case .closed: return "The live search was closed."
-        case .replaced: return "Another analysis board took this position over."
-        case .idle: return "The live search was closed after sitting idle."
-        case .engineFailed: return "The engine running the live search stopped."
-        case .runnerGone: return "The machine running the engine went away."
-        case .unknown: return "The live search stopped."
+        case .closed: return String(localized: "The live search was closed.")
+        case .replaced: return String(localized: "Another analysis board took this position over.")
+        case .idle: return String(localized: "The live search was closed after sitting idle.")
+        case .engineFailed: return String(localized: "The engine running the live search stopped.")
+        case .runnerGone: return String(localized: "The machine running the engine went away.")
+        case .unknown: return String(localized: "The live search stopped.")
         }
     }
 }

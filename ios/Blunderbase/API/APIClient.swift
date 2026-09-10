@@ -30,19 +30,19 @@ extension APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unauthorized:
-            return "Signed out. Enter the server password again."
+            return String(localized: "Signed out. Enter the server password again.")
         case .setupRequired:
-            return "This server has no password yet. Set one in the web app first."
+            return String(localized: "This server has no password yet. Set one in the web app first.")
         case .readOnly:
-            return "This server is read-only, so nothing can be saved to it."
+            return String(localized: "This server is read-only, so nothing can be saved to it.")
         case .notFound:
-            return "That is not on this server any more."
+            return String(localized: "That is not on this server any more.")
         case let .server(status, _, message):
-            return message ?? "The server answered \(status)."
+            return message ?? String(localized: "The server answered \(status).")
         case .transport:
-            return "Could not reach the server."
+            return String(localized: "Could not reach the server.")
         case .decoding:
-            return "The server sent something this app could not read."
+            return String(localized: "The server sent something this app could not read.")
         }
     }
 

@@ -39,6 +39,11 @@ struct GameDetailView: View {
     /// from would be a screen that will not let them read the rest of the game.
     @State private var hasOpenedAtInitialPly = false
 
+    /// The phone's "engine off" mode, bound here so a flip in Settings reaches a game that
+    /// is already open. The store gets a copy in `onChange`, because the store is what
+    /// every pane reads and a `@AppStorage` lives on a view.
+    @AppStorage(Preferences.Key.engineHidden) private var engineHidden = false
+
     private let summary: GameSummary?
     /// Where to open, as a **cursor** — a half-move count, the scale `GameStore.cursor` uses
     /// and not the scale a `MoveRow.ply` uses. They differ by what a caller means: a moment's
@@ -113,6 +118,14 @@ struct GameDetailView: View {
             // still lands where the caller asked. The one-shot flag is what keeps the two
             // paths from being two seeks.
             .onChange(of: store.state) { _, _ in openAtInitialPly() }
+            .onChange(of: engineHidden, initial: true) { _, hidden in
+                store.engineHidden = hidden
+                guard hidden else { return }
+                // The live board is the engine too, and the pane its switch lives on is
+                // about to go; closing it here rather than leaving it for the reaper.
+                live.isOn = false
+                if pane == .eval || pane == .engine { pane = .moves }
+            }
             .onChange(of: store.snapshot.fen, initial: true) { _, fen in
                 input.clear()
                 // The live board follows the cursor. The store debounces and only sends a
@@ -196,21 +209,23 @@ struct GameDetailView: View {
             let block = max(0, outer.size.height - Self.chromeHeight - panes)
             let side = max(
                 0,
-                min(
-                    outer.size.width - Theme.Metrics.evalBarWidth - 3 * boardMargin,
-                    block - 2 * boardMargin
-                )
+                min(fullWidthBoardSide(outer.size.width), block - 2 * boardMargin)
             )
             VStack(spacing: 0) {
                 players
 
                 HStack(spacing: boardMargin) {
-                    EvalBarView(
-                        whiteWin: store.whiteWin,
-                        scoreLabel: store.scoreLabel,
-                        orientation: store.orientation
-                    )
-                    .frame(width: Theme.Metrics.evalBarWidth, height: side)
+                    // The bar goes with the engine, and the board takes its column: a
+                    // dimmed 50/50 would still be the bar saying "nothing here", and a
+                    // reader annotating unaided should not have to look away from one.
+                    if !engineHidden {
+                        EvalBarView(
+                            whiteWin: store.whiteWin,
+                            scoreLabel: store.scoreLabel,
+                            orientation: store.orientation
+                        )
+                        .frame(width: Theme.Metrics.evalBarWidth, height: side)
+                    }
 
                     BoardView(
                         snapshot: store.snapshot,
@@ -262,8 +277,14 @@ struct GameDetailView: View {
                     onToggle: { togglePanes(in: outer.size) }
                 )
 
-                GamePanes(store: store, live: live, pane: $pane, isReadOnly: session.isReadOnly)
-                    .frame(height: panes)
+                GamePanes(
+                    store: store,
+                    live: live,
+                    pane: $pane,
+                    isReadOnly: session.isReadOnly,
+                    engineHidden: engineHidden
+                )
+                .frame(height: panes)
             }
         }
     }
@@ -275,9 +296,11 @@ struct GameDetailView: View {
     /// derived by subtraction, and a row whose height changes has to change here too.
     private static let chromeHeight: CGFloat = 34 + 38 + 26
 
-    /// How wide a board can be, which is what a board wants to be.
+    /// How wide a board can be, which is what a board wants to be. With the engine hidden
+    /// the eval bar's column is the board's.
     private func fullWidthBoardSide(_ width: CGFloat) -> CGFloat {
-        width - Theme.Metrics.evalBarWidth - 3 * boardMargin
+        let bar = engineHidden ? 0 : Theme.Metrics.evalBarWidth + boardMargin
+        return width - bar - 2 * boardMargin
     }
 
     /// The panes' resting height: **whatever is left once the board is as wide as the phone**.
@@ -419,7 +442,8 @@ struct GameDetailView: View {
                 backToGame
             } else {
                 Button {
-                    show(.eval)
+                    // The counter is a shortcut to the graph; with no graph, to the moves.
+                    show(engineHidden ? .moves : .eval)
                 } label: {
                     Text(store.positionLabel)
                         .font(Theme.Font.mono(12))
@@ -460,7 +484,7 @@ struct GameDetailView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             VStack(spacing: 0) {
-                Text(store.detail?.game.opening ?? summary?.opening ?? "Game")
+                Text(store.detail?.game.opening ?? summary?.opening ?? String(localized: "Game"))
                     .font(Theme.Font.text(13, weight: .semibold))
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
@@ -472,14 +496,18 @@ struct GameDetailView: View {
         }
 
         ToolbarItemGroup(placement: .topBarTrailing) {
-            Button {
-                store.showHints.toggle()
-                Haptics.selectionChanged()
-            } label: {
-                Image(systemName: store.showHints ? "lightbulb.fill" : "lightbulb")
-                    .foregroundStyle(store.showHints ? Theme.accent : Theme.dim)
+            // The lightbulb is the arrows' switch, and with the engine hidden there are no
+            // arrows to switch; a button that does nothing is worse than none.
+            if !engineHidden {
+                Button {
+                    store.showHints.toggle()
+                    Haptics.selectionChanged()
+                } label: {
+                    Image(systemName: store.showHints ? "lightbulb.fill" : "lightbulb")
+                        .foregroundStyle(store.showHints ? Theme.accent : Theme.dim)
+                }
+                .accessibilityLabel(store.showHints ? "Hide hints" : "Show hints")
             }
-            .accessibilityLabel(store.showHints ? "Hide hints" : "Show hints")
 
             Menu {
                 Button {
@@ -487,18 +515,25 @@ struct GameDetailView: View {
                 } label: {
                     Label("Flip the board", systemImage: "arrow.up.arrow.down")
                 }
-                Button {
-                    store.toPreviousFlagged()
-                } label: {
-                    Label("Previous flagged move", systemImage: "arrow.up")
+                // The flagged moves are the engine's, so the two ways to jump between
+                // them go with it rather than sitting greyed out for the whole game.
+                if !engineHidden {
+                    Button {
+                        store.toPreviousFlagged()
+                    } label: {
+                        Label("Previous flagged move", systemImage: "arrow.up")
+                    }
+                    .disabled(!store.hasPreviousFlagged)
+                    Button {
+                        store.toNextFlagged()
+                    } label: {
+                        Label("Next flagged move", systemImage: "arrow.down")
+                    }
+                    .disabled(!store.hasNextFlagged)
                 }
-                .disabled(!store.hasPreviousFlagged)
-                Button {
-                    store.toNextFlagged()
-                } label: {
-                    Label("Next flagged move", systemImage: "arrow.down")
-                }
-                .disabled(!store.hasNextFlagged)
+
+                Divider()
+                EngineVisibilityToggle(engineHidden: $engineHidden)
 
                 if onPreviousGame != nil || onNextGame != nil {
                     Divider()

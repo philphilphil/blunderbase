@@ -62,12 +62,12 @@ extension Classification {
     /// A word for the classification, for accessibility labels and the flagged list.
     var name: String {
         switch self {
-        case .blunder: return "Blunder"
-        case .mistake: return "Mistake"
-        case .inaccuracy: return "Inaccuracy"
-        case .best: return "Best"
-        case .good: return "Good"
-        case .unknown: return "Unclassified"
+        case .blunder: return String(localized: "Blunder")
+        case .mistake: return String(localized: "Mistake")
+        case .inaccuracy: return String(localized: "Inaccuracy")
+        case .best: return String(localized: "Best")
+        case .good: return String(localized: "Good")
+        case .unknown: return String(localized: "Unclassified")
         }
     }
 }
@@ -84,5 +84,5 @@ extension Optional where Wrapped == Classification {
     var color: Color { self?.color ?? Theme.dim2 }
     var ink: Color { self?.ink ?? Theme.faint }
     var isFlagged: Bool { self?.isFlagged ?? false }
-    var name: String { self?.name ?? "Unclassified" }
+    var name: String { self?.name ?? String(localized: "Unclassified") }
 }

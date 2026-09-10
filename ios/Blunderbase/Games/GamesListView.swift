@@ -21,9 +21,9 @@ import UIKit
 struct GamesListView: View {
     @Environment(Session.self) private var session
     @State private var store = GamesStore()
-    /// The six worst moments of the last month, which ride above the list. Their own store,
-    /// because they are one unfiltered call that fails on its own — see `MomentsStore`.
-    @State private var moments = MomentsStore()
+    /// Whether the engine may speak: the rows lose their stamp and their verdict, and the
+    /// switch itself sits in the bar. See `Preferences.engineHidden`.
+    @AppStorage(Preferences.Key.engineHidden) private var engineHidden = false
 
     var body: some View {
         NavigationStack {
@@ -31,6 +31,11 @@ struct GamesListView: View {
                 .background(Theme.void)
                 .navigationTitle("Games")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        EngineVisibilityButton(engineHidden: $engineHidden)
+                    }
+                }
                 .searchable(
                     text: searchBinding,
                     placement: .navigationBarDrawer(displayMode: .always),
@@ -43,12 +48,7 @@ struct GamesListView: View {
         .task {
             guard let endpoints = session.endpoints else { return }
             store.attach(endpoints: endpoints, session: session)
-            moments.attach(endpoints: endpoints, session: session)
-            // The list first and the strip after it, deliberately: the strip is drawn inside
-            // the loaded list, so a phone on a slow connection sees the library arrive rather
-            // than waiting on six tiles it cannot see yet.
             if store.state == .idle { await store.load() }
-            if moments.state == .idle { await moments.load() }
         }
     }
 
@@ -78,7 +78,6 @@ struct GamesListView: View {
 
     private var rows: some View {
         List {
-            strip
             Section {
                 ForEach(store.cards) { card in
                     row(card)
@@ -94,26 +93,7 @@ struct GamesListView: View {
         .scrollContentBackground(.hidden)
         .environment(\.defaultMinListRowHeight, 0)
         .refreshable {
-            // Two independent requests, so they go together: the pull ends when both have
-            // answered rather than when the slower one has waited for the other.
-            async let library: Void = store.refresh()
-            async let recent: Void = moments.refresh()
-            _ = await (library, recent)
-        }
-    }
-
-    /// The worst-moments strip, as the list's own first rows.
-    ///
-    /// A section of the `List` rather than a header on the games section: a plain list pins
-    /// its section headers, and a strip that stuck to the top of the screen would be exactly
-    /// the fixed height it must not have.
-    @ViewBuilder
-    private var strip: some View {
-        if let endpoints = session.endpoints, moments.isVisible(over: store) {
-            Section {
-                WorstMomentsStrip(store: moments, endpoints: endpoints)
-                    .modifier(BareRow())
-            }
+            await store.refresh()
         }
     }
 
@@ -123,7 +103,7 @@ struct GamesListView: View {
             RowLink {
                 GameDetailView(gameID: card.id, summary: card.game, endpoints: endpoints)
             } label: {
-                GameRowView(card: card)
+                GameRowView(card: card, engineHidden: engineHidden)
             }
             .modifier(BareRow())
             .contextMenu {
@@ -162,12 +142,16 @@ struct GamesListView: View {
     private var headerText: String {
         let total = Format.count(store.total)
         guard store.hasFilters else {
-            return store.total == 1 ? "1 game" : "\(total) games"
+            return store.total == 1
+                ? String(localized: "1 game")
+                : String(localized: "\(total) games")
         }
         if store.reachedEnd {
-            return store.total == 1 ? "1 game matches these filters" : "\(total) match these filters"
+            return store.total == 1
+                ? String(localized: "1 game matches these filters")
+                : String(localized: "\(total) match these filters")
         }
-        return "\(Format.count(store.cards.count)) of \(total) match these filters"
+        return String(localized: "\(Format.count(store.cards.count)) of \(total) match these filters")
     }
 
     /// The spinner that says another page is coming. It sits in the list rather than over it
@@ -193,7 +177,7 @@ struct GamesListView: View {
     private var skeleton: some View {
         VStack(spacing: 0) {
             ForEach(0..<8, id: \.self) { index in
-                SkeletonRow()
+                SkeletonRow(engineHidden: engineHidden)
                     .opacity(1 - Double(index) * 0.1)
             }
             Spacer()
@@ -209,7 +193,7 @@ struct GamesListView: View {
             tint: Theme.mistake,
             title: message,
             detail: nil,
-            actionTitle: "Try again"
+            actionTitle: String(localized: "Try again")
         ) {
             Task { await store.load() }
         }
@@ -224,9 +208,9 @@ struct GamesListView: View {
             Placeholder(
                 symbol: "line.3.horizontal.decrease.circle",
                 tint: Theme.dim,
-                title: "No games match these filters",
+                title: String(localized: "No games match these filters"),
                 detail: nil,
-                actionTitle: "Clear filters"
+                actionTitle: String(localized: "Clear filters")
             ) {
                 Task { await store.clearFilters() }
             }
@@ -234,8 +218,8 @@ struct GamesListView: View {
             Placeholder(
                 symbol: "tray",
                 tint: Theme.dim,
-                title: "No games yet",
-                detail: "Games appear here once they are imported in the web app.",
+                title: String(localized: "No games yet"),
+                detail: String(localized: "Games appear here once they are imported in the web app."),
                 actionTitle: nil,
                 action: nil
             )
@@ -262,8 +246,11 @@ private struct BareRow: ViewModifier {
     }
 }
 
-/// One row's worth of grey, in the real row's proportions.
+/// One row's worth of grey, in the real row's proportions — which are two lines and a
+/// stamp, or two lines alone while the engine is hidden and the stamp is not coming.
 private struct SkeletonRow: View {
+    var engineHidden: Bool = false
+
     var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
@@ -271,9 +258,11 @@ private struct SkeletonRow: View {
                 block(width: 130, height: 9)
             }
             Spacer()
-            RoundedRectangle(cornerRadius: Theme.Radius.chip)
-                .fill(Theme.graphBg)
-                .frame(width: 46, height: 22)
+            if !engineHidden {
+                RoundedRectangle(cornerRadius: Theme.Radius.chip)
+                    .fill(Theme.graphBg)
+                    .frame(width: 46, height: 22)
+            }
         }
         .padding(.horizontal, Theme.Metrics.gutter)
         .padding(.vertical, 9)

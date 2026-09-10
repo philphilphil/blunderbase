@@ -43,7 +43,7 @@ struct EvalPane: View {
                     .fill(isWhite ? Theme.sideWhite : Theme.sideBlack)
                     .overlay(Circle().strokeBorder(isWhite ? Theme.sideWhiteEdge : Theme.sideBlackEdge, lineWidth: 1))
                     .frame(width: 8, height: 8)
-                Text(name ?? (isWhite ? "White" : "Black"))
+                Text(name ?? (isWhite ? String(localized: "White") : String(localized: "Black")))
                     .font(Theme.Font.text(12))
                     .foregroundStyle(Theme.dim)
                     .lineLimit(1)
@@ -53,7 +53,9 @@ struct EvalPane: View {
                 counter(tally.mistakes, glyph: "?", color: Theme.mistake)
                 counter(tally.inaccuracies, glyph: "?!", color: Theme.inaccuracy)
                 if let average = tally.averageLoss {
-                    Text(String(format: "%.1f%% avg", average))
+                    // The percent sign rides inside the interpolation rather than in the
+                    // key, where a bare `%` would be read as the start of a format.
+                    Text("\(String(format: "%.1f%%", average)) avg")
                         .font(Theme.Font.mono(11))
                         .foregroundStyle(Theme.faint)
                 }
@@ -77,91 +79,124 @@ struct EvalPane: View {
 
     // MARK: Chart
 
-    /// White's share of the win across the game, as a filled line.
+    /// The 50 % axis: a level game, and the line every column stands on.
+    private static let axis: Double = 50
+
+    /// The measured width of the plot, which is what decides how wide a column is. Zero
+    /// until the first layout, and the chart is drawn again the moment it is known.
+    @State private var plotWidth: CGFloat = 0
+
+    /// White's share of the win across the game, one column per ply.
     ///
-    /// The area is the reading: how much of the column is White's, at a glance, the same
-    /// question the eval bar beside the board answers for one position. The line on top is
-    /// what makes a single sharp move visible, because an area edge alone gets lost against
-    /// the fill at this height.
+    /// The web's default (`web/src/routes/game/components/EvalGraph.tsx`), and the reason it
+    /// replaced the filled curve here: a column that starts on the axis and reaches up in
+    /// White's tone or down in Black's names the side that is ahead by *pointing* at it,
+    /// where the curve left over half the plot as a third grey belonging to nobody and asked
+    /// the reader to hold the convention in their head. Every ply also becomes its own
+    /// object, which is the honest picture of what the data is — the engine's verdict after
+    /// each move, not a continuous quantity.
     ///
-    /// Interpolation is monotone rather than straight segments: it keeps the curve from
-    /// overshooting past a value the game never had, which a spline would do at exactly the
-    /// moments that matter here — a sharp drop on a blunder.
+    /// Two side dots pinned to the plot's left edge are the key, as on the web, so there is
+    /// no y axis to read: up is White, down is Black, and the quarter lines say how far.
     ///
-    /// **Solid white on the full-strength plot ground**, which is the web's treatment
-    /// (`web/src/routes/game/components/EvalGraph.tsx`) and lichess's before it. The two used
-    /// to be mixed down — a 28 % white area over a 40 % ground — which read on the dark
-    /// theme and became near-white on near-white the moment the light theme existed, because
-    /// `sideWhite` is white in both themes and the ground it was diluted against is not. At
-    /// full strength the plot is its own surface and the fill is a colour rather than a tint,
-    /// so the same picture works either way round. The line is `sideWhiteEdge` for the same
-    /// reason the web rims its bars: it is the boundary of the white shape, and it has to
-    /// read against the fill on one side and the ground on the other.
+    /// How wide a column is drawn is `EvalBars.layout`, the web's own rule: a gap and a
+    /// rounded cap while there is room for them, a solid band once a long game leaves under
+    /// two points a ply. The web also rims each column; a Swift Charts mark has no stroke,
+    /// and the black tone clears the plot ground in both themes, so the rim is not missed.
+    ///
+    /// Blunders and mistakes wear their glyph on the tip of the column, outside the fill,
+    /// for the owner's own moves — the ones the reader is here about — or for both sides on
+    /// a game they did not play.
     private var chart: some View {
-        Chart {
-            ForEach(store.curve) { point in
-                AreaMark(
-                    x: .value("Ply", point.ply),
-                    y: .value("Win", point.win)
-                )
-                .interpolationMethod(.monotone)
-                .foregroundStyle(Theme.sideWhite)
-            }
-
-            ForEach(store.curve) { point in
-                LineMark(
-                    x: .value("Ply", point.ply),
-                    y: .value("Win", point.win)
-                )
-                .interpolationMethod(.monotone)
-                .lineStyle(StrokeStyle(lineWidth: 1.5))
-                .foregroundStyle(Theme.sideWhiteEdge)
-            }
-
-            ForEach(store.curve.filter { $0.classification.isFlagged }) { point in
-                // On the curve rather than pinned to the top: a mark at the value shows what
-                // the move cost as well as that it was flagged.
-                PointMark(
-                    x: .value("Ply", point.ply),
-                    y: .value("Win", point.win)
-                )
-                .symbolSize(28)
-                .foregroundStyle(point.classification.color)
-            }
-
-            RuleMark(y: .value("Level", 50))
+        let layout = EvalBars.layout(plotWidth: plotWidth, plies: store.moves.count)
+        return Chart {
+            RuleMark(y: .value("Level", 75))
                 .foregroundStyle(Theme.graphGrid)
-                .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
+                .lineStyle(StrokeStyle(lineWidth: 1))
+            RuleMark(y: .value("Level", 25))
+                .foregroundStyle(Theme.graphGrid)
+                .lineStyle(StrokeStyle(lineWidth: 1))
 
-            RuleMark(x: .value("Cursor", store.cursor))
+            ForEach(store.curve.dropFirst()) { point in
+                BarMark(
+                    x: .value("Ply", Double(point.ply)),
+                    yStart: .value("Win", EvalPane.axis),
+                    yEnd: .value("Win", point.win),
+                    width: .fixed(layout.width)
+                )
+                .foregroundStyle(point.win >= EvalPane.axis ? Theme.sideWhite : Theme.sideBlack)
+                .cornerRadius(layout.width >= 3 ? 1 : 0)
+            }
+
+            // The axis after the columns and the grid, so it stays on top of both.
+            RuleMark(y: .value("Level", EvalPane.axis))
+                .foregroundStyle(Theme.graphAxis)
+                .lineStyle(StrokeStyle(lineWidth: 1))
+
+            RuleMark(x: .value("Cursor", Double(store.cursor)))
                 .foregroundStyle(Theme.accent)
-                .lineStyle(StrokeStyle(lineWidth: 1.5))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+
+            ForEach(markedPoints) { point in
+                PointMark(
+                    x: .value("Ply", Double(point.ply)),
+                    y: .value("Win", point.win)
+                )
+                .symbolSize(0)
+                .annotation(
+                    // Outside the fill — up when White is ahead, down when Black is — and
+                    // pulled back inside the plot at the ends of the game.
+                    position: point.win >= EvalPane.axis ? .top : .bottom,
+                    spacing: 3,
+                    overflowResolution: .init(x: .fit(to: .plot), y: .fit(to: .plot))
+                ) {
+                    Text(point.classification.glyph)
+                        .font(Theme.Font.mono(9, weight: .bold))
+                        .foregroundStyle(point.classification.ink)
+                        .padding(.horizontal, 3)
+                        .frame(height: 11)
+                        .background(point.classification.color, in: RoundedRectangle(cornerRadius: 2))
+                }
+            }
         }
         .chartYScale(domain: 0...100)
         // The x axis is the game's length, not the curve's. Left to itself the chart picks a
         // "nice" upper bound past the last point, and the plot ends short of the right edge
         // by whatever the rounding added — a game of 41 moves drawn as if it had 45. The
-        // domain is fixed to the move count so the last move sits on the edge, and so the
-        // cursor rule and a tap on the plot map to the same ply the curve does.
-        .chartXScale(domain: 0...max(store.moves.count, 1))
-        .chartYAxis {
-            AxisMarks(values: [0, 50, 100]) {
-                AxisValueLabel()
-                    .font(Theme.Font.mono(9))
-                    .foregroundStyle(Theme.graphTick)
-            }
-        }
+        // domain is the move count, padded by half a ply each side so the first and last
+        // columns stand whole rather than cut down the middle by the plot's edge, and so the
+        // cursor rule and a tap on the plot map to the same ply the columns do.
+        .chartXScale(domain: -0.5...(Double(max(store.moves.count, 1)) + 0.5))
+        .chartYAxis(.hidden)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 5)) { value in
                 AxisValueLabel {
                     // The axis is the cursor — half-moves played — and the label is the whole
                     // move a reader counts in. After `n` half-moves the move that arrived is
                     // number `(n + 1) / 2`: 1 and 2 are both move 1, 3 and 4 both move 2.
-                    if let count = value.as(Int.self) {
+                    // Nothing has arrived at count 0, so there is no move to number there.
+                    if let count = value.as(Double.self).map({ Int($0.rounded()) }), count >= 1 {
                         Text(verbatim: "\((count + 1) / 2)")
                             .font(Theme.Font.mono(9))
                             .foregroundStyle(Theme.graphTick)
                     }
+                }
+            }
+        }
+        .chartBackground { proxy in
+            // The key, and the ruler. The dots sit inside the plot's own corners, which is
+            // the only place that is the plot's whichever way the axis labels fall; the
+            // width goes to the state the columns are sized from.
+            GeometryReader { geometry in
+                if let plotFrame = proxy.plotFrame {
+                    let plot = geometry[plotFrame]
+                    sideDot(white: true)
+                        .position(x: plot.minX + 7, y: plot.minY + 7)
+                    sideDot(white: false)
+                        .position(x: plot.minX + 7, y: plot.maxY - 7)
+                    Color.clear
+                        .onAppear { plotWidth = plot.width }
+                        .onChange(of: plot.width) { _, width in plotWidth = width }
                 }
             }
         }
@@ -177,8 +212,8 @@ struct EvalPane: View {
                         DragGesture(minimumDistance: 0).onChanged { value in
                             guard let plotFrame = proxy.plotFrame else { return }
                             let x = value.location.x - geometry[plotFrame].origin.x
-                            if let count: Int = proxy.value(atX: x) {
-                                store.seek(to: count)
+                            if let count: Double = proxy.value(atX: x) {
+                                store.seek(to: Int(count.rounded()))
                             }
                         }
                     )
@@ -188,6 +223,32 @@ struct EvalPane: View {
         .padding(.horizontal, Theme.Metrics.gutter)
         .padding(.bottom, 12)
         .background(Theme.graphBg)
+    }
+
+    /// The plies that wear a glyph on the plot: blunders and mistakes, as the web's legend
+    /// explains and nothing else, and the owner's own where the owner is known. A point's
+    /// ply is the *count* it arrived at, so the move that made it is the one before, and
+    /// an even move ply is White's.
+    private var markedPoints: [CurvePoint] {
+        let owner = store.detail?.game.ownerIsWhite
+        return store.curve.filter { point in
+            guard point.classification == .blunder || point.classification == .mistake else {
+                return false
+            }
+            guard let owner else { return true }
+            let moverIsWhite = (point.ply - 1) % 2 == 0
+            return moverIsWhite == owner
+        }
+    }
+
+    /// The same disc the players' strip uses, small: the plot's whole key is "this end is
+    /// White's".
+    private func sideDot(white: Bool) -> some View {
+        Circle()
+            .fill(white ? Theme.sideWhite : Theme.sideBlack)
+            .overlay(Circle().strokeBorder(white ? Theme.sideWhiteEdge : Theme.sideBlackEdge, lineWidth: 1))
+            .frame(width: 8, height: 8)
+            .accessibilityHidden(true)
     }
 
     // MARK: Flagged list
@@ -246,5 +307,27 @@ struct EvalPane: View {
                 }
             }
         }
+    }
+}
+
+/// The eval plot's column geometry, from the space it has and the plies it must fit — the
+/// web's `barLayout` (`web/src/routes/game/gameModel.ts`), copied rather than re-derived so
+/// the two plots degrade the same way.
+///
+/// Density is the whole of it. A 40-move game across the phone's plot leaves four or five
+/// points a ply and the columns want a gap and a rounded cap; a 100-move game leaves under
+/// two, where a gap would be moiré. So the gap is given up as the columns narrow and the
+/// plot degrades into the solid band it would otherwise have been — the same silhouette,
+/// drawn the only way that width allows.
+enum EvalBars {
+    struct Layout: Equatable {
+        let width: CGFloat
+        let gap: CGFloat
+    }
+
+    static func layout(plotWidth: CGFloat, plies: Int) -> Layout {
+        let step = plotWidth / CGFloat(max(1, plies))
+        let gap: CGFloat = step >= 4 ? 1.1 : step >= 2.5 ? 0.6 : 0
+        return Layout(width: max(0.75, step - gap), gap: gap)
     }
 }

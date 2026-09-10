@@ -101,10 +101,10 @@ struct NotesPane: View {
     /// A note's ply is a half-move *count* — the position after the move — while a move's is
     /// its own 0-based index, so the move a note is filed under is the one at `count - 1`.
     private func anchor(_ note: NoteResponse) -> String {
-        guard let count = note.ply, count > 0 else { return "on the game" }
+        guard let count = note.ply, count > 0 else { return String(localized: "on the game") }
         let ply = count - 1
         let san = store.moves.first { $0.ply == ply }?.san
-        return "on \(Format.move(ply: ply, san: san))"
+        return String(localized: "on \(Format.move(ply: ply, san: san))")
     }
 
     // MARK: Composer
@@ -161,8 +161,8 @@ struct NotesPane: View {
     }
 
     private var composerAnchor: String {
-        guard store.cursor > 0, let move = store.playedMove else { return "on the game" }
-        return "on \(Format.move(ply: move.ply, san: move.san))"
+        guard store.cursor > 0, let move = store.playedMove else { return String(localized: "on the game") }
+        return String(localized: "on \(Format.move(ply: move.ply, san: move.san))")
     }
 
     private var canSave: Bool {

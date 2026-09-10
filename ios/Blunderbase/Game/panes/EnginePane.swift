@@ -37,7 +37,7 @@ struct EnginePane: View {
         }
     }
 
-    private func empty(_ text: String) -> some View {
+    private func empty(_ text: LocalizedStringKey) -> some View {
         Text(text)
             .font(Theme.Font.text(13))
             .foregroundStyle(Theme.dim)
@@ -201,7 +201,7 @@ struct EnginePane: View {
         }
         switch live.phase {
         case .off: return ""
-        case .opening: return "starting…"
+        case .opening: return String(localized: "starting…")
         case .failed(let message), .ended(let message): return message
         case .running:
             var parts: [String] = []

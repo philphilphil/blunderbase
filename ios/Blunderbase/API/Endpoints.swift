@@ -121,7 +121,11 @@ struct Endpoints: Sendable {
         static let games = "/games"
         static let notes = "/notes"
         static let worstMoments = "/stats/worst-moments"
+        static let profile = "/stats/profile"
+        static let dashboard = "/stats/dashboard"
+        static let compare = "/stats/compare"
         static let explorerBook = "/explorer/book"
+        static let explorerPositions = "/explorer/positions"
 
         static func game(_ id: Int) -> String { "/games/\(id)" }
     }
@@ -176,11 +180,28 @@ struct Endpoints: Sendable {
     ///
     /// Null is the ordinary answer, and it is an answer rather than an absence: no two of
     /// the owner's games reached this position.
-    func positionBook(fen: String) async throws -> BookEntry? {
+    ///
+    /// `color` narrows the fold to the games the owner had that side in — the explorer's
+    /// lens, and nil is both.
+    func positionBook(fen: String, color: PieceColor? = nil) async throws -> BookEntry? {
         try await client.getOptional(
             Path.explorerBook,
-            query: [URLQueryItem(name: "fen", value: fen)],
+            query: [URLQueryItem(name: "fen", value: fen), .text("color", color?.rawValue)].compactMap { $0 },
             as: BookEntry.self
+        )
+    }
+
+    /// The owner's games that reached a position, newest first — the explorer's "games in
+    /// this line". One deliberate request per position, for the same reason as the book.
+    func findPositions(fen: String, color: PieceColor? = nil, limit: Int = 20) async throws -> [PositionOccurrence] {
+        try await client.get(
+            Path.explorerPositions,
+            query: [
+                URLQueryItem(name: "fen", value: fen),
+                .text("color", color?.rawValue),
+                .number("limit", min(max(limit, 1), GameQuery.maxLimit)),
+            ].compactMap { $0 },
+            as: [PositionOccurrence].self
         )
     }
 
@@ -210,6 +231,40 @@ struct Endpoints: Sendable {
 
     /// `backend/api/routes/stats.py: MAX_MOMENTS`.
     private static let maxMoments = 100
+
+    /// Ratings over time and the size of the library.
+    func profile() async throws -> ProfileResponse {
+        try await client.get(Path.profile, as: ProfileResponse.self)
+    }
+
+    /// Every aggregation over the last `days`, anchored on the newest game — or over the
+    /// whole library when `days` is nil.
+    func dashboard(days: Int? = nil) async throws -> StatsDashboardResponse {
+        try await client.get(
+            Path.dashboard,
+            query: [URLQueryItem.number("days", days)].compactMap { $0 },
+            as: StatsDashboardResponse.self
+        )
+    }
+
+    /// One dimension over two windows, with the delta between them.
+    func compare(
+        dimension: String,
+        then: ClosedRange<Date>,
+        now: ClosedRange<Date>
+    ) async throws -> ComparisonResponse {
+        try await client.get(
+            Path.compare,
+            query: [
+                URLQueryItem(name: "dimension", value: dimension),
+                .timestamp("then_start", then.lowerBound),
+                .timestamp("then_end", then.upperBound),
+                .timestamp("now_start", now.lowerBound),
+                .timestamp("now_end", now.upperBound),
+            ].compactMap { $0 },
+            as: ComparisonResponse.self
+        )
+    }
 
     // MARK: Notes
 

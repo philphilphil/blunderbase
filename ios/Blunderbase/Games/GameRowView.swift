@@ -21,8 +21,16 @@ import SwiftUI
 /// The flag chips count the *worst moments the card carries* — three at most, because that
 /// is what `GET /games?cards=true` sends. They are not a census of the game's mistakes and
 /// must never be read as one, which is why they are glyph-and-count rather than a total.
+///
+/// With the engine hidden the row keeps line one whole and loses three things from line
+/// two and the right: the stamp, the drop and the chips, which are the engine's verdict on
+/// how the game went. The tier word stays — which pass has run is what Blunderbase did,
+/// not what it concluded, and it is how a reader annotating unaided knows there is a
+/// verdict to check against afterwards.
 struct GameRowView: View {
     let card: GameCard
+    /// Whether the engine's verdict is on the row. See `Preferences.engineHidden`.
+    var engineHidden: Bool = false
 
     /// The stamp on the right. Small enough to be a texture in the row rather than a chart
     /// competing with the text, and wide enough that a swing has somewhere to happen.
@@ -34,8 +42,10 @@ struct GameRowView: View {
                 players
                 qualifiers
             }
-            Sparkline(points: card.evalCurve ?? [], flagged: flaggedPlies)
-                .frame(width: GameRowView.sparklineSize.width, height: GameRowView.sparklineSize.height)
+            if !engineHidden {
+                Sparkline(points: card.evalCurve ?? [], flagged: flaggedPlies)
+                    .frame(width: GameRowView.sparklineSize.width, height: GameRowView.sparklineSize.height)
+            }
         }
         .padding(.horizontal, Theme.Metrics.gutter)
         .padding(.vertical, 9)
@@ -104,11 +114,13 @@ struct GameRowView: View {
             Spacer(minLength: 4)
 
             tier
-            Text(Format.winLoss(worstDrop))
-                .font(Theme.Font.mono(11, weight: .medium))
-                .foregroundStyle(Format.severityColor(worstDrop))
-                .fixedSize()
-            flags
+            if !engineHidden {
+                Text(Format.winLoss(worstDrop))
+                    .font(Theme.Font.mono(11, weight: .medium))
+                    .foregroundStyle(Format.severityColor(worstDrop))
+                    .fixedSize()
+                flags
+            }
         }
         .lineLimit(1)
     }
@@ -134,7 +146,7 @@ struct GameRowView: View {
         }
     }
 
-    private func marker(_ text: String, color: Color) -> some View {
+    private func marker(_ text: LocalizedStringKey, color: Color) -> some View {
         Text(text)
             .font(Theme.Font.text(9, weight: .medium))
             .foregroundStyle(color)
@@ -201,13 +213,15 @@ struct GameRowView: View {
     /// combined children in layout order and "phib 1834 Hikaru 2812 1–0" is not a sentence.
     private var accessibilityLabel: String {
         var parts: [String] = []
-        parts.append("\(card.game.white ?? "White") versus \(card.game.black ?? "Black")")
+        let white = card.game.white ?? String(localized: "White")
+        let black = card.game.black ?? String(localized: "Black")
+        parts.append(String(localized: "\(white) versus \(black)"))
         if let result = card.game.result { parts.append(Format.result(result)) }
         if let played = card.game.playedAt { parts.append(Format.date(played)) }
-        if let drop = worstDrop {
-            parts.append("worst move cost \(Int(drop.rounded())) percent")
+        if !engineHidden, let drop = worstDrop {
+            parts.append(String(localized: "worst move cost \(Int(drop.rounded())) percent"))
         }
-        if card.analyzed != true { parts.append("not analysed") }
+        if card.analyzed != true { parts.append(String(localized: "not analysed")) }
         return parts.joined(separator: ", ")
     }
 }

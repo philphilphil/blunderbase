@@ -61,6 +61,70 @@ final class GameScreenSnapshotTests: XCTestCase {
         try assertNotBlank(image, name: "game-screen-small")
     }
 
+    /// The screen with the engine hidden: no eval bar, so the board has the column; no
+    /// glyph on d5; Moves, Book and Notes on the strip and nothing else. The blunder is on
+    /// the board so that anything still leaking through would be visible in the picture.
+    func testTheGameScreenWithTheEngineHidden() throws {
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: Preferences.Key.engineHidden)
+        defaults.set(true, forKey: Preferences.Key.engineHidden)
+        defer { defaults.set(previous, forKey: Preferences.Key.engineHidden) }
+
+        let store = try loadedStore()
+        store.seek(to: 10)
+
+        let size = CGSize(width: 393, height: 852)
+        let screen = NavigationStack {
+            GameDetailView(store: store, summary: store.detail?.game)
+        }
+        .environment(Session())
+        .environment(EventsClient())
+
+        let image = try render(screen, size: size, named: "game-screen-unaided")
+        try assertNotBlank(image, name: "game-screen-unaided")
+        XCTAssertTrue(store.engineHidden, "the screen hands the phone's setting to its store")
+        XCTAssertNil(store.glyph)
+    }
+
+    /// The screen in German: every SwiftUI literal on it comes out of `Localizable.xcstrings`
+    /// through the view's locale, and a sentence that stayed English is the one thing this
+    /// picture is for. What the picture cannot show is the other half — the strings built
+    /// with `String(localized:)` follow the *process* language, which a test cannot switch —
+    /// so those are checked against the compiled German table directly.
+    func testTheGameScreenInGerman() throws {
+        let store = try loadedStore()
+        store.seek(to: 10)
+
+        let size = CGSize(width: 393, height: 852)
+        let screen = NavigationStack {
+            GameDetailView(store: store, summary: store.detail?.game)
+        }
+        .environment(Session())
+        .environment(EventsClient())
+        .environment(\.locale, Locale(identifier: "de"))
+
+        let image = try render(screen, size: size, named: "game-screen-de")
+        try assertNotBlank(image, name: "game-screen-de")
+        // The German table the build compiled out of the catalog, read as the app would
+        // read it on a German phone: a tab, a classification, a plural form.
+        let german = try XCTUnwrap(
+            Bundle.main.path(forResource: "de", ofType: "lproj").flatMap(Bundle.init(path:))
+        )
+        func de(_ key: String) -> String {
+            german.localizedString(forKey: key, value: nil, table: "Localizable")
+        }
+        XCTAssertEqual(de("Moves"), "Züge")
+        XCTAssertEqual(de("Blunder"), "Grober Patzer")
+        XCTAssertEqual(
+            String(format: de("%lld speeds"), locale: Locale(identifier: "de"), 1),
+            "1 Bedenkzeit"
+        )
+        XCTAssertEqual(
+            String(format: de("%lld speeds"), locale: Locale(identifier: "de"), 3),
+            "3 Bedenkzeiten"
+        )
+    }
+
     /// The screen with a variation open, which is where "back to game" has to be findable.
     func testTheGameScreenInAnAnalysisLine() throws {
         let store = try loadedStore()
@@ -99,6 +163,51 @@ final class GameScreenSnapshotTests: XCTestCase {
         try snapshot(BookPane(store: inBook), named: "pane-book")
     }
 
+    /// The explorer with a line played and a book under it, and the dashboard with numbers
+    /// on it: the two screens that are mostly layout, drawn over adopted answers.
+    func testTheExplorerAndTheDashboardRender() throws {
+        let explorer = ExplorerStore()
+        explorer.play(uci: "e2e4")
+        explorer.play(uci: "e7e5")
+        explorer.play(uci: "g1f3")
+        explorer.play(uci: "b8c6")
+        explorer.adopt(book: try GameFixture.friedLiver().book?[4])
+        let size = CGSize(width: 393, height: 852)
+        let explorerScreen = ExplorerView(store: explorer)
+            .environment(Session())
+            .environment(EventsClient())
+        try assertNotBlank(try render(explorerScreen, size: size, named: "explorer"), name: "explorer")
+
+        let dashboard = DashboardStore()
+        dashboard.adopt(
+            profile: try APIClient.makeDecoder().decode(ProfileResponse.self, from: Data("""
+            {"accounts": [], "volume": {"games": 1284},
+             "ratings": [{"platform": "lichess", "speed": "blitz", "games": 3,
+                          "points": [{"at": "2026-06-01T10:00:00Z", "rating": 1690},
+                                     {"at": "2026-07-01T10:00:00Z", "rating": 1650},
+                                     {"at": "2026-08-22T18:04:00Z", "rating": 1712}]},
+                         {"platform": "chesscom", "speed": "blitz", "games": 2,
+                          "points": [{"at": "2026-06-10T10:00:00Z", "rating": 1500},
+                                     {"at": "2026-08-01T10:00:00Z", "rating": 1560}]}]}
+            """.utf8)),
+            allTime: try APIClient.makeDecoder().decode(StatsDashboardResponse.self, from: Data("""
+            {"anchor": "2026-08-22T18:04:00Z", "until": "2026-08-22T18:04:00Z",
+             "dimensions": {"blunders_by_phase": {"total": {"key": "total", "blunder": 47}}}}
+            """.utf8)),
+            trends: DashboardStore.Trends(
+                window: .month, games: 40, until: nil,
+                blundersPerGame: 1.6, winLossPerMove: 3.2, score: 55,
+                blundersDelta: -0.4, winLossDelta: -0.5, scoreDelta: 3
+            )
+        )
+        let moments = MomentsStore()
+        moments.adopt([])
+        let dashboardScreen = DashboardView(store: dashboard, moments: moments)
+            .environment(Session())
+            .environment(EventsClient())
+        try assertNotBlank(try render(dashboardScreen, size: size, named: "dashboard"), name: "dashboard")
+    }
+
     private func snapshot(_ view: some View, named name: String) throws {
         let size = CGSize(width: 393, height: 320)
         let image = try render(
@@ -114,6 +223,9 @@ final class GameScreenSnapshotTests: XCTestCase {
             gameID: 1,
             endpoints: Endpoints(serverURL: try XCTUnwrap(URL(string: "https://example.invalid")))
         )
+        // Pinned rather than read from the phone, so the unaided snapshot is the only one
+        // drawn unaided even after a crashed run left the setting behind.
+        store.engineHidden = Preferences.engineHidden
         store.adopt(try GameFixture.friedLiver())
         return store
     }

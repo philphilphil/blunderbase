@@ -1,13 +1,13 @@
 import SwiftUI
 import Observation
 
-/// Six things to work on, above the library.
+/// Six things to work on, on the dashboard.
 ///
 /// This is the phone's version of the web dashboard's "worst recent moments" panel
 /// (`web/src/routes/dashboard/WorstMomentsRow.tsx`): the six worst moves of the last thirty
-/// days, one per game, ranked by the win percentage they gave away. The phone has no
-/// dashboard to put it on, so it goes at the top of the games list — the screen the app
-/// opens on, and the only one that is already about the library as a whole.
+/// days, one per game, ranked by the win percentage they gave away. It used to sit at the
+/// top of the games list, because the phone had no dashboard to put it on; it has one now,
+/// and the list is a table with filters again.
 ///
 /// **Tiles, not boards.** The web draws each moment as a small position with the blunder in
 /// red and the engine's move as an arrow. A board that size is legible on a laptop and is
@@ -18,13 +18,9 @@ import Observation
 /// says "blunder" by drawing the move in the blunder's red on a board, and a tile with no
 /// board has to say it.
 ///
-/// **It scrolls away with the list.** The strip is the first section of the `List` rather
-/// than a `safeAreaInset` beside the filter bar, because it is content and not chrome:
-/// something read once on arrival must not cost eighty points of every screen after that.
-///
-/// **It is not shown over a filtered list.** A search or a filter makes the list an answer
-/// to a question, and six moments from the whole library sitting on top of that answer are
-/// answering a different one. See `MomentsStore.isVisible(over:)`.
+/// **It is not shown with the engine hidden.** Six of the engine's verdicts are the loudest
+/// thing on the screen, and a reader annotating unaided should not meet them on the way
+/// in. See `MomentsStore.isVisible(engineHidden:)`.
 struct WorstMomentsStrip: View {
     let store: MomentsStore
     /// Where a tile leads. Held rather than reached for through the environment so the strip
@@ -121,8 +117,9 @@ struct WorstMomentsStrip: View {
 
     private func label(_ moment: MomentResponse) -> String {
         let move = Format.move(ply: moment.ply, san: moment.san)
-        return "\(moment.classification.name), \(move) against \(subtitle(moment)),"
-            + " gave away \(Format.winPercent(moment.winLoss))"
+        return String(
+            localized: "\(moment.classification.name), \(move) against \(subtitle(moment)), gave away \(Format.winPercent(moment.winLoss))"
+        )
     }
 
     /// A tile's worth of grey, in the tile's own proportions, so the strip does not change
@@ -193,15 +190,15 @@ final class MomentsStore {
         self.endpoints = endpoints
     }
 
-    /// Whether the strip belongs on screen at all, above this list.
+    /// Whether the strip belongs on screen at all.
     ///
-    /// Two reasons to be absent, and they are deliberately one question: the library is
-    /// narrowed, so the strip would answer something nobody asked; or there is nothing to
-    /// show — no moments in the window, or a request that failed — and an empty box saying
-    /// so is worse than the space it takes. Only "still loading" draws without content, and
-    /// then it draws the shape the content will have.
-    func isVisible(over games: GamesStore) -> Bool {
-        guard !games.hasFilters else { return false }
+    /// Two reasons to be absent, and they are deliberately one question: the engine is
+    /// hidden, and six of its verdicts are the loudest thing on the screen; or there is
+    /// nothing to show — no moments in the window, or a request that failed — and an empty
+    /// box saying so is worse than the space it takes. Only "still loading" draws without
+    /// content, and then it draws the shape the content will have.
+    func isVisible(engineHidden: Bool = false) -> Bool {
+        guard !engineHidden else { return false }
         switch state {
         case .idle, .loading: return true
         case .loaded: return !moments.isEmpty

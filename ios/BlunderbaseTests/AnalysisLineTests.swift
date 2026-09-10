@@ -19,6 +19,7 @@ final class AnalysisLineTests: XCTestCase {
             gameID: 1,
             endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!)
         )
+        store.engineHidden = false
         store.adopt(try GameFixture.friedLiver())
         // Cursor 9: nine half-moves played, so after 5.exd5 with Black to move. The game's
         // own move from here is the blunder 5…Nxd5, which is ply 9.

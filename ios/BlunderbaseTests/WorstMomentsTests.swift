@@ -5,9 +5,9 @@ import XCTest
 ///
 /// Two rules carry the feature, and neither is visible in the view's body.
 ///
-/// **It is absent over a narrowed library.** A search or a filter makes the games list an
-/// answer to a question; six moments from the whole library sitting on top of that answer
-/// are answering a different one, and a reader would have to notice that on their own.
+/// **It is absent with the engine hidden, and when there is nothing to show.** Six of the
+/// engine's verdicts are the loudest thing on the dashboard, and an empty strip saying so
+/// would cost the top of the screen to report an absence.
 ///
 /// **A tile opens the game on the position the move was played from.** The moment's `ply` is
 /// a 0-based move ply, the cursor is a half-move count, and the two are the same number for
@@ -19,42 +19,35 @@ final class WorstMomentsTests: XCTestCase {
 
     // MARK: When the strip is on screen
 
-    func testTheStripIsHiddenWhileSomethingIsSearchedFor() throws {
-        let games = GamesStore()
+    func testTheStripIsShownOverAWindowWithMomentsInIt() throws {
         let moments = MomentsStore()
         moments.adopt([try blunder()])
-        XCTAssertTrue(moments.isVisible(over: games))
-
-        games.search = "hikaru"
-        XCTAssertTrue(games.hasFilters)
-        XCTAssertFalse(moments.isVisible(over: games), "the list is an answer to a query now")
-    }
-
-    func testTheStripIsHiddenUnderAFilter() async throws {
-        let games = GamesStore()
-        let moments = MomentsStore()
-        moments.adopt([try blunder()])
-
-        await games.apply { $0.hasBlunders = true }
-        XCTAssertFalse(moments.isVisible(over: games))
-
-        await games.clearFilters()
-        XCTAssertFalse(games.hasFilters)
-        XCTAssertTrue(moments.isVisible(over: games))
+        XCTAssertTrue(moments.isVisible())
     }
 
     /// Nothing in the window shows nothing at all — not an empty box saying so, which would
-    /// cost the top of the list to report an absence.
+    /// cost the top of the dashboard to report an absence.
     func testAnEmptyWindowDrawsNothingRatherThanAnEmptyState() {
         let moments = MomentsStore()
         moments.adopt([])
-        XCTAssertFalse(moments.isVisible(over: GamesStore()))
+        XCTAssertFalse(moments.isVisible())
     }
 
     /// Loading is the one state that draws without content: the skeleton is the shape the
-    /// tiles will have, so the list does not jump when they land.
+    /// tiles will have, so the screen does not jump when they land.
     func testTheSkeletonIsDrawnBeforeTheFirstAnswer() {
-        XCTAssertTrue(MomentsStore().isVisible(over: GamesStore()))
+        XCTAssertTrue(MomentsStore().isVisible())
+    }
+
+    /// Six engine verdicts are the loudest thing on the screen, so with the engine hidden
+    /// the strip goes — loaded or still loading.
+    func testTheStripIsHiddenWithTheEngine() throws {
+        let moments = MomentsStore()
+        XCTAssertFalse(moments.isVisible(engineHidden: true), "not even the skeleton")
+
+        moments.adopt([try blunder()])
+        XCTAssertFalse(moments.isVisible(engineHidden: true))
+        XCTAssertTrue(moments.isVisible(engineHidden: false))
     }
 
     // MARK: Where a tile lands
@@ -66,6 +59,7 @@ final class WorstMomentsTests: XCTestCase {
             gameID: 1,
             endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!)
         )
+        store.engineHidden = false
         store.adopt(try GameFixture.friedLiver())
 
         let moment = try blunder()
@@ -89,6 +83,7 @@ final class WorstMomentsTests: XCTestCase {
             gameID: 1,
             endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!)
         )
+        store.engineHidden = false
         store.adopt(try GameFixture.friedLiver())
 
         // A note written at count 10 is about the position 5… Nxd5 made.

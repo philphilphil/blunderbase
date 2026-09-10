@@ -31,6 +31,23 @@ final class Session {
 
     static let serverURLKey = "blunderbase.serverURL"
 
+    /// The public demo, `docker/docker-compose.demo.yml`: a read-only library of anonymised
+    /// games with no password, so connecting to it is signing in. It is on the connect
+    /// screen for two readers — somebody deciding whether to host a Blunderbase, and the App
+    /// Store reviewer, who has no server of their own and must be able to reach a library
+    /// without being handed credentials. Both get the same button.
+    static let demoURL = URL(string: "https://demo.blunderbase.org")!
+
+    /// Whether the stored server is the demo, which is the one server with no password to
+    /// ask for — the connect screen offers to reconnect rather than a field nothing fits in.
+    var isDemoServer: Bool { serverURL == Session.demoURL }
+
+    /// Point the app at the demo. The same verb as typing its address, so it is stored and
+    /// restored like any server and "use a different server" is the way back out.
+    func connectToDemo() async {
+        await connect(to: Session.demoURL.absoluteString)
+    }
+
     private(set) var state: State = .needsServer
     private(set) var serverURL: URL?
     private(set) var capabilities: RuntimeCapabilities?
@@ -88,7 +105,7 @@ final class Session {
     /// on the train is worse than remembering a URL that turned out to be wrong.
     func connect(to urlString: String) async {
         guard let url = Session.normalisedURL(from: urlString) else {
-            state = .failed("That does not look like a server address.")
+            state = .failed(String(localized: "That does not look like a server address."))
             return
         }
         use(url)
@@ -188,7 +205,7 @@ final class Session {
 
     private func signInMessage(for error: APIError) -> String {
         switch error {
-        case .unauthorized: return "That password was not accepted."
+        case .unauthorized: return String(localized: "That password was not accepted.")
         default: return error.localizedDescription
         }
     }

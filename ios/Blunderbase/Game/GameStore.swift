@@ -59,6 +59,18 @@ final class GameStore {
     /// of the game: the toolbar button changes this game, the setting changes the next one.
     var showHints: Bool = Preferences.showHints
 
+    /// Whether the engine may speak on this screen at all — the mode behind `showHints`.
+    ///
+    /// It starts from the phone's setting and the screen keeps it in step with it, so a
+    /// flip in Settings or on the games list reaches a game already open. While it is on,
+    /// `moves` answers with the engine stripped off, and every panel that reads through
+    /// the store — the eval bar, the curve, the glyph, the arrows, the lines, Maia — goes
+    /// quiet by construction rather than by each checking. A preview line is an engine
+    /// line, so it is dropped the moment the mode comes on.
+    var engineHidden: Bool = Preferences.engineHidden {
+        didSet { if engineHidden { previewLine = nil } }
+    }
+
     /// The Maia level being read. Starts at the server's configured target Elo, which is
     /// the level the owner is actually trying to beat.
     var maiaElo: Int?
@@ -95,6 +107,7 @@ final class GameStore {
     func adopt(_ detail: GameDetail, maiaTargetElo: Int? = nil) {
         self.detail = detail
         self.notes = detail.notes ?? []
+        self.unaidedMoves = Preferences.withoutEngine(detail.moves)
         self.snapshots = Replay.snapshots(from: detail.moves.map {
             ReplayMove(ply: $0.ply, san: $0.san, uci: $0.uci)
         })
@@ -226,7 +239,17 @@ final class GameStore {
 
     // MARK: The two lookups
 
-    var moves: [MoveRow] { detail?.moves ?? [] }
+    /// The game's moves — with everything the engine said about them taken off while the
+    /// engine is hidden. Every lookup below reads through this, which is what makes the
+    /// mode one decision.
+    var moves: [MoveRow] {
+        engineHidden ? unaidedMoves : (detail?.moves ?? [])
+    }
+
+    /// The same rows without their verdicts, built once when the game arrives: `moves` is
+    /// read on every step, and stripping a few hundred rows per step is work nobody asked
+    /// for.
+    private var unaidedMoves: [MoveRow] = []
 
     /// The move that arrived at the current position, or nil at the start.
     ///
@@ -549,7 +572,7 @@ final class GameStore {
     /// What the transport counts. In a line it counts the line, because that is what
     /// stepping moves through.
     var positionLabel: String {
-        isInLine ? "line \(lineIndex)/\(line.count)" : "\(cursor)/\(moves.count)"
+        isInLine ? String(localized: "line \(lineIndex)/\(line.count)") : "\(cursor)/\(moves.count)"
     }
 
     var canStepBack: Bool { isInLine ? true : cursor > 0 }

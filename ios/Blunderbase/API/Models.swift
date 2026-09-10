@@ -55,9 +55,9 @@ enum Source: String, Sendable, Equatable {
         case .chesscom: return "Chess.com"
         case .fics: return "FICS"
         case .pgn: return "PGN"
-        case .manual: return "Manual"
-        case .masters: return "Masters"
-        case .unknown: return "Other"
+        case .manual: return String(localized: "Manual")
+        case .masters: return String(localized: "Masters")
+        case .unknown: return String(localized: "Other")
         }
     }
 }
@@ -91,12 +91,12 @@ enum Speed: String, Sendable, Equatable {
 
     var label: String {
         switch self {
-        case .bullet: return "Bullet"
-        case .blitz: return "Blitz"
-        case .rapid: return "Rapid"
-        case .classical: return "Classical"
-        case .correspondence: return "Correspondence"
-        case .unknown: return "Other"
+        case .bullet: return String(localized: "Bullet")
+        case .blitz: return String(localized: "Blitz")
+        case .rapid: return String(localized: "Rapid")
+        case .classical: return String(localized: "Classical")
+        case .correspondence: return String(localized: "Correspondence")
+        case .unknown: return String(localized: "Other")
         }
     }
 }
@@ -758,6 +758,36 @@ struct BookEntry: Decodable, Sendable, Equatable {
     }
 }
 
+/// One of the owner's games that reached a position — `/explorer/positions`, the explorer's
+/// "games in this line".
+///
+/// `ply` is the 0-based ply of the move played *from* the position, the same scale a worst
+/// moment uses, so opening the game at it lands on the position with the move still to
+/// come. The verdict fields are the engine's on that move and go quiet with it.
+struct PositionOccurrence: Decodable, Sendable, Equatable, Identifiable {
+    let game: GameSummary
+    let ply: Int
+    var moveNumber: Int?
+    var moveUci: String?
+    var moveSan: String?
+    var winLoss: Double?
+    var classification: Classification?
+
+    /// A game reaches a position once in the ordinary case and twice by repetition, so
+    /// the ply is part of the identity.
+    var id: String { "\(game.id)-\(ply)" }
+
+    enum CodingKeys: String, CodingKey {
+        case game
+        case ply
+        case moveNumber = "move_number"
+        case moveUci = "move_uci"
+        case moveSan = "move_san"
+        case winLoss = "win_loss"
+        case classification
+    }
+}
+
 // MARK: - The game screen's payload
 
 /// Everything one game needs, in one call.
@@ -997,4 +1027,129 @@ struct MomentResponse: Decodable, Sendable, Equatable, Identifiable {
         case bestMoveUci = "best_move_uci"
         case bestMoveSan = "best_move_san"
     }
+}
+
+// MARK: - The profile and the dashboard's numbers
+
+/// One point of a rating series: when, and what the owner was rated after that game.
+struct RatingPoint: Decodable, Sendable, Equatable, Identifiable {
+    let at: Date
+    let rating: Int
+    var gameID: Int?
+
+    var id: Date { at }
+
+    enum CodingKeys: String, CodingKey {
+        case at
+        case rating
+        case gameID = "game_id"
+    }
+}
+
+/// The owner's rating over time on one platform at one speed.
+///
+/// Per platform *and* speed, as the server keeps it: a bullet rating and a classical rating
+/// on the same site are two different numbers and averaging them says nothing. The
+/// dashboard groups these by speed and draws one line per platform inside each chart.
+struct RatingSeries: Decodable, Sendable, Equatable {
+    var platform: String?
+    var speed: String?
+    var games: Int?
+    var current: Int?
+    var min: Int?
+    var max: Int?
+    var points: [RatingPoint]
+}
+
+/// How much the library holds, and how it went — `/stats/profile`'s `volume`.
+struct ProfileVolume: Decodable, Sendable, Equatable {
+    var games: Int?
+    var wins: Int?
+    var draws: Int?
+    var losses: Int?
+    var score: Double?
+    var firstGame: Date?
+    var lastGame: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case games
+        case wins
+        case draws
+        case losses
+        case score
+        case firstGame = "first_game"
+        case lastGame = "last_game"
+    }
+}
+
+/// `/stats/profile`: ratings over time and the size of the library. The accounts it also
+/// carries are the web's business — connecting one is done in the browser.
+struct ProfileResponse: Decodable, Sendable, Equatable {
+    var ratings: [RatingSeries]
+    var volume: ProfileVolume
+}
+
+/// One bucket of an aggregation, read as numbers by name.
+///
+/// The keys beyond `key` are the dimension's own — `games`, `blunders_per_game`, `score`,
+/// `avg_win_loss`, `blunder` — and differ per dimension, so a bucket keeps whatever numbers
+/// arrived rather than declaring a field for each. A caller asks for a name and gets nil
+/// where the dimension does not say, which is how the web reads the same payload (`num` in
+/// `routes/stats/kit/analytics.ts`).
+struct StatsBucket: Decodable, Sendable, Equatable {
+    var key: String?
+    var numbers: [String: Double]
+
+    init(key: String? = nil, numbers: [String: Double] = [:]) {
+        self.key = key
+        self.numbers = numbers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnyKey.self)
+        var numbers: [String: Double] = [:]
+        for name in container.allKeys {
+            if name.stringValue == "key" {
+                key = try? container.decode(String.self, forKey: name)
+            } else if let value = try? container.decode(Double.self, forKey: name) {
+                numbers[name.stringValue] = value
+            }
+        }
+        self.numbers = numbers
+    }
+
+    func number(_ field: String) -> Double? { numbers[field] }
+
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+}
+
+/// One aggregation: its buckets and the total across them.
+struct StatsResponse: Decodable, Sendable, Equatable {
+    var dimension: String?
+    var since: Date?
+    var until: Date?
+    var buckets: [StatsBucket]?
+    var total: StatsBucket?
+}
+
+/// `/stats/dashboard`: every dimension over one window the server anchored on the newest
+/// game, so the phone and the browser cut the same games at the same instant.
+struct StatsDashboardResponse: Decodable, Sendable, Equatable {
+    var anchor: Date?
+    var since: Date?
+    var until: Date?
+    var dimensions: [String: StatsResponse]
+}
+
+/// `/stats/compare`: one dimension over two windows and the difference between them.
+struct ComparisonResponse: Decodable, Sendable, Equatable {
+    var dimension: String?
+    var then: StatsResponse?
+    var now: StatsResponse?
+    var delta: StatsResponse?
 }

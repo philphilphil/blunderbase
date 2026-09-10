@@ -45,7 +45,7 @@ struct NotesListView: View {
                 tint: Theme.mistake,
                 title: message,
                 detail: nil,
-                actionTitle: "Try again"
+                actionTitle: String(localized: "Try again")
             ) {
                 Task { await store.load() }
             }
@@ -54,8 +54,8 @@ struct NotesListView: View {
                 Placeholder(
                     symbol: "note.text",
                     tint: Theme.dim,
-                    title: "Nothing written down yet",
-                    detail: "Notes you write on a move show up here, newest first.",
+                    title: String(localized: "Nothing written down yet"),
+                    detail: String(localized: "Notes you write on a move show up here, newest first."),
                     actionTitle: nil,
                     action: nil
                 )

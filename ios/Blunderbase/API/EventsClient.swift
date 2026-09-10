@@ -212,7 +212,7 @@ final class EventsClient: EventsFeed {
         case .data:
             // Nothing on this socket is binary. Said out loud rather than ignored, because a
             // server that started sending binary would otherwise look like one gone silent.
-            lastError = "The server sent a binary frame on /events, which this app does not read."
+            lastError = String(localized: "The server sent a binary frame on /events, which this app does not read.")
         @unknown default:
             break
         }

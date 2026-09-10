@@ -6,8 +6,9 @@ Installation, may cache, and does not contain a second implementation of Blunder
 chess and query rules. Every evaluation, classification, Maia distribution and book number
 on screen came from the server.
 
-This is a proof of concept. It has two screens that matter — the games list and the game
-detail — plus a notes list and settings.
+This is a proof of concept. Five tabs, in the web rail's order: a dashboard, the games list,
+the explorer, a notes list and settings — and the game screen, which every one of them
+leads into.
 
 ## Requirements
 
@@ -36,14 +37,43 @@ On first launch the app asks for the server URL and the password. It signs in wi
 `POST /api/auth/login` and keeps the `blunderbase_session` cookie, which the server slides
 forward for thirty days, so the app stays signed in between launches.
 
+Under the address field is **Try the demo**, which connects to `demo.blunderbase.org` — the
+public read-only library of anonymised games, which has no password, so one tap signs in.
+It is there for anyone deciding whether to host a Blunderbase, and it is what the App Store
+reviewer uses: the review notes point at that button rather than handing over credentials.
+Signing out of the demo offers to reconnect rather than asking for a password it does not
+have; **Use a different server** is the way back to your own.
+
+## The dashboard
+
+The web dashboard's sections in the web's order, minus the two that act on the server: the
+line under the title counts the games and the blunders; **Ratings** draws one chart per
+speed with a line per platform, a year back by default, cut by the window control at the
+newest rated game, with a legend for the sites and a speeds menu that switches charts off
+and remembers it on this phone; **Worst
+moments** is the six worst moves of the last thirty days, in words rather than boards
+because a board that size is not legible on a phone, each opening its game on the position
+the blunder was played from; **Last N days** is blunders per game, the win percentage given
+away and the score, each against the equally long window before. The sync button and the
+analysis queue stay in the browser, where a tap can do something about them, and the recent
+games are the Games tab.
+
 ## The games list
 
-Above the rows, and scrolling away with them, is a strip of the six worst moments of the
-last thirty days — the phone's version of the web dashboard's panel, in words rather than
-boards, because a board that size is not legible on a phone. Tapping one opens its game on
-the position the blunder was played from, so the move and the engine's answer are both on
-screen. The strip is hidden whenever a search or a filter is on: the list is then an answer
-to a question, and six moments from the whole library would be answering a different one.
+A table with filters and nothing above it: result, blunders, analysed, speed and source as
+chips under the search field, and two lines per game — names and result, then date, time
+control, length, the worst drop and the flag chips, with the eval curve as a stamp.
+
+## The explorer
+
+Your own openings: a board, and under it what your games did from the position on it — how
+often you have been here, the split, the score and the average drop of every continuation
+you have played. Tapping a row plays it and the table becomes that position's; tapping the
+board plays any move, book or not. **Games in this line** lists the games that reached the
+position, each opening on that very move, and the segmented control narrows the fold to
+the games you had one colour in. The Lichess masters and rated pools the web's explorer
+also reads stay in the browser: a phone has room for one table under a board, and the one
+worth carrying is your own.
 
 ## The game screen
 
@@ -62,6 +92,35 @@ full-size board and one row of moves rather than a shrunken board and a long lis
 Three ways to move through the game: drag across the board to walk it, tap a move in the
 Moves tab, tap or drag the graph in the Eval tab.
 
+## Reading without the engine
+
+The web app's ⇧E is here too: the computer in the games list's bar, **Hide the engine** in
+the game's menu, or the switch under Settings › Engine. On, it hides everything an engine
+has said about your games so you can annotate a game yourself first and check afterwards:
+the list loses the stamps, the drops and the `??` chips and the worst-moments strip; the game
+loses the eval bar, the glyph on the board, the advice arrows, the Eval and Engine tabs and
+the live board; the Book keeps its counts and scores but not its average drop. What stays is
+the game and what Blunderbase has *done* — the `deep` and `unanalysed` markers on the rows.
+It is a setting of this phone, it survives relaunches, and the games list's computer goes
+dim while it is on so a clean move list is not mistaken for an unanalysed game.
+
+## Languages
+
+English and German, following the phone: iOS picks the app's language from the system
+language list, and Settings › Blunderbase › Language overrides it for this app alone. There
+is no language switch inside the app, because the phone already has one.
+
+Every string lives in `Blunderbase/Resources/Localizable.xcstrings`, a String Catalog with
+English as the source. SwiftUI literals (`Text("…")`, `Button("…")`, `Label`) are keys by
+themselves; a string that is built as a plain `String` — an accessibility label, a chip
+title, an error sentence, a helper that takes `String` — goes through `String(localized:)`
+so it is a key too. `SWIFT_EMIT_LOC_STRINGS` is on, so building in Xcode adds a new key to
+the catalog on its own; a German value is then written by hand, in German rather than as
+translated English, using the words the manual uses (grober Patzer, Bedenkzeit, Remis,
+Quelle). Numbers that are identifiers — a rating, an Elo, a ply — are written with
+`Text(verbatim:)` so they are never grouped into `1.712`; dates go through `Format.date`,
+which takes its order and punctuation from the locale.
+
 ## What it talks to
 
 Only the existing REST API and the events socket — no backend change was needed.
@@ -69,7 +128,9 @@ Only the existing REST API and the events socket — no backend change was neede
 | Screen | Endpoint |
 |---|---|
 | Connect | `GET /api/auth/status`, `POST /api/auth/login`, `POST /api/auth/logout` |
-| Games | `GET /api/games?cards=true&…`, `GET /api/stats/worst-moments` |
+| Dashboard | `GET /api/stats/profile`, `GET /api/stats/dashboard`, `GET /api/stats/compare`, `GET /api/stats/worst-moments` |
+| Games | `GET /api/games?cards=true&…` |
+| Explorer | `GET /api/explorer/book`, `GET /api/explorer/positions` |
 | Game | `GET /api/games/{id}`, `GET /api/explorer/book` |
 | Notes | `GET /api/notes`, `POST /api/notes` |
 | Live engine | `POST/PATCH/DELETE /api/streams`, output on `ws(s)://…/events` |

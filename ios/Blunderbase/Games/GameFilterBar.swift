@@ -58,10 +58,10 @@ struct GameFilterBar: View {
 
     private var outcomeLabel: String {
         switch store.query.outcome {
-        case "win": return "Wins"
-        case "loss": return "Losses"
-        case "draw": return "Draws"
-        default: return "Result"
+        case "win": return String(localized: "Wins")
+        case "loss": return String(localized: "Losses")
+        case "draw": return String(localized: "Draws")
+        default: return String(localized: "Result")
         }
     }
 
@@ -69,9 +69,9 @@ struct GameFilterBar: View {
     /// answer, and asking somebody to open a menu to pick "on" is a tap wasted.
     private var blundersChip: some View {
         toggleChip(
-            "Blunders",
+            String(localized: "Blunders"),
             isOn: store.query.hasBlunders == true,
-            accessibility: "Only games with blunders"
+            accessibility: String(localized: "Only games with blunders")
         ) { query in
             query.hasBlunders = query.hasBlunders == true ? nil : true
         }
@@ -79,9 +79,9 @@ struct GameFilterBar: View {
 
     private var analysedChip: some View {
         toggleChip(
-            "Analysed",
+            String(localized: "Analysed"),
             isOn: store.query.analyzed == true,
-            accessibility: "Only analysed games"
+            accessibility: String(localized: "Only analysed games")
         ) { query in
             query.analyzed = query.analyzed == true ? nil : true
         }
@@ -103,7 +103,7 @@ struct GameFilterBar: View {
             }
             if !store.query.speeds.isEmpty {
                 Divider()
-                menuItem("Any speed", isOn: false) { $0.speeds = [] }
+                menuItem(String(localized: "Any speed"), isOn: false) { $0.speeds = [] }
             }
         } label: {
             chip(speedLabel, isActive: !store.query.speeds.isEmpty, hasMenu: true)
@@ -113,21 +113,25 @@ struct GameFilterBar: View {
 
     private var speedLabel: String {
         switch store.query.speeds.count {
-        case 0: return "Speed"
+        case 0: return String(localized: "Speed")
         case 1: return store.query.speeds[0].label
         case 2: return store.query.speeds.map(\.label).joined(separator: ", ")
-        default: return "\(store.query.speeds.count) speeds"
+        default: return String(localized: "\(store.query.speeds.count) speeds")
         }
     }
 
     private var sourceChip: some View {
         Menu {
-            menuItem("Any source", isOn: store.query.source == nil) { $0.source = nil }
+            menuItem(String(localized: "Any source"), isOn: store.query.source == nil) { $0.source = nil }
             ForEach(GameFilterBar.sources, id: \.rawValue) { source in
                 menuItem(source.label, isOn: store.query.source == source) { $0.source = source }
             }
         } label: {
-            chip(store.query.source?.label ?? "Source", isActive: store.query.source != nil, hasMenu: true)
+            chip(
+                store.query.source?.label ?? String(localized: "Source"),
+                isActive: store.query.source != nil,
+                hasMenu: true
+            )
         }
         .accessibilityLabel("Filter by where the game came from")
     }
@@ -211,10 +215,10 @@ struct GameFilterBar: View {
     /// The owner's side of the result, which is what `outcome` means on the wire — a loss
     /// is a loss whichever colour they had.
     private static let outcomes: [OutcomeOption] = [
-        OutcomeOption(label: "All results", value: nil),
-        OutcomeOption(label: "Wins", value: "win"),
-        OutcomeOption(label: "Losses", value: "loss"),
-        OutcomeOption(label: "Draws", value: "draw"),
+        OutcomeOption(label: String(localized: "All results"), value: nil),
+        OutcomeOption(label: String(localized: "Wins"), value: "win"),
+        OutcomeOption(label: String(localized: "Losses"), value: "loss"),
+        OutcomeOption(label: String(localized: "Draws"), value: "draw"),
     ]
 
     /// `.unknown` is this app's word for a value it could not read, not one the server

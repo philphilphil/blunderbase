@@ -127,7 +127,24 @@ struct ConnectView: View {
             Button("Connect", action: connect)
                 .buttonStyle(PrimaryButton(isEnabled: canConnect))
                 .disabled(!canConnect)
+
+            demoButton
         }
+    }
+
+    /// The way in for somebody with no server: a reader deciding whether to host one, or
+    /// the App Store reviewer, who is handed this screen and no credentials. The demo has no
+    /// password, so one tap is the whole sign-in. Quiet rather than primary: the screen's
+    /// question is still "which Blunderbase", and the demo is the answer for people who do
+    /// not have one yet.
+    private var demoButton: some View {
+        Button("Try the demo") {
+            focus = nil
+            isEditingServer = false
+            Task { await session.connectToDemo() }
+        }
+        .buttonStyle(QuietButton())
+        .disabled(isBusy)
     }
 
     private var canConnect: Bool {
@@ -144,7 +161,39 @@ struct ConnectView: View {
 
     // MARK: Signing in
 
+    /// The demo has no password, so signing out of it and landing on a password field
+    /// would be a question with no answer. Reconnecting is the sign-in.
+    @ViewBuilder
     private var passwordForm: some View {
+        if session.isDemoServer {
+            demoForm
+        } else {
+            ownServerForm
+        }
+    }
+
+    private var demoForm: some View {
+        VStack(spacing: 14) {
+            Text("The demo is a read-only library of anonymised games. It needs no password.")
+                .font(Theme.Font.text(13))
+                .foregroundStyle(Theme.dim)
+                .multilineTextAlignment(.center)
+
+            Button("Connect to the demo") {
+                Task { await session.connectToDemo() }
+            }
+            .buttonStyle(PrimaryButton(isEnabled: !isBusy))
+            .disabled(isBusy)
+
+            Button("Use a different server") {
+                isEditingServer = true
+                focus = .address
+            }
+            .buttonStyle(QuietButton())
+        }
+    }
+
+    private var ownServerForm: some View {
         VStack(spacing: 14) {
             if let host = session.serverURL?.host() {
                 Text(host)

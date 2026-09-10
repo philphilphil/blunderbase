@@ -219,12 +219,12 @@ final class LiveEngineStore {
     }
 
     /// The machine's name for the panel's "analysed on ⟨machine⟩" line.
-    var hostName: String { runnerName ?? "this server" }
+    var hostName: String { runnerName ?? String(localized: "this server") }
 
     /// `Stockfish 17 on rig`, or nil before the server has said what it opened on.
     var analysedOn: String? {
         guard let engineName else { return nil }
-        return "\(engineName) on \(hostName)"
+        return String(localized: "\(engineName) on \(hostName)")
     }
 
     /// The position the board is showing, in this app's spelling. Not what frames are

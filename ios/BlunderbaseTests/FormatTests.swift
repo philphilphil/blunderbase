@@ -10,12 +10,15 @@ final class FormatTests: XCTestCase {
 
     func testDateOmitsTheYearInsideTheCurrentOne() {
         let now = date(2026, 9, 3)
-        XCTAssertEqual(Format.date(date(2026, 8, 22), now: now), "22 Aug")
+        XCTAssertEqual(Format.date(date(2026, 8, 22), now: now, locale: british), "22 Aug")
+        // The same day on a German phone: day first, month abbreviated with its dot.
+        XCTAssertEqual(Format.date(date(2026, 8, 22), now: now, locale: german), "22. Aug.")
     }
 
     func testDateShowsTheYearOutsideTheCurrentOne() {
         let now = date(2026, 9, 3)
-        XCTAssertEqual(Format.date(date(2016, 12, 7), now: now), "7 Dec 16")
+        XCTAssertEqual(Format.date(date(2016, 12, 7), now: now, locale: british), "7 Dec 16")
+        XCTAssertEqual(Format.date(date(2016, 12, 7), now: now, locale: german), "7. Dez. 16")
     }
 
     func testAbsentDateIsADash() {
@@ -187,6 +190,9 @@ final class FormatTests: XCTestCase {
     }
 
     // MARK: Helpers
+
+    private let british = Locale(identifier: "en_GB")
+    private let german = Locale(identifier: "de_DE")
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
         var components = DateComponents()

@@ -76,10 +76,10 @@ struct GlyphBadge: View {
 
     private var accessibilityText: String {
         switch glyph.text {
-        case "??": "Blunder on \(glyph.square.algebraic)"
-        case "?": "Mistake on \(glyph.square.algebraic)"
-        case "?!": "Inaccuracy on \(glyph.square.algebraic)"
-        default: "\(glyph.text) on \(glyph.square.algebraic)"
+        case "??": String(localized: "Blunder on \(glyph.square.algebraic)")
+        case "?": String(localized: "Mistake on \(glyph.square.algebraic)")
+        case "?!": String(localized: "Inaccuracy on \(glyph.square.algebraic)")
+        default: String(localized: "\(glyph.text) on \(glyph.square.algebraic)")
         }
     }
 }

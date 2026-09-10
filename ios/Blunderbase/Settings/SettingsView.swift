@@ -5,8 +5,8 @@ import SwiftUI
 /// A settings screen for a one-owner, one-server app is mostly a *statement* rather than a
 /// set of controls: the server, whether it will accept writes, and which Maia levels it has
 /// are facts about the deployment that this app cannot change, and showing them is how
-/// somebody confirms they are on the instance they think they are on. The only thing here
-/// that is genuinely a preference is the Board section.
+/// somebody confirms they are on the instance they think they are on. The only things here
+/// that are genuinely preferences are the Board section and the engine switch.
 ///
 /// The Maia levels are worth the row they take. Which ratings a deployment asks the human
 /// model at is a deployment-time choice, and it decides what every Maia reading in the app
@@ -26,6 +26,10 @@ struct SettingsView: View {
     @AppStorage(Preferences.Key.showHints) private var showHints = true
     @AppStorage(Preferences.Key.haptics) private var haptics = true
 
+    /// The engine's switch. Also on the games list's bar and in the game's menu; this is
+    /// the one with the sentence beside it.
+    @AppStorage(Preferences.Key.engineHidden) private var engineHidden = false
+
     /// The theme. The same key is read by `BlunderbaseApp`, which is where the choice is
     /// applied to the window; this screen only writes it.
     @AppStorage(Preferences.Key.appearance) private var appearance = Preferences.Appearance.system
@@ -37,6 +41,7 @@ struct SettingsView: View {
             List {
                 serverSection
                 appearanceSection
+                engineSection
                 boardSection
                 aboutSection
             }
@@ -54,7 +59,7 @@ struct SettingsView: View {
         Section {
             row("Server", value: serverLabel)
             if session.isReadOnly {
-                row("Access", value: "Read-only")
+                row("Access", value: String(localized: "Read-only"))
             }
             row("Maia levels", value: maiaLevels)
             row("Target Elo", value: String(session.maiaTargetElo))
@@ -84,7 +89,7 @@ struct SettingsView: View {
     }
 
     private var serverLabel: String {
-        guard let url = session.serverURL else { return "Not connected" }
+        guard let url = session.serverURL else { return String(localized: "Not connected") }
         return url.host() ?? url.absoluteString
     }
 
@@ -93,7 +98,7 @@ struct SettingsView: View {
     /// have" has "none" as a real answer.
     private var maiaLevels: String {
         session.maiaElos.isEmpty
-            ? "None"
+            ? String(localized: "None")
             : session.maiaElos.sorted().map(String.init).joined(separator: ", ")
     }
 
@@ -120,6 +125,28 @@ struct SettingsView: View {
             Text("System follows the phone's own setting. Dark is the design's own look.")
                 .font(Theme.Font.text(11))
                 .foregroundStyle(Theme.faint)
+        }
+        .listRowBackground(Theme.surface)
+    }
+
+    // MARK: Engine
+
+    /// Its own section rather than a fourth row under Board, because it is not about the
+    /// board: it takes the numbers off the games list and the panes as well, and a reader
+    /// looking for why the list has gone quiet should find the switch under its own name.
+    private var engineSection: some View {
+        Section {
+            toggle("Hide the engine", isOn: $engineHidden)
+        } header: {
+            sectionHeader("Engine")
+        } footer: {
+            Text(
+                "Hides everything an engine has said about your games — the evaluation, "
+                + "the flags, the lines, Maia — so you can annotate a game yourself first "
+                + "and check afterwards. Which pass has run stays visible."
+            )
+            .font(Theme.Font.text(11))
+            .foregroundStyle(Theme.faint)
         }
         .listRowBackground(Theme.surface)
     }
@@ -173,7 +200,9 @@ struct SettingsView: View {
 
     // MARK: Row shapes
 
-    private func row(_ label: String, value: String) -> some View {
+    /// The labels are `LocalizedStringKey` so a literal at the call site is translated and
+    /// picked up by the catalog; the values are what the server said, verbatim.
+    private func row(_ label: LocalizedStringKey, value: String) -> some View {
         HStack(spacing: 12) {
             Text(label)
                 .font(Theme.Font.text(15))
@@ -189,7 +218,7 @@ struct SettingsView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func toggle(_ label: String, isOn: Binding<Bool>) -> some View {
+    private func toggle(_ label: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Text(label)
                 .font(Theme.Font.text(15))
@@ -199,7 +228,7 @@ struct SettingsView: View {
         .frame(minHeight: 34)
     }
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         Text(title)
             .font(Theme.Font.text(11, weight: .semibold))
             .foregroundStyle(Theme.faint)

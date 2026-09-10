@@ -68,7 +68,7 @@ struct PlayerRow: View {
     }
 
     private var nameText: some View {
-        Text(name ?? "Unknown")
+        Text(name ?? String(localized: "Unknown"))
             .font(Theme.Font.text(14, weight: isOwner ? .semibold : .regular))
             .foregroundStyle(isOwner ? Theme.text : Theme.body2)
             .lineLimit(1)
@@ -111,10 +111,10 @@ struct PlayerRow: View {
     }
 
     private var accessibilityLabel: String {
-        var parts = [name ?? "Unknown"]
-        if let rating { parts.append("rated \(rating)") }
-        parts.append(isWhite ? "white" : "black")
-        if let clock { parts.append("clock \(Format.clock(clock))") }
+        var parts = [name ?? String(localized: "Unknown")]
+        if let rating { parts.append(String(localized: "rated \(rating)")) }
+        parts.append(isWhite ? String(localized: "white") : String(localized: "black"))
+        if let clock { parts.append(String(localized: "clock \(Format.clock(clock))")) }
         return parts.joined(separator: ", ")
     }
 }
