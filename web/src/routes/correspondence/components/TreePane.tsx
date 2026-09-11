@@ -248,6 +248,12 @@ function Line({
 }) {
   const parts: ReactNode[] = []
   let node: CorrespondenceTreeNode | undefined = start
+  // The alternatives to the move just printed, and the position they all answer. Printed
+  // *after* the move, the way every notation does it — `2. Nf3 d6 (2… g6) (2… Nc6) 3. d4`
+  // — so the line reads on and the variations hang off the move they replace. The start of
+  // a line has none here: its own siblings are the alternatives the parent Line prints.
+  let alternatives: CorrespondenceTreeNode[] = []
+  let parent: CorrespondenceTreeNode | null = null
   // True whenever the next chip begins a run — the first move, or the first after an
   // interruption — which is where a Black move has to print its number too.
   let opening = true
@@ -282,15 +288,15 @@ function Line({
       opening = true
     }
 
-    const children = sortSiblings(current.children)
-    for (const alternative of children.slice(1)) {
+    for (const alternative of alternatives) {
+      const behind = leftBehind || isLeftBehind(parent, alternative)
       parts.push(
         <div
           key={`v${alternative.id}`}
           data-weak={weak.has(alternative.id) ? 'true' : undefined}
           className={cn(
             'my-0.5 border-l border-hairline pl-3',
-            (leftBehind || isLeftBehind(current, alternative)) && 'opacity-55',
+            behind && 'opacity-55',
             alternative.mark === 'excluded' && 'opacity-55',
             weak.has(alternative.id) && 'opacity-55',
           )}
@@ -302,13 +308,16 @@ function Line({
             progress={progress}
             onSelect={onSelect}
             onMenu={onMenu}
-            leftBehind={leftBehind || isLeftBehind(current, alternative)}
+            leftBehind={behind}
           />
         </div>,
       )
       opening = true
     }
 
+    const children = sortSiblings(current.children)
+    parent = current
+    alternatives = children.slice(1)
     node = children[0]
   }
 

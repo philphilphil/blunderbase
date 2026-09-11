@@ -111,6 +111,22 @@ describe('the tree pane', () => {
     expect(within(screen.getByTestId('tree-node-4')).getByText('c5')).toBeInTheDocument()
   })
 
+  it('prints the main move before the alternatives to it, and the line goes on after them', () => {
+    // 1.e4 e5 (1…c5) 2.Nf3 — the notation everybody reads, not the variations first.
+    const tree = sample()
+    const e5 = tree.children[0].children.find((child) => child.san === 'e5') as CorrespondenceTreeNode
+    e5.children = [
+      node({ id: 9, san: 'Nf3', uci: 'g1f3', ply: 3, move_number: 2, frame: 'white', played: true }),
+    ]
+    draw({ tree })
+    const order = [2, 3, 4, 9].map((id) => screen.getByTestId(`tree-node-${id}`))
+    for (let i = 1; i < order.length; i++) {
+      expect(
+        order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
+  })
+
   it('draws a mark as its glyph', () => {
     draw()
     expect(within(screen.getByTestId('tree-node-4')).getByText('?!')).toBeInTheDocument()
