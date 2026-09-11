@@ -4,10 +4,15 @@ import { createBrowserRouter, Link, Navigate } from 'react-router-dom'
 
 import { AppShell } from '@/components/shell/AppShell'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
+import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
+import { useAppSettings } from '@/lib/api/queries'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import {
   AnalysisPage,
+  CorrespondenceGamePage,
+  CorrespondencePage,
+  CorrespondenceSettingsPage,
   DashboardPage,
   EnginePassesPage,
   EnginesPage,
@@ -42,6 +47,23 @@ function McpRoute({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Correspondence mode is off by default, and while it is off its screens do not exist —
+ * the same shape as `McpRoute` above, with the deployment's own setting in place of a
+ * runtime capability.
+ *
+ * The redirect waits for the settings to land rather than bouncing on a `undefined`:
+ * arriving at `/correspondence/7` from a bookmark would otherwise be a trip to the
+ * dashboard for everyone, mode on or off. The API itself is not gated — a deployment that
+ * has switched the mode off must still be able to read the games it holds.
+ */
+function CorrespondenceRoute({ children }: { children: ReactNode }) {
+  const settings = useAppSettings()
+  if (!settings.data) return null
+  const on = (settings.data.correspondence_enabled ?? SETTING_DEFAULTS.correspondence_enabled) === 1
+  return on ? <>{children}</> : <Navigate to="/" replace />
+}
+
+/**
  * Every route in one place. Screens live in their own directory under `src/routes/` and
  * are re-exported from an `index.ts`, so a page can be rebuilt without this file or the
  * shell changing.
@@ -72,6 +94,7 @@ export const router = createBrowserRouter([
       { path: 'analysis/coverage', element: <AnalysisPage /> },
       { path: 'analysis/engine', element: <EnginePassesPage /> },
       { path: 'analysis/maia', element: <MaiaSettingsPage /> },
+      { path: 'analysis/correspondence', element: <CorrespondenceSettingsPage /> },
       { path: 'engines', element: <EnginesPage /> },
       // `/mcp` is the server itself, so the human-facing setup page uses `/assistant`.
       {
@@ -83,6 +106,22 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'live', element: <LivePage /> },
+      {
+        path: 'correspondence',
+        element: (
+          <CorrespondenceRoute>
+            <CorrespondencePage />
+          </CorrespondenceRoute>
+        ),
+      },
+      {
+        path: 'correspondence/:id',
+        element: (
+          <CorrespondenceRoute>
+            <CorrespondenceGamePage />
+          </CorrespondenceRoute>
+        ),
+      },
       { path: '*', element: <NotFound /> },
     ],
   },

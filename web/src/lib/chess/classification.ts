@@ -190,6 +190,15 @@ export const SOURCE_STYLES: Record<Source, SourceStyle> = {
     chipClass: 'bg-chip-neutral border-edge-strong text-soft',
     color: 'var(--bb-dim)',
   },
+  // A correspondence game started here. It belongs to no platform — there is no ICCF
+  // adapter and no account to sync — so it carries the neutral chip and says only what it
+  // is, the way `pgn` does.
+  iccf: {
+    label: 'ICCF',
+    dotClass: 'bg-info',
+    chipClass: 'bg-chip-neutral border-edge-strong text-soft',
+    color: 'var(--bb-info)',
+  },
 }
 
 // --- analysis tiers (design 1c, "Analysis tiers") -------------------------

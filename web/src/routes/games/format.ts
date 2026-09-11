@@ -165,8 +165,9 @@ export function tierOf(game: GameCard): Tier | null {
 }
 
 /**
- * Left untranslated on purpose: four of the six are the platforms' own names and a file
- * format, and `OTB` and `Masters` are what the chess world calls those two everywhere.
+ * Left untranslated on purpose: four of the seven are the platforms' own names and a file
+ * format, and `OTB`, `Masters` and `ICCF` are what the chess world calls those three
+ * everywhere.
  */
 export const SOURCE_LABELS: Record<Source, string> = {
   lichess: 'Lichess',
@@ -175,6 +176,7 @@ export const SOURCE_LABELS: Record<Source, string> = {
   manual: 'OTB',
   pgn: 'PGN',
   masters: 'Masters',
+  iccf: 'ICCF',
 }
 
 export const OUTCOME_LABELS: Record<Outcome, MessageDescriptor> = {

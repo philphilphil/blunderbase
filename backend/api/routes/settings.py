@@ -1,8 +1,10 @@
 """`/settings` — analysis configuration shared by the focused UI pages.
 
-Eleven settings live here: the Maia levels (a list of one to five), the three 0/1 flags
-over the Maia pass itself, the two node budgets and the deep line count, and the three
-classification thresholds. They are stored settings rather than environment variables
+Fourteen settings live here: the Maia levels (a list of one to five), the three 0/1 flags
+over the Maia pass itself, the two node budgets and the deep line count, the three
+classification thresholds, and the three that correspondence mode is configured with —
+whether it exists at all, the default reply window and how many lines a search keeps. They
+are stored settings rather than environment variables
 because they are the ones an owner changes as their play changes, and a restart is not a
 thing to ask of them for that. `services/app_settings.py` owns what they mean; this is the
 form's two calls over it.

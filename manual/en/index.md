@@ -32,6 +32,8 @@ One chapter per entry in the app's sidebar, in the sidebar's order.
 - [Statistics](guide/stats.md) — what the numbers count and how to slice them.
 - [Notes](guide/notes.md) — notes on positions, games and variations.
 - [Live](guide/live.md) — the board an MCP client drives, and saving a moment off it.
+- [Correspondence](guide/correspondence.md) — the games you are in the middle of: deadlines,
+  the tree of candidate moves, finishing one. Off until you switch it on.
 - [Library](guide/library.md) — importing from Lichess, Chess.com, FICS and PGN, syncing on
   a clock, exporting, backing up, resetting.
 - [Analysis](guide/analysis.md) — coverage, quick and deep passes, Maia levels, what counts

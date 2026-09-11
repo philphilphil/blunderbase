@@ -119,6 +119,7 @@ plugins:
             Statistics: Statistiken
             Notes: Notizen
             Live: Live
+            Correspondence: Fernschach
             Library: Bibliothek
             Analysis: Analyse
             AI assistant: KI-Assistent
@@ -147,6 +148,7 @@ nav:
       - Statistics: guide/stats.md
       - Notes: guide/notes.md
       - Live: guide/live.md
+      - Correspondence: guide/correspondence.md
       - Library: guide/library.md
       - Analysis: guide/analysis.md
       - AI assistant: guide/coach.md

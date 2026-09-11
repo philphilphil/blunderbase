@@ -9,6 +9,15 @@ export const EnginePassesPage = lazy(() =>
 export const MaiaSettingsPage = lazy(() =>
   import('@/routes/analysis').then((route) => ({ default: route.MaiaSettingsPage })),
 )
+export const CorrespondenceSettingsPage = lazy(() =>
+  import('@/routes/analysis').then((route) => ({ default: route.CorrespondenceSettingsPage })),
+)
+export const CorrespondencePage = lazy(() =>
+  import('@/routes/correspondence').then((route) => ({ default: route.CorrespondencePage })),
+)
+export const CorrespondenceGamePage = lazy(() =>
+  import('@/routes/correspondence').then((route) => ({ default: route.CorrespondenceGamePage })),
+)
 export const DashboardPage = lazy(() =>
   import('@/routes/dashboard').then((route) => ({ default: route.DashboardPage })),
 )

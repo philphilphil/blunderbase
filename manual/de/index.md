@@ -32,6 +32,8 @@ Reihenfolge.
   und Filter.
 - [Notizen](guide/notes.md) – woran eine Notiz hängt, wo sie auftaucht, die Notizseite.
 - [Live](guide/live.md) – das Brett, das ein MCP-Client steuert.
+- [Fernschach](guide/correspondence.md) – die Partien, die du gerade spielst: Fristen, der
+  Baum der Kandidatenzüge, das Abschließen. Aus, bis du es einschaltest.
 - [Bibliothek](guide/library.md) – Import von Lichess, Chess.com, FICS und PGN, automatische
   Synchronisierung, Export, Sicherung, Zurücksetzen.
 - [Analyse](guide/analysis.md) – Schnell- und Tiefenanalyse, Maia, Abdeckung, Budgets, was

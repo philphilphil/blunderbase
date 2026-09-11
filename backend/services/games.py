@@ -612,6 +612,278 @@ def get_game(session: Session, game_id: int) -> Game | None:
     return session.get(Game, game_id)
 
 
+# --- the one mutation of a stored game ------------------------------------
+#
+# A `Game` is written once by the import pipeline and read for ever after: the eval graph,
+# the cards, the stats folds, the explorer's book and every deduplication all assume the
+# move list they saw last time is the move list there is. Correspondence play is the single
+# exception — a game the owner is *playing* grows a move every few days — so the two
+# functions below are where that exception lives, next to the immutability they break.
+#
+# **Nothing but `services.correspondence` may call them.** They are correct only for a game
+# that is still being played: an unfinished `Game` whose analysis is its tree rather than a
+# run, with no clocks, no source that could re-fetch it and no finished pass to invalidate.
+# Calling them on an imported game would leave its runs, its card, its stat fold and its
+# `dedup_hash` describing a game that no longer exists, and the next sync of its source
+# would import the original again as a new game.
+#
+# What they keep in step, in one transaction and without committing it: the move lists and
+# `ply_count`, the PGN (rebuilt from the headers the game carries and the moves it now
+# has), the `dedup_hash` the importer identifies a game by, the `game_positions` rows with
+# their `positions` upserted and marked for the explorer's book sweep, and the analysis card
+# cleared so it is recomputed rather than read stale.
+
+
+class GameMutationError(ValueError):
+    """A move that cannot be added to or taken off a game."""
+
+
+class GameFinishedError(GameMutationError):
+    """A finished game, which is immutable again the moment it has a result."""
+
+
+class IllegalMoveError(GameMutationError):
+    """A move that cannot be played in the game's current position."""
+
+
+def start_board(game: Game) -> Any:
+    """The `chess.Board` a game begins from: its PGN's `FEN` header, or the initial array.
+
+    The PGN is the one place a game's starting position is written down — there is no
+    column for it — so it is the one place this asks.
+    """
+    import chess
+
+    fen = pgn_headers(game).get("FEN")
+    return chess.Board(fen) if fen else chess.Board()
+
+
+def board_now(game: Game) -> Any:
+    """The `chess.Board` after every move the game has, replayed from its start position."""
+    board = start_board(game)
+    for uci in game.moves_uci:
+        board.push(board.parse_uci(uci))
+    return board
+
+
+def pgn_headers(game: Game) -> dict[str, str]:
+    """The headers the game's stored PGN carries, as a plain dict.
+
+    Empty for a game whose PGN cannot be read at all, which is the honest answer: the
+    headers that matter are rewritten from the row on every rebuild anyway.
+    """
+    import io
+
+    import chess.pgn
+
+    if not (game.pgn or "").strip():
+        return {}
+    try:
+        parsed = chess.pgn.read_game(io.StringIO(game.pgn))
+    except Exception:
+        return {}
+    if parsed is None:
+        return {}
+    return {key: value for key, value in parsed.headers.items() if value}
+
+
+def rebuild_pgn(game: Game) -> str:
+    """The game's PGN written again from its headers and the moves it now has.
+
+    The headers the game already carries are kept — `Event`, `Site` (the ICCF game's page),
+    `Round`, `TimeControl`, `SetUp` and `FEN` among them — and the ones the database is the
+    authority on are written over the top of them, so a rebuilt PGN can never disagree with
+    the row it was built from. The movetext is the mainline and nothing else: variations
+    belong to the correspondence tree, which exports a PGN of its own.
+    """
+    import chess.pgn
+
+    out = chess.pgn.Game()
+    out.headers.update(pgn_headers(game))
+    out.headers["White"] = game.white_name
+    out.headers["Black"] = game.black_name
+    out.headers["Result"] = str(game.result)
+    for header, value in (
+        ("WhiteElo", game.white_rating),
+        ("BlackElo", game.black_rating),
+        ("TimeControl", game.time_control),
+        ("Termination", game.termination),
+        ("ECO", game.eco),
+        ("Opening", game.opening_name),
+    ):
+        if value is not None:
+            out.headers[header] = str(value)
+    if game.played_at is not None:
+        out.headers["Date"] = game.played_at.strftime("%Y.%m.%d")
+
+    board = start_board(game)
+    node: Any = out
+    for uci in game.moves_uci:
+        move = board.parse_uci(uci)
+        node = node.add_variation(move)
+        board.push(move)
+    exporter = chess.pgn.StringExporter(headers=True, variations=False, comments=False)
+    return str(out.accept(exporter))
+
+
+def append_move(session: Session, game: Game, uci: str) -> Game:
+    """Play one move onto a game that is still being played. Nothing else may call this.
+
+    See the block above for why this function exists at all and why it is the only one of
+    its kind. The move is validated by being played — an illegal one is an
+    `IllegalMoveError` and writes nothing — and the SAN comes from the board it was played
+    on, so a stored SAN can never disagree with the position it was made in.
+
+    A finished game is refused: a result is what makes a game immutable again, and a move
+    appended after one would be a game whose result describes a different position.
+
+    Uncommitted on purpose. The caller is `correspondence.play_move`, which has a node to
+    mark played in the same breath, and a game whose move list and tree were committed
+    separately would be readable in between with the two disagreeing.
+    """
+    from backend.services import explorer as explorer_service
+    from backend.services import import_service
+
+    if game.result is not Result.UNKNOWN:
+        raise GameFinishedError(
+            f"game {game.id} finished as {game.result}; a finished game takes no more moves"
+        )
+
+    board = board_now(game)
+    wanted = str(uci or "").strip()
+    try:
+        move = board.parse_uci(wanted)
+    except ValueError as exc:
+        raise IllegalMoveError(f"{wanted!r} cannot be played here: {exc}") from None
+    # `parse_uci` hands back the null move before it checks legality, and a null move is
+    # not something a game can hold — the same rule the repertoire's replay applies.
+    if not move:
+        raise IllegalMoveError(f"{wanted!r} is not a move")
+    san = board.san(move)
+    spelled = board.uci(move)
+    board.push(move)
+
+    ply = game.ply_count
+    tip = session.scalars(
+        select(GamePosition).where(GamePosition.game_id == game.id, GamePosition.ply == ply)
+    ).first()
+    if tip is None:
+        raise GameMutationError(f"game {game.id} has no stored position at ply {ply}")
+    tip.move_uci = spelled
+    tip.move_san = san
+    session.add(
+        GamePosition(
+            game_id=game.id,
+            ply=ply + 1,
+            position_id=import_service.position_for(session, board.fen()).id,
+            move_uci=None,
+            move_san=None,
+        )
+    )
+
+    game.moves_uci = [*game.moves_uci, spelled]
+    game.moves_san = [*game.moves_san, san]
+    game.ply_count = ply + 1
+    _restamp(session, game)
+    session.flush()
+    explorer_service.mark_positions_dirty(session, game.id)
+    return game
+
+
+def pop_move(session: Session, game: Game) -> Game:
+    """Take the last move back off a game that is still being played. Nothing else may
+    call this.
+
+    The undo of `append_move`, with the same rules and the same reasoning: the stored
+    position the move led to goes, the position it was played from forgets the move, and
+    every derived field is rebuilt rather than patched. A game with no moves and a finished
+    game are both refused.
+    """
+    from backend.services import explorer as explorer_service
+
+    if game.result is not Result.UNKNOWN:
+        raise GameFinishedError(
+            f"game {game.id} finished as {game.result}; a finished game gives no moves back"
+        )
+    if not game.moves_uci:
+        raise GameMutationError(f"game {game.id} has no moves to take back")
+
+    ply = game.ply_count
+    # Before the join row goes: it is that row that says which position to re-fold.
+    explorer_service.mark_positions_dirty(session, game.id)
+    session.execute(
+        delete(GamePosition).where(GamePosition.game_id == game.id, GamePosition.ply == ply)
+    )
+    parent = session.scalars(
+        select(GamePosition).where(GamePosition.game_id == game.id, GamePosition.ply == ply - 1)
+    ).first()
+    if parent is not None:
+        parent.move_uci = None
+        parent.move_san = None
+
+    game.moves_uci = list(game.moves_uci[:-1])
+    game.moves_san = list(game.moves_san[:-1])
+    game.ply_count = ply - 1
+    _restamp(session, game)
+    session.flush()
+    return game
+
+
+def _restamp(session: Session, game: Game) -> None:
+    """Everything a changed move list makes wrong: the opening, the PGN, the identity, the card.
+
+    The `dedup_hash` is recomputed through the importer's own function rather than by a
+    second copy of the recipe, so a game whose moves changed is identified by exactly what
+    a PGN of those moves would be identified by. The opening comes first, because the PGN
+    carries it in its `ECO` and `Opening` headers.
+    """
+    from backend.services import import_service
+
+    _rename_opening(game)
+    game.pgn = rebuild_pgn(game)
+    game.dedup_hash = import_service.dedup_hash(
+        import_service.ParsedGame(
+            source=game.source,
+            white_name=game.white_name,
+            black_name=game.black_name,
+            result=game.result,
+            pgn=game.pgn,
+            moves_uci=list(game.moves_uci),
+            moves_san=list(game.moves_san),
+            played_at=game.played_at,
+        )
+    )
+    # NULL is "nobody has built this game's card", which is what a reader falls back to the
+    # slow path on. A card built over a different move list would be read as current.
+    game.card = None
+
+
+def _rename_opening(game: Game) -> None:
+    """Name the opening from the book, for a game whose moves have just changed.
+
+    Every other game is named once, at ingest, from the deepest position on its line the
+    vendored book knows — a game that grows a move at a time would otherwise reach the
+    library with no ECO and no opening name at all, missing from the Opening filter, from
+    the openings dimension in stats and from its own header.
+
+    The same rule the explorer names positions by, so the two never disagree about a game,
+    and re-asked on every change rather than only on the way in: a move taken back has to be
+    able to take its name back with it. A name already there survives only where the book
+    answers nothing — a game from a thematic position, where whatever the source said is the
+    best there is.
+    """
+    from backend.adapters import openings
+
+    board = start_board(game)
+    epds = [board.epd()]
+    for uci in game.moves_uci:
+        board.push(board.parse_uci(uci))
+        epds.append(board.epd())
+    named = openings.deepest(epds)
+    if named is not None:
+        game.eco, game.opening_name = named.eco, named.name
+
+
 def get_game_detail(
     session: Session,
     game_id: int,

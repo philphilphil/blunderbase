@@ -25,6 +25,13 @@ import type {
   AuthStatus,
   BatchAnalysisRequest,
   Color,
+  CorrespondenceFinishRequest,
+  CorrespondenceGameCreate,
+  CorrespondenceGameUpdate,
+  CorrespondenceNodeCreate,
+  CorrespondenceNodeUpdate,
+  CorrespondencePgnImport,
+  CorrespondenceState,
   EngineCreate,
   EngineDeleteResult,
   EngineRolesUpdate,
@@ -1489,6 +1496,180 @@ export function useMaiaFill(
  */
 export function useLiveState(options?: Options<Awaited<ReturnType<typeof api.getLiveState>>>) {
   return useQuery({ queryKey: queryKeys.live(), queryFn: api.getLiveState, ...options })
+}
+
+// --- correspondence -------------------------------------------------------
+
+/**
+ * The correspondence games and the tree behind one of them.
+ *
+ * Nothing here polls and nothing here patches a mutation's answer into the cache: every
+ * write emits `correspondence.updated`, and the tree, the move list and the deadlines are
+ * one document (`lib/events/invalidation.ts` refetches it whole). A PATCH that answers with
+ * the detail still lands through the socket a moment later, which is what keeps a second
+ * tab and an MCP client showing what this one shows.
+ */
+export function useCorrespondenceGames(
+  state?: CorrespondenceState,
+  options?: Options<Awaited<ReturnType<typeof api.listCorrespondenceGames>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.correspondenceGames(state),
+    queryFn: () => api.listCorrespondenceGames(state),
+    ...options,
+  })
+}
+
+/** Keyed by the library game id. `enabled: false` is how a page asks for nothing yet. */
+export function useCorrespondenceGame(
+  gameId: number | null,
+  options?: Options<Awaited<ReturnType<typeof api.getCorrespondenceGame>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.correspondenceGame(gameId ?? 0),
+    queryFn: () => api.getCorrespondenceGame(gameId as number),
+    enabled: gameId !== null,
+    ...options,
+  })
+}
+
+/** Every correspondence write invalidates the whole root: one document, one refetch. */
+function useCorrespondenceWrite<TData, TVariables>(
+  mutationFn: (variables: TVariables) => Promise<TData>,
+  options?: UseMutationOptions<TData, Error, TVariables>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.correspondence() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
+export function useCreateCorrespondenceGame(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.createCorrespondenceGame>>,
+    Error,
+    CorrespondenceGameCreate
+  >,
+) {
+  return useCorrespondenceWrite(api.createCorrespondenceGame, options)
+}
+
+export function useImportCorrespondenceGame(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.importCorrespondenceGame>>,
+    Error,
+    CorrespondencePgnImport
+  >,
+) {
+  return useCorrespondenceWrite(api.importCorrespondenceGame, options)
+}
+
+export function useUpdateCorrespondenceGame(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.updateCorrespondenceGame>>,
+    Error,
+    { gameId: number; body: CorrespondenceGameUpdate }
+  >,
+) {
+  return useCorrespondenceWrite(
+    ({ gameId, body }: { gameId: number; body: CorrespondenceGameUpdate }) =>
+      api.updateCorrespondenceGame(gameId, body),
+    options,
+  )
+}
+
+/** Either side's move. A 422 `illegal_move` writes nothing at all. */
+export function usePlayCorrespondenceMove(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.playCorrespondenceMove>>,
+    Error,
+    { gameId: number; uci: string }
+  >,
+) {
+  return useCorrespondenceWrite(
+    ({ gameId, uci }: { gameId: number; uci: string }) => api.playCorrespondenceMove(gameId, uci),
+    options,
+  )
+}
+
+export function useUndoCorrespondenceMove(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.undoCorrespondenceMove>>,
+    Error,
+    number
+  >,
+) {
+  return useCorrespondenceWrite(api.undoCorrespondenceMove, options)
+}
+
+/**
+ * The game is over: the ordinary passes are queued and the tree freezes. The games library
+ * is invalidated too — the row's result, its badges and the stats behind it all move.
+ */
+export function useFinishCorrespondenceGame(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.finishCorrespondenceGame>>,
+    Error,
+    { gameId: number; body: CorrespondenceFinishRequest }
+  >,
+) {
+  const client = useQueryClient()
+  return useCorrespondenceWrite(
+    ({ gameId, body }: { gameId: number; body: CorrespondenceFinishRequest }) =>
+      api.finishCorrespondenceGame(gameId, body),
+    {
+      ...options,
+      onSuccess: (...args) => {
+        void client.invalidateQueries({ queryKey: queryKeys.games() })
+        void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+        options?.onSuccess?.(...args)
+      },
+    },
+  )
+}
+
+/** A drag on the board, or a whole line sent to the tree. */
+export function useAddCorrespondenceNode(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.addCorrespondenceNode>>,
+    Error,
+    CorrespondenceNodeCreate
+  >,
+) {
+  return useCorrespondenceWrite(api.addCorrespondenceNode, options)
+}
+
+export function useUpdateCorrespondenceNode(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.updateCorrespondenceNode>>,
+    Error,
+    { id: number; body: CorrespondenceNodeUpdate }
+  >,
+) {
+  return useCorrespondenceWrite(
+    ({ id, body }: { id: number; body: CorrespondenceNodeUpdate }) =>
+      api.updateCorrespondenceNode(id, body),
+    options,
+  )
+}
+
+/** The subtree. A 409 `correspondence_node_busy` means a search is running inside it. */
+export function useDeleteCorrespondenceNode(
+  options?: UseMutationOptions<void, Error, number>,
+) {
+  return useCorrespondenceWrite(api.deleteCorrespondenceNode, options)
+}
+
+/** The tree as an annotated PGN. Hand the result to `saveDownload`. */
+export function useExportCorrespondencePgn(
+  options?: UseMutationOptions<Download, Error, number>,
+) {
+  return useMutation({ mutationFn: api.exportCorrespondencePgn, ...options })
 }
 
 // --- meta -----------------------------------------------------------------

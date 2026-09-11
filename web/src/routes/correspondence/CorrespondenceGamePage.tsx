@@ -1,0 +1,575 @@
+/**
+ * `/correspondence/:id` — one game, and the tree behind it.
+ *
+ * This is its own view and not the game page with a pane swapped. The game page is built
+ * around a finished line and one engine's verdict on it; this is built around a tree and
+ * several engines thinking at once, and the tree is the thing in the middle.
+ *
+ * Three columns on a wide screen, as `docs/design/prototypes/correspondence-view.html`
+ * draws them: the board at the selected node with the candidates table under it, the tree,
+ * and a column of engines over the notes. Below `md` the same four panes are tabs under a
+ * pinned board, the way `MobileGameView` does it — the board is what the screen is for, and
+ * stacking would scroll it away the moment anything else was read.
+ *
+ * **Dragging a move is "send to tree".** A move played on the board walks to the child that
+ * is already there or creates it, in one gesture: whether the tree knew the move is the
+ * server's problem (`POST /correspondence/nodes` is idempotent), not the reader's.
+ *
+ * Everything the page shows comes from one payload (`GET /correspondence/games/{id}`) and
+ * every write is followed by `correspondence.updated` on the socket, which refetches it
+ * whole — the tree, the move list and the deadlines are one document, so there is nothing
+ * to patch in place and nothing that can be half-updated.
+ */
+import { Trans, useLingui } from '@lingui/react/macro'
+import { ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight, Download, FlipVertical2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useParams } from 'react-router-dom'
+
+import { Board, type BoardArrow, type Square } from '@/components/board/Board'
+import { SetPageChrome } from '@/components/shell/PageChrome'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { saveDownload } from '@/lib/api/client'
+import {
+  useAddCorrespondenceNode,
+  useCorrespondenceGame,
+  useDeleteCorrespondenceNode,
+  useExportCorrespondencePgn,
+  useFinishCorrespondenceGame,
+  usePlayCorrespondenceMove,
+  useUndoCorrespondenceMove,
+  useUpdateCorrespondenceGame,
+  useUpdateCorrespondenceNode,
+} from '@/lib/api/queries'
+import type { Result } from '@/lib/api/types'
+import { useLinePreview } from '@/lib/board/useLinePreview'
+import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
+import { whiteWinPercent } from '@/lib/chess/evaluation'
+import { useIsMobile } from '@/lib/ui/media'
+import { isTyping } from '@/lib/ui/shortcuts'
+import { cn } from '@/lib/utils'
+import { EvalBar } from '@/routes/game/components/EvalBar'
+
+import { BookPane, type BookSource } from './components/BookPane'
+import { CandidatesTable } from './components/CandidatesTable'
+import { EnginesPane } from './components/EnginesPane'
+import { FinishDialog, GameHeader, OpponentMoveDialog } from './components/GameHeader'
+import { NotesPane, type NotesTab } from './components/NotesPane'
+import { TreePane } from './components/TreePane'
+import { opponentOf } from './format'
+import { destsFor, uciFor } from './moves'
+import {
+  countEvaluated,
+  countNodes,
+  inWhiteFrame,
+  indexTree,
+  mainlineFrom,
+  nextSelection,
+  playedPath,
+  sortSiblings,
+  type ArrowKey,
+} from './tree'
+
+type MobilePane = 'board' | 'tree' | 'engines' | 'notes'
+
+const ARROWS: ArrowKey[] = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
+
+/** The pane title strip every column wears — chrome, a rule, and whatever sits hard right. */
+function PaneTitle({
+  title,
+  detail,
+  end,
+}: {
+  title: ReactNode
+  detail?: ReactNode
+  end?: ReactNode
+}) {
+  return (
+    <div className="flex h-[2.1875rem] flex-none items-center gap-2 border-b border-line bg-panel px-2.5 text-[0.6875rem]">
+      <strong className="font-semibold text-ink">{title}</strong>
+      {detail ? <span className="truncate text-dim">{detail}</span> : null}
+      {end ? <div className="ml-auto flex items-center gap-1.5">{end}</div> : null}
+    </div>
+  )
+}
+
+export function CorrespondenceGamePage() {
+  const { t } = useLingui()
+  const params = useParams<{ id: string }>()
+  const gameId = Number(params.id)
+  const detail = useCorrespondenceGame(Number.isFinite(gameId) ? gameId : null)
+  const mobile = useIsMobile()
+  const prefs = useLinePreviewPrefs()
+
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [flipped, setFlipped] = useState(false)
+  const [dialog, setDialog] = useState<'opponent' | 'finish' | null>(null)
+  const [notesTab, setNotesTab] = useState<NotesTab>('position')
+  const [bookSource, setBookSource] = useState<BookSource>('masters')
+  const [pane, setPane] = useState<MobilePane>('board')
+  const [hover, setHover] = useState<{ id: number; pv: string[] } | null>(null)
+
+  const updateGame = useUpdateCorrespondenceGame()
+  const playMove = usePlayCorrespondenceMove({ onSuccess: () => setDialog(null) })
+  const undoMove = useUndoCorrespondenceMove()
+  const finish = useFinishCorrespondenceGame({ onSuccess: () => setDialog(null) })
+  const addNode = useAddCorrespondenceNode()
+  const updateNode = useUpdateCorrespondenceNode()
+  const deleteNode = useDeleteCorrespondenceNode()
+  const exportPgn = useExportCorrespondencePgn({ onSuccess: (file) => saveDownload(file) })
+
+  const game = detail.data?.game ?? null
+  const tree = detail.data?.tree ?? null
+  const index = useMemo(() => indexTree(tree), [tree])
+
+  // The selection follows the payload: a node that no longer exists (a subtree deleted, a
+  // move taken back) falls back to the position the game stands in rather than leaving the
+  // board on something that is gone.
+  const tipId = game?.current_node_id ?? tree?.id ?? null
+  useEffect(() => {
+    if (!tree) return
+    setSelectedId((current) =>
+      current !== null && index.has(current) ? current : (tipId ?? tree.id),
+    )
+  }, [tree, index, tipId])
+
+  const selected = selectedId !== null ? (index.get(selectedId)?.node ?? null) : null
+  const node = selected ?? tree
+  const played = useMemo(() => playedPath(tree), [tree])
+  const tip = played.at(-1) ?? tree
+
+  const select = useCallback((id: number) => {
+    setSelectedId(id)
+    setHover(null)
+  }, [])
+
+  /** Arrow keys walk the tree: along the line, and across the sibling set. */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isTyping(event.target)) return
+      if (document.querySelector('[role="dialog"]')) return
+      if (!ARROWS.includes(event.key as ArrowKey)) return
+      setSelectedId((current) => {
+        if (current === null) return current
+        const next = nextSelection(index, current, event.key as ArrowKey)
+        if (next !== current) event.preventDefault()
+        return next
+      })
+      setHover(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [index])
+
+  /**
+   * One move into the tree from the selected node. The child that is already there is
+   * walked to; anything else is created and selected — one gesture for both, which is what
+   * "send to tree" means, and the same gesture whether the move came off the board or off a
+   * row in the book.
+   */
+  const playInto = useCallback(
+    (uci: string) => {
+      if (!node || game?.finished) return
+      const existing = node.children.find((child) => child.uci === uci)
+      if (existing) {
+        select(existing.id)
+        return
+      }
+      addNode.mutate(
+        { parent_id: node.id, uci },
+        { onSuccess: (added) => select(added.tip.id) },
+      )
+    },
+    [node, game?.finished, addNode, select],
+  )
+
+  const onBoardMove = useCallback(
+    (orig: Square, dest: Square) => {
+      if (!node) return
+      const uci = uciFor(node.fen, orig, dest)
+      if (uci) playInto(uci)
+    },
+    [node, playInto],
+  )
+
+  const dests = useMemo(
+    () => (node && !game?.finished ? destsFor(node.fen) : new Map<Square, Square[]>()),
+    [node, game?.finished],
+  )
+
+  // The candidates as arrows: the first one in the strong brush, the rest pale. It is the
+  // same reading the table gives, on the board, and it is what the column has instead of an
+  // engine's PV until step 2 gives it one.
+  const arrows = useMemo<BoardArrow[]>(
+    () =>
+      sortSiblings(node?.children ?? []).map((child, position) => ({
+        from: (child.uci ?? '').slice(0, 2),
+        to: (child.uci ?? '').slice(2, 4),
+        color: position === 0 ? 'accent' : 'paleAccent',
+      })),
+    [node],
+  )
+
+  const preview = useLinePreview(
+    node?.fen ?? null,
+    hover ? { line: `cand:${hover.id}`, ply: null, pv: hover.pv } : null,
+    prefs,
+    node?.ply ?? 0,
+  )
+
+  if (!Number.isFinite(gameId)) {
+    return <Missing />
+  }
+
+  if (detail.isPending) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-5">
+        <Skeleton className="h-14 w-full" data-testid="correspondence-game-loading" />
+        <Skeleton className="min-h-0 flex-1 w-full" />
+      </div>
+    )
+  }
+
+  if (detail.error || !game || !node || !tree) {
+    return <Missing message={detail.error?.message} />
+  }
+
+  const busy =
+    playMove.isPending || undoMove.isPending || finish.isPending || updateGame.isPending
+  const writeError =
+    addNode.error ?? updateNode.error ?? deleteNode.error ?? updateGame.error ?? undoMove.error
+
+  /** The candidate the header would play: a child of the position the game stands in. */
+  const playable =
+    selected && tip && selected.parent_id === tip.id && !selected.played ? selected : null
+
+  const boardFen = preview.fen ?? node.fen
+  const boardLastMove = preview.fen ? preview.lastMove : (node.uci ?? null)
+  // The bar is White's point of view — its fills, its percentage and the number in its
+  // tooltip alike — so the node's own number is turned out of the mover's frame first.
+  // Handing it the tree's number unturned would print "−0.40 · White 56%" on every node a
+  // Black move reached.
+  const boardScore = inWhiteFrame(node.own, node.frame)
+  const win = boardScore ? whiteWinPercent(boardScore) : null
+  const orientation = flipped
+    ? game.owner_color === 'black'
+      ? 'white'
+      : 'black'
+    : game.owner_color === 'black'
+      ? 'black'
+      : 'white'
+
+  const boardColumn = (
+    <div className="flex min-h-0 flex-col border-r border-edge-strong bg-surface max-md:border-r-0">
+      <div className="flex min-h-0 flex-1 items-center justify-center p-3">
+        <div className="flex w-full max-w-[34rem] gap-2">
+          <EvalBar win={win} score={boardScore} orientation={orientation} />
+          <Board
+            className="min-w-0 flex-1"
+            fen={boardFen}
+            orientation={orientation}
+            lastMove={boardLastMove}
+            arrows={preview.shapes.length > 0 ? [] : arrows}
+            shapes={preview.shapes}
+            turnColor={node.turn}
+            viewOnly={Boolean(game.finished)}
+            dests={dests}
+            onMove={game.finished ? undefined : onBoardMove}
+          />
+        </div>
+      </div>
+      <div className="flex flex-none items-center justify-center gap-1.5 border-t border-line bg-panel py-1.5">
+        <Control
+          label={t`Back to the start`}
+          onClick={() => select(tree.id)}
+          icon={<ChevronsLeft aria-hidden />}
+        />
+        <Control
+          label={t`Previous move`}
+          onClick={() => select(nextSelection(index, node.id, 'ArrowLeft'))}
+          icon={<ChevronLeft aria-hidden />}
+        />
+        <Control
+          label={t`Next move`}
+          onClick={() => select(nextSelection(index, node.id, 'ArrowRight'))}
+          icon={<ChevronRight aria-hidden />}
+        />
+        <Control
+          label={t`End of this line`}
+          onClick={() => select(mainlineFrom(node).at(-1)?.id ?? node.id)}
+          icon={<ChevronsRight aria-hidden />}
+        />
+        <Control
+          label={t`Flip the board`}
+          onClick={() => setFlipped((was) => !was)}
+          icon={<FlipVertical2 aria-hidden />}
+        />
+        <span className="ml-2 font-mono text-[0.625rem] text-dim">
+          {preview.caption ?? (node.uci ? `${node.san} · ${t`ply ${node.ply}`}` : t`start`)}
+        </span>
+      </div>
+      <div className="flex min-h-[9rem] flex-none flex-col border-t border-edge-strong">
+        <PaneTitle
+          title={<Trans>Candidates</Trans>}
+          detail={t`by backed evaluation`}
+          end={
+            node.flags?.checkmate ? (
+              <span className="text-blunder">
+                <Trans>checkmate</Trans>
+              </span>
+            ) : node.flags?.stalemate ? (
+              <span className="text-mistake">
+                <Trans>stalemate</Trans>
+              </span>
+            ) : node.flags?.threefold ? (
+              <span className="text-mistake">
+                <Trans>threefold</Trans>
+              </span>
+            ) : node.flags?.fifty_move ? (
+              <span className="text-mistake">
+                <Trans>fifty-move draw</Trans>
+              </span>
+            ) : null
+          }
+        />
+        <CandidatesTable
+          node={node}
+          selectedId={selectedId}
+          onSelect={select}
+          onHover={setHover}
+        />
+      </div>
+    </div>
+  )
+
+  const treeColumn = (
+    <div className="flex min-h-0 flex-col border-r border-edge-strong bg-surface max-md:border-r-0">
+      <PaneTitle
+        title={<Trans>Tree</Trans>}
+        detail={t`${countNodes(tree)} positions · ${countEvaluated(tree)} evaluated`}
+        end={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled
+              title={t`Expansion arrives in a later step`}
+            >
+              <Trans>Expand</Trans>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled
+              title={t`Pruning arrives in the next step`}
+            >
+              <Trans>Prune weak</Trans>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={exportPgn.isPending}
+              onClick={() => exportPgn.mutate(game.game_id)}
+            >
+              <Download aria-hidden />
+              <Trans>Export PGN</Trans>
+            </Button>
+          </>
+        }
+      />
+      <TreePane
+        tree={tree}
+        selectedId={selectedId}
+        readOnly={Boolean(game.finished)}
+        onSelect={select}
+        onMark={(id, mark) => updateNode.mutate({ id, body: { mark } })}
+        onComment={(commented) => {
+          select(commented.id)
+          setNotesTab('position')
+          setPane('notes')
+        }}
+        onPromote={(id) => updateNode.mutate({ id, body: { promote: true } })}
+        onDelete={(id) => deleteNode.mutate(id)}
+      />
+    </div>
+  )
+
+  const enginesColumn = (
+    <div className="flex min-h-0 flex-col bg-surface">
+      <PaneTitle
+        title={<Trans>Engines</Trans>}
+        detail={node.san ? `· ${node.san}` : undefined}
+        end={
+          <Button type="button" variant="ghost" size="sm" disabled title={t`Searches arrive in the next step`}>
+            <Trans>Search with…</Trans>
+          </Button>
+        }
+      />
+      <EnginesPane node={node} />
+    </div>
+  )
+
+  const notesColumn = (
+    <div className="flex min-h-0 flex-col border-t border-edge-strong bg-surface">
+      <NotesPane
+        gameId={game.game_id}
+        node={node}
+        tab={notesTab}
+        onTabChange={setNotesTab}
+        commentPending={updateNode.isPending}
+        readOnly={Boolean(game.finished)}
+        onComment={(id, comment) => updateNode.mutate({ id, body: { comment } })}
+        book={
+          <BookPane
+            node={node}
+            source={bookSource}
+            onSourceChange={setBookSource}
+            onPlay={game.finished ? () => {} : playInto}
+            // A book row rides the same preview machinery a candidate does; the id is a
+            // constant nothing else uses, because the line is the book's and not a node's.
+            onPreview={(line) => setHover(line ? { id: -1, pv: line } : null)}
+          />
+        }
+      />
+    </div>
+  )
+
+  const chrome = (
+    <SetPageChrome
+      breadcrumb={[
+        { label: t`Correspondence`, to: '/correspondence' },
+        { label: opponentOf(game) },
+      ]}
+      manual="guide/correspondence"
+    />
+  )
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {chrome}
+      <GameHeader
+        game={game}
+        playable={playable}
+        busy={busy}
+        onDue={(iso) => updateGame.mutate({ gameId: game.game_id, body: { reply_due: iso } })}
+        onOpponentMove={() => setDialog('opponent')}
+        onPlay={(uci) => playMove.mutate({ gameId: game.game_id, uci })}
+        onUndo={() => undoMove.mutate(game.game_id)}
+        onFinish={() => setDialog('finish')}
+      />
+
+      {writeError ? (
+        <p role="alert" className="flex-none bg-blunder/5 px-4 py-1.5 text-[0.6875rem] text-blunder">
+          {writeError.message}
+        </p>
+      ) : null}
+
+      {mobile ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex flex-none border-b border-edge-strong bg-panel">
+            {(['board', 'tree', 'engines', 'notes'] as MobilePane[]).map((each) => (
+              <button
+                key={each}
+                type="button"
+                aria-pressed={pane === each}
+                onClick={() => setPane(each)}
+                className={cn(
+                  'flex-1 border-b-2 py-2 text-[0.6875rem] transition-colors',
+                  pane === each
+                    ? 'border-b-accent-teal text-ink'
+                    : 'border-b-transparent text-dim hover:text-ink',
+                )}
+              >
+                {each === 'board' ? (
+                  <Trans>Board</Trans>
+                ) : each === 'tree' ? (
+                  <Trans>Tree</Trans>
+                ) : each === 'engines' ? (
+                  <Trans>Engines</Trans>
+                ) : (
+                  <Trans>Notes</Trans>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {pane === 'board' ? boardColumn : null}
+            {pane === 'tree' ? treeColumn : null}
+            {pane === 'engines' ? enginesColumn : null}
+            {pane === 'notes' ? notesColumn : null}
+          </div>
+        </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(24rem,0.9fr)_minmax(22rem,1.15fr)_minmax(20rem,0.95fr)] bg-void">
+          {boardColumn}
+          {treeColumn}
+          <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(11rem,0.75fr)]">
+            {enginesColumn}
+            {notesColumn}
+          </div>
+        </div>
+      )}
+
+      {dialog === 'opponent' && tip ? (
+        <OpponentMoveDialog
+          tip={tip}
+          pending={playMove.isPending}
+          error={playMove.error?.message ?? null}
+          onPlay={(uci) => playMove.mutate({ gameId: game.game_id, uci })}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+      {dialog === 'finish' ? (
+        <FinishDialog
+          pending={finish.isPending}
+          error={finish.error?.message ?? null}
+          onFinish={(result: Result, termination) =>
+            finish.mutate({ gameId: game.game_id, body: { result, termination } })
+          }
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function Control({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string
+  icon: ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex h-6 min-w-8 items-center justify-center rounded-md border border-edge bg-elevated text-body hover:bg-raised [&_svg]:size-3.5"
+    >
+      {icon}
+    </button>
+  )
+}
+
+function Missing({ message }: { message?: string }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-start gap-2 p-6">
+      <p className="text-[0.8125rem] text-ink">
+        <Trans>That correspondence game is not here.</Trans>
+      </p>
+      {message ? <p className="font-mono text-[0.6875rem] text-dim">{message}</p> : null}
+      <Link to="/correspondence" className="text-[0.75rem] text-accent-teal hover:text-accent-link">
+        <Trans>Back to the list</Trans>
+      </Link>
+    </div>
+  )
+}
+

@@ -260,6 +260,22 @@ describe('invalidationsFor — quiet events', () => {
     ).toEqual([])
   })
 
+  it('refetches the whole correspondence root on a change to one game', () => {
+    // The root rather than that one game's key: a move changes the list's three cuts too,
+    // and the tree, the move list and the deadlines are one document.
+    const keys = invalidationsFor({ event: 'correspondence.updated', game_id: 7 })
+    expect(has(keys, queryKeys.correspondence())).toBe(true)
+  })
+
+  it('takes the library with it, because a correspondence move rewrites the game row', () => {
+    // `append_move` restamps the moves, the ply count, the PGN and the opening, clears the
+    // card and adds a position — the games table, the game page and the explorer all read
+    // rows that just changed.
+    const keys = invalidationsFor({ event: 'correspondence.updated', game_id: 7 })
+    expect(has(keys, queryKeys.games())).toBe(true)
+    expect(has(keys, queryKeys.explorer())).toBe(true)
+  })
+
   it('ignores an event name it does not know', () => {
     expect(invalidationsFor({ event: 'something.new' })).toEqual([])
   })

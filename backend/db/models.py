@@ -22,12 +22,15 @@ from backend.db.base import Base
 from backend.db.enums import (
     Classification,
     Color,
+    CorrespondenceMark,
     EngineKind,
     JobStatus,
     NoteSource,
     Platform,
     Result,
     RunStatus,
+    SearchKind,
+    SearchStatus,
     Source,
     Speed,
     Tier,
@@ -543,12 +546,25 @@ class AnalysisRun(Base):
     __tablename__ = "analysis_runs"
     __table_args__ = (
         Index("ix_analysis_runs_game_id", "game_id"),
+        Index("ix_analysis_runs_correspondence_search_id", "correspondence_search_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     game_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("games.id", ondelete="CASCADE"))
     # Set instead of `game_id` for a run over a position that is not part of a stored game.
     fen: Mapped[str | None] = mapped_column(String(FEN_LENGTH))
+    # The correspondence search this run is carrying, for a `task`: a bounded search over
+    # one node's position, queued here so it runs on whatever host the queue has. Set on a
+    # run with a `fen` and no `game_id`, exactly as a `POST /analysis/position` run is, and
+    # what `complete_run` reads to hand the run's one `MoveEval` back to the tree.
+    #
+    # Not a foreign key, and neither is `correspondence_searches.run_id` pointing back:
+    # two enforced references between the same pair of tables is a cycle, and adding a
+    # constraint to this table at all would mean a batch rebuild of `analysis_runs` on
+    # SQLite — which would silently recreate the mixed-direction claim index below without
+    # its directions. A search that is gone reads as no search, which is what the absorbing
+    # side does with it anyway.
+    correspondence_search_id: Mapped[int | None] = mapped_column(Integer)
     engine_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("engines.id"))
     tier: Mapped[Tier] = mapped_column(EnumString(Tier), nullable=False)
     status: Mapped[RunStatus] = mapped_column(
@@ -773,6 +789,229 @@ class RepertoireMove(Base):
     updated_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
     )
+
+
+class CorrespondenceGame(Base):
+    """The live state of one correspondence game: one row per `Game` being played.
+
+    A correspondence game *is* a `Game` — imported through the ordinary pipeline with
+    `Source.ICCF` (or `MANUAL`), `Speed.CORRESPONDENCE` and `Result.UNKNOWN` — and this row
+    is what is true only while it is still being played: where it is being played, when the
+    owner's move is due, and how long they get after each of the opponent's. When the game
+    finishes the row stays, because the tree hangs off it and the deadline arithmetic is
+    part of the game's history.
+
+    Two things are deliberately *not* stored. Whose move it is, is `Game.ply_count`'s parity
+    against `Game.owner_color`; whether the game is finished is `Game.result != "*"`.
+    Storing either would be a second copy of a fact the game already answers, and the two
+    would eventually disagree — `services.correspondence` derives both on read.
+    """
+
+    __tablename__ = "correspondence_games"
+    __table_args__ = (Index("ix_correspondence_games_reply_due", "reply_due"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    game_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    # The tournament and the game's page on the server it is played on. Both go into the
+    # PGN headers (`Event`, `Site`) every time the move list is rebuilt.
+    event: Mapped[str | None] = mapped_column(String(128))
+    url: Mapped[str | None] = mapped_column(String(512))
+    # When the owner's move is due. Set from `days_per_move` when the opponent's move
+    # arrives and editable by hand, because the server it is played on — not this row — is
+    # the authority on the clock.
+    reply_due: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    days_per_move: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    last_move_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    game: Mapped[Game] = relationship()
+
+
+class CorrespondenceNode(Base):
+    """One position in one correspondence game's tree: the move into it, and what it means.
+
+    The tree is the player's work. Its root has no parent and no move and stands on the
+    game's first position; every other node is a move played from its parent's position,
+    and the nodes flagged `played` are the game as it has actually gone — one path from the
+    root whose moves are `Game.moves_uci`, which `services.correspondence` enforces on
+    every mutation.
+
+    `epd` is the normalised position *after* the move, keyed exactly as `positions.fen` is
+    (`explorer.normalize_fen`), which is what lets a node read the evaluations another
+    branch, another game or another engine already earned for that position.
+
+    Legality is not a constraint here and cannot be: a move is legal or not against its
+    parent's board, so the replay in the service is the validation, and it is where
+    `move_san` comes from — a stored SAN can never disagree with the position it was
+    written in. Repetition, the fifty-move counter and a dead position are properties of
+    the *path* to a node rather than of the node, so they are computed on read and stored
+    nowhere.
+
+    `rank` orders siblings and 0 is first, the repertoire's rule; deletes of a subtree are
+    done in Python for the repertoire's reason.
+    """
+
+    __tablename__ = "correspondence_nodes"
+    __table_args__ = (
+        UniqueConstraint(
+            "parent_id", "move_uci", name="uq_correspondence_nodes_parent_id_move_uci"
+        ),
+        Index("ix_correspondence_nodes_game_id_parent_id", "game_id", "parent_id"),
+        Index("ix_correspondence_nodes_epd", "epd"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    game_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("correspondence_nodes.id", ondelete="CASCADE")
+    )
+    # NULL on the root and nowhere else: the root is a position nobody moved into.
+    move_uci: Mapped[str | None] = mapped_column(String(UCI_LENGTH))
+    move_san: Mapped[str | None] = mapped_column(String(SAN_LENGTH))
+    epd: Mapped[str] = mapped_column(String(FEN_LENGTH), nullable=False)
+    # Half-moves from the game's first position, so the root is 0.
+    ply: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    played: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Which engine's verdict the tree reads here; NULL is "the deepest one there is".
+    pinned_engine_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("engines.id", ondelete="SET NULL")
+    )
+    mark: Mapped[CorrespondenceMark | None] = mapped_column(EnumString(CorrespondenceMark))
+    # This move was sent to the opponent as a conditional continuation.
+    conditional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The owner's note on the move, empty rather than NULL so a tree payload never has to
+    # tell "no comment" from "the comment is nothing".
+    comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+
+class CorrespondenceEval(Base):
+    """What one engine knows about one position. Keyed by the position, not by the node.
+
+    This is the one table here that does not hang off a game, and that is the whole design:
+    a transposition inside one tree, the same opening in two of the owner's games, and a
+    node deleted and added again all read the same verdict. The tree is where the player is
+    looking; this is what the engines know.
+
+    `engine_name` and `engine_version` are copied off the engine row so a verdict still
+    reads after the row is deleted or upgraded — the id goes to NULL with the row, and the
+    name is what the pane shows. Scores are from the side to move's point of view, exactly
+    as `MoveEval` stores them, and exactly one of `cp` and `mate` is set.
+
+    A checkpoint only ever moves a row forward: a shallower result never overwrites a
+    deeper one, so a thirty-second task landing on a position a three-day search already
+    settled changes nothing.
+    """
+
+    __tablename__ = "correspondence_evals"
+    __table_args__ = (
+        UniqueConstraint("epd", "engine_id", name="uq_correspondence_evals_epd_engine_id"),
+        Index("ix_correspondence_evals_epd", "epd"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    epd: Mapped[str] = mapped_column(String(FEN_LENGTH), nullable=False)
+    engine_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("engines.id", ondelete="SET NULL")
+    )
+    engine_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    engine_version: Mapped[str | None] = mapped_column(String(64))
+    cp: Mapped[int | None] = mapped_column(Integer)
+    mate: Mapped[int | None] = mapped_column(Integer)
+    depth: Mapped[int | None] = mapped_column(Integer)
+    nodes: Mapped[int | None] = mapped_column(Integer)
+    # Accumulated across pauses: a search resumed after a night is one search's time.
+    time_ms: Mapped[int | None] = mapped_column(Integer)
+    # `MoveEval.best_lines`' shape: [{"multipv": 1, "cp": 34, "mate": null, "pv": [...]}].
+    # In this row's frame, which is the side to move's: line 1's score is the row's own
+    # `cp`/`mate`, and a reader turns the whole row once or not at all.
+    best_lines: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON(none_as_null=True))
+    # One entry per completed depth, capped: [{"depth", "nodes", "cp", "mate", "best"}].
+    # The eval's trajectory, which is how a player judges whether a number has settled.
+    history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    # {"wdl": ..., "dtz": ..., "source": ...} once a probe has answered, NULL otherwise. A
+    # tablebase verdict outranks any search.
+    tablebase: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+
+class CorrespondenceSearch(Base):
+    """One engine at work on one node: the row that survives a restart.
+
+    A search is Device-local work rather than Library data — the tree and its evaluations
+    are what is worth keeping — but it is a row and not a dictionary in a process, because
+    a search runs for days and a restart must be able to say what was running, what was
+    parked and what was lost. The worker reacts to these rows; nothing but the worker owns
+    a process.
+
+    `kind` splits the two engine modes: a `search` is infinite and runs in the
+    correspondence pool, a `task` is bounded and is carried by the `AnalysisRun` named in
+    `run_id`. All three limits NULL is a search with no end but the owner's; a task always
+    carries a node budget. `warm` says a paused search still holds its process, hash
+    intact — which a restart makes false for every row.
+
+    At most one search in `queued`, `running` or `paused` per (node, engine); the service
+    enforces it, because "one at a time unless it has finished" is not a shape a unique
+    index can hold.
+    """
+
+    __tablename__ = "correspondence_searches"
+    __table_args__ = (
+        Index("ix_correspondence_searches_node_id", "node_id"),
+        Index("ix_correspondence_searches_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    node_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("correspondence_nodes.id", ondelete="CASCADE"), nullable=False
+    )
+    engine_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("engines.id", ondelete="SET NULL")
+    )
+    multipv: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    kind: Mapped[SearchKind] = mapped_column(
+        EnumString(SearchKind), nullable=False, default=SearchKind.SEARCH
+    )
+    # The queued run carrying a task; NULL for a search. Deliberately not a foreign key:
+    # `analysis_runs.correspondence_search_id` already points the other way, and two
+    # enforced references between the same pair of tables is a cycle neither SQLite's
+    # `CREATE TABLE` order nor SQLAlchemy's topological sort can resolve. That column is
+    # the one with the constraint, because it is what `complete_run` reads; this is the
+    # search's own note of which run is carrying it, and a run that is gone reads as one.
+    run_id: Mapped[int | None] = mapped_column(Integer)
+    limit_depth: Mapped[int | None] = mapped_column(Integer)
+    limit_nodes: Mapped[int | None] = mapped_column(Integer)
+    limit_seconds: Mapped[int | None] = mapped_column(Integer)
+    # UCI `searchmoves`: the moves this search is restricted to, NULL for all of them.
+    root_moves: Mapped[list[str] | None] = mapped_column(JSON(none_as_null=True))
+    status: Mapped[SearchStatus] = mapped_column(
+        EnumString(SearchStatus), nullable=False, default=SearchStatus.QUEUED
+    )
+    warm: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Which host is running it; NULL for this one.
+    runner_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("runners.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    paused_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    error: Mapped[str | None] = mapped_column(Text)
+    stderr: Mapped[str | None] = mapped_column(Text)
 
 
 # The notes full-text index is not a table SQLAlchemy can declare, so importing it here is

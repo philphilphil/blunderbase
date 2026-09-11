@@ -51,3 +51,11 @@ holds until you press it again; the whole of it is under
 
 `N` writes a note about the position on the board. Notes come back in every game that
 reaches that position — see [Notes](notes.md).
+
+## The correspondence tree
+
+A game you played by correspondence carries a **Correspondence tree** button in the title
+bar. It opens the tree that was built while the game was running — the candidate moves, the
+comments and what the engines said about each position — to read, not to change: the tree
+froze when the game did. The button is there only for those games, and only while
+correspondence mode is on; the mode is [Correspondence](correspondence.md).

@@ -48,3 +48,18 @@ or both, and **Ask about both sides**: off looks at your moves only, on predicts
 opponent's too. It never answers with a line: one look and no search gives a
 spread of moves, not a continuation. A *fill* pass adds levels to a game that already has
 an evaluation.
+
+## Correspondence
+
+**Analysis → Correspondence** switches the correspondence mode on, and holds the two numbers
+a new game starts with. Off — the default — there is no **Correspondence** in the sidebar and
+its pages send you home.
+
+| Setting | |
+|---|---|
+| **Correspondence mode** | On adds the sidebar entry under **Live** |
+| **Days per move** | The reply window a new game is given, 1 to 365, ten by default. It is copied onto a game when the game is created, so changing it here leaves games already under way alone |
+| **Lines per position** | How many candidate lines an engine keeps when it is set on one position of a correspondence tree, 1 to 5, three by default |
+
+An empty box means the default is in force. What the mode itself does is
+[Correspondence](correspondence.md).

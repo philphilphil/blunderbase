@@ -5,7 +5,7 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are fourteen of them, in five groups, plus two rows that are not settings at all
+There are seventeen of them, in six groups, plus two rows that are not settings at all
 (`queue_paused` and `tour_seen`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
@@ -35,6 +35,14 @@ they are the budget of the *next* run rather than of every run ever queued.
 **The classification thresholds** — `inaccuracy`, `mistake`, `blunder`, in win-percentage
 points lost by the mover. Read per plan, which means a game re-analysed after they moved
 is judged by the new ones and one analysed before it keeps what it was judged by.
+
+**Correspondence** — `correspondence_enabled`, `correspondence_days_per_move`,
+`correspondence_multipv`. Whether the mode exists at all for this owner (off by default,
+because most owners never play correspondence and should never see the rail entry), how
+long the owner gives themselves after the opponent's move, and how many lines a search over
+one node keeps. Ordinary members of `SETTINGS`: three numbers with a range, read where they
+are used — the first by the rail and the router, the other two as the defaults a new game
+and a new search are created with, so changing one never moves a game already being played.
 
 **The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
 engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
@@ -106,6 +114,11 @@ DEEP_MULTIPV = "deep_multipv"
 INACCURACY_THRESHOLD = "inaccuracy_threshold"
 MISTAKE_THRESHOLD = "mistake_threshold"
 BLUNDER_THRESHOLD = "blunder_threshold"
+# Correspondence mode: whether it is on at all, the default reply window in days, and how
+# many lines a search over one node keeps.
+CORRESPONDENCE_ENABLED = "correspondence_enabled"
+CORRESPONDENCE_DAYS_PER_MOVE = "correspondence_days_per_move"
+CORRESPONDENCE_MULTIPV = "correspondence_multipv"
 # The three role assignments, each a nullable engine id. Not in `SETTINGS` for the same
 # reason `MAIA_ELOS` is not: those are single numbers with a range and a clamp, and an
 # engine id has neither — the nearest sensible engine to one that is gone is no engine.
@@ -159,6 +172,15 @@ BLUNDER_DEFAULT = 15.0
 # The levels an install that configured nothing asks Maia at: the top of what the model can
 # answer, and only that one. The same default the single target elo had, as a list of one.
 MAIA_ELOS_DEFAULT: tuple[int, ...] = (MAIA_MAX_RATING,)
+# Off, because most owners never play correspondence: the rail entry and the routes only
+# exist once this is on.
+CORRESPONDENCE_ENABLED_DEFAULT = 0
+# ICCF's ordinary reflection allowance is ten days a move, which is what a game created
+# without a number of its own is given.
+CORRESPONDENCE_DAYS_PER_MOVE_DEFAULT = 10
+# Three candidate moves is the shape of correspondence work: the question is which of a
+# handful of moves survives a week of looking, not what the single best move is.
+CORRESPONDENCE_MULTIPV_DEFAULT = 3
 
 # A budget of no nodes at all is not a cheaper pass, it is no pass; there is deliberately
 # no ceiling, because how long the owner is willing to wait is theirs to decide.
@@ -171,6 +193,13 @@ MAX_THRESHOLD = 100.0
 # A flag's range: off, on, and nothing in between for a clamp to land on.
 FLAG_OFF = 0
 FLAG_ON = 1
+# A reply window of no days is not a shorter window, it is no game; a year is longer than
+# any correspondence server allows between moves.
+MIN_DAYS_PER_MOVE = 1
+MAX_DAYS_PER_MOVE = 365
+# Five candidates is as many as the candidates table can be read at a glance, and every
+# extra line is engine time taken off the ones that matter.
+MAX_CORRESPONDENCE_MULTIPV = 5
 # How many Maia levels one deployment may carry. Every level is a full extra policy query
 # per ply of every run, so this is a budget as much as a UI limit; five columns is also
 # about as many as the game panel can put side by side and still be read.
@@ -257,6 +286,27 @@ SETTINGS: tuple[Setting, ...] = (
         low=MIN_THRESHOLD,
         high=MAX_THRESHOLD,
         whole=False,
+    ),
+    Setting(
+        key=CORRESPONDENCE_ENABLED,
+        default=CORRESPONDENCE_ENABLED_DEFAULT,
+        low=FLAG_OFF,
+        high=FLAG_ON,
+        whole=True,
+    ),
+    Setting(
+        key=CORRESPONDENCE_DAYS_PER_MOVE,
+        default=CORRESPONDENCE_DAYS_PER_MOVE_DEFAULT,
+        low=MIN_DAYS_PER_MOVE,
+        high=MAX_DAYS_PER_MOVE,
+        whole=True,
+    ),
+    Setting(
+        key=CORRESPONDENCE_MULTIPV,
+        default=CORRESPONDENCE_MULTIPV_DEFAULT,
+        low=MIN_MULTIPV,
+        high=MAX_CORRESPONDENCE_MULTIPV,
+        whole=True,
     ),
 )
 
@@ -532,6 +582,32 @@ def get_deep_nodes(session: Session) -> int:
 def get_deep_multipv(session: Session) -> int:
     value = stored(session, DEEP_MULTIPV)
     return DEEP_MULTIPV_DEFAULT if value is None else int(value)
+
+
+def get_correspondence_enabled(session: Session) -> bool:
+    """Whether correspondence mode exists for this owner at all.
+
+    Off unless it has been switched on: the rail entry is hidden and the routes redirect
+    home, so an owner who never plays correspondence never sees the mode.
+    """
+    return _flag(session, CORRESPONDENCE_ENABLED)
+
+
+def get_correspondence_days_per_move(session: Session) -> int:
+    """The reply window a correspondence game created now is given, in days.
+
+    Read when a game is created and copied onto its row, for the reason a run's budget is
+    copied onto the run: a game already being played must not have its deadlines moved by
+    a number somebody changed on the settings page.
+    """
+    value = stored(session, CORRESPONDENCE_DAYS_PER_MOVE)
+    return CORRESPONDENCE_DAYS_PER_MOVE_DEFAULT if value is None else int(value)
+
+
+def get_correspondence_multipv(session: Session) -> int:
+    """How many lines a correspondence search over one node keeps, unless it says otherwise."""
+    value = stored(session, CORRESPONDENCE_MULTIPV)
+    return CORRESPONDENCE_MULTIPV_DEFAULT if value is None else int(value)
 
 
 def get_thresholds(session: Session) -> tuple[float, float, float]:

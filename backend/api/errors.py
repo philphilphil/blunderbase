@@ -19,7 +19,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.services import analysis as analysis_service
 from backend.services import app_settings as app_settings_service
 from backend.services import auth as auth_service
+from backend.services import correspondence as correspondence_service
 from backend.services import engines as engines_service
+from backend.services import games as games_service
 from backend.services import import_service
 from backend.services import maia_live as maia_live_service
 from backend.services import mcp_keys as mcp_keys_service
@@ -133,6 +135,22 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     # A line that could not be played is the request being wrong, not the tree: nothing is
     # written, so the client can fix the moves and send the same body again.
     (repertoire_service.RepertoireError, 422, "repertoire_invalid_line"),
+    # Correspondence. The three conflicts are states rather than bad requests: the library
+    # already holds the game, the game has a result and its tree is frozen, or a search is
+    # still parked inside the subtree somebody asked to delete — each one is something the
+    # caller can act on, and none of them is a retry.
+    (correspondence_service.GameAlreadyStoredError, 409, "duplicate_correspondence_game"),
+    (correspondence_service.TreeLockedError, 409, "correspondence_finished"),
+    (correspondence_service.NodeBusyError, 409, "correspondence_node_busy"),
+    (correspondence_service.UnknownCorrespondenceGameError, 404, "unknown_correspondence_game"),
+    (correspondence_service.UnknownNodeError, 404, "unknown_correspondence_node"),
+    (correspondence_service.CorrespondenceError, 422, "correspondence_invalid"),
+    # A move a game cannot take. The finished game is the same conflict as above by another
+    # route (`games.append_move` is what refuses it), and an illegal move is the request
+    # being wrong — nothing was written, so the same body with a legal move works.
+    (games_service.GameFinishedError, 409, "correspondence_finished"),
+    (games_service.IllegalMoveError, 422, "illegal_move"),
+    (games_service.GameMutationError, 422, "invalid_request"),
     (notes_service.NoteNotFoundError, 404, "unknown_note"),
     (notes_service.LineNotFoundError, 404, "unknown_line"),
     (notes_service.UnknownGameError, 404, "unknown_game"),

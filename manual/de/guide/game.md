@@ -54,3 +54,12 @@ ausschaltest; alles dazu steht unter [Einstellungen](settings.md#hide-the-engine
 
 `N` öffnet eine Notiz zur Stellung auf dem Brett. Notizen erscheinen in jeder Partie, die
 diese Stellung erreicht – siehe [Notizen](notes.md).
+
+## Der Fernschachbaum { #the-correspondence-tree }
+
+Eine Partie, die du im Fernschach gespielt hast, trägt in der Titelleiste die Schaltfläche
+**Fernschachbaum**. Sie öffnet den Baum, der während der Partie entstanden ist – die
+Zugkandidaten, die Kommentare und das, was die Engines zu jeder Stellung gesagt haben – zum
+Lesen, nicht zum Ändern: Der Baum ist mit der Partie eingefroren. Die Schaltfläche gibt es
+nur bei diesen Partien und nur, solange der Fernschachmodus an ist; der Modus steht unter
+[Fernschach](correspondence.md).

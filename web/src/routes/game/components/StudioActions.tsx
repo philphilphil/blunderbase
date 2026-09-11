@@ -14,9 +14,16 @@
  * "Add to library" belong to the button rather than to the page that places it.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { useImportReferenceGame } from '@/lib/api/queries'
+import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
+import {
+  useAppSettings,
+  useCorrespondenceGames,
+  useImportReferenceGame,
+} from '@/lib/api/queries'
+import { CorrespondenceTreeDialog } from '@/routes/correspondence/components/CorrespondenceTreeDialog'
 import { cn } from '@/lib/utils'
 
 import type { StudioGame } from '../GamePage'
@@ -32,13 +39,17 @@ export function StudioActions({
   game: StudioGame
   backTo: string | null
 }) {
-  if (game.kind === 'library' && !backTo) return null
+  const tree = useCorrespondenceTree(game.kind === 'library' ? game.id : null)
+  if (game.kind === 'library' && !backTo && !tree.has) return null
   return (
     // A group of its own, so the row wraps it whole rather than splitting the door from the
     // way back — the same rule every other group in that row is built on.
     <div className="flex flex-none items-center gap-2 max-md:gap-1.5">
       {game.kind === 'reference' ? (
         <AddToLibrary source={game.source} id={game.id} backTo={backTo} />
+      ) : null}
+      {tree.has && game.kind === 'library' ? (
+        <CorrespondenceTreeButton gameId={game.id} />
       ) : null}
       {backTo ? (
         <Link
@@ -49,6 +60,49 @@ export function StudioActions({
         </Link>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Whether this library game is one the owner played by correspondence, and therefore has a
+ * tree behind it.
+ *
+ * Answered off the correspondence list rather than by asking for the game's tree: that list
+ * is one small request the rail has already made, and a per-game probe would be a 404 on
+ * every ordinary game anybody opens. Nothing is asked at all while the mode is off.
+ */
+function useCorrespondenceTree(gameId: number | null): { has: boolean } {
+  const settings = useAppSettings()
+  const on =
+    (settings.data?.correspondence_enabled ?? SETTING_DEFAULTS.correspondence_enabled) === 1
+  const games = useCorrespondenceGames(undefined, { enabled: on && gameId !== null })
+  return {
+    has:
+      gameId !== null &&
+      (games.data?.games ?? []).some((candidate) => candidate.game_id === gameId),
+  }
+}
+
+/**
+ * The door into the months of work behind a finished correspondence game. Read-only: the
+ * tree froze when the game did, and this screen is where the game is read, not where the
+ * tree is edited.
+ */
+function CorrespondenceTreeButton({ gameId }: { gameId: number }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(BUTTON, 'border-edge bg-elevated text-soft hover:text-ink')}
+      >
+        <Trans>Correspondence tree</Trans>
+      </button>
+      {open ? (
+        <CorrespondenceTreeDialog gameId={gameId} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
   )
 }
 

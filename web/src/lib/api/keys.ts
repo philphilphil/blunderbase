@@ -203,4 +203,22 @@ export const queryKeys = {
   ): QueryKey => ['maia', 'policy', fen, elos, rolloutPlies],
 
   live: (): QueryKey => ['live'],
+
+  /**
+   * The correspondence games and their trees. Their own root rather than a corner of
+   * `['games']`: the tree, the deadlines and the move list are one document that only a
+   * correspondence write changes, and `['games']` is invalidated by every import and every
+   * finished analysis run — which would refetch a tree of two hundred nodes for news that
+   * cannot have touched it.
+   *
+   * `correspondenceGame` is keyed by the *library* game id, which is what the route
+   * `/correspondence/:id` carries and what `correspondence.updated` names.
+   */
+  correspondence: (): QueryKey => ['correspondence'],
+  correspondenceGames: (state?: 'ongoing' | 'finished'): QueryKey => [
+    'correspondence',
+    'list',
+    state ?? null,
+  ],
+  correspondenceGame: (gameId: number): QueryKey => ['correspondence', 'game', gameId],
 } as const

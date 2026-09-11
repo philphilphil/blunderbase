@@ -9,7 +9,7 @@ stehen je für eine Filtergruppe:
 | Chip | Filtert nach |
 |---|---|
 | **Datum** | Gespielt von und bis, mit den Vorgaben 7 Tage, 30 Tage, 90 Tage und 12 Monate |
-| **Quelle** | Lichess, Chess.com, FICS, OTB, PGN oder Meister |
+| **Quelle** | Lichess, Chess.com, FICS, OTB, PGN, ICCF oder Meister |
 | **Farbe** | Die Farbe, die du hattest |
 | **Ergebnis** | Dein Ergebnis (Sieg, Niederlage, Remis) oder das PGN-Ergebnis (1-0, 0-1, ½-½) |
 | **Eröffnung** | Ein ECO-Code oder ein Präfix: `C6` ist jede Caro-Kann von C60 bis C69 |

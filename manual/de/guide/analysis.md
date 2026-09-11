@@ -50,3 +50,18 @@ Schnellanalysen, Tiefenanalysen oder beiden mitläuft, und **Nach beiden Seiten 
 aus betrachtet nur deine Züge, an sagt auch die des Gegners voraus. Eine Variante liefert
 Maia nie: ein Blick ohne Suche ergibt eine Verteilung von Zügen, keine Fortsetzung. Ein
 *Nachtrag* ergänzt fehlende Spielstärken bei einer Partie, die schon eine Bewertung hat.
+
+## Fernschach { #correspondence }
+
+**Analyse → Fernschach** schaltet den Fernschachmodus ein und hält die zwei Zahlen, mit
+denen eine neue Partie startet. Ist er aus – die Voreinstellung –, gibt es **Fernschach**
+nicht in der Seitenleiste, und seine Seiten schicken dich zur Übersicht zurück.
+
+| Einstellung | |
+|---|---|
+| **Fernschachmodus** | An ergänzt den Eintrag in der Seitenleiste unter **Live** |
+| **Tage pro Zug** | Das Antwortfenster, das eine neue Partie bekommt, 1 bis 365, voreingestellt zehn. Es wird beim Anlegen auf die Partie kopiert; änderst du es hier, bleiben laufende Partien also unberührt |
+| **Varianten je Stellung** | Wie viele Kandidatenvarianten eine Engine behält, wenn sie auf eine Stellung eines Fernschachbaums angesetzt wird, 1 bis 5, voreingestellt drei |
+
+Ein leeres Feld heißt: die Voreinstellung gilt. Was der Modus selbst tut, steht unter
+[Fernschach](correspondence.md).

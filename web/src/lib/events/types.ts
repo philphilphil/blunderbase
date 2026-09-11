@@ -40,6 +40,7 @@ export const EVENT_NAMES = [
   'runner.connected',
   'runner.disconnected',
   'runner.updated',
+  'correspondence.updated',
 ] as const
 
 export type EventName = (typeof EVENT_NAMES)[number]
@@ -288,6 +289,18 @@ export interface RunnerUpdatedEvent {
 
 export type RunnerEvent = RunnerConnectedEvent | RunnerDisconnectedEvent | RunnerUpdatedEvent
 
+/**
+ * Something about one correspondence game changed — a move, an edit, a node, a deadline.
+ *
+ * One event for all of them, on purpose: the tree, the move list and the deadlines are one
+ * document, so the page refetches `GET /correspondence/games/{id}` (and the list) rather
+ * than trying to apply nine different kinds of patch to a tree it holds.
+ */
+export interface CorrespondenceUpdatedEvent {
+  event: 'correspondence.updated'
+  game_id: number
+}
+
 export type BlunderbaseEvent =
   | PingEvent
   | ImportEvent
@@ -297,6 +310,7 @@ export type BlunderbaseEvent =
   | LiveUpdatedEvent
   | StreamEvent
   | RunnerEvent
+  | CorrespondenceUpdatedEvent
 
 /** A frame carrying an event name we do not model yet. */
 export interface UnknownEvent {

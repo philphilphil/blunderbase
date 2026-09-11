@@ -1,2 +1,3 @@
 export { AnalysisPage } from './AnalysisPage'
 export { EnginePassesPage, MaiaSettingsPage } from './AnalysisSettings'
+export { CorrespondenceSettingsPage } from './CorrespondenceSettings'

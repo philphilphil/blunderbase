@@ -25,6 +25,7 @@ from backend.db.enums import (
     JobStatus,
     NoteSource,
     Platform,
+    Result,
     RunStatus,
     Source,
     Tier,
@@ -146,6 +147,18 @@ class AppSettings(BaseModel):
     blunder_threshold: float | None = Field(
         default=None, description="win-percentage points lost that make a move a blunder"
     )
+    correspondence_enabled: int | None = Field(
+        default=None,
+        description="1 if correspondence mode is on; the rail entry and the "
+        "`/correspondence` routes exist only while it is",
+    )
+    correspondence_days_per_move: int | None = Field(
+        default=None,
+        description="the reply window a correspondence game created now is given, in days",
+    )
+    correspondence_multipv: int | None = Field(
+        default=None, description="how many lines a correspondence search keeps, 1 to 5"
+    )
 
 
 class AppSettingsUpdate(Input):
@@ -182,6 +195,15 @@ class AppSettingsUpdate(Input):
     inaccuracy_threshold: float | None = None
     mistake_threshold: float | None = None
     blunder_threshold: float | None = None
+    correspondence_enabled: int | None = Field(
+        default=None, description="1 to show correspondence mode, 0 or null to hide it"
+    )
+    correspondence_days_per_move: int | None = Field(
+        default=None, description="1 to 365; the default reply window of a new game"
+    )
+    correspondence_multipv: int | None = Field(
+        default=None, description="1 to 5 lines per correspondence search"
+    )
 
 
 class TourState(BaseModel):
@@ -1552,6 +1574,233 @@ class RepertoireMoveUpdate(Input):
 
     comment: str | None = None
     promote: bool = False
+
+
+# --- correspondence -------------------------------------------------------
+
+
+class CorrespondenceGameCreate(Input):
+    """A correspondence game the owner is starting.
+
+    `owner_color` is required and is not a guess: half of what the mode does — whose move
+    it is, when the reply is due, which way the tree reads — is that colour, and a
+    correspondence handle need not be an account in this library at all. An `iccf_id` makes
+    the game a `Source.ICCF` one with that number as its `source_id`; without one it is
+    `Source.MANUAL`.
+    """
+
+    white: str = Field(min_length=1, max_length=128)
+    black: str = Field(min_length=1, max_length=128)
+    owner_color: Color
+    event: str | None = None
+    url: str | None = Field(default=None, description="the game's page on the server")
+    iccf_id: str | None = Field(default=None, description="the ICCF game number")
+    time_control: str | None = Field(default=None, description="free text, e.g. 10 days/move")
+    start_fen: str | None = Field(default=None, description="null is the initial array")
+    days_per_move: int | None = Field(
+        default=None, description="1 to 365; the deployment's default when left out"
+    )
+    reply_due: datetime | None = None
+    white_rating: int | None = None
+    black_rating: int | None = None
+
+
+class CorrespondencePgnImport(Input):
+    """One PGN, as the server the game is played on exports it, with the moves so far."""
+
+    pgn: str = Field(min_length=1)
+    owner_color: Color
+    event: str | None = None
+    url: str | None = None
+    iccf_id: str | None = None
+    days_per_move: int | None = None
+    reply_due: datetime | None = None
+
+
+class CorrespondenceGameUpdate(Input):
+    """What the owner keeps about a game. A field left out is left alone; null clears it."""
+
+    event: str | None = None
+    url: str | None = None
+    reply_due: datetime | None = None
+    days_per_move: int | None = None
+
+
+class CorrespondenceMoveCreate(Input):
+    """One move, either side's, in UCI. Illegal here is a 422 and writes nothing."""
+
+    uci: str = Field(min_length=4, max_length=8)
+
+
+class CorrespondenceFinish(Input):
+    """How the game ended. `*` is not a result, and the tree freezes with the game."""
+
+    result: Result
+    termination: str | None = None
+
+
+class CorrespondenceNodeCreate(Input):
+    """A move, or a whole line, to put into the tree under one node.
+
+    Exactly one of `uci` and `ucis`: a drag on the board is one move, "send this line to
+    the tree" is the list. A move already stored under the walked parent is reused.
+    """
+
+    parent_id: int
+    uci: str | None = None
+    ucis: list[str] | None = None
+
+    @model_validator(mode="after")
+    def _one_of(self) -> CorrespondenceNodeCreate:
+        if bool(self.uci) == bool(self.ucis):
+            raise ValueError("give either uci or ucis, not both and not neither")
+        return self
+
+
+class CorrespondenceNodeUpdate(Input):
+    """An edit to one node. A field left out is left alone; null clears it."""
+
+    comment: str | None = None
+    mark: str | None = Field(
+        default=None, description="good | interesting | dubious | bad | excluded, or null"
+    )
+    pinned_engine_id: int | None = Field(
+        default=None, description="which engine's verdict this node reads; null is deepest"
+    )
+    conditional: bool | None = None
+    promote: bool = False
+
+
+class CorrespondenceScore(Payload):
+    """A node's number in its own frame — the side that played the move into it."""
+
+    cp: int | None = None
+    mate: int | None = None
+    depth: int | None = None
+    engine_id: int | None = None
+    engine_name: str | None = None
+
+
+class CorrespondenceEvalRow(Payload):
+    """One engine's verdict on one position, from the side to move's point of view."""
+
+    engine_id: int | None = None
+    engine_name: str
+    engine_version: str | None = None
+    cp: int | None = None
+    mate: int | None = None
+    depth: int | None = None
+    nodes: int | None = None
+    time_ms: int | None = None
+    best_lines: list[dict[str, Any]] | None = None
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    tablebase: dict[str, Any] | None = None
+    updated_at: str | None = None
+
+
+class CorrespondenceSearchRow(Payload):
+    """One engine at work on one node, or parked on it."""
+
+    id: int
+    node_id: int
+    engine_id: int | None = None
+    engine_name: str | None = None
+    kind: str
+    status: str
+    warm: bool = False
+    multipv: int = 1
+    run_id: int | None = None
+    runner_id: int | None = None
+
+
+class CorrespondenceNodeResponse(Payload):
+    """One node on its own, with nothing that needs the rest of the tree.
+
+    What a create or a patch answers with; the tree adds `own`, `backed`, `evals`,
+    `searches`, `flags` and `children`.
+    """
+
+    id: int
+    game_id: int
+    parent_id: int | None = None
+    uci: str | None = None
+    san: str | None = None
+    epd: str
+    ply: int
+    rank: int = 0
+    played: bool = False
+    conditional: bool = False
+    mark: str | None = None
+    glyph: str | None = None
+    comment: str = ""
+    pinned_engine_id: int | None = None
+
+
+class CorrespondenceTreeNode(CorrespondenceNodeResponse):
+    """The same node inside the tree: its numbers, its engines and its children."""
+
+    fen: str
+    turn: Color
+    frame: Color = Field(description="whose point of view `own` and `backed` are from")
+    own: CorrespondenceScore | None = None
+    backed: CorrespondenceScore | None = None
+    evals: list[CorrespondenceEvalRow] = Field(default_factory=list)
+    searches: list[CorrespondenceSearchRow] = Field(default_factory=list)
+    disagree: bool = False
+    flags: dict[str, Any] = Field(default_factory=dict)
+    children: list[CorrespondenceTreeNode] = Field(default_factory=list)
+
+
+CorrespondenceTreeNode.model_rebuild()
+
+
+class CorrespondenceGameSummary(Payload):
+    """One correspondence game as the list page and the game header read it."""
+
+    game_id: int
+    white: str
+    black: str
+    owner_color: Color | None = None
+    event: str | None = None
+    url: str | None = None
+    result: Result
+    state: str
+    finished: bool = False
+    ply_count: int = 0
+    move_number: int = 1
+    to_move: Color
+    your_move: bool = False
+    days_per_move: int
+    reply_due: str | None = None
+    days_left: float | None = None
+    root_eval: CorrespondenceScore | None = Field(
+        default=None,
+        description="the verdict on the position the game stands in, in White's frame",
+    )
+    current_node_id: int | None = None
+
+
+class CorrespondenceGameList(Payload):
+    """Every correspondence game, your move first and soonest due at the top."""
+
+    games: list[CorrespondenceGameSummary] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+
+
+class CorrespondenceGameDetail(Payload):
+    """One game, its whole tree and every search over it, in one payload."""
+
+    game: CorrespondenceGameSummary
+    tree: CorrespondenceTreeNode | None = None
+    searches: list[CorrespondenceSearchRow] = Field(default_factory=list)
+
+
+class CorrespondenceNodeAdded(Payload):
+    """What adding a move or a line did: how many nodes were new, and where it ends."""
+
+    game_id: int
+    created: int = 0
+    tip: CorrespondenceNodeResponse
 
 
 # --- runner gateway -------------------------------------------------------

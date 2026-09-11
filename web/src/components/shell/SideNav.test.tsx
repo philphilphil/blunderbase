@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -11,12 +11,22 @@ import { ThemeProvider } from '@/lib/ui/theme'
 
 import { NavDrawer, SideNav } from './SideNav'
 
-const { useEngines, useGames, useLiveState } = vi.hoisted(() => ({
-  useEngines: vi.fn(),
-  useGames: vi.fn(),
-  useLiveState: vi.fn(),
+const { useEngines, useGames, useLiveState, useAppSettings, useCorrespondenceGames } = vi.hoisted(
+  () => ({
+    useEngines: vi.fn(),
+    useGames: vi.fn(),
+    useLiveState: vi.fn(),
+    useAppSettings: vi.fn(),
+    useCorrespondenceGames: vi.fn(),
+  }),
+)
+vi.mock('@/lib/api/queries', () => ({
+  useEngines,
+  useGames,
+  useLiveState,
+  useAppSettings,
+  useCorrespondenceGames,
 }))
-vi.mock('@/lib/api/queries', () => ({ useEngines, useGames, useLiveState }))
 
 const { useEvents } = vi.hoisted(() => ({ useEvents: vi.fn() }))
 vi.mock('@/lib/events/EventsProvider', () => ({ useEvents }))
@@ -28,6 +38,9 @@ function stub(status: ConnectionStatus, reconnects: number) {
   useEngines.mockReturnValue(pending)
   useGames.mockReturnValue(pending)
   useLiveState.mockReturnValue(pending)
+  // Correspondence mode off, which is the default and what every test but its own wants.
+  useAppSettings.mockReturnValue(pending)
+  useCorrespondenceGames.mockReturnValue(pending)
   useEvents.mockReturnValue({ status, reconnects })
 }
 
@@ -54,6 +67,8 @@ describe('the rail footer', () => {
   it('asks nothing of the games endpoint for a coverage bar it no longer draws', () => {
     useEngines.mockReturnValue(pending)
     useLiveState.mockReturnValue(pending)
+    useAppSettings.mockReturnValue(pending)
+    useCorrespondenceGames.mockReturnValue(pending)
     useEvents.mockReturnValue({ status: 'open', reconnects: 0 })
     useGames.mockImplementation((query) => ({
       data: { total: query.analyzed ? 2 : 9_553 },
@@ -144,6 +159,64 @@ describe('the analysis navigation', () => {
 
     expect(screen.getByRole('link', { name: 'Engine passes' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Maia' })).toBeInTheDocument()
+  })
+})
+
+describe('the correspondence entry', () => {
+  /** The mode as the settings report it, with the games the list would answer with. */
+  function withMode(enabled: number | null, yourMove = 0) {
+    stub('open', 0)
+    useAppSettings.mockReturnValue({
+      data: { correspondence_enabled: enabled },
+      isPending: false,
+    })
+    useCorrespondenceGames.mockReturnValue({
+      data: { games: [], counts: { ongoing: 3, finished: 1, your_move: yourMove } },
+      isPending: false,
+    })
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <SideNav />
+        </MemoryRouter>
+      </ThemeProvider>,
+    )
+  }
+
+  it('is not in the rail at all while the mode is off', () => {
+    withMode(0)
+    expect(screen.queryByRole('link', { name: /Correspondence/ })).not.toBeInTheDocument()
+  })
+
+  it('is not there for a deployment that has never set the switch', () => {
+    // Null is "nobody has set this", and the default is off — the rail must read that as
+    // off rather than as "unknown, show it anyway".
+    withMode(null)
+    expect(screen.queryByRole('link', { name: /Correspondence/ })).not.toBeInTheDocument()
+  })
+
+  it('appears after Live once the mode is on', () => {
+    withMode(1)
+    const entry = screen.getByRole('link', { name: /Correspondence/ })
+    expect(entry).toHaveAttribute('href', '/correspondence')
+    const rail = screen.getByRole('navigation', { name: 'Sections' })
+    const rows = within(rail).getAllByRole('link')
+    expect(rows.indexOf(entry)).toBe(rows.findIndex((row) => row.textContent === 'Live') + 1)
+  })
+
+  it('carries the count of games waiting on you, and nothing when none are', () => {
+    withMode(1, 2)
+    expect(screen.getByRole('link', { name: /Correspondence/ })).toHaveTextContent('2')
+    cleanup()
+    withMode(1, 0)
+    expect(screen.getByRole('link', { name: /Correspondence/ })).toHaveTextContent(
+      /^Correspondence$/,
+    )
+  })
+
+  it('asks for no correspondence games while the mode is off', () => {
+    withMode(0)
+    expect(useCorrespondenceGames).toHaveBeenCalledWith(undefined, { enabled: false })
   })
 })
 

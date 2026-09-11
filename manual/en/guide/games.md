@@ -9,7 +9,7 @@ own one group:
 | Chip | Narrows by |
 |---|---|
 | **Date** | Played from and until, with 7d, 30d, 90d and 12m presets |
-| **Source** | Lichess, Chess.com, FICS, OTB, PGN or Masters |
+| **Source** | Lichess, Chess.com, FICS, OTB, PGN, ICCF or Masters |
 | **Colour** | The side you had |
 | **Result** | Your result (win, loss, draw) or the PGN result (1-0, 0-1, ½-½) |
 | **Opening** | An ECO code, or a prefix — `C6` is every Caro-Kann from C60 to C69 |

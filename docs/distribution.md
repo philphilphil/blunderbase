@@ -62,10 +62,13 @@ These concepts follow the Library between synchronized Installations:
 | Concept | Current representation | Rule |
 |---|---|---|
 | Chess accounts | `Account` | Portable owner identities |
-| Games | `Game` | Portable, effectively immutable after import |
+| Games | `Game` | Portable, effectively immutable after import; an ongoing correspondence game is the one exception, growing by a move at a time until it is finished |
 | Notes | `Note` | Portable authored content; concurrent edits must be preserved |
 | Saved lines | `Line` | Portable authored content; concurrent edits must be preserved |
 | Analysis artifacts | Completed `AnalysisRun` and `MoveEval` data | Portable immutable results |
+| Correspondence games | `CorrespondenceGame` | Portable authored state of an ongoing game: the event, the link and the deadlines |
+| Correspondence trees | `CorrespondenceNode` | Portable authored content; concurrent edits must be preserved |
+| Correspondence evaluations | `CorrespondenceEval` | Portable immutable results, keyed by position and engine rather than by node |
 | Analysis meaning | Thresholds, Maia levels and analysis budgets in `AppSetting` | Portable Library preferences |
 
 ### Rebuildable Library projections
@@ -93,6 +96,7 @@ These concepts remain with one Installation:
 | Runner registration and connectivity | `Runner` |
 | Engine role assignments | Engine-role keys in `AppSetting` |
 | Queue pause and unfinished analysis work | Queue setting and non-completed `AnalysisRun` rows |
+| Correspondence searches, their processes and what is parked | `CorrespondenceSearch` |
 | Import execution and cursors | `ImportJob` |
 | Live boards, streams and event subscriptions | In-memory runtime state |
 | Downloaded engines, weights and temporary uploads | Installation filesystem |

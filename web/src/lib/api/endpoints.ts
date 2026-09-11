@@ -21,6 +21,18 @@ import type {
   BatchAnalysisResponse,
   Color,
   ComparisonResponse,
+  CorrespondenceFinishRequest,
+  CorrespondenceGameCreate,
+  CorrespondenceGameDetail,
+  CorrespondenceGameFinished,
+  CorrespondenceGameList,
+  CorrespondenceGameUpdate,
+  CorrespondenceNode,
+  CorrespondenceNodeAdded,
+  CorrespondenceNodeCreate,
+  CorrespondenceNodeUpdate,
+  CorrespondencePgnImport,
+  CorrespondenceState,
   DimensionList,
   EngineCreate,
   EngineDeleteResult,
@@ -696,3 +708,67 @@ export const getLiveState = () => http.get<LiveState>('/live')
 
 export const resetLive = () => http.post<LiveState>('/live/reset')
 export const selectLivePosition = (index: number) => http.post<LiveState>(`/live/positions/${index}`)
+
+// --- correspondence -------------------------------------------------------
+
+/**
+ * The games the owner is playing over weeks, and the tree behind each of them
+ * (`backend/api/routes/correspondence.py`).
+ *
+ * The routes are deliberately not gated on `correspondence_enabled`: that setting decides
+ * whether the rail entry and the client routes exist, and a deployment that has switched
+ * the mode off must still be able to read the games it already holds.
+ *
+ * A node is addressed by its own id rather than under its game, because an id is enough to
+ * find it and making the client repeat the game would let the two disagree.
+ */
+export const listCorrespondenceGames = (state?: CorrespondenceState) =>
+  http.get<CorrespondenceGameList>('/correspondence/games', { query: { state } })
+
+export const createCorrespondenceGame = (body: CorrespondenceGameCreate) =>
+  http.post<CorrespondenceGameDetail>('/correspondence/games', { body })
+
+/** One PGN as the server the game is played on exports it, with the moves so far. */
+export const importCorrespondenceGame = (body: CorrespondencePgnImport) =>
+  http.post<CorrespondenceGameDetail>('/correspondence/games/import', { body })
+
+/** Keyed by the *library* game id, which is what `/correspondence/:id` carries. */
+export const getCorrespondenceGame = (gameId: number) =>
+  http.get<CorrespondenceGameDetail>(`/correspondence/games/${gameId}`)
+
+/** A field left out is left alone; a field sent as null is cleared. */
+export const updateCorrespondenceGame = (gameId: number, body: CorrespondenceGameUpdate) =>
+  http.patch<CorrespondenceGameDetail>(`/correspondence/games/${gameId}`, { body })
+
+/** Either side's move: it is appended to the game and the child node is marked played. */
+export const playCorrespondenceMove = (gameId: number, uci: string) =>
+  http.post<CorrespondenceGameDetail>(`/correspondence/games/${gameId}/moves`, { body: { uci } })
+
+/** The node stays behind with `played: false`, and keeps its subtree and its comments. */
+export const undoCorrespondenceMove = (gameId: number) =>
+  http.delete<CorrespondenceGameDetail>(`/correspondence/games/${gameId}/moves/last`)
+
+/** Queues the ordinary quick and deep passes and freezes the tree. */
+export const finishCorrespondenceGame = (gameId: number, body: CorrespondenceFinishRequest) =>
+  http.post<CorrespondenceGameFinished>(`/correspondence/games/${gameId}/finish`, { body })
+
+/** The played line as the mainline, every other node a variation, with evals and NAGs. */
+export const exportCorrespondencePgn = (gameId: number) =>
+  requestDownload(`/correspondence/games/${gameId}/pgn`, {
+    fallbackName: `correspondence-${gameId}.pgn`,
+  })
+
+/**
+ * A move, or a whole line, under one node — the board's drag and "send this line to the
+ * tree" are the same call. Idempotent: a move already stored under the walked parent is
+ * reused and `created` counts only what was new.
+ */
+export const addCorrespondenceNode = (body: CorrespondenceNodeCreate) =>
+  http.post<CorrespondenceNodeAdded>('/correspondence/nodes', { body })
+
+export const updateCorrespondenceNode = (id: number, body: CorrespondenceNodeUpdate) =>
+  http.patch<CorrespondenceNode>(`/correspondence/nodes/${id}`, { body })
+
+/** The subtree, and the surviving siblings renumbered. Refused while a search runs inside. */
+export const deleteCorrespondenceNode = (id: number) =>
+  http.delete<void>(`/correspondence/nodes/${id}`)

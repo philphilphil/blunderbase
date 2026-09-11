@@ -680,12 +680,32 @@ def store_positions(
     explorer_service.mark_positions_dirty(session, game.id)
 
 
+def position_for(session: Session, fen: str) -> Position:
+    """The row for one position, stored if the library has never reached it before.
+
+    `store_positions`' unit of one, for the one writer that adds a position to a game that
+    is already stored: `games.append_move`, on a correspondence game the owner is playing.
+    Same key, same normalisation and the same upsert, so a position reached by a move
+    played today is the same row as the same position reached by a game imported last year.
+
+    Uncommitted, like everything else in this pipeline: the caller owns the transaction.
+    """
+    epd, zobrist, side = explorer_service.normalize_fen(fen)
+    position = session.scalars(select(Position).where(Position.fen == epd)).first()
+    if position is None:
+        position = Position(fen=epd, zobrist_key=zobrist, side_to_move=side)
+        session.add(position)
+        session.flush()
+    return position
+
+
 def import_one(
     session: Session,
     parsed: ParsedGame,
     *,
     progress: ProgressHook | None = None,
     presume_owner: bool = True,
+    analyze: bool = True,
 ) -> IngestOutcome:
     """Store one game the owner asked for by name, under a job of its own.
 
@@ -699,6 +719,10 @@ def import_one(
 
     A game that will not store is recorded on the job as a failure and re-raised: this is
     one game a person is waiting on, not a stream where one bad game must not stop the rest.
+
+    `analyze=False` stores the game without the automatic quick pass, which is what a
+    correspondence game being created is: it has no moves yet, its analysis is the tree
+    while it is played, and a pass over it would be redone after every move.
     """
     known = games_service.identify(session, parsed.source, parsed.source_id, dedup_hash(parsed))
     if known.deleted is not None:
@@ -711,7 +735,7 @@ def import_one(
 
     result = ImportResult(seen=1)
     try:
-        outcome = ingest_game(session, job, parsed, presume_owner=presume_owner)
+        outcome = ingest_game(session, job, parsed, presume_owner=presume_owner, analyze=analyze)
     except Exception as exc:
         session.rollback()
         error = f"{type(exc).__name__}: {exc}"

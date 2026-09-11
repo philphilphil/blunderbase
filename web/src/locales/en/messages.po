@@ -259,6 +259,8 @@ msgstr "Set up browser engine"
 #: src/components/analysis/useEngineSetup.tsx
 #: src/lib/desktop/PgnDropOverlay.tsx
 #: src/routes/auth/ChangePasswordDialog.tsx
+#: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/engines/AddEngineForm.tsx
 #: src/routes/engines/BrowserRunnerSection.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
@@ -273,6 +275,7 @@ msgid "Cancel"
 msgstr "Cancel"
 
 #: src/components/badges/SideDot.tsx
+#: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
@@ -281,6 +284,7 @@ msgid "White"
 msgstr "White"
 
 #: src/components/badges/SideDot.tsx
+#: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
@@ -390,6 +394,7 @@ msgid "Board settings — notation, arrows, sound, the eval graph and line previ
 msgstr "Board settings — notation, arrows, sound, the eval graph and line preview (S)"
 
 #: src/components/board/BoardSettings.tsx
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/live/SessionMeta.tsx
 msgid "Board"
 msgstr "Board"
@@ -400,6 +405,7 @@ msgstr "This browser only."
 
 #: src/components/board/BoardSettings.tsx
 #: src/routes/auth/ChangePasswordDialog.tsx
+#: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
 msgid "Close"
 msgstr "Close"
 
@@ -590,6 +596,7 @@ msgstr "Pages"
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
 #: src/lib/ui/shortcuts.ts
+#: src/routes/correspondence/components/BookPane.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/components/BookPanel.tsx
@@ -612,6 +619,7 @@ msgstr "Openings"
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
 #: src/lib/ui/shortcuts.ts
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/game/components/MobileGameView.tsx
 #: src/routes/game/components/NotesTrack.tsx
 #: src/routes/notes/NotesPage.tsx
@@ -687,6 +695,7 @@ msgstr "import, export and reset"
 #: src/components/shell/SideNav.tsx
 #: src/routes/analysis/AnalysisPage.tsx
 #: src/routes/analysis/AnalysisSettings.tsx
+#: src/routes/analysis/CorrespondenceSettings.tsx
 #: src/routes/games/filters.ts
 msgid "Analysis"
 msgstr "Analysis"
@@ -697,6 +706,9 @@ msgstr "coverage, backfills and what they cost"
 
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/engines/DemoEngines.tsx
 #: src/routes/engines/EnginesPage.tsx
 msgid "Engines"
@@ -923,6 +935,15 @@ msgstr "what this screen answers to"
 #: src/components/shell/ShortcutsOverlay.tsx
 msgid "Keyboard shortcuts (?)"
 msgstr "Keyboard shortcuts (?)"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/analysis/CorrespondenceSettings.tsx
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/dashboard/RatingCard.tsx
+#: src/routes/game/gameModel.ts
+msgid "Correspondence"
+msgstr "Correspondence"
 
 #: src/components/shell/SideNav.tsx
 #: src/routes/import/LibraryManagePage.tsx
@@ -1418,6 +1439,7 @@ msgid "Next game in your games list"
 msgstr "Next game in your games list"
 
 #: src/lib/ui/shortcuts.ts
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/live/LivePage.tsx
 msgid "Flip the board"
 msgstr "Flip the board"
@@ -1542,7 +1564,9 @@ msgstr "The coverage could not be read."
 
 #: src/routes/analysis/AnalysisPage.tsx
 #: src/routes/analysis/AnalysisSettings.tsx
+#: src/routes/analysis/CorrespondenceSettings.tsx
 #: src/routes/auth/AuthLoading.tsx
+#: src/routes/correspondence/CorrespondencePage.tsx
 #: src/routes/engines/CapacityGrid.tsx
 #: src/routes/engines/EnginesPage.tsx
 #: src/routes/explorer/ExplorerPage.tsx
@@ -1589,6 +1613,7 @@ msgid "Mistake"
 msgstr "Mistake"
 
 #: src/routes/analysis/AnalysisSettings.tsx
+#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Default 10"
 msgstr "Default 10"
 
@@ -1625,6 +1650,7 @@ msgid "Off asks only about your moves; on also predicts what the opponent is lik
 msgstr "Off asks only about your moves; on also predicts what the opponent is likely to play."
 
 #: src/routes/analysis/AnalysisSettings.tsx
+#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "The analysis configuration could not be read."
 msgstr "The analysis configuration could not be read."
 
@@ -1684,6 +1710,51 @@ msgstr "Choose which passes pay for human-move predictions and whose moves they 
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Changed the levels? <0>Fill missing levels</0> from Analysis overview."
 msgstr "Changed the levels? <0>Fill missing levels</0> from Analysis overview."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Games played over weeks, with a tree of positions the engines keep working on."
+msgstr "Games played over weeks, with a tree of positions the engines keep working on."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Days per move"
+msgstr "Days per move"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Lines per search"
+msgstr "Lines per search"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Default 3"
+msgstr "Default 3"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Correspondence mode"
+msgstr "Correspondence mode"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Off, nothing changes: there is no rail entry and the screens are not reachable. Games already stored keep everything they hold."
+msgstr "Off, nothing changes: there is no rail entry and the screens are not reachable. Games already stored keep everything they hold."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Show correspondence mode"
+msgstr "Show correspondence mode"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Adds Correspondence to the rail, after Live, with the number of games waiting on your move."
+msgstr "Adds Correspondence to the rail, after Live, with the number of games waiting on your move."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Start a game from <0>Correspondence</0>."
+msgstr "Start a game from <0>Correspondence</0>."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Defaults for a new game"
+msgstr "Defaults for a new game"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "What a game created here is given, and how many lines a search over one position keeps. Both can be changed per game."
+msgstr "What a game created here is given, and how many lines a search over one position keeps. Both can be changed per game."
 
 #: src/routes/analysis/CoverageSplit.tsx
 msgid "Deep pass"
@@ -1997,6 +2068,651 @@ msgstr "that is not the password"
 msgid "the server answered {status}"
 msgstr "the server answered {status}"
 
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Back to the start"
+msgstr "Back to the start"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Previous move"
+msgstr "Previous move"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Next move"
+msgstr "Next move"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "End of this line"
+msgstr "End of this line"
+
+#. Breadcrumb crumb for the position the line is replayed from.
+#. Stands in for a move at the starting position
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/explorer/components/LineBreadcrumb.tsx
+#: src/routes/game/components/EvalGraph.tsx
+#: src/routes/game/notesModel.ts
+#: src/routes/notes/presentation.ts
+msgid "start"
+msgstr "start"
+
+#. placeholder {0}: node.ply
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "ply {0}"
+msgstr "ply {0}"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Candidates"
+msgstr "Candidates"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "by backed evaluation"
+msgstr "by backed evaluation"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "checkmate"
+msgstr "checkmate"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "stalemate"
+msgstr "stalemate"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "threefold"
+msgstr "threefold"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "fifty-move draw"
+msgstr "fifty-move draw"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Tree"
+msgstr "Tree"
+
+#. placeholder {0}: countNodes(tree)
+#. placeholder {1}: countEvaluated(tree)
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} positions · {1} evaluated"
+msgstr "{0} positions · {1} evaluated"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Expansion arrives in a later step"
+msgstr "Expansion arrives in a later step"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Expand"
+msgstr "Expand"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Pruning arrives in the next step"
+msgstr "Pruning arrives in the next step"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Prune weak"
+msgstr "Prune weak"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/import/LibraryManagement.tsx
+msgid "Export PGN"
+msgstr "Export PGN"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Searches arrive in the next step"
+msgstr "Searches arrive in the next step"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Search with…"
+msgstr "Search with…"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "That correspondence game is not here."
+msgstr "That correspondence game is not here."
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Back to the list"
+msgstr "Back to the list"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "ICCF {number}"
+msgstr "ICCF {number}"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "after {last}"
+msgstr "after {last}"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "no moves yet"
+msgstr "no moves yet"
+
+#. placeholder {0}: game.move_number
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "move {0}, White to play"
+msgstr "move {0}, White to play"
+
+#. placeholder {0}: game.move_number
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "move {0}, Black to play"
+msgstr "move {0}, Black to play"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/notes/filters.ts
+msgid "Game"
+msgstr "Game"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Position"
+msgstr "Position"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Root"
+msgstr "Root"
+
+#. placeholder {0}: Math.ceil(game.ply_count / 2)
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "{0, plural, one {1 move} other {# moves}}"
+msgstr "{0, plural, one {1 move} other {# moves}}"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Open in Games"
+msgstr "Open in Games"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "{ongoing, plural, =0 {No games running} one {1 game running} other {# games running}}"
+msgstr "{ongoing, plural, =0 {No games running} one {1 game running} other {# games running}}"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/dashboard/DashboardPage.tsx
+msgid "Import PGN"
+msgstr "Import PGN"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "New game"
+msgstr "New game"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "No engine is searching a correspondence position yet."
+msgstr "No engine is searching a correspondence position yet."
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Searches, tasks and the capacity they use arrive in the next step."
+msgstr "Searches, tasks and the capacity they use arrive in the next step."
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "The correspondence games could not be read."
+msgstr "The correspondence games could not be read."
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Your move"
+msgstr "Your move"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "by due date"
+msgstr "by due date"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Nothing is waiting on you."
+msgstr "Nothing is waiting on you."
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Due"
+msgstr "Due"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Waiting for the opponent"
+msgstr "Waiting for the opponent"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "No move of yours is out with an opponent."
+msgstr "No move of yours is out with an opponent."
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Sent"
+msgstr "Sent"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/import/JobProgress.tsx
+msgid "Finished"
+msgstr "Finished"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "in the library now"
+msgstr "in the library now"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "No correspondence game has finished yet."
+msgstr "No correspondence game has finished yet."
+
+#: src/routes/correspondence/components/BookPane.tsx
+msgid "The masters database is Lichess's, and it needs the token stored under Settings → Explorer. Your own games are on the other tab and need nothing."
+msgstr "The masters database is Lichess's, and it needs the token stored under Settings → Explorer. Your own games are on the other tab and need nothing."
+
+#: src/routes/correspondence/components/BookPane.tsx
+msgid "The masters database stops here."
+msgstr "The masters database stops here."
+
+#: src/routes/correspondence/components/BookPane.tsx
+msgid "What the masters play from this position"
+msgstr "What the masters play from this position"
+
+#: src/routes/correspondence/components/BookPane.tsx
+#: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/explorer/components/MoveTreeTable.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+#: src/routes/game/components/BookPanel.tsx
+msgid "Move"
+msgstr "Move"
+
+#: src/routes/correspondence/components/BookPane.tsx
+#: src/routes/explorer/components/ReferenceMoveTable.tsx
+msgid "White / draw / black"
+msgstr "White / draw / black"
+
+#: src/routes/correspondence/components/BookPane.tsx
+msgid "Masters"
+msgstr "Masters"
+
+#: src/routes/correspondence/components/BookPane.tsx
+msgid "Your games"
+msgstr "Your games"
+
+#: src/routes/correspondence/components/BookPane.tsx
+msgid "Which book"
+msgstr "Which book"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "No move has been considered here yet. Play one on the board to put it in the tree."
+msgstr "No move has been considered here yet. Play one on the board to put it in the tree."
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "Own"
+msgstr "Own"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "Backed"
+msgstr "Backed"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "Depth"
+msgstr "Depth"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Mark"
+msgstr "Mark"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "The minimax under this move disagrees with its own number"
+msgstr "The minimax under this move disagrees with its own number"
+
+#: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
+#: src/routes/game/components/StudioActions.tsx
+msgid "Correspondence tree"
+msgstr "Correspondence tree"
+
+#: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
+msgid "what was considered while the game ran"
+msgstr "what was considered while the game ran"
+
+#: src/routes/correspondence/components/EnginesPane.tsx
+msgid "No engine has looked at this position yet."
+msgstr "No engine has looked at this position yet."
+
+#: src/routes/correspondence/components/EnginesPane.tsx
+msgid "Searches — one engine on one position for as long as you let it, several at once — arrive in the next step. Until then the tree is where the thinking is kept."
+msgstr "Searches — one engine on one position for as long as you let it, several at once — arrive in the next step. Until then the tree is where the thinking is kept."
+
+#. placeholder {0}: one.depth
+#: src/routes/correspondence/components/EnginesPane.tsx
+msgid "depth {0}"
+msgstr "depth {0}"
+
+#: src/routes/correspondence/components/EnginesPane.tsx
+msgid "nodes"
+msgstr "nodes"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "The move that arrived"
+msgstr "The move that arrived"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Written the way the move mail writes it, or as UCI. It is appended to the game and becomes the line the tree hangs off."
+msgstr "Written the way the move mail writes it, or as UCI. It is appended to the game and becomes the line the tree hangs off."
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Not a legal move in this position."
+msgstr "Not a legal move in this position."
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Already in the tree"
+msgstr "Already in the tree"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgctxt "button"
+msgid "Play it"
+msgstr "Play it"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Finish this game"
+msgstr "Finish this game"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "It becomes a library game: the quick and deep passes are queued, it counts in the statistics, and the tree stays attached to it — read-only from here on."
+msgstr "It becomes a library game: the quick and deep passes are queued, it counts in the statistics, and the tree stays attached to it — read-only from here on."
+
+#: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/games/filters.ts
+msgid "Result"
+msgstr "Result"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "How it ended"
+msgstr "How it ended"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Resignation, agreed draw, adjudication…"
+msgstr "Resignation, agreed draw, adjudication…"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Finish game"
+msgstr "Finish game"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "you · Black"
+msgstr "you · Black"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "you · White"
+msgstr "you · White"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "ICCF game {number}"
+msgstr "ICCF game {number}"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "the game's page"
+msgstr "the game's page"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Their move"
+msgstr "Their move"
+
+#. placeholder {0}: game.move_number
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "move {0}"
+msgstr "move {0}"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Reply due"
+msgstr "Reply due"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Opponent played…"
+msgstr "Opponent played…"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Append the selected candidate to the game"
+msgstr "Append the selected candidate to the game"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "It is not your move"
+msgstr "It is not your move"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Play {move}"
+msgstr "Play {move}"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Play this move"
+msgstr "Play this move"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Take the last move back"
+msgstr "Take the last move back"
+
+#: src/routes/correspondence/components/GameHeader.tsx
+msgid "Finish…"
+msgstr "Finish…"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Which one is you"
+msgstr "Which one is you"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "New correspondence game"
+msgstr "New correspondence game"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "The game is stored the moment you create it, with no moves and no analysis pass — the tree is its analysis while it runs."
+msgstr "The game is stored the moment you create it, with no moves and no analysis pass — the tree is its analysis while it runs."
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Name"
+msgstr "Name"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Event"
+msgstr "Event"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Tournament or section"
+msgstr "Tournament or section"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "ICCF game number"
+msgstr "ICCF game number"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "optional"
+msgstr "optional"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Link to the game"
+msgstr "Link to the game"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/games/components/FilterBar.tsx
+#: src/routes/games/filters.ts
+msgid "Time control"
+msgstr "Time control"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "10 moves / 50 days"
+msgstr "10 moves / 50 days"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Starting position"
+msgstr "Starting position"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "FEN — leave empty for the normal array"
+msgstr "FEN — leave empty for the normal array"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default"
+msgstr "default"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Create game"
+msgstr "Create game"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Import a correspondence game"
+msgstr "Import a correspondence game"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Paste the PGN the server exports. Its moves become the game's played line, and its headers fill in whatever you leave empty below."
+msgstr "Paste the PGN the server exports. Its moves become the game's played line, and its headers fill in whatever you leave empty below."
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "PGN"
+msgstr "PGN"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "I am White"
+msgstr "I am White"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "I am Black"
+msgstr "I am Black"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "overrides the PGN"
+msgstr "overrides the PGN"
+
+#: src/routes/correspondence/components/NewGameDialog.tsx
+msgid "Import game"
+msgstr "Import game"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+#: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/game/components/NoteComposer.tsx
+msgid "Note text"
+msgstr "Note text"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "Edit this note"
+msgstr "Edit this note"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+#: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/game/components/NoteComposer.tsx
+msgid "Delete this note"
+msgstr "Delete this note"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "Comment on the move"
+msgstr "Comment on the move"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "Goes into the PGN beside the move. It saves when you click away."
+msgstr "Goes into the PGN beside the move. It saves when you click away."
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "This position"
+msgstr "This position"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "This game"
+msgstr "This game"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+#: src/routes/game/components/NotesTrack.tsx
+msgid "Book"
+msgstr "Book"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+#: src/routes/explorer/components/PositionNotes.tsx
+msgid "Add note"
+msgstr "Add note"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "It saves when you click away."
+msgstr "It saves when you click away."
+
+#: src/routes/correspondence/components/NotesPane.tsx
+#: src/routes/game/components/NoteComposer.tsx
+msgid "What is worth remembering about this position?"
+msgstr "What is worth remembering about this position?"
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "The plan, what this opponent tends to do, the deadline arithmetic."
+msgstr "The plan, what this opponent tends to do, the deadline arithmetic."
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "Nothing written about this position yet."
+msgstr "Nothing written about this position yet."
+
+#: src/routes/correspondence/components/NotesPane.tsx
+msgid "Nothing written about this game yet."
+msgstr "Nothing written about this game yet."
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "The minimax under this move disagrees with the engine's own number here"
+msgstr "The minimax under this move disagrees with the engine's own number here"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Two engines disagree here"
+msgstr "Two engines disagree here"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "searching"
+msgstr "searching"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "a task is waiting"
+msgstr "a task is waiting"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "This game has no tree yet."
+msgstr "This game has no tree yet."
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Tasks arrive in a later step"
+msgstr "Tasks arrive in a later step"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Queue task"
+msgstr "Queue task"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Comment…"
+msgstr "Comment…"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Promote to first"
+msgstr "Promote to first"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "A move the game played cannot be deleted"
+msgstr "A move the game played cannot be deleted"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Delete subtree"
+msgstr "Delete subtree"
+
+#: src/routes/correspondence/format.ts
+msgid "{days, plural, one {# day late} other {# days late}}"
+msgstr "{days, plural, one {# day late} other {# days late}}"
+
+#: src/routes/correspondence/format.ts
+msgid "today"
+msgstr "today"
+
+#: src/routes/correspondence/format.ts
+msgid "{days, plural, one {in # day} other {in # days}}"
+msgstr "{days, plural, one {in # day} other {in # days}}"
+
+#: src/routes/correspondence/format.ts
+msgid "Good"
+msgstr "Good"
+
+#: src/routes/correspondence/format.ts
+msgid "Interesting"
+msgstr "Interesting"
+
+#: src/routes/correspondence/format.ts
+msgid "Dubious"
+msgstr "Dubious"
+
+#: src/routes/correspondence/format.ts
+msgid "Bad"
+msgstr "Bad"
+
+#: src/routes/correspondence/format.ts
+msgid "Excluded"
+msgstr "Excluded"
+
 #: src/routes/dashboard/DashboardPage.tsx
 msgid "The backend is not answering. Nothing below will be current."
 msgstr "The backend is not answering. Nothing below will be current."
@@ -2021,10 +2737,6 @@ msgstr "{gameCount} games in the database. {blunders, plural, one {{blunderCount
 #: src/routes/stats/reports.ts
 msgid "Overview"
 msgstr "Overview"
-
-#: src/routes/dashboard/DashboardPage.tsx
-msgid "Import PGN"
-msgstr "Import PGN"
 
 #: src/routes/dashboard/QueueCard.tsx
 msgid "queued"
@@ -2115,11 +2827,6 @@ msgstr "Rapid"
 #: src/routes/stats/cards/TimeControlCard.tsx
 msgid "Classical"
 msgstr "Classical"
-
-#: src/routes/dashboard/RatingCard.tsx
-#: src/routes/game/gameModel.ts
-msgid "Correspondence"
-msgstr "Correspondence"
 
 #: src/routes/dashboard/RatingCard.tsx
 msgid "speeds"
@@ -2364,12 +3071,6 @@ msgstr "unnamed engine"
 #: src/routes/engines/AddEngineForm.tsx
 msgid "{declared, plural, one {# option} other {# options}}"
 msgstr "{declared, plural, one {# option} other {# options}}"
-
-#: src/routes/engines/AddEngineForm.tsx
-#: src/routes/engines/CreateRunnerForm.tsx
-#: src/routes/engines/EngineDetail.tsx
-msgid "Name"
-msgstr "Name"
 
 #: src/routes/engines/AddEngineForm.tsx
 msgid "Kind"
@@ -2786,10 +3487,6 @@ msgid "A test run starts the binary here; <0>{enginePath}</0> is a path on <1>{r
 msgstr "A test run starts the binary here; <0>{enginePath}</0> is a path on <1>{runnerName}</1>."
 
 #: src/routes/engines/EngineDetail.tsx
-msgid "Position"
-msgstr "Position"
-
-#: src/routes/engines/EngineDetail.tsx
 msgid "starting position"
 msgstr "starting position"
 
@@ -2955,10 +3652,6 @@ msgstr "action"
 #: src/routes/engines/OptionsEditor.tsx
 msgid "default ({fallback})"
 msgstr "default ({fallback})"
-
-#: src/routes/engines/OptionsEditor.tsx
-msgid "default"
-msgstr "default"
 
 #: src/routes/engines/OptionsEditor.tsx
 msgid "Filter options"
@@ -3290,15 +3983,6 @@ msgstr "open in library"
 msgid "Nothing has reached this position yet."
 msgstr "Nothing has reached this position yet."
 
-#. Breadcrumb crumb for the position the line is replayed from.
-#. Stands in for a move at the starting position
-#: src/routes/explorer/components/LineBreadcrumb.tsx
-#: src/routes/game/components/EvalGraph.tsx
-#: src/routes/game/notesModel.ts
-#: src/routes/notes/presentation.ts
-msgid "start"
-msgstr "start"
-
 #: src/routes/explorer/components/LineSummary.tsx
 msgid "Your results in this line"
 msgstr "Your results in this line"
@@ -3357,12 +4041,6 @@ msgstr "This database has no game to show from here."
 
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
-#: src/routes/game/components/BookPanel.tsx
-msgid "Move"
-msgstr "Move"
-
-#: src/routes/explorer/components/MoveTreeTable.tsx
-#: src/routes/explorer/components/ReferenceMoveTable.tsx
 msgid "Share"
 msgstr "Share"
 
@@ -3415,10 +4093,6 @@ msgid "saved"
 msgstr "saved"
 
 #: src/routes/explorer/components/PositionNotes.tsx
-msgid "Add note"
-msgstr "Add note"
-
-#: src/routes/explorer/components/PositionNotes.tsx
 msgid "Nothing written about this position yet. What is worth remembering here?"
 msgstr "Nothing written about this position yet. What is worth remembering here?"
 
@@ -3449,22 +4123,8 @@ msgid "note via MCP"
 msgstr "note via MCP"
 
 #: src/routes/explorer/components/PositionNotes.tsx
-msgid "Edit this note"
-msgstr "Edit this note"
-
-#: src/routes/explorer/components/PositionNotes.tsx
-#: src/routes/game/components/NoteComposer.tsx
-msgid "Delete this note"
-msgstr "Delete this note"
-
-#: src/routes/explorer/components/PositionNotes.tsx
 msgid "What is worth remembering about this position? It saves when you click away."
 msgstr "What is worth remembering about this position? It saves when you click away."
-
-#: src/routes/explorer/components/PositionNotes.tsx
-#: src/routes/game/components/NoteComposer.tsx
-msgid "Note text"
-msgstr "Note text"
 
 #: src/routes/explorer/components/ReferenceFilters.tsx
 #: src/routes/stats/StatsPage.tsx
@@ -3498,10 +4158,6 @@ msgstr "speed"
 #: src/routes/stats/cards/ProgressCard.tsx
 msgid "rating"
 msgstr "rating"
-
-#: src/routes/explorer/components/ReferenceMoveTable.tsx
-msgid "White / draw / black"
-msgstr "White / draw / black"
 
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 msgid "Avg elo"
@@ -3983,10 +4639,6 @@ msgid "(<0>{winLoss}</0> win)"
 msgstr "(<0>{winLoss}</0> win)"
 
 #: src/routes/game/components/NoteComposer.tsx
-msgid "What is worth remembering about this position?"
-msgstr "What is worth remembering about this position?"
-
-#: src/routes/game/components/NoteComposer.tsx
 msgid "pins the line"
 msgstr "pins the line"
 
@@ -4012,10 +4664,6 @@ msgstr "Save note"
 #: src/routes/game/components/NotesTrack.tsx
 msgid "Book and notes"
 msgstr "Book and notes"
-
-#: src/routes/game/components/NotesTrack.tsx
-msgid "Book"
-msgstr "Book"
 
 #: src/routes/game/components/NotesTrack.tsx
 msgid "{noteCount, plural, one {# note} other {# notes}}"
@@ -4316,11 +4964,6 @@ msgstr "Exact clock"
 
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/filters.ts
-msgid "Time control"
-msgstr "Time control"
-
-#: src/routes/games/components/FilterBar.tsx
-#: src/routes/games/filters.ts
 msgid "Opponent"
 msgstr "Opponent"
 
@@ -4486,10 +5129,6 @@ msgstr "Flags"
 #: src/routes/stats/StatsPage.tsx
 msgid "Colour"
 msgstr "Colour"
-
-#: src/routes/games/filters.ts
-msgid "Result"
-msgstr "Result"
 
 #: src/routes/games/filters.ts
 msgctxt "filter chip"
@@ -4822,10 +5461,6 @@ msgid "Finished — {failed} failed"
 msgstr "Finished — {failed} failed"
 
 #: src/routes/import/JobProgress.tsx
-msgid "Finished"
-msgstr "Finished"
-
-#: src/routes/import/JobProgress.tsx
 msgid "job {jobId}"
 msgstr "job {jobId}"
 
@@ -4876,10 +5511,6 @@ msgstr "Portable PGN export"
 #: src/routes/import/LibraryManagement.tsx
 msgid "Every game, note and saved line for another chess application. Engine analysis and settings are not part of PGN."
 msgstr "Every game, note and saved line for another chess application. Engine analysis and settings are not part of PGN."
-
-#: src/routes/import/LibraryManagement.tsx
-msgid "Export PGN"
-msgstr "Export PGN"
 
 #: src/routes/import/LibraryManagement.tsx
 msgid "Database backup"
@@ -5574,10 +6205,6 @@ msgstr "loose"
 #: src/routes/notes/filters.ts
 msgid "About"
 msgstr "About"
-
-#: src/routes/notes/filters.ts
-msgid "Game"
-msgstr "Game"
 
 #: src/routes/notes/filters.ts
 msgid "Written"

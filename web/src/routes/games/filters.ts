@@ -41,7 +41,15 @@ export interface LibraryFilters {
 
 const WHOSE: readonly Exclude<Whose, 'mine'>[] = ['others', 'all']
 
-const SOURCES: readonly Source[] = ['lichess', 'chesscom', 'fics', 'pgn', 'manual', 'masters']
+const SOURCES: readonly Source[] = [
+  'lichess',
+  'chesscom',
+  'fics',
+  'pgn',
+  'manual',
+  'masters',
+  'iccf',
+]
 const COLORS: readonly Color[] = ['white', 'black']
 const RESULTS: readonly Result[] = ['1-0', '0-1', '1/2-1/2']
 const OUTCOMES: readonly Outcome[] = ['win', 'loss', 'draw']

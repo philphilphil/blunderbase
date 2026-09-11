@@ -101,6 +101,20 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'runner.updated':
       return [queryKeys.runners(), queryKeys.queue()]
 
+    // A move, an edit, a node, a deadline: one frame for all of them, because the tree, the
+    // move list and the deadlines are one document.
+    // The correspondence root rather than the one game's key: the list is asked for in
+    // three cuts (no state, ongoing, finished) and a move changes every one of them, so
+    // naming the game alone would leave the sections behind. There are a handful of these
+    // queries at most and one of them is mounted at a time.
+    // The library keys ride along because a correspondence game is a `Game` and playing a
+    // move rewrites it — `append_move` restamps the moves, the ply count, the PGN, the
+    // opening and the dedup hash, clears the card and adds a `GamePosition`, which is a row
+    // the games table, that game's page and the explorer's counts all read. A frame arrives
+    // a few times a day at most, so the breadth costs nothing.
+    case 'correspondence.updated':
+      return [queryKeys.correspondence(), queryKeys.games(), queryKeys.explorer()]
+
     // Carried whole on the socket, and a keepalive is not news. `stream.snapshot` arrives
     // twice a second per open board — refetching on it would be a refetch loop.
     case 'stream.started':

@@ -73,6 +73,14 @@ export interface BoardProps {
   drawable?: boolean
   animation?: boolean
   animationDuration?: number
+  /**
+   * Where each piece may go, as chessops' `chessgroundDests` builds it.
+   *
+   * chessground refuses every drag on a board that is not `movable.free` and has no
+   * `dests` (`canMove` in its `board.ts`), so a board meant to be played on has to be told
+   * the legal moves. Left out, the board is read-only in practice whatever `viewOnly` says.
+   */
+  dests?: Map<Square, Square[]>
   onMove?: (orig: Square, dest: Square) => void
   onSelect?: (square: Square) => void
   className?: string
@@ -191,6 +199,7 @@ export function Board({
   drawable = false,
   animation = true,
   animationDuration = 200,
+  dests,
   onMove,
   onSelect,
   className,
@@ -242,6 +251,7 @@ export function Board({
       drawable: { enabled: drawable, visible: true, brushes: BOARD_BRUSHES },
       movable: {
         free: false,
+        ...(dests ? { dests } : {}),
         events: { after: (orig, dest) => handlers.current.onMove?.(orig, dest) },
       },
       events: { select: (key) => handlers.current.onSelect?.(key) },
@@ -270,7 +280,11 @@ export function Board({
       lastMove: parseLastMove(lastMove),
       animation: { enabled: animation, duration: animationDuration },
       highlight: { lastMove: true, check: true, custom },
-      movable: { free: false, color: onMove ? (turnColor ?? 'both') : undefined },
+      movable: {
+        free: false,
+        color: onMove ? (turnColor ?? 'both') : undefined,
+        ...(dests ? { dests } : {}),
+      },
     }
     if (turnColor) next.turnColor = turnColor
     if (check !== undefined) next.check = check
@@ -289,6 +303,7 @@ export function Board({
     animationDuration,
     custom,
     drawn,
+    dests,
     onMove,
   ])
 

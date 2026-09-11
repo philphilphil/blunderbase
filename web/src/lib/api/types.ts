@@ -10,8 +10,12 @@ export type Extra = Record<string, unknown>
 
 // --- enums (backend/db/enums.py) ------------------------------------------
 
-/** `masters` is a game added from the reference explorer's masters archive — never synced. */
-export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual' | 'masters'
+/**
+ * `masters` is a game added from the reference explorer's masters archive — never synced.
+ * `iccf` is a correspondence game the owner started here, its `source_id` the ICCF game
+ * number; it belongs to no platform, so nothing maps it to one.
+ */
+export type Source = 'lichess' | 'chesscom' | 'fics' | 'pgn' | 'manual' | 'masters' | 'iccf'
 export type Platform = 'lichess' | 'chesscom' | 'fics' | 'otb'
 export type Color = 'white' | 'black'
 export type Result = '1-0' | '0-1' | '1/2-1/2' | '*'
@@ -30,6 +34,7 @@ export const SOURCES: readonly Source[] = [
   'pgn',
   'manual',
   'masters',
+  'iccf',
 ]
 export const SPEEDS: readonly Speed[] = [
   'bullet',
@@ -155,6 +160,18 @@ export interface AppSettings {
   inaccuracy_threshold: number | null
   mistake_threshold: number | null
   blunder_threshold: number | null
+  /**
+   * Correspondence mode: whether it exists at all for this owner (0 or 1, off by default),
+   * the reply window a new game is given, and how many lines a search over one node keeps.
+   *
+   * Optional in the type for the same reason `maia_elos` is — a fixture or an optimistic
+   * write need not invent them — but every one of them is a full member of the settings
+   * registry, so `completeUpdate` has to carry them or the next save of any form clears
+   * the mode.
+   */
+  correspondence_enabled?: number | null
+  correspondence_days_per_move?: number | null
+  correspondence_multipv?: number | null
 }
 
 /**
@@ -1718,6 +1735,276 @@ export interface SearchResponse {
   opponents: OpponentHit[]
   openings: OpeningHit[]
   notes: NoteResponse[]
+}
+
+// --- correspondence (`/correspondence`) -----------------------------------
+
+/** Ongoing games are the ones being played; finished ones are library games with a tree. */
+export type CorrespondenceState = 'ongoing' | 'finished'
+
+/**
+ * The player's word about a move, against the engine's. The glyph is derived from it by
+ * the backend and never sent by a client — see `CorrespondenceNode.glyph`.
+ */
+export type CorrespondenceMark = 'good' | 'interesting' | 'dubious' | 'bad' | 'excluded'
+
+export const CORRESPONDENCE_MARKS: readonly CorrespondenceMark[] = [
+  'good',
+  'interesting',
+  'dubious',
+  'bad',
+  'excluded',
+]
+
+/** `search` is an infinite one in the correspondence pool; `task` is a bounded queue run. */
+export type CorrespondenceSearchKind = 'search' | 'task'
+
+export type CorrespondenceSearchStatus =
+  | 'queued'
+  | 'running'
+  | 'paused'
+  | 'done'
+  | 'stopped'
+  | 'failed'
+
+/**
+ * A node's number, in the frame the node names (`TreeNode.frame`) rather than the side to
+ * move's — which is the one difference between this and `CorrespondenceEval` below.
+ * Exactly one of `cp` and `mate` is set. `backed` is the narrow form: `cp` and `mate` only.
+ */
+export interface CorrespondenceScore extends Extra {
+  cp?: number | null
+  mate?: number | null
+  depth?: number | null
+  nodes?: number | null
+  engine_id?: number | null
+  engine_name?: string | null
+  updated_at?: string | null
+}
+
+/**
+ * One engine's raw row for a position, from the SIDE TO MOVE's point of view — the whole
+ * row, `best_lines` included, so line 1's score is the row's own. A node's `own` and
+ * `backed` are in the node's frame instead, so anything printing a row beside them turns it
+ * first: `routes/correspondence/format.ts`'s `inNodeFrame`.
+ */
+export interface CorrespondenceEval extends Extra {
+  engine_id?: number | null
+  engine_name: string
+  engine_version?: string | null
+  cp?: number | null
+  mate?: number | null
+  depth?: number | null
+  nodes?: number | null
+  time_ms?: number | null
+  best_lines?: { multipv: number; cp?: number | null; mate?: number | null; pv: string[] }[] | null
+  history?: { depth?: number | null; nodes?: number | null; cp?: number | null; mate?: number | null; best?: string | null }[]
+  tablebase?: { wdl?: number | null; dtz?: number | null; source?: string | null } | null
+  updated_at?: string | null
+}
+
+/** One engine at work on one node, or parked on it. Nothing in step 1 creates one. */
+export interface CorrespondenceSearch extends Extra {
+  id: number
+  node_id: number
+  engine_id?: number | null
+  engine_name?: string | null
+  kind: CorrespondenceSearchKind
+  status: CorrespondenceSearchStatus
+  warm?: boolean
+  multipv?: number
+  run_id?: number | null
+  runner_id?: number | null
+  limit_depth?: number | null
+  limit_nodes?: number | null
+  limit_seconds?: number | null
+  root_moves?: string[] | null
+  created_at?: string | null
+  started_at?: string | null
+  paused_at?: string | null
+  finished_at?: string | null
+  heartbeat_at?: string | null
+  error?: string | null
+}
+
+/** What a node create or a node patch answers with: the node alone, no tree around it. */
+export interface CorrespondenceNode extends Extra {
+  id: number
+  game_id: number
+  parent_id?: number | null
+  uci?: string | null
+  san?: string | null
+  epd: string
+  ply: number
+  rank: number
+  played: boolean
+  conditional: boolean
+  mark?: CorrespondenceMark | null
+  /** `!`, `!?`, `?!`, `?`, `✕` — derived from `mark`, never sent by a client. */
+  glyph?: string | null
+  /** `""` rather than null. */
+  comment: string
+  pinned_engine_id?: number | null
+  move_number?: number
+  created_at?: string
+  updated_at?: string
+}
+
+/** What the path to a node says about itself: draws, mates and repetitions. */
+export interface CorrespondenceNodeFlags extends Extra {
+  repetition?: number
+  threefold?: boolean
+  halfmove_clock?: number
+  fifty_move?: boolean
+  dead_position?: boolean
+  checkmate?: boolean
+  stalemate?: boolean
+}
+
+/**
+ * A node inside the tree: the same node plus what the engines say about it and what hangs
+ * under it. `own` and `backed` are in `frame` — the side that played the move into this
+ * node — so the two are comparable and the gap between them is the whole point.
+ */
+export interface CorrespondenceTreeNode extends CorrespondenceNode {
+  fen: string
+  turn: Color
+  frame: Color
+  own?: CorrespondenceScore | null
+  backed?: CorrespondenceScore | null
+  evals: CorrespondenceEval[]
+  searches: CorrespondenceSearch[]
+  /** Two engines more than 50 cp apart on this position. */
+  disagree: boolean
+  flags: CorrespondenceNodeFlags
+  /** In rank order, 0 first; the played child is promoted to rank 0. */
+  children: CorrespondenceTreeNode[]
+}
+
+/** One correspondence game as the list page and the game header read it. */
+export interface CorrespondenceGameSummary extends Extra {
+  game_id: number
+  white: string
+  black: string
+  white_rating?: number | null
+  black_rating?: number | null
+  owner_color?: Color | null
+  source: Source
+  source_id?: string | null
+  event?: string | null
+  url?: string | null
+  time_control?: string | null
+  result: Result
+  termination?: string | null
+  state: CorrespondenceState
+  finished: boolean
+  ply_count: number
+  move_number: number
+  to_move: Color
+  your_move: boolean
+  moves_uci: string[]
+  moves_san: string[]
+  last_move_san?: string | null
+  /** Always a full FEN — the initial array for a game that started from one. */
+  start_fen: string
+  days_per_move: number
+  reply_due?: string | null
+  /** Negative when the reply is late. */
+  days_left?: number | null
+  last_move_at?: string | null
+  created_at: string
+  updated_at: string
+  /**
+   * The verdict on the position the game STANDS IN — the played tip, not the tree root —
+   * and in White's frame rather than the tip's, because it is printed on its own with no
+   * move beside it to say whose point of view it is.
+   */
+  root_eval?: CorrespondenceScore | null
+  root_backed?: CorrespondenceScore | null
+  current_node_id?: number | null
+  /** Only on a list row: the queued, running and paused searches — the engine chips. */
+  searches?: CorrespondenceSearch[]
+}
+
+export interface CorrespondenceGameList {
+  games: CorrespondenceGameSummary[]
+  /** Always about every game, never about the filtered cut. */
+  counts: { ongoing?: number; finished?: number; your_move?: number } & Extra
+}
+
+/** One game, its whole tree and every search over it, in one payload. */
+export interface CorrespondenceGameDetail {
+  game: CorrespondenceGameSummary
+  tree: CorrespondenceTreeNode | null
+  searches: CorrespondenceSearch[]
+}
+
+/** Finishing also queues the ordinary passes; the list is empty when no engine is assigned. */
+export interface CorrespondenceGameFinished extends CorrespondenceGameDetail {
+  queued_runs: number[]
+}
+
+/** What adding a move or a whole line did: how many nodes were new, and where it ends. */
+export interface CorrespondenceNodeAdded {
+  game_id: number
+  created: number
+  tip: CorrespondenceNode
+}
+
+export interface CorrespondenceGameCreate {
+  white: string
+  black: string
+  owner_color: Color
+  event?: string | null
+  url?: string | null
+  /** Set makes the game `iccf` with this as its `source_id`; absent makes it `manual`. */
+  iccf_id?: string | null
+  time_control?: string | null
+  start_fen?: string | null
+  days_per_move?: number | null
+  reply_due?: string | null
+  white_rating?: number | null
+  black_rating?: number | null
+}
+
+export interface CorrespondencePgnImport {
+  pgn: string
+  owner_color: Color
+  event?: string | null
+  url?: string | null
+  iccf_id?: string | null
+  days_per_move?: number | null
+  reply_due?: string | null
+}
+
+/** A field left out is left alone; a field sent as null is cleared. */
+export interface CorrespondenceGameUpdate {
+  event?: string | null
+  url?: string | null
+  reply_due?: string | null
+  days_per_move?: number | null
+}
+
+export interface CorrespondenceFinishRequest {
+  /** Never `*`. */
+  result: Result
+  termination?: string | null
+}
+
+/** Exactly one of `uci` and `ucis`: a drag is one move, "send this line" is the list. */
+export interface CorrespondenceNodeCreate {
+  parent_id: number
+  uci?: string
+  ucis?: string[]
+}
+
+export interface CorrespondenceNodeUpdate {
+  comment?: string | null
+  mark?: CorrespondenceMark | null
+  pinned_engine_id?: number | null
+  conditional?: boolean | null
+  /** Renumber the sibling set so this node is rank 0. */
+  promote?: boolean
 }
 
 // --- meta -----------------------------------------------------------------

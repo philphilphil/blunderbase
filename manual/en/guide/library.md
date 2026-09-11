@@ -40,6 +40,19 @@ Choose a file in the PGN box, or drop one anywhere in the window; several droppe
 are read as one file. Say whether the games are **Mine** or **Not mine** first. Games that
 are not yours are analysed and searchable like any other, but count in no statistic.
 
+### Correspondence games
+
+A game you are still playing is not imported here. It is entered under
+[Correspondence](correspondence.md), which stores it with the source **ICCF** when you give
+it an ICCF game number and as a manual game when you do not.
+
+It is a library game from the day you create it, not from the day it ends: it stands in
+**Games** straight away with no moves yet and the result still open, the sync history below
+records it as a one-game run under its source, and it grows a move at a time as you enter
+the moves. It is left unanalysed while it runs — its tree is where the engines' work is
+kept — and finishing it queues the ordinary quick and deep pass, after which it reads like
+every other game.
+
 ### Read the sync history
 
 Every run, newest first: the source, when it started, how long it took, and how many games

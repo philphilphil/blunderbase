@@ -28,6 +28,7 @@ import {
   Gauge,
   LayoutDashboard,
   Library,
+  Mail,
   PanelLeftClose,
   PanelLeftOpen,
   Radio,
@@ -49,7 +50,14 @@ import {
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { StatusDot } from '@/components/badges/StatusDot'
-import { useEngines, useGames, useLiveState } from '@/lib/api/queries'
+import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
+import {
+  useAppSettings,
+  useCorrespondenceGames,
+  useEngines,
+  useGames,
+  useLiveState,
+} from '@/lib/api/queries'
 import type { Color } from '@/lib/api/types'
 import { useEvents } from '@/lib/events/EventsProvider'
 import { REPO_URL } from '@/lib/links'
@@ -89,6 +97,14 @@ const WORKSPACE: NavItem[] = [
 ]
 
 /**
+ * The entry that is only there for some deployments: correspondence mode, off by default
+ * (`correspondence_enabled`). Kept out of `WORKSPACE` rather than filtered out of it, so
+ * that the list every reader of this file sees is the list every install has, and the one
+ * conditional entry says so by standing apart.
+ */
+const CORRESPONDENCE: NavItem = { to: '/correspondence', label: msg`Correspondence`, icon: Mail }
+
+/**
  * The data itself, what has been run over it, and what runs it — in that order.
  */
 const DATA: NavItem[] = [
@@ -119,6 +135,7 @@ const SUBPAGES: Record<string, { to: string; label: MessageDescriptor }[]> = {
     { to: '/analysis/coverage', label: msg`Coverage` },
     { to: '/analysis/engine', label: msg`Engine passes` },
     { to: '/analysis/maia', label: msg`Maia` },
+    { to: '/analysis/correspondence', label: msg`Correspondence` },
   ],
 }
 
@@ -612,9 +629,19 @@ function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
   const { t } = useLingui()
   const games = useGames({ limit: 1 })
   const live = useLiveState()
+  const settings = useAppSettings()
 
   const total = games.data?.total
   const liveActive = live.data?.active === true
+
+  // Correspondence mode. The count beside the entry is the one number that decides whether
+  // the owner has to do anything today — games waiting on *their* move — which is why it is
+  // in the rail rather than on the page. The list is only asked for once the mode is on, so
+  // an install that never plays correspondence makes no request for it.
+  const correspondence =
+    (settings.data?.correspondence_enabled ?? SETTING_DEFAULTS.correspondence_enabled) === 1
+  const corrGames = useCorrespondenceGames(undefined, { enabled: correspondence })
+  const yourMove = corrGames.data?.counts.your_move ?? 0
 
   const entry = (item: NavItem, trailing?: string) => (
     <Fragment key={item.to}>
@@ -640,6 +667,15 @@ function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
               : undefined,
         ),
       )}
+      {correspondence ? (
+        <Item
+          item={CORRESPONDENCE}
+          trailing={yourMove > 0 ? String(yourMove) : undefined}
+          // Amber, not the quiet mono of the Games count: this number is a deadline, and
+          // the only reason the entry carries one at all.
+          trailingClass="text-mistake"
+        />
+      ) : null}
 
       <div className="h-3.5" />
       <SectionLabel>
