@@ -2502,6 +2502,7 @@ msgstr "What the masters play from this position"
 #: src/routes/correspondence/components/BookPane.tsx
 #: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/components/BookPanel.tsx
@@ -2530,15 +2531,18 @@ msgid "No move has been considered here yet. Play one on the board to put it in 
 msgstr "No move has been considered here yet. Play one on the board to put it in the tree."
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Own"
 msgstr "Own"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Backed"
 msgstr "Backed"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Depth"
 msgstr "Depth"
 
@@ -3141,6 +3145,7 @@ msgid "Stop it at"
 msgstr "Stop it at"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/engines/EngineDetail.tsx
 msgid "Nodes"
 msgstr "Nodes"

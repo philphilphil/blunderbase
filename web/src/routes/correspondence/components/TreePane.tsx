@@ -1,11 +1,17 @@
 /**
  * The tree: the game's moves as the spine, everything that was considered nested under it.
  *
- * This is the middle column and the widest, because it is the thing the mode is for. A node
- * prints its move, its own evaluation, the minimax backed up from underneath when the two
- * differ (with the arrow that says which way), a depth chip, and a `≠` when two engines
- * disagree on the position. Marks are glyphs beside the move — `!`, `!?`, `?!`, `?`, `✕` —
- * the owner's word against the engine's, and the one the PGN exports as a NAG.
+ * This is the middle column and the widest, because it is the thing the mode is for. It is
+ * a grid, not flowing notation: **one row per ply**, with the same columns on every row —
+ * move, own evaluation, the minimax backed up from underneath when the two differ (with the
+ * arrow that says which way), depth, nodes, and the state glyphs — so the numbers line up
+ * down the whole tree and a variation is read by comparing a column, not by parsing a
+ * paragraph. That is how IDeA's tree reads, and it is what a tree of evaluated positions
+ * is for; flowing PGN text was tried first and stopped being legible the moment every move
+ * carried four numbers. A variation steps its rows in by one level and carries a rule down
+ * its left; the indentation lives inside the move column so the other columns never move.
+ * Marks are glyphs beside the move — `!`, `!?`, `?!`, `?`, `✕` — the owner's word against
+ * the engine's, and the one the PGN exports as a NAG.
  *
  * Two kinds of quiet. A variation that hangs off a position the game has already left is
  * greyed: it was considered before the move was made and is kept in case of a
@@ -80,18 +86,36 @@ function moveNumber(node: CorrespondenceTreeNode): string {
   return node.frame === 'white' ? `${number}.` : `${number}…`
 }
 
-function Chip({
+/**
+ * One column template for every row and for the heading, so the numbers line up down the
+ * whole tree whatever a variation's depth: move (with the indentation inside it), own
+ * eval, backed eval, depth, nodes, and the state glyphs.
+ */
+const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.5rem_4.5rem_2.5rem_3.5rem_4.5rem]'
+
+/** How far a variation's rows step in per level of nesting. */
+function indent(level: number): string {
+  return `${level * 0.875}rem`
+}
+
+function Row({
   node,
+  level,
   selected,
   weak,
+  behind,
   progress,
   onSelect,
   onMenu,
 }: {
   node: CorrespondenceTreeNode
+  /** How many variations deep this row sits; the spine is 0. */
+  level: number
   selected: boolean
   /** Far enough behind its best sibling to have left the decision — see `searches.ts`. */
   weak: boolean
+  /** Hangs off a position the game has already left. */
+  behind: boolean
   /** How much of the work under this node is still outstanding — the `2 of 7`. */
   progress?: TaskProgress
   onSelect: () => void
@@ -116,7 +140,7 @@ function Chip({
   const mark = node.mark ?? null
 
   return (
-    <span
+    <div
       role="button"
       tabIndex={-1}
       data-testid={`tree-node-${node.id}`}
@@ -124,40 +148,57 @@ function Chip({
       onClick={onSelect}
       onContextMenu={onMenu}
       className={cn(
-        'inline-flex cursor-pointer items-baseline gap-1 rounded-sm px-1 py-px align-baseline whitespace-nowrap hover:bg-raised',
+        COLUMNS,
+        'grid cursor-pointer items-baseline gap-x-2 rounded-sm py-px pr-1 whitespace-nowrap hover:bg-raised',
         selected && 'bg-selected outline outline-accent-teal',
         (mark === 'excluded' || weak) && 'opacity-60',
+        behind && 'opacity-55',
       )}
     >
-      <span className={cn('text-ink', node.played && 'font-semibold')}>
-        {notate(node.san ?? node.uci ?? '')}
+      <span className="flex min-w-0 items-baseline gap-1" style={{ paddingLeft: indent(level) }}>
+        <span className={cn(level > 0 && 'border-l border-hairline pl-2', 'flex items-baseline gap-1')}>
+          <span className="text-faint">{moveNumber(node)}</span>
+          <span className={cn('text-ink', node.played && 'font-semibold')}>
+            {notate(node.san ?? node.uci ?? '')}
+          </span>
+          {mark ? (
+            <span className={cn('-ml-0.5', MARK_CLASS[mark])} aria-hidden>
+              {MARK_GLYPHS[mark]}
+            </span>
+          ) : null}
+        </span>
       </span>
-      {mark ? (
-        <span className={cn('-ml-0.5', MARK_CLASS[mark])} aria-hidden>
-          {MARK_GLYPHS[mark]}
-        </span>
-      ) : null}
-      {node.own ? (
-        <span className="text-[0.6875rem] text-body">{formatScore(node.own)}</span>
-      ) : null}
-      {node.backed && direction !== null && direction !== 'same' ? (
-        <span
-          className={cn('text-[0.625rem]', direction === 'down' ? 'text-mistake' : 'text-good')}
-          title={t`The minimax under this move disagrees with the engine's own number here`}
-        >
-          {direction === 'down' ? '▼' : '▲'} {formatScore(node.backed)}
-        </span>
-      ) : null}
-      {depth !== null ? (
-        <span className="rounded-sm border border-edge px-1 text-[0.5625rem] leading-[0.875rem] text-dim">
-          d<span className="text-body">{depth}</span>
-        </span>
-      ) : null}
-      {nodeCount ? (
-        <span className="rounded-sm border border-edge px-1 text-[0.5625rem] leading-[0.875rem] text-dim">
-          <span className="text-body">{formatNodes(nodeCount)}</span>
-        </span>
-      ) : null}
+      <span className="text-right text-[0.6875rem] text-body tabular-nums">
+        {node.own ? formatScore(node.own) : ''}
+      </span>
+      <span
+        className={cn(
+          'text-right text-[0.625rem] tabular-nums',
+          direction === 'down' ? 'text-mistake' : direction === 'up' ? 'text-good' : 'text-dim',
+        )}
+        title={
+          node.backed && direction !== null && direction !== 'same'
+            ? t`The minimax under this move disagrees with the engine's own number here`
+            : undefined
+        }
+      >
+        {node.backed && direction !== null && direction !== 'same'
+          ? `${direction === 'down' ? '▼' : '▲'} ${formatScore(node.backed)}`
+          : ''}
+      </span>
+      <span className="text-right text-[0.625rem] text-dim tabular-nums">
+        {depth !== null ? (
+          <>
+            d<span className="text-body">{depth}</span>
+          </>
+        ) : (
+          ''
+        )}
+      </span>
+      <span className="text-right text-[0.625rem] text-body tabular-nums">
+        {nodeCount ? formatNodes(nodeCount) : ''}
+      </span>
+      <span className="flex items-baseline gap-1">
       {node.disagree ? (
         <span className="text-[0.625rem] text-mistake" title={t`Two engines disagree here`}>
           ≠
@@ -210,14 +251,47 @@ function Chip({
           ) : null}
         </span>
       ) : null}
-    </span>
+      </span>
+    </div>
   )
 }
 
-function Comment({ text }: { text: string }) {
+function Comment({ text, level }: { text: string; level: number }) {
   return (
-    <div className="my-0.5 ml-2 border-l-2 border-edge py-px pl-2 font-sans text-[0.6875rem] leading-[1.45] text-soft">
+    <div
+      className="my-0.5 border-l-2 border-edge py-px pl-2 font-sans text-[0.6875rem] leading-[1.45] text-soft"
+      style={{ marginLeft: `calc(${indent(level)} + 1.75rem)` }}
+    >
       {text}
+    </div>
+  )
+}
+
+/** The column heads, sticky over the rows so a long tree still says what a column is. */
+function Heading() {
+  return (
+    <div
+      className={cn(
+        COLUMNS,
+        'sticky top-0 z-10 grid gap-x-2 border-b border-hairline bg-surface py-1 pr-1 font-sans text-[0.625rem] text-dim',
+      )}
+    >
+      <span>
+        <Trans>Move</Trans>
+      </span>
+      <span className="text-right">
+        <Trans>Own</Trans>
+      </span>
+      <span className="text-right">
+        <Trans>Backed</Trans>
+      </span>
+      <span className="text-right">
+        <Trans>Depth</Trans>
+      </span>
+      <span className="text-right">
+        <Trans>Nodes</Trans>
+      </span>
+      <span />
     </div>
   )
 }
@@ -231,6 +305,7 @@ function Comment({ text }: { text: string }) {
  */
 function Line({
   start,
+  level,
   selectedId,
   weak,
   progress,
@@ -239,6 +314,8 @@ function Line({
   leftBehind,
 }: {
   start: CorrespondenceTreeNode
+  /** How deep in variations this line sits; the spine is 0. */
+  level: number
   selectedId: number | null
   weak: Set<number>
   progress: Map<number, TaskProgress>
@@ -254,55 +331,36 @@ function Line({
   // a line has none here: its own siblings are the alternatives the parent Line prints.
   let alternatives: CorrespondenceTreeNode[] = []
   let parent: CorrespondenceTreeNode | null = null
-  // True whenever the next chip begins a run — the first move, or the first after an
-  // interruption — which is where a Black move has to print its number too.
-  let opening = true
 
   while (node) {
     const current = node
     if (current.uci) {
-      if (opening || current.frame === 'white') {
-        parts.push(
-          <span key={`n${current.id}`} className="mr-0.5 text-faint">
-            {moveNumber(current)}
-          </span>,
-        )
-      }
       parts.push(
-        <Chip
+        <Row
           key={`c${current.id}`}
           node={current}
+          level={level}
           selected={current.id === selectedId}
           weak={weak.has(current.id)}
+          behind={leftBehind}
           progress={progress.get(current.id)}
           onSelect={() => onSelect(current.id)}
           onMenu={(event) => onMenu(current, event)}
         />,
       )
-      parts.push(<span key={`s${current.id}`}> </span>)
-      opening = false
     }
 
     if (current.comment) {
-      parts.push(<Comment key={`m${current.id}`} text={current.comment} />)
-      opening = true
+      parts.push(<Comment key={`m${current.id}`} text={current.comment} level={level} />)
     }
 
     for (const alternative of alternatives) {
       const behind = leftBehind || isLeftBehind(parent, alternative)
       parts.push(
-        <div
-          key={`v${alternative.id}`}
-          data-weak={weak.has(alternative.id) ? 'true' : undefined}
-          className={cn(
-            'my-0.5 border-l border-hairline pl-3',
-            behind && 'opacity-55',
-            alternative.mark === 'excluded' && 'opacity-55',
-            weak.has(alternative.id) && 'opacity-55',
-          )}
-        >
+        <div key={`v${alternative.id}`} data-weak={weak.has(alternative.id) ? 'true' : undefined}>
           <Line
             start={alternative}
+            level={level + 1}
             selectedId={selectedId}
             weak={weak}
             progress={progress}
@@ -312,7 +370,6 @@ function Line({
           />
         </div>,
       )
-      opening = true
     }
 
     const children = sortSiblings(current.children)
@@ -402,10 +459,12 @@ export function TreePane({
   const menuNode = menu ? findNode(tree, menu.nodeId) : null
 
   return (
-    <div ref={host} className="relative min-h-0 flex-1 overflow-auto px-3 py-2">
+    <div ref={host} className="relative min-h-0 flex-1 overflow-auto px-3 pb-2">
       <div className="font-mono text-[0.75rem] leading-[1.5]">
+        <Heading />
         <Line
           start={tree}
+          level={0}
           selectedId={selectedId}
           weak={weak}
           progress={progress}

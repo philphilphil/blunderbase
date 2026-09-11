@@ -2502,6 +2502,7 @@ msgstr "Was die Meister aus dieser Stellung spielen"
 #: src/routes/correspondence/components/BookPane.tsx
 #: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
 #: src/routes/game/components/BookPanel.tsx
@@ -2530,15 +2531,18 @@ msgid "No move has been considered here yet. Play one on the board to put it in 
 msgstr "Hier wurde noch kein Zug erwogen. Spiele einen auf dem Brett, um ihn in den Baum zu legen."
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Own"
 msgstr "Eigen"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Backed"
 msgstr "Zurückgerechnet"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Depth"
 msgstr "Tiefe"
 
@@ -3141,6 +3145,7 @@ msgid "Stop it at"
 msgstr "Beenden bei"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/engines/EngineDetail.tsx
 msgid "Nodes"
 msgstr "Knoten"
