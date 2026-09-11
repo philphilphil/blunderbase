@@ -1,0 +1,433 @@
+<!doctype html>
+<!-- PROTOTYPE — the correspondence mode: the list and the game view (docs/correspondence.md, step 0).
+     Drawn against the real tokens from web/src/index.css. Static HTML; the "live" engine pane ticks
+     with a little JS so the stack of two engines can be felt. Delete or absorb after review. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blunderbase — correspondence view</title>
+  <link rel="icon" href="../brand/favicon.png" />
+  <script>
+    (() => {
+      const q = new URLSearchParams(location.search).get('theme')
+      let saved = null
+      try { saved = localStorage.getItem('blunderbase-prototype-theme') } catch {}
+      const theme = ['light', 'dark'].includes(q) ? q : ['light', 'dark'].includes(saved) ? saved
+        : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      document.documentElement.dataset.theme = theme
+    })()
+  </script>
+  <style>
+    /* --- tokens: the app's own, dark first, light overrides (web/src/index.css) --- */
+    :root{color-scheme:dark;
+      --void:#1d1e1f;--panel:#292a2a;--surface:#232424;--elevated:#303131;--raised:#343535;--selected:#29445b;
+      --hairline:#3a3c3b;--line:#3e4040;--edge:#474949;--edge-strong:#555756;
+      --text:#eeeeea;--body:#d8d8d3;--muted:#b6b5b0;--dim:#a3a29c;--faint:#8b8a82;
+      --accent:#83b7e3;--blunder:#ee766e;--mistake:#dda05a;--inaccuracy:#cbb96a;--good:#78b98c;--deep:#c1adde;--brilliant:#b098d7;
+      --board-light:#a9b2b8;--board-dark:#616d75;--track:#3a3c3b;--meter:#6b6f6d;--arrow:#99b9d1;--arrow-deep:#b6aac9}
+    html[data-theme="light"]{color-scheme:light;
+      --void:#e7e7e4;--panel:#f2f2f0;--surface:#fafaf8;--elevated:#f4f4f1;--raised:#ebebe8;--selected:#dbe6f2;
+      --hairline:#dcdcd8;--line:#d1d1cd;--edge:#c5c5c0;--edge-strong:#b6b6b1;
+      --text:#202020;--body:#3b3b39;--muted:#5c5c59;--dim:#71716e;--faint:#8a8a86;
+      --accent:#245f9e;--blunder:#bb3e35;--mistake:#9b6819;--inaccuracy:#7d6a12;--good:#34724a;--deep:#63499a;--brilliant:#7054a5;
+      --board-light:#d8dde0;--board-dark:#8f9da5;--track:#dededa;--meter:#7f8589;--arrow:#6f98b9;--arrow-deep:#8d7fb0}
+
+    *{box-sizing:border-box}html,body{height:100%;margin:0}
+    body{min-width:320px;overflow:hidden;color:var(--text);background:var(--void);font:13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+    button{font:inherit;cursor:pointer}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.num{font-variant-numeric:tabular-nums}
+    .app{display:grid;grid-template-rows:42px 1fr;height:100%}
+
+    /* titlebar + rail, the app's chrome */
+    .toolbar{display:flex;align-items:center;gap:13px;padding:0 12px;border-bottom:1px solid var(--edge-strong);background:var(--panel)}
+    .brand{display:flex;align-items:center;gap:7px;font-weight:650;letter-spacing:-.01em;cursor:pointer}.brand img{width:18px;height:18px}
+    .divider{width:1px;height:19px;background:var(--line)}.crumb{color:var(--dim)}.crumb b{color:var(--text);font-weight:500}.spacer{flex:1}
+    .tool{height:29px;min-width:31px;padding:0 9px;border:1px solid var(--edge);border-radius:4px;color:var(--body);background:var(--elevated)}.tool:hover{border-color:var(--edge-strong);background:var(--raised)}.tool.primary{color:#fff;border-color:#4c6c56;background:#4c6c56}
+    .help{width:22px;height:22px;display:grid;place-items:center;border:1px solid var(--edge);border-radius:50%;color:var(--dim);font-size:11px}
+    .workspace{display:grid;grid-template-columns:196px minmax(0,1fr);min-height:0}
+    .sidebar{display:flex;flex-direction:column;min-height:0;padding:11px 8px 9px;border-right:1px solid var(--edge-strong);background:var(--panel)}
+    .side-label{margin:7px 8px 4px;color:var(--faint);font-size:10px;font-weight:600}
+    .nav{display:grid;gap:1px}.nav a{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:7px;min-height:29px;padding:0 8px;border-radius:4px;color:var(--body)}.nav a:hover{background:var(--raised);text-decoration:none}.nav a.active{color:var(--text);background:var(--selected)}
+    .icon{color:var(--dim);text-align:center;font-size:12px}.count{color:var(--dim);font-size:11px}.count.due{color:var(--mistake)}
+    .side-rule{height:1px;margin:9px 8px;background:var(--line)}
+    .engines-strip{margin-top:auto;padding:8px 8px 0;border-top:1px solid var(--line);color:var(--dim);font-size:10px}.engines-strip div{display:flex;justify-content:space-between;margin-top:4px}.engines-strip b{color:var(--body);font-weight:500}
+    .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);vertical-align:0}.dot.live{background:var(--good)}.dot.warm{background:var(--mistake)}.dot.queued{background:var(--accent)}
+
+    .screen{display:none;min-width:0;min-height:0}body[data-screen="list"] .list-screen,body[data-screen="game"] .game-screen{display:block}
+
+    /* --- the list --- */
+    .list-screen{overflow:auto;background:var(--surface)}.page{min-width:820px;max-width:1240px;margin:0 auto;padding:22px 26px 42px}
+    .page-head{display:flex;align-items:end;gap:18px;min-height:44px;margin-bottom:6px}.page-head h1{margin:0 0 2px;font-size:21px;line-height:1;letter-spacing:-.02em}.page-head p{margin:0;color:var(--dim)}
+    .actions{display:flex;gap:7px;margin-left:auto}
+    .capacity{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 22px;padding:9px 0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);color:var(--dim);font-size:11px}.capacity b{color:var(--body);font-weight:500}
+    .section{margin-bottom:26px}.section-head{display:flex;align-items:baseline;gap:9px;min-height:31px;padding-bottom:7px;border-bottom:1px solid var(--edge-strong)}.section-head h2{margin:0;font-size:14px;font-weight:650}.detail{color:var(--dim);font-size:11px}.end{margin-left:auto}
+    table{width:100%;border-collapse:collapse}th{height:28px;color:var(--dim);font-size:10px;font-weight:500;text-align:left}td{height:44px;border-top:1px solid var(--hairline);vertical-align:middle}tr.row:hover td{background:var(--raised);cursor:pointer}
+    .side{display:inline-block;width:10px;height:10px;margin-right:7px;border:1px solid var(--faint);border-radius:50%;background:#fff;vertical-align:-1px}.side.black{background:#222}
+    .opp{font-weight:550}.sub{display:block;margin-top:2px;color:var(--dim);font-size:10px}
+    .due{font-size:12px}.due.soon{color:var(--mistake)}.due.late{color:var(--blunder)}
+    .chip{display:inline-flex;align-items:center;gap:5px;margin-right:5px;padding:2px 6px;border:1px solid var(--edge);border-radius:3px;color:var(--body);font:10px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}.chip.q{border-style:dashed;color:var(--dim)}
+    .eval{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace}.eval.neg{color:var(--blunder)}.eval.pos{color:var(--good)}
+    .running{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;padding-top:12px}
+    .run{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 11px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}.run b{font-weight:600}.run .sub{margin:0}.run .eval{align-self:center;font-size:14px}
+    .run .bar{grid-column:1/-1;height:3px;margin-top:6px;background:var(--track)}.run .bar i{display:block;height:100%;background:var(--meter)}
+
+    /* --- the game view: header + three columns --- */
+    .game-screen{height:100%;min-width:1180px;overflow:hidden}
+    .game-page{display:grid;grid-template-rows:64px minmax(0,1fr);height:100%}
+    .game-head{display:flex;align-items:center;gap:16px;padding:8px 17px;border-bottom:1px solid var(--edge-strong);background:var(--surface)}
+    .game-head-main{min-width:0}.game-head h1{overflow:hidden;margin:0 0 3px;font-size:16px;font-weight:650;line-height:1.15;text-overflow:ellipsis;white-space:nowrap}.game-head p{margin:0;color:var(--dim);font-size:11px}
+    .game-head .score{margin:0 5px;color:var(--dim);font-weight:400}.game-head .you{margin-left:6px;padding:1px 5px;border:1px solid var(--edge);border-radius:3px;color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace;vertical-align:1px}
+    .turn{display:flex;align-items:center;gap:8px;margin-left:8px;padding:5px 9px;border:1px solid var(--edge);border-radius:4px;font-size:11px;white-space:nowrap}.turn b{font-weight:600}.turn input{width:118px;height:22px;padding:0 5px;border:1px solid var(--edge);border-radius:3px;color:var(--text);background:var(--elevated);font:11px inherit}
+    .head-actions{display:flex;gap:7px;margin-left:auto}
+    .columns{display:grid;grid-template-columns:minmax(430px,.9fr) minmax(420px,1.15fr) minmax(360px,.95fr);min-height:0;background:var(--void)}
+    .pane{position:relative;display:grid;grid-template-rows:35px minmax(0,1fr);min-width:0;min-height:0;border-right:1px solid var(--edge-strong);background:var(--surface)}.pane:last-child{border-right:0}
+    .pane-title{display:flex;align-items:center;gap:8px;height:35px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--panel);font-size:11px}.pane-title strong{font-weight:650}.pane-title .end{color:var(--dim)}
+    .pane-title .tab{padding:0 7px;border:0;border-bottom:2px solid transparent;height:35px;color:var(--dim);background:transparent;font-size:11px}.pane-title .tab.active{color:var(--text);border-bottom-color:var(--accent)}
+    .small{height:24px;padding:0 8px;border:1px solid var(--edge);border-radius:3px;color:var(--body);background:var(--elevated);font-size:11px}.small:hover{background:var(--raised)}.small.quiet{border-color:transparent;background:transparent;color:var(--dim)}.small.quiet:hover{color:var(--text);background:var(--raised)}
+
+    /* left: board + candidates */
+    .left{display:grid;grid-template-rows:27px minmax(0,1fr) 27px 33px minmax(150px,auto);border-right:1px solid var(--edge-strong);background:var(--surface)}
+    .board-player{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:7px;padding:0 16px;color:var(--body);font-size:11px}.board-player.top{border-bottom:1px solid var(--line)}.board-player.bottom{border-top:1px solid var(--line)}.board-player b{font-weight:600}.board-player .clock{color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .board-area{display:grid;place-items:center;min-height:0;padding:10px 14px}
+    .board-shell{display:flex;gap:7px;width:min(100%,560px);max-height:100%;aspect-ratio:1.035/1}
+    .evalbar{position:relative;width:16px;flex:none;overflow:hidden;border:1px solid var(--edge-strong);background:#393b3d}.evalbar:before{content:"";position:absolute;right:0;bottom:0;left:0;height:54%;background:#eee}.evalbar span{position:absolute;z-index:1;bottom:6px;left:50%;transform:translateX(-50%) rotate(-90deg);color:#333;font:9px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .board{position:relative;min-width:0;flex:1;aspect-ratio:1;align-self:center;border:1px solid var(--edge-strong);background-color:var(--board-light);background-image:conic-gradient(var(--board-dark) 25%,var(--board-light) 25% 50%,var(--board-dark) 50% 75%,var(--board-light) 75%);background-size:25% 25%;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+    .piece{position:absolute;left:calc(var(--x)*12.5%);top:calc(var(--y)*12.5%);display:grid;place-items:center;width:12.5%;height:12.5%;font:clamp(24px,2.6vw,42px)/1 Georgia,"Times New Roman",serif;user-select:none}.piece.white{color:#fafafa;text-shadow:0 1px 1px #111,0 0 1px #111}.piece.black{color:#111}
+    .last{position:absolute;left:calc(var(--x)*12.5%);top:calc(var(--y)*12.5%);width:12.5%;height:12.5%;background:rgba(155,199,234,.35)}
+    .board svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+    .board-controls{display:flex;align-items:center;justify-content:center;gap:5px;border-top:1px solid var(--line);background:var(--panel)}
+    .board-controls button{min-width:31px;height:24px;border:1px solid var(--edge);border-radius:4px;color:var(--body);background:var(--elevated);font-size:11px}.board-controls .ply{margin-left:8px;color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .cand-title{height:33px;border-top:1px solid var(--edge-strong)}
+    .candidates{overflow:auto}.candidates table th{height:24px;padding:0 10px}.candidates td{height:30px;padding:0 10px;border-top:1px solid var(--hairline);font-size:12px}.candidates tr.sel td{background:var(--selected)}.candidates tr:hover td{background:var(--raised);cursor:pointer}
+    .candidates .mv{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace}.candidates .eng{color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}.candidates .arrow{color:var(--dim);font-size:10px}
+    .arrow.down{color:var(--blunder)}.arrow.up{color:var(--good)}
+
+    /* middle: the tree */
+    .tree{overflow:auto;padding:8px 0 20px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .spine{padding:0 12px}
+    .node{display:inline-flex;align-items:baseline;gap:4px;padding:1px 5px;border-radius:3px;cursor:pointer;white-space:nowrap}.node:hover{background:var(--raised)}.node.sel{outline:1px solid var(--accent);background:var(--selected)}
+    .node .san{color:var(--text)}.node .san.played{font-weight:650}.node .mark{margin-left:-2px}.mark.good{color:var(--good)}.mark.interesting{color:var(--accent)}.mark.dubious{color:var(--inaccuracy)}.mark.bad{color:var(--blunder)}.mark.excluded{color:var(--faint)}
+    .node .ev{color:var(--body);font-size:11px}.node .bk{color:var(--dim);font-size:10px}.node .bk.disagree{color:var(--mistake)}
+    .node .d{padding:0 4px;border:1px solid var(--edge);border-radius:3px;color:var(--dim);font-size:9px;line-height:14px}.node .d i{font-style:normal;color:var(--body)}
+    .node .ne{color:var(--mistake);font-size:10px}.node .spin{display:inline-block;width:8px;height:8px;border:1.5px solid var(--good);border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite;vertical-align:-1px}.node .qm{color:var(--accent);font-size:10px}.node .tb{padding:0 4px;border-radius:3px;color:#10281a;background:var(--good);font-size:9px;line-height:14px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .var{margin:2px 0 2px 0;padding-left:18px;border-left:1px solid var(--hairline)}.var .var{margin-left:8px}
+    .var.faded>.node{opacity:.55}.var.left-behind{opacity:.5}
+    .comment{margin:1px 0 3px 8px;padding:2px 8px;border-left:2px solid var(--edge);color:var(--muted);font:11px/1.4 -apple-system,BlinkMacSystemFont,sans-serif}
+    .move-no{color:var(--faint)}
+    .ctx{position:absolute;z-index:3;min-width:190px;padding:4px;border:1px solid var(--edge-strong);border-radius:4px;background:var(--panel);box-shadow:0 6px 18px rgba(0,0,0,.35);font:12px -apple-system,BlinkMacSystemFont,sans-serif}.ctx div{padding:5px 9px;border-radius:3px}.ctx div:hover{background:var(--selected)}.ctx hr{margin:3px 0;border:0;border-top:1px solid var(--line)}.ctx small{color:var(--dim);margin-left:8px;float:right}
+
+    /* right: engines stacked + notes */
+    .right{display:grid;grid-template-rows:35px minmax(0,1fr);min-width:0;min-height:0;background:var(--surface)}
+    .engine-stack{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(150px,.75fr);min-height:0}
+    .engine{display:grid;grid-template-rows:35px minmax(0,1fr) 22px;min-height:0;border-bottom:1px solid var(--edge-strong)}
+    .engine .pane-title strong{color:var(--text)}.engine .live{color:var(--good)}.engine .warm{color:var(--mistake)}
+    .engine .stat{margin-left:auto;display:flex;gap:9px;color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}.engine .stat b{color:var(--body);font-weight:500}
+    .engine-lines{overflow:auto}.engine-line{display:grid;grid-template-columns:47px 1fr;gap:7px;padding:7px 10px;border-bottom:1px solid var(--hairline)}.engine-line:hover{background:var(--raised)}.engine-line .engine-eval{font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace}.engine-line:first-child .engine-eval{color:var(--good)}.pv{color:var(--muted);font:10px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}.pv b{color:var(--text);font-weight:600}
+    .engine-foot{display:flex;align-items:center;gap:8px;padding:0 10px;color:var(--dim);font-size:10px;background:var(--panel);border-top:1px solid var(--line)}.engine-foot svg{height:12px;width:90px}.engine-foot .spark{fill:none;stroke:var(--accent);stroke-width:1}
+    .engine.stored .engine-lines{opacity:.85}
+    .notes{display:grid;grid-template-rows:35px minmax(0,1fr) auto;min-height:0}.notes-list{overflow:auto;padding:8px 10px}.note{padding:8px 0;border-bottom:1px solid var(--hairline);color:var(--body);font-size:11px}.note:first-child{padding-top:0}.note small{display:block;margin-top:4px;color:var(--dim);font-size:9px}
+    .note-form{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line);background:var(--panel)}.note-form input{min-width:0;flex:1;height:26px;padding:0 7px;border:1px solid var(--edge);border-radius:4px;color:var(--text);background:var(--elevated)}.note-form button{height:26px;border:1px solid #4c6c56;border-radius:4px;color:#fff;background:#4c6c56}
+
+    .legend{position:fixed;right:12px;bottom:10px;z-index:2;padding:6px 9px;border:1px solid var(--edge);border-radius:4px;background:var(--panel);color:var(--dim);font-size:10px;opacity:.9}.legend b{color:var(--body);font-weight:500}
+  </style>
+</head>
+<body data-screen="game">
+<div class="app">
+  <header class="toolbar">
+    <div class="brand" onclick="show('list')"><img src="../brand/logo.png" alt="" /> Blunderbase</div>
+    <span class="divider"></span>
+    <span class="crumb"><span class="screen-link" style="cursor:pointer" onclick="show('list')">Correspondence</span> <span class="game-crumb">› <b>Baum – Kowalski</b></span></span>
+    <span class="spacer"></span>
+    <button class="tool" onclick="show('list')">List</button>
+    <button class="tool" onclick="show('game')">Game</button>
+    <button class="tool theme-toggle" onclick="toggleTheme()"><span>◐</span></button>
+    <span class="help" title="Manual: guide/correspondence">?</span>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="side-label">WORKSPACE</div>
+      <nav class="nav">
+        <a><span class="icon">▤</span><span>Dashboard</span></a>
+        <a><span class="icon">♜</span><span>Games</span><span class="count">9 214</span></a>
+        <a><span class="icon">⌘</span><span>Explorer</span></a>
+        <a><span class="icon">∿</span><span>Stats</span></a>
+        <a><span class="icon">✎</span><span>Notes</span></a>
+        <a><span class="icon">◉</span><span>Live</span></a>
+        <a class="active" onclick="show('list')"><span class="icon">✉</span><span>Correspondence</span><span class="count due">2</span></a>
+      </nav>
+      <div class="side-rule"></div>
+      <div class="side-label">DATA &amp; COMPUTE</div>
+      <nav class="nav">
+        <a><span class="icon">⇩</span><span>Library</span></a>
+        <a><span class="icon">⚙</span><span>Analysis</span></a>
+        <a><span class="icon">▣</span><span>Engines</span></a>
+      </nav>
+      <div class="engines-strip">
+        <div><span><span class="dot live"></span> searches</span><b>2 / 2 slots</b></div>
+        <div><span><span class="dot warm"></span> parked, warm</span><b>1 · 8 GB</b></div>
+        <div><span><span class="dot queued"></span> tasks queued</span><b>7</b></div>
+        <div><span>studio (runner)</span><b>1 / 2</b></div>
+      </div>
+    </aside>
+
+    <!-- ================= the list ================= -->
+    <section class="screen list-screen">
+      <div class="page">
+        <div class="page-head">
+          <div><h1>Correspondence</h1><p>4 games running · WS/M/168, ICCF</p></div>
+          <div class="actions"><button class="tool">Pause all</button><button class="tool">Import PGN</button><button class="tool primary">New game</button></div>
+        </div>
+        <div class="capacity">
+          <span><span class="dot live"></span> <b>2 of 2</b> search slots in use on this machine</span>
+          <span><span class="dot warm"></span> <b>1</b> engine parked warm, <b>8 GB</b></span>
+          <span><span class="dot queued"></span> <b>7</b> tasks queued, <b>3</b> running on <b>studio</b></span>
+          <span><b>studio</b> connected · 1 of 2 slots free</span>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Your move</h2><span class="detail">by due date</span><span class="detail end">2</span></div>
+          <table>
+            <thead><tr><th style="width:38%">Game</th><th>Position</th><th>Due</th><th>Engines</th><th style="text-align:right">Root</th></tr></thead>
+            <tbody>
+              <tr class="row" onclick="show('game')">
+                <td><span class="side"></span><span class="opp">Kowalski, Marek</span> <span class="sub" style="display:inline;margin-left:8px">2318</span><span class="sub">WS/M/168 · ICCF · game 1 258 402</span></td>
+                <td><span class="mono">after 16…Nf6</span><span class="sub">move 17, White to play</span></td>
+                <td><span class="due soon">in 3 days</span><span class="sub">Sep 14</span></td>
+                <td><span class="chip"><span class="dot live"></span>SF 17 d51</span><span class="chip"><span class="dot live"></span>Lc0 12.4M</span><span class="chip q">3 tasks</span></td>
+                <td style="text-align:right"><span class="eval pos">+0.34</span></td>
+              </tr>
+              <tr class="row">
+                <td><span class="side black"></span><span class="opp">Oliveira, Ruben</span> <span class="sub" style="display:inline;margin-left:8px">2402</span><span class="sub">WS/M/168 · ICCF · game 1 258 407</span></td>
+                <td><span class="mono">after 24.Rc1</span><span class="sub">move 24, Black to play</span></td>
+                <td><span class="due">in 9 days</span><span class="sub">Sep 20</span></td>
+                <td><span class="chip"><span class="dot warm"></span>SF 17 d47 paused</span><span class="chip q">4 tasks</span></td>
+                <td style="text-align:right"><span class="eval">−0.08</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Waiting for the opponent</h2><span class="detail end">2</span></div>
+          <table>
+            <thead><tr><th style="width:38%">Game</th><th>Position</th><th>Sent</th><th>Engines</th><th style="text-align:right">Root</th></tr></thead>
+            <tbody>
+              <tr class="row"><td><span class="side"></span><span class="opp">Jansen, Dirk</span><span class="sub">WS/M/168 · ICCF</span></td><td><span class="mono">31.Qe5</span><span class="sub">move 31, Black to play</span></td><td>2 days ago</td><td><span class="chip">SF 17 d44</span></td><td style="text-align:right"><span class="eval pos">+1.12</span></td></tr>
+              <tr class="row"><td><span class="side black"></span><span class="opp">Petrov, Ilya</span><span class="sub">Friendly · manual</span></td><td><span class="mono">9…c5</span><span class="sub">move 10, White to play · conditional sent</span></td><td>yesterday</td><td><span class="chip">SF 17 d38</span><span class="chip">Lc0 4.1M</span></td><td style="text-align:right"><span class="eval">+0.15</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Running now</h2><span class="detail">every engine on every game</span></div>
+          <div class="running">
+            <div class="run"><b>Stockfish 17 · this machine</b><span class="eval pos">+0.34</span><span class="sub">Kowalski · 17.Nf5 · depth 51 · 2d 4h</span><span class="sub num">41 Mn/s</span><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="run"><b>Leela 0.31 · this machine</b><span class="eval pos">+0.18</span><span class="sub">Kowalski · 17.Nf5 · 12.4M nodes · 6h</span><span class="sub num">1.1 kn/s</span><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="run"><b>Stockfish 17 · studio</b><span class="eval">−0.12</span><span class="sub">Kowalski · 17.Rad1 · task 2 of 7 · d34</span><span class="sub num">to 40M nodes</span><div class="bar"><i style="width:62%"></i></div></div>
+            <div class="run"><b>Stockfish 17 · this machine · parked</b><span class="eval">−0.08</span><span class="sub">Oliveira · 24…Nd5 · depth 47 · warm, 8 GB</span><span class="sub"><span class="dot warm"></span> paused 3h ago</span><div class="bar"><i style="width:0"></i></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Finished</h2><span class="detail">the last few, in the library now</span></div>
+          <table><tbody>
+            <tr class="row"><td><span class="side black"></span><span class="opp">Haugen, Sven</span><span class="sub">WS/O/1421 · ½–½ · 41 moves · Aug 30</span></td><td style="text-align:right"><a href="#">open in Games ›</a></td></tr>
+            <tr class="row"><td><span class="side"></span><span class="opp">Ruiz, Adrián</span><span class="sub">WS/O/1421 · 1–0 · 52 moves · Aug 12</span></td><td style="text-align:right"><a href="#">open in Games ›</a></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= the game view ================= -->
+    <section class="screen game-screen">
+      <div class="game-page">
+        <div class="game-head">
+          <div class="game-head-main">
+            <h1>Baum<span class="you">you · White</span><span class="score">–</span>Kowalski, Marek <span class="score">2318</span></h1>
+            <p>WS/M/168 · ICCF game 1 258 402 · 10 moves / 50 days · started Jun 3 · <a href="#">iccf.com ›</a></p>
+          </div>
+          <div class="turn"><b>Your move</b> · move 17 · due <input value="Sep 14 · in 3 days" /></div>
+          <div class="head-actions">
+            <button class="tool">Opponent played…</button>
+            <button class="tool primary">Play 17.Nf5</button>
+            <button class="tool">Finish…</button>
+          </div>
+        </div>
+
+        <div class="columns">
+          <!-- left -->
+          <div class="left">
+            <div class="board-player top"><span class="side black"></span><b>Kowalski, Marek</b><span class="clock">2318 · 31 days left</span></div>
+            <div class="board-area">
+              <div class="board-shell">
+                <div class="evalbar"><span>+0.34</span></div>
+                <div class="board" id="board">
+                  <svg class="arrows" viewBox="0 0 8 8">
+                    <defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3" markerHeight="3" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker></defs>
+                    <line x1="6.5" y1="5.5" x2="5.5" y2="2.5" stroke="var(--arrow)" stroke-width=".22" opacity=".85" stroke-linecap="round" marker-end="url(#ah)"/>
+                    <line x1="4.5" y1="1.5" x2="4.5" y2="2.5" stroke="var(--arrow-deep)" stroke-width=".18" opacity=".7" stroke-linecap="round" marker-end="url(#ah)"/>
+                    <line x1="5.5" y1="2.5" x2="7.5" y2="1.5" stroke="var(--arrow)" stroke-width=".14" opacity=".55" stroke-linecap="round" marker-end="url(#ah)"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div class="board-player bottom"><span class="side"></span><b>Baum</b><span class="clock">2290 · 27 days left · 9 on this move</span></div>
+            <div class="board-controls"><button>|◀</button><button>◀</button><button>▶</button><button>▶|</button><button title="Flip">⇅</button><span class="ply">16…Nf6 · ply 32 · tree node</span></div>
+            <div class="pane" style="border:0;grid-template-rows:33px minmax(0,1fr)">
+              <div class="pane-title cand-title"><strong>Candidates</strong><span class="end">after 16…Nf6 · by backed eval</span></div>
+              <div class="candidates">
+                <table>
+                  <thead><tr><th>Move</th><th>Own</th><th>Backed</th><th>Depth</th><th>Engines</th><th>Mark</th></tr></thead>
+                  <tbody>
+                    <tr class="sel"><td class="mv">17.Nf5</td><td class="eval pos">+0.34</td><td class="eval">+0.12 <span class="arrow down">▼</span></td><td class="num">51 · 12.4M</td><td class="eng">SF Lc0 <span style="color:var(--mistake)">≠</span></td><td class="mark interesting">!?</td></tr>
+                    <tr><td class="mv">17.Rad1</td><td class="eval">+0.10</td><td class="eval">+0.10</td><td class="num">40</td><td class="eng">SF</td><td></td></tr>
+                    <tr><td class="mv">17.h4</td><td class="eval">+0.05</td><td class="eval">−0.02 <span class="arrow down">▼</span></td><td class="num">38</td><td class="eng">SF</td><td class="mark dubious">?!</td></tr>
+                    <tr><td class="mv">17.Bxf6</td><td class="eval">−0.21</td><td class="eval">—</td><td class="num">30</td><td class="eng">SF</td><td class="mark excluded">✕</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- middle: tree -->
+          <div class="pane">
+            <div class="pane-title"><strong>Tree</strong><span class="end">212 positions · 38 evaluated today</span><span class="spacer"></span><button class="small quiet">Expand ▾</button><button class="small quiet">Prune weak</button><button class="small quiet">Export PGN</button></div>
+            <div class="tree" id="tree">
+              <div class="spine">
+                <span class="move-no">1.</span> <span class="node"><span class="san played">e4</span></span> <span class="node"><span class="san played">c5</span></span>
+                <span class="move-no">2.</span> <span class="node"><span class="san played">Nf3</span></span> <span class="node"><span class="san played">d6</span></span>
+                <span class="move-no">3.</span> <span class="node"><span class="san played">d4</span></span> <span class="node"><span class="san played">cxd4</span></span>
+                <span class="move-no">4.</span> <span class="node"><span class="san played">Nxd4</span></span> <span class="node"><span class="san played">Nf6</span></span>
+                <span class="move-no">5.</span> <span class="node"><span class="san played">Nc3</span></span> <span class="node"><span class="san played">a6</span></span>
+                <span class="move-no">…</span>
+                <span class="move-no">14.</span> <span class="node"><span class="san played">Kb1</span> <span class="ev">+0.30</span> <span class="d">d<i>40</i></span></span>
+                <span class="node"><span class="san played">Rc8</span> <span class="ev">+0.28</span> <span class="d">d<i>41</i></span></span>
+              </div>
+              <div class="var left-behind">
+                <span class="node"><span class="san">Nb6</span> <span class="ev">+0.44</span> <span class="d">d<i>36</i></span></span>
+                <span class="move-no">15.</span> <span class="node"><span class="san">g4</span> <span class="ev">+0.51</span> <span class="d">d<i>30</i></span></span>
+                <div class="comment">Looked at before he played 14…Rc8. Kept in case of a transposition.</div>
+              </div>
+              <div class="spine">
+                <span class="move-no">15.</span> <span class="node"><span class="san played">g4</span> <span class="ev">+0.35</span> <span class="d">d<i>44</i></span></span>
+                <span class="node"><span class="san played">b5</span> <span class="ev">+0.33</span> <span class="d">d<i>42</i></span></span>
+                <span class="move-no">16.</span> <span class="node"><span class="san played">g5</span> <span class="ev">+0.36</span> <span class="d">d<i>46</i></span></span>
+                <span class="node"><span class="san played">Nf6</span> <span class="ev">+0.34</span> <span class="bk disagree">↳ +0.12</span> <span class="d">d<i>51</i></span> <span class="d">Lc0 12.4M</span> <span class="ne" title="Stockfish and Leela disagree by more than 0.15">≠</span></span>
+              </div>
+              <div class="var">
+                <span class="move-no">17.</span> <span class="node sel" oncontextmenu="menu(event)"><span class="san">Nf5</span><span class="mark interesting">!?</span> <span class="ev">+0.34</span> <span class="bk disagree">↳ +0.12</span> <span class="d">d<i>51</i> S</span> <span class="d">12.4M L</span> <span class="spin"></span><span class="spin" style="border-color:var(--deep);border-right-color:transparent"></span></span>
+                <div class="comment">Main try. The engine likes it at the root but the minimax says Black holds after …e6 — the fight is 18.Nh6+ vs 18.Nd6. Both running.</div>
+                <div class="var">
+                  <span class="node"><span class="san">e6</span> <span class="ev">+0.12</span> <span class="d">d<i>48</i></span></span>
+                  <span class="move-no">18.</span> <span class="node"><span class="san">Nh6+</span> <span class="ev">+0.20</span> <span class="bk">↳ +0.20</span> <span class="d">d<i>44</i></span></span>
+                  <span class="node"><span class="san">gxh6</span> <span class="ev">+0.20</span> <span class="d">d<i>41</i></span></span>
+                  <span class="move-no">19.</span> <span class="node"><span class="san">gxf6</span> <span class="ev">+0.22</span> <span class="d">d<i>40</i></span> <span class="qm" title="task queued">◌</span></span>
+                  <div class="var">
+                    <span class="move-no">18.</span> <span class="node"><span class="san">Nd6+</span><span class="mark good">!</span> <span class="ev">+0.08</span> <span class="bk">↳ +0.12</span> <span class="d">d<i>39</i></span></span>
+                    <span class="node"><span class="san">Bxd6</span> <span class="ev">+0.12</span> <span class="d">d<i>37</i></span> <span class="qm">◌</span></span>
+                    <span class="move-no">19.</span> <span class="node"><span class="san">Rxd6</span> <span class="ev">+0.15</span> <span class="d">d<i>35</i></span> <span class="qm">◌</span></span>
+                  </div>
+                  <div class="var faded">
+                    <span class="move-no">18.</span> <span class="node"><span class="san">Bxf6</span><span class="mark dubious">?!</span> <span class="ev">−0.30</span> <span class="d">d<i>33</i></span></span>
+                    <span class="node"><span class="san">gxf6</span> <span class="ev">−0.28</span> <span class="d">d<i>30</i></span></span>
+                  </div>
+                </div>
+                <div class="var">
+                  <span class="node"><span class="san">Bxf5</span> <span class="ev">+0.60</span> <span class="d">d<i>40</i></span></span>
+                  <span class="move-no">18.</span> <span class="node"><span class="san">exf5</span> <span class="ev">+0.62</span> <span class="d">d<i>38</i></span></span>
+                  <span class="node"><span class="san">d5</span> <span class="ev">+0.55</span> <span class="d">d<i>36</i></span></span>
+                </div>
+              </div>
+              <div class="var">
+                <span class="move-no">17.</span> <span class="node"><span class="san">Rad1</span> <span class="ev">+0.10</span> <span class="d">d<i>40</i></span> <span class="qm">◌ 2 of 7</span></span>
+                <span class="node"><span class="san">Qc7</span> <span class="ev">+0.09</span> <span class="d">d<i>34</i></span></span>
+                <span class="move-no">18.</span> <span class="node"><span class="san">f4</span> <span class="ev">+0.14</span> <span class="d">d<i>31</i></span> <span class="qm">◌</span></span>
+              </div>
+              <div class="var">
+                <span class="move-no">17.</span> <span class="node"><span class="san">h4</span><span class="mark dubious">?!</span> <span class="ev">+0.05</span> <span class="bk disagree">↳ −0.02</span> <span class="d">d<i>38</i></span></span>
+                <span class="node"><span class="san">Nxe4</span> <span class="ev">−0.02</span> <span class="d">d<i>40</i></span></span>
+                <span class="move-no">18.</span> <span class="node"><span class="san">Nxe4</span> <span class="ev">−0.01</span> <span class="d">d<i>36</i></span></span>
+                <span class="node"><span class="san">Bxg5</span> <span class="ev">+0.00</span> <span class="d">d<i>34</i></span> <span class="tb" title="Syzygy: draw">TB ½</span></span>
+              </div>
+              <div class="var faded">
+                <span class="move-no">17.</span> <span class="node"><span class="san">Bxf6</span><span class="mark excluded">✕</span> <span class="ev">−0.21</span> <span class="d">d<i>30</i></span></span>
+                <div class="comment">Gives up the bishop pair for nothing. Excluded — never expanded, never a task.</div>
+              </div>
+            </div>
+            <div class="ctx" id="ctx" hidden>
+              <div>Search with Stockfish 17 <small>S</small></div><div>Search with Leela 0.31 <small>L</small></div><div>Search only marked moves…</div>
+              <hr /><div>Queue task <small>40M</small></div><div>Expand · 3 wide · 2 stages</div><div>Play out 10 plies</div><div>Refresh subtree</div>
+              <hr /><div>Mark: ! &nbsp;!? &nbsp;?! &nbsp;? &nbsp;✕</div><div>Comment…</div><div>Send as conditional</div><div>Promote to first</div><hr /><div style="color:var(--blunder)">Delete subtree</div>
+            </div>
+          </div>
+
+          <!-- right: engines + notes -->
+          <div class="right">
+            <div class="pane-title"><strong>Engines on 17.Nf5</strong><span class="end">2 searching · 1 verdict stored</span><span class="spacer"></span><button class="small">Search with… ▾</button></div>
+            <div class="engine-stack">
+              <div class="engine">
+                <div class="pane-title"><span class="dot live"></span><strong>Stockfish 17</strong><span class="live">searching · 2d 4h</span><span class="stat"><span>depth <b id="sf-depth">51</b></span><span><b id="sf-nodes">7.2T</b> nodes</span><span><b>41M</b>/s</span></span><button class="small quiet">Pause</button><button class="small quiet">Stop</button></div>
+                <div class="engine-lines">
+                  <div class="engine-line"><span class="engine-eval" id="sf-eval">+0.34</span><span class="pv"><b>17…e6</b> 18.Nh6+ gxh6 19.gxf6 Qxf6 20.Rg1+ Kh8 21.Qe3 Rg8 22.Rxg8+ Rxg8 23.Qxh6 Qg7 24.Qxg7+ Kxg7 25.Ne2 Bxa2</span></div>
+                  <div class="engine-line"><span class="engine-eval">+0.60</span><span class="pv"><b>17…Bxf5</b> 18.exf5 d5 19.Bg2 d4 20.Ne2 Nd5 21.Nxd4 Nxc3 22.bxc3</span></div>
+                  <div class="engine-line"><span class="engine-eval">+0.71</span><span class="pv"><b>17…Nxe4</b> 18.Nxe4 Bxf5 19.Nd6+ Bxd6 20.Qxd6 Qxd6 21.Rxd6</span></div>
+                  <div class="engine-line"><span class="engine-eval">+1.02</span><span class="pv"><b>17…Nd7</b> 18.Nd5 Bxd5 19.exd5 Ne5 20.f4</span></div>
+                </div>
+                <div class="engine-foot">history <svg viewBox="0 0 90 12" preserveAspectRatio="none"><polyline class="spark" points="0,9 10,8 20,8 30,6 40,7 50,5 60,5 70,4 80,4 90,4"/></svg> +0.18 at d30 → +0.34 at d51 · best move stable since d38</div>
+              </div>
+              <div class="engine">
+                <div class="pane-title"><span class="dot live"></span><strong>Leela 0.31</strong><span class="live">searching · 6h</span><span class="stat"><span><b id="lc-nodes">12.4M</b> nodes</span><span>depth <b>22</b></span><span><b>1.1k</b>/s</span></span><button class="small quiet">Pause</button><button class="small quiet">Stop</button></div>
+                <div class="engine-lines">
+                  <div class="engine-line"><span class="engine-eval" id="lc-eval">+0.18</span><span class="pv"><b>17…e6</b> 18.Nd6+ Bxd6 19.Rxd6 Qc7 20.Rd2 Nd7 21.f4 b4 22.Ne2 a5</span></div>
+                  <div class="engine-line"><span class="engine-eval">+0.41</span><span class="pv"><b>17…Bxf5</b> 18.exf5 d5 19.Bg2 Bc5 20.Rhe1</span></div>
+                  <div class="engine-line"><span class="engine-eval">+0.55</span><span class="pv"><b>17…Nxe4</b> 18.Nxe4 Bxf5 19.Nd6+</span></div>
+                </div>
+                <div class="engine-foot">history <svg viewBox="0 0 90 12" preserveAspectRatio="none"><polyline class="spark" points="0,4 15,5 30,7 45,8 60,8 75,8 90,8"/></svg> +0.30 at 1M → +0.18 at 12M · prefers 18.Nd6+ — the <span style="color:var(--mistake)">≠</span></div>
+              </div>
+              <div class="notes">
+                <div class="pane-title"><button class="tab active">This position</button><button class="tab">This game <span style="color:var(--dim)">3</span></button><span class="end">17.Nf5</span></div>
+                <div class="notes-list">
+                  <div class="note">Nh6+ wins the exchange by force but the resulting ending with the a-pawn is the one from Haugen — I held that as Black. Check the tablebase line before committing.<small>you · today · pinned to this position · also in Oliveira's tree</small></div>
+                  <div class="note">Leela's 18.Nd6+ idea: the d6 outpost matters more than the pawn. Queue tasks on both 18th moves and let the minimax decide.<small>you · yesterday</small></div>
+                </div>
+                <div class="note-form"><input placeholder="Write a note on this position…" /><button>Save</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="legend"><b>Prototype.</b> Toggle: <b>List</b> / <b>Game</b> in the toolbar · right-click <b>17.Nf5</b> in the tree for the verb set · ◐ flips the theme</div>
+
+<script>
+  function show(name){document.body.dataset.screen=name;document.querySelector('.game-crumb').style.visibility=name==='game'?'visible':'hidden'}
+  function toggleTheme(){const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;try{localStorage.setItem('blunderbase-prototype-theme',t)}catch{}}
+  show('game')
+
+  // the board: the position after 16…Nf6 (a Najdorf with opposite castling; close enough to read)
+  const rows=['r.r...k.','.q.b.ppp','p..pbn..','.p...pP.','....P...','..N.B...','PPPQ....','.KR..B.R']
+  const glyph={k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'}
+  const board=document.getElementById('board')
+  rows.forEach((row,y)=>[...row].forEach((c,x)=>{if(c==='.')return;const el=document.createElement('span');const white=c===c.toUpperCase();el.className='piece '+(white?'white':'black');el.style.setProperty('--x',x);el.style.setProperty('--y',y);el.textContent=glyph[c.toLowerCase()];board.appendChild(el)}))
+  ;[[6,2],[5,1]].forEach(([x,y])=>{const m=document.createElement('span');m.className='last';m.style.setProperty('--x',x);m.style.setProperty('--y',y);board.insertBefore(m,board.firstChild)})
+
+  // a little life in the engine panes
+  let sfNodes=7.2,lcNodes=12.4,tick=0
+  setInterval(()=>{tick++;sfNodes+=0.041;lcNodes+=0.0011
+    document.getElementById('sf-nodes').textContent=sfNodes.toFixed(2)+'T'
+    document.getElementById('lc-nodes').textContent=lcNodes.toFixed(2)+'M'
+    if(tick%90===0){document.getElementById('sf-depth').textContent=52}
+  },1000)
+
+  // context menu on the selected node
+  const ctx=document.getElementById('ctx')
+  function menu(e){e.preventDefault();const r=document.getElementById('tree').getBoundingClientRect();ctx.style.left=(e.clientX-r.left+8)+'px';ctx.style.top=(e.clientY-r.top+e.currentTarget.closest('.tree').scrollTop-20)+'px';ctx.hidden=false}
+  document.addEventListener('click',()=>{ctx.hidden=true})
+  document.querySelectorAll('.node').forEach(n=>n.addEventListener('click',()=>{document.querySelectorAll('.node.sel').forEach(s=>s.classList.remove('sel'));n.classList.add('sel')}))
+</script>
+</body>
+</html>
