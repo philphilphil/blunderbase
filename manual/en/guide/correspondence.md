@@ -127,6 +127,12 @@ Lines the game has left — the alternatives to a move the opponent did not play
 rather than removed. They cost nothing, they are the record of what you looked at, and
 **Delete subtree** is there when a branch is genuinely dead.
 
+A move with lines under it carries a `−` at the end of its row; click it to fold those lines
+away, and the `+` that takes its place says how many positions are hidden. The fold belongs
+to the line, not to your browser: it is saved with the node, so the tree you tidied on one
+machine is tidy on the next, and it still works on a finished game. A folded line opens by
+itself while the position you have selected is inside it.
+
 **Export PGN** writes the whole tree out: the played line as the mainline, every other node
 as a variation under the move it answers, your comments as comments, your marks as NAGs and
 each node's evaluation as `{[%eval 0.25]}` — the spelling Lichess uses, so any reader that

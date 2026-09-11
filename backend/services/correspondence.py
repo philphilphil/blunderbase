@@ -748,6 +748,7 @@ def update_node(
     mark: str | None = UNCHANGED,
     pinned_engine_id: int | None = UNCHANGED,
     conditional: bool = UNCHANGED,
+    collapsed: bool = UNCHANGED,
     promote: bool = False,
 ) -> dict[str, Any]:
     """Comment on a move, mark it, pin an engine to it, or make it the first of its siblings.
@@ -756,11 +757,24 @@ def update_node(
     eye (`db.enums.CorrespondenceMark`); a pin is which engine's verdict this node reads,
     and no pin is "the deepest one there is". Promoting renumbers the whole sibling set, so
     two moves can never both claim to be first.
+
+    `collapsed` is the one edit a finished game's tree still takes: folding a line away
+    changes what is on screen, not what was analysed, and a read-only tree is still read.
     """
     node = _node(session, node_id)
     _row, game = _load(session, node.game_id)
-    _require_open(game, tree=True)
+    folding_only = (
+        comment is UNCHANGED
+        and mark is UNCHANGED
+        and pinned_engine_id is UNCHANGED
+        and conditional is UNCHANGED
+        and not promote
+    )
+    if not folding_only:
+        _require_open(game, tree=True)
 
+    if collapsed is not UNCHANGED:
+        node.collapsed = bool(collapsed)
     if comment is not UNCHANGED:
         node.comment = (comment or "").strip()
     if mark is not UNCHANGED:
@@ -3096,6 +3110,7 @@ def _node_payload(node: CorrespondenceNode, start: _Start) -> dict[str, Any]:
         "rank": node.rank,
         "played": node.played,
         "conditional": node.conditional,
+        "collapsed": node.collapsed,
         "mark": str(mark) if mark else None,
         "glyph": MARK_GLYPHS[mark] if mark else None,
         "comment": node.comment or "",

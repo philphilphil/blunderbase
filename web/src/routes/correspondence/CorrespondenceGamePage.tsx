@@ -481,6 +481,7 @@ export function CorrespondenceGamePage() {
         }}
         onPromote={(id) => updateNode.mutate({ id, body: { promote: true } })}
         onDelete={(id) => deleteNode.mutate(id)}
+        onFold={(id, collapsed) => updateNode.mutate({ id, body: { collapsed } })}
         onSearch={
           game.finished
             ? undefined

@@ -134,6 +134,13 @@ gespielt hat –, werden ausgegraut und nicht entfernt. Sie kosten nichts und si
 dafür, was du dir angesehen hast; **Teilbaum löschen** steht bereit, wenn ein Ast wirklich
 erledigt ist.
 
+Ein Zug mit Linien darunter trägt am Ende seiner Zeile ein `−`; ein Klick klappt diese
+Linien ein, und das `+`, das an seine Stelle tritt, sagt, wie viele Stellungen verborgen
+sind. Das Einklappen gehört zur Linie, nicht zu deinem Browser: Es wird mit dem Knoten
+gespeichert, der Baum, den du auf einem Rechner aufgeräumt hast, ist also auch auf dem
+nächsten aufgeräumt, und es funktioniert auch bei einer beendeten Partie. Eine eingeklappte
+Linie öffnet sich von selbst, solange die ausgewählte Stellung in ihr liegt.
+
 **PGN exportieren** schreibt den ganzen Baum heraus: die gespielte Linie als Hauptvariante,
 jeden anderen Knoten als Variante unter dem Zug, den er beantwortet, deine Kommentare als
 Kommentare, deine Markierungen als NAGs und die Bewertung jedes Knotens als

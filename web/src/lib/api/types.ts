@@ -2016,6 +2016,8 @@ export interface CorrespondenceNode extends Extra {
   rank: number
   played: boolean
   conditional: boolean
+  /** The lines under this move are folded away on screen. Kept on the node, not the browser. */
+  collapsed: boolean
   mark?: CorrespondenceMark | null
   /** `!`, `!?`, `?!`, `?`, `✕` — derived from `mark`, never sent by a client. */
   glyph?: string | null
@@ -2208,6 +2210,8 @@ export interface CorrespondenceNodeUpdate {
   mark?: CorrespondenceMark | null
   pinned_engine_id?: number | null
   conditional?: boolean | null
+  /** Fold the lines under this move away, or unfold them. Works on a finished game too. */
+  collapsed?: boolean | null
   /** Renumber the sibling set so this node is rank 0. */
   promote?: boolean
 }

@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -895,6 +896,12 @@ class CorrespondenceNode(Base):
     mark: Mapped[CorrespondenceMark | None] = mapped_column(EnumString(CorrespondenceMark))
     # This move was sent to the opponent as a conditional continuation.
     conditional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The lines under this move are folded away on screen. A view preference, but one that
+    # belongs to the line rather than to a browser: a tree the owner tidied on the desktop
+    # arrives tidy on the laptop, and stays tidy after the game is finished.
+    collapsed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     # The owner's note on the move, empty rather than NULL so a tree payload never has to
     # tell "no comment" from "the comment is nothing".
     comment: Mapped[str] = mapped_column(Text, nullable=False, default="")

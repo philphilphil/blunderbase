@@ -452,6 +452,30 @@ def test_a_comment_a_mark_and_a_promotion(session: Session) -> None:
     assert kept["comment"] == "the main try" and kept["mark"] is None
 
 
+def test_folding_a_line_is_kept_on_the_node_and_survives_the_game_finishing(
+    session: Session,
+) -> None:
+    payload = make_game(session)
+    game_id = payload["game"]["game_id"]
+    root_id = payload["tree"]["id"]
+    e4 = correspondence_service.add_node(session, parent_id=root_id, ucis=["e2e4"])["tip"]
+    correspondence_service.add_node(session, parent_id=e4["id"], ucis=["c7c5"])
+    assert e4["san"] == "e4" and e4["collapsed"] is False
+
+    folded = correspondence_service.update_node(session, e4["id"], collapsed=True)
+    assert folded["collapsed"] is True
+    tree = correspondence_service.get_game(session, game_id)
+    assert tree["tree"]["children"][0]["collapsed"] is True
+
+    # The fold is a view preference, so it is the one edit a finished game's tree still
+    # takes; a comment on the same node is refused like any other write.
+    correspondence_service.finish_game(session, game_id, result=Result.DRAW)
+    unfolded = correspondence_service.update_node(session, e4["id"], collapsed=False)
+    assert unfolded["collapsed"] is False
+    with pytest.raises(correspondence_service.TreeLockedError):
+        correspondence_service.update_node(session, e4["id"], collapsed=True, comment="late")
+
+
 def test_a_mark_nobody_has_is_refused(session: Session) -> None:
     payload = make_game(session)
     added = correspondence_service.add_node(session, parent_id=payload["tree"]["id"], ucis=["e2e4"])

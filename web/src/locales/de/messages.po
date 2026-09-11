@@ -3191,6 +3191,19 @@ msgid "Better than it looked: the minimax under this move is better for the side
 msgstr "Besser als gedacht: das Minimax unter diesem Zug ist für die Seite, die ihn gemacht hat, besser als die eigene Zahl der Engine hier"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Unfold the lines under this move"
+msgstr "Die Linien unter diesem Zug ausklappen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Fold the lines under this move away"
+msgstr "Die Linien unter diesem Zug einklappen"
+
+#. placeholder {0}: fold.hidden
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} positions folded away — click to show them"
+msgstr "{0} Stellungen eingeklappt – klicken, um sie zu zeigen"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
 msgstr "Diese Zahl ist veraltet: Sie wurde unter der Veraltet-Tiefe erreicht oder von einer Version der Engine, die du nicht mehr hast. Teilbaum auffrischen fragt noch einmal."
 

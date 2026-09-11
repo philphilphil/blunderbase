@@ -1715,6 +1715,13 @@ class CorrespondenceNodeUpdate(Input):
         default=None, description="which engine's verdict this node reads; null is deepest"
     )
     conditional: bool | None = None
+    collapsed: bool | None = Field(
+        default=None,
+        description=(
+            "fold the lines under this move away on screen; "
+            "the one edit a finished game's tree still takes"
+        ),
+    )
     promote: bool = False
 
 

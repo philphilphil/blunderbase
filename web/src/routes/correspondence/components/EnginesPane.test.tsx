@@ -22,6 +22,7 @@ function node(patch: Partial<CorrespondenceTreeNode> = {}): CorrespondenceTreeNo
     rank: 0,
     played: true,
     conditional: false,
+    collapsed: false,
     comment: '',
     fen: AFTER_E4,
     // After 1.e4 Black is to move, so an engine row is stored in Black's frame while the

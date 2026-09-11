@@ -3191,6 +3191,19 @@ msgid "Better than it looked: the minimax under this move is better for the side
 msgstr "Better than it looked: the minimax under this move is better for the side that played it than the engine's own number here"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Unfold the lines under this move"
+msgstr "Unfold the lines under this move"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Fold the lines under this move away"
+msgstr "Fold the lines under this move away"
+
+#. placeholder {0}: fold.hidden
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} positions folded away — click to show them"
+msgstr "{0} positions folded away — click to show them"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
 msgstr "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
 

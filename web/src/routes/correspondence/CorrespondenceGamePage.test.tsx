@@ -46,6 +46,7 @@ function node(patch: Partial<CorrespondenceTreeNode> = {}): CorrespondenceTreeNo
     rank: 0,
     played: true,
     conditional: false,
+    collapsed: false,
     comment: '',
     fen: START,
     turn: 'white',

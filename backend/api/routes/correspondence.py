@@ -215,6 +215,7 @@ def update_node(session: SessionDep, node_id: int, body: CorrespondenceNodeUpdat
         mark=body.mark if "mark" in given else unchanged,
         pinned_engine_id=(body.pinned_engine_id if "pinned_engine_id" in given else unchanged),
         conditional=body.conditional if "conditional" in given else unchanged,
+        collapsed=body.collapsed if "collapsed" in given else unchanged,
         promote=body.promote,
     )
 

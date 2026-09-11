@@ -55,7 +55,7 @@ import {
   MARK_LABELS,
 } from '../format'
 import { isActive, isLive, isWarm, taskCounts, weakNodes, type TaskProgress } from '../searches'
-import { backedDirection, inWhiteFrame, isLeftBehind, sortSiblings } from '../tree'
+import { backedDirection, countNodes, inWhiteFrame, isLeftBehind, sortSiblings } from '../tree'
 
 export interface TreeMenu {
   nodeId: number
@@ -71,6 +71,11 @@ export interface TreePaneProps {
   onComment: (node: CorrespondenceTreeNode) => void
   onPromote: (id: number) => void
   onDelete: (id: number) => void
+  /**
+   * Fold the lines under a move away, or unfold them. Kept on the node by the server, so
+   * it is offered on a finished game too — the one edit a read-only tree still takes.
+   */
+  onFold?: (id: number, collapsed: boolean) => void
   /** Open the search dialog on this node — the menu's first verb. */
   onSearch?: (node: CorrespondenceTreeNode) => void
   /** One bounded look at this position, through the analysis queue. */
@@ -110,6 +115,7 @@ function Row({
   weak,
   behind,
   progress,
+  fold,
   onSelect,
   onMenu,
 }: {
@@ -123,6 +129,8 @@ function Row({
   behind: boolean
   /** How much of the work under this node is still outstanding — the `2 of 7`. */
   progress?: TaskProgress
+  /** The `−`/`+` at the row's end: present only where there are lines to fold. */
+  fold?: { collapsed: boolean; hidden: number; onToggle: () => void }
   onSelect: () => void
   onMenu: (event: MouseEvent) => void
 }) {
@@ -207,6 +215,31 @@ function Row({
         {nodeCount ? formatNodes(nodeCount) : ''}
       </span>
       <span className="flex items-baseline gap-1">
+      {fold ? (
+        <button
+          type="button"
+          data-testid={`tree-fold-${node.id}`}
+          aria-expanded={!fold.collapsed}
+          aria-label={fold.collapsed ? t`Unfold the lines under this move` : t`Fold the lines under this move away`}
+          title={
+            fold.collapsed
+              ? t`${fold.hidden} positions folded away — click to show them`
+              : t`Fold the lines under this move away`
+          }
+          onClick={(event) => {
+            event.stopPropagation()
+            fold.onToggle()
+          }}
+          className={cn(
+            'inline-flex size-3.5 items-center justify-center rounded-sm border text-[0.625rem] leading-none',
+            fold.collapsed
+              ? 'border-edge-strong text-body hover:bg-raised'
+              : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
+          )}
+        >
+          {fold.collapsed ? '+' : '−'}
+        </button>
+      ) : null}
       {node.disagree ? (
         <span className="text-[0.625rem] text-mistake" title={t`Two engines disagree here`}>
           ≠
@@ -319,6 +352,7 @@ function Line({
   progress,
   onSelect,
   onMenu,
+  onFold,
   leftBehind,
 }: {
   start: CorrespondenceTreeNode
@@ -329,6 +363,7 @@ function Line({
   progress: Map<number, TaskProgress>
   onSelect: (id: number) => void
   onMenu: (node: CorrespondenceTreeNode, event: MouseEvent) => void
+  onFold?: (id: number, collapsed: boolean) => void
   leftBehind: boolean
 }) {
   const parts: ReactNode[] = []
@@ -343,6 +378,26 @@ function Line({
   // first: an analysis line is short enough to be read as the outline it is.
   while (node) {
     const current: CorrespondenceTreeNode = node
+    const children = sortSiblings(current.children)
+    const next: CorrespondenceTreeNode | undefined = current.played
+      ? children.find((child) => child.played)
+      : undefined
+    // What would be indented under this row: every child but the game's own continuation.
+    // Those are what the fold hides. A fold never hides the selected node — the row the
+    // board is showing has to be on screen — so a subtree holding it stays open until the
+    // selection leaves it, and the `+` is drawn again then.
+    const branches = children.filter((child) => child !== next)
+    const folded =
+      current.collapsed && !branches.some((branch) => contains(branch, selectedId))
+    const fold =
+      onFold && branches.length > 0
+        ? {
+            collapsed: folded,
+            hidden: branches.reduce((total, branch) => total + countNodes(branch), 0),
+            onToggle: () => onFold(current.id, !folded),
+          }
+        : undefined
+
     if (current.uci) {
       parts.push(
         <Row
@@ -353,6 +408,7 @@ function Line({
           weak={weak.has(current.id)}
           behind={leftBehind}
           progress={progress.get(current.id)}
+          fold={fold}
           onSelect={() => onSelect(current.id)}
           onMenu={(event) => onMenu(current, event)}
         />,
@@ -363,12 +419,7 @@ function Line({
       parts.push(<Comment key={`m${current.id}`} text={current.comment} level={level} />)
     }
 
-    const children = sortSiblings(current.children)
-    const next: CorrespondenceTreeNode | undefined = current.played
-      ? children.find((child) => child.played)
-      : undefined
-    for (const child of children) {
-      if (child === next) continue
+    for (const child of folded ? [] : branches) {
       const behind = leftBehind || isLeftBehind(current, child)
       parts.push(
         <div key={`v${child.id}`} data-weak={weak.has(child.id) ? 'true' : undefined}>
@@ -380,6 +431,7 @@ function Line({
             progress={progress}
             onSelect={onSelect}
             onMenu={onMenu}
+            onFold={onFold}
             leftBehind={behind}
           />
         </div>,
@@ -390,6 +442,13 @@ function Line({
   }
 
   return <>{parts}</>
+}
+
+/** Whether `id` is `node` or anywhere under it. Null is nowhere. */
+function contains(node: CorrespondenceTreeNode, id: number | null): boolean {
+  if (id === null) return false
+  if (node.id === id) return true
+  return node.children.some((child) => contains(child, id))
 }
 
 function MenuItem({
@@ -431,6 +490,7 @@ export function TreePane({
   onComment,
   onPromote,
   onDelete,
+  onFold,
   onSearch,
   onQueueTask,
   onExpand,
@@ -479,6 +539,7 @@ export function TreePane({
           selectedId={selectedId}
           weak={weak}
           progress={progress}
+          onFold={onFold}
           onSelect={onSelect}
           onMenu={(node, event) => {
             if (readOnly) return

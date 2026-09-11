@@ -23,6 +23,7 @@ function node(patch: Partial<CorrespondenceTreeNode> = {}): CorrespondenceTreeNo
     rank: 0,
     played: false,
     conditional: false,
+    collapsed: false,
     comment: '',
     fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     turn: 'black',
@@ -142,6 +143,52 @@ describe('the tree pane', () => {
       ).toBeTruthy()
     }
     expect(order.map((row) => row.dataset.level)).toEqual(['0', '1', '2', '0', '0', '1'])
+  })
+
+  it('folds the lines under a move away, keeps a folded line open around the selection, and says so', async () => {
+    // e4 has a line under it (1…c5), so its row ends in a `−`; e5 has nothing to fold.
+    const onFold = vi.fn()
+    const { unmount } = render(
+      <I18nProvider>
+        <TreePane tree={sample()} selectedId={null} onSelect={vi.fn()} onMark={vi.fn()} onComment={vi.fn()} onPromote={vi.fn()} onDelete={vi.fn()} onFold={onFold} />
+      </I18nProvider>,
+    )
+    expect(screen.queryByTestId('tree-fold-3')).not.toBeInTheDocument()
+    const minus = screen.getByTestId('tree-fold-2')
+    expect(minus).toHaveTextContent('−')
+    await userEvent.click(minus)
+    expect(onFold).toHaveBeenCalledWith(2, true)
+    unmount()
+
+    // Folded: c5 is gone from the screen, the `+` says one position is hidden, and clicking
+    // it asks to unfold. The played e5 is still there — the game itself never folds.
+    const folded = sample()
+    folded.children[0].collapsed = true
+    render(
+      <I18nProvider>
+        <TreePane tree={folded} selectedId={null} onSelect={vi.fn()} onMark={vi.fn()} onComment={vi.fn()} onPromote={vi.fn()} onDelete={vi.fn()} onFold={onFold} />
+      </I18nProvider>,
+    )
+    expect(screen.queryByTestId('tree-node-4')).not.toBeInTheDocument()
+    expect(screen.getByTestId('tree-node-3')).toBeInTheDocument()
+    const plus = screen.getByTestId('tree-fold-2')
+    expect(plus).toHaveTextContent('+')
+    expect(plus).toHaveAttribute('title', expect.stringContaining('1 positions'))
+    await userEvent.click(plus)
+    expect(onFold).toHaveBeenLastCalledWith(2, false)
+  })
+
+  it('shows a folded line anyway while the selected node is inside it', () => {
+    const folded = sample()
+    folded.children[0].collapsed = true
+    draw({ tree: folded, selectedId: 4, onFold: vi.fn() })
+    expect(screen.getByTestId('tree-node-4')).toBeInTheDocument()
+    expect(screen.getByTestId('tree-fold-2')).toHaveTextContent('−')
+  })
+
+  it('offers no fold at all when the page cannot save one', () => {
+    draw()
+    expect(screen.queryByTestId('tree-fold-2')).not.toBeInTheDocument()
   })
 
   it('draws a mark as its glyph', () => {
