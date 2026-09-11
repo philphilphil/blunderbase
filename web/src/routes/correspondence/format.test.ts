@@ -9,7 +9,7 @@ import {
   duePhrase,
   dueTone,
   iccfNumber,
-  inNodeFrame,
+  rowAsWhite,
   opponentOf,
   ownerColor,
   sections,
@@ -124,31 +124,30 @@ describe('the date box', () => {
   })
 })
 
-describe('inNodeFrame', () => {
-  // The node after 1.e4: Black is to move, so a stored row is in Black's frame while the
-  // node prints White's — the one place the two columns of the screen could disagree.
-  const afterE4 = { turn: 'black', frame: 'white' } as const
-  // The root, where the mover and the side to move are the same side.
-  const root = { turn: 'white', frame: 'white' } as const
+describe('rowAsWhite', () => {
+  // The node after 1.e4: Black is to move, so a stored row is in Black's frame and has to
+  // be turned; after 1.e4 e5 White is to move and the row already is White's.
+  const afterE4 = { turn: 'black' } as const
+  const afterE5 = { turn: 'white' } as const
 
-  it('turns a row stored from the side to move into the frame the node prints', () => {
-    expect(inNodeFrame({ cp: -30 }, afterE4)).toEqual({ cp: 30, mate: undefined })
-    expect(inNodeFrame({ mate: -4 }, afterE4)).toEqual({ cp: undefined, mate: 4 })
+  it('turns a row stored from the side to move into White\'s frame', () => {
+    expect(rowAsWhite({ cp: -30 }, afterE4)).toEqual({ cp: 30, mate: undefined })
+    expect(rowAsWhite({ mate: -4 }, afterE4)).toEqual({ cp: undefined, mate: 4 })
   })
 
-  it('leaves the root alone, where the mover is the side to move', () => {
+  it('leaves a row alone where White is the side to move', () => {
     const row = { cp: -30, depth: 40 }
-    expect(inNodeFrame(row, root)).toBe(row)
+    expect(rowAsWhite(row, afterE5)).toBe(row)
   })
 
   it('keeps everything that is not a score, and passes nothing through as null', () => {
-    expect(inNodeFrame({ cp: 12, depth: 51, engine_name: 'Stockfish 17' }, afterE4)).toEqual({
+    expect(rowAsWhite({ cp: 12, depth: 51, engine_name: 'Stockfish 17' }, afterE4)).toEqual({
       cp: -12,
       mate: undefined,
       depth: 51,
       engine_name: 'Stockfish 17',
     })
-    expect(inNodeFrame(null, afterE4)).toBeNull()
-    expect(inNodeFrame({ cp: 30 }, null)).toEqual({ cp: 30 })
+    expect(rowAsWhite(null, afterE4)).toBeNull()
+    expect(rowAsWhite({ cp: 30 }, null)).toEqual({ cp: 30 })
   })
 })

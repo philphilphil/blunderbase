@@ -93,9 +93,12 @@ Each node shows its move, its evaluation and the evaluation its own branches bac
   reached too shallow or by an engine you no longer have — see
   [Tasks and expansion](#tasks-and-expansion).
 
-Both numbers are written from the point of view of the side that played the move, the way a
-variation is read: `15.Bd3 +0.41` means White stands better. The bar beside the board and
-the list's own column are White's instead, as an evaluation bar always is.
+Every number on these screens is White's, as an evaluation bar always is: `+0.41` means
+White stands better whoever made the move, and `−0.30` after a Black move means Black
+stands better. So a column read down the tree keeps its sign. What the colour of the backed
+number says is about the mover: amber, the move was refuted further down — the line under
+it is worse for the side that played it than the engine's own number promised; green, it
+turned out better than it looked.
 
 A node's own menu carries the verbs:
 

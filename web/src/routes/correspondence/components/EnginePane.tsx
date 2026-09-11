@@ -14,9 +14,9 @@
  * would show a depth-51 header over depth-38 lines the moment a page was reloaded
  * mid-search. The pane says which one it is drawing.
  *
- * Every score is turned into the node's frame first (`format.ts`'s `inNodeFrame`): a
- * snapshot and a stored row both arrive from the side to move's point of view, and this pane
- * is read beside a tree that prints the mover's.
+ * Every score is turned into White's frame first (`format.ts`'s `rowAsWhite`): a snapshot
+ * and a stored row both arrive from the side to move's point of view, and every number on
+ * these screens is printed as White's.
  *
  * **A task is drawn as this engine's verdict like any other**, which is the point of it:
  * the tree does not keep two kinds of number. What differs is the header — a task says it
@@ -44,7 +44,7 @@ import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
-import { inNodeFrame } from '../format'
+import { rowAsWhite } from '../format'
 import {
   formatSpan,
   isLive,
@@ -124,7 +124,7 @@ export function EnginePane({
   const depth = snapshot?.depth ?? stored?.depth ?? null
   const nodes = snapshot?.nodes ?? stored?.nodes ?? null
   const top = lines[0] ?? null
-  const score = inNodeFrame(top ?? stored ?? null, node)
+  const score = rowAsWhite(top ?? stored ?? null, node)
   const history = stored?.history ?? []
   const points = sparkline(history)
   const reading = readHistory(history)
@@ -318,7 +318,7 @@ export function EnginePane({
                     line.multipv === 1 ? 'text-good' : 'text-body',
                   )}
                 >
-                  {formatScore(inNodeFrame(line, node))}
+                  {formatScore(rowAsWhite(line, node))}
                 </span>
                 <span
                   className="truncate font-mono text-[0.625rem] leading-[1.55] text-soft"
@@ -346,8 +346,8 @@ export function EnginePane({
         <span className="truncate">
           {reading ? (
             <HistoryWords
-              from={formatScore(inNodeFrame(reading.from, node))}
-              to={formatScore(inNodeFrame(reading.to, node))}
+              from={formatScore(rowAsWhite(reading.from, node))}
+              to={formatScore(rowAsWhite(reading.to, node))}
               atFrom={reading.from.depth ?? null}
               atTo={reading.to.depth ?? null}
               stable={reading.stableFor}

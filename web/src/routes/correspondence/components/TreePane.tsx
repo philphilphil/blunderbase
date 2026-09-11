@@ -3,8 +3,11 @@
  *
  * This is the middle column and the widest, because it is the thing the mode is for. It is
  * a grid, not flowing notation: **one row per ply**, with the same columns on every row —
- * move, own evaluation, the minimax backed up from underneath when the two differ (with the
- * arrow that says which way), depth, nodes, and the state glyphs — so the numbers line up
+ * move, own evaluation, the minimax backed up from underneath when the two differ (amber
+ * when the mover's move was refuted below, green when it turned out better), depth, nodes,
+ * and the state glyphs — so the numbers line up. Every number is White's: a column read
+ * down a tree cannot flip its sign on alternate rows, and White's is what every
+ * evaluation bar and every chess program prints. The numbers line up
  * down the whole tree and a variation is read by comparing a column, not by parsing a
  * paragraph. That is how IDeA's tree reads, and it is what a tree of evaluated positions
  * is for; flowing PGN text was tried first and stopped being legible the moment every move
@@ -52,7 +55,7 @@ import {
   MARK_LABELS,
 } from '../format'
 import { isActive, isLive, isWarm, taskCounts, weakNodes, type TaskProgress } from '../searches'
-import { backedDirection, isLeftBehind, sortSiblings } from '../tree'
+import { backedDirection, inWhiteFrame, isLeftBehind, sortSiblings } from '../tree'
 
 export interface TreeMenu {
   nodeId: number
@@ -172,7 +175,7 @@ function Row({
         </span>
       </span>
       <span className="text-right text-[0.6875rem] text-body tabular-nums">
-        {node.own ? formatScore(node.own) : ''}
+        {node.own ? formatScore(inWhiteFrame(node.own, node.frame)) : ''}
       </span>
       <span
         className={cn(
@@ -181,12 +184,14 @@ function Row({
         )}
         title={
           node.backed && direction !== null && direction !== 'same'
-            ? t`The minimax under this move disagrees with the engine's own number here`
+            ? direction === 'down'
+              ? t`Refuted further down: the minimax under this move is worse for the side that played it than the engine's own number here`
+              : t`Better than it looked: the minimax under this move is better for the side that played it than the engine's own number here`
             : undefined
         }
       >
         {node.backed && direction !== null && direction !== 'same'
-          ? `${direction === 'down' ? '▼' : '▲'} ${formatScore(node.backed)}`
+          ? `↳ ${formatScore(inWhiteFrame(node.backed, node.frame))}`
           : ''}
       </span>
       <span className="text-right text-[0.625rem] text-dim tabular-nums">

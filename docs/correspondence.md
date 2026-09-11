@@ -285,7 +285,12 @@ The read model computes two numbers per node and stores neither:
 
 - **own** — the node's chosen eval (pinned engine, else deepest).
 - **backed** — minimax over the children that have a value, in White's frame for the
-  comparison and handed back in the mover's; a node with no valued child backs its own.
+  comparison and handed back in the mover's (the payload's `frame`); a node with no valued
+  child backs its own. The screens print every number as White's — `tree.ts`'s
+  `inWhiteFrame` turns `own` and `backed` by the node's frame, `format.ts`'s `rowAsWhite`
+  turns a raw eval row by the side to move — because a column read down a tree cannot flip
+  its sign on alternate rows; the mover's frame survives only in the colour of the backed
+  number, which says whether the mover's move was refuted below.
 
 Both go out, because the gap between them is the point.
 

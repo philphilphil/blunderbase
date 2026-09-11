@@ -24,7 +24,7 @@ import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { MARK_CLASS, MARK_GLYPHS } from '../format'
-import { backedDirection, candidatesOf, mainlineFrom } from '../tree'
+import { backedDirection, candidatesOf, inWhiteFrame, mainlineFrom } from '../tree'
 
 export function CandidatesTable({
   node,
@@ -103,20 +103,27 @@ export function CandidatesTable({
                 <td className="h-[1.875rem] px-2.5 font-mono font-semibold text-ink">
                   {notate(child.san ?? child.uci ?? '')}
                 </td>
-                <td className="px-2.5 font-mono text-body">{formatScore(child.own)}</td>
                 <td className="px-2.5 font-mono text-body">
-                  {formatScore(child.backed)}
-                  {direction === 'down' || direction === 'up' ? (
-                    <span
-                      className={cn(
-                        'ml-1 text-[0.625rem]',
-                        direction === 'down' ? 'text-mistake' : 'text-good',
-                      )}
-                      title={t`The minimax under this move disagrees with its own number`}
-                    >
-                      {direction === 'down' ? '▼' : '▲'}
-                    </span>
-                  ) : null}
+                  {formatScore(inWhiteFrame(child.own, child.frame))}
+                </td>
+                <td
+                  className={cn(
+                    'px-2.5 font-mono',
+                    direction === 'down'
+                      ? 'text-mistake'
+                      : direction === 'up'
+                        ? 'text-good'
+                        : 'text-body',
+                  )}
+                  title={
+                    direction === 'down'
+                      ? t`Refuted further down: the minimax under this move is worse for the side that plays it than its own number`
+                      : direction === 'up'
+                        ? t`Better than it looked: the minimax under this move is better for the side that plays it than its own number`
+                        : undefined
+                  }
+                >
+                  {formatScore(inWhiteFrame(child.backed, child.frame))}
                 </td>
                 <td className="px-2.5 font-mono tabular text-dim">
                   {child.own?.depth ?? '—'}

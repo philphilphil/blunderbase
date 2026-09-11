@@ -2552,8 +2552,12 @@ msgid "Mark"
 msgstr "Mark"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "The minimax under this move disagrees with its own number"
-msgstr "The minimax under this move disagrees with its own number"
+msgid "Refuted further down: the minimax under this move is worse for the side that plays it than its own number"
+msgstr "Refuted further down: the minimax under this move is worse for the side that plays it than its own number"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "Better than it looked: the minimax under this move is better for the side that plays it than its own number"
+msgstr "Better than it looked: the minimax under this move is better for the side that plays it than its own number"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
 msgid "A task is being worked on here"
@@ -3179,8 +3183,12 @@ msgid "Start searching"
 msgstr "Start searching"
 
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "The minimax under this move disagrees with the engine's own number here"
-msgstr "The minimax under this move disagrees with the engine's own number here"
+msgid "Refuted further down: the minimax under this move is worse for the side that played it than the engine's own number here"
+msgstr "Refuted further down: the minimax under this move is worse for the side that played it than the engine's own number here"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Better than it looked: the minimax under this move is better for the side that played it than the engine's own number here"
+msgstr "Better than it looked: the minimax under this move is better for the side that played it than the engine's own number here"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."

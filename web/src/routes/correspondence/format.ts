@@ -167,23 +167,24 @@ export const MARK_CLASS: Record<CorrespondenceMark, string> = {
 }
 
 /**
- * One engine number, read in the frame the node prints everything else in.
+ * One engine row, read as White's.
  *
- * A node's `own` and `backed` are in the frame of the side that played the move into the
- * node — `15.Bd3 +0.41` means White is better, which is how a tree is read — while the raw
- * `evals` rows and the `best_lines` under them are stored the way `MoveEval` stores a
- * score, from the side to move's point of view. On every node but the root those are
- * opposite, so a pane printing a row as it arrived would show `+0.30` in the tree and
- * `−0.30` for the same engine on the same position one column over. Turned once here, the
- * whole screen reads in one frame — the hazard `lib/analysis/streamModel.ts` documents for
- * the live panel, answered the same way.
+ * The raw `evals` rows and the `best_lines` under them are stored the way `MoveEval`
+ * stores a score, from the side to move's point of view, so with Black to move `+0.30`
+ * means Black is better. Every number on the correspondence screens is printed from
+ * White's point of view — the frame every evaluation bar, every engine panel and every
+ * chess program uses, and the only one in which a column of numbers down a tree can be
+ * read without flipping the sign on alternate rows. So a row is turned once here, by the
+ * node's own `turn` — the hazard `lib/analysis/streamModel.ts` documents for the live
+ * panel, answered the same way. The tree's `own` and `backed` come in the mover's frame
+ * and go through `tree.ts`'s `inWhiteFrame` instead, by the node's `frame`.
  */
-export function inNodeFrame<T extends { cp?: number | null; mate?: number | null }>(
+export function rowAsWhite<T extends { cp?: number | null; mate?: number | null }>(
   score: T | null | undefined,
-  node: Pick<CorrespondenceTreeNode, 'turn' | 'frame'> | null | undefined,
+  node: Pick<CorrespondenceTreeNode, 'turn'> | null | undefined,
 ): T | null {
   if (!score) return null
-  if (!node || node.turn === node.frame) return score
+  if (!node || node.turn === 'white') return score
   return {
     ...score,
     cp: score.cp === null || score.cp === undefined ? score.cp : -score.cp,

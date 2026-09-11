@@ -151,9 +151,12 @@ describe('the tree pane', () => {
 
   it('shows the backed number with the arrow that says the engine was refuted', () => {
     draw()
+    // 1…e5 is Black's move, so its mover-frame +0.34 prints as White's −0.34, and the
+    // backed −0.12 beside it is the refutation, in amber.
     const refuted = screen.getByTestId('tree-node-3')
-    expect(within(refuted).getByText('+0.34')).toBeInTheDocument()
-    expect(within(refuted).getByText(/▼/)).toHaveTextContent('+0.12')
+    expect(within(refuted).getByText('−0.34')).toBeInTheDocument()
+    expect(within(refuted).getByText(/↳/)).toHaveTextContent('−0.12')
+    expect(within(refuted).getByText(/↳/)).toHaveClass('text-mistake')
   })
 
   it('marks a position two engines disagree on', () => {

@@ -98,9 +98,13 @@ zurückgeben:
   **Veraltet-Marke**, wenn die gezeigte Zahl zu flach erreicht wurde oder von einer Engine
   stammt, die du nicht mehr hast – siehe [Aufgaben und Erweitern](#tasks-and-expansion).
 
-Beide Zahlen stehen aus Sicht der Seite, die den Zug gemacht hat, so wie eine Variante
-gelesen wird: `15.Ld3 +0,41` heißt, Weiß steht besser. Der Balken neben dem Brett und die
-Spalte in der Liste stehen dagegen aus Weiß' Sicht, wie ein Bewertungsbalken immer.
+Jede Zahl auf diesen Bildschirmen steht aus Weiß' Sicht, wie ein Bewertungsbalken immer:
+`+0,41` heißt, Weiß steht besser, wer auch immer gezogen hat, und `−0,30` nach einem
+schwarzen Zug heißt, Schwarz steht besser. Eine Spalte, die du den Baum hinunter liest,
+behält so ihr Vorzeichen. Was die Farbe der zurückgerechneten Zahl sagt, betrifft den
+Ziehenden: Bernstein – der Zug wurde weiter unten widerlegt, die Variante darunter ist für
+die Seite, die ihn gemacht hat, schlechter als die eigene Zahl der Engine versprach; Grün –
+er hat sich als besser erwiesen, als er aussah.
 
 Das Menü eines Knotens trägt die Verben:
 
