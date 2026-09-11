@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.3.0 — 2026-09-11
+
+- Changed correspondence to offer every engine in every picker, with the deep engine suggested
+- Removed the search engine list and the task engine from the correspondence settings
+- Added an engine choice to Queue task, Expand and Refresh subtree
+
 ## v1.2.0 — 2026-09-11
 
 - Added correspondence mode: ongoing games, an analysis tree, engines searching for days (switch it on under Analysis → Correspondence)
