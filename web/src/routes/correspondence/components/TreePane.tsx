@@ -8,8 +8,10 @@
  * down the whole tree and a variation is read by comparing a column, not by parsing a
  * paragraph. That is how IDeA's tree reads, and it is what a tree of evaluated positions
  * is for; flowing PGN text was tried first and stopped being legible the moment every move
- * carried four numbers. A variation steps its rows in by one level and carries a rule down
- * its left; the indentation lives inside the move column so the other columns never move.
+ * carried four numbers. Indentation means "a child of the row above": every reply to a
+ * move sits one level in under it, outlined all the way down, with the one exception that
+ * the game's own next move continues level with its parent (see `Line`). The indentation
+ * lives inside the move column so the other columns never move.
  * Marks are glyphs beside the move — `!`, `!?`, `?!`, `?`, `✕` — the owner's word against
  * the engine's, and the one the PGN exports as a NAG.
  *
@@ -144,6 +146,7 @@ function Row({
       role="button"
       tabIndex={-1}
       data-testid={`tree-node-${node.id}`}
+      data-level={level}
       data-selected={selected ? 'true' : undefined}
       onClick={onSelect}
       onContextMenu={onMenu}
@@ -325,15 +328,16 @@ function Line({
 }) {
   const parts: ReactNode[] = []
   let node: CorrespondenceTreeNode | undefined = start
-  // The alternatives to the move just printed, and the position they all answer. Printed
-  // *after* the move, the way every notation does it — `2. Nf3 d6 (2… g6) (2… Nc6) 3. d4`
-  // — so the line reads on and the variations hang off the move they replace. The start of
-  // a line has none here: its own siblings are the alternatives the parent Line prints.
-  let alternatives: CorrespondenceTreeNode[] = []
-  let parent: CorrespondenceTreeNode | null = null
 
+  // Indentation means exactly one thing here: *a child of the row it hangs under*. The one
+  // exception is the game itself — a played move's played child continues at the same
+  // level, because a spine that stepped in once per ply would be off the screen by move
+  // twenty. So under a played move come its other children, indented, each with its whole
+  // subtree outlined beneath it, and then the move the game actually went on with, level
+  // with its parent. Under a move that was not played, every child is indented, the best
+  // first: an analysis line is short enough to be read as the outline it is.
   while (node) {
-    const current = node
+    const current: CorrespondenceTreeNode = node
     if (current.uci) {
       parts.push(
         <Row
@@ -354,12 +358,17 @@ function Line({
       parts.push(<Comment key={`m${current.id}`} text={current.comment} level={level} />)
     }
 
-    for (const alternative of alternatives) {
-      const behind = leftBehind || isLeftBehind(parent, alternative)
+    const children = sortSiblings(current.children)
+    const next: CorrespondenceTreeNode | undefined = current.played
+      ? children.find((child) => child.played)
+      : undefined
+    for (const child of children) {
+      if (child === next) continue
+      const behind = leftBehind || isLeftBehind(current, child)
       parts.push(
-        <div key={`v${alternative.id}`} data-weak={weak.has(alternative.id) ? 'true' : undefined}>
+        <div key={`v${child.id}`} data-weak={weak.has(child.id) ? 'true' : undefined}>
           <Line
-            start={alternative}
+            start={child}
             level={level + 1}
             selectedId={selectedId}
             weak={weak}
@@ -372,10 +381,7 @@ function Line({
       )
     }
 
-    const children = sortSiblings(current.children)
-    parent = current
-    alternatives = children.slice(1)
-    node = children[0]
+    node = next
   }
 
   return <>{parts}</>

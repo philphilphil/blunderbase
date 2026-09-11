@@ -111,20 +111,37 @@ describe('the tree pane', () => {
     expect(within(screen.getByTestId('tree-node-4')).getByText('c5')).toBeInTheDocument()
   })
 
-  it('prints the main move before the alternatives to it, and the line goes on after them', () => {
-    // 1.e4 e5 (1…c5) 2.Nf3 — the notation everybody reads, not the variations first.
+  it('indents a reply under the move it answers, and the game itself runs straight down', () => {
+    // 1.e4, then its other reply 1…c5 indented under it with 2.Nc3 indented under *that*,
+    // then the played 1…e5 level with e4, then 2.Nf3 level again with its reply 2…d6 under it.
     const tree = sample()
-    const e5 = tree.children[0].children.find((child) => child.san === 'e5') as CorrespondenceTreeNode
+    const e4 = tree.children[0]
+    const e5 = e4.children.find((child) => child.san === 'e5') as CorrespondenceTreeNode
+    const c5 = e4.children.find((child) => child.san === 'c5') as CorrespondenceTreeNode
+    c5.children = [
+      node({ id: 8, san: 'Nc3', uci: 'b1c3', ply: 3, move_number: 2, frame: 'white', parent_id: 4 }),
+    ]
     e5.children = [
-      node({ id: 9, san: 'Nf3', uci: 'g1f3', ply: 3, move_number: 2, frame: 'white', played: true }),
+      node({
+        id: 9,
+        san: 'Nf3',
+        uci: 'g1f3',
+        ply: 3,
+        move_number: 2,
+        frame: 'white',
+        played: true,
+        parent_id: 3,
+        children: [node({ id: 10, san: 'd6', uci: 'd7d6', ply: 4, move_number: 2, frame: 'black', parent_id: 9 })],
+      }),
     ]
     draw({ tree })
-    const order = [2, 3, 4, 9].map((id) => screen.getByTestId(`tree-node-${id}`))
+    const order = [2, 4, 8, 3, 9, 10].map((id) => screen.getByTestId(`tree-node-${id}`))
     for (let i = 1; i < order.length; i++) {
       expect(
         order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy()
     }
+    expect(order.map((row) => row.dataset.level)).toEqual(['0', '1', '2', '0', '0', '1'])
   })
 
   it('draws a mark as its glyph', () => {
