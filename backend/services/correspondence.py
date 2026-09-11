@@ -43,7 +43,7 @@ from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, NamedTuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from backend.db.enums import (
@@ -51,6 +51,7 @@ from backend.db.enums import (
     CorrespondenceMark,
     EngineKind,
     Result,
+    RunStatus,
     SearchKind,
     SearchStatus,
     Source,
@@ -58,12 +59,14 @@ from backend.db.enums import (
     Tier,
 )
 from backend.db.models import (
+    AnalysisRun,
     CorrespondenceEval,
     CorrespondenceGame,
     CorrespondenceNode,
     CorrespondenceSearch,
     Engine,
     Game,
+    MoveEval,
 )
 from backend.db.types import utcnow
 from backend.services import analysis as analysis_service
@@ -82,6 +85,15 @@ EVENT_UPDATED = "correspondence.updated"
 # to the database; its name lives here so that the two halves cannot drift apart.
 EVENT_SEARCH = "correspondence.search"
 EVENT_SNAPSHOT = "correspondence.snapshot"
+# What an `correspondence.updated` frame touched, so a client knows how wide to refetch.
+# `game` is the expensive one — the `Game` row itself moved, so the library, that game's
+# page and the explorer's counts are all behind — and it stays the default, because
+# forgetting to widen a frame shows up as a stale games table nobody can explain.
+# `tree` is a node, an eval or a task: correspondence's own keys and nothing else. An
+# overnight expansion lands one of these per absorbed task, which is the frame this exists
+# for — a hundred and fifty of them must not each refetch the library and the explorer.
+SCOPE_GAME = "game"
+SCOPE_TREE = "tree"
 
 # How many points an eval's history keeps. Eighty is deeper than any engine reaches on a
 # position a person is waiting for, so in practice nothing is ever dropped — the cap is
@@ -133,6 +145,43 @@ DISAGREEMENT_CP = 50
 # the distance to mate is subtracted so that mate in two outranks mate in nine.
 MATE_SCORE = 1_000_000
 
+# Where a task sits in the analysis queue: between the quick tier (0) and the deep tier
+# (10), so a bounded look at one correspondence position jumps the import backlog and never
+# gets in front of the deep pass somebody is sitting and waiting for.
+#
+# The band is nine wide because that is where the *due date* is encoded. `claim_next_run`
+# orders by priority and then FIFO, so a game whose reply is due tomorrow has to come out
+# of the queue before one due next week — and the only two places that ordering can be
+# expressed are the priority and `created_at`. It is the priority, because a run's
+# `created_at` is when the run was created and a queue page that showed anything else would
+# be lying, whereas its priority is exactly "how badly is this wanted". One step per whole
+# day left: nine for due today or overdue, one for eight days out or a game with no
+# deadline at all. Settled when the task is queued rather than when it runs, the same rule
+# the budget follows — a task lives for minutes, so the day it was queued on is the day it
+# is worked on.
+TASK_PRIORITY_LOW = 1
+TASK_PRIORITY_HIGH = 9
+
+# How many children one stage of an expansion may make, and how many stages deep it may go.
+# Width times stages is the arithmetic the owner is buying: three and three is up to
+# thirty-nine positions, five and three up to a hundred and fifty-five, which is already
+# a night's work for one engine. Beyond that a person should be steering with marks rather
+# than asking for a bigger number.
+MAX_EXPAND_WIDTH = 5
+MAX_EXPAND_STAGES = 3
+# A mark's steering, in the numbers it changes (`docs/correspondence.md`, "Marks"): a
+# `good` or `interesting` move is worth one more stage and one more sibling than its
+# neighbours, and a `bad` one is worth one stage at most however deep the expansion around
+# it goes. `excluded` is not a number — such a move is never expanded and never gets a task.
+MARK_BONUS = 1
+BAD_MARK_STAGES = 1
+
+# How many stale nodes one "refresh subtree" may queue before it refuses and says how many
+# it found. Fifty tasks is an hour or two of one engine; a subtree with more stale nodes
+# than that is one to refresh a branch at a time, and a button that quietly queued four
+# hundred runs would be the kind of thing an owner discovers from their fans.
+REFRESH_LIMIT = 50
+
 # The states in which a search still owns its node: it is queued for a slot, running in
 # one, or parked with its process warm. A subtree holding one of these cannot be deleted.
 LIVE_SEARCH_STATES = (SearchStatus.QUEUED, SearchStatus.RUNNING, SearchStatus.PAUSED)
@@ -173,6 +222,19 @@ class _Start(NamedTuple):
     move_number: int
 
 
+class _Reading(NamedTuple):
+    """What it takes to read the eval table into a payload, gathered once per answer.
+
+    `names` and `versions` are every engine the payload mentions, looked up in one query;
+    `stale_depth` is the setting below which a verdict is old news. All three are the same
+    for every row of one answer, and asking per row would be a query per node.
+    """
+
+    names: dict[int, str]
+    versions: dict[int, str | None]
+    stale_depth: int
+
+
 # --- failures --------------------------------------------------------------
 
 
@@ -210,6 +272,14 @@ class UnknownSearchError(LookupError):
 
 class SearchBusyError(CorrespondenceConflict):
     """That engine is already queued, running or parked on that node."""
+
+
+class TaskRunningError(CorrespondenceConflict):
+    """The task has already been claimed by a worker, so there is nothing left to cancel."""
+
+
+class TooMuchToRefreshError(CorrespondenceConflict):
+    """More stale nodes under there than one refresh is allowed to queue, and how many."""
 
 
 # --- games -----------------------------------------------------------------
@@ -572,15 +642,19 @@ def get_game(session: Session, game_id: int) -> dict[str, Any]:
     nodes = _nodes(session, game_id)
     evals = _evals_for(session, {node.epd for node in nodes})
     searches = _searches_for(session, [node.id for node in nodes])
-    names = _engine_names(session, evals, searches)
+    reading = _reading(
+        session,
+        [row for rows in evals.values() for row in rows],
+        list(searches.values()),
+    )
 
-    tree, by_id = _assemble(game, nodes, evals, searches, names)
+    tree, by_id = _assemble(game, nodes, evals, searches, reading)
     tip = _tip(nodes)
     return {
         "game": _game_payload(row, game, by_id.get(tip.id)),
         "tree": tree,
         "searches": [
-            _search_payload(search, names) for rows in searches.values() for search in rows
+            _search_payload(search, reading.names) for rows in searches.values() for search in rows
         ],
     }
 
@@ -658,7 +732,7 @@ def add_node(session: Session, *, parent_id: int, ucis: Sequence[str] | str) -> 
             created += 1
         node = found
     session.commit()
-    _announce(parent.game_id)
+    _announce(parent.game_id, scope=SCOPE_TREE)
     return {
         "game_id": parent.game_id,
         "created": created,
@@ -699,7 +773,7 @@ def update_node(
         _promote(session, node)
     node.updated_at = utcnow()
     session.commit()
-    _announce(node.game_id)
+    _announce(node.game_id, scope=SCOPE_TREE)
     return _node_payload(node, _start_of(game))
 
 
@@ -725,16 +799,27 @@ def delete_node(session: Session, node_id: int) -> None:
         )
 
     doomed = _descendants(session, node)
-    busy = session.scalars(
-        select(CorrespondenceSearch.id).where(
-            CorrespondenceSearch.node_id.in_(doomed),
-            CorrespondenceSearch.status.in_(LIVE_SEARCH_STATES),
+    live = list(
+        session.scalars(
+            select(CorrespondenceSearch).where(
+                CorrespondenceSearch.node_id.in_(doomed),
+                CorrespondenceSearch.status.in_(LIVE_SEARCH_STATES),
+            )
         )
-    ).first()
-    if busy is not None:
+    )
+    # A queued task is not a reason to refuse: it is a row in the analysis queue and a run
+    # nobody has started, and an expansion leaves dozens of them about — telling the owner
+    # to cancel twelve tasks by hand before they may delete a branch would make expansion
+    # a thing to be careful with. So they are cancelled here, both directions closed the
+    # way `cancel_task` closes them, and only work that is actually under way refuses.
+    if any(
+        row.kind is not SearchKind.TASK or row.status is not SearchStatus.QUEUED for row in live
+    ):
         raise NodeBusyError(
             "a search is still running or parked inside that subtree; stop it first"
         )
+    for row in live:
+        cancel_task(session, row.id)
 
     game_id, parent_id = node.game_id, node.parent_id
     session.execute(delete(CorrespondenceSearch).where(CorrespondenceSearch.node_id.in_(doomed)))
@@ -742,7 +827,7 @@ def delete_node(session: Session, node_id: int) -> None:
     session.flush()
     _renumber(session, game_id, parent_id)
     session.commit()
-    _announce(game_id)
+    _announce(game_id, scope=SCOPE_TREE)
 
 
 def export_pgn(session: Session, game_id: int) -> str:
@@ -882,8 +967,14 @@ def pause_search(session: Session, search_id: int) -> dict[str, Any]:
     Whether the process really is parked is the worker's answer, which arrives as a second
     event once it has let go of its slot — `warm` on the row is written there and never
     here, because this module is not allowed to know whether a process exists.
+
+    A *task* cannot be paused: there is no process of ours to park — its run sits in the
+    analysis queue, which has no pause — and a row moved to `paused` under a run a worker
+    then claims would have the tree drawing a parked node while an engine works it.
+    `cancel_task` is the verb that exists, and `_refuse_task` says so.
     """
     row = _search(session, search_id)
+    _refuse_task(row, "paused")
     if row.status is SearchStatus.PAUSED:
         return _search_payload(row, _names_for(session, [row]))
     _require_live(row, "paused")
@@ -894,8 +985,13 @@ def pause_search(session: Session, search_id: int) -> dict[str, Any]:
 
 
 def resume_search(session: Session, search_id: int) -> dict[str, Any]:
-    """Queue a paused search again. Warm if its process survived, cold if it did not."""
+    """Queue a paused search again. Warm if its process survived, cold if it did not.
+
+    A task is refused for the reason `pause_search` refuses one: it never reaches `paused`,
+    and its place in the queue is the analysis queue's to hand out.
+    """
     row = _search(session, search_id)
+    _refuse_task(row, "resumed")
     if row.status is SearchStatus.QUEUED:
         return _search_payload(row, _names_for(session, [row]))
     if row.status is not SearchStatus.PAUSED:
@@ -916,8 +1012,14 @@ def stop_search(session: Session, search_id: int) -> dict[str, Any]:
     `warm` goes false here rather than when the worker has answered, because it is what the
     page prints about memory this deployment is holding, and a row that still claimed a
     process after the owner stopped it would be a strip the owner cannot act on.
+
+    Stopping a *task* is cancelling it, and is done through `cancel_task` — the row is only
+    half of a task, and one stopped here with its run left in the queue would be forty
+    million nodes spent on a position with nowhere to put the answer.
     """
     row = _search(session, search_id)
+    if row.kind is SearchKind.TASK:
+        return cancel_task(session, row.id)
     if row.status in TERMINAL_SEARCH_STATES:
         return _search_payload(row, _names_for(session, [row]))
     row.status = SearchStatus.STOPPED
@@ -1009,11 +1111,17 @@ def status(session: Session) -> dict[str, Any]:
     slots = _running_slots(session)
     running = [row for row in rows if row.status is SearchStatus.RUNNING]
     parked = [row for row in rows if row.status is SearchStatus.PAUSED and row.warm]
+    tasks = _task_counts(session)
     return {
         "slots": slots,
         "in_use": len(running),
         "queued": sum(1 for row in rows if row.status is SearchStatus.QUEUED),
         "paused": sum(1 for row in rows if row.status is SearchStatus.PAUSED),
+        # Tasks are counted apart from searches and not against the slots, because they are
+        # not in this pool at all: a task is an `AnalysisRun` in the ordinary queue and may
+        # be running on a runner on another machine. The strip says how much of the mode's
+        # work is out there all the same, which is the question the owner is asking.
+        "tasks": tasks,
         "parked": [
             {
                 "search_id": row.id,
@@ -1045,6 +1153,30 @@ def status(session: Session) -> dict[str, Any]:
             for index, engine in enumerate(search_engines(session))
         ],
         "eligible_engines": [_engine_entry(engine) for engine in eligible_engines(session)],
+    }
+
+
+def _task_counts(session: Session) -> dict[str, int]:
+    """How many tasks are waiting and how many are being worked on, right now.
+
+    Read off the search rows rather than off the runs: a task that is `running` is one a
+    worker has claimed, wherever that worker is, and the row is the one thing both halves
+    of the deployment agree about.
+    """
+    rows = list(
+        session.execute(
+            select(CorrespondenceSearch.status, func.count())
+            .where(
+                CorrespondenceSearch.kind == SearchKind.TASK,
+                CorrespondenceSearch.status.in_(LIVE_SEARCH_STATES),
+            )
+            .group_by(CorrespondenceSearch.status)
+        ).all()
+    )
+    counted = {str(status): int(count) for status, count in rows}
+    return {
+        "queued": counted.get(str(SearchStatus.QUEUED), 0),
+        "running": counted.get(str(SearchStatus.RUNNING), 0),
     }
 
 
@@ -1081,6 +1213,747 @@ def _engine_entry(engine: Engine, *, default: bool = False) -> dict[str, Any]:
     }
 
 
+# --- tasks and expansion ---------------------------------------------------
+
+
+def task_engine(session: Session, engine_id: int | None = None) -> Engine:
+    """The engine a task runs on: the one asked for, the one chosen, else the deep tier's.
+
+    Unlike a search, a task is an ordinary `AnalysisRun` and goes through the ordinary
+    queue — so a runner's engine is not only allowed, it is the point: a correspondence
+    deployment with a machine of its own gets its expansions run there for nothing. The
+    only things refused are an engine that is gone, one that is switched off, and a
+    human-move model, which answers a position rather than searching it.
+    """
+    from backend.services import engines as engines_service
+
+    wanted = engine_id
+    if wanted is None:
+        wanted = app_settings_service.get_correspondence_task_engine_id(session)
+    if wanted is None:
+        chosen = engines_service.engine_for_tier(session, Tier.DEEP)
+        if chosen is None:
+            raise CorrespondenceError(
+                "no engine is set for correspondence tasks, and no engine holds the deep "
+                "role either; choose one on Analysis → Correspondence"
+            )
+        return chosen
+    engine = session.get(Engine, int(wanted))
+    if engine is None:
+        raise CorrespondenceError(f"no engine with id {wanted}")
+    if not engine.enabled:
+        raise CorrespondenceError(f"{engine.name!r} is switched off")
+    if engine.kind is not EngineKind.UCI:
+        raise CorrespondenceError(
+            f"{engine.name!r} is a human-move model, and a task needs a UCI engine"
+        )
+    return engine
+
+
+def queue_task(
+    session: Session,
+    *,
+    node_id: int,
+    engine_id: int | None = None,
+    width: int | None = None,
+    stages: int | None = None,
+    commit: bool = True,
+) -> dict[str, Any]:
+    """A bounded search over one node, through the analysis queue like any other run.
+
+    Two rows, written together: a `task` search, which is what the tree draws a queue mark
+    from and what `absorb_run` finds its way back through, and an `AnalysisRun` over the
+    node's position carrying the task's budget. From there it is nobody's special case —
+    `claim_next_run` hands it to whichever worker asks first, on this host or on a runner,
+    and it comes back through `complete_run` like every other pass.
+
+    `width` and `stages` are what an expansion still owes below this node and are carried
+    on the search row, because hours pass between queueing a task and absorbing its answer
+    and nothing else survives them.
+    """
+    node = _node(session, node_id)
+    _row, game = _load(session, node.game_id)
+    _require_open(game, tree=True)
+    if node.mark is CorrespondenceMark.EXCLUDED:
+        raise CorrespondenceError(
+            "that move is excluded, and an excluded move is never given engine time"
+        )
+
+    engine = task_engine(session, engine_id)
+    live = session.scalars(
+        select(CorrespondenceSearch).where(
+            CorrespondenceSearch.node_id == node.id,
+            CorrespondenceSearch.engine_id == engine.id,
+            CorrespondenceSearch.status.in_(LIVE_SEARCH_STATES),
+        )
+    ).first()
+    if live is not None:
+        raise SearchBusyError(
+            f"{engine.name!r} is already on that position ({live.status}); "
+            f"cancel that first if you want another look"
+        )
+
+    nodes = app_settings_service.get_correspondence_task_nodes(session)
+    multipv = app_settings_service.get_correspondence_task_multipv(session)
+    row = CorrespondenceSearch(
+        node_id=node.id,
+        engine_id=engine.id,
+        multipv=multipv,
+        kind=SearchKind.TASK,
+        limit_nodes=nodes,
+        status=SearchStatus.QUEUED,
+        expand_width=None if width is None else int(width),
+        expand_stages=None if stages is None else max(0, int(stages)),
+    )
+    session.add(row)
+    session.flush()
+
+    board = _board_at(game, node, _nodes(session, node.game_id))
+    run = analysis_service.request_analysis(
+        session,
+        fen=board.fen(),
+        tier=Tier.DEEP,
+        engine_id=engine.id,
+        nodes=nodes,
+        multipv=multipv,
+        priority=_task_priority(session, node.game_id),
+        # A task is a search over one position and nothing else: a human-move model has
+        # nothing to add to a tree of engine verdicts, and asking it would put the run's
+        # two halves on two machines the moment the task engine is a runner's.
+        maia=False,
+        commit=False,
+    )
+    run.correspondence_search_id = row.id
+    row.run_id = run.id
+    if not commit:
+        # The caller owns the transaction — an expansion writes a dozen of these — and owns
+        # the announcement with it: an event that went out before the commit would have a
+        # page refetch the tree from before its own task existed, and nothing after that to
+        # tell it otherwise.
+        session.flush()
+        return _search_payload(row, {engine.id: engine.name})
+    session.commit()
+    return _announce_search(session, row, {engine.id: engine.name})
+
+
+def _announce_all(session: Session, payloads: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Say that each of these searches was written, now that the transaction has landed."""
+    announced: list[dict[str, Any]] = []
+    for payload in payloads:
+        row = session.get(CorrespondenceSearch, int(payload["id"]))
+        announced.append(payload if row is None else _announce_search(session, row))
+    return announced
+
+
+def expand_node(
+    session: Session,
+    node_id: int,
+    *,
+    width: int | None = None,
+    stages: int = 1,
+    tasks: bool = True,
+) -> dict[str, Any]:
+    """Turn the first moves of a node's best lines into children, and set engines on them.
+
+    IDeA's expansion, and the reason the analysis queue was worth reusing: one call ends,
+    an hour later and on whatever hosts the queue has, with a dozen evaluated positions
+    under the move being decided.
+
+    The children come from the node's *stored* verdict, so a node no engine has looked at
+    has nothing to expand from — and then this queues one task on the node itself, carrying
+    the whole expansion, which `absorb_run` unwinds the moment that task answers. Which is
+    what "expand this move" means on a fresh branch.
+
+    The marks steer it, and this is where they bite: an `excluded` child is skipped
+    entirely, a `bad` one is worth one stage at most, and a `good` or `interesting` one gets
+    an extra stage and an extra sibling. A mark is the player's word against the engine's,
+    so it changes what the machine spends its night on rather than only what the tree looks
+    like.
+    """
+    node = _node(session, node_id)
+    _row, game = _load(session, node.game_id)
+    _require_open(game, tree=True)
+    if node.mark is CorrespondenceMark.EXCLUDED:
+        raise CorrespondenceError("that move is excluded, so it is never expanded")
+
+    wide = _expand_width(session, width)
+    deep = _expand_stages(stages)
+    lines = _best_lines(session, node)
+    if not lines:
+        if not tasks:
+            raise CorrespondenceError(
+                "no engine has looked at that position yet, so there are no lines to expand; "
+                "queue a task on it first"
+            )
+        search = queue_task(session, node_id=node.id, width=wide, stages=deep, commit=False)
+        session.commit()
+        announced = _announce_all(session, [search])
+        _announce(node.game_id, scope=SCOPE_TREE)
+        return {"game_id": node.game_id, "created": 0, "queued": 1, "searches": announced}
+
+    created, searches = _expand_from(
+        session, node, game, lines, width=wide, stages=deep, tasks=tasks
+    )
+    session.commit()
+    announced = _announce_all(session, searches)
+    _announce(node.game_id, scope=SCOPE_TREE)
+    return {
+        "game_id": node.game_id,
+        "created": created,
+        "queued": len(announced),
+        "searches": announced,
+    }
+
+
+def cancel_task(session: Session, search_id: int) -> dict[str, Any]:
+    """Take a queued task back out of the queue: the run goes, the search says `stopped`.
+
+    Both directions of the link are closed here, which is the whole job. A run deleted with
+    its search row left `queued` would be a spinner on a node that nothing will ever take
+    off it; a search row deleted with its run left in the queue would be an engine spending
+    forty million nodes on a position nobody is waiting for, with nowhere to put the answer.
+
+    A task a worker has already claimed cannot be cancelled — there is no cancelled status
+    for a run in flight, and a pass mid-search is cheaper finished than thrown away — so
+    this says so rather than half-doing it. A task that has already ended is left exactly
+    as it is, as a second `stop` on a search is.
+    """
+    row = _search(session, search_id)
+    if row.kind is not SearchKind.TASK:
+        raise CorrespondenceError("that is a search rather than a task; stop it instead")
+    if row.status in TERMINAL_SEARCH_STATES:
+        return _search_payload(row, _names_for(session, [row]))
+
+    run = session.get(AnalysisRun, row.run_id) if row.run_id else None
+    if run is not None and run.status is not RunStatus.QUEUED:
+        raise TaskRunningError(
+            f"that task is already {run.status} on an engine; it will finish on its own"
+        )
+    if run is not None:
+        session.delete(run)
+    row.status = SearchStatus.STOPPED
+    row.warm = False
+    row.run_id = None
+    row.finished_at = utcnow()
+    session.commit()
+    payload = _announce_search(session, row)
+    _announce_game_of(session, row)
+    return payload
+
+
+def release_tasks(
+    session: Session, search_ids: Sequence[int], *, reason: str | None = None
+) -> list[dict[str, Any]]:
+    """Say that these tasks' runs are gone, because the queue was cleared under them.
+
+    The other direction of `cancel_task`, and the reason it exists: "Clear the queue" on the
+    Analysis page deletes every queued run, correspondence tasks included, and knows nothing
+    about trees. So it hands the search ids back here and the rows follow their runs out.
+    """
+    rows = list(
+        session.scalars(
+            select(CorrespondenceSearch).where(
+                CorrespondenceSearch.id.in_([int(value) for value in search_ids]),
+                CorrespondenceSearch.status.in_(LIVE_SEARCH_STATES),
+            )
+        )
+    )
+    if not rows:
+        return []
+    moment = utcnow()
+    for row in rows:
+        row.status = SearchStatus.STOPPED
+        row.warm = False
+        row.run_id = None
+        row.finished_at = moment
+        row.error = reason or "the analysis queue was cleared before this task ran"
+    session.commit()
+    announced = [_announce_search(session, row) for row in rows]
+    for game_id in _games_of(session, rows):
+        _announce(game_id, scope=SCOPE_TREE)
+    return announced
+
+
+def mark_task_running(session: Session, search_id: int) -> dict[str, Any] | None:
+    """A worker has claimed this task's run. The row says so, and the tree spins.
+
+    Written rather than derived from the run: the search row is what every correspondence
+    surface reads, and a tree that had to join the analysis queue to know whether a node
+    was being worked on would be two sources of truth for one fact. `requeue_task` is the
+    other half — a run handed back to the queue puts its task back to `queued`.
+    """
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None or row.kind is not SearchKind.TASK:
+        return None
+    if row.status is not SearchStatus.QUEUED:
+        return None
+    row.status = SearchStatus.RUNNING
+    row.started_at = utcnow()
+    row.heartbeat_at = utcnow()
+    session.commit()
+    return _announce_search(session, row)
+
+
+def requeue_task(session: Session, search_id: int) -> dict[str, Any] | None:
+    """The task's run went back into the queue — a worker died, or was stopped mid-pass."""
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None or row.kind is not SearchKind.TASK:
+        return None
+    if row.status is not SearchStatus.RUNNING:
+        return None
+    row.status = SearchStatus.QUEUED
+    row.started_at = None
+    session.commit()
+    return _announce_search(session, row)
+
+
+def fail_task(
+    session: Session, search_id: int, *, error: str, stderr: str | None = None
+) -> dict[str, Any] | None:
+    """A task's run failed for good. The search says so, and the tree keeps what it had."""
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None:
+        return None
+    payload = mark_finished(session, row.id, status=SearchStatus.FAILED, error=error, stderr=stderr)
+    _announce_game_of(session, row)
+    return payload
+
+
+def absorb_run(session: Session, run: AnalysisRun) -> dict[str, Any] | None:
+    """A finished task's evaluation into the tree, and the next stage of its expansion.
+
+    Called by `analysis.complete_run` for any run that names a search, which is the one
+    place the two queues meet. Three things happen, in this order:
+
+    * the run's single `MoveEval` becomes a (position, engine) verdict, **forward only**:
+      a task that lands on a position a three-day search has already settled changes
+      nothing, which is what makes a shared eval table safe to write into from two kinds
+      of worker at once;
+    * the search row goes `done`, so the tree's queue mark comes off the node;
+    * if the task was queued by an expansion with stages left, the first moves of the
+      lines it came back with become children and get tasks of their own.
+
+    A run whose search or node is gone — the branch was deleted while the task sat in the
+    queue — absorbs nothing and says nothing. The evaluation is not written in that case
+    even though the eval table outlives nodes, because there is no node left to read the
+    position off: a run carries an EPD, and mapping it back to a tree is exactly what the
+    search row was for.
+    """
+    if run.correspondence_search_id is None:
+        return None
+    row = session.get(CorrespondenceSearch, int(run.correspondence_search_id))
+    if row is None:
+        return None
+    node = session.get(CorrespondenceNode, row.node_id)
+    if node is None:  # pragma: no cover - the foreign key cascades with the node
+        return None
+
+    evaluation = session.scalars(
+        select(MoveEval).where(MoveEval.run_id == run.id).order_by(MoveEval.ply, MoveEval.id)
+    ).first()
+    engine = session.get(Engine, row.engine_id) if row.engine_id else None
+    picture = _task_picture(node, evaluation)
+    stored = _write_eval(
+        session,
+        epd=node.epd,
+        engine_id=row.engine_id,
+        engine=engine,
+        picture=picture,
+        time_delta_ms=_run_millis(run),
+    )
+
+    ended = row.status in TERMINAL_SEARCH_STATES
+    if not ended:
+        row.status = SearchStatus.DONE
+        row.warm = False
+        row.finished_at = utcnow()
+        row.heartbeat_at = utcnow()
+        row.error = None
+    session.commit()
+
+    if not ended:
+        # A task the owner stopped, or one whose queue was cleared, still keeps whatever
+        # verdict the engine happened to reach — forward-only makes that free — but it
+        # expands nothing: the expansion was the thing that was called off.
+        _expand_after(session, row, node, picture)
+    _announce_search(session, row)
+    _announce(node.game_id, scope=SCOPE_TREE)
+    return None if stored is None else _eval_payload(stored, _reading(session, [stored], []))
+
+
+def refresh_subtree(
+    session: Session, node_id: int, *, limit: int = REFRESH_LIMIT, engine_id: int | None = None
+) -> dict[str, Any]:
+    """Queue a task on every stale node from here down, or refuse and say how many there are.
+
+    Stale is `is_stale`: a verdict from an engine version that has since been upgraded, or
+    one shallower than `correspondence_stale_depth`. A node no engine has ever looked at
+    counts too — a refresh of a branch is "make this branch current", and a hole in it is
+    the least current thing there is.
+
+    Excluded moves are skipped along with everything under them, and a node that already
+    has an engine on it is left alone: it is being made current as we speak.
+    """
+    node = _node(session, node_id)
+    _row, game = _load(session, node.game_id)
+    _require_open(game, tree=True)
+
+    nodes = _nodes(session, node.game_id)
+    children = _by_parent(nodes)
+    evals = _evals_for(session, {row.epd for row in nodes})
+    searches = _searches_for(session, [row.id for row in nodes])
+    reading = _reading(
+        session, [row for rows in evals.values() for row in rows], list(searches.values())
+    )
+
+    wanted: list[CorrespondenceNode] = []
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if current.mark is CorrespondenceMark.EXCLUDED:
+            continue
+        stack.extend(children.get(current.id, []))
+        if any(row.status in LIVE_SEARCH_STATES for row in searches.get(current.id, [])):
+            continue
+        if _node_stale(current, evals.get(current.epd, []), reading):
+            wanted.append(current)
+    if len(wanted) > limit:
+        raise TooMuchToRefreshError(
+            f"{len(wanted)} positions under there are stale, and one refresh queues at "
+            f"most {limit}; refresh a branch at a time"
+        )
+
+    queued: list[dict[str, Any]] = []
+    for stale in sorted(wanted, key=lambda row: (row.ply, row.rank, row.id)):
+        try:
+            queued.append(queue_task(session, node_id=stale.id, engine_id=engine_id, commit=False))
+        except (SearchBusyError, CorrespondenceError):
+            continue
+    session.commit()
+    announced = _announce_all(session, queued)
+    _announce(node.game_id, scope=SCOPE_TREE)
+    return {
+        "game_id": node.game_id,
+        "stale": len(wanted),
+        "queued": len(announced),
+        "searches": announced,
+    }
+
+
+def is_stale(row: CorrespondenceEval, *, version: str | None, stale_depth: int) -> bool:
+    """Whether a stored verdict is one to ask again, for either of the two reasons.
+
+    Too shallow, or written by a build of the engine that is no longer installed. The
+    second is the one a person forgets: a Stockfish upgraded in January makes every verdict
+    from December a verdict from a different player, however deep it went.
+
+    An engine that is gone from the table cannot be compared with, so a verdict of its own
+    is judged on depth alone — there is no version to disagree with, and marking it stale
+    for that would mark every deleted engine's work stale forever.
+    """
+    if (row.depth or 0) < stale_depth:
+        return True
+    return version is not None and (row.engine_version or "") != version
+
+
+# --- internals: tasks and expansion ----------------------------------------
+
+
+def _task_priority(session: Session, game_id: int) -> int:
+    """Where this task goes in the queue: nearest deadline first, inside the task band.
+
+    One step of priority per whole day left. See `TASK_PRIORITY_LOW` for why the due date
+    is encoded here rather than in the run's `created_at`.
+    """
+    due = session.scalar(
+        select(CorrespondenceGame.reply_due).where(CorrespondenceGame.game_id == int(game_id))
+    )
+    if due is None:
+        return TASK_PRIORITY_LOW
+    left = (_moment(due) or utcnow()) - utcnow()
+    days = left.total_seconds() / 86400
+    steps = int(days) if days > 0 else 0
+    return max(TASK_PRIORITY_LOW, TASK_PRIORITY_HIGH - steps)
+
+
+def _expand_width(session: Session, width: int | None) -> int:
+    """How many children one stage makes: what was asked for, else the task's line count."""
+    if width is None:
+        width = app_settings_service.get_correspondence_task_multipv(session)
+    return max(1, min(MAX_EXPAND_WIDTH, int(width)))
+
+
+def _expand_stages(stages: int | None) -> int:
+    if stages is None:
+        return 1
+    return max(1, min(MAX_EXPAND_STAGES, int(stages)))
+
+
+def _best_lines(session: Session, node: CorrespondenceNode) -> list[dict[str, Any]]:
+    """The lines the node's chosen verdict came back with, in multipv order."""
+    rows = _evals_for(session, [node.epd]).get(node.epd, [])
+    chosen = chosen_eval(rows, node.pinned_engine_id)
+    if chosen is None or not chosen.best_lines:
+        return []
+    return sorted(
+        (dict(line) for line in chosen.best_lines), key=lambda line: line.get("multipv") or 1
+    )
+
+
+def _expand_from(
+    session: Session,
+    node: CorrespondenceNode,
+    game: Game,
+    lines: Sequence[dict[str, Any]],
+    *,
+    width: int,
+    stages: int,
+    tasks: bool,
+) -> tuple[int, list[dict[str, Any]]]:
+    """One stage: the top `width` first moves become children, each with a task under it.
+
+    Nothing is committed here — the caller owns the transaction, because an expansion that
+    wrote half its children and then failed on an illegal move would leave a tree nobody
+    asked for. A move already in the tree is walked to rather than added, so expanding the
+    same node twice widens it instead of duplicating it.
+    """
+    nodes = _nodes(session, node.game_id)
+    board = _board_at(game, node, nodes)
+    created = 0
+    queued: list[dict[str, Any]] = []
+    for uci in _first_moves(board, lines, width):
+        child = _child(session, node, uci)
+        if child is not None and child.mark is CorrespondenceMark.EXCLUDED:
+            continue
+        if child is None:
+            move = board.parse_uci(uci)
+            child = _add(
+                session,
+                node.game_id,
+                node,
+                board.uci(move),
+                board.san(move),
+                _epd(board, move),
+            )
+            created += 1
+        if not tasks:
+            continue
+        left = _stages_for(child, stages)
+        try:
+            queued.append(
+                queue_task(
+                    session,
+                    node_id=child.id,
+                    width=_width_for(child, width),
+                    stages=left,
+                    commit=False,
+                )
+            )
+        except (SearchBusyError, CorrespondenceError):
+            # An engine is already on that child, or the deployment has none to give: the
+            # rest of the expansion is still worth having, and the row that is already
+            # there will answer for this one.
+            continue
+    return created, queued
+
+
+def _expand_after(
+    session: Session,
+    row: CorrespondenceSearch,
+    node: CorrespondenceNode,
+    picture: dict[str, Any] | None,
+) -> None:
+    """The stage of an expansion this task owed, now that its lines have arrived.
+
+    Read off the task's own row rather than off anything held in memory: hours and a
+    restart may have passed, and the run may have been worked on another machine entirely.
+    """
+    stages = row.expand_stages or 0
+    if stages <= 0 or picture is None or not picture.get("lines"):
+        return
+    if node.mark is CorrespondenceMark.EXCLUDED:
+        return
+    _row, game = _load(session, node.game_id)
+    if game.result is not Result.UNKNOWN:
+        # The game finished while the task was in the queue: its tree is read-only now, and
+        # the verdict this run brought is the last thing that will be written into it.
+        return
+    width = _expand_width(session, row.expand_width)
+    try:
+        _created, queued = _expand_from(
+            session, node, game, picture["lines"], width=width, stages=stages, tasks=True
+        )
+    except CorrespondenceError:
+        logger.warning("correspondence: expansion below node %s could not continue", node.id)
+        session.rollback()
+        return
+    # The debt is paid, and saying so is what makes absorbing idempotent: a run completed
+    # twice — a retry that both sides thought they owned — must not expand the node twice.
+    row.expand_stages = 0
+    session.commit()
+    _announce_all(session, queued)
+
+
+def _first_moves(board: Any, lines: Sequence[dict[str, Any]], width: int) -> list[str]:
+    """The first move of each line, deduped, legal here, at most `width` of them.
+
+    Checked against the board because the lines may be a verdict from another game that
+    transposed into this position, and a PV whose first move is not legal here is a row
+    written by an engine that was asked about something else.
+    """
+    found: list[str] = []
+    for line in lines:
+        pv = line.get("pv") or []
+        if not pv:
+            continue
+        try:
+            move = board.parse_uci(str(pv[0]))
+        except ValueError:
+            continue
+        spelled = board.uci(move)
+        if spelled not in found:
+            found.append(spelled)
+        if len(found) >= width:
+            break
+    return found
+
+
+def _epd(board: Any, move: Any) -> str:
+    """The normalised position after this move, without disturbing the board."""
+    board.push(move)
+    try:
+        return normalize_fen(board.fen())[0]
+    finally:
+        board.pop()
+
+
+def _stages_for(child: CorrespondenceNode, stages: int) -> int:
+    """How many stages the expansion still owes below this child, after its mark."""
+    left = max(0, stages - 1)
+    if child.mark in (CorrespondenceMark.GOOD, CorrespondenceMark.INTERESTING):
+        return min(MAX_EXPAND_STAGES, left + MARK_BONUS)
+    if child.mark is CorrespondenceMark.BAD:
+        return min(left, BAD_MARK_STAGES)
+    return left
+
+
+def _width_for(child: CorrespondenceNode, width: int) -> int:
+    """How wide the expansion below this child is, after its mark."""
+    if child.mark in (CorrespondenceMark.GOOD, CorrespondenceMark.INTERESTING):
+        return min(MAX_EXPAND_WIDTH, width + MARK_BONUS)
+    return width
+
+
+def _task_picture(node: CorrespondenceNode, row: MoveEval | None) -> dict[str, Any] | None:
+    """A task's one `MoveEval` in the shape `checkpoint` writes, or None if it said nothing.
+
+    Two conversions, and both would be invisible if they were wrong. A run's `best_lines`
+    are in **White's** frame, because that is how `MoveEval` stores every score; a
+    correspondence verdict is in the **side to move's**, because that is how a live search's
+    snapshots arrive and how the tree reads a number. And a run's `eval_before_*` is already
+    the mover's, so it is the one pair that crosses unchanged.
+
+    A run over a **terminal** position is not a verdict, exactly as `_picture` decides for a
+    snapshot with no line: no engine was asked, and what `terminal_score` writes is a
+    `mate = 0` whose sign lives in `cp` (`Score.stored_cp`) — a pair the eval table's
+    `{cp, mate}` cannot carry, so a checkmate would be stored as a mate of unknown side and
+    minimax would back the wrong move up. The tree already knows a mate when it sees one:
+    `checkmate`, `stalemate` and `dead_position` are computed from the node's path on read.
+    """
+    if row is None:
+        return None
+    if row.eval_before_cp is None and row.eval_before_mate is None:
+        return None
+    if not row.best_lines:
+        return None
+    white_to_move = _white_to_move(node.epd)
+    lines = _mover_lines(row.best_lines, white_to_move)
+    return {
+        "depth": int(row.depth or 0),
+        "nodes": row.nodes,
+        "cp": row.eval_before_cp,
+        "mate": row.eval_before_mate,
+        "lines": lines,
+        "best": row.best_move_uci or ((lines[0].get("pv") or [None])[0] if lines else None),
+    }
+
+
+def _mover_lines(lines: Sequence[dict[str, Any]] | None, white_to_move: bool) -> list[dict]:
+    """`MoveEval.best_lines` (White's frame) as the eval table keeps them (the mover's)."""
+    if not lines:
+        return []
+    if white_to_move:
+        return [dict(line) for line in lines]
+    flipped: list[dict[str, Any]] = []
+    for line in lines:
+        entry = dict(line)
+        for key in ("cp", "mate"):
+            value = entry.get(key)
+            if isinstance(value, int) and not isinstance(value, bool):
+                entry[key] = -value
+        flipped.append(entry)
+    return flipped
+
+
+def _white_to_move(epd: str) -> bool:
+    """Whose move it is in a stored EPD, read off the field rather than by parsing it."""
+    parts = epd.split()
+    return len(parts) < 2 or parts[1] == "w"
+
+
+def _run_millis(run: AnalysisRun) -> int:
+    """How long the task's run actually took, for the eval row's running total."""
+    start, end = _moment(run.started_at), _moment(run.finished_at)
+    if start is None or end is None:
+        return 0
+    return max(0, int((end - start).total_seconds() * 1000))
+
+
+def _node_stale(
+    node: CorrespondenceNode, rows: Sequence[CorrespondenceEval], reading: _Reading
+) -> bool:
+    """Whether this node is one a refresh should ask about again.
+
+    A node with no verdict at all is stale by this reading, which is not what `is_stale`
+    says about a *verdict* — there is none to judge. The difference is deliberate: the flag
+    on the tree answers "is this number old", and this answers "is this branch current".
+    """
+    chosen = chosen_eval(rows, node.pinned_engine_id)
+    if chosen is None:
+        return True
+    return is_stale(
+        chosen,
+        version=reading.versions.get(chosen.engine_id or -1),
+        stale_depth=reading.stale_depth,
+    )
+
+
+def _games_of(session: Session, rows: Sequence[CorrespondenceSearch]) -> list[int]:
+    """The games these searches' nodes belong to, once each: one refetch per page, not per
+    row, which is what a queue-wide clear over a dozen tasks would otherwise cost."""
+    node_ids = sorted({row.node_id for row in rows})
+    if not node_ids:
+        return []
+    return sorted(
+        set(
+            session.scalars(
+                select(CorrespondenceNode.game_id).where(CorrespondenceNode.id.in_(node_ids))
+            )
+        )
+    )
+
+
+def _announce_game_of(session: Session, row: CorrespondenceSearch) -> None:
+    """Tell the page holding this search's game to refetch, if the node is still there.
+
+    A task's row survives its node being deleted only in the moment between the two writes;
+    with the node gone there is no tree to refetch and nothing to say.
+    """
+    node = session.get(CorrespondenceNode, row.node_id)
+    if node is not None:
+        _announce(node.game_id, scope=SCOPE_TREE)
+
+
 # --- searches: what the worker calls ---------------------------------------
 
 
@@ -1099,6 +1972,12 @@ def search_context(session: Session, search_id: int) -> dict[str, Any] | None:
 
     row = session.get(CorrespondenceSearch, int(search_id))
     if row is None or row.status is not SearchStatus.QUEUED:
+        return None
+    if row.kind is not SearchKind.SEARCH:
+        # A task is queued the same way and announced through the same event, but it is the
+        # analysis queue's work and not this pool's. The event carries `kind` so the worker
+        # never gets this far; this is the second lock on the same door, because a task
+        # started as an infinite search would hold a correspondence slot forever.
         return None
     node = _node(session, row.node_id)
     _row, game = _load(session, node.game_id)
@@ -1251,53 +2130,25 @@ def checkpoint(
         return None
 
     engine = session.get(Engine, row.engine_id) if row.engine_id else None
-    picture = _picture(snapshot)
-    stored = session.scalars(
-        select(CorrespondenceEval).where(
-            CorrespondenceEval.epd == node.epd,
-            CorrespondenceEval.engine_id == row.engine_id,
-        )
-    ).first()
+    stored = _write_eval(
+        session,
+        epd=node.epd,
+        engine_id=row.engine_id,
+        engine=engine,
+        picture=_picture(snapshot),
+        time_delta_ms=time_delta_ms,
+    )
     if stored is None:
-        if picture is None:
-            # No row for a search that has not said anything yet. A checkmate, a stop
-            # inside the first snapshot interval: the engine has judged nothing, and a row
-            # written here would be a permanent all-NULL verdict keyed by (position,
-            # engine) — a pane with no number on it in every game that ever reaches this
-            # position, and an empty answer for `chosen_eval` if the owner pinned it.
-            session.commit()
-            return None
-        stored = CorrespondenceEval(
-            epd=node.epd,
-            engine_id=row.engine_id,
-            engine_name=engine.name if engine else "engine",
-            engine_version=engine.version if engine else None,
-            history=[],
-        )
-        session.add(stored)
-    if engine is not None:
-        # An engine that has been upgraded under a running search: the verdict is the new
-        # binary's from here on, and the row says which one wrote it.
-        stored.engine_name = engine.name
-        stored.engine_version = engine.version
-    stored.time_ms = (stored.time_ms or 0) + max(0, int(time_delta_ms))
-
-    if picture is not None and picture["depth"] >= (stored.depth or 0):
-        stored.cp = picture["cp"]
-        stored.mate = picture["mate"]
-        stored.depth = picture["depth"]
-        stored.nodes = picture["nodes"]
-        stored.best_lines = picture["lines"]
-        _append_history(stored, picture)
-    stored.updated_at = utcnow()
+        session.commit()
+        return None
     session.commit()
     if final:
         # The tree reads the eval table, so the page has to refetch once the search has
         # stopped writing to it. Not on every checkpoint: the live numbers travel as
         # `correspondence.snapshot`, and a tree refetch every few seconds for three days
         # would be the one thing this mode must not cost.
-        _announce(node.game_id)
-    return _eval_payload(stored, {stored.engine_id or -1: stored.engine_name})
+        _announce(node.game_id, scope=SCOPE_TREE)
+    return _eval_payload(stored, _reading(session, [stored], []))
 
 
 def recover_at_boot(session: Session) -> dict[str, Any]:
@@ -1745,6 +2596,61 @@ def _evals_for(session: Session, epds: Iterable[str]) -> dict[str, list[Correspo
     return found
 
 
+def _write_eval(
+    session: Session,
+    *,
+    epd: str,
+    engine_id: int | None,
+    engine: Engine | None,
+    picture: dict[str, Any] | None,
+    time_delta_ms: int = 0,
+) -> CorrespondenceEval | None:
+    """One picture into the (position, engine) row, forward only. Nothing is committed.
+
+    The one place a verdict is written, whichever kind of work produced it: a three-day
+    search's checkpoint and a forty-million-node task's answer go through exactly these
+    rules, which is the only way "a shallower result never overwrites a deeper one" can be
+    true of a table two queues write into.
+
+    None comes back when there is nothing to write and no row to write it to — a search
+    that has said nothing yet, a task over a position the engine could not be asked about.
+    A row is never created empty: an all-NULL verdict keyed by (position, engine) would be
+    a pane with no number on it in every game that ever reaches this position.
+    """
+    stored = session.scalars(
+        select(CorrespondenceEval).where(
+            CorrespondenceEval.epd == epd,
+            CorrespondenceEval.engine_id == engine_id,
+        )
+    ).first()
+    if stored is None:
+        if picture is None:
+            return None
+        stored = CorrespondenceEval(
+            epd=epd,
+            engine_id=engine_id,
+            engine_name=engine.name if engine else "engine",
+            engine_version=engine.version if engine else None,
+            history=[],
+        )
+        session.add(stored)
+    if engine is not None:
+        # An engine that has been upgraded under a running search: the verdict is the new
+        # binary's from here on, and the row says which one wrote it.
+        stored.engine_name = engine.name
+        stored.engine_version = engine.version
+    stored.time_ms = (stored.time_ms or 0) + max(0, int(time_delta_ms))
+    if picture is not None and picture["depth"] >= (stored.depth or 0):
+        stored.cp = picture["cp"]
+        stored.mate = picture["mate"]
+        stored.depth = picture["depth"]
+        stored.nodes = picture["nodes"]
+        stored.best_lines = picture["lines"]
+        _append_history(stored, picture)
+    stored.updated_at = utcnow()
+    return stored
+
+
 def _searches_for(
     session: Session, node_ids: Sequence[int]
 ) -> dict[int, list[CorrespondenceSearch]]:
@@ -1761,24 +2667,31 @@ def _searches_for(
     return found
 
 
-def _engine_names(
+def _reading(
     session: Session,
-    evals: dict[str, list[CorrespondenceEval]],
-    searches: dict[int, list[CorrespondenceSearch]],
-) -> dict[int, str]:
-    """The name of every engine the payload mentions, in one query.
+    evals: Sequence[CorrespondenceEval],
+    searches: Sequence[Sequence[CorrespondenceSearch]],
+) -> _Reading:
+    """Everything a payload needs about the engines it mentions, in one query.
 
-    An eval row carries its own engine's name so a deleted engine still reads; a search row
-    does not, because a search only exists while its engine does.
+    Names, because an eval row carries its own engine's name so a deleted engine still
+    reads while a search row does not; versions, because "stale" is partly a comparison
+    against the binary that is installed *now*; and the stale depth, which is a setting and
+    is read once per payload rather than once per verdict.
     """
-    ids = {row.engine_id for rows in evals.values() for row in rows if row.engine_id}
-    ids |= {row.engine_id for rows in searches.values() for row in rows if row.engine_id}
-    if not ids:
-        return {}
-    return {
-        engine.id: engine.name
-        for engine in session.scalars(select(Engine).where(Engine.id.in_(sorted(ids))))
-    }
+    ids = {row.engine_id for row in evals if row.engine_id}
+    ids |= {row.engine_id for rows in searches for row in rows if row.engine_id}
+    names: dict[int, str] = {}
+    versions: dict[int, str | None] = {}
+    if ids:
+        for engine in session.scalars(select(Engine).where(Engine.id.in_(sorted(ids)))):
+            names[engine.id] = engine.name
+            versions[engine.id] = engine.version
+    return _Reading(
+        names=names,
+        versions=versions,
+        stale_depth=app_settings_service.get_correspondence_stale_depth(session),
+    )
 
 
 def _running(session: Session, game_ids: Sequence[int]) -> dict[int, list[dict[str, Any]]]:
@@ -1815,6 +2728,14 @@ def _search(session: Session, search_id: int) -> CorrespondenceSearch:
 def _require_live(row: CorrespondenceSearch, verb: str) -> None:
     if row.status in TERMINAL_SEARCH_STATES:
         raise CorrespondenceError(f"that search is {row.status} and cannot be {verb}")
+
+
+def _refuse_task(row: CorrespondenceSearch, verb: str) -> None:
+    """Say no to a verb that only an infinite search has. Tasks belong to the queue."""
+    if row.kind is SearchKind.TASK:
+        raise CorrespondenceError(
+            f"that is a task rather than a search and cannot be {verb}; cancel it instead"
+        )
 
 
 def _live_searches(
@@ -2045,6 +2966,12 @@ def _announce_search(
             "node_id": row.node_id,
             "game_id": game_id,
             "engine_id": row.engine_id,
+            # Which of the two engine modes moved. The search worker acts on `search` rows
+            # and must ignore `task` ones — they are the analysis queue's, and one started
+            # as an infinite search would hold a correspondence slot until the owner
+            # noticed — so the kind travels with every transition rather than being looked
+            # up by a reader that would then have to have a Session.
+            "kind": str(row.kind),
             "status": str(row.status),
             "warm": bool(row.warm),
         }
@@ -2179,16 +3106,20 @@ def _node_payload(node: CorrespondenceNode, start: _Start) -> dict[str, Any]:
     }
 
 
-def _eval_payload(row: CorrespondenceEval, names: dict[int, str]) -> dict[str, Any]:
-    """One engine's verdict on one position, exactly as it is stored.
+def _eval_payload(row: CorrespondenceEval, reading: _Reading) -> dict[str, Any]:
+    """One engine's verdict on one position, exactly as it is stored, plus whether it is old.
 
     Side to move's point of view, the way `MoveEval` stores a score — the node's own
     numbers are turned into the mover's frame in `own` and `backed`, and this is the raw
     row an engine pane draws.
+
+    `stale` is computed rather than stored, for the reason `own` and `backed` are: it is a
+    comparison against a setting and against the engine version installed *now*, and a
+    column holding it would be a column to sweep every time either moved.
     """
     return {
         "engine_id": row.engine_id,
-        "engine_name": names.get(row.engine_id or -1) or row.engine_name,
+        "engine_name": reading.names.get(row.engine_id or -1) or row.engine_name,
         "engine_version": row.engine_version,
         "cp": row.cp,
         "mate": row.mate,
@@ -2198,6 +3129,11 @@ def _eval_payload(row: CorrespondenceEval, names: dict[int, str]) -> dict[str, A
         "best_lines": row.best_lines,
         "history": row.history or [],
         "tablebase": row.tablebase,
+        "stale": is_stale(
+            row,
+            version=reading.versions.get(row.engine_id or -1),
+            stale_depth=reading.stale_depth,
+        ),
         "updated_at": _stamp(row.updated_at),
     }
 
@@ -2241,7 +3177,7 @@ def _assemble(
     nodes: Sequence[CorrespondenceNode],
     evals: dict[str, list[CorrespondenceEval]],
     searches: dict[int, list[CorrespondenceSearch]],
-    names: dict[int, str],
+    reading: _Reading,
 ) -> tuple[dict[str, Any] | None, dict[int, dict[str, Any]]]:
     """The whole tree as nested payloads, with the two numbers and the draw flags on each.
 
@@ -2294,9 +3230,24 @@ def _assemble(
                 # say whose it is, and working it out a second time in the client is how
                 # the two would come to disagree.
                 "chosen_engine_id": chosen.engine_id if chosen is not None else None,
-                "evals": [_eval_payload(row, names) for row in rows],
-                "searches": [_search_payload(row, names) for row in searches.get(node.id, [])],
+                "evals": [_eval_payload(row, reading) for row in rows],
+                "searches": [
+                    _search_payload(row, reading.names) for row in searches.get(node.id, [])
+                ],
                 "disagree": disagreement(rows),
+                # Whether the number this node shows is one to ask again — the pin's or the
+                # deepest one's, since that is the verdict the tree is reading here. A node
+                # nothing has evaluated is not stale: there is no verdict to be old.
+                "stale": chosen is not None
+                and is_stale(
+                    chosen,
+                    version=reading.versions.get(chosen.engine_id or -1),
+                    stale_depth=reading.stale_depth,
+                ),
+                # The task waiting on, or running over, this position, for the queue mark
+                # the tree draws. At most one is shown: two engines on one node is the
+                # searches' business, and a queue mark says "something is coming".
+                "task": _task_state(searches.get(node.id, []), reading.names),
                 "flags": _flags(board, seen[node.epd]),
                 "children": kids,
             }
@@ -2307,6 +3258,27 @@ def _assemble(
 
     tree, _value = walk(root)
     return tree, payloads
+
+
+def _task_state(
+    rows: Sequence[CorrespondenceSearch], names: dict[int, str]
+) -> dict[str, Any] | None:
+    """The live task on this node, as the tree's queue mark reads it. None if there is none."""
+    live = next(
+        (row for row in rows if row.kind is SearchKind.TASK and row.status in LIVE_SEARCH_STATES),
+        None,
+    )
+    if live is None:
+        return None
+    return {
+        "search_id": live.id,
+        "run_id": live.run_id,
+        "status": str(live.status),
+        "engine_id": live.engine_id,
+        "engine_name": names.get(live.engine_id or -1),
+        "stages": live.expand_stages,
+        "width": live.expand_width,
+    }
 
 
 def _flags(board: Any, repetitions: int) -> dict[str, Any]:
@@ -2420,8 +3392,17 @@ def _score_payload(row: CorrespondenceEval | None, frame: Color) -> dict[str, An
 
 
 def _score(cp: int | None, mate: int | None) -> int:
-    """One comparable number, so a mate and a centipawn score can be ordered together."""
+    """One comparable number, so a mate and a centipawn score can be ordered together.
+
+    `mate = 0` is the one value that cannot say whose mate it is — `Mate(0)` and `MateGiven`
+    both report it — so the sign is taken from `cp`, the way `Score.stored_cp` writes it.
+    Nothing stores such a pair (`_picture` and `_task_picture` both refuse a terminal
+    position), and reading one as "mated" regardless would order a delivered mate below
+    every losing move there is.
+    """
     if mate is not None:
+        if mate == 0:
+            return -MATE_SCORE if (cp or 0) < 0 else MATE_SCORE
         return MATE_SCORE - mate if mate > 0 else -MATE_SCORE - mate
     return cp or 0
 
@@ -2649,11 +3630,15 @@ def _list_order(row: dict[str, Any]) -> tuple[Any, ...]:
     return (section, due if due is not None else 10**6, -row["game_id"])
 
 
-def _announce(game_id: int) -> None:
+def _announce(game_id: int, *, scope: str = SCOPE_GAME) -> None:
     """Tell every surface the game moved; the page refetches the tree.
 
     One event for every change here, deliberately: the tree, the move list, the deadlines
     and the marks are one document as far as a reader is concerned, and a client that had
     to work out which of eight events meant "refetch" would eventually get it wrong.
+
+    `scope` is the one thing the frame does split, and only because of how often the tree
+    half fires: a change that did not touch the `Game` row says `tree`, so a client can
+    leave the library and the explorer alone. See `SCOPE_GAME`.
     """
-    events_service.emit({"event": EVENT_UPDATED, "game_id": int(game_id)})
+    events_service.emit({"event": EVENT_UPDATED, "game_id": int(game_id), "scope": scope})

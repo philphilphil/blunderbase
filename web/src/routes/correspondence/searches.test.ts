@@ -8,11 +8,15 @@ import type {
 
 import {
   countPruned,
+  countTasks,
   enginePanes,
   formatSpan,
+  isTask,
   prunableNodes,
   readHistory,
   sparkline,
+  taskCounts,
+  taskProgress,
   weakChildren,
 } from './searches'
 
@@ -188,5 +192,125 @@ describe('formatSpan', () => {
     expect(formatSpan(30 * 60)).toBe('30m')
     expect(formatSpan(6 * 3600 + 12 * 60)).toBe('6h 12m')
     expect(formatSpan(2 * 86_400 + 4 * 3600)).toBe('2d 4h')
+  })
+})
+
+describe('tasks', () => {
+  it('tells the two engine modes apart, and counts the tasks by themselves', () => {
+    const rows = [
+      search({ id: 1, kind: 'search', status: 'running' }),
+      search({ id: 2, kind: 'task', status: 'queued' }),
+      search({ id: 3, kind: 'task', status: 'running' }),
+      search({ id: 4, kind: 'task', status: 'done' }),
+    ]
+    expect(rows.filter(isTask).map((row) => row.id)).toEqual([2, 3, 4])
+    // The finished one is neither queued nor running: the counts are what is still out.
+    expect(countTasks(rows)).toEqual({ queued: 1, running: 1 })
+  })
+
+  it('counts what is still out under a node, and never the node itself', () => {
+    // A move whose expansion made three children, two of which still have a task, and one
+    // of those has a grandchild with one too: 3 of 4 positions under it are still waiting.
+    const tree = node({
+      id: 1,
+      task: { search_id: 9, status: 'queued' },
+      children: [
+        node({
+          id: 2,
+          task: { search_id: 10, status: 'running' },
+          children: [node({ id: 5, task: { search_id: 12, status: 'queued' } })],
+        }),
+        node({ id: 3, task: { search_id: 11, status: 'queued' } }),
+        node({ id: 4 }),
+      ],
+    })
+    expect(taskProgress(tree)).toEqual({ left: 3, total: 4 })
+    // A leaf with a task of its own reports nothing: that one is the mark beside the move.
+    expect(taskProgress(node({ id: 7, task: { search_id: 3, status: 'queued' } }))).toEqual({
+      left: 0,
+      total: 0,
+    })
+
+    // One walk for the whole tree answers the same as asking node by node.
+    const counts = taskCounts(tree)
+    expect(counts.get(1)).toEqual({ left: 3, total: 4 })
+    expect(counts.get(2)).toEqual({ left: 1, total: 1 })
+    expect(counts.get(4)).toEqual({ left: 0, total: 0 })
+  })
+
+  it('keeps the reason a stopped task left behind, beside the engine it belonged to', () => {
+    // "Clear the queue" takes a task's run with it and writes why on the row. Nothing is
+    // active on the engine any more, so without this the sentence would be unreadable.
+    const panes = enginePanes(
+      node({
+        evals: [stored()],
+        searches: [
+          search({
+            id: 4,
+            kind: 'task',
+            status: 'stopped',
+            engine_id: 1,
+            error: 'the analysis queue was cleared before this task ran',
+          }),
+        ],
+      }),
+    )
+    expect(panes).toHaveLength(1)
+    expect(panes[0].search).toBeNull()
+    expect(panes[0].ended?.error).toMatch(/queue was cleared/)
+  })
+
+  it('makes a pane for a failed task on a position nothing has evaluated', () => {
+    // The expansion case: a fresh child has no eval row and no active search, so unless the
+    // failed task makes a pane of its own the reason is nowhere and the branch dies quietly.
+    const panes = enginePanes(
+      node({
+        evals: [],
+        searches: [
+          search({
+            id: 7,
+            kind: 'task',
+            status: 'failed',
+            engine_id: 3,
+            engine_name: 'Stockfish 17',
+            error: 'no such file or directory',
+          }),
+        ],
+      }),
+    )
+    expect(panes).toHaveLength(1)
+    expect(panes[0].engineId).toBe(3)
+    expect(panes[0].engineName).toBe('Stockfish 17')
+    expect(panes[0].search).toBeNull()
+    expect(panes[0].stored).toBeNull()
+    expect(panes[0].ended?.error).toMatch(/no such file/)
+  })
+
+  it('keeps the newest reason when two tasks died on the same engine', () => {
+    const panes = enginePanes(
+      node({
+        evals: [],
+        searches: [
+          search({ id: 7, kind: 'task', status: 'failed', engine_id: 3, error: 'the first' }),
+          search({ id: 9, kind: 'task', status: 'failed', engine_id: 3, error: 'the second' }),
+        ],
+      }),
+    )
+    expect(panes).toHaveLength(1)
+    expect(panes[0].ended?.error).toBe('the second')
+  })
+
+  it('says nothing about an ended task while the engine is working again', () => {
+    const panes = enginePanes(
+      node({
+        evals: [stored()],
+        searches: [
+          search({ id: 4, kind: 'task', status: 'failed', engine_id: 1, error: 'boom' }),
+          search({ id: 5, kind: 'search', status: 'running', engine_id: 1 }),
+        ],
+      }),
+    )
+    expect(panes[0].search?.id).toBe(5)
+    expect(panes[0].ended).toBeNull()
   })
 })

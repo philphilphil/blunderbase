@@ -22,7 +22,7 @@
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { ArrowRight, FileText, Pause, Play, Plus } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -38,16 +38,18 @@ import {
   useImportCorrespondenceGame,
   usePauseAllCorrespondenceSearches,
   useResumeAllCorrespondenceSearches,
+  useRunnersStatus,
 } from '@/lib/api/queries'
 import type { CorrespondenceGameSummary } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { formatNodes, formatScore } from '@/lib/chess/evaluation'
+import { engineHosts } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
 import { CapacityStrip } from './components/CapacityStrip'
 import { ImportPgnDialog, NewGameDialog } from './components/NewGameDialog'
 import { RunningNow } from './components/RunningNow'
-import { isLive, isWarm } from './searches'
+import { isInfinite, isLive, isTask, isWarm } from './searches'
 import {
   duePhrase,
   dueTone,
@@ -105,6 +107,10 @@ function Due({ game }: { game: CorrespondenceGameSummary }) {
  * both when it has both, because a Leela chip reading "d22" would say nothing at all. A
  * parked engine keeps its chip and turns amber — it is still holding memory, and the row
  * would otherwise look idle.
+ *
+ * A task wears the tree's queue mark before the engine's name and carries no counter: it
+ * streams nothing while it waits its turn in the analysis queue, and a chip that showed a
+ * depth for one would be showing somebody else's.
  */
 function EngineChips({ game }: { game: CorrespondenceGameSummary }) {
   const { t } = useLingui()
@@ -114,6 +120,7 @@ function EngineChips({ game }: { game: CorrespondenceGameSummary }) {
     <span className="flex flex-wrap gap-1">
       {searches.map((search) => {
         const live = isLive(search)
+        const task = isTask(search)
         const snapshot = live ? (search.snapshot ?? null) : null
         const counter = [
           snapshot?.depth ? `d${snapshot.depth}` : null,
@@ -125,7 +132,15 @@ function EngineChips({ game }: { game: CorrespondenceGameSummary }) {
           <span
             key={search.id}
             data-testid={`engine-chip-${search.id}`}
-            title={isWarm(search) ? t`parked, warm` : undefined}
+            title={
+              task
+                ? live
+                  ? t`a task is being worked on`
+                  : t`a task is waiting in the analysis queue`
+                : isWarm(search)
+                  ? t`parked, warm`
+                  : undefined
+            }
             className={cn(
               'inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-px font-mono text-[0.625rem] text-body',
               search.status === 'queued' ? 'border-dashed border-edge text-dim' : 'border-edge',
@@ -138,6 +153,8 @@ function EngineChips({ game }: { game: CorrespondenceGameSummary }) {
                 live ? 'bg-good' : search.status === 'paused' ? 'bg-mistake' : 'bg-accent-teal',
               )}
             />
+            {/* The queue mark the tree uses, so one glyph means one thing on both screens. */}
+            {task ? <span className="text-accent-teal">◌</span> : null}
             {search.engine_name ?? '—'}
             {counter ? <span className="text-dim">{counter}</span> : null}
           </span>
@@ -279,6 +296,16 @@ export function CorrespondencePage() {
   const resumeAll = useResumeAllCorrespondenceSearches()
   const [dialog, setDialog] = useState<'new' | 'import' | null>(null)
 
+  // Where each engine lives, so a task can name the machine it is being worked on: a task
+  // is ordinary queue work and runs wherever its engine is, which is the whole reason a
+  // runner's engine is allowed to be the task engine.
+  const runners = useRunnersStatus()
+  const hosts = useMemo(() => {
+    const found = new Map<number, string | null>()
+    for (const host of engineHosts(runners.data)) found.set(host.engineId, host.runnerName)
+    return found
+  }, [runners.data])
+
   // One clock for the section rather than one per card: the only thing on this page that
   // moves on its own is "2d 4h", and it moves once a minute.
   const running = (searches.data?.searches ?? []).some(isLive)
@@ -304,10 +331,12 @@ export function CorrespondencePage() {
   const counts = games.data?.counts ?? {}
   const ongoing = counts.ongoing ?? cut.yourMove.length + cut.waiting.length
   const rows = searches.data?.searches ?? []
-  // What Pause all would move, and what Resume all would bring back. With neither there is
-  // one button and it is disabled, rather than two that both do nothing.
-  const active = rows.filter((search) => search.status !== 'paused').length
-  const parked = rows.filter((search) => search.status === 'paused').length
+  // What Pause all would move, and what Resume all would bring back. Tasks are left out of
+  // both counts: they hold no slot and cannot be paused, so a queue full of them must not
+  // light up a Pause all that would move nothing.
+  const pool = rows.filter(isInfinite)
+  const active = pool.filter((search) => search.status !== 'paused').length
+  const parked = pool.filter((search) => search.status === 'paused').length
 
   return (
     <PageBody>
@@ -413,7 +442,7 @@ export function CorrespondencePage() {
             detail={t`every engine on every game`}
             end={<span className="font-mono text-[0.6875rem] text-dim">{rows.length}</span>}
           >
-            <RunningNow searches={rows} games={games.data.games} now={now} />
+            <RunningNow searches={rows} games={games.data.games} hosts={hosts} now={now} />
           </Section>
 
           <Section title={<Trans>Finished</Trans>} detail={t`in the library now`}>

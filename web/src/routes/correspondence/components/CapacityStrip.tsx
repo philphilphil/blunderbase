@@ -3,7 +3,11 @@
  *
  * Three numbers and a host list, because those are the three questions an owner asks
  * before starting a fourth search: is there a slot free, how much memory are the parked
- * processes holding, and is the other machine still connected. Parked processes are not
+ * processes holding, and is the other machine still connected. A fourth, apart from them:
+ * how many **tasks** are out. They hold no slot — each is a run in the ordinary analysis
+ * queue and may be working on another machine — so they are counted beside the slots
+ * rather than against them, and a deployment with no free slot and forty tasks running is
+ * not the same picture as one with neither. Parked processes are not
  * capped (`docs/correspondence.md`, Settled) — the strip is what makes that safe, by
  * saying what they cost so the owner can decide when it is too much.
  *
@@ -85,6 +89,12 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
   const parked = (status.parked ?? []).length
   const paused = status.paused ?? 0
   const queued = status.queued ?? 0
+  // Counted apart from the slots, and deliberately: a task is an ordinary queue run and
+  // may be working on a runner, so it takes nothing from the two numbers above it. An
+  // owner reading "0 of 2 slots in use" with a dozen tasks out is not idle.
+  const tasksQueued = status.tasks?.queued ?? 0
+  const tasksRunning = status.tasks?.running ?? 0
+  const tasks = tasksQueued + tasksRunning
   const remote = (status.hosts ?? []).filter((host) => host.runner_id !== null)
 
   return (
@@ -120,6 +130,19 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
           <Trans>for a slot</Trans>
         </span>
       ) : null}
+      {tasks > 0 ? (
+        <span data-testid="correspondence-tasks">
+          <Dot tone={tasksRunning > 0 ? 'live' : 'queued'} />{' '}
+          <b className="font-medium text-body">
+            <Plural value={tasks} one="# task" other="# tasks" />
+          </b>{' '}
+          {tasksRunning > 0 && tasksQueued > 0
+            ? t`in the analysis queue, ${tasksRunning} being worked on`
+            : tasksRunning > 0
+              ? t`being worked on`
+              : t`waiting in the analysis queue`}
+        </span>
+      ) : null}
       {remote.map((host) => (
         <span key={host.runner_id ?? host.host}>
           <b className="font-medium text-body">{host.host}</b>{' '}
@@ -128,7 +151,7 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
       ))}
       {/* `paused` rather than `parked`: a search paused cold after a restart is still work
           the owner has waiting, and telling them to start one would be the wrong advice. */}
-      {inUse === 0 && paused === 0 && queued === 0 ? (
+      {inUse === 0 && paused === 0 && queued === 0 && tasks === 0 ? (
         <span className="text-dim-2">
           <Trans>Nothing is searching. Open a game and set an engine on a position.</Trans>
         </span>

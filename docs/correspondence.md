@@ -1,6 +1,10 @@
 # Correspondence mode — design and plan
 
-Status: **planned, not started** (2026-09-11). This is the target design for the
+Status: **steps 0–3 shipped, steps 4–5 planned** (2026-09-11) — the prototype, games and
+tree, searches on this host, and tasks and expansion are in; searches on runners and the
+list under step 5 are not. Where a table, a route, an event or a setting is named here it is
+what the code actually has, so a later step can be built against this page. This is the
+target design for the
 correspondence (ICCF-style) mode: games the owner is playing over weeks, engines running on
 chosen positions for hours or days, and a tree of positions that keeps what the engines
 found. It follows the shapes in [ARCHITECTURE.md](ARCHITECTURE.md) and says where it has to
@@ -221,6 +225,7 @@ changes nothing.
 | `kind` | `search` (infinite, own pool) or `task` (bounded, the analysis queue) |
 | `run_id` | for a task: the `AnalysisRun` that carries it |
 | `limit_depth`, `limit_nodes`, `limit_seconds` | all NULL is infinite; a task always has a node budget |
+| `expand_width`, `expand_stages` | what an expansion still owes below this task: how many children to make of the lines it comes back with, and how many stages to go on for. NULL on a task queued on its own and on every `search`; copied onto each child's task one stage lower, so an expansion unwinds with no state but these two |
 | `root_moves` | restrict the search to these moves (UCI `searchmoves`); NULL is all |
 | `status` | `queued`, `running`, `paused`, `done`, `stopped`, `failed` |
 | `warm` | paused with its process parked, hash intact |
@@ -231,8 +236,17 @@ changes nothing.
 At most one search in `queued`, `running` or `paused` per (node, engine).
 
 **`analysis_runs`** gains one nullable column, `correspondence_search_id`, so that
-`complete_run` can hand a task's `MoveEval` to the tree. A task run has a `fen` and no
-`game_id`, exactly as `POST /analysis/position` runs do today.
+`complete_run` can hand a task's `MoveEval` to the tree. It is deliberately *not* a foreign
+key: `correspondence_searches.run_id` already points the other way, and two enforced
+references between the same pair of tables is a cycle SQLite's `CREATE TABLE` order cannot
+resolve. A task run has a `fen` and no `game_id`, exactly as `POST /analysis/position` runs
+do today — which is why deleting a correspondence game has to collect its tasks' runs
+through the search rows about to cascade, rather than by `game_id`.
+
+**`move_evals`** gains `depth` and `nodes`: where the search behind a row actually got to,
+as the engine reported it, rather than the budget it was given. Without them a task's
+verdict cannot be compared with the one already in `correspondence_evals`, and "a shallower
+result never overwrites a deeper one" would have nothing to read.
 
 ## The service: `services/correspondence.py`
 
@@ -340,14 +354,28 @@ host each search is on.
 | `POST /correspondence/games/{id}/moves` · `DELETE …/moves/last` | play, undo |
 | `POST /correspondence/games/{id}/finish` | result, termination |
 | `POST /correspondence/nodes` · `PATCH /{id}` · `DELETE /{id}` · `POST /{id}/expand` | the tree; expand takes `width`, `stages`, `tasks` |
-| `POST /correspondence/searches` · `POST /{id}/pause\|resume\|stop` · `GET` | the work, searches and tasks alike |
+| `POST /correspondence/nodes/{id}/refresh` | a task on every stale position below this one; takes `engine_id`, refused with a 409 naming the number when there are more than one refresh may queue |
+| `POST /correspondence/searches` · `POST /{id}/pause\|resume\|stop` · `GET` | the work, searches and tasks alike; `kind: "task"` on the POST queues a bounded run instead of an infinite search |
+| `POST /correspondence/searches/{id}/cancel` | take a queued task back out of the queue: the run goes, the row says `stopped`. A task already claimed is a 409, and a search has no cancel — **Stop** is what ends one |
 | `POST /correspondence/searches/pause-all` · `resume-all` | the laptop is closing |
 | `GET /correspondence/status` | slots, parked processes, per host |
 
-Events, in the `area.verb` style: `correspondence.updated` (`game_id`; the page refetches the
-tree), `correspondence.search` (`search_id`, `node_id`, `game_id`, `status`, `warm`),
-`correspondence.snapshot` (the stream snapshot shape plus `search_id` and `node_id`,
-written into the query cache like `stream.snapshot`, never refetched).
+Events, in the `area.verb` style:
+
+- `correspondence.updated` (`game_id`, `scope`; the page refetches the tree). `scope` is
+  `game` or `tree`: `game` means the `Game` row itself moved, so the library, that game's
+  page and the explorer's counts are behind too, and it is the default because forgetting to
+  widen a frame shows up as a stale games table nobody can explain. `tree` is a node, an
+  eval or a task — correspondence's own keys and nothing else — which is what an overnight
+  expansion emits once per absorbed task, and a hundred and fifty of those must not each
+  refetch the library.
+- `correspondence.search` (`search_id`, `node_id`, `game_id`, `engine_id`, `kind`, `status`,
+  `warm`). `kind` is `search` or `task` and travels with every transition: the search worker
+  acts on `search` rows and must ignore `task` ones — one started as an infinite search would
+  hold a correspondence slot until the owner noticed — and a reader that had to look the kind
+  up would need a Session.
+- `correspondence.snapshot` (the stream snapshot shape plus `search_id` and `node_id`,
+  written into the query cache like `stream.snapshot`, never refetched).
 
 No MCP tools in this pass. When they come they are wrappers over the same functions;
 `show_position` already puts any node's FEN on the live board.
@@ -357,9 +385,21 @@ No MCP tools in this pass. When they come they are wrappers over the same functi
 **Rail.** `Correspondence` after `Live` in the workspace group, shown only while
 `correspondence_enabled` is on; `/correspondence/*` redirects to `/` otherwise, the way
 `McpRoute` does. The setting lives on a new Analysis subpage, **Analysis → Correspondence**,
-with the rest of the mode's settings: search slots, the search engines to offer (any
-enabled UCI engine that drives a board; the first is the default), the task engine, task
-node budget and multipv, default multipv for searches, default days per move.
+with the rest of the mode's settings. The keys, as the registry and
+`web/src/lib/api/appSettings.ts` spell them — `PUT /settings` is a full replace, so a new one
+has to be in both or the next save of any settings form wipes it:
+
+| key | |
+|---|---|
+| `correspondence_enabled` | the rail entry and the routes |
+| `correspondence_slots` | how many searches may run at once (1–16, default 2) |
+| `correspondence_multipv` | default lines for a search (default 3) |
+| `correspondence_days_per_move` | what a new game starts with (default 10) |
+| `correspondence_task_nodes` | one task's node budget (default 40,000,000) |
+| `correspondence_task_multipv` | lines a task keeps, and therefore how wide an expansion can be (default 3) |
+| `correspondence_stale_depth` | below what depth a stored verdict is stale, whatever engine wrote it (default 30) |
+| `correspondence_search_engine_ids` | the engines the search picker offers, in order; the first is the default. A JSON list, not in the numeric registry |
+| `correspondence_task_engine_id` | the engine tasks run on; absent means the deep tier's. A JSON id, not in the numeric registry, and cleared when that engine is deleted |
 
 **Correspondence** (`/correspondence`). Three sections, in this order: **Your move**
 sorted by due date, **Waiting for the opponent**, **Finished** (the last few, each a link
@@ -448,21 +488,21 @@ the guide mirrors the screen.
 Each step ships on its own and is tested before the next starts (services in `tests/`,
 worker against `tests/fake_uci.py`, panes beside their files).
 
-0. **The prototype.** `docs/design/prototypes/correspondence-view.html`: the three-column
+0. **The prototype** *(shipped)*. `docs/design/prototypes/correspondence-view.html`: the three-column
    view above with two engines running, a tree with disagreements, the candidates table;
    accepted before step 1 builds any of it.
-1. **Games and tree, no engine.** Models and migration (`Source.ICCF` included);
+1. **Games and tree, no engine** *(shipped)*. Models and migration (`Source.ICCF` included);
    `games_service.append_move` / `pop_move`; the service's game and tree halves; the
    router; the setting and the rail entry; the list page, the two dialogs, the view with
    the tree, marks, draw detection on the node, the book pane at the node, candidates
    (evals empty) and notes; PGN export of the tree with comments and glyphs; the manual
    chapter.
-2. **Searches on this host, several engines at once.** The worker, checkpoints that only
+2. **Searches on this host, several engines at once** *(shipped)*. The worker, checkpoints that only
    move forward, limits, `root_moves`, warm pause, recovery at boot; the engine column with
    one pane per engine, pinning and the disagreement mark; weak lines fading and `prune`;
    "Running now" and the capacity strip on the list page; toasts; the Analysis subpage;
    the engines chapter.
-3. **Tasks and expansion.** The `AnalysisRun` link, `absorb_run`, `queue_task` with the
+3. **Tasks and expansion** *(shipped)*. The `AnalysisRun` link, `absorb_run`, `queue_task` with the
    nearest due date first, `expand` with stages and width steered by the marks, the queue
    marks on the tree, stale verdicts and "refresh subtree"; tasks run on runners for free.
 4. **Searches on runners.** `stream_open` with the sink refactor and no preemption;

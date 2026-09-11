@@ -107,13 +107,21 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     // three cuts (no state, ongoing, finished) and a move changes every one of them, so
     // naming the game alone would leave the sections behind. There are a handful of these
     // queries at most and one of them is mounted at a time.
-    // The library keys ride along because a correspondence game is a `Game` and playing a
-    // move rewrites it — `append_move` restamps the moves, the ply count, the PGN, the
-    // opening and the dedup hash, clears the card and adds a `GamePosition`, which is a row
-    // the games table, that game's page and the explorer's counts all read. A frame arrives
-    // a few times a day at most, so the breadth costs nothing.
-    case 'correspondence.updated':
-      return [queryKeys.correspondence(), queryKeys.games(), queryKeys.explorer()]
+    // The library keys ride along when the `Game` row itself moved, because a correspondence
+    // game is a `Game` and playing a move rewrites it — `append_move` restamps the moves, the
+    // ply count, the PGN, the opening and the dedup hash, clears the card and adds a
+    // `GamePosition`, which is a row the games table, that game's page and the explorer's
+    // counts all read. That frame arrives a few times a day, so the breadth costs nothing.
+    // A `tree` frame is the opposite: a node, an eval or an absorbed task, one per finished
+    // task, which an overnight `expand` fires up to a hundred and fifty of. Nothing outside
+    // correspondence changed, and the 3s cooldown throttles a burst but not a stream one
+    // every ninety seconds — so those keys stay out of it.
+    case 'correspondence.updated': {
+      const keys: QueryKey[] = [queryKeys.correspondence()]
+      const scope = (event as { scope?: string }).scope
+      if (scope !== 'tree') keys.push(queryKeys.games(), queryKeys.explorer())
+      return keys
+    }
 
     // A search changed state: queued, started, parked, ended. The correspondence root
     // only — a search touches the tree's stored evals at its FINAL checkpoint and says so

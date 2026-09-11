@@ -71,7 +71,24 @@ const LIST = {
         },
       ],
     }),
-    game({ game_id: 2, black: 'Jansen, Dirk', your_move: false, days_left: null }),
+    game({
+      game_id: 2,
+      black: 'Jansen, Dirk',
+      your_move: false,
+      days_left: null,
+      searches: [
+        {
+          id: 21,
+          node_id: 9,
+          game_id: 2,
+          engine_id: 9,
+          engine_name: 'Stockfish 17 (big)',
+          kind: 'task',
+          status: 'running',
+          limit_nodes: 40_000_000,
+        },
+      ],
+    }),
     game({
       game_id: 3,
       black: 'Haugen, Sven',
@@ -89,6 +106,7 @@ const STATUS = {
   in_use: 1,
   queued: 0,
   paused: 1,
+  tasks: { queued: 5, running: 1 },
   parked: [
     { search_id: 8, node_id: 4, engine_id: 1, engine_name: 'Stockfish 17', hash_mb: 8192 },
   ],
@@ -131,7 +149,44 @@ const SEARCHES = {
       warm: true,
       multipv: 3,
     },
+    {
+      id: 21,
+      node_id: 9,
+      game_id: 2,
+      engine_id: 9,
+      engine_name: 'Stockfish 17 (big)',
+      kind: 'task',
+      status: 'running',
+      limit_nodes: 40_000_000,
+    },
   ],
+}
+
+/** Where each engine lives — engine 9 is the runner's, which is where its tasks run. */
+const RUNNERS = {
+  local: {
+    name: 'this host',
+    busy: 0,
+    streams: 0,
+    workers: true,
+    queued: 0,
+    running: 0,
+    engines: [{ id: 1, name: 'Stockfish 17', kind: 'uci', enabled: true, streams: true }],
+  },
+  runners: [
+    {
+      id: 3,
+      name: 'studio',
+      slots: 2,
+      connected: true,
+      busy: 1,
+      streams: 0,
+      free_slots: 1,
+      queued_eligible: 0,
+      engines: [{ id: 9, name: 'Stockfish 17 (big)', kind: 'uci', enabled: true, streams: false }],
+    },
+  ],
+  queue: { queued: 0, running: 0 },
 }
 
 let posted: { path: string; body: unknown }[]
@@ -157,6 +212,7 @@ beforeEach(() => {
         if (path.includes('/correspondence/searches')) return json({ searches: [] })
         return json({ game: game({ game_id: 42 }), tree: null, searches: [] }, 201)
       }
+      if (path.includes('/runners/status')) return json(RUNNERS)
       if (path.includes('/correspondence/status')) return json(STATUS)
       if (path.includes('/correspondence/searches')) return json(SEARCHES)
       if (path.includes('/correspondence/games')) return json(LIST)
@@ -237,6 +293,34 @@ describe('the correspondence list', () => {
     const chip = await screen.findByTestId('engine-chip-7')
     expect(chip).toHaveTextContent('Stockfish 17')
     expect(chip).toHaveTextContent('d51')
+  })
+
+  it('counts the tasks in the strip, apart from the slots they do not hold', async () => {
+    draw()
+    const tasks = await screen.findByTestId('correspondence-tasks')
+    expect(tasks).toHaveTextContent('6 tasks')
+    expect(tasks).toHaveTextContent('1 being worked on')
+  })
+
+  it('shows a running task under Running now, on the machine its engine lives on', async () => {
+    draw()
+    const running = await screen.findByTestId('correspondence-running')
+    const card = within(running).getByTestId('running-search-21')
+    expect(card).toHaveTextContent('task')
+    expect(card).toHaveTextContent('being worked on')
+    // A task sends no snapshots, so what it can say about its size is the budget it was
+    // queued with — and the host is where its engine is, which is a runner here.
+    expect(card).toHaveTextContent('up to 40M nodes')
+    await waitFor(() => expect(card).toHaveTextContent('studio'))
+  })
+
+  it('marks a task on the game row with the tree’s own queue mark', async () => {
+    draw()
+    // Twice on the page now: the row itself, and the card for the task running on it.
+    await screen.findAllByText('Jansen, Dirk')
+    const chip = await screen.findByTestId('engine-chip-21')
+    expect(chip).toHaveTextContent('◌')
+    expect(chip).toHaveTextContent('Stockfish 17 (big)')
   })
 })
 

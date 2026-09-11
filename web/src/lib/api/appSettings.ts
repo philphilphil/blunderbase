@@ -31,6 +31,9 @@ export const SETTING_DEFAULTS = {
   correspondence_days_per_move: 10,
   correspondence_multipv: 3,
   correspondence_slots: 2,
+  correspondence_task_nodes: 40_000_000,
+  correspondence_task_multipv: 3,
+  correspondence_stale_depth: 30,
 } as const
 
 /** What a box holds: a number, or the empty string that means "nobody has set this". */
@@ -61,14 +64,19 @@ export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
     inaccuracy_threshold: settings.inaccuracy_threshold,
     mistake_threshold: settings.mistake_threshold,
     blunder_threshold: settings.blunder_threshold,
-    // Correspondence mode's five. A settings form that left them out would switch the
+    // Correspondence mode's nine. A settings form that left them out would switch the
     // mode off on its next save — the PUT is a replace, and an absent key is a cleared one.
-    // The engine list is the second list here, and is carried whole for the same reason
-    // `maia_elos` is: a save of the Engine passes page must not empty the search picker.
+    // The engine list and the task engine are the two identities here, and are carried
+    // whole for the same reason `maia_elos` is: a save of the Engine passes page must not
+    // empty the search picker or unassign the engine the tasks run on.
     correspondence_enabled: settings.correspondence_enabled ?? null,
     correspondence_days_per_move: settings.correspondence_days_per_move ?? null,
     correspondence_multipv: settings.correspondence_multipv ?? null,
     correspondence_slots: settings.correspondence_slots ?? null,
     correspondence_search_engine_ids: settings.correspondence_search_engine_ids ?? [],
+    correspondence_task_nodes: settings.correspondence_task_nodes ?? null,
+    correspondence_task_multipv: settings.correspondence_task_multipv ?? null,
+    correspondence_stale_depth: settings.correspondence_stale_depth ?? null,
+    correspondence_task_engine_id: settings.correspondence_task_engine_id ?? null,
   }
 }

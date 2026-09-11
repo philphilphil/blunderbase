@@ -848,7 +848,21 @@ def clear_queue(session: Session) -> int:
     client refetches the queue without being handed every dropped row — the tier and the
     `maia_only` it carries are nominal here, since nothing about this drop was scoped to
     either.
+
+    A correspondence task is one of these rows, so the searches whose runs are about to go
+    are collected first and told afterwards. Without that the tree would keep a row saying
+    "queued" for a run nobody holds any more — a spinner over a node that nothing will ever
+    take off it. `cancel_queued` needs none of this: it drops full-game runs only, and a
+    task has no game.
     """
+    tasks = list(
+        session.scalars(
+            select(AnalysisRun.correspondence_search_id).where(
+                AnalysisRun.status == RunStatus.QUEUED,
+                AnalysisRun.correspondence_search_id.is_not(None),
+            )
+        )
+    )
     dropped = session.execute(
         delete(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
     ).rowcount
@@ -860,6 +874,10 @@ def clear_queue(session: Session) -> int:
         backfill_event(Tier.QUICK, queued=0, outstanding=depth["queued"] + depth["running"]),
     )
     session.commit()
+    if tasks:
+        from backend.services import correspondence as correspondence_service
+
+        correspondence_service.release_tasks(session, tasks)
     return int(dropped)
 
 
@@ -1640,6 +1658,13 @@ def claim_next_run(
     if run is None:  # pragma: no cover - the claimed row cannot disappear inside this call
         return None
     session.refresh(run)
+    if run.correspondence_search_id is not None:
+        # A correspondence task: its search row is what the tree draws a spinner from, and
+        # this is the moment it starts. Only ever one extra tiny UPDATE, and only for the
+        # handful of runs that carry a task.
+        from backend.services import correspondence as correspondence_service
+
+        correspondence_service.mark_task_running(session, run.correspondence_search_id)
     emit_run_event(run_event(EVENT_RUN_STARTED, run))
     return run
 
@@ -1768,10 +1793,36 @@ def requeue_stale_runs(
             run.started_at = None
     if stale:
         session.commit()
+    _reconcile_stale_tasks(session, stale)
     for run in stale:
         event = EVENT_RUN_QUEUED if run.status is RunStatus.QUEUED else EVENT_RUN_FAILED
         emit_run_event(run_event(event, run, error=run.error, requeued=True))
     return stale
+
+
+def _reconcile_stale_tasks(session: Session, runs: Sequence[AnalysisRun]) -> None:
+    """Move the search row of every correspondence task in this sweep with its run.
+
+    The fourth way a run changes status, and the one that was missing a hand: `complete_run`,
+    `fail_run` and `abandon_run` all carry a task's row along with its run, and a sweep that
+    did not would leave the tree saying `running` for a run nobody holds. That is not merely
+    a stale spinner — a `running` task refuses cancel, refuses stop, refuses a second task on
+    the node and refuses deleting the branch, so a crash whose retry was already spent would
+    wedge the node with no way out through the API.
+    """
+    tasks = [run for run in runs if run.correspondence_search_id is not None]
+    if not tasks:
+        return
+    from backend.services import correspondence as correspondence_service
+
+    for run in tasks:
+        search_id = int(run.correspondence_search_id or 0)
+        if run.status is RunStatus.QUEUED:
+            correspondence_service.requeue_task(session, search_id)
+        else:
+            correspondence_service.fail_task(
+                session, search_id, error=run.error or STALE_RUN_MESSAGE
+            )
 
 
 def complete_run(
@@ -1793,6 +1844,9 @@ def complete_run(
 
     This is also the only moment a game's card or its stat summary can change, so both are
     rewritten here, inside the same commit.
+
+    A run carrying a correspondence task hands its one evaluation to the tree afterwards,
+    in a commit of its own — see `_absorb_correspondence`.
     """
     _require_attempt(run, attempt_token)
     session.execute(delete(MoveEval).where(MoveEval.run_id == run.id))
@@ -1805,7 +1859,31 @@ def complete_run(
     run.stderr = None
     _refresh_game_rollups(session, run)
     session.commit()
+    _absorb_correspondence(session, run)
     emit_run_event(run_event(EVENT_RUN_DONE, run, evals=len(evals)))
+
+
+def _absorb_correspondence(session: Session, run: AnalysisRun) -> None:
+    """Hand a finished task's evaluation to the correspondence tree, if it is one.
+
+    After the run's own commit rather than inside it, and behind a `try`: the run really
+    did finish, and a tree that cannot take its answer — a node deleted while the task was
+    in the queue, an expansion that cannot find a legal move — must not turn a completed
+    pass into a failed one. What is lost then is one verdict in the tree, which the owner
+    can ask for again; what would be lost by rolling back is a whole search's work.
+
+    The import is local because `services.correspondence` imports this module: the tree
+    knows the queue, and the queue knows only that a run may name a search.
+    """
+    if run.correspondence_search_id is None:
+        return
+    from backend.services import correspondence as correspondence_service
+
+    try:
+        correspondence_service.absorb_run(session, run)
+    except Exception:  # pragma: no cover - defence, exercised only by a broken tree
+        logger.exception("correspondence: run %s could not be absorbed into the tree", run.id)
+        session.rollback()
 
 
 def _refresh_game_rollups(session: Session, run: AnalysisRun) -> None:
@@ -1853,6 +1931,10 @@ def fail_run(
 
     `attempt_token` guards exactly as it does in `complete_run`: a failure reported by a
     runner whose run was already taken away must not fail the attempt that replaced it.
+
+    A run carrying a correspondence task fails its search row with it — but only once the
+    retry is spent, because a search marked failed while its run is queued again would be a
+    tree saying the position was given up on while an engine was about to look at it.
     """
     _require_attempt(run, attempt_token)
     run.error = error
@@ -1865,6 +1947,15 @@ def fail_run(
         run.status = RunStatus.FAILED
         run.finished_at = utcnow()
     session.commit()
+    if run.correspondence_search_id is not None:
+        from backend.services import correspondence as correspondence_service
+
+        if will_retry:
+            correspondence_service.requeue_task(session, run.correspondence_search_id)
+        else:
+            correspondence_service.fail_task(
+                session, run.correspondence_search_id, error=error, stderr=stderr
+            )
     emit_run_event(
         run_event(EVENT_RUN_FAILED, run, error=error, stderr=stderr, will_retry=will_retry)
     )
@@ -1894,6 +1985,10 @@ def abandon_run(
         run.attempts = max(0, run.attempts - 1)
     run.error = reason
     session.commit()
+    if run.correspondence_search_id is not None:
+        from backend.services import correspondence as correspondence_service
+
+        correspondence_service.requeue_task(session, run.correspondence_search_id)
     emit_run_event(run_event(EVENT_RUN_QUEUED, run))
     return True
 
@@ -2357,6 +2452,8 @@ def _position_row(plan: RunPlan, board: chess.Board, score: Score, result: Any) 
         win_before=win_percent(pov.stored_cp, pov.mate_in),
         best_move_uci=None if best is None else best.uci,
         best_lines=result.best_lines() if result is not None else None,
+        depth=None if result is None else result.depth,
+        nodes=None if result is None else result.nodes,
     )
 
 
@@ -2397,6 +2494,10 @@ def _move_row(
         ),
         best_move_uci=None if best is None else best.uci,
         best_lines=result.best_lines() if result is not None else None,
+        # The search over the position *before* the move, which is what the rest of this
+        # row is a reading of.
+        depth=None if result is None else result.depth,
+        nodes=None if result is None else result.nodes,
     )
 
 

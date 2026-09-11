@@ -88,6 +88,10 @@ Each node shows its move, its evaluation and the evaluation its own branches bac
   moves deeper is exactly what an own eval above its backed eval means.
 - An amber **≠** says two engines are more than half a pawn apart on this position, so the
   number under it is worth less than it looks.
+- Beside them a node says what is happening to it: a **spinner** while an engine is on it, a
+  **queue mark** while a task waits its turn, and a **stale mark** when the number shown was
+  reached too shallow or by an engine you no longer have — see
+  [Tasks and expansion](#tasks-and-expansion).
 
 Both numbers are written from the point of view of the side that played the move, the way a
 variation is read: `15.Bd3 +0.41` means White stands better. The bar beside the board and
@@ -98,6 +102,9 @@ A node's own menu carries the verbs:
 | Verb | |
 |---|---|
 | **Search with…** | Set an engine on this position, see [Search a position](#search-a-position) |
+| **Queue task** | One bounded look at this position, through the analysis queue, see [Tasks and expansion](#tasks-and-expansion) |
+| **Expand…** | Make the best moves here into children and put a task under each |
+| **Refresh subtree** | Queue a task on every stale position from here down |
 | **Comment** | Your note on the move; it goes into the PGN as a comment |
 | **Mark** | Your verdict on the move, below |
 | **Promote to first** | Make this the first of its alternatives, so it reads as the main one |
@@ -190,6 +197,60 @@ the node back to the deepest. The pin is per node, so you can trust Leela in the
 without changing anything else. The amber **≠** on a node is the sign to read both panes
 before believing either number.
 
+## Tasks and expansion
+
+A search is one engine thinking about one position for as long as you let it. A **task** is
+the other half: a bounded look — forty million nodes by default, a minute or two — over one
+position, queued into the ordinary analysis queue. It takes no search slot, so it never
+stands in the way of a search, and it runs wherever the queue has room, including on a
+[remote runner](../operate/runners.md). Which engine works them is **Analysis →
+Correspondence → Task engine**; with none chosen, whichever engine holds the deep role does.
+
+A node's menu carries both. **Queue task** asks for one look at that position. **Expand…**
+is the one that does the work of an evening:
+
+| | |
+|---|---|
+| **Width** | How many moves each stage keeps — the first moves of the position's best lines, strongest first. Blank takes **Lines per task** from the settings |
+| **Stages** | How many levels deep to go, 1 to 3. Width 3 and 2 stages is up to twelve positions; width 3 and 3 stages is up to thirty-nine |
+| **Queue tasks** | On, each new move gets an engine. Off, the moves go into the tree and nothing is calculated |
+
+Expanding a node the engines have already judged makes the children at once and queues a
+task under each; one that nobody has looked at yet gets a single task carrying the whole
+expansion, which unfolds by itself when that task answers. Either way you can close the
+browser: the expansion lives on the queued rows and not in the page. **Expand…** above the
+tree does the same for the position you have selected, without going through the menu.
+
+Tasks go into the queue ahead of the automatic pass every imported game gets and behind a
+deep pass you are sitting and waiting for, and among themselves **the nearest deadline is
+worked first** — one game due tomorrow comes out of the queue before one due next week,
+however they were queued. A node with a task waiting on it carries a queue mark; one being
+worked on carries a spinner. **Cancel** takes a waiting task back out of the queue; one an
+engine has already started finishes. **Clear the queue** on the
+[Analysis](analysis.md#what-is-left-to-analyse) page empties it of tasks as well, and each
+node whose task went with it says why it stopped. A task whose machine goes away mid-search
+— the process killed, a remote host unplugged — goes back into the queue by itself and is
+tried once more; if that fails too the node is marked failed with the reason on it and is
+free to be given a new task.
+
+Your **marks** steer all of it, which is the reason to make them:
+
+| Mark | What an expansion does with it |
+|---|---|
+| **✕ Excluded** | Never expanded, never given a task, and everything under it is skipped too |
+| **? Bad** | One stage at most, however deep the expansion around it goes |
+| **! Good**, **!? Interesting** | One stage more and one sibling more than its neighbours |
+| No mark | The width and the stages you asked for |
+
+**Refresh subtree** in the same menu is the maintenance verb. A verdict is **stale** when it
+is shallower than **Stale below depth** — thirty by default — or when it was written by a
+version of the engine that is no longer installed, which is the one people forget: a
+Stockfish upgraded in January makes every verdict from December somebody else's. Stale
+verdicts are marked on the tree, and **Refresh subtree** queues a task on every stale
+position from that node down, holes in the branch included. It refuses, and says how many
+it found, when there are more than fifty: refresh a branch at a time rather than a whole
+game's tree at once.
+
 ## Pause, stop and what survives
 
 Every pane carries **Pause** and **Stop**, and they are not the same thing:
@@ -227,9 +288,16 @@ working for, the evaluation it is at, the depth and the node count, and how long
 going. A parked search is in the list too, greyed and marked warm, and so is one waiting for
 a slot. Each card is a link into the game it belongs to.
 
+**Tasks are in the list as well**, marked `task`: one card per task that is waiting or being
+worked on, with the engine, the machine that engine lives on and the node budget it was
+queued with. A task streams nothing while it waits, so it carries no depth — what it can say
+about its size is what it will spend.
+
 The **capacity strip** under the page heading counts the same work over the whole
 installation: search slots in use of the slots this machine has, searches waiting for one,
-engines parked warm and the memory they hold, and a line per remote host. The same figures
+engines parked warm and the memory they hold, how many tasks are out and how many of them
+an engine has already, and a line per remote host. Tasks are counted beside the slots rather
+than against them: they hold none. The same figures
 sit along the foot of the sidebar, so they are answered from every screen. Both the strip
 and the list follow the searches as they report — there is no page here to refresh.
 
@@ -274,7 +342,7 @@ belongs to the frozen tree, and a finished game shows it as text instead.
   finishes, and you can ask for the pass later.
 - The deadline is cleared and the game leaves **Your move**.
 - The tree freezes. It is kept with the game and stays readable, but nothing in it can be
-  changed again, and it takes no new searches.
+  changed again, and it takes no new searches and no new tasks.
 - A search still running on the game is not stopped for you — it is your engine time to
   spend. **Stop** it in its pane when the game is over.
 

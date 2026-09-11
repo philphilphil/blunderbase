@@ -26,6 +26,8 @@ from fastapi import APIRouter, Response, status
 
 from backend.api.deps import SessionDep
 from backend.api.schemas import (
+    CorrespondenceExpand,
+    CorrespondenceExpansion,
     CorrespondenceFinish,
     CorrespondenceGameCreate,
     CorrespondenceGameDetail,
@@ -37,6 +39,7 @@ from backend.api.schemas import (
     CorrespondenceNodeResponse,
     CorrespondenceNodeUpdate,
     CorrespondencePgnImport,
+    CorrespondenceRefresh,
     CorrespondenceSearchCreate,
     CorrespondenceSearchList,
     CorrespondenceSearchRow,
@@ -228,6 +231,40 @@ def delete_node(session: SessionDep, node_id: int) -> Response:
 
 
 @router.post(
+    "/nodes/{node_id}/expand",
+    response_model=CorrespondenceExpansion,
+    status_code=status.HTTP_201_CREATED,
+    summary="Make children from the node's best lines and set engines on them",
+)
+def expand_node(session: SessionDep, node_id: int, body: CorrespondenceExpand) -> Any:
+    """One call that ends, an hour later, with a dozen evaluated positions under a move.
+
+    The children come from the node's stored verdict, so a node no engine has looked at
+    gets one task carrying the whole expansion instead — which unwinds when that task
+    answers. The marks under the node steer both numbers as it goes.
+    """
+    return correspondence_service.expand_node(
+        session, node_id, width=body.width, stages=body.stages, tasks=body.tasks
+    )
+
+
+@router.post(
+    "/nodes/{node_id}/refresh",
+    response_model=CorrespondenceExpansion,
+    status_code=status.HTTP_201_CREATED,
+    summary="Queue a task on every stale position below this one",
+)
+def refresh_subtree(session: SessionDep, node_id: int, body: CorrespondenceRefresh) -> Any:
+    """Stale is too shallow, or from a version of the engine that has since been upgraded.
+
+    Refused with a 409 naming the number when there are more stale positions under there
+    than one refresh may queue — a button that quietly queued four hundred runs is not one
+    an owner can take back.
+    """
+    return correspondence_service.refresh_subtree(session, node_id, engine_id=body.engine_id)
+
+
+@router.post(
     "/searches",
     response_model=CorrespondenceSearchRow,
     status_code=status.HTTP_201_CREATED,
@@ -239,7 +276,15 @@ def start_search(session: SessionDep, body: CorrespondenceSearchCreate) -> Any:
     Answered as soon as the row is written rather than when the engine is going: a search
     may wait for a slot for as long as the searches ahead of it take, and a POST that hung
     for three days would be a strange thing.
+
+    `kind: "task"` writes the other kind of row: a bounded run into the analysis queue,
+    which any worker or runner may claim. The answer is the same shape either way, and the
+    `kind` on it is what a page draws from.
     """
+    if body.kind == "task":
+        return correspondence_service.queue_task(
+            session, node_id=body.node_id, engine_id=body.engine_id
+        )
     return correspondence_service.start_search(
         session,
         node_id=body.node_id,
@@ -313,6 +358,20 @@ def resume_search(session: SessionDep, search_id: int) -> Any:
 def stop_search(session: SessionDep, search_id: int) -> Any:
     """A parked process is quit; a running one goes back into the pool warm."""
     return correspondence_service.stop_search(session, search_id)
+
+
+@router.post(
+    "/searches/{search_id}/cancel",
+    response_model=CorrespondenceSearchRow,
+    summary="Take a queued task back out of the queue",
+)
+def cancel_task(session: SessionDep, search_id: int) -> Any:
+    """The run goes and the search says `stopped`; a task already claimed is a 409.
+
+    A task rather than a search: an infinite search has no run to delete, and **Stop** is
+    what ends one.
+    """
+    return correspondence_service.cancel_task(session, search_id)
 
 
 @router.get(

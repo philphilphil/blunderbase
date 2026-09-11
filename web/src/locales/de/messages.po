@@ -265,6 +265,8 @@ msgstr "Browser-Engine einrichten"
 #: src/lib/desktop/PgnDropOverlay.tsx
 #: src/routes/auth/ChangePasswordDialog.tsx
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
@@ -977,6 +979,10 @@ msgstr "geparkt, warm"
 #: src/components/shell/SideNav.tsx
 msgid "waiting"
 msgstr "wartet"
+
+#: src/components/shell/SideNav.tsx
+msgid "tasks"
+msgstr "Aufgaben"
 
 #: src/components/shell/SideNav.tsx
 msgid "No engines configured"
@@ -1761,6 +1767,26 @@ msgid "Default 2"
 msgstr "Standard 2"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Nodes per task"
+msgstr "Knoten pro Aufgabe"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Default 40,000,000"
+msgstr "Voreinstellung 40.000.000"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Lines per task"
+msgstr "Linien pro Aufgabe"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Stale below depth"
+msgstr "Veraltet unter Tiefe"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Default 30"
+msgstr "Voreinstellung 30"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Engine {id}"
 msgstr "Engine {id}"
 
@@ -1840,6 +1866,34 @@ msgstr "{0} entfernen"
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "No engine here can run a search: one is needed that is switched on, speaks UCI and can drive a board."
 msgstr "Keine Engine hier kann suchen: nötig ist eine, die eingeschaltet ist, UCI spricht und ein Brett bedienen kann."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Tasks"
+msgstr "Aufgaben"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner."
+msgstr "Eine Aufgabe ist ein begrenzter Blick auf eine Stellung, über die gewöhnliche Analysewarteschlange – sie belegt keinen Suchplatz, und eine Erweiterung ist ein Dutzend davon auf einmal. Anders als eine Suche kann sie auf einem entfernten Runner laufen."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Task engine"
+msgstr "Aufgaben-Engine"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Whichever engine holds the deep role"
+msgstr "Die Engine mit der Rolle Tiefenanalyse"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Engine {taskEngineId}"
+msgstr "Engine {taskEngineId}"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Every engine that is switched on and speaks UCI, on this machine and on your runners. A machine of its own is the setup this mode is happiest in."
+msgstr "Jede Engine, die eingeschaltet ist und UCI spricht, auf diesem Rechner und auf deinen Runnern. Am wohlsten ist diesem Modus ein eigener Rechner."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
+msgstr "Vierzig Millionen Knoten sind ein bis zwei Minuten einer modernen Engine. Die Linienzahl ist zugleich, wie breit eine Erweiterung sein kann, denn die Äste entstehen aus diesen Linien. Unter der Veraltet-Tiefe wird ein gespeichertes Urteil im Baum als eines markiert, das noch einmal zu fragen ist."
 
 #: src/routes/analysis/CoverageSplit.tsx
 msgid "Deep pass"
@@ -2153,6 +2207,35 @@ msgstr "das ist nicht das Passwort"
 msgid "the server answered {status}"
 msgstr "der Server antwortete mit {status}"
 
+#. placeholder {0}: answer.created
+#. placeholder {1}: answer.queued
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} positions added, {1} queued for an engine."
+msgstr "{0} Stellungen hinzugefügt, {1} für eine Engine eingereiht."
+
+#. placeholder {0}: answer.created
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} positions added."
+msgstr "{0} Stellungen hinzugefügt."
+
+#. placeholder {0}: answer.queued
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} positions queued for an engine."
+msgstr "{0} Stellungen für eine Engine eingereiht."
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Those moves were already in the tree."
+msgstr "Diese Züge standen schon im Baum."
+
+#. placeholder {0}: answer.queued
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} stale positions queued for an engine."
+msgstr "{0} veraltete Stellungen für eine Engine eingereiht."
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Nothing under there is stale."
+msgstr "Darunter ist nichts veraltet."
+
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "Back to the start"
 msgstr "Zurück zum Anfang"
@@ -2219,14 +2302,14 @@ msgid "{0} positions · {1} evaluated"
 msgstr "{0} Stellungen · {1} bewertet"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Expansion arrives in a later step"
-msgstr "Das Ausweiten kommt in einem späteren Schritt"
+msgid "Make the best moves after the selected position into branches, with an engine on each"
+msgstr "Die besten Züge nach der gewählten Stellung zu Ästen machen, mit einer Engine auf jedem"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "Expand"
-msgstr "Ausweiten"
+msgid "Expand…"
+msgstr "Erweitern …"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "Nothing in this tree has fallen far enough behind to prune"
@@ -2271,6 +2354,14 @@ msgstr "Diese Fernschachpartie gibt es hier nicht."
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "Back to the list"
 msgstr "Zurück zur Liste"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "a task is being worked on"
+msgstr "an einer Aufgabe wird gerechnet"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "a task is waiting in the analysis queue"
+msgstr "eine Aufgabe wartet in der Analysewarteschlange"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 msgid "ICCF {number}"
@@ -2461,6 +2552,15 @@ msgid "The minimax under this move disagrees with its own number"
 msgstr "Das Minimax unter diesem Zug widerspricht seiner eigenen Zahl"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "A task is being worked on here"
+msgstr "Hier wird an einer Aufgabe gerechnet"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "A task is waiting in the analysis queue"
+msgstr "Eine Aufgabe wartet in der Analysewarteschlange"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "One engine's verdict is pinned here"
 msgstr "Hier ist das Urteil einer Engine angeheftet"
@@ -2474,6 +2574,10 @@ msgstr "hier ist das Urteil einer Engine angeheftet"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Two engines disagree here"
 msgstr "Zwei Engines sind hier uneins"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "This number is stale: too shallow, or from a version of the engine you no longer have"
+msgstr "Diese Zahl ist veraltet: zu flach oder von einer Version der Engine, die du nicht mehr hast"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
 msgid "{gb} GB"
@@ -2507,6 +2611,24 @@ msgstr "{queued, plural, one {# Suche wartet} other {# Suchen warten}}"
 msgid "for a slot"
 msgstr "auf einen Platz"
 
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{tasks, plural, one {# task} other {# tasks}}"
+msgstr "{tasks, plural, one {# Aufgabe} other {# Aufgaben}}"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "in the analysis queue, {tasksRunning} being worked on"
+msgstr "in der Analysewarteschlange, an {tasksRunning} wird gerechnet"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "being worked on"
+msgstr "wird gerechnet"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "waiting in the analysis queue"
+msgstr "wartet in der Analysewarteschlange"
+
 #. placeholder {0}: host.in_use ?? 0
 #. placeholder {1}: host.slots
 #: src/routes/correspondence/components/CapacityStrip.tsx
@@ -2525,6 +2647,18 @@ msgstr "Fernschachbaum"
 #: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
 msgid "what was considered while the game ran"
 msgstr "was während der Partie erwogen wurde"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "A bounded look through the analysis queue, which may be running on another machine"
+msgstr "Ein begrenzter Blick über die Analysewarteschlange, der auch auf einem anderen Rechner laufen kann"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "task running"
+msgstr "Aufgabe läuft"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "task waiting in the queue"
+msgstr "Aufgabe wartet in der Warteschlange"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 #: src/routes/correspondence/components/RunningNow.tsx
@@ -2553,8 +2687,16 @@ msgid "waiting for a slot"
 msgstr "wartet auf einen Platz"
 
 #: src/routes/correspondence/components/EnginePane.tsx
+msgid "task stopped"
+msgstr "Aufgabe abgebrochen"
+
+#: src/routes/correspondence/components/EnginePane.tsx
 msgid "stored"
 msgstr "gespeichert"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "This verdict is stale: below the stale depth, or from a version of this engine you no longer have"
+msgstr "Dieses Urteil ist veraltet: unter der Veraltet-Tiefe oder von einer Version dieser Engine, die du nicht mehr hast"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "depth {depth}"
@@ -2600,6 +2742,10 @@ msgstr "Stoppen"
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "The engine has not sent a line yet."
 msgstr "Die Engine hat noch keine Variante geschickt."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "This engine never got a verdict on this position."
+msgstr "Diese Engine ist zu keinem Urteil über diese Stellung gekommen."
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "No lines were kept for this verdict."
@@ -2654,6 +2800,45 @@ msgstr "Noch hat keine Engine diese Stellung angesehen."
 #: src/routes/correspondence/components/EnginesPane.tsx
 msgid "Search with… puts one on it for as long as you let it. Several engines can work on the same position at once, each in a pane of its own."
 msgstr "„Suchen mit…“ setzt eine darauf, so lange du sie lässt. Mehrere Engines können gleichzeitig an derselben Stellung arbeiten, jede in einem eigenen Feld."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/game/notesModel.ts
+msgid "the starting position"
+msgstr "die Ausgangsstellung"
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "The best moves after {where} become branches of their own, and an engine looks at each of them."
+msgstr "Die besten Züge nach {where} werden zu eigenen Ästen, und eine Engine sieht sich jeden davon an."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Width"
+msgstr "Breite"
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Stages"
+msgstr "Stufen"
+
+#. placeholder {0}: expansionSize(chosen, stages)
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Up to {0} positions. Your marks change that as it goes: an excluded move is skipped, a bad one stops after one stage, and a good or interesting one gets a stage and a sibling more."
+msgstr "Bis zu {0} Stellungen. Deine Markierungen ändern das unterwegs: Ein ausgeschlossener Zug wird übersprungen, ein schlechter hört nach einer Stufe auf, und ein guter oder interessanter bekommt eine Stufe und einen Geschwisterzug mehr."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Queue tasks"
+msgstr "Aufgaben einreihen"
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Off, the moves go into the tree and nothing is calculated."
+msgstr "Aus wandern die Züge in den Baum, und gerechnet wird nichts."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "No engine has looked at this position yet, so one task is queued on the move itself and the branches appear when it answers."
+msgstr "Noch hat keine Engine diese Stellung angesehen: Eine Aufgabe wird auf den Zug selbst eingereiht, und die Äste erscheinen, sobald sie antwortet."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Expand"
+msgstr "Erweitern"
 
 #: src/routes/correspondence/components/GameHeader.tsx
 msgid "The move that arrived"
@@ -2912,10 +3097,23 @@ msgstr "Zu dieser Stellung ist noch nichts geschrieben."
 msgid "Nothing written about this game yet."
 msgstr "Zu dieser Partie ist noch nichts geschrieben."
 
+#. placeholder {0}: formatNodes(search.limit_nodes)
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "up to {0} nodes"
+msgstr "bis zu {0} Knoten"
+
 #. placeholder {0}: snapshot.depth
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "depth {0}"
 msgstr "Tiefe {0}"
+
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "A bounded look through the analysis queue"
+msgstr "Ein begrenzter Blick über die Analysewarteschlange"
+
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "task"
+msgstr "Aufgabe"
 
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "from the side to move's point of view"
@@ -2924,11 +3122,6 @@ msgstr "aus Sicht der Seite am Zug"
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "No engine is on a correspondence position right now."
 msgstr "Gerade sitzt keine Engine auf einer Fernschach-Stellung."
-
-#: src/routes/correspondence/components/SearchDialog.tsx
-#: src/routes/game/notesModel.ts
-msgid "the starting position"
-msgstr "die Ausgangsstellung"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "One engine on {where}, for as long as you let it. It keeps its slot until it finishes or you pause it."
@@ -2985,6 +3178,10 @@ msgid "The minimax under this move disagrees with the engine's own number here"
 msgstr "Das Minimax unter diesem Zug widerspricht hier der eigenen Zahl der Engine"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
+msgstr "Diese Zahl ist veraltet: Sie wurde unter der Veraltet-Tiefe erreicht oder von einer Version der Engine, die du nicht mehr hast. Teilbaum auffrischen fragt noch einmal."
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "parked"
 msgstr "geparkt"
 
@@ -2993,16 +3190,58 @@ msgid "An engine is parked here, warm — resuming costs seconds"
 msgstr "Hier ist eine Engine geparkt, warm — das Fortsetzen kostet Sekunden"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Tasks are still out on the positions under this move"
+msgstr "Auf den Stellungen unter diesem Zug sind noch Aufgaben unterwegs"
+
+#. placeholder {0}: outstanding.left
+#. placeholder {1}: outstanding.total
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} of {1}"
+msgstr "{0} von {1}"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "This game has no tree yet."
 msgstr "Diese Partie hat noch keinen Baum."
 
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "Tasks arrive in a later step"
-msgstr "Aufgaben kommen in einem späteren Schritt"
+msgid "An excluded move is never given engine time"
+msgstr "Ein ausgeschlossener Zug bekommt nie Engine-Zeit"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "A task is already on this position"
+msgstr "Auf dieser Stellung liegt schon eine Aufgabe"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "One bounded look at this position, through the analysis queue"
+msgstr "Ein begrenzter Blick auf diese Stellung, über die Analysewarteschlange"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Queue task"
 msgstr "Aufgabe einreihen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "An excluded move is never expanded"
+msgstr "Ein ausgeschlossener Zug wird nie erweitert"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Make the best moves here into children and put a task under each"
+msgstr "Die besten Züge hier zu Kindern machen und unter jedes eine Aufgabe legen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Queue a task on every stale position from here down"
+msgstr "Auf jeder veralteten Stellung von hier abwärts eine Aufgabe einreihen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Refresh subtree"
+msgstr "Teilbaum auffrischen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Take this waiting task back out of the queue"
+msgstr "Diese wartende Aufgabe wieder aus der Warteschlange nehmen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Cancel task"
+msgstr "Aufgabe abbrechen"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Comment…"

@@ -8,7 +8,10 @@
  *
  * The parked ones are here too, greyed and marked, because a parked process is still
  * spending memory. Leaving them out would make the section disagree with the capacity strip
- * three lines above it.
+ * three lines above it. So are the **tasks**, marked as tasks: they are the other half of
+ * what the hardware is doing, and a dozen of them out on a runner is exactly the thing this
+ * section exists to show. A task carries its budget rather than a depth — nothing streams
+ * pictures out of the analysis queue — and the host it names is where its engine lives.
  *
  * Each card carries the game, the move, the engine's own number and both of its counters —
  * depth and nodes — because for Leela the second is the one that means anything.
@@ -21,7 +24,7 @@ import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
 import { opponentOf } from '../format'
-import { formatSpan, isLive, isWarm, runningSeconds } from '../searches'
+import { formatSpan, isLive, isTask, isWarm, runningSeconds } from '../searches'
 
 /** The game a search belongs to, by id, so a card can name it and link to it. */
 export function gamesById(
@@ -33,19 +36,27 @@ export function gamesById(
 function Card({
   search,
   game,
+  host,
   now,
 }: {
   search: CorrespondenceSearch
   game: CorrespondenceGameSummary | undefined
+  /** Where this one is being worked: a runner's name, or null for this machine. */
+  host: string | null
   now: number
 }) {
   const { t } = useLingui()
   const live = isLive(search)
   const warm = isWarm(search)
+  const task = isTask(search)
   const snapshot = live ? (search.snapshot ?? null) : null
   const elapsed = runningSeconds(search, now)
   const detail = [
     game ? opponentOf(game) : null,
+    // A task sends no snapshots — it is a run in the analysis queue and nobody is watching
+    // it half a second at a time — so what it can say about its size is its budget, which
+    // is what it was queued with.
+    task && search.limit_nodes ? t`up to ${formatNodes(search.limit_nodes)} nodes` : null,
     snapshot?.depth ? t`depth ${snapshot.depth}` : null,
     snapshot?.nodes ? t`${formatNodes(snapshot.nodes)} nodes` : null,
     live && elapsed !== null ? formatSpan(elapsed) : null,
@@ -61,8 +72,18 @@ function Card({
         !live && 'opacity-70',
       )}
     >
-      <span className="truncate text-[0.75rem] font-semibold text-ink">
-        {search.engine_name ?? t`Engine`}
+      <span className="flex min-w-0 items-baseline gap-1.5">
+        <span className="truncate text-[0.75rem] font-semibold text-ink">
+          {search.engine_name ?? t`Engine`}
+        </span>
+        {task ? (
+          <span
+            className="flex-none rounded-sm border border-edge px-1 text-[0.5625rem] text-dim uppercase"
+            title={t`A bounded look through the analysis queue`}
+          >
+            <Trans>task</Trans>
+          </span>
+        ) : null}
       </span>
       {/*
         The search's own top line, from the SIDE TO MOVE's point of view — this card has no
@@ -84,7 +105,11 @@ function Card({
             live ? 'bg-good' : warm ? 'bg-mistake' : 'bg-faint',
           )}
         />
-        {live ? (
+        {task && live ? (
+          <Trans>being worked on</Trans>
+        ) : task ? (
+          <Trans>waiting in the analysis queue</Trans>
+        ) : live ? (
           <Trans>searching</Trans>
         ) : warm ? (
           <Trans>parked, warm</Trans>
@@ -93,11 +118,10 @@ function Card({
         ) : (
           <Trans>waiting for a slot</Trans>
         )}
-        {search.runner_id === null || search.runner_id === undefined ? (
-          <span className="ml-auto">
-            <Trans>this machine</Trans>
-          </span>
-        ) : null}
+        {/* Where the work is. A search says so on its own row; a task says where its
+            engine lives, which is the same answer — a task runs on its engine's host, and
+            that is the whole reason a runner's engine may be the task engine. */}
+        <span className="ml-auto">{host ?? <Trans>this machine</Trans>}</span>
       </span>
     </div>
   )
@@ -114,10 +138,13 @@ function Card({
 export function RunningNow({
   searches,
   games,
+  hosts,
   now,
 }: {
   searches: readonly CorrespondenceSearch[]
   games: readonly CorrespondenceGameSummary[]
+  /** Engine id → the runner it lives on, absent or null for this machine. */
+  hosts?: ReadonlyMap<number, string | null>
   /** Now, in milliseconds — the page owns the clock so one tick redraws the whole section. */
   now: number
 }) {
@@ -139,6 +166,7 @@ export function RunningNow({
           key={search.id}
           search={search}
           game={search.game_id === null ? undefined : byId.get(search.game_id ?? -1)}
+          host={(search.engine_id === null ? null : hosts?.get(search.engine_id ?? -1)) ?? null}
           now={now}
         />
       ))}

@@ -162,3 +162,121 @@ describe('the tree pane', () => {
     expect(screen.queryByTestId('tree-menu')).not.toBeInTheDocument()
   })
 })
+
+/**
+ * A move with a task waiting on it, one child being worked on, and a stale verdict — the
+ * three marks step 3 adds, on one tree.
+ */
+function tasked(): CorrespondenceTreeNode {
+  const grandchild = node({
+    id: 12,
+    san: 'Nf6',
+    uci: 'g8f6',
+    ply: 3,
+    frame: 'black',
+    task: { search_id: 31, status: 'queued' },
+  })
+  const child = node({
+    id: 11,
+    san: 'Nf3',
+    uci: 'g1f3',
+    ply: 2,
+    frame: 'white',
+    task: { search_id: 30, status: 'running' },
+    children: [grandchild],
+  })
+  const root = node({
+    id: 10,
+    san: 'e4',
+    uci: 'e2e4',
+    ply: 1,
+    own: { cp: 20, depth: 18 },
+    stale: true,
+    task: { search_id: 29, status: 'queued', stages: 2, width: 3 },
+    children: [child],
+  })
+  return node({ id: 9, uci: null, san: null, ply: 0, played: true, children: [root] })
+}
+
+describe('the tree pane and the tasks under it', () => {
+  it('marks the position a task is waiting on, and how much is still out below it', () => {
+    draw({ tree: tasked() })
+    const chip = screen.getByTestId('tree-queued-10')
+    expect(chip).toHaveTextContent('◌')
+    // Two of the two positions under this move are still waiting; the node's own task is
+    // the mark itself and is not counted twice.
+    expect(chip).toHaveTextContent('2 of 2')
+  })
+
+  it('marks a stale verdict, and says why', () => {
+    draw({ tree: tasked() })
+    expect(screen.getByTestId('tree-stale-10')).toHaveAttribute(
+      'title',
+      expect.stringContaining('stale'),
+    )
+  })
+
+  it('queues a task from the menu, and refuses one where a task is already going', async () => {
+    const onQueueTask = vi.fn()
+    draw({ tree: tasked(), onQueueTask })
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-10') })
+    expect(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+    ).toBeDisabled()
+
+    await userEvent.keyboard('{Escape}')
+    const plain = node({ id: 4, san: 'c5', uci: 'c7c5', ply: 2, frame: 'black' })
+    draw({ tree: node({ id: 1, uci: null, san: null, children: [plain] }), onQueueTask })
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-4') })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+    )
+    expect(onQueueTask).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }))
+  })
+
+  it('never offers engine time on an excluded move', async () => {
+    const excluded = node({ id: 5, san: 'h5', uci: 'h7h5', ply: 2, frame: 'black', mark: 'excluded' })
+    draw({
+      tree: node({ id: 1, uci: null, san: null, children: [excluded] }),
+      onQueueTask: vi.fn(),
+      onExpand: vi.fn(),
+    })
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-5') })
+    const menu = screen.getByTestId('tree-menu')
+    expect(within(menu).getByRole('menuitem', { name: 'Queue task' })).toBeDisabled()
+    expect(within(menu).getByRole('menuitem', { name: 'Expand…' })).toBeDisabled()
+  })
+
+  it('cancels a waiting task, and offers no cancel for one already being worked on', async () => {
+    const onCancelTask = vi.fn()
+    draw({ tree: tasked(), onExpand: vi.fn(), onRefresh: vi.fn(), onCancelTask })
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-11') })
+    expect(
+      within(screen.getByTestId('tree-menu')).queryByRole('menuitem', { name: 'Cancel task' }),
+    ).not.toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-12') })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Cancel task' }),
+    )
+    expect(onCancelTask).toHaveBeenCalledWith(31)
+  })
+
+  it('offers Expand… and Refresh subtree, and hands over the node they were raised on', async () => {
+    const onExpand = vi.fn()
+    const onRefresh = vi.fn()
+    draw({ tree: tasked(), onExpand, onRefresh })
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-11') })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Expand…' }),
+    )
+    expect(onExpand).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }))
+
+    await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-11') })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Refresh subtree' }),
+    )
+    expect(onRefresh).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }))
+  })
+})

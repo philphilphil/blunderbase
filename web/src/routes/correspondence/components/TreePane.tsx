@@ -17,9 +17,17 @@
  * alternatives to the move that follows it. `tree.ts` owns every question about order, so
  * the pane and the candidates table cannot disagree about which move is first.
  *
- * The context menu carries the whole verb set the design names. The verbs that need an
- * engine — search, task, expand — are drawn disabled with a note saying which step brings
- * them, rather than left out: a menu that grows new items later teaches the reader twice.
+ * Three marks say what is *happening* to a node, and they are three different claims: a
+ * spinner while an engine is on it, a queue mark while a task waits its turn — carrying
+ * `2 of 7` when what is waiting is an expansion under the move rather than a look at the
+ * move itself — and a stale mark when the number shown was reached too shallow or by an
+ * engine version that is gone. The stale one is drawn from `node.stale`, which the server
+ * computes: it is a comparison against a setting and against what is installed now, and a
+ * client working it out for itself would be a second opinion about it.
+ *
+ * The context menu carries the whole verb set the design names. A verb is disabled with the
+ * reason in its title rather than left out — an excluded move is never given engine time,
+ * and a menu that hid the item would leave the reader wondering where it went.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Pin } from 'lucide-react'
@@ -35,7 +43,7 @@ import {
   MARK_GLYPHS,
   MARK_LABELS,
 } from '../format'
-import { isActive, isLive, isWarm, weakNodes } from '../searches'
+import { isActive, isLive, isWarm, taskCounts, weakNodes, type TaskProgress } from '../searches'
 import { backedDirection, isLeftBehind, sortSiblings } from '../tree'
 
 export interface TreeMenu {
@@ -54,6 +62,14 @@ export interface TreePaneProps {
   onDelete: (id: number) => void
   /** Open the search dialog on this node — the menu's first verb. */
   onSearch?: (node: CorrespondenceTreeNode) => void
+  /** One bounded look at this position, through the analysis queue. */
+  onQueueTask?: (node: CorrespondenceTreeNode) => void
+  /** Open the expand dialog on this node: width, stages, and whether to queue tasks. */
+  onExpand?: (node: CorrespondenceTreeNode) => void
+  /** A task on every stale position from here down. */
+  onRefresh?: (node: CorrespondenceTreeNode) => void
+  /** Take this node's waiting task back out of the queue. */
+  onCancelTask?: (searchId: number) => void
   /** A finished game's tree is read-only: every verb that writes is gone. */
   readOnly?: boolean
 }
@@ -68,6 +84,7 @@ function Chip({
   node,
   selected,
   weak,
+  progress,
   onSelect,
   onMenu,
 }: {
@@ -75,6 +92,8 @@ function Chip({
   selected: boolean
   /** Far enough behind its best sibling to have left the decision — see `searches.ts`. */
   weak: boolean
+  /** How much of the work under this node is still outstanding — the `2 of 7`. */
+  progress?: TaskProgress
   onSelect: () => void
   onMenu: (event: MouseEvent) => void
 }) {
@@ -86,6 +105,11 @@ function Chip({
   const searching = searches.some(isLive)
   const parked = searches.some(isWarm)
   const queued = searches.some((search) => search.status === 'queued')
+  // A task is drawn from the node's own `task` rather than from the searches under it: the
+  // server has already decided which of them the mark is about, and the two must not
+  // disagree about whether a position is being worked on.
+  const task = node.task ?? null
+  const outstanding = progress && progress.left > 0 ? progress : null
   // Leela's depth means little and its node count means a lot, so a node whose verdict
   // came with one prints both — `docs/correspondence.md`, decision 5.
   const nodeCount = node.own?.nodes ?? null
@@ -139,6 +163,15 @@ function Chip({
           ≠
         </span>
       ) : null}
+      {node.stale ? (
+        <span
+          data-testid={`tree-stale-${node.id}`}
+          className="text-[0.625rem] text-inaccuracy"
+          title={t`This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again.`}
+        >
+          ⟳
+        </span>
+      ) : null}
       {node.pinned_engine_id ? (
         <span title={t`One engine's verdict is pinned here`}>
           <Pin className="size-2.5 text-accent-teal" aria-label={t`one engine's verdict is pinned here`} />
@@ -157,9 +190,24 @@ function Chip({
           title={t`An engine is parked here, warm — resuming costs seconds`}
         />
       ) : null}
-      {queued ? (
-        <span className="text-[0.625rem] text-accent-teal" title={t`waiting for a slot`}>
+      {queued || outstanding ? (
+        <span
+          data-testid={`tree-queued-${node.id}`}
+          className="text-[0.625rem] text-accent-teal"
+          title={
+            task?.status === 'queued'
+              ? t`A task is waiting in the analysis queue`
+              : queued
+                ? t`waiting for a slot`
+                : t`Tasks are still out on the positions under this move`
+          }
+        >
           ◌
+          {outstanding ? (
+            <span className="ml-0.5 text-[0.5625rem] text-dim">
+              {t`${outstanding.left} of ${outstanding.total}`}
+            </span>
+          ) : null}
         </span>
       ) : null}
     </span>
@@ -185,6 +233,7 @@ function Line({
   start,
   selectedId,
   weak,
+  progress,
   onSelect,
   onMenu,
   leftBehind,
@@ -192,6 +241,7 @@ function Line({
   start: CorrespondenceTreeNode
   selectedId: number | null
   weak: Set<number>
+  progress: Map<number, TaskProgress>
   onSelect: (id: number) => void
   onMenu: (node: CorrespondenceTreeNode, event: MouseEvent) => void
   leftBehind: boolean
@@ -218,6 +268,7 @@ function Line({
           node={current}
           selected={current.id === selectedId}
           weak={weak.has(current.id)}
+          progress={progress.get(current.id)}
           onSelect={() => onSelect(current.id)}
           onMenu={(event) => onMenu(current, event)}
         />,
@@ -248,6 +299,7 @@ function Line({
             start={alternative}
             selectedId={selectedId}
             weak={weak}
+            progress={progress}
             onSelect={onSelect}
             onMenu={onMenu}
             leftBehind={leftBehind || isLeftBehind(current, alternative)}
@@ -303,6 +355,10 @@ export function TreePane({
   onPromote,
   onDelete,
   onSearch,
+  onQueueTask,
+  onExpand,
+  onRefresh,
+  onCancelTask,
   readOnly = false,
 }: TreePaneProps) {
   const { i18n, t } = useLingui()
@@ -311,6 +367,9 @@ export function TreePane({
   // One walk of the payload rather than one per node: which moves have fallen far enough
   // behind their best sibling to have stopped being part of the decision.
   const weak = useMemo(() => weakNodes(tree), [tree])
+  // The same, for how many tasks are still out under each node — one post-order walk for
+  // the whole tree, because every chip asks.
+  const progress = useMemo(() => taskCounts(tree), [tree])
 
   useEffect(() => {
     if (!menu) return
@@ -340,6 +399,7 @@ export function TreePane({
           start={tree}
           selectedId={selectedId}
           weak={weak}
+          progress={progress}
           onSelect={onSelect}
           onMenu={(node, event) => {
             if (readOnly) return
@@ -373,12 +433,58 @@ export function TreePane({
           >
             <Trans>Search with…</Trans>
           </MenuItem>
-          <MenuItem disabled title={t`Tasks arrive in a later step`}>
+          <MenuItem
+            disabled={!onQueueTask || menuNode.mark === 'excluded' || Boolean(menuNode.task)}
+            title={
+              menuNode.mark === 'excluded'
+                ? t`An excluded move is never given engine time`
+                : menuNode.task
+                  ? t`A task is already on this position`
+                  : t`One bounded look at this position, through the analysis queue`
+            }
+            onClick={() => {
+              onQueueTask?.(menuNode)
+              setMenu(null)
+            }}
+          >
             <Trans>Queue task</Trans>
           </MenuItem>
-          <MenuItem disabled title={t`Expansion arrives in a later step`}>
-            <Trans>Expand</Trans>
+          <MenuItem
+            disabled={!onExpand || menuNode.mark === 'excluded'}
+            title={
+              menuNode.mark === 'excluded'
+                ? t`An excluded move is never expanded`
+                : t`Make the best moves here into children and put a task under each`
+            }
+            onClick={() => {
+              onExpand?.(menuNode)
+              setMenu(null)
+            }}
+          >
+            <Trans>Expand…</Trans>
           </MenuItem>
+          <MenuItem
+            disabled={!onRefresh}
+            title={t`Queue a task on every stale position from here down`}
+            onClick={() => {
+              onRefresh?.(menuNode)
+              setMenu(null)
+            }}
+          >
+            <Trans>Refresh subtree</Trans>
+          </MenuItem>
+          {menuNode.task && menuNode.task.status === 'queued' ? (
+            <MenuItem
+              disabled={!onCancelTask}
+              title={t`Take this waiting task back out of the queue`}
+              onClick={() => {
+                onCancelTask?.(menuNode.task?.search_id as number)
+                setMenu(null)
+              }}
+            >
+              <Trans>Cancel task</Trans>
+            </MenuItem>
+          ) : null}
           <hr className="my-1 border-0 border-t border-line" />
           <div className="flex items-center gap-1 px-2 py-1">
             <span className="text-[0.625rem] text-dim">

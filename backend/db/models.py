@@ -661,6 +661,14 @@ class MoveEval(Base):
     # and a row holding it answers `IS NOT NULL` while decoding to None. That is what had
     # `_settled_maia_levels` reading whole runs as carrying no Maia levels at all (0011).
     best_lines: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON(none_as_null=True))
+    # Where the search that produced `eval_before_*` actually got to, as the engine
+    # reported it: the depth of its last iteration and the nodes it had visited. What the
+    # budget bought rather than what it asked for — `AnalysisRun.nodes` is the request, and
+    # these are the answer, which is why a correspondence task can only be compared with a
+    # three-day search on these. NULL on a terminal position, which no engine was asked
+    # about, and on a row that came from a runner too old to send them.
+    depth: Mapped[int | None] = mapped_column(Integer)
+    nodes: Mapped[int | None] = mapped_column(Integer)
     # Maia's predicted human move per rating level: {"1700": [{"uci": "e2e4", "p": 0.31}, ...]}
     maia_policy: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
 
@@ -995,6 +1003,14 @@ class CorrespondenceSearch(Base):
     limit_depth: Mapped[int | None] = mapped_column(Integer)
     limit_nodes: Mapped[int | None] = mapped_column(Integer)
     limit_seconds: Mapped[int | None] = mapped_column(Integer)
+    # What an expansion still has left to do below this task, carried on the row because
+    # nothing else survives the hours between queueing a task and absorbing its answer: how
+    # many children to make of the lines it comes back with, and how many stages of that to
+    # go on for. NULL on a task that was queued on its own — one position, one verdict,
+    # nothing under it — and on every `search`. Copied onto each child's own task as it is
+    # queued, one stage lower, so an expansion unwinds without any state but these two.
+    expand_width: Mapped[int | None] = mapped_column(Integer)
+    expand_stages: Mapped[int | None] = mapped_column(Integer)
     # UCI `searchmoves`: the moves this search is restricted to, NULL for all of them.
     root_moves: Mapped[list[str] | None] = mapped_column(JSON(none_as_null=True))
     status: Mapped[SearchStatus] = mapped_column(

@@ -21,6 +21,8 @@ import type {
   BatchAnalysisResponse,
   Color,
   ComparisonResponse,
+  CorrespondenceExpand,
+  CorrespondenceExpansion,
   CorrespondenceFinishRequest,
   CorrespondenceGameCreate,
   CorrespondenceGameDetail,
@@ -32,6 +34,7 @@ import type {
   CorrespondenceNodeCreate,
   CorrespondenceNodeUpdate,
   CorrespondencePgnImport,
+  CorrespondenceRefresh,
   CorrespondenceSearch,
   CorrespondenceSearchCreate,
   CorrespondenceSearchList,
@@ -778,6 +781,24 @@ export const deleteCorrespondenceNode = (id: number) =>
   http.delete<void>(`/correspondence/nodes/${id}`)
 
 /**
+ * Make the node's best moves into children and put a task under each of them.
+ *
+ * A node with a stored verdict is expanded now; one nobody has looked at gets a single
+ * task carrying the whole expansion, which unwinds server-side when that task answers —
+ * either way the page learns of it through `correspondence.updated` and refetches.
+ */
+export const expandCorrespondenceNode = (id: number, body: CorrespondenceExpand) =>
+  http.post<CorrespondenceExpansion>(`/correspondence/nodes/${id}/expand`, { body })
+
+/**
+ * A task on every stale position from this node down. 409
+ * `correspondence_refresh_too_large` when there are more than one press may queue, and the
+ * message names how many were found.
+ */
+export const refreshCorrespondenceSubtree = (id: number, body: CorrespondenceRefresh = {}) =>
+  http.post<CorrespondenceExpansion>(`/correspondence/nodes/${id}/refresh`, { body })
+
+/**
  * Put one engine on one node.
  *
  * A 201 means the row is written and it *will* be searched, not that an engine is already
@@ -809,6 +830,15 @@ export const resumeCorrespondenceSearch = (id: number) =>
 /** The end of it: `stopped`, and the process quit or handed back to the pool. */
 export const stopCorrespondenceSearch = (id: number) =>
   http.post<CorrespondenceSearch>(`/correspondence/searches/${id}/stop`)
+
+/**
+ * Take a queued task back out of the queue: its run is deleted and the row comes back
+ * `stopped`. Idempotent on a task that has already ended; 409 `correspondence_task_running`
+ * when a worker already has it, because a pass mid-search is cheaper finished than thrown
+ * away. `stop` on a task delegates here, so either button does the right thing.
+ */
+export const cancelCorrespondenceTask = (id: number) =>
+  http.post<CorrespondenceSearch>(`/correspondence/searches/${id}/cancel`)
 
 /** The laptop is closing. Answers with the rows it moved, which may be none. */
 export const pauseAllCorrespondenceSearches = () =>

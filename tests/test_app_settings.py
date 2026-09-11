@@ -39,6 +39,9 @@ UNCONFIGURED: dict[str, Any] = {
     # than a default standing in for an unset row, so it answers with the row and not a
     # fallback.
     app_settings.CORRESPONDENCE_SEARCH_ENGINE_IDS: [],
+    # And the task engine, which is an identity like the three roles: null is a real state
+    # — nobody has chosen one, so whichever engine holds the deep role runs the tasks.
+    app_settings.CORRESPONDENCE_TASK_ENGINE_ID: None,
 }
 
 # --- the service ----------------------------------------------------------

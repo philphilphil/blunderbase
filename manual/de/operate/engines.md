@@ -124,8 +124,24 @@ zwei vielleicht nicht. Verhindert wird es nicht – für eine lokale Engine gibt
 Grenze, wie viele Kopien laufen –, aber gedacht sind zwei Plätze für eine CPU-Engine und
 eine GPU-Engine, jede auf ihrer eigenen Hardware.
 
+**Aufgaben sind die andere Hälfte des Modus, und sie sind gewöhnliche
+Warteschlangenarbeit.** Eine Aufgabe – ein begrenzter Blick auf eine Stellung, und das,
+woraus eine [Erweiterung](../guide/correspondence.md#tasks-and-expansion) besteht – ist ein
+`AnalysisRun` wie jeder andere: Sie belegt keinen Suchplatz, sie zählt zusammen mit der
+Schnell- und der Tiefenanalyse gegen `BLUNDERBASE_ANALYSIS_CONCURRENCY`, und sie läuft auf
+dem Host, dem die Warteschlange sie gibt – [Remote Runner](runners.md) eingeschlossen. Die
+Engine unter **Analyse → Fernschach → Aufgaben-Engine** darf also auf einem Runner liegen,
+anders als eine Such-Engine, die hier sein muss – und wo du einen Runner hast, gehört sie
+dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre Kerne für die
+Suchen und die Durchläufe. Aufgaben stehen in der Warteschlange zwischen den Stufen, vor der
+Schnellanalyse jeder importierten Partie und hinter einer Tiefenanalyse, auf die jemand
+wartet, und untereinander gilt: die nächste Frist zuerst. **Warteschlange leeren** auf der
+Analyseseite wirft die noch wartenden Aufgaben mit allem anderen hinaus, und jeder betroffene
+Knoten sagt es.
+
 Ideal ist eine eigene Maschine. Ein [Remote Runner](runners.md) ist heute der Weg zu einer
-für die Warteschlange; eine Suche läuft weiterhin nur auf diesem Server. Eine Engine, die
+für die Warteschlange, und die Aufgaben nutzen ihn schon; eine Suche läuft weiterhin nur auf
+diesem Server. Eine Engine, die
 ein Runner anbietet, taucht in der Auswahl **Suchen mit …** nicht auf, und eine Suche, die
 auf ihr angefordert wird, wird abgewiesen – eine für Fernschach gekaufte Maschine wird also
 am besten der Server.

@@ -3,6 +3,7 @@
  * per frame, flat, with the `event` key naming it.
  */
 import type {
+  CorrespondenceSearchKind,
   CorrespondenceSearchStatus,
   JobStatus,
   LineResponse,
@@ -298,10 +299,18 @@ export type RunnerEvent = RunnerConnectedEvent | RunnerDisconnectedEvent | Runne
  * One event for all of them, on purpose: the tree, the move list and the deadlines are one
  * document, so the page refetches `GET /correspondence/games/{id}` (and the list) rather
  * than trying to apply nine different kinds of patch to a tree it holds.
+ *
+ * `scope` says how wide that refetch has to be. `game` means the `Game` row itself moved —
+ * a move played, a game created or finished — so the library and the explorer are behind
+ * too. `tree` is a node, an eval or a task, and touches nothing outside correspondence:
+ * an overnight expansion lands one of those per absorbed task, and each of them dragging
+ * the games table and the explorer along is the refetch storm this field prevents. Absent
+ * on a frame from an older server, which is read as `game`.
  */
 export interface CorrespondenceUpdatedEvent {
   event: 'correspondence.updated'
   game_id: number
+  scope?: 'game' | 'tree'
 }
 
 /**
@@ -316,6 +325,13 @@ export interface CorrespondenceSearchEvent {
   node_id: number
   game_id: number | null
   engine_id: number | null
+  /**
+   * Which of the two engine modes moved. A task's transitions arrive on this same event —
+   * `queued` when it is written, `running` when a worker claims its run, then `done`,
+   * `failed` or `stopped` — and a reader that cannot tell them apart would announce a
+   * dozen finished tasks from one expansion as a dozen finished searches.
+   */
+  kind?: CorrespondenceSearchKind
   status: CorrespondenceSearchStatus
   warm: boolean
 }

@@ -66,6 +66,12 @@ def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
     app_settings_service.set_correspondence_search_engine_ids(
         session, body.correspondence_search_engine_ids
     )
+    # And the task engine is the third value outside `replace`, written the same way and
+    # for the same reason: an engine id has no clamp, so a PUT that names one sets it and
+    # one that does not clears it back to "whichever engine holds the deep role".
+    app_settings_service.set_correspondence_task_engine_id(
+        session, body.correspondence_task_engine_id
+    )
     return _answer(session, stored)
 
 
@@ -99,6 +105,11 @@ def _answer(session: Session, values: dict[str, int | float | None]) -> AppSetti
             # than a default standing in for one.
             app_settings_service.CORRESPONDENCE_SEARCH_ENGINE_IDS: (
                 app_settings_service.get_correspondence_search_engine_ids(session)
+            ),
+            # Null here is a real state and not a missing one: no engine has been chosen
+            # for tasks, and whichever engine holds the deep role runs them.
+            app_settings_service.CORRESPONDENCE_TASK_ENGINE_ID: (
+                app_settings_service.get_correspondence_task_engine_id(session)
             ),
         }
     )

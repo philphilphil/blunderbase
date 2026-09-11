@@ -39,6 +39,41 @@ const STORED: AppSettings = {
   correspondence_multipv: 3,
   correspondence_slots: 2,
   correspondence_search_engine_ids: [1],
+  correspondence_task_nodes: 40_000_000,
+  correspondence_task_multipv: 3,
+  correspondence_stale_depth: 30,
+  correspondence_task_engine_id: null,
+}
+
+/**
+ * What `/runners/status` answers. The task engine is chosen out of this rather than out of
+ * `/correspondence/status`: a task is queue work and may run on a runner, and a runner's
+ * engines are only ever listed here.
+ */
+const RUNNERS = {
+  local: {
+    name: 'this host',
+    busy: 0,
+    streams: 0,
+    workers: true,
+    queued: 0,
+    running: 0,
+    engines: [{ id: 1, name: 'Stockfish 17', kind: 'uci', enabled: true, streams: true }],
+  },
+  runners: [
+    {
+      id: 4,
+      name: 'gpu-box',
+      slots: 2,
+      connected: true,
+      busy: 0,
+      streams: 0,
+      free_slots: 2,
+      queued_eligible: 0,
+      engines: [{ id: 9, name: 'Stockfish 17 (big)', kind: 'uci', enabled: true, streams: false }],
+    },
+  ],
+  queue: { queued: 0, running: 0 },
 }
 
 const STATUS = {
@@ -91,6 +126,7 @@ beforeEach(() => {
         statusReads += 1
         return json(STATUS)
       }
+      if (path.includes('/runners/status')) return json(RUNNERS)
       if (!path.endsWith('/api/settings')) return json({})
       if ((init?.method ?? 'GET') === 'PUT') {
         sent = JSON.parse(String(init?.body)) as AppSettingsUpdate
@@ -121,6 +157,10 @@ describe('Analysis → Correspondence', () => {
       correspondence_multipv: 3,
       correspondence_slots: 4,
       correspondence_search_engine_ids: [1],
+      correspondence_task_nodes: 40_000_000,
+      correspondence_task_multipv: 3,
+      correspondence_stale_depth: 30,
+      correspondence_task_engine_id: null,
       maia_elos: [1500, 1800],
       quick_nodes: 111_000,
       deep_nodes: 2_222_000,
@@ -169,6 +209,38 @@ describe('Analysis → Correspondence', () => {
     // `GET /correspondence/status` is read *through* the engine list this form writes: the
     // picker's order and its default both come from it.
     await waitFor(() => expect(statusReads).toBeGreaterThan(1))
+  })
+
+  it('offers a runner’s engine for the tasks, which a search could never use', async () => {
+    draw()
+    const picker = await screen.findByLabelText<HTMLSelectElement>('Task engine')
+    // The remote one is offered although it drives no board here: a task is ordinary queue
+    // work, and a machine of its own is the setup the mode is happiest in.
+    expect(
+      within(picker).getByRole('option', { name: 'Stockfish 17 (big) · gpu-box' }),
+    ).toBeInTheDocument()
+    expect(picker).toHaveValue('')
+
+    await userEvent.selectOptions(picker, '9')
+    await userEvent.click(screen.getByRole('button', { name: /Save/ }))
+    await waitFor(() => expect(sent).not.toBeNull())
+    expect(sent?.correspondence_task_engine_id).toBe(9)
+  })
+
+  it('sends the task numbers as they were typed, and an empty box as the default', async () => {
+    draw()
+    const nodes = await screen.findByLabelText('Nodes per task')
+    await userEvent.clear(nodes)
+    await userEvent.type(nodes, '80000000')
+    const stale = screen.getByLabelText('Stale below depth')
+    await userEvent.clear(stale)
+    await userEvent.click(screen.getByRole('button', { name: /Save/ }))
+
+    await waitFor(() => expect(sent).not.toBeNull())
+    expect(sent?.correspondence_task_nodes).toBe(80_000_000)
+    // Cleared is "nobody has set this", which is null and not zero.
+    expect(sent?.correspondence_stale_depth).toBeNull()
+    expect(sent?.correspondence_task_multipv).toBe(3)
   })
 
   it('says that the slot count needs a restart, because the pool is sized at boot', async () => {

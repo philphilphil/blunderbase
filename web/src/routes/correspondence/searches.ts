@@ -41,6 +41,85 @@ export function isLive(search: CorrespondenceSearch): boolean {
   return search.status === 'running'
 }
 
+/**
+ * A bounded run through the analysis queue rather than a search in the correspondence
+ * pool. The two share a row and a status vocabulary and almost nothing else: a task holds
+ * no slot, cannot be paused, may be working on another machine, and ends by itself.
+ */
+export function isTask(search: CorrespondenceSearch): boolean {
+  return search.kind === 'task'
+}
+
+/** The other half of the same cut, spelled out so no caller has to write the negation. */
+export function isInfinite(search: CorrespondenceSearch): boolean {
+  return search.kind !== 'task'
+}
+
+/** Queued and running tasks, counted apart from the searches — they hold no slot. */
+export function countTasks(searches: readonly CorrespondenceSearch[]): {
+  queued: number
+  running: number
+} {
+  const tasks = searches.filter(isTask)
+  return {
+    queued: tasks.filter((task) => task.status === 'queued').length,
+    running: tasks.filter(isLive).length,
+  }
+}
+
+/**
+ * How much of the work under one node is still outstanding — the `2 of 7` beside an
+ * expansion's root.
+ *
+ * `total` is the positions below the node, `left` how many of them still have a task
+ * queued or running. A node's *own* task is not counted: that one is the mark beside the
+ * move itself, and counting it twice would make a single queued task read as "1 of 1"
+ * under a move with no children at all.
+ */
+export interface TaskProgress {
+  left: number
+  total: number
+}
+
+export function taskProgress(node: CorrespondenceTreeNode): TaskProgress {
+  let left = 0
+  let total = 0
+  const walk = (current: CorrespondenceTreeNode) => {
+    for (const child of current.children ?? []) {
+      total += 1
+      if (child.task) left += 1
+      walk(child)
+    }
+  }
+  walk(node)
+  return { left, total }
+}
+
+/**
+ * The same answer for every node of a tree, in one post-order walk rather than one walk
+ * per node — the tree pane draws a chip per node, and a tree of two hundred positions
+ * asked node by node would be forty thousand visits per render.
+ */
+export function taskCounts(
+  root: CorrespondenceTreeNode | null,
+): Map<number, TaskProgress> {
+  const counts = new Map<number, TaskProgress>()
+  const walk = (node: CorrespondenceTreeNode): TaskProgress => {
+    let left = 0
+    let total = 0
+    for (const child of node.children ?? []) {
+      const under = walk(child)
+      total += 1 + under.total
+      left += (child.task ? 1 : 0) + under.left
+    }
+    const progress = { left, total }
+    counts.set(node.id, progress)
+    return progress
+  }
+  if (root) walk(root)
+  return counts
+}
+
 /** Parked with its process and its hash still in memory — the amber dot. */
 export function isWarm(search: CorrespondenceSearch): boolean {
   return search.status === 'paused' && search.warm === true
@@ -63,6 +142,12 @@ export interface EnginePaneModel {
   engineName: string
   search: CorrespondenceSearch | null
   stored: CorrespondenceEval | null
+  /**
+   * The last piece of work by this engine on this node that ended badly, when nothing of
+   * its is running: a task whose run failed, or one whose queue was cleared under it. The
+   * verdict beside it may be older than that sentence, which is why the two are separate.
+   */
+  ended: CorrespondenceSearch | null
   /** This engine's verdict is the one the node's `own` states. */
   chosen: boolean
   /** The owner pinned this engine here, rather than the tree choosing the deepest. */
@@ -86,12 +171,14 @@ export function enginePanes(node: CorrespondenceTreeNode | null): EnginePaneMode
     engineName: string,
     search: CorrespondenceSearch | null,
     stored: CorrespondenceEval | null,
+    ended: CorrespondenceSearch | null = null,
   ): EnginePaneModel => ({
     key: engineId === null ? `search-${search?.id ?? 0}` : `engine-${engineId}`,
     engineId,
     engineName,
     search,
     stored,
+    ended,
     chosen: engineId !== null && node.chosen_engine_id === engineId,
     pinned: engineId !== null && node.pinned_engine_id === engineId,
   })
@@ -109,6 +196,29 @@ export function enginePanes(node: CorrespondenceTreeNode | null): EnginePaneMode
     const pane = model(id, name, search, held?.stored ?? null)
     if (id === null) loose.push(pane)
     else byEngine.set(id, pane)
+  }
+  // A task whose run failed, or whose queue was cleared under it, said why on the row it
+  // left behind — and that row is the only place the reason is. It is attached to the pane
+  // of an engine that has nothing running, so the sentence is read beside the verdict it
+  // explains rather than lost the moment the task stopped being active.
+  //
+  // Where that engine has no pane at all, the pane is made for it. That is the ordinary
+  // case rather than the odd one: an expansion's children are nodes nothing has ever
+  // evaluated, so a task that dies on one leaves no eval row and no active search to hang
+  // the reason on — and without a pane the owner gets a silent dead branch instead of the
+  // sentence that says why.
+  for (const search of node.searches ?? []) {
+    if (isActive(search) || !search.error) continue
+    const id = search.engine_id ?? null
+    if (id === null) continue
+    const held = byEngine.get(id)
+    if (!held) {
+      byEngine.set(id, model(id, search.engine_name ?? '', null, null, search))
+      continue
+    }
+    if (held.search !== null) continue
+    if (held.ended && held.ended.id > search.id) continue
+    byEngine.set(id, { ...held, ended: search })
   }
 
   const rank = (pane: EnginePaneModel) => {

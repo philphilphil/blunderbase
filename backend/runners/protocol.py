@@ -514,6 +514,11 @@ EVAL_FIELDS = (
     "win_loss",
     "best_move_uci",
     "best_lines",
+    # Where the search actually got to. Added after the first runners shipped, so a runner
+    # that predates them simply sends neither and the row arrives with both NULL — which is
+    # what `decode_eval`'s `data.get` already means by an absent field.
+    "depth",
+    "nodes",
     "maia_policy",
 )
 

@@ -169,6 +169,23 @@ class AppSettings(BaseModel):
         description="the engines the search picker offers, in order; the first is its "
         "default, and an empty list means every eligible engine",
     )
+    correspondence_task_nodes: int | None = Field(
+        default=None, description="the node budget one correspondence task is queued with"
+    )
+    correspondence_task_multipv: int | None = Field(
+        default=None,
+        description="how many lines a task keeps, 1 to 5 — and how wide an "
+        "expansion can be, since the children come from those lines",
+    )
+    correspondence_stale_depth: int | None = Field(
+        default=None,
+        description="below this depth a stored verdict is marked stale, 1 to 100",
+    )
+    correspondence_task_engine_id: int | None = Field(
+        default=None,
+        description="the engine tasks run on; null falls back to whichever engine holds "
+        "the deep role, and a runner's engine is allowed here",
+    )
 
 
 class AppSettingsUpdate(Input):
@@ -221,6 +238,18 @@ class AppSettingsUpdate(Input):
         default=None,
         description="the engines the search picker offers, in order; null or empty is "
         "every eligible engine",
+    )
+    correspondence_task_nodes: int | None = Field(
+        default=None, description="the node budget of one task; at least 1"
+    )
+    correspondence_task_multipv: int | None = Field(
+        default=None, description="1 to 5 lines per task"
+    )
+    correspondence_stale_depth: int | None = Field(
+        default=None, description="1 to 100; below this depth a verdict is stale"
+    )
+    correspondence_task_engine_id: int | None = Field(
+        default=None, description="the engine tasks run on; null is the deep role's engine"
     )
 
 
@@ -1713,6 +1742,11 @@ class CorrespondenceEvalRow(Payload):
     best_lines: list[dict[str, Any]] | None = None
     history: list[dict[str, Any]] = Field(default_factory=list)
     tablebase: dict[str, Any] | None = None
+    stale: bool = Field(
+        default=False,
+        description="the verdict is shallower than `correspondence_stale_depth`, or came "
+        "from a version of the engine that is no longer installed",
+    )
     updated_at: str | None = None
 
 
@@ -1780,10 +1814,23 @@ class CorrespondenceSearchCreate(Input):
     All three limits left out is the ordinary case: a correspondence search runs until the
     owner has decided, which may be next Tuesday. `root_moves` restricts it to the
     candidates being decided between — UCI, legal in that position, refused if not.
+
+    `kind: "task"` is the other engine mode and takes none of that: a bounded run through
+    the analysis queue, with the deployment's task engine, node budget and line count, so
+    the only field it reads besides `node_id` is an optional `engine_id`.
     """
 
     node_id: int
-    engine_id: int
+    kind: str = Field(
+        default="search",
+        pattern="^(search|task)$",
+        description="`search` is infinite and runs in the correspondence pool; `task` is "
+        "bounded and goes through the analysis queue, on this host or on a runner",
+    )
+    engine_id: int | None = Field(
+        default=None,
+        description="required for a search; for a task, null is the deployment's task engine",
+    )
     multipv: int | None = Field(default=None, ge=1, description="null is the deployment's default")
     limit_depth: int | None = Field(default=None, ge=1)
     limit_nodes: int | None = Field(default=None, ge=1)
@@ -1829,6 +1876,18 @@ class CorrespondenceSearchEngine(Payload):
     default: bool = False
 
 
+class CorrespondenceTasks(Payload):
+    """The bounded half of the mode, counted apart from the searches.
+
+    Tasks hold no correspondence slot: each is an `AnalysisRun` in the ordinary queue and
+    may be running on a runner on another machine. The strip says how many are out there
+    all the same.
+    """
+
+    queued: int = 0
+    running: int = 0
+
+
 class CorrespondenceStatus(Payload):
     """The capacity strip: slots, what is in them, what is parked, and where."""
 
@@ -1836,6 +1895,7 @@ class CorrespondenceStatus(Payload):
     in_use: int = 0
     queued: int = 0
     paused: int = 0
+    tasks: CorrespondenceTasks = Field(default_factory=CorrespondenceTasks)
     parked: list[CorrespondenceParked] = Field(default_factory=list)
     hosts: list[CorrespondenceHost] = Field(default_factory=list)
     engines: list[CorrespondenceSearchEngine] = Field(
@@ -1885,8 +1945,30 @@ class CorrespondenceTreeNode(CorrespondenceNodeResponse):
     evals: list[CorrespondenceEvalRow] = Field(default_factory=list)
     searches: list[CorrespondenceSearchRow] = Field(default_factory=list)
     disagree: bool = False
+    stale: bool = Field(
+        default=False,
+        description="the verdict this node shows is one to ask again — too shallow, or "
+        "from an engine version that has since been upgraded",
+    )
+    task: CorrespondenceTask | None = Field(
+        default=None, description="the task queued or running on this position, if there is one"
+    )
     flags: dict[str, Any] = Field(default_factory=dict)
     children: list[CorrespondenceTreeNode] = Field(default_factory=list)
+
+
+class CorrespondenceTask(Payload):
+    """A bounded run over this node's position: the tree's queue mark and its spinner."""
+
+    search_id: int
+    run_id: int | None = None
+    status: str = Field(description="queued or running")
+    engine_id: int | None = None
+    engine_name: str | None = None
+    stages: int | None = Field(
+        default=None, description="how many stages of expansion this task still owes"
+    )
+    width: int | None = Field(default=None, description="how many children each stage makes")
 
 
 CorrespondenceTreeNode.model_rebuild()
@@ -1939,6 +2021,39 @@ class CorrespondenceNodeAdded(Payload):
     game_id: int
     created: int = 0
     tip: CorrespondenceNodeResponse
+
+
+class CorrespondenceExpand(Input):
+    """How far to expand a node: how many children per stage, and how many stages.
+
+    `tasks: false` makes the children and sets no engine on them, which is "put these moves
+    in the tree" rather than "go and look at them". The marks under the node change both
+    numbers as the expansion goes — see the manual's *Tasks and expansion*.
+    """
+
+    width: int | None = Field(
+        default=None, ge=1, le=5, description="null is the deployment's task line count"
+    )
+    stages: int = Field(default=1, ge=1, le=3)
+    tasks: bool = True
+
+
+class CorrespondenceExpansion(Payload):
+    """What an expansion or a refresh did: nodes made, tasks queued, and which ones."""
+
+    game_id: int
+    created: int = 0
+    queued: int = 0
+    stale: int | None = Field(
+        default=None, description="how many stale positions a refresh found under the node"
+    )
+    searches: list[CorrespondenceSearchRow] = Field(default_factory=list)
+
+
+class CorrespondenceRefresh(Input):
+    """Which engine a refresh queues its tasks on. Null is the deployment's task engine."""
+
+    engine_id: int | None = None
 
 
 # --- runner gateway -------------------------------------------------------

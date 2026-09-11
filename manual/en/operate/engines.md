@@ -117,10 +117,24 @@ would be and a card that holds one network comfortably may not hold two. Nothing
 a local engine carries no limit on how many copies of it run — but the setup two slots are
 meant for is one CPU engine and one GPU engine, each on its own hardware.
 
+**Tasks are the other half of the mode, and they are ordinary queue work.** A task — a
+bounded look at one position, and what an
+[expansion](../guide/correspondence.md#tasks-and-expansion) is made of — is an
+`AnalysisRun` like any other: it takes no search slot, it counts against
+`BLUNDERBASE_ANALYSIS_CONCURRENCY` along with the quick and deep passes, and it runs on
+whichever host the queue hands it to, [remote runners](runners.md) included. So the engine
+picked under **Analysis → Correspondence → Task engine** may live on a runner — unlike a
+search engine, which has to be here — and where you have a runner that is where it belongs:
+the tasks go to the other machine and this one keeps its cores for the searches and for the
+passes. Tasks sit between the tiers in the queue, ahead of the quick pass every import gets
+and behind a deep pass somebody is waiting on, and among themselves the game with the
+nearest deadline is worked first. **Clear the queue** on the Analysis page drops the tasks
+still waiting along with everything else waiting, and each of their nodes says so.
+
 The ideal is a machine of its own. A [remote runner](runners.md) is how you get one for the
-queue today; a search still runs on this server only. An engine a runner advertises is not
-offered in the **Search with…** picker and a search asked for on one is refused, so a
-machine bought for correspondence is best made the server.
+queue today, and tasks use it already; a search still runs on this server only. An engine a
+runner advertises is not offered in the **Search with…** picker and a search asked for on
+one is refused, so a machine bought for correspondence is best made the server.
 
 ## The engine in your browser
 

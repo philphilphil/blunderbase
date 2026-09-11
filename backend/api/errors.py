@@ -135,14 +135,18 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     # A line that could not be played is the request being wrong, not the tree: nothing is
     # written, so the client can fix the moves and send the same body again.
     (repertoire_service.RepertoireError, 422, "repertoire_invalid_line"),
-    # Correspondence. The four conflicts are states rather than bad requests: the library
+    # Correspondence. The six conflicts are states rather than bad requests: the library
     # already holds the game, the game has a result and its tree is frozen, a search is
-    # still parked inside the subtree somebody asked to delete, or that engine is already
-    # on that position — each one is something the caller can act on, and none is a retry.
+    # still parked inside the subtree somebody asked to delete, that engine is already on
+    # that position, the task somebody asked to cancel is already on an engine, or a
+    # refresh would queue more work than one press of a button is allowed to — each one is
+    # something the caller can act on, and none is a retry.
     (correspondence_service.GameAlreadyStoredError, 409, "duplicate_correspondence_game"),
     (correspondence_service.TreeLockedError, 409, "correspondence_finished"),
     (correspondence_service.NodeBusyError, 409, "correspondence_node_busy"),
     (correspondence_service.SearchBusyError, 409, "correspondence_search_busy"),
+    (correspondence_service.TaskRunningError, 409, "correspondence_task_running"),
+    (correspondence_service.TooMuchToRefreshError, 409, "correspondence_refresh_too_large"),
     (correspondence_service.UnknownCorrespondenceGameError, 404, "unknown_correspondence_game"),
     (correspondence_service.UnknownNodeError, 404, "unknown_correspondence_node"),
     (correspondence_service.UnknownSearchError, 404, "unknown_correspondence_search"),

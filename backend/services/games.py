@@ -33,6 +33,8 @@ from backend.db.enums import (
 from backend.db.models import (
     Account,
     AnalysisRun,
+    CorrespondenceNode,
+    CorrespondenceSearch,
     DeletedGame,
     Game,
     GamePosition,
@@ -273,6 +275,14 @@ def delete_games(session: Session, game_ids: Sequence[int]) -> Deleted:
     wipe. A kept line belongs to the game it branches off and goes with it; a note that
     named that line but not the game survives with its `line_id` cleared, which is what
     that foreign key is `SET NULL` for.
+
+    A correspondence game's queued tasks go with it too, and they have to be found the long
+    way round: a task is a run over a FEN, so its `game_id` is NULL and `game_id IN (…)`
+    never sees it, while the search row it belongs to cascades away with the node. Left
+    behind, each one would still be claimed by a worker or a runner and would spend its
+    whole node budget on a position nothing is waiting for — an expansion in flight is a
+    dozen of those. So the runs are collected through the searches of the nodes about to
+    go, while those rows are still there to be read.
     """
     from backend.services import explorer as explorer_service
 
@@ -288,11 +298,19 @@ def delete_games(session: Session, game_ids: Sequence[int]) -> Deleted:
             continue
         deleted.remembered += record_deletions(session, present)
         explorer_service.mark_games_dirty(session, present)
-        of_these = select(AnalysisRun.id).where(AnalysisRun.game_id.in_(present))
-        _deleted(session, delete(MoveEval).where(MoveEval.run_id.in_(of_these)))
-        deleted.runs += _deleted(
-            session, delete(AnalysisRun).where(AnalysisRun.game_id.in_(present))
+        searches_of_these = (
+            select(CorrespondenceSearch.id)
+            .join(CorrespondenceNode, CorrespondenceSearch.node_id == CorrespondenceNode.id)
+            .where(CorrespondenceNode.game_id.in_(present))
         )
+        of_these = select(AnalysisRun.id).where(
+            or_(
+                AnalysisRun.game_id.in_(present),
+                AnalysisRun.correspondence_search_id.in_(searches_of_these),
+            )
+        )
+        _deleted(session, delete(MoveEval).where(MoveEval.run_id.in_(of_these)))
+        deleted.runs += _deleted(session, delete(AnalysisRun).where(AnalysisRun.id.in_(of_these)))
         deleted.notes += _deleted(session, delete(Note).where(Note.game_id.in_(present)))
         deleted.lines += _deleted(session, delete(Line).where(Line.game_id.in_(present)))
         _deleted(session, delete(GamePosition).where(GamePosition.game_id.in_(present)))
@@ -510,9 +528,18 @@ def delete_all_games(session: Session) -> Wiped:
     # Before the join rows go, because it is those rows that say which positions a game
     # touched. Every game is going, so every position's fold is wrong.
     explorer_service.discard_position_books(session)
-    of_a_game = select(AnalysisRun.id).where(AnalysisRun.game_id.is_not(None))
+    # A correspondence task is a run over a FEN with no `game_id`, and its search row hangs
+    # off a node of a game that is going — so every one of them is about to be orphaned, and
+    # a run left queued would still be claimed and still spend its budget. Every search there
+    # is belongs to a game, and every game is going: no join is needed to say which.
+    of_a_game = select(AnalysisRun.id).where(
+        or_(
+            AnalysisRun.game_id.is_not(None),
+            AnalysisRun.correspondence_search_id.is_not(None),
+        )
+    )
     _deleted(session, delete(MoveEval).where(MoveEval.run_id.in_(of_a_game)))
-    wiped.runs = _deleted(session, delete(AnalysisRun).where(AnalysisRun.game_id.is_not(None)))
+    wiped.runs = _deleted(session, delete(AnalysisRun).where(AnalysisRun.id.in_(of_a_game)))
     wiped.notes = _deleted(session, delete(Note).where(Note.game_id.is_not(None)))
     # Every `game_positions` row names a game, and every game is going.
     _deleted(session, delete(GamePosition))

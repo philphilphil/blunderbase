@@ -9,7 +9,9 @@
  *
  * **Only the ends nobody asked for.** `stopped` is the owner pressing Stop and needs no
  * announcement, and `queued`, `running` and `paused` are transitions they caused. What is
- * left is `done` and `failed`.
+ * left is `done` and `failed` — and, of those, a *task* finishing is left out too: one
+ * expansion is a dozen tasks answering within minutes of each other, and a dozen toasts
+ * about work asked for in one press is noise. A task that failed still speaks.
  *
  * The engine's name is not on the frame, so it is read out of the query cache — which still
  * holds the row, because invalidations are flushed on a timer and this listener runs before
@@ -89,6 +91,12 @@ export function useCorrespondenceSearchToasts(): void {
     if (!on) return
     const event = frame as CorrespondenceSearchEvent
     if (event.status !== 'done' && event.status !== 'failed') return
+    // A finished *task* is not news: an expansion is a dozen of them and they answer within
+    // minutes of each other, so announcing each would bury whatever the owner was reading
+    // under twelve toasts about work they asked for in one press. The tree marks them as
+    // they land. A task that *failed* is still worth a line — that one is not what was
+    // asked for.
+    if (event.kind === 'task' && event.status !== 'failed') return
     const { search, san } = cachedSearch(client, event)
     const engine = search?.engine_name ?? t`The engine`
     const where = san ?? t`this position`

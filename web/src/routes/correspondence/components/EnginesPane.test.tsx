@@ -193,3 +193,73 @@ describe('EnginesPane', () => {
     expect(screen.getByText(/No engine has looked at this position yet/)).toBeInTheDocument()
   })
 })
+
+describe('the engine column and the tasks in it', () => {
+  it('draws a waiting task as this engine’s pane, with Cancel instead of Pause', async () => {
+    const onCancel = vi.fn()
+    draw(
+      node({
+        searches: [
+          search({ id: 21, kind: 'task', status: 'queued', limit_nodes: 40_000_000 }),
+        ],
+      }),
+      { onCancel },
+    )
+    const pane = screen.getByTestId('engine-pane-1')
+    expect(within(pane).getByText('task waiting in the queue')).toBeInTheDocument()
+    expect(within(pane).queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+    await userEvent.click(within(pane).getByRole('button', { name: 'Cancel' }))
+    expect(onCancel).toHaveBeenCalledWith(21)
+  })
+
+  it('says why a task died on a position nothing had evaluated', () => {
+    // An expansion's children are fresh positions: no eval row, no active search. The
+    // failed task's row is the only place the reason exists, so the pane is made for it.
+    draw(
+      node({
+        searches: [
+          search({
+            id: 21,
+            kind: 'task',
+            status: 'failed',
+            error: 'Stockfish 17: no such file or directory',
+          }),
+        ],
+      }),
+    )
+    const pane = screen.getByTestId('engine-pane-1')
+    expect(within(pane).getByText('task stopped')).toBeInTheDocument()
+    expect(within(pane).getByRole('alert')).toHaveTextContent('no such file or directory')
+  })
+
+  it('offers no cancel for a task an engine already has: it finishes', () => {
+    draw(
+      node({ searches: [search({ id: 21, kind: 'task', status: 'running' })] }),
+      { onCancel: vi.fn() },
+    )
+    const pane = screen.getByTestId('engine-pane-1')
+    expect(within(pane).getByText('task running')).toBeInTheDocument()
+    expect(within(pane).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+  })
+
+  it('marks a stored verdict that is stale, and says which of the two reasons applies', () => {
+    draw(
+      node({
+        evals: [
+          {
+            engine_id: 1,
+            engine_name: 'Stockfish 17',
+            cp: 30,
+            depth: 18,
+            stale: true,
+            best_lines: [{ multipv: 1, cp: 30, pv: ['e7e5'] }],
+          },
+        ],
+      }),
+    )
+    expect(screen.getByTestId('engine-pane-stale')).toHaveAttribute(
+      'title',
+      expect.stringContaining('stale'),
+    )
+  })
+})

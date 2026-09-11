@@ -184,6 +184,26 @@ export interface AppSettings {
    * eligible engine (enabled, UCI, drives a board, on this host) is offered.
    */
   correspondence_search_engine_ids?: number[]
+  /**
+   * The bounded half of the mode. A *task* is one `AnalysisRun` over one node's position,
+   * so these two are its budget in the sense `quick_nodes` is a pass's: read when the task
+   * is queued and copied onto its run. The line count doubles as how wide an expansion can
+   * be, because the children come from those lines.
+   */
+  correspondence_task_nodes?: number | null
+  correspondence_task_multipv?: number | null
+  /**
+   * Below this depth a stored verdict is marked stale on the tree, whatever engine wrote
+   * it — the other half of stale being an engine that has since been upgraded, which is a
+   * comparison and needs no setting.
+   */
+  correspondence_stale_depth?: number | null
+  /**
+   * The engine tasks run on. Null is a real state and not "not loaded": nobody has chosen
+   * one, and then whichever engine holds the deep role runs them. Unlike a search's
+   * engine, this one may live on a remote runner — a task is ordinary queue work.
+   */
+  correspondence_task_engine_id?: number | null
 }
 
 /**
@@ -1812,6 +1832,12 @@ export interface CorrespondenceEval extends Extra {
   best_lines?: { multipv: number; cp?: number | null; mate?: number | null; pv: string[] }[] | null
   history?: { depth?: number | null; nodes?: number | null; cp?: number | null; mate?: number | null; best?: string | null }[]
   tablebase?: { wdl?: number | null; dtz?: number | null; source?: string | null } | null
+  /**
+   * This verdict is one to ask again: shallower than `correspondence_stale_depth`, or
+   * written by a build of the engine that is no longer installed. Per verdict rather than
+   * per node, so a pane can mark one engine's number old while another's is current.
+   */
+  stale?: boolean
   updated_at?: string | null
 }
 
@@ -1878,7 +1904,15 @@ export interface CorrespondenceSearchList {
 /** What to put on a position, and what — if anything — should end it. */
 export interface CorrespondenceSearchCreate {
   node_id: number
-  engine_id: number
+  /**
+   * `search` is one engine on this position for as long as the owner lets it, in the
+   * correspondence pool; `task` is one bounded run through the analysis queue, which takes
+   * the deployment's engine, budget and line count and ignores everything below. Absent is
+   * `search`, which is what the dialog sends.
+   */
+  kind?: CorrespondenceSearchKind
+  /** Required for a search; for a task, null is the deployment's task engine. */
+  engine_id?: number | null
   /** null is the deployment's `correspondence_multipv`. */
   multipv?: number | null
   limit_depth?: number | null
@@ -1886,6 +1920,38 @@ export interface CorrespondenceSearchCreate {
   limit_seconds?: number | null
   /** UCI `searchmoves`, legal in the node's position; null searches everything. */
   root_moves?: string[] | null
+}
+
+/**
+ * How far to expand a node: how many moves each stage keeps, and how many stages.
+ *
+ * `tasks: false` makes the children and sets no engine on them — "put these moves in the
+ * tree" rather than "go and look at them".
+ */
+export interface CorrespondenceExpand {
+  /** 1 to 5; null is the deployment's `correspondence_task_multipv`. */
+  width?: number | null
+  /** 1 to 3. */
+  stages?: number
+  tasks?: boolean
+}
+
+/** Which engine a refresh queues its tasks on; null is the deployment's task engine. */
+export interface CorrespondenceRefresh {
+  engine_id?: number | null
+}
+
+/**
+ * What an expansion or a refresh did. `stale` is a refresh's own number — how many stale
+ * positions were found under the node — and null from an expansion, which was not looking
+ * for any; `queued` and it differ when some of them already had an engine on them.
+ */
+export interface CorrespondenceExpansion {
+  game_id: number
+  created: number
+  queued: number
+  stale?: number | null
+  searches: CorrespondenceSearch[]
 }
 
 /** One paused search whose process is still here, and what it is holding. */
@@ -1922,6 +1988,11 @@ export interface CorrespondenceStatus extends Extra {
   in_use: number
   queued: number
   paused: number
+  /**
+   * The bounded half of the mode, counted apart from the slots: a task is an ordinary
+   * queue run and may be working on a runner, so it holds nothing here.
+   */
+  tasks?: { queued: number; running: number } & Extra
   parked: CorrespondenceParked[]
   hosts: CorrespondenceHost[]
   /** What the picker offers, in the owner's order; the first carries `default`. */
@@ -1956,6 +2027,24 @@ export interface CorrespondenceNode extends Extra {
   updated_at?: string
 }
 
+/**
+ * A bounded run over one node's position, as the tree reads it.
+ *
+ * At most one per node: two engines on one position is the searches' business, and a queue
+ * mark says "something is coming" rather than who is bringing it. `stages` and `width` are
+ * what an expansion still owes below this node — they are why a task on a fresh branch can
+ * unfold into a dozen positions when it answers.
+ */
+export interface CorrespondenceTask extends Extra {
+  search_id: number
+  run_id?: number | null
+  status: 'queued' | 'running'
+  engine_id?: number | null
+  engine_name?: string | null
+  stages?: number | null
+  width?: number | null
+}
+
 /** What the path to a node says about itself: draws, mates and repetitions. */
 export interface CorrespondenceNodeFlags extends Extra {
   repetition?: number
@@ -1984,6 +2073,14 @@ export interface CorrespondenceTreeNode extends CorrespondenceNode {
   searches: CorrespondenceSearch[]
   /** Two engines more than 50 cp apart on this position. */
   disagree: boolean
+  /**
+   * The verdict this node *shows* — the pinned engine's, else the deepest — is too shallow
+   * or from an engine version that has since been upgraded. False when nothing has
+   * evaluated the node: there is no number to be old.
+   */
+  stale?: boolean
+  /** The task waiting on, or running over, this position: the queue mark and the spinner. */
+  task?: CorrespondenceTask | null
   flags: CorrespondenceNodeFlags
   /** In rank order, 0 first; the played child is promoted to rank 0. */
   children: CorrespondenceTreeNode[]

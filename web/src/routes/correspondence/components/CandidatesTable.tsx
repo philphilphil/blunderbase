@@ -10,6 +10,10 @@
  *
  * Hovering a row previews the line it starts on the board (`lib/board/linePreview`), so
  * "what happens after this" is a pointer rather than four clicks.
+ *
+ * The engines column carries the same three marks the tree does — a task waiting or being
+ * worked on, and a stale verdict — because this is the table the move is chosen from, and
+ * "that number is from a task that has not run yet" changes what the row is worth.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Pin } from 'lucide-react'
@@ -118,6 +122,19 @@ export function CandidatesTable({
                   {child.own?.depth ?? '—'}
                 </td>
                 <td className="px-2.5 font-mono text-[0.625rem] text-dim">
+                  {child.task ? (
+                    <span
+                      data-testid={`candidate-task-${child.id}`}
+                      className="mr-1 text-accent-teal"
+                      title={
+                        child.task.status === 'running'
+                          ? t`A task is being worked on here`
+                          : t`A task is waiting in the analysis queue`
+                      }
+                    >
+                      {child.task.status === 'running' ? '◍' : '◌'}
+                    </span>
+                  ) : null}
                   {child.pinned_engine_id ? (
                     <span title={t`One engine's verdict is pinned here`}>
                       <Pin
@@ -130,6 +147,14 @@ export function CandidatesTable({
                   {child.disagree ? (
                     <span className="ml-1 text-mistake" title={t`Two engines disagree here`}>
                       ≠
+                    </span>
+                  ) : null}
+                  {child.stale ? (
+                    <span
+                      className="ml-1 text-inaccuracy"
+                      title={t`This number is stale: too shallow, or from a version of the engine you no longer have`}
+                    >
+                      ⟳
                     </span>
                   ) : null}
                 </td>

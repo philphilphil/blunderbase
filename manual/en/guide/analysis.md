@@ -62,6 +62,10 @@ the default — there is no **Correspondence** in the sidebar and its pages send
 | **Lines per search** | How many candidate lines an engine keeps when it is set on one position of a correspondence tree, 1 to 5, three by default |
 | **Search slots** | How many searches this machine runs at once, 1 to 16, two by default — one CPU engine and one GPU engine is the ordinary pair. Searches have slots of their own, so a search that runs for days never takes one an imported game's quick pass is waiting for. It is read when the server starts: **change it and restart** |
 | **Search engines** | Which engines the **Search with…** picker offers, in your order; the first is the one it suggests. Choose none and every engine that is eligible is offered — enabled, UCI, able to drive a board, and on this machine. An engine on a remote runner cannot run a search yet |
+| **Task engine** | Which engine works the bounded looks — tasks, and the expansions made of them. Unlike a search, a task is ordinary queue work, so an engine on a remote runner is allowed and is the sensible choice where you have one. Choose none and whichever engine holds the **deep** role does it |
+| **Nodes per task** | What one task costs, forty million by default: a minute or two of a modern engine, which is what makes an expansion of a dozen positions finish while you are still looking at the board. It is copied onto a task when the task is queued, so changing it sizes the next one |
+| **Lines per task** | How many candidate lines a task keeps, 1 to 5, three by default — and therefore how wide an expansion can be, since the children are made from those lines |
+| **Stale below depth** | Below this depth a stored verdict is marked stale on the tree, 1 to 100, thirty by default. The other half of stale needs no number: a verdict written by a version of the engine that is no longer installed is stale however deep it went |
 
 An empty box means the default is in force. What the mode itself does is
 [Correspondence](correspondence.md), and how to give it an engine of its own is

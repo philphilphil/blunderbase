@@ -5,7 +5,7 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are nineteen of them, in six groups, plus two rows that are not settings at all
+There are twenty-three of them, in six groups, plus two rows that are not settings at all
 (`queue_paused` and `tour_seen`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
@@ -37,20 +37,28 @@ points lost by the mover. Read per plan, which means a game re-analysed after th
 is judged by the new ones and one analysed before it keeps what it was judged by.
 
 **Correspondence** — `correspondence_enabled`, `correspondence_days_per_move`,
-`correspondence_multipv`, `correspondence_slots`. Whether the mode exists at all for this
-owner (off by default, because most owners never play correspondence and should never see
-the rail entry), how long the owner gives themselves after the opponent's move, how many
-lines a search over one node keeps, and how many searches this host runs at once. Ordinary
-members of `SETTINGS`: four numbers with a range, read where they are used — the first by
-the rail and the router, the next two as the defaults a new game and a new search are
-created with, so changing one never moves a game already being played. The slot count is
-the exception to "read where it is used": it sizes the search worker's engine pool, so it
-is read once at startup and a change takes a restart.
+`correspondence_multipv`, `correspondence_slots`, and the three the bounded half of the
+mode is configured with, `correspondence_task_nodes`, `correspondence_task_multipv` and
+`correspondence_stale_depth`. Whether the mode exists at all for this owner (off by
+default, because most owners never play correspondence and should never see the rail
+entry), how long the owner gives themselves after the opponent's move, how many lines a
+search over one node keeps, how many searches this host runs at once, what one *task*
+costs and how many lines it keeps, and below what depth a stored verdict counts as stale.
+Ordinary members of `SETTINGS`: seven numbers with a range, read where they are used — the
+first by the rail and the router, the next as the defaults a new game and a new search are
+created with, and the two task numbers as the budget copied onto a task's run when it is
+queued, so changing one never moves a game already being played or a task already waiting.
+Two exceptions to "read where it is used": the slot count sizes the search worker's engine
+pool, so it is read once at startup and a change takes a restart, and the stale depth is
+read on every tree payload, because staleness is a reading of the eval table rather than
+something written into it.
 
-`correspondence_search_engine_ids` is the mode's fifth setting and is not one of those: a
-list of engine ids in the owner's own order, the engines the search picker offers, with the
-first as its default. A list of identities rather than a number with a clamp, so it has its
-own accessor pair exactly as `maia_elos` does, and empty means "every eligible engine".
+`correspondence_search_engine_ids` and `correspondence_task_engine_id` are the mode's
+other two and are not those: a list of engine ids in the owner's own order — the engines
+the search picker offers, with the first as its default — and the single engine tasks run
+on. Identities rather than numbers with a clamp, so each has its own accessor pair exactly
+as `maia_elos` does; empty means "every eligible engine" for the first and "the deep
+tier's engine" for the second.
 
 **The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
 engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
@@ -132,6 +140,22 @@ CORRESPONDENCE_MULTIPV = "correspondence_multipv"
 # search, because it sizes an engine pool — changing it takes a restart, and the manual
 # says so.
 CORRESPONDENCE_SLOTS = "correspondence_slots"
+# What one correspondence *task* costs and how many lines it keeps. A task is the bounded
+# half of the mode — an `AnalysisRun` over one node's position, queued into the ordinary
+# analysis queue — so these two are the task's budget in exactly the sense `quick_nodes`
+# and `deep_multipv` are a pass's: read when the task is queued and copied onto its run.
+CORRESPONDENCE_TASK_NODES = "correspondence_task_nodes"
+CORRESPONDENCE_TASK_MULTIPV = "correspondence_task_multipv"
+# Below what depth a stored verdict counts as stale, whatever engine wrote it. The other
+# half of "stale" is the engine's version, which is a comparison rather than a number and
+# so has no setting.
+CORRESPONDENCE_STALE_DEPTH = "correspondence_stale_depth"
+# Which engine tasks run on. An identity rather than a number, so it is outside `SETTINGS`
+# and has its own accessor pair, exactly as the three engine roles do: there is no clamp
+# that rescues an engine id, and the nearest sensible engine to one that is gone is none —
+# in which case `services.correspondence` falls back to the deep tier's engine, because a
+# task is a bounded search and that is the role a bounded search already has.
+CORRESPONDENCE_TASK_ENGINE_ID = "correspondence_task_engine_id"
 # Which engines the search picker offers, in the owner's own order; the first is the
 # default. A list of engine ids, so it is outside `SETTINGS` and gets its own accessor
 # pair the way `maia_elos` does — there is no clamp that rescues an engine id, and the
@@ -204,6 +228,19 @@ CORRESPONDENCE_MULTIPV_DEFAULT = 3
 # correspondence setup. A one-slot install can still run one, and a machine with cores to
 # spare can say so.
 CORRESPONDENCE_SLOTS_DEFAULT = 2
+# Forty million nodes is a minute or two of a modern Stockfish on a few cores: long enough
+# that the verdict is worth keeping in the tree, short enough that an expansion of a dozen
+# positions finishes while the owner is still looking at the board. Two orders of magnitude
+# above a deep pass's per-position budget, because a task is one position rather than
+# eighty.
+CORRESPONDENCE_TASK_NODES_DEFAULT = 40_000_000
+# Three lines, for the reason a search keeps three: expansion turns the first moves of
+# these lines into children, and the question a correspondence player is asking is which of
+# three or four moves survives.
+CORRESPONDENCE_TASK_MULTIPV_DEFAULT = 3
+# Depth 30 is where a verdict stops moving for most positions a task is asked about, so a
+# row under it is one worth asking again rather than one to trust.
+CORRESPONDENCE_STALE_DEPTH_DEFAULT = 30
 
 # A budget of no nodes at all is not a cheaper pass, it is no pass; there is deliberately
 # no ceiling, because how long the owner is willing to wait is theirs to decide.
@@ -229,6 +266,12 @@ MIN_CORRESPONDENCE_SLOTS = 1
 MAX_CORRESPONDENCE_SLOTS = 16
 # As many engines as the picker can be read at a glance, and more than anyone has.
 MAX_CORRESPONDENCE_SEARCH_ENGINES = 10
+# A verdict is stale below this depth. One is "nothing is ever stale by depth"; a hundred
+# is deeper than any engine reaches on a position somebody is waiting for, which is
+# "everything is always stale" — both are states an owner may want, and neither is a number
+# to refuse.
+MIN_CORRESPONDENCE_STALE_DEPTH = 1
+MAX_CORRESPONDENCE_STALE_DEPTH = 100
 # How many Maia levels one deployment may carry. Every level is a full extra policy query
 # per ply of every run, so this is a budget as much as a UI limit; five columns is also
 # about as many as the game panel can put side by side and still be read.
@@ -342,6 +385,27 @@ SETTINGS: tuple[Setting, ...] = (
         default=CORRESPONDENCE_SLOTS_DEFAULT,
         low=MIN_CORRESPONDENCE_SLOTS,
         high=MAX_CORRESPONDENCE_SLOTS,
+        whole=True,
+    ),
+    Setting(
+        key=CORRESPONDENCE_TASK_NODES,
+        default=CORRESPONDENCE_TASK_NODES_DEFAULT,
+        low=MIN_NODES,
+        high=None,
+        whole=True,
+    ),
+    Setting(
+        key=CORRESPONDENCE_TASK_MULTIPV,
+        default=CORRESPONDENCE_TASK_MULTIPV_DEFAULT,
+        low=MIN_MULTIPV,
+        high=MAX_CORRESPONDENCE_MULTIPV,
+        whole=True,
+    ),
+    Setting(
+        key=CORRESPONDENCE_STALE_DEPTH,
+        default=CORRESPONDENCE_STALE_DEPTH_DEFAULT,
+        low=MIN_CORRESPONDENCE_STALE_DEPTH,
+        high=MAX_CORRESPONDENCE_STALE_DEPTH,
         whole=True,
     ),
 )
@@ -655,6 +719,74 @@ def get_correspondence_slots(session: Session) -> int:
     """
     value = stored(session, CORRESPONDENCE_SLOTS)
     return CORRESPONDENCE_SLOTS_DEFAULT if value is None else int(value)
+
+
+def get_correspondence_task_nodes(session: Session) -> int:
+    """The node budget one correspondence task is queued with.
+
+    Read when the task is queued and copied onto its `AnalysisRun`, exactly as a quick or
+    deep pass's budget is: a task already waiting in the queue keeps what it was queued
+    with, and changing this sizes the next one.
+    """
+    value = stored(session, CORRESPONDENCE_TASK_NODES)
+    return CORRESPONDENCE_TASK_NODES_DEFAULT if value is None else int(value)
+
+
+def get_correspondence_task_multipv(session: Session) -> int:
+    """How many lines one correspondence task keeps — and therefore how wide an expansion
+    can be, since expansion turns the first moves of those lines into children."""
+    value = stored(session, CORRESPONDENCE_TASK_MULTIPV)
+    return CORRESPONDENCE_TASK_MULTIPV_DEFAULT if value is None else int(value)
+
+
+def get_correspondence_stale_depth(session: Session) -> int:
+    """Below what depth a stored verdict is stale, whatever engine wrote it.
+
+    Read where it is used rather than copied anywhere: staleness is a *reading* of the eval
+    table, so moving this number changes what the tree marks the moment it is saved, which
+    is the whole point of a threshold.
+    """
+    value = stored(session, CORRESPONDENCE_STALE_DEPTH)
+    return CORRESPONDENCE_STALE_DEPTH_DEFAULT if value is None else int(value)
+
+
+def get_correspondence_task_engine_id(session: Session) -> int | None:
+    """The engine the owner chose for correspondence tasks, or None because nobody has.
+
+    Only the id is stored and only the id is answered, as with the three engine roles:
+    whether that engine still exists, is switched on or can run a task is
+    `services.correspondence`'s question, and asking it here would put half of it in two
+    places.
+    """
+    row = session.get(AppSetting, CORRESPONDENCE_TASK_ENGINE_ID)
+    if row is None:
+        return None
+    value = row.value
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        # A hand-edited row. "Nobody chose" is the honest reading of a value that is not an
+        # id, and the fallback then decides.
+        return None
+    return value
+
+
+def set_correspondence_task_engine_id(session: Session, engine_id: int | None) -> int | None:
+    """Choose the engine tasks run on, or unchoose it. Returns what is chosen afterwards.
+
+    None deletes the row rather than writing a null, as every other write here treats "the
+    owner has not chosen": there is one fallback and it is the absence of a row — here, the
+    deep tier's engine.
+    """
+    if engine_id is None or int(engine_id) <= 0:
+        session.execute(delete(AppSetting).where(AppSetting.key == CORRESPONDENCE_TASK_ENGINE_ID))
+        session.commit()
+        return None
+    row = session.get(AppSetting, CORRESPONDENCE_TASK_ENGINE_ID)
+    if row is None:
+        session.add(AppSetting(key=CORRESPONDENCE_TASK_ENGINE_ID, value=int(engine_id)))
+    else:
+        row.value = int(engine_id)
+    session.commit()
+    return int(engine_id)
 
 
 def clean_engine_ids(values: object) -> list[int]:

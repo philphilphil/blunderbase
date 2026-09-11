@@ -49,7 +49,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import SearchStatus
+from backend.db.enums import SearchKind, SearchStatus
 from backend.db.session import database_backpressure, get_sessionmaker
 from backend.services import app_settings as app_settings_service
 from backend.services import correspondence as correspondence_service
@@ -299,6 +299,12 @@ class CorrespondenceSearches:
     def _on_event(self, event: dict[str, Any]) -> None:
         """One `correspondence.search` event, from whichever thread wrote the row."""
         if event.get("event") != correspondence_service.EVENT_SEARCH:
+            return
+        if event.get("kind") not in (None, SearchKind.SEARCH.value):
+            # A `task`: an `AnalysisRun` in the ordinary queue, which the analysis workers
+            # and the runners serve. It travels on the same event because the tree draws
+            # both from it, and this pool has nothing to do with it. None is a row from
+            # before the kind was carried, which could only ever be a search.
             return
         loop = self._loop
         search_id = event.get("search_id")

@@ -10,8 +10,13 @@ import type {
   CorrespondenceGameSummary,
   CorrespondenceTreeNode,
 } from '@/lib/api/types'
+import { toast } from '@/lib/toast'
 
 import { CorrespondenceGamePage } from './CorrespondenceGamePage'
+
+vi.mock('@/lib/toast', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
+}))
 
 class FakeSocket {
   onopen: (() => void) | null = null
@@ -140,6 +145,8 @@ const MASTERS = {
 
 let payload: CorrespondenceGameDetail
 let posted: { path: string; method: string; body: unknown }[]
+/** When set, every search write is refused with this sentence, as the service would. */
+let refuseSearch: string | null
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -151,6 +158,8 @@ function json(body: unknown, status = 200) {
 beforeEach(() => {
   payload = detail()
   posted = []
+  refuseSearch = null
+  vi.mocked(toast.error).mockClear()
   vi.stubGlobal('WebSocket', FakeSocket)
   vi.stubGlobal(
     'fetch',
@@ -159,6 +168,9 @@ beforeEach(() => {
       const method = init?.method ?? 'GET'
       if (method !== 'GET') {
         posted.push({ path, method, body: init?.body ? JSON.parse(String(init.body)) : null })
+        if (refuseSearch && path.includes('/correspondence/searches')) {
+          return json({ error: 'engine_unavailable', detail: refuseSearch }, 422)
+        }
         // A node create answers with the node it walked to, not with the game.
         if (path.includes('/correspondence/nodes')) {
           return json({ game_id: 7, created: 1, tip: node({ id: 9, parent_id: 1, ply: 1 }) })
@@ -359,5 +371,123 @@ describe('the correspondence game view', () => {
       0,
     )
     expect(screen.queryByLabelText('Comment on the move')).not.toBeInTheDocument()
+  })
+})
+
+describe('the correspondence game view: tasks and expansion', () => {
+  it('queues a task from the tree menu with no engine and no limits of its own', async () => {
+    draw()
+    await userEvent.pointer({
+      keys: '[MouseRight]',
+      target: await screen.findByTestId('tree-node-2'),
+    })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+    )
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].path).toContain('/correspondence/searches')
+    // The deployment's task engine, budget and line count: the body says which node and
+    // which of the two engine modes, and nothing else.
+    expect(posted[0].body).toEqual({ node_id: 2, kind: 'task' })
+  })
+
+  it('toasts why a task could not be queued, the menu having no dialog to hold it', async () => {
+    // The first thing this verb does on a deployment with no task engine is fail, and the
+    // menu item has nowhere of its own to say so.
+    refuseSearch = 'no engine is set for correspondence tasks'
+    draw()
+    await userEvent.pointer({
+      keys: '[MouseRight]',
+      target: await screen.findByTestId('tree-node-2'),
+    })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+    )
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('no engine is set for correspondence tasks'),
+    )
+  })
+
+  it('opens the search picker without the refusal the last task earned', async () => {
+    refuseSearch = 'no engine is set for correspondence tasks'
+    draw()
+    await userEvent.pointer({
+      keys: '[MouseRight]',
+      target: await screen.findByTestId('tree-node-2'),
+    })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+    )
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Search with…' }))
+
+    expect(
+      screen.queryByText('no engine is set for correspondence tasks'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('expands the selected node from the pane’s own button', async () => {
+    draw()
+    await userEvent.click(await screen.findByRole('button', { name: 'Expand…' }))
+    await userEvent.click(screen.getByRole('button', { name: '2' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].path).toContain('/correspondence/nodes/1/expand')
+    expect(posted[0].body).toEqual({ width: null, stages: 2, tasks: true })
+  })
+
+  it('refreshes a subtree from the menu, with the deployment’s task engine', async () => {
+    draw()
+    await userEvent.pointer({
+      keys: '[MouseRight]',
+      target: await screen.findByTestId('tree-node-3'),
+    })
+    await userEvent.click(
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Refresh subtree' }),
+    )
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].path).toContain('/correspondence/nodes/3/refresh')
+    expect(posted[0].body).toEqual({})
+  })
+
+  it('cancels a waiting task from the engine pane', async () => {
+    const queued = {
+      id: 21,
+      node_id: 2,
+      game_id: 7,
+      engine_id: 1,
+      engine_name: 'Stockfish 17',
+      kind: 'task' as const,
+      status: 'queued' as const,
+      limit_nodes: 40_000_000,
+    }
+    const base = detail()
+    const [e4, ...rest] = base.tree?.children ?? []
+    payload = {
+      ...base,
+      tree: node({
+        children: [{ ...e4, searches: [queued], task: { search_id: 21, status: 'queued' } }, ...rest],
+      }),
+      searches: [queued],
+    }
+    draw()
+    await userEvent.click(await screen.findByTestId('tree-node-2'))
+    expect(await screen.findByText('task waiting in the queue')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].path).toContain('/correspondence/searches/21/cancel')
+  })
+
+  it('offers no expansion and no tasks once the game is over', async () => {
+    payload = detail({ finished: true, state: 'finished', result: '1-0' })
+    draw()
+    expect(await screen.findByText('Kowalski, Marek')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand…' })).toBeDisabled()
   })
 })

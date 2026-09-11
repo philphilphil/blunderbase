@@ -54,6 +54,22 @@ describe('the capacity strip', () => {
     expect(strip).not.toHaveTextContent(/Nothing is searching/)
   })
 
+  it('counts the tasks apart from the slots, because they hold none', () => {
+    // Nothing in a slot and a dozen tasks out on a runner is not an idle deployment, and
+    // the strip must not read as one.
+    draw(status({ tasks: { queued: 11, running: 1 } }))
+    const strip = screen.getByTestId('correspondence-capacity')
+    expect(strip).toHaveTextContent('0 of 2')
+    expect(screen.getByTestId('correspondence-tasks')).toHaveTextContent('12 tasks')
+    expect(strip).not.toHaveTextContent(/Nothing is searching/)
+  })
+
+  it('says nothing about tasks when there are none', () => {
+    draw(status({ tasks: { queued: 0, running: 0 } }))
+    expect(screen.queryByTestId('correspondence-tasks')).not.toBeInTheDocument()
+    expect(screen.getByTestId('correspondence-capacity')).toHaveTextContent(/Nothing is searching/)
+  })
+
   it('adds up only the hashes it was given', () => {
     expect(
       parkedMegabytes(

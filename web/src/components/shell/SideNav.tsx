@@ -314,8 +314,10 @@ function DotRow({
  * What the correspondence engines are doing, along the foot of the rail.
  *
  * A search runs for days, so the owner is usually on some other screen while their machine
- * is busy — and "are both slots taken" is a question they have from every one of them. Four
- * short lines under the engine roster is cheap enough to keep it answered everywhere.
+ * is busy — and "are both slots taken" is a question they have from every one of them. A few
+ * short lines under the engine roster is cheap enough to keep it answered everywhere. The
+ * tasks are one of them, counted beside the slots and never against them: they are runs in
+ * the analysis queue and may be working on another machine.
  *
  * Only while the mode is on, and only while there is something to say: an install with no
  * search running gets its rail back.
@@ -332,7 +334,12 @@ function CorrespondenceStrip() {
   const parked = (data.parked ?? []).length
   const paused = data.paused ?? 0
   const queued = data.queued ?? 0
-  if (inUse === 0 && paused === 0 && queued === 0 && remote.length === 0) return null
+  // Beside the slots, never against them: a task is a run in the analysis queue and may be
+  // working on another machine, so it takes nothing from the line above it.
+  const tasks = (data.tasks?.queued ?? 0) + (data.tasks?.running ?? 0)
+  if (inUse === 0 && paused === 0 && queued === 0 && tasks === 0 && remote.length === 0) {
+    return null
+  }
   const row = (dot: string, label: string, value: string) => (
     <div key={label} className="mt-1 flex items-center justify-between gap-2">
       <span className="flex min-w-0 items-center gap-1.5 truncate">
@@ -347,6 +354,15 @@ function CorrespondenceStrip() {
       {row('bg-good', t`searches`, `${inUse} / ${data.slots ?? 0}`)}
       {parked > 0 ? row('bg-mistake', t`parked, warm`, String(parked)) : null}
       {queued > 0 ? row('bg-accent-teal', t`waiting`, String(queued)) : null}
+      {tasks > 0
+        ? row(
+            data.tasks?.running ? 'bg-good' : 'bg-accent-teal',
+            t`tasks`,
+            data.tasks?.running
+              ? `${data.tasks.running} / ${tasks}`
+              : String(tasks),
+          )
+        : null}
       {remote.map((host) =>
         row('bg-faint', host.host, `${host.in_use ?? 0} / ${host.slots}`),
       )}

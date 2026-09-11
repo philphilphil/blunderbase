@@ -1,6 +1,6 @@
 /**
- * **Analysis → Correspondence**: whether the mode exists at all, and the two numbers a new
- * game and a new search start from.
+ * **Analysis → Correspondence**: whether the mode exists at all, and the numbers a new
+ * game, a new search and a new task start from.
  *
  * It is a small page on purpose. Correspondence mode is off by default — most owners never
  * play it and should never see the rail entry — so the first thing on the page is the
@@ -17,6 +17,12 @@
  * rather than "offer none". Eligible is the backend's word: switched on, UCI, able to
  * drive a board, on this machine.
  *
+ * **The task engine is chosen out of a wider pool than the search engines.** A search runs
+ * in this process's own pool and must therefore be an engine that can drive a board here; a
+ * task is an ordinary `AnalysisRun` and runs wherever the queue has room, so every enabled
+ * UCI engine is offered, a runner's included. That is why this one list comes from
+ * `/runners/status` rather than from `/correspondence/status`.
+ *
  * The form saves through `completeUpdate` like the other two settings pages: `PUT
  * /settings` is a replace, so a page that sent only its own fields would clear everything
  * Maia and Engine passes hold — and, now, each other's list.
@@ -32,6 +38,7 @@ import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   completeUpdate,
@@ -39,13 +46,22 @@ import {
   settingText as storedText,
   SETTING_DEFAULTS as DEFAULTS,
 } from '@/lib/api/appSettings'
-import { useAppSettings, useCorrespondenceStatus, useSaveAppSettings } from '@/lib/api/queries'
+import {
+  useAppSettings,
+  useCorrespondenceStatus,
+  useRunnersStatus,
+  useSaveAppSettings,
+} from '@/lib/api/queries'
+import { engineHosts } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
 type NumberKey =
   | 'correspondence_days_per_move'
   | 'correspondence_multipv'
   | 'correspondence_slots'
+  | 'correspondence_task_nodes'
+  | 'correspondence_task_multipv'
+  | 'correspondence_stale_depth'
 
 export function CorrespondenceSettingsPage() {
   const { t } = useLingui()
@@ -56,10 +72,16 @@ export function CorrespondenceSettingsPage() {
   // picker's list, which is this setting already applied; this page needs the pool it is
   // chosen out of.
   const status = useCorrespondenceStatus()
+  // The task engine is chosen out of a wider pool than the searches are: a task is
+  // ordinary queue work, so an engine on a remote runner is not only allowed, it is the
+  // sensible choice where there is one. `/runners/status` is the only place that knows a
+  // runner's engines, which is why this page reads it and the picker's own list does not.
+  const runners = useRunnersStatus()
   const save = useSaveAppSettings({
     onSuccess: () => {
       setDraft({})
       setChosen(null)
+      setTaskEngine(undefined)
     },
   })
   const [draft, setDraft] = useState<
@@ -67,6 +89,12 @@ export function CorrespondenceSettingsPage() {
   >({})
   /** null while the stored list stands; an array as soon as the owner has moved anything. */
   const [chosen, setChosen] = useState<number[] | null>(null)
+  /**
+   * `undefined` while the stored engine stands, and then the choice — which may itself be
+   * `null`, meaning "whichever engine holds the deep role". Two kinds of nothing, and a
+   * single null would make "not touched yet" indistinguishable from "deliberately none".
+   */
+  const [taskEngine, setTaskEngine] = useState<number | null | undefined>(undefined)
 
   const chrome = (
     <SetPageChrome
@@ -140,10 +168,36 @@ export function CorrespondenceSettingsPage() {
     step: 1,
     unset: t`Default 2`,
   }
+  const taskFields: SettingSpec<NumberKey>[] = [
+    {
+      key: 'correspondence_task_nodes',
+      label: t`Nodes per task`,
+      min: 1,
+      step: 1_000_000,
+      unset: t`Default 40,000,000`,
+    },
+    {
+      key: 'correspondence_task_multipv',
+      label: t`Lines per task`,
+      min: 1,
+      max: 5,
+      step: 1,
+      unset: t`Default 3`,
+    },
+    {
+      key: 'correspondence_stale_depth',
+      label: t`Stale below depth`,
+      min: 1,
+      max: 100,
+      step: 1,
+      unset: t`Default 30`,
+    },
+  ]
   const keys = [
     'correspondence_enabled',
     ...fields.map((field) => field.key),
     slots.key,
+    ...taskFields.map((field) => field.key),
   ] as const
 
   // `eligible_engines`, not `engines`: the latter is already this setting applied, so
@@ -151,9 +205,17 @@ export function CorrespondenceSettingsPage() {
   const offered = status.data?.eligible_engines ?? []
   const storedEngines = stored.correspondence_search_engine_ids ?? []
   const engineIds = chosen ?? storedEngines
+  // Every enabled UCI engine the deployment knows, this machine's and every runner's — the
+  // one picker on these screens that is not limited to what can drive a board here.
+  const taskEngines = engineHosts(runners.data).filter(
+    (host) => host.enabled && host.kind === 'uci',
+  )
+  const storedTaskEngine = stored.correspondence_task_engine_id ?? null
+  const taskEngineId = taskEngine === undefined ? storedTaskEngine : taskEngine
   const dirty =
     keys.some((key) => text(key) !== storedText(stored, key)) ||
-    (chosen !== null && chosen.join(',') !== storedEngines.join(','))
+    (chosen !== null && chosen.join(',') !== storedEngines.join(',')) ||
+    (taskEngine !== undefined && taskEngine !== storedTaskEngine)
 
   /** Names for the ids on the list, including one whose engine row has since gone. */
   const nameOf = (id: number) =>
@@ -177,6 +239,10 @@ export function CorrespondenceSettingsPage() {
       correspondence_multipv: parse(text('correspondence_multipv')),
       correspondence_slots: parse(text('correspondence_slots')),
       correspondence_search_engine_ids: engineIds,
+      correspondence_task_nodes: parse(text('correspondence_task_nodes')),
+      correspondence_task_multipv: parse(text('correspondence_task_multipv')),
+      correspondence_stale_depth: parse(text('correspondence_stale_depth')),
+      correspondence_task_engine_id: taskEngineId,
     })
   }
 
@@ -363,6 +429,73 @@ export function CorrespondenceSettingsPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex-col items-stretch gap-1">
+            <CardTitle>
+              <Trans>Tasks</Trans>
+            </CardTitle>
+            <CardDescription>
+              <Trans>
+                A task is one bounded look at one position, through the ordinary analysis
+                queue — it takes no search slot, and an expansion is a dozen of them at
+                once. Unlike a search, it can run on a remote runner.
+              </Trans>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex max-w-md flex-col gap-1.5">
+              <Label htmlFor="correspondence-task-engine">
+                <Trans>Task engine</Trans>
+              </Label>
+              <select
+                id="correspondence-task-engine"
+                value={taskEngineId === null ? '' : String(taskEngineId)}
+                onChange={(event) =>
+                  setTaskEngine(event.target.value === '' ? null : Number(event.target.value))
+                }
+                className="h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50"
+              >
+                <option value="">{t`Whichever engine holds the deep role`}</option>
+                {/* An engine that was chosen and has since been switched off or deleted is
+                    still what is stored, and a select showing something else would be
+                    lying about that. */}
+                {taskEngineId !== null &&
+                !taskEngines.some((host) => host.engineId === taskEngineId) ? (
+                  <option value={String(taskEngineId)}>{t`Engine ${taskEngineId}`}</option>
+                ) : null}
+                {taskEngines.map((host) => (
+                  <option key={host.engineId} value={String(host.engineId)}>
+                    {host.runnerName ? `${host.name} · ${host.runnerName}` : host.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[0.625rem] leading-[1.5] text-dim-2">
+                <Trans>
+                  Every engine that is switched on and speaks UCI, on this machine and on
+                  your runners. A machine of its own is the setup this mode is happiest in.
+                </Trans>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-4 border-t border-hairline pt-3">
+              {taskFields.map((field) => (
+                <SettingField
+                  key={field.key}
+                  field={field}
+                  value={text(field.key)}
+                  onChange={(next) => setDraft({ ...draft, [field.key]: next })}
+                />
+              ))}
+              <p className="max-w-xs pt-6 text-[0.625rem] leading-[1.6] text-dim-2">
+                <Trans>
+                  Forty million nodes is a minute or two of a modern engine. The line count
+                  is also how wide an expansion can be, since the branches are made from
+                  those lines. Below the stale depth a stored verdict is marked on the tree
+                  as one to ask again.
+                </Trans>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
         {save.isError ? (
           <p role="alert" className="text-[0.6875rem] text-blunder">
             {save.error.message}
@@ -374,6 +507,7 @@ export function CorrespondenceSettingsPage() {
           onRevert={() => {
             setDraft({})
             setChosen(null)
+            setTaskEngine(undefined)
           }}
         />
       </form>

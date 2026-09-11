@@ -271,9 +271,24 @@ describe('invalidationsFor — quiet events', () => {
     // `append_move` restamps the moves, the ply count, the PGN and the opening, clears the
     // card and adds a position — the games table, the game page and the explorer all read
     // rows that just changed.
+    const keys = invalidationsFor({ event: 'correspondence.updated', game_id: 7, scope: 'game' })
+    expect(has(keys, queryKeys.games())).toBe(true)
+    expect(has(keys, queryKeys.explorer())).toBe(true)
+  })
+
+  it('reads a frame with no scope as the wide one, for a server that predates the field', () => {
     const keys = invalidationsFor({ event: 'correspondence.updated', game_id: 7 })
     expect(has(keys, queryKeys.games())).toBe(true)
     expect(has(keys, queryKeys.explorer())).toBe(true)
+  })
+
+  it('leaves the library and the explorer alone for a tree frame', () => {
+    // One of these lands per absorbed task, and an overnight expansion is a hundred and
+    // fifty of them: nothing outside correspondence changed, so nothing outside it refetches.
+    const keys = invalidationsFor({ event: 'correspondence.updated', game_id: 7, scope: 'tree' })
+    expect(has(keys, queryKeys.correspondence())).toBe(true)
+    expect(has(keys, queryKeys.games())).toBe(false)
+    expect(has(keys, queryKeys.explorer())).toBe(false)
   })
 
   it('ignores an event name it does not know', () => {

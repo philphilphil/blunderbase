@@ -18,13 +18,19 @@
  * snapshot and a stored row both arrive from the side to move's point of view, and this pane
  * is read beside a tree that prints the mover's.
  *
+ * **A task is drawn as this engine's verdict like any other**, which is the point of it:
+ * the tree does not keep two kinds of number. What differs is the header — a task says it
+ * is a task, because it may be running on another machine and it cannot be paused — and the
+ * controls, where Cancel replaces Pause/Resume/Stop and is offered only while the task is
+ * still waiting its turn.
+ *
  * The footer is the eval history — the trajectory that tells a correspondence player
  * whether a number is settled — as a sparkline with one line of words under it. A number
  * that is still climbing at depth 50 is a number that is not finished, and no single
  * evaluation can say that.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Pause, Play, Square as StopIcon } from 'lucide-react'
+import { Pause, Play, Square as StopIcon, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import type {
@@ -42,6 +48,7 @@ import { inNodeFrame } from '../format'
 import {
   formatSpan,
   isLive,
+  isTask,
   isWarm,
   limitParts,
   readHistory,
@@ -61,6 +68,8 @@ export interface EnginePaneProps {
   onPause: (id: number) => void
   onResume: (id: number) => void
   onStop: (id: number) => void
+  /** Take a waiting task out of the queue. A task has no pause and no resume. */
+  onCancel?: (id: number) => void
   /** Pin this engine's verdict here, or take the pin off. Absent on a finished game. */
   onPin?: (engineId: number | null) => void
   busy?: boolean
@@ -85,13 +94,21 @@ export function EnginePane({
   onPause,
   onResume,
   onStop,
+  onCancel,
   onPin,
   busy,
 }: EnginePaneProps) {
   const { t } = useLingui()
   const notate = useNotation()
   const { search, stored } = pane
+  // A task is the other engine mode and wears none of this pane's controls: it holds no
+  // slot to give back, so there is nothing to pause and nothing to resume — only cancel,
+  // and only while it is still waiting its turn.
+  const task = search !== null && isTask(search)
   const live = search !== null && isLive(search)
+  // A task that failed or was cleared away, on a position this engine never got a verdict
+  // on — the pane the expansion left behind. Its whole content is the reason below.
+  const stopped = search === null && stored === null && pane.ended !== null
   const snapshot = live ? (search?.snapshot ?? null) : null
   const { tone } = statusOf(search)
 
@@ -137,7 +154,14 @@ export function EnginePane({
         <strong className="truncate font-semibold text-ink" title={pane.engineName}>
           {pane.engineName}
         </strong>
-        {tone === 'live' ? (
+        {task ? (
+          <span
+            className={cn('whitespace-nowrap', live ? 'text-good' : 'text-accent-teal')}
+            title={t`A bounded look through the analysis queue, which may be running on another machine`}
+          >
+            {live ? <Trans>task running</Trans> : <Trans>task waiting in the queue</Trans>}
+          </span>
+        ) : tone === 'live' ? (
           <span className="whitespace-nowrap text-good">
             {elapsed === null ? (
               <Trans>searching</Trans>
@@ -157,6 +181,12 @@ export function EnginePane({
           <span className="whitespace-nowrap text-accent-teal">
             <Trans>waiting for a slot</Trans>
           </span>
+        ) : stopped ? (
+          // Nothing running, nothing stored, and a task that ended badly: the pane exists
+          // only to carry the reason under this header, so it must not say "stored".
+          <span className="whitespace-nowrap text-blunder">
+            <Trans>task stopped</Trans>
+          </span>
         ) : (
           <span className="whitespace-nowrap text-dim">
             <Trans>stored</Trans>
@@ -164,6 +194,18 @@ export function EnginePane({
         )}
 
         <span className="ml-auto flex flex-none items-center gap-2 font-mono text-[0.625rem] tabular text-dim">
+          {/* Per verdict rather than per node: this engine's number can be old news while
+              the one in the pane below it is current, and the tree's own mark cannot say
+              which of the two it meant. */}
+          {stored?.stale && !live ? (
+            <span
+              data-testid="engine-pane-stale"
+              className="text-inaccuracy"
+              title={t`This verdict is stale: below the stale depth, or from a version of this engine you no longer have`}
+            >
+              ⟳
+            </span>
+          ) : null}
           {depth !== null ? <span>{t`depth ${depth}`}</span> : null}
           {nodes ? <span>{t`${formatNodes(nodes)} nodes`}</span> : null}
           {live && snapshot?.nps ? <span>{formatNps(snapshot.nps)}</span> : null}
@@ -193,7 +235,18 @@ export function EnginePane({
           </button>
         ) : null}
 
-        {search ? (
+        {search && task ? (
+          <div className="flex flex-none items-center gap-0.5">
+            <PaneButton
+              label={t`Cancel`}
+              // A task an engine has already claimed finishes: there is no cancelled state
+              // for a run in flight, and the server says so rather than half-doing it.
+              disabled={busy || live || !onCancel}
+              onClick={() => onCancel?.(search.id)}
+              icon={<X aria-hidden />}
+            />
+          </div>
+        ) : search ? (
           <div className="flex flex-none items-center gap-0.5">
             {search.status === 'paused' || search.status === 'queued' ? (
               <PaneButton
@@ -220,9 +273,12 @@ export function EnginePane({
         ) : null}
       </div>
 
-      {search?.error ? (
+      {/* A task whose queue was cleared under it, or whose run failed for good, left its
+          reason on a row that is no longer active — `pane.ended`. It is the only place that
+          sentence exists, so it is printed here rather than lost. */}
+      {search?.error || pane.ended?.error ? (
         <p role="alert" className="border-b border-hairline bg-blunder/5 px-2.5 py-1 text-[0.625rem] text-blunder">
-          {search.error}
+          {search?.error ?? pane.ended?.error}
         </p>
       ) : null}
 
@@ -231,6 +287,8 @@ export function EnginePane({
           <p className="px-2.5 py-2 text-[0.6875rem] text-dim">
             {live ? (
               <Trans>The engine has not sent a line yet.</Trans>
+            ) : stopped ? (
+              <Trans>This engine never got a verdict on this position.</Trans>
             ) : (
               <Trans>No lines were kept for this verdict.</Trans>
             )}

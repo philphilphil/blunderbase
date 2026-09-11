@@ -31,6 +31,8 @@ export interface EnginesPaneProps {
   onPause: (id: number) => void
   onResume: (id: number) => void
   onStop: (id: number) => void
+  /** A waiting task out of the queue; a search has no such verb. */
+  onCancel?: (id: number) => void
   onPin?: (engineId: number | null) => void
   busy?: boolean
 }
@@ -45,6 +47,7 @@ export function EnginesPane({
   onPause,
   onResume,
   onStop,
+  onCancel,
   onPin,
   busy,
 }: EnginesPaneProps) {
@@ -87,6 +90,7 @@ export function EnginesPane({
           onPause={onPause}
           onResume={onResume}
           onStop={onStop}
+          onCancel={onCancel}
           onPin={onPin}
           busy={busy}
         />

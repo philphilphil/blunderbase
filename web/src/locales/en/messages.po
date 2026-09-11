@@ -265,6 +265,8 @@ msgstr "Set up browser engine"
 #: src/lib/desktop/PgnDropOverlay.tsx
 #: src/routes/auth/ChangePasswordDialog.tsx
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
@@ -977,6 +979,10 @@ msgstr "parked, warm"
 #: src/components/shell/SideNav.tsx
 msgid "waiting"
 msgstr "waiting"
+
+#: src/components/shell/SideNav.tsx
+msgid "tasks"
+msgstr "tasks"
 
 #: src/components/shell/SideNav.tsx
 msgid "No engines configured"
@@ -1761,6 +1767,26 @@ msgid "Default 2"
 msgstr "Default 2"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Nodes per task"
+msgstr "Nodes per task"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Default 40,000,000"
+msgstr "Default 40,000,000"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Lines per task"
+msgstr "Lines per task"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Stale below depth"
+msgstr "Stale below depth"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Default 30"
+msgstr "Default 30"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Engine {id}"
 msgstr "Engine {id}"
 
@@ -1840,6 +1866,34 @@ msgstr "Remove {0}"
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "No engine here can run a search: one is needed that is switched on, speaks UCI and can drive a board."
 msgstr "No engine here can run a search: one is needed that is switched on, speaks UCI and can drive a board."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Tasks"
+msgstr "Tasks"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner."
+msgstr "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Task engine"
+msgstr "Task engine"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Whichever engine holds the deep role"
+msgstr "Whichever engine holds the deep role"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Engine {taskEngineId}"
+msgstr "Engine {taskEngineId}"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Every engine that is switched on and speaks UCI, on this machine and on your runners. A machine of its own is the setup this mode is happiest in."
+msgstr "Every engine that is switched on and speaks UCI, on this machine and on your runners. A machine of its own is the setup this mode is happiest in."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
+msgstr "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
 
 #: src/routes/analysis/CoverageSplit.tsx
 msgid "Deep pass"
@@ -2153,6 +2207,35 @@ msgstr "that is not the password"
 msgid "the server answered {status}"
 msgstr "the server answered {status}"
 
+#. placeholder {0}: answer.created
+#. placeholder {1}: answer.queued
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} positions added, {1} queued for an engine."
+msgstr "{0} positions added, {1} queued for an engine."
+
+#. placeholder {0}: answer.created
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} positions added."
+msgstr "{0} positions added."
+
+#. placeholder {0}: answer.queued
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} positions queued for an engine."
+msgstr "{0} positions queued for an engine."
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Those moves were already in the tree."
+msgstr "Those moves were already in the tree."
+
+#. placeholder {0}: answer.queued
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} stale positions queued for an engine."
+msgstr "{0} stale positions queued for an engine."
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Nothing under there is stale."
+msgstr "Nothing under there is stale."
+
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "Back to the start"
 msgstr "Back to the start"
@@ -2219,14 +2302,14 @@ msgid "{0} positions · {1} evaluated"
 msgstr "{0} positions · {1} evaluated"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Expansion arrives in a later step"
-msgstr "Expansion arrives in a later step"
+msgid "Make the best moves after the selected position into branches, with an engine on each"
+msgstr "Make the best moves after the selected position into branches, with an engine on each"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "Expand"
-msgstr "Expand"
+msgid "Expand…"
+msgstr "Expand…"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "Nothing in this tree has fallen far enough behind to prune"
@@ -2271,6 +2354,14 @@ msgstr "That correspondence game is not here."
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "Back to the list"
 msgstr "Back to the list"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "a task is being worked on"
+msgstr "a task is being worked on"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "a task is waiting in the analysis queue"
+msgstr "a task is waiting in the analysis queue"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 msgid "ICCF {number}"
@@ -2461,6 +2552,15 @@ msgid "The minimax under this move disagrees with its own number"
 msgstr "The minimax under this move disagrees with its own number"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "A task is being worked on here"
+msgstr "A task is being worked on here"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "A task is waiting in the analysis queue"
+msgstr "A task is waiting in the analysis queue"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "One engine's verdict is pinned here"
 msgstr "One engine's verdict is pinned here"
@@ -2474,6 +2574,10 @@ msgstr "one engine's verdict is pinned here"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Two engines disagree here"
 msgstr "Two engines disagree here"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+msgid "This number is stale: too shallow, or from a version of the engine you no longer have"
+msgstr "This number is stale: too shallow, or from a version of the engine you no longer have"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
 msgid "{gb} GB"
@@ -2507,6 +2611,24 @@ msgstr "{queued, plural, one {# search waiting} other {# searches waiting}}"
 msgid "for a slot"
 msgstr "for a slot"
 
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{tasks, plural, one {# task} other {# tasks}}"
+msgstr "{tasks, plural, one {# task} other {# tasks}}"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "in the analysis queue, {tasksRunning} being worked on"
+msgstr "in the analysis queue, {tasksRunning} being worked on"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "being worked on"
+msgstr "being worked on"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "waiting in the analysis queue"
+msgstr "waiting in the analysis queue"
+
 #. placeholder {0}: host.in_use ?? 0
 #. placeholder {1}: host.slots
 #: src/routes/correspondence/components/CapacityStrip.tsx
@@ -2525,6 +2647,18 @@ msgstr "Correspondence tree"
 #: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
 msgid "what was considered while the game ran"
 msgstr "what was considered while the game ran"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "A bounded look through the analysis queue, which may be running on another machine"
+msgstr "A bounded look through the analysis queue, which may be running on another machine"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "task running"
+msgstr "task running"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "task waiting in the queue"
+msgstr "task waiting in the queue"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 #: src/routes/correspondence/components/RunningNow.tsx
@@ -2553,8 +2687,16 @@ msgid "waiting for a slot"
 msgstr "waiting for a slot"
 
 #: src/routes/correspondence/components/EnginePane.tsx
+msgid "task stopped"
+msgstr "task stopped"
+
+#: src/routes/correspondence/components/EnginePane.tsx
 msgid "stored"
 msgstr "stored"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "This verdict is stale: below the stale depth, or from a version of this engine you no longer have"
+msgstr "This verdict is stale: below the stale depth, or from a version of this engine you no longer have"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "depth {depth}"
@@ -2600,6 +2742,10 @@ msgstr "Stop"
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "The engine has not sent a line yet."
 msgstr "The engine has not sent a line yet."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "This engine never got a verdict on this position."
+msgstr "This engine never got a verdict on this position."
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "No lines were kept for this verdict."
@@ -2654,6 +2800,45 @@ msgstr "No engine has looked at this position yet."
 #: src/routes/correspondence/components/EnginesPane.tsx
 msgid "Search with… puts one on it for as long as you let it. Several engines can work on the same position at once, each in a pane of its own."
 msgstr "Search with… puts one on it for as long as you let it. Several engines can work on the same position at once, each in a pane of its own."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/game/notesModel.ts
+msgid "the starting position"
+msgstr "the starting position"
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "The best moves after {where} become branches of their own, and an engine looks at each of them."
+msgstr "The best moves after {where} become branches of their own, and an engine looks at each of them."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Width"
+msgstr "Width"
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Stages"
+msgstr "Stages"
+
+#. placeholder {0}: expansionSize(chosen, stages)
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Up to {0} positions. Your marks change that as it goes: an excluded move is skipped, a bad one stops after one stage, and a good or interesting one gets a stage and a sibling more."
+msgstr "Up to {0} positions. Your marks change that as it goes: an excluded move is skipped, a bad one stops after one stage, and a good or interesting one gets a stage and a sibling more."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Queue tasks"
+msgstr "Queue tasks"
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Off, the moves go into the tree and nothing is calculated."
+msgstr "Off, the moves go into the tree and nothing is calculated."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "No engine has looked at this position yet, so one task is queued on the move itself and the branches appear when it answers."
+msgstr "No engine has looked at this position yet, so one task is queued on the move itself and the branches appear when it answers."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Expand"
+msgstr "Expand"
 
 #: src/routes/correspondence/components/GameHeader.tsx
 msgid "The move that arrived"
@@ -2912,10 +3097,23 @@ msgstr "Nothing written about this position yet."
 msgid "Nothing written about this game yet."
 msgstr "Nothing written about this game yet."
 
+#. placeholder {0}: formatNodes(search.limit_nodes)
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "up to {0} nodes"
+msgstr "up to {0} nodes"
+
 #. placeholder {0}: snapshot.depth
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "depth {0}"
 msgstr "depth {0}"
+
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "A bounded look through the analysis queue"
+msgstr "A bounded look through the analysis queue"
+
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "task"
+msgstr "task"
 
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "from the side to move's point of view"
@@ -2924,11 +3122,6 @@ msgstr "from the side to move's point of view"
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "No engine is on a correspondence position right now."
 msgstr "No engine is on a correspondence position right now."
-
-#: src/routes/correspondence/components/SearchDialog.tsx
-#: src/routes/game/notesModel.ts
-msgid "the starting position"
-msgstr "the starting position"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "One engine on {where}, for as long as you let it. It keeps its slot until it finishes or you pause it."
@@ -2985,6 +3178,10 @@ msgid "The minimax under this move disagrees with the engine's own number here"
 msgstr "The minimax under this move disagrees with the engine's own number here"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
+msgstr "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "parked"
 msgstr "parked"
 
@@ -2993,16 +3190,58 @@ msgid "An engine is parked here, warm — resuming costs seconds"
 msgstr "An engine is parked here, warm — resuming costs seconds"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Tasks are still out on the positions under this move"
+msgstr "Tasks are still out on the positions under this move"
+
+#. placeholder {0}: outstanding.left
+#. placeholder {1}: outstanding.total
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} of {1}"
+msgstr "{0} of {1}"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "This game has no tree yet."
 msgstr "This game has no tree yet."
 
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "Tasks arrive in a later step"
-msgstr "Tasks arrive in a later step"
+msgid "An excluded move is never given engine time"
+msgstr "An excluded move is never given engine time"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "A task is already on this position"
+msgstr "A task is already on this position"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "One bounded look at this position, through the analysis queue"
+msgstr "One bounded look at this position, through the analysis queue"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Queue task"
 msgstr "Queue task"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "An excluded move is never expanded"
+msgstr "An excluded move is never expanded"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Make the best moves here into children and put a task under each"
+msgstr "Make the best moves here into children and put a task under each"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Queue a task on every stale position from here down"
+msgstr "Queue a task on every stale position from here down"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Refresh subtree"
+msgstr "Refresh subtree"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Take this waiting task back out of the queue"
+msgstr "Take this waiting task back out of the queue"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Cancel task"
+msgstr "Cancel task"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Comment…"

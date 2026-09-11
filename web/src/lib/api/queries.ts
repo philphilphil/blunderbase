@@ -25,12 +25,14 @@ import type {
   AuthStatus,
   BatchAnalysisRequest,
   Color,
+  CorrespondenceExpand,
   CorrespondenceFinishRequest,
   CorrespondenceGameCreate,
   CorrespondenceGameUpdate,
   CorrespondenceNodeCreate,
   CorrespondenceNodeUpdate,
   CorrespondencePgnImport,
+  CorrespondenceRefresh,
   CorrespondenceSearchCreate,
   CorrespondenceState,
   EngineCreate,
@@ -1670,6 +1672,61 @@ export function useDeleteCorrespondenceNode(
   options?: UseMutationOptions<void, Error, number>,
 ) {
   return useCorrespondenceWrite(api.deleteCorrespondenceNode, options)
+}
+
+/**
+ * Expansion: the children and the tasks under them, in one call.
+ *
+ * The answer's counts are worth saying out loud — an expansion that made nothing because
+ * every move was already there still queued the engines, and the two numbers are how the
+ * owner tells that from a press that did nothing. The tree itself arrives through
+ * `correspondence.updated` like every other write.
+ */
+export function useExpandCorrespondenceNode(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.expandCorrespondenceNode>>,
+    Error,
+    { id: number; body: CorrespondenceExpand }
+  >,
+) {
+  return useCorrespondenceWrite(
+    ({ id, body }: { id: number; body: CorrespondenceExpand }) =>
+      api.expandCorrespondenceNode(id, body),
+    options,
+  )
+}
+
+/**
+ * A task on every stale position under one node. A 409
+ * `correspondence_refresh_too_large` names how many were found and is a sentence to show
+ * rather than an error to swallow.
+ */
+export function useRefreshCorrespondenceSubtree(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.refreshCorrespondenceSubtree>>,
+    Error,
+    { id: number; body?: CorrespondenceRefresh }
+  >,
+) {
+  return useCorrespondenceWrite(
+    ({ id, body }: { id: number; body?: CorrespondenceRefresh }) =>
+      api.refreshCorrespondenceSubtree(id, body ?? {}),
+    options,
+  )
+}
+
+/**
+ * A queued task back out of the queue. 409 `correspondence_task_running` means an engine
+ * already has it and it will finish on its own — which is a thing to say, not to retry.
+ */
+export function useCancelCorrespondenceTask(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.cancelCorrespondenceTask>>,
+    Error,
+    number
+  >,
+) {
+  return useCorrespondenceWrite(api.cancelCorrespondenceTask, options)
 }
 
 /**

@@ -93,6 +93,10 @@ zurückgeben:
   Züge tiefer widerlegt.
 - Ein bernsteinfarbenes **≠** sagt, dass zwei Engines in dieser Stellung mehr als einen
   halben Bauern auseinanderliegen – die Zahl darunter ist also weniger wert, als sie aussieht.
+- Daneben sagt ein Knoten, was gerade mit ihm geschieht: ein **Spinner**, solange eine Engine
+  auf ihm sitzt, eine **Warteschlangenmarke**, solange eine Aufgabe wartet, und eine
+  **Veraltet-Marke**, wenn die gezeigte Zahl zu flach erreicht wurde oder von einer Engine
+  stammt, die du nicht mehr hast – siehe [Aufgaben und Erweitern](#tasks-and-expansion).
 
 Beide Zahlen stehen aus Sicht der Seite, die den Zug gemacht hat, so wie eine Variante
 gelesen wird: `15.Ld3 +0,41` heißt, Weiß steht besser. Der Balken neben dem Brett und die
@@ -103,6 +107,9 @@ Das Menü eines Knotens trägt die Verben:
 | Verb | |
 |---|---|
 | **Suchen mit …** | Eine Engine auf diese Stellung ansetzen, siehe [Eine Stellung rechnen lassen](#search-a-position) |
+| **Aufgabe einreihen** | Ein begrenzter Blick auf diese Stellung, über die Analysewarteschlange, siehe [Aufgaben und Erweitern](#tasks-and-expansion) |
+| **Erweitern …** | Die besten Züge hier zu Kindern machen und unter jedes eine Aufgabe legen |
+| **Teilbaum auffrischen** | Auf jeder veralteten Stellung von hier abwärts eine Aufgabe einreihen |
 | **Kommentieren** | Deine Anmerkung zum Zug; sie geht als Kommentar ins PGN |
 | **Markieren** | Dein Urteil über den Zug, siehe unten |
 | **Nach vorn holen** | Diesen Zug zur ersten seiner Alternativen machen, damit er als Hauptzug gelesen wird |
@@ -203,6 +210,65 @@ dann **Angeheftet** – gibt den Knoten zurück an das tiefste. Die Anheftung gi
 sie für richtig hältst, ohne sonst etwas zu ändern. Das bernsteinfarbene **≠** an einem
 Knoten ist der Hinweis, beide Felder zu lesen, bevor du einer der Zahlen traust.
 
+## Aufgaben und Erweitern { #tasks-and-expansion }
+
+Eine Suche ist eine Engine, die über eine Stellung nachdenkt, solange du sie lässt. Eine
+**Aufgabe** ist die andere Hälfte: ein begrenzter Blick – voreingestellt vierzig Millionen
+Knoten, ein bis zwei Minuten – auf eine Stellung, eingereiht in die gewöhnliche
+Analysewarteschlange. Sie belegt keinen Suchplatz, steht einer Suche also nie im Weg, und
+sie läuft dort, wo die Warteschlange Platz hat – auch auf einem
+[entfernten Runner](../operate/runners.md). Welche Engine sie abarbeitet, legst du unter
+**Analyse → Fernschach → Aufgaben-Engine** fest; wählst du keine, tut es die Engine mit der
+Rolle Tiefenanalyse.
+
+Das Menü eines Knotens trägt beides. **Aufgabe einreihen** bittet um einen Blick auf diese
+Stellung. **Erweitern …** ist das, was die Arbeit eines Abends erledigt:
+
+| | |
+|---|---|
+| **Breite** | Wie viele Züge jede Stufe behält – die ersten Züge der besten Varianten der Stellung, das stärkste zuerst. Leer nimmt **Linien pro Aufgabe** aus den Einstellungen |
+| **Stufen** | Wie viele Ebenen tief, 1 bis 3. Breite 3 und 2 Stufen sind bis zu zwölf Stellungen, Breite 3 und 3 Stufen bis zu neununddreißig |
+| **Aufgaben einreihen** | An bekommt jeder neue Zug eine Engine. Aus wandern die Züge in den Baum, und gerechnet wird nichts |
+
+Erweiterst du einen Knoten, den die Engines schon beurteilt haben, entstehen die Kinder
+sofort und unter jedem wartet eine Aufgabe; bei einem, den noch niemand angesehen hat,
+entsteht eine einzige Aufgabe, die die ganze Erweiterung trägt und sie von selbst entfaltet,
+sobald sie antwortet. So oder so kannst du den Browser schließen: Die Erweiterung steckt in
+den eingereihten Zeilen und nicht in der Seite. **Erweitern …** über dem Baum tut dasselbe
+für die Stellung, die du gewählt hast, ohne den Umweg über das Menü.
+
+Aufgaben stehen in der Warteschlange vor der automatischen Analyse jeder importierten Partie
+und hinter einer Tiefenanalyse, auf die du gerade wartest, und untereinander gilt: **die
+nächste Frist zuerst**. Eine Partie, die morgen fällig ist, kommt vor einer, die nächste
+Woche fällig ist – gleich in welcher Reihenfolge sie eingereiht wurden. Ein Knoten, auf dem
+eine Aufgabe wartet, trägt eine Warteschlangenmarke; einer, an dem gerechnet wird, einen
+Spinner. **Abbrechen** nimmt eine wartende Aufgabe wieder heraus; eine, die eine Engine
+schon begonnen hat, läuft zu Ende. **Warteschlange leeren** auf der Seite
+[Analyse](analysis.md#what-is-left-to-analyse) leert sie auch von Aufgaben, und jeder
+Knoten, dessen Aufgabe mit hinausging, sagt, warum sie gestoppt wurde. Verschwindet die
+Maschine mitten in der Rechnung – der Prozess abgeschossen, ein entfernter Rechner
+abgesteckt –, geht die Aufgabe von selbst zurück in die Warteschlange und wird noch einmal
+versucht; klappt auch das nicht, wird der Knoten als fehlgeschlagen markiert, trägt den
+Grund und ist wieder frei für eine neue Aufgabe.
+
+Deine **Markierungen** steuern das Ganze – der Grund, sie zu setzen:
+
+| Markierung | Was eine Erweiterung damit macht |
+|---|---|
+| **✕ Ausgeschlossen** | Wird nie erweitert, bekommt nie eine Aufgabe, und alles darunter wird ebenfalls übersprungen |
+| **? Schlecht** | Höchstens eine Stufe, wie tief die Erweiterung ringsum auch geht |
+| **! Gut**, **!? Interessant** | Eine Stufe mehr und ein Geschwisterzug mehr als die Nachbarn |
+| Keine Markierung | Die Breite und die Stufen, um die du gebeten hast |
+
+**Teilbaum auffrischen** im selben Menü ist das Wartungsverb. Ein Urteil ist **veraltet**,
+wenn es flacher ist als **Veraltet unter Tiefe** – voreingestellt dreißig – oder wenn es von
+einer Version der Engine stammt, die nicht mehr installiert ist. Das ist das, was man
+vergisst: Ein im Januar aktualisiertes Stockfish macht jedes Urteil vom Dezember zu dem
+eines anderen. Veraltete Urteile sind im Baum markiert, und **Teilbaum auffrischen** reiht
+auf jeder veralteten Stellung von diesem Knoten abwärts eine Aufgabe ein, Lücken im Ast
+eingeschlossen. Sind es mehr als fünfzig, wird es abgelehnt und sagt, wie viele es sind:
+dann lieber Ast für Ast als den ganzen Baum einer Partie auf einmal.
+
 ## Pausieren, stoppen und was überlebt { #pause-stop-and-what-survives }
 
 Jedes Feld trägt **Pause** und **Stopp**, und das ist nicht dasselbe:
@@ -242,10 +308,17 @@ lange sie schon läuft. Eine geparkte Suche steht ebenfalls in der Liste, blass 
 Vermerk warm, und eine, die auf einen Platz wartet, auch. Jede Karte ist ein Link in die
 Partie, zu der sie gehört.
 
+**Auch Aufgaben stehen in der Liste**, mit dem Vermerk `Aufgabe`: eine Karte je Aufgabe, die
+wartet oder an der gerechnet wird, mit der Engine, dem Rechner, auf dem diese Engine lebt,
+und dem Knotenbudget, mit dem sie eingereiht wurde. Eine Aufgabe meldet nichts, solange sie
+wartet, trägt also keine Tiefe – was sie über ihre Größe sagen kann, ist das, was sie
+ausgeben wird.
+
 Die **Kapazitätsleiste** unter der Seitenüberschrift zählt dieselbe Arbeit über die ganze
 Installation: belegte Suchplätze von denen, die dieser Rechner hat, Suchen, die auf einen
-warten, warm geparkte Engines und der Speicher, den sie halten, und eine Zeile je entferntem
-Rechner. Dieselben Zahlen stehen am Fuß der Seitenleiste, damit sie von jedem Bildschirm aus
+warten, warm geparkte Engines und der Speicher, den sie halten, wie viele Aufgaben unterwegs
+sind und an wie vielen davon schon gerechnet wird, und eine Zeile je entferntem
+Rechner. Aufgaben werden neben den Plätzen gezählt und nicht gegen sie: Sie belegen keinen. Dieselben Zahlen stehen am Fuß der Seitenleiste, damit sie von jedem Bildschirm aus
 beantwortet sind. Leiste und Liste folgen den Suchen, wie sie melden – hier gibt es nichts
 nachzuladen.
 
@@ -294,7 +367,7 @@ Partie ausging (Aufgabe, Schiedsspruch, Zeit). Danach:
   nachholen.
 - Die Frist wird gelöscht und die Partie verlässt **Du bist am Zug**.
 - Der Baum friert ein. Er bleibt bei der Partie und lesbar, aber nichts darin lässt sich
-  noch ändern, und er nimmt keine neue Suche mehr an.
+  noch ändern, und er nimmt weder eine neue Suche noch eine neue Aufgabe mehr an.
 - Eine Suche, die noch auf der Partie läuft, wird dir nicht abgenommen – es ist deine
   Rechenzeit. **Stopp** in ihrem Feld beendet sie, wenn die Partie vorbei ist.
 
