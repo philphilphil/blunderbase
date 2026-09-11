@@ -86,8 +86,8 @@
     .pane-title .tab{padding:0 7px;border:0;border-bottom:2px solid transparent;height:35px;color:var(--dim);background:transparent;font-size:11px}.pane-title .tab.active{color:var(--text);border-bottom-color:var(--accent)}
     .small{height:24px;padding:0 8px;border:1px solid var(--edge);border-radius:3px;color:var(--body);background:var(--elevated);font-size:11px}.small:hover{background:var(--raised)}.small.quiet{border-color:transparent;background:transparent;color:var(--dim)}.small.quiet:hover{color:var(--text);background:var(--raised)}
 
-    /* left: board + candidates */
-    .left{display:grid;grid-template-rows:27px minmax(0,1fr) 27px 33px minmax(150px,auto);border-right:1px solid var(--edge-strong);background:var(--surface)}
+    /* left: board + notes */
+    .left{display:grid;grid-template-rows:27px minmax(0,1fr) 27px 33px minmax(190px,.8fr);border-right:1px solid var(--edge-strong);background:var(--surface)}
     .board-player{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:7px;padding:0 16px;color:var(--body);font-size:11px}.board-player.top{border-bottom:1px solid var(--line)}.board-player.bottom{border-top:1px solid var(--line)}.board-player b{font-weight:600}.board-player .clock{color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
     .board-area{display:grid;place-items:center;min-height:0;padding:10px 14px}
     .board-shell{display:flex;gap:7px;width:min(100%,560px);max-height:100%;aspect-ratio:1.035/1}
@@ -98,10 +98,8 @@
     .board svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
     .board-controls{display:flex;align-items:center;justify-content:center;gap:5px;border-top:1px solid var(--line);background:var(--panel)}
     .board-controls button{min-width:31px;height:24px;border:1px solid var(--edge);border-radius:4px;color:var(--body);background:var(--elevated);font-size:11px}.board-controls .ply{margin-left:8px;color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
-    .cand-title{height:33px;border-top:1px solid var(--edge-strong)}
-    .candidates{overflow:auto}.candidates table th{height:24px;padding:0 10px}.candidates td{height:30px;padding:0 10px;border-top:1px solid var(--hairline);font-size:12px}.candidates tr.sel td{background:var(--selected)}.candidates tr:hover td{background:var(--raised);cursor:pointer}
-    .candidates .mv{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace}.candidates .eng{color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}.candidates .arrow{color:var(--dim);font-size:10px}
     .arrow.down{color:var(--blunder)}.arrow.up{color:var(--good)}
+    .note-mark{color:var(--accent);font-size:10px}
 
     /* middle: the tree */
     .tree{overflow:auto;padding:8px 0 20px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -118,16 +116,16 @@
     .move-no{color:var(--faint)}
     .ctx{position:absolute;z-index:3;min-width:190px;padding:4px;border:1px solid var(--edge-strong);border-radius:4px;background:var(--panel);box-shadow:0 6px 18px rgba(0,0,0,.35);font:12px -apple-system,BlinkMacSystemFont,sans-serif}.ctx div{padding:5px 9px;border-radius:3px}.ctx div:hover{background:var(--selected)}.ctx hr{margin:3px 0;border:0;border-top:1px solid var(--line)}.ctx small{color:var(--dim);margin-left:8px;float:right}
 
-    /* right: engines stacked + notes */
+    /* right: engines stacked */
     .right{display:grid;grid-template-rows:35px minmax(0,1fr);min-width:0;min-height:0;background:var(--surface)}
-    .engine-stack{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(150px,.75fr);min-height:0}
+    .engine-stack{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr);min-height:0}
     .engine{display:grid;grid-template-rows:35px minmax(0,1fr) 22px;min-height:0;border-bottom:1px solid var(--edge-strong)}
     .engine .pane-title strong{color:var(--text)}.engine .live{color:var(--good)}.engine .warm{color:var(--mistake)}
     .engine .stat{margin-left:auto;display:flex;gap:9px;color:var(--dim);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}.engine .stat b{color:var(--body);font-weight:500}
     .engine-lines{overflow:auto}.engine-line{display:grid;grid-template-columns:47px 1fr;gap:7px;padding:7px 10px;border-bottom:1px solid var(--hairline)}.engine-line:hover{background:var(--raised)}.engine-line .engine-eval{font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace}.engine-line:first-child .engine-eval{color:var(--good)}.pv{color:var(--muted);font:10px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}.pv b{color:var(--text);font-weight:600}
     .engine-foot{display:flex;align-items:center;gap:8px;padding:0 10px;color:var(--dim);font-size:10px;background:var(--panel);border-top:1px solid var(--line)}.engine-foot svg{height:12px;width:90px}.engine-foot .spark{fill:none;stroke:var(--accent);stroke-width:1}
     .engine.stored .engine-lines{opacity:.85}
-    .notes{display:grid;grid-template-rows:35px minmax(0,1fr) auto;min-height:0}.notes-list{overflow:auto;padding:8px 10px}.note{padding:8px 0;border-bottom:1px solid var(--hairline);color:var(--body);font-size:11px}.note:first-child{padding-top:0}.note small{display:block;margin-top:4px;color:var(--dim);font-size:9px}
+    .notes{display:grid;grid-template-rows:35px minmax(0,1fr) auto;min-height:0;border-top:1px solid var(--edge-strong)}.notes-list{overflow:auto;padding:8px 10px}.note{padding:8px 0;border-bottom:1px solid var(--hairline);color:var(--body);font-size:11px}.note:first-child{padding-top:0}.note small{display:block;margin-top:4px;color:var(--dim);font-size:9px}
     .note-form{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line);background:var(--panel)}.note-form input{min-width:0;flex:1;height:26px;padding:0 7px;border:1px solid var(--edge);border-radius:4px;color:var(--text);background:var(--elevated)}.note-form button{height:26px;border:1px solid #4c6c56;border-radius:4px;color:#fff;background:#4c6c56}
 
     .legend{position:fixed;right:12px;bottom:10px;z-index:2;padding:6px 9px;border:1px solid var(--edge);border-radius:4px;background:var(--panel);color:var(--dim);font-size:10px;opacity:.9}.legend b{color:var(--body);font-weight:500}
@@ -275,19 +273,13 @@
             </div>
             <div class="board-player bottom"><span class="side"></span><b>Baum</b><span class="clock">2290 · 27 days left · 9 on this move</span></div>
             <div class="board-controls"><button>|◀</button><button>◀</button><button>▶</button><button>▶|</button><button title="Flip">⇅</button><span class="ply">16…Nf6 · ply 32 · tree node</span></div>
-            <div class="pane" style="border:0;grid-template-rows:33px minmax(0,1fr)">
-              <div class="pane-title cand-title"><strong>Candidates</strong><span class="end">after 16…Nf6 · by backed eval</span></div>
-              <div class="candidates">
-                <table>
-                  <thead><tr><th>Move</th><th>Own</th><th>Backed</th><th>Depth</th><th>Engines</th><th>Mark</th></tr></thead>
-                  <tbody>
-                    <tr class="sel"><td class="mv">17.Nf5</td><td class="eval pos">+0.34</td><td class="eval">+0.12 <span class="arrow down">▼</span></td><td class="num">51 · 12.4M</td><td class="eng">SF Lc0 <span style="color:var(--mistake)">≠</span></td><td class="mark interesting">!?</td></tr>
-                    <tr><td class="mv">17.Rad1</td><td class="eval">+0.10</td><td class="eval">+0.10</td><td class="num">40</td><td class="eng">SF</td><td></td></tr>
-                    <tr><td class="mv">17.h4</td><td class="eval">+0.05</td><td class="eval">−0.02 <span class="arrow down">▼</span></td><td class="num">38</td><td class="eng">SF</td><td class="mark dubious">?!</td></tr>
-                    <tr><td class="mv">17.Bxf6</td><td class="eval">−0.21</td><td class="eval">—</td><td class="num">30</td><td class="eng">SF</td><td class="mark excluded">✕</td></tr>
-                  </tbody>
-                </table>
+            <div class="notes">
+              <div class="pane-title"><button class="tab active">This position <span style="color:var(--dim)">2</span></button><button class="tab">This game <span style="color:var(--dim)">3</span></button><button class="tab">Book</button><span class="end">17.Nf5</span></div>
+              <div class="notes-list">
+                <div class="note">Nh6+ wins the exchange by force but the resulting ending with the a-pawn is the one from Haugen — I held that as Black. Check the tablebase line before committing.<small>you · today · pinned to this position · also in Oliveira's tree</small></div>
+                <div class="note">Leela's 18.Nd6+ idea: the d6 outpost matters more than the pawn. Queue tasks on both 18th moves and let the minimax decide.<small>you · yesterday</small></div>
               </div>
+              <div class="note-form"><input placeholder="Write a note on this position…" /><button>Save</button></div>
             </div>
           </div>
 
@@ -317,7 +309,7 @@
                 <span class="node"><span class="san played">Nf6</span> <span class="ev">+0.34</span> <span class="bk disagree">↳ +0.12</span> <span class="d">d<i>51</i></span> <span class="d">Lc0 12.4M</span> <span class="ne" title="Stockfish and Leela disagree by more than 0.15">≠</span></span>
               </div>
               <div class="var">
-                <span class="move-no">17.</span> <span class="node sel" oncontextmenu="menu(event)"><span class="san">Nf5</span><span class="mark interesting">!?</span> <span class="ev">+0.34</span> <span class="bk disagree">↳ +0.12</span> <span class="d">d<i>51</i> S</span> <span class="d">12.4M L</span> <span class="spin"></span><span class="spin" style="border-color:var(--deep);border-right-color:transparent"></span></span>
+                <span class="move-no">17.</span> <span class="node sel" oncontextmenu="menu(event)"><span class="san">Nf5</span><span class="mark interesting">!?</span> <span class="ev">+0.34</span> <span class="bk disagree">↳ +0.12</span> <span class="d">d<i>51</i> S</span> <span class="d">12.4M L</span> <span class="note-mark" title="2 notes on this position — under the board">✎</span> <span class="spin"></span><span class="spin" style="border-color:var(--deep);border-right-color:transparent"></span></span>
                 <div class="comment">Main try. The engine likes it at the root but the minimax says Black holds after …e6 — the fight is 18.Nh6+ vs 18.Nd6. Both running.</div>
                 <div class="var">
                   <span class="node"><span class="san">e6</span> <span class="ev">+0.12</span> <span class="d">d<i>48</i></span></span>
@@ -385,14 +377,6 @@
                   <div class="engine-line"><span class="engine-eval">+0.55</span><span class="pv"><b>17…Nxe4</b> 18.Nxe4 Bxf5 19.Nd6+</span></div>
                 </div>
                 <div class="engine-foot">history <svg viewBox="0 0 90 12" preserveAspectRatio="none"><polyline class="spark" points="0,4 15,5 30,7 45,8 60,8 75,8 90,8"/></svg> +0.30 at 1M → +0.18 at 12M · prefers 18.Nd6+ — the <span style="color:var(--mistake)">≠</span></div>
-              </div>
-              <div class="notes">
-                <div class="pane-title"><button class="tab active">This position</button><button class="tab">This game <span style="color:var(--dim)">3</span></button><span class="end">17.Nf5</span></div>
-                <div class="notes-list">
-                  <div class="note">Nh6+ wins the exchange by force but the resulting ending with the a-pawn is the one from Haugen — I held that as Black. Check the tablebase line before committing.<small>you · today · pinned to this position · also in Oliveira's tree</small></div>
-                  <div class="note">Leela's 18.Nd6+ idea: the d6 outpost matters more than the pawn. Queue tasks on both 18th moves and let the minimax decide.<small>you · yesterday</small></div>
-                </div>
-                <div class="note-form"><input placeholder="Write a note on this position…" /><button>Save</button></div>
               </div>
             </div>
           </div>

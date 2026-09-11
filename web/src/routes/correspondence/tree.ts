@@ -124,37 +124,6 @@ export function inWhiteFrame(
   }
 }
 
-/** What a node is judged by: the minimax over what is under it, falling back to its own. */
-export function candidateRank(node: CorrespondenceTreeNode): number {
-  const backed = scoreRank(node.backed)
-  return backed === Number.NEGATIVE_INFINITY ? scoreRank(node.own) : backed
-}
-
-/**
- * The selected node's children as the decision table prints them: by backed evaluation,
- * best first.
- *
- * Every child of one node was played by the same side, so their frames agree and the
- * numbers are directly comparable — which is the whole reason the table can be sorted at
- * all. An excluded move sinks below everything valued, whatever its number says: it is a
- * move the owner has ruled out, and it must not sit at the top of the list of what to play.
- * Unevaluated moves keep the tree's own order among themselves, so a line just added does
- * not jump about as the first numbers land.
- */
-export function candidatesOf(node: CorrespondenceTreeNode | null): CorrespondenceTreeNode[] {
-  if (!node) return []
-  const ordered = sortSiblings(node.children)
-  return ordered
-    .map((child, position) => ({ child, position, rank: candidateRank(child) }))
-    .sort((left, right) => {
-      const excluded = Number(left.child.mark === 'excluded') - Number(right.child.mark === 'excluded')
-      if (excluded !== 0) return excluded
-      if (left.rank !== right.rank) return right.rank - left.rank
-      return left.position - right.position
-    })
-    .map((entry) => entry.child)
-}
-
 /**
  * Whether a node's own number and the minimax under it disagree enough to say so, and
  * which way. `null` when there is nothing to compare — the arrow is a claim about a

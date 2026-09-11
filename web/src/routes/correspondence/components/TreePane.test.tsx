@@ -196,6 +196,17 @@ describe('the tree pane', () => {
     expect(within(screen.getByTestId('tree-node-4')).getByText('?!')).toBeInTheDocument()
   })
 
+  it('marks a move whose position has notes, and only that move', () => {
+    const tree = sample()
+    tree.children[0].children[1].notes = 2
+    draw({ tree })
+    expect(screen.getByTestId('tree-notes-4')).toHaveAttribute(
+      'title',
+      expect.stringContaining('2 notes'),
+    )
+    expect(screen.queryByTestId('tree-notes-3')).not.toBeInTheDocument()
+  })
+
   it('shows the backed number with the arrow that says the engine was refuted', () => {
     draw()
     // 1…e5 is Black's move, so its mover-frame +0.34 prints as White's −0.34, and the

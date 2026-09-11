@@ -35,7 +35,6 @@ const STORED: AppSettings = {
   mistake_threshold: 9,
   blunder_threshold: 14,
   correspondence_enabled: 1,
-  correspondence_days_per_move: 10,
   correspondence_multipv: 3,
   correspondence_slots: 2,
   correspondence_search_engine_ids: [1],
@@ -153,7 +152,6 @@ describe('Analysis → Correspondence', () => {
     // The whole record: a PUT is a replace, and an absent key is a cleared one.
     expect(sent).toMatchObject({
       correspondence_enabled: 1,
-      correspondence_days_per_move: 10,
       correspondence_multipv: 3,
       correspondence_slots: 4,
       correspondence_search_engine_ids: [1],

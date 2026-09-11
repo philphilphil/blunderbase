@@ -717,7 +717,6 @@ msgstr "coverage, backfills and what they cost"
 #: src/components/shell/SideNav.tsx
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/correspondence/CorrespondencePage.tsx
-#: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/engines/DemoEngines.tsx
 #: src/routes/engines/EnginesPage.tsx
 msgid "Engines"
@@ -1643,7 +1642,6 @@ msgid "Mistake"
 msgstr "Mistake"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Default 10"
 msgstr "Default 10"
 
@@ -1746,11 +1744,6 @@ msgid "Games played over weeks, with a tree of positions the engines keep workin
 msgstr "Games played over weeks, with a tree of positions the engines keep working on."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-#: src/routes/correspondence/components/NewGameDialog.tsx
-msgid "Days per move"
-msgstr "Days per move"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Lines per search"
 msgstr "Lines per search"
 
@@ -1811,12 +1804,12 @@ msgid "Start a game from <0>Correspondence</0>."
 msgstr "Start a game from <0>Correspondence</0>."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Defaults for a new game"
-msgstr "Defaults for a new game"
+msgid "Defaults for a new search"
+msgstr "Defaults for a new search"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "What a game created here is given, and how many lines a search over one position keeps. Both can be changed per game."
-msgstr "What a game created here is given, and how many lines a search over one position keeps. Both can be changed per game."
+msgid "How many lines a search over one position keeps unless the search dialog says otherwise. There is no default deadline: the server a game is played on owns its clock, and you type the date off that page."
+msgstr "How many lines a search over one position keeps unless the search dialog says otherwise. There is no default deadline: the server a game is played on owns its clock, and you type the date off that page."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Searches"
@@ -1843,7 +1836,6 @@ msgid "Every eligible engine is offered."
 msgstr "Every eligible engine is offered."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-#: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/engines/OptionsEditor.tsx
 msgid "default"
 msgstr "default"
@@ -2268,14 +2260,6 @@ msgid "ply {0}"
 msgstr "ply {0}"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
-msgid "Candidates"
-msgstr "Candidates"
-
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
-msgid "by backed evaluation"
-msgstr "by backed evaluation"
-
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "checkmate"
 msgstr "checkmate"
 
@@ -2500,7 +2484,6 @@ msgid "What the masters play from this position"
 msgstr "What the masters play from this position"
 
 #: src/routes/correspondence/components/BookPane.tsx
-#: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
@@ -2525,67 +2508,6 @@ msgstr "Your games"
 #: src/routes/correspondence/components/BookPane.tsx
 msgid "Which book"
 msgstr "Which book"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "No move has been considered here yet. Play one on the board to put it in the tree."
-msgstr "No move has been considered here yet. Play one on the board to put it in the tree."
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Own"
-msgstr "Own"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Backed"
-msgstr "Backed"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/SearchDialog.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Depth"
-msgstr "Depth"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Mark"
-msgstr "Mark"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "Refuted further down: the minimax under this move is worse for the side that plays it than its own number"
-msgstr "Refuted further down: the minimax under this move is worse for the side that plays it than its own number"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "Better than it looked: the minimax under this move is better for the side that plays it than its own number"
-msgstr "Better than it looked: the minimax under this move is better for the side that plays it than its own number"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "A task is being worked on here"
-msgstr "A task is being worked on here"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "A task is waiting in the analysis queue"
-msgstr "A task is waiting in the analysis queue"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "One engine's verdict is pinned here"
-msgstr "One engine's verdict is pinned here"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "one engine's verdict is pinned here"
-msgstr "one engine's verdict is pinned here"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Two engines disagree here"
-msgstr "Two engines disagree here"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "This number is stale: too shallow, or from a version of the engine you no longer have"
-msgstr "This number is stale: too shallow, or from a version of the engine you no longer have"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
 msgid "{gb} GB"
@@ -3063,8 +2985,8 @@ msgid "Comment on the move"
 msgstr "Comment on the move"
 
 #: src/routes/correspondence/components/NotesPane.tsx
-msgid "Goes into the PGN beside the move. It saves when you click away."
-msgstr "Goes into the PGN beside the move. It saves when you click away."
+msgid "Goes into the PGN beside the move. Enter saves, Shift+Enter breaks the line."
+msgstr "Goes into the PGN beside the move. Enter saves, Shift+Enter breaks the line."
 
 #: src/routes/correspondence/components/NotesPane.tsx
 msgid "This position"
@@ -3085,8 +3007,8 @@ msgid "Add note"
 msgstr "Add note"
 
 #: src/routes/correspondence/components/NotesPane.tsx
-msgid "It saves when you click away."
-msgstr "It saves when you click away."
+msgid "Enter saves, Shift+Enter breaks the line."
+msgstr "Enter saves, Shift+Enter breaks the line."
 
 #: src/routes/correspondence/components/NotesPane.tsx
 #: src/routes/game/components/NoteComposer.tsx
@@ -3150,6 +3072,11 @@ msgstr "Stop it at"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Depth"
+msgstr "Depth"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/engines/EngineDetail.tsx
 msgid "Nodes"
 msgstr "Nodes"
@@ -3204,8 +3131,38 @@ msgid "{0} positions folded away — click to show them"
 msgstr "{0} positions folded away — click to show them"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Two engines disagree here"
+msgstr "Two engines disagree here"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
 msgstr "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "One engine's verdict is pinned here"
+msgstr "One engine's verdict is pinned here"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "one engine's verdict is pinned here"
+msgstr "one engine's verdict is pinned here"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "One note on this position — under the board"
+msgstr "One note on this position — under the board"
+
+#. placeholder {0}: node.notes
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} notes on this position — under the board"
+msgstr "{0} notes on this position — under the board"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "one note on this position"
+msgstr "one note on this position"
+
+#. placeholder {0}: node.notes
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} notes on this position"
+msgstr "{0} notes on this position"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "parked"
@@ -3216,6 +3173,10 @@ msgid "An engine is parked here, warm — resuming costs seconds"
 msgstr "An engine is parked here, warm — resuming costs seconds"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "A task is waiting in the analysis queue"
+msgstr "A task is waiting in the analysis queue"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Tasks are still out on the positions under this move"
 msgstr "Tasks are still out on the positions under this move"
 
@@ -3224,6 +3185,14 @@ msgstr "Tasks are still out on the positions under this move"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "{0} of {1}"
 msgstr "{0} of {1}"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Own"
+msgstr "Own"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Backed"
+msgstr "Backed"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "This game has no tree yet."
@@ -3268,6 +3237,10 @@ msgstr "Take this waiting task back out of the queue"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Cancel task"
 msgstr "Cancel task"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Mark"
+msgstr "Mark"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Comment…"
@@ -4755,8 +4728,8 @@ msgid "note via MCP"
 msgstr "note via MCP"
 
 #: src/routes/explorer/components/PositionNotes.tsx
-msgid "What is worth remembering about this position? It saves when you click away."
-msgstr "What is worth remembering about this position? It saves when you click away."
+msgid "What is worth remembering about this position? Enter saves, Shift+Enter breaks the line."
+msgstr "What is worth remembering about this position? Enter saves, Shift+Enter breaks the line."
 
 #: src/routes/explorer/components/ReferenceFilters.tsx
 #: src/routes/stats/StatsPage.tsx

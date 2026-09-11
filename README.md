@@ -27,6 +27,7 @@
 - Remote-Engine-Runner to use your company's idle inference-server-CPUs for your hobbies
 - Game explorer with win-stats over your own games and connected lichess db with 8 billion games
 - Add reference games to your library for analysis and notes
+- Correspondence mode: ongoing games, an analysis tree, engines searching for days
 - Fully self-hostable, easiest via docker
 
 <p align="center">
@@ -74,7 +75,6 @@ are running. How the code is built is in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 ## Roadmap
 - Desktop app for Linux, Mac and Windows
 - Mobile companion app for iOS and Android
-- Correspondence games with long ongoing calculations
 - Sync-Service to keep multiple blunderbase's in sync
 - Multi-Engine-Analysis on the same game, for the engine nerds
 - Puzzles out of your games

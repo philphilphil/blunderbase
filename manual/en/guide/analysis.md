@@ -58,7 +58,6 @@ the default — there is no **Correspondence** in the sidebar and its pages send
 | Setting | |
 |---|---|
 | **Correspondence mode** | On adds the sidebar entry under **Live** |
-| **Days per move** | The reply window a new game is given, 1 to 365, ten by default. It is copied onto a game when the game is created, so changing it here leaves games already under way alone |
 | **Lines per search** | How many candidate lines an engine keeps when it is set on one position of a correspondence tree, 1 to 5, three by default |
 | **Search slots** | How many searches this machine runs at once, 1 to 16, two by default — one CPU engine and one GPU engine is the ordinary pair. Searches have slots of their own, so a search that runs for days never takes one an imported game's quick pass is waiting for. It is read when the server starts: **change it and restart** |
 | **Search engines** | Which engines the **Search with…** picker offers, in your order; the first is the one it suggests. Choose none and every engine that is eligible is offered — enabled, UCI, able to drive a board, and on this machine. An engine on a remote runner cannot run a search yet |

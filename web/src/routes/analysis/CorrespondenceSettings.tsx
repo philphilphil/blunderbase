@@ -56,7 +56,6 @@ import { engineHosts } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
 type NumberKey =
-  | 'correspondence_days_per_move'
   | 'correspondence_multipv'
   | 'correspondence_slots'
   | 'correspondence_task_nodes'
@@ -144,14 +143,6 @@ export function CorrespondenceSettingsPage() {
   const enabled = (parse(text('correspondence_enabled')) ?? DEFAULTS.correspondence_enabled) === 1
   const fields: SettingSpec<NumberKey>[] = [
     {
-      key: 'correspondence_days_per_move',
-      label: t`Days per move`,
-      min: 1,
-      max: 365,
-      step: 1,
-      unset: t`Default 10`,
-    },
-    {
       key: 'correspondence_multipv',
       label: t`Lines per search`,
       min: 1,
@@ -235,7 +226,6 @@ export function CorrespondenceSettingsPage() {
     save.mutate({
       ...completeUpdate(stored),
       correspondence_enabled: enabled ? 1 : 0,
-      correspondence_days_per_move: parse(text('correspondence_days_per_move')),
       correspondence_multipv: parse(text('correspondence_multipv')),
       correspondence_slots: parse(text('correspondence_slots')),
       correspondence_search_engine_ids: engineIds,
@@ -300,12 +290,13 @@ export function CorrespondenceSettingsPage() {
         <Card>
           <CardHeader className="flex-col items-stretch gap-1">
             <CardTitle>
-              <Trans>Defaults for a new game</Trans>
+              <Trans>Defaults for a new search</Trans>
             </CardTitle>
             <CardDescription>
               <Trans>
-                What a game created here is given, and how many lines a search over one
-                position keeps. Both can be changed per game.
+                How many lines a search over one position keeps unless the search dialog
+                says otherwise. There is no default deadline: the server a game is played on
+                owns its clock, and you type the date off that page.
               </Trans>
             </CardDescription>
           </CardHeader>

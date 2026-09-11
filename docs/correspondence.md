@@ -92,7 +92,7 @@ correspondence functions, "ICCF" is the rulebook.
 | Repetition and fifty-move draws seen in the tree | IDeA, CB | step 1, on the node; the tree is path-based, so minimax has no cycles to fall into |
 | Stale evaluations marked, a subtree re-evaluated | IDeA | step 3, depth and engine-version age, "refresh subtree" queues tasks |
 | Conditional moves ("if 20.Nf3 then 20…d5") | ICCF | step 5 |
-| Reflection time per move, the clock | CB, ICCF | a due date and days per move; the ICCF server stays the authority on the clock |
+| Reflection time per move, the clock | CB, ICCF | a due date typed off the server's page, which sorts the list and the task queue; the ICCF server stays the authority on the clock and nothing here computes one |
 | Opening reference at each node | CB | step 1: the game page's book pane at the node's position, masters and repertoire |
 | Annotated PGN out, with evaluations and glyphs | IDeA, CB | step 1 |
 | Every engine on every game on one screen | IDeA's status window | step 2, "Running now" on the list page |
@@ -167,8 +167,7 @@ Four tables. All cascade from `games.id`.
 |---|---|
 | `game_id` | unique FK to `games`; `owner_color` on the game is required |
 | `event`, `url` | tournament name and the ICCF game page; written into the PGN headers |
-| `reply_due` | when the owner's move is due (nullable, set by hand) |
-| `days_per_move` | what `reply_due` is set to after the opponent's move arrives |
+| `reply_due` | when the owner's move is due (nullable, set by hand off the server's page, cleared when the owner moves; never computed — ICCF banks days and adds increments per move, and a guess would sort the list and the task queue by fiction) |
 | `last_move_at`, `created_at`, `updated_at` | |
 
 Whose move it is is derived: `ply_count` parity against `owner_color`. Whether it is
@@ -355,7 +354,7 @@ host each search is on.
 | `POST /correspondence/games` | create |
 | `POST /correspondence/games/import` | one PGN, moves so far |
 | `GET /correspondence/games/{id}` | game, tree, evals, searches, in one payload |
-| `PATCH /correspondence/games/{id}` | due date, event, url, days per move |
+| `PATCH /correspondence/games/{id}` | due date, event, url |
 | `POST /correspondence/games/{id}/moves` · `DELETE …/moves/last` | play, undo |
 | `POST /correspondence/games/{id}/finish` | result, termination |
 | `POST /correspondence/nodes` · `PATCH /{id}` · `DELETE /{id}` · `POST /{id}/expand` | the tree; expand takes `width`, `stages`, `tasks` |
@@ -399,7 +398,6 @@ has to be in both or the next save of any settings form wipes it:
 | `correspondence_enabled` | the rail entry and the routes |
 | `correspondence_slots` | how many searches may run at once (1–16, default 2) |
 | `correspondence_multipv` | default lines for a search (default 3) |
-| `correspondence_days_per_move` | what a new game starts with (default 10) |
 | `correspondence_task_nodes` | one task's node budget (default 40,000,000) |
 | `correspondence_task_multipv` | lines a task keeps, and therefore how wide an expansion can be (default 3) |
 | `correspondence_stale_depth` | below what depth a stored verdict is stale, whatever engine wrote it (default 30) |
@@ -428,44 +426,49 @@ the thing in the middle. Three columns on a wide screen:
 ├───────────────┬──────────────────────────────┬──────────────────────────────┐
 │ board         │ tree                         │ Stockfish 17   d51  +0.34    │
 │ (selected     │ 15.Bd3 +0.41 (+0.12 ▼)       │  1. Nf5 e6 Nh6+ …            │
-│  node, PV     │   15...c5  -0.12  d48 S      │  2. Rad1 …                   │
+│  node, PV     │   15...c5  -0.12  d48 S  ✎   │  2. Rad1 …                   │
 │  arrows)      │     16.d5  +0.20  d44 S/L ≠  │  3. h4 …           [Pause]   │
 │               │     16.Nb5 ● searching L     │──────────────────────────────│
 │───────────────│   15...Nf6 -0.05  d40 S      │ Leela 0.31     12.4M  +0.18  │
-│ candidates    │ 15.Rad1 +0.10 (task queued)  │  1. Rad1 …                   │
-│ move own bkd  │ 15.h4  …                     │  2. Nf5 …          [Pause]   │
-│ Nf5 .34 .12   │                              │──────────────────────────────│
-│ Rad1 .10  –   │                              │ notes · this position/game   │
+│ notes         │ 15.Rad1 +0.10 (task queued)  │  1. Rad1 …                   │
+│ this position │ 15.h4  …                     │  2. Nf5 …          [Pause]   │
+│ this game     │                              │                              │
+│ book          │                              │                              │
 └───────────────┴──────────────────────────────┴──────────────────────────────┘
 ```
 
-- **Header**: players, event, whose move, the due date (editable in place), and the two
-  actions that move the game: **Opponent played…** and **Play this move** (on the
-  selected candidate, both append a move), plus **Finish**.
+- **Header**: players, event, whose move, the due date (editable in place, typed off the
+  server's page, never computed), and the two actions that move the game: **Opponent
+  played…** and **Play this move** (on the selected candidate, both append a move), plus
+  **Finish**.
 - **Board**, left, at the selected node; dragging a move creates a child or walks to the
-  existing one — this is "send to tree", one gesture; the selected node's PV is drawn
-  through `linePreview`, and hovering a line in any engine pane previews it.
-- **Candidates**, under the board: the selected node's children as a table — move, own
-  eval, backed eval, depth, which engines, updated — sorted by backed eval. This is the
-  decision table.
+  existing one — this is "send to tree", one gesture; the selected node's children are
+  drawn as arrows, the selected engine line through `linePreview`, and hovering a line in
+  any engine pane previews it. There is no candidates table: it was the node's children,
+  which the tree shows one level down and the board shows as arrows, and its place went
+  to the notes.
 - **Tree**, the middle column, the widest: the game's moves as the spine, variations
   nested under them, each node with its move, own eval, backed eval when it differs (and
   the arrow that says which way), a depth chip and an engine initial per verdict, a `≠`
   when two engines disagree beyond a threshold, a spinner while a search runs, a queue
-  mark while a task waits, greyed when it hangs off a position the game has left. Arrow
-  keys walk it: left and right along the line, up and down across siblings. A node's
-  context menu is the whole verb set: search with…, queue task, expand, promote, comment,
-  delete.
+  mark while a task waits, a note mark (`✎`) when the position has notes, greyed when it
+  hangs off a position the game has left. Arrow keys walk it: left and right along the
+  line, up and down across siblings. A node's context menu is the whole verb set: search
+  with…, queue task, expand, promote, comment, delete.
 - **Engines**, the right column: one pane per engine that is searching or has a verdict on
   the selected node, stacked — the `InfiniteAnalysisPanel` shape each, live while its
   search runs, the stored lines and the eval history sparkline otherwise, its own
   **Pause** / **Resume** / **Stop**. A **Search with…** button at the top of the column
   adds an engine to the node. The stack is what "Stockfish and Leela at the same time"
   looks like: both thinking, both visible, both hoverable.
-- **Notes**, the bottom of the right column, two tabs: *this position* (notes pinned to
-  the node's FEN, plus the node comment inline) and *this game* (notes pinned to the game
-  with no ply — the journal: what the opponent tends to do, the plan, the deadline
-  arithmetic). Both write through the existing composer.
+- **Notes**, under the board, three tabs: *this position* (notes pinned to the node's
+  FEN, plus the node comment inline), *this game* (notes pinned to the game with no ply —
+  the journal: what the opponent tends to do, the plan, the deadline arithmetic) and
+  *book* (the opening reference at the node). Both note tabs write through the existing
+  composer. The notes sit under the board rather than under the engines because two engine
+  panes stacked left them a strip, and the journal is what a player opens first when a
+  game comes round after eight days. The tree payload carries a note count per node
+  (`notes`, from the notes table by position), which is what the tree's `✎` reads.
 
 The first step of the design pass is a prototype in `docs/design/prototypes/`
 (`correspondence-view.html`), drawn against the real tokens, before any pane is built —
@@ -494,14 +497,15 @@ Each step ships on its own and is tested before the next starts (services in `te
 worker against `tests/fake_uci.py`, panes beside their files).
 
 0. **The prototype** *(shipped)*. `docs/design/prototypes/correspondence-view.html`: the three-column
-   view above with two engines running, a tree with disagreements, the candidates table;
-   accepted before step 1 builds any of it.
+   view above with two engines running, a tree with disagreements, the notes under the
+   board; accepted before step 1 builds any of it.
 1. **Games and tree, no engine** *(shipped)*. Models and migration (`Source.ICCF` included);
    `games_service.append_move` / `pop_move`; the service's game and tree halves; the
    router; the setting and the rail entry; the list page, the two dialogs, the view with
-   the tree, marks, draw detection on the node, the book pane at the node, candidates
-   (evals empty) and notes; PGN export of the tree with comments and glyphs; the manual
-   chapter.
+   the tree, marks, draw detection on the node, the book pane at the node and notes; PGN
+   export of the tree with comments and glyphs; the manual chapter. (A candidates table
+   under the board shipped here and was removed on 2026-09-11: it duplicated the tree's
+   next level, and its place went to the notes.)
 2. **Searches on this host, several engines at once** *(shipped)*. The worker, checkpoints that only
    move forward, limits, `root_moves`, warm pause, recovery at boot; the engine column with
    one pane per engine, pinning and the disagreement mark; weak lines fading and `prune`;

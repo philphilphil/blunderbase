@@ -827,11 +827,10 @@ class CorrespondenceGame(Base):
     # PGN headers (`Event`, `Site`) every time the move list is rebuilt.
     event: Mapped[str | None] = mapped_column(String(128))
     url: Mapped[str | None] = mapped_column(String(512))
-    # When the owner's move is due. Set from `days_per_move` when the opponent's move
-    # arrives and editable by hand, because the server it is played on — not this row — is
-    # the authority on the clock.
+    # When the owner's move is due. Typed by the owner off the server's page and cleared
+    # when they move — never computed here, because the server the game is played on is the
+    # authority on the clock and a guess at it would sort the list wrongly.
     reply_due: Mapped[datetime | None] = mapped_column(UtcDateTime)
-    days_per_move: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     last_move_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(

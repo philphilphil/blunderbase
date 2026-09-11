@@ -41,7 +41,6 @@ function game(patch: Partial<CorrespondenceGameSummary> = {}): CorrespondenceGam
     moves_san: [],
     last_move_san: 'Nf6',
     start_fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-    days_per_move: 10,
     reply_due: '2026-09-14T12:00:00+00:00',
     days_left: 3,
     created_at: '2026-06-03T10:00:00+00:00',
@@ -378,7 +377,6 @@ describe('the Import PGN dialog', () => {
     expect(posted[0].body).toMatchObject({
       pgn: '1. e4 c5',
       owner_color: 'black',
-      days_per_move: null,
       reply_due: null,
     })
   })

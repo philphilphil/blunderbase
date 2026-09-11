@@ -277,8 +277,7 @@ def test_the_nearest_deadline_is_claimed_first(session: Session) -> None:
 
 def test_a_game_with_no_deadline_goes_to_the_bottom_of_the_task_band(session: Session) -> None:
     add_engine(session)
-    undated = make_game(session, iccf_id="1", days_per_move=10)
-    correspondence_service.update_game(session, undated["game"]["game_id"], reply_due=None)
+    undated = make_game(session, iccf_id="1")
     due = make_game(session, iccf_id="2", reply_due=datetime.now(UTC) + timedelta(days=2))
 
     loose = correspondence_service.queue_task(session, node_id=undated["tree"]["id"])

@@ -36,12 +36,12 @@ they are the budget of the *next* run rather than of every run ever queued.
 points lost by the mover. Read per plan, which means a game re-analysed after they moved
 is judged by the new ones and one analysed before it keeps what it was judged by.
 
-**Correspondence** — `correspondence_enabled`, `correspondence_days_per_move`,
-`correspondence_multipv`, `correspondence_slots`, and the three the bounded half of the
+**Correspondence** — `correspondence_enabled`, `correspondence_multipv`,
+`correspondence_slots`, and the three the bounded half of the
 mode is configured with, `correspondence_task_nodes`, `correspondence_task_multipv` and
 `correspondence_stale_depth`. Whether the mode exists at all for this owner (off by
 default, because most owners never play correspondence and should never see the rail
-entry), how long the owner gives themselves after the opponent's move, how many lines a
+entry), how many lines a
 search over one node keeps, how many searches this host runs at once, what one *task*
 costs and how many lines it keeps, and below what depth a stored verdict counts as stale.
 Ordinary members of `SETTINGS`: seven numbers with a range, read where they are used — the
@@ -130,10 +130,10 @@ DEEP_MULTIPV = "deep_multipv"
 INACCURACY_THRESHOLD = "inaccuracy_threshold"
 MISTAKE_THRESHOLD = "mistake_threshold"
 BLUNDER_THRESHOLD = "blunder_threshold"
-# Correspondence mode: whether it is on at all, the default reply window in days, and how
-# many lines a search over one node keeps.
+# Correspondence mode: whether it is on at all, and how many lines a search over one node
+# keeps. There is deliberately no reply window: the server a game is played on is the
+# authority on its clock, and the owner types the deadline off that page.
 CORRESPONDENCE_ENABLED = "correspondence_enabled"
-CORRESPONDENCE_DAYS_PER_MOVE = "correspondence_days_per_move"
 CORRESPONDENCE_MULTIPV = "correspondence_multipv"
 # How many correspondence searches this host may run at once. A member of `SETTINGS` like
 # the rest: a number with a range. Read when the search worker starts rather than per
@@ -218,9 +218,6 @@ MAIA_ELOS_DEFAULT: tuple[int, ...] = (MAIA_MAX_RATING,)
 # Off, because most owners never play correspondence: the rail entry and the routes only
 # exist once this is on.
 CORRESPONDENCE_ENABLED_DEFAULT = 0
-# ICCF's ordinary reflection allowance is ten days a move, which is what a game created
-# without a number of its own is given.
-CORRESPONDENCE_DAYS_PER_MOVE_DEFAULT = 10
 # Three candidate moves is the shape of correspondence work: the question is which of a
 # handful of moves survives a week of looking, not what the single best move is.
 CORRESPONDENCE_MULTIPV_DEFAULT = 3
@@ -253,12 +250,8 @@ MAX_THRESHOLD = 100.0
 # A flag's range: off, on, and nothing in between for a clamp to land on.
 FLAG_OFF = 0
 FLAG_ON = 1
-# A reply window of no days is not a shorter window, it is no game; a year is longer than
-# any correspondence server allows between moves.
-MIN_DAYS_PER_MOVE = 1
-MAX_DAYS_PER_MOVE = 365
-# Five candidates is as many as the candidates table can be read at a glance, and every
-# extra line is engine time taken off the ones that matter.
+# Five candidates is as many as an engine pane can be read at a glance, and every extra
+# line is engine time taken off the ones that matter.
 MAX_CORRESPONDENCE_MULTIPV = 5
 # A deployment with no search slot at all cannot search anything, and sixteen long
 # searches on one machine is already more processes than any owner's cores.
@@ -364,13 +357,6 @@ SETTINGS: tuple[Setting, ...] = (
         default=CORRESPONDENCE_ENABLED_DEFAULT,
         low=FLAG_OFF,
         high=FLAG_ON,
-        whole=True,
-    ),
-    Setting(
-        key=CORRESPONDENCE_DAYS_PER_MOVE,
-        default=CORRESPONDENCE_DAYS_PER_MOVE_DEFAULT,
-        low=MIN_DAYS_PER_MOVE,
-        high=MAX_DAYS_PER_MOVE,
         whole=True,
     ),
     Setting(
@@ -691,17 +677,6 @@ def get_correspondence_enabled(session: Session) -> bool:
     home, so an owner who never plays correspondence never sees the mode.
     """
     return _flag(session, CORRESPONDENCE_ENABLED)
-
-
-def get_correspondence_days_per_move(session: Session) -> int:
-    """The reply window a correspondence game created now is given, in days.
-
-    Read when a game is created and copied onto its row, for the reason a run's budget is
-    copied onto the run: a game already being played must not have its deadlines moved by
-    a number somebody changed on the settings page.
-    """
-    value = stored(session, CORRESPONDENCE_DAYS_PER_MOVE)
-    return CORRESPONDENCE_DAYS_PER_MOVE_DEFAULT if value is None else int(value)
 
 
 def get_correspondence_multipv(session: Session) -> int:

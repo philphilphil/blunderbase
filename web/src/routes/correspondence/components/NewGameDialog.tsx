@@ -38,11 +38,6 @@ function text(value: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
-function number(value: string): number | null {
-  const parsed = Number(value.trim())
-  return value.trim() === '' || !Number.isFinite(parsed) ? null : Math.trunc(parsed)
-}
-
 /** The one control with no default: which of the two names is you. */
 function WhichIsYou({
   value,
@@ -114,7 +109,6 @@ export function NewGameDialog({
   const [url, setUrl] = useState('')
   const [timeControl, setTimeControl] = useState('')
   const [startFen, setStartFen] = useState('')
-  const [days, setDays] = useState('')
   const [due, setDue] = useState('')
 
   const ready = white.trim() !== '' && black.trim() !== '' && owner !== null
@@ -131,7 +125,6 @@ export function NewGameDialog({
       iccf_id: text(iccf),
       time_control: text(timeControl),
       start_fen: text(startFen),
-      days_per_move: number(days),
       reply_due: dateInputToIso(due),
     })
   }
@@ -224,16 +217,6 @@ export function NewGameDialog({
               onChange={(changed) => setStartFen(changed.target.value)}
             />
           </Field>
-          <Field id="cg-days" label={<Trans>Days per move</Trans>} className="w-28 flex-none max-md:w-full">
-            <Input
-              id="cg-days"
-              value={days}
-              inputMode="numeric"
-              className="font-mono"
-              placeholder={t`default`}
-              onChange={(changed) => setDays(changed.target.value)}
-            />
-          </Field>
           <Field id="cg-due" label={<Trans>Reply due</Trans>} className="w-44 flex-none max-md:w-full">
             <Input
               id="cg-due"
@@ -283,7 +266,6 @@ export function ImportPgnDialog({
   const [event, setEvent] = useState('')
   const [iccf, setIccf] = useState('')
   const [url, setUrl] = useState('')
-  const [days, setDays] = useState('')
   const [due, setDue] = useState('')
 
   const ready = pgn.trim() !== '' && owner !== null
@@ -297,7 +279,6 @@ export function ImportPgnDialog({
       event: text(event),
       url: text(url),
       iccf_id: text(iccf),
-      days_per_move: number(days),
       reply_due: dateInputToIso(due),
     })
   }
@@ -366,16 +347,6 @@ export function ImportPgnDialog({
               autoComplete="off"
               placeholder="https://"
               onChange={(changed) => setUrl(changed.target.value)}
-            />
-          </Field>
-          <Field id="ci-days" label={<Trans>Days per move</Trans>} className="w-28 flex-none max-md:w-full">
-            <Input
-              id="ci-days"
-              value={days}
-              inputMode="numeric"
-              className="font-mono"
-              placeholder={t`default`}
-              onChange={(changed) => setDays(changed.target.value)}
             />
           </Field>
           <Field id="ci-due" label={<Trans>Reply due</Trans>} className="w-44 flex-none max-md:w-full">

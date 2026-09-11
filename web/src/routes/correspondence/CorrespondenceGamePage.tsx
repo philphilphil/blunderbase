@@ -6,10 +6,14 @@
  * several engines thinking at once, and the tree is the thing in the middle.
  *
  * Three columns on a wide screen, as `docs/design/prototypes/correspondence-view.html`
- * draws them: the board at the selected node with the candidates table under it, the tree,
- * and a column of engines over the notes. Below `md` the same four panes are tabs under a
- * pinned board, the way `MobileGameView` does it — the board is what the screen is for, and
- * stacking would scroll it away the moment anything else was read.
+ * draws them: the board at the selected node with the notes under it, the tree, and a
+ * column of engines. The notes sit under the board rather than under the engines because
+ * two engine panes stacked left them a strip, and the journal — what the opponent tends to
+ * do, the plan — is what a player opens first when a game comes round after eight days.
+ * There is no candidates table: it was the selected node's children, which the tree
+ * already shows one level down, and the board draws them as arrows. Below `md` the four
+ * panes are tabs, the way `MobileGameView` does it — the board is what the screen is for,
+ * and stacking would scroll it away the moment anything else was read.
  *
  * **Dragging a move is "send to tree".** A move played on the board walks to the child that
  * is already there or creates it, in one gesture: whether the tree knew the move is the
@@ -62,7 +66,6 @@ import { cn } from '@/lib/utils'
 import { EvalBar } from '@/routes/game/components/EvalBar'
 
 import { BookPane, type BookSource } from './components/BookPane'
-import { CandidatesTable } from './components/CandidatesTable'
 import { Frame } from './components/DialogFrame'
 import { EnginesPane } from './components/EnginesPane'
 import { ExpandDialog } from './components/ExpandDialog'
@@ -268,9 +271,9 @@ export function CorrespondenceGamePage() {
     [node, game?.finished],
   )
 
-  // The candidates as arrows: the first one in the strong brush, the rest pale. It is the
-  // same reading the table gives, on the board, and it is what the column has instead of an
-  // engine's PV until step 2 gives it one.
+  // The selected node's children as arrows: the first one in the strong brush, the rest
+  // pale. It is the tree's next level drawn on the board, and what the board shows until a
+  // hovered engine line takes over.
   const arrows = useMemo<BoardArrow[]>(
     () =>
       sortSiblings(node?.children ?? []).map((child, position) => ({
@@ -337,7 +340,7 @@ export function CorrespondenceGamePage() {
       : 'white'
 
   const boardColumn = (
-    <div className="flex min-h-0 flex-col border-r border-edge-strong bg-surface max-md:border-r-0">
+    <div className="flex min-h-0 flex-col bg-surface">
       <div className="flex min-h-0 flex-1 items-center justify-center p-3">
         <div className="flex w-full max-w-[34rem] gap-2">
           <EvalBar win={win} score={boardScore} orientation={orientation} />
@@ -384,39 +387,26 @@ export function CorrespondenceGamePage() {
         <span className="ml-2 font-mono text-[0.625rem] text-dim">
           {preview.caption ?? (node.uci ? `${node.san} · ${t`ply ${node.ply}`}` : t`start`)}
         </span>
-      </div>
-      <div className="flex min-h-[9rem] flex-none flex-col border-t border-edge-strong">
-        <PaneTitle
-          title={<Trans>Candidates</Trans>}
-          detail={t`by backed evaluation`}
-          end={
-            node.flags?.checkmate ? (
-              <span className="text-blunder">
-                <Trans>checkmate</Trans>
-              </span>
-            ) : node.flags?.stalemate ? (
-              <span className="text-mistake">
-                <Trans>stalemate</Trans>
-              </span>
-            ) : node.flags?.threefold ? (
-              <span className="text-mistake">
-                <Trans>threefold</Trans>
-              </span>
-            ) : node.flags?.fifty_move ? (
-              <span className="text-mistake">
-                <Trans>fifty-move draw</Trans>
-              </span>
-            ) : null
-          }
-        />
-        <CandidatesTable
-          node={node}
-          selectedId={selectedId}
-          onSelect={select}
-          onHover={(line) =>
-            setHover(line ? { line: `cand:${line.id}`, ply: null, pv: line.pv } : null)
-          }
-        />
+        {/* The board's own verdict on the position, where the caption is: a mate or a draw
+            by rule is a fact about the node, and the notes pane below is about the owner's
+            writing on it. */}
+        {node.flags?.checkmate ? (
+          <span className="font-mono text-[0.625rem] text-blunder">
+            · <Trans>checkmate</Trans>
+          </span>
+        ) : node.flags?.stalemate ? (
+          <span className="font-mono text-[0.625rem] text-mistake">
+            · <Trans>stalemate</Trans>
+          </span>
+        ) : node.flags?.threefold ? (
+          <span className="font-mono text-[0.625rem] text-mistake">
+            · <Trans>threefold</Trans>
+          </span>
+        ) : node.flags?.fifty_move ? (
+          <span className="font-mono text-[0.625rem] text-mistake">
+            · <Trans>fifty-move draw</Trans>
+          </span>
+        ) : null}
       </div>
     </div>
   )
@@ -565,7 +555,7 @@ export function CorrespondenceGamePage() {
   )
 
   const notesColumn = (
-    <div className="flex min-h-0 flex-col border-t border-edge-strong bg-surface">
+    <div className="flex min-h-0 flex-col border-t border-edge-strong bg-surface max-md:border-t-0">
       <NotesPane
         gameId={game.game_id}
         node={node}
@@ -656,12 +646,15 @@ export function CorrespondenceGamePage() {
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(24rem,0.9fr)_minmax(22rem,1.15fr)_minmax(20rem,0.95fr)] bg-void">
-          {boardColumn}
-          {treeColumn}
-          <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(11rem,0.75fr)]">
-            {enginesColumn}
+          {/* The board keeps its square and the notes take what is left under it, never
+              less than a heading and a few lines: on a short window the board gives way,
+              not the writing. */}
+          <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(12rem,0.8fr)] border-r border-edge-strong">
+            {boardColumn}
             {notesColumn}
           </div>
+          {treeColumn}
+          {enginesColumn}
         </div>
       )}
 

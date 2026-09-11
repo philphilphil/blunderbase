@@ -152,10 +152,6 @@ class AppSettings(BaseModel):
         description="1 if correspondence mode is on; the rail entry and the "
         "`/correspondence` routes exist only while it is",
     )
-    correspondence_days_per_move: int | None = Field(
-        default=None,
-        description="the reply window a correspondence game created now is given, in days",
-    )
     correspondence_multipv: int | None = Field(
         default=None, description="how many lines a correspondence search keeps, 1 to 5"
     )
@@ -224,9 +220,6 @@ class AppSettingsUpdate(Input):
     blunder_threshold: float | None = None
     correspondence_enabled: int | None = Field(
         default=None, description="1 to show correspondence mode, 0 or null to hide it"
-    )
-    correspondence_days_per_move: int | None = Field(
-        default=None, description="1 to 365; the default reply window of a new game"
     )
     correspondence_multipv: int | None = Field(
         default=None, description="1 to 5 lines per correspondence search"
@@ -1644,10 +1637,9 @@ class CorrespondenceGameCreate(Input):
     iccf_id: str | None = Field(default=None, description="the ICCF game number")
     time_control: str | None = Field(default=None, description="free text, e.g. 10 days/move")
     start_fen: str | None = Field(default=None, description="null is the initial array")
-    days_per_move: int | None = Field(
-        default=None, description="1 to 365; the deployment's default when left out"
+    reply_due: datetime | None = Field(
+        default=None, description="when the reply is due, as the server shows it; never computed"
     )
-    reply_due: datetime | None = None
     white_rating: int | None = None
     black_rating: int | None = None
 
@@ -1660,7 +1652,6 @@ class CorrespondencePgnImport(Input):
     event: str | None = None
     url: str | None = None
     iccf_id: str | None = None
-    days_per_move: int | None = None
     reply_due: datetime | None = None
 
 
@@ -1670,7 +1661,6 @@ class CorrespondenceGameUpdate(Input):
     event: str | None = None
     url: str | None = None
     reply_due: datetime | None = None
-    days_per_move: int | None = None
 
 
 class CorrespondenceMoveCreate(Input):
@@ -1961,6 +1951,9 @@ class CorrespondenceTreeNode(CorrespondenceNodeResponse):
         default=None, description="the task queued or running on this position, if there is one"
     )
     flags: dict[str, Any] = Field(default_factory=dict)
+    notes: int = Field(
+        default=0, description="how many notes are pinned to this position, comment aside"
+    )
     children: list[CorrespondenceTreeNode] = Field(default_factory=list)
 
 
@@ -1997,7 +1990,6 @@ class CorrespondenceGameSummary(Payload):
     move_number: int = 1
     to_move: Color
     your_move: bool = False
-    days_per_move: int
     reply_due: str | None = None
     days_left: float | None = None
     root_eval: CorrespondenceScore | None = Field(

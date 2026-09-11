@@ -41,7 +41,7 @@
  * and a menu that hid the item would leave the reader wondering where it went.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Pin } from 'lucide-react'
+import { Pin, StickyNote } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
 import type { CorrespondenceMark, CorrespondenceTreeNode } from '@/lib/api/types'
@@ -257,6 +257,26 @@ function Row({
       {node.pinned_engine_id ? (
         <span title={t`One engine's verdict is pinned here`}>
           <Pin className="size-2.5 text-accent-teal" aria-label={t`one engine's verdict is pinned here`} />
+        </span>
+      ) : null}
+      {node.notes ? (
+        // Notes pinned to the position, as distinct from the move comment printed under
+        // the row: a comment is read in passing, a note has to be opened, so the row has
+        // to say there is one to open.
+        <span
+          data-testid={`tree-notes-${node.id}`}
+          title={
+            node.notes === 1
+              ? t`One note on this position — under the board`
+              : t`${node.notes} notes on this position — under the board`
+          }
+        >
+          <StickyNote
+            className="size-2.5 text-accent-teal"
+            aria-label={
+              node.notes === 1 ? t`one note on this position` : t`${node.notes} notes on this position`
+            }
+          />
         </span>
       ) : null}
       {searching ? (

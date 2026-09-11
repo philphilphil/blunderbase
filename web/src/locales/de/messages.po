@@ -717,7 +717,6 @@ msgstr "Abdeckung, Nachträge und was sie kosten"
 #: src/components/shell/SideNav.tsx
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/correspondence/CorrespondencePage.tsx
-#: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/engines/DemoEngines.tsx
 #: src/routes/engines/EnginesPage.tsx
 msgid "Engines"
@@ -1643,7 +1642,6 @@ msgid "Mistake"
 msgstr "Fehler"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Default 10"
 msgstr "Standard 10"
 
@@ -1746,11 +1744,6 @@ msgid "Games played over weeks, with a tree of positions the engines keep workin
 msgstr "Partien über Wochen, mit einem Baum aus Stellungen, an denen die Engines weiterrechnen."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-#: src/routes/correspondence/components/NewGameDialog.tsx
-msgid "Days per move"
-msgstr "Tage pro Zug"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Lines per search"
 msgstr "Linien pro Suche"
 
@@ -1811,12 +1804,12 @@ msgid "Start a game from <0>Correspondence</0>."
 msgstr "Eine Partie startest du unter <0>Fernschach</0>."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Defaults for a new game"
-msgstr "Voreinstellungen für eine neue Partie"
+msgid "Defaults for a new search"
+msgstr "Voreinstellungen für eine neue Suche"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "What a game created here is given, and how many lines a search over one position keeps. Both can be changed per game."
-msgstr "Was eine hier angelegte Partie mitbekommt, und wie viele Linien eine Suche über eine Stellung behält. Beides lässt sich pro Partie ändern."
+msgid "How many lines a search over one position keeps unless the search dialog says otherwise. There is no default deadline: the server a game is played on owns its clock, and you type the date off that page."
+msgstr "Wie viele Varianten eine Suche über eine Stellung behält, wenn der Suchdialog nichts anderes sagt. Eine voreingestellte Frist gibt es nicht: Die Uhr gehört dem Server, auf dem die Partie läuft, und das Datum tippst du von dieser Seite ab."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Searches"
@@ -1843,7 +1836,6 @@ msgid "Every eligible engine is offered."
 msgstr "Alle geeigneten Engines stehen zur Auswahl."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-#: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/engines/OptionsEditor.tsx
 msgid "default"
 msgstr "Standard"
@@ -2268,14 +2260,6 @@ msgid "ply {0}"
 msgstr "Halbzug {0}"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
-msgid "Candidates"
-msgstr "Kandidaten"
-
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
-msgid "by backed evaluation"
-msgstr "nach zurückgerechneter Bewertung"
-
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "checkmate"
 msgstr "matt"
 
@@ -2500,7 +2484,6 @@ msgid "What the masters play from this position"
 msgstr "Was die Meister aus dieser Stellung spielen"
 
 #: src/routes/correspondence/components/BookPane.tsx
-#: src/routes/correspondence/components/CandidatesTable.tsx
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/explorer/components/MoveTreeTable.tsx
@@ -2525,67 +2508,6 @@ msgstr "Deine Partien"
 #: src/routes/correspondence/components/BookPane.tsx
 msgid "Which book"
 msgstr "Welches Buch"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "No move has been considered here yet. Play one on the board to put it in the tree."
-msgstr "Hier wurde noch kein Zug erwogen. Spiele einen auf dem Brett, um ihn in den Baum zu legen."
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Own"
-msgstr "Eigen"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Backed"
-msgstr "Zurückgerechnet"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/SearchDialog.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Depth"
-msgstr "Tiefe"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Mark"
-msgstr "Zeichen"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "Refuted further down: the minimax under this move is worse for the side that plays it than its own number"
-msgstr "Weiter unten widerlegt: das Minimax unter diesem Zug ist für die Seite, die ihn macht, schlechter als seine eigene Zahl"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "Better than it looked: the minimax under this move is better for the side that plays it than its own number"
-msgstr "Besser als gedacht: das Minimax unter diesem Zug ist für die Seite, die ihn macht, besser als seine eigene Zahl"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "A task is being worked on here"
-msgstr "Hier wird an einer Aufgabe gerechnet"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "A task is waiting in the analysis queue"
-msgstr "Eine Aufgabe wartet in der Analysewarteschlange"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "One engine's verdict is pinned here"
-msgstr "Hier ist das Urteil einer Engine angeheftet"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "one engine's verdict is pinned here"
-msgstr "hier ist das Urteil einer Engine angeheftet"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Two engines disagree here"
-msgstr "Zwei Engines sind hier uneins"
-
-#: src/routes/correspondence/components/CandidatesTable.tsx
-msgid "This number is stale: too shallow, or from a version of the engine you no longer have"
-msgstr "Diese Zahl ist veraltet: zu flach oder von einer Version der Engine, die du nicht mehr hast"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
 msgid "{gb} GB"
@@ -3063,8 +2985,8 @@ msgid "Comment on the move"
 msgstr "Kommentar zum Zug"
 
 #: src/routes/correspondence/components/NotesPane.tsx
-msgid "Goes into the PGN beside the move. It saves when you click away."
-msgstr "Kommt im PGN neben den Zug. Wird gespeichert, wenn du wegklickst."
+msgid "Goes into the PGN beside the move. Enter saves, Shift+Enter breaks the line."
+msgstr "Steht im PGN neben dem Zug. Enter speichert, Shift+Enter bricht die Zeile um."
 
 #: src/routes/correspondence/components/NotesPane.tsx
 msgid "This position"
@@ -3085,8 +3007,8 @@ msgid "Add note"
 msgstr "Notiz hinzufügen"
 
 #: src/routes/correspondence/components/NotesPane.tsx
-msgid "It saves when you click away."
-msgstr "Wird gespeichert, wenn du wegklickst."
+msgid "Enter saves, Shift+Enter breaks the line."
+msgstr "Enter speichert, Shift+Enter bricht die Zeile um."
 
 #: src/routes/correspondence/components/NotesPane.tsx
 #: src/routes/game/components/NoteComposer.tsx
@@ -3150,6 +3072,11 @@ msgstr "Beenden bei"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Depth"
+msgstr "Tiefe"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
 #: src/routes/engines/EngineDetail.tsx
 msgid "Nodes"
 msgstr "Knoten"
@@ -3204,8 +3131,38 @@ msgid "{0} positions folded away — click to show them"
 msgstr "{0} Stellungen eingeklappt – klicken, um sie zu zeigen"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "Two engines disagree here"
+msgstr "Zwei Engines sind hier uneins"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "This number is stale: it was reached below the stale depth, or by a version of the engine you no longer have. Refresh subtree asks again."
 msgstr "Diese Zahl ist veraltet: Sie wurde unter der Veraltet-Tiefe erreicht oder von einer Version der Engine, die du nicht mehr hast. Teilbaum auffrischen fragt noch einmal."
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "One engine's verdict is pinned here"
+msgstr "Hier ist das Urteil einer Engine angeheftet"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "one engine's verdict is pinned here"
+msgstr "hier ist das Urteil einer Engine angeheftet"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "One note on this position — under the board"
+msgstr "Eine Notiz zu dieser Stellung – unter dem Brett"
+
+#. placeholder {0}: node.notes
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} notes on this position — under the board"
+msgstr "{0} Notizen zu dieser Stellung – unter dem Brett"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "one note on this position"
+msgstr "eine Notiz zu dieser Stellung"
+
+#. placeholder {0}: node.notes
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "{0} notes on this position"
+msgstr "{0} Notizen zu dieser Stellung"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "parked"
@@ -3216,6 +3173,10 @@ msgid "An engine is parked here, warm — resuming costs seconds"
 msgstr "Hier ist eine Engine geparkt, warm — das Fortsetzen kostet Sekunden"
 
 #: src/routes/correspondence/components/TreePane.tsx
+msgid "A task is waiting in the analysis queue"
+msgstr "Eine Aufgabe wartet in der Analysewarteschlange"
+
+#: src/routes/correspondence/components/TreePane.tsx
 msgid "Tasks are still out on the positions under this move"
 msgstr "Auf den Stellungen unter diesem Zug sind noch Aufgaben unterwegs"
 
@@ -3224,6 +3185,14 @@ msgstr "Auf den Stellungen unter diesem Zug sind noch Aufgaben unterwegs"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "{0} of {1}"
 msgstr "{0} von {1}"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Own"
+msgstr "Eigen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Backed"
+msgstr "Zurückgerechnet"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "This game has no tree yet."
@@ -3268,6 +3237,10 @@ msgstr "Diese wartende Aufgabe wieder aus der Warteschlange nehmen"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Cancel task"
 msgstr "Aufgabe abbrechen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Mark"
+msgstr "Zeichen"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Comment…"
@@ -4755,8 +4728,8 @@ msgid "note via MCP"
 msgstr "Notiz über MCP"
 
 #: src/routes/explorer/components/PositionNotes.tsx
-msgid "What is worth remembering about this position? It saves when you click away."
-msgstr "Was lohnt sich an dieser Stellung zu merken? Es wird gespeichert, sobald du wegklickst."
+msgid "What is worth remembering about this position? Enter saves, Shift+Enter breaks the line."
+msgstr "Was ist an dieser Stellung merkenswert? Enter speichert, Shift+Enter bricht die Zeile um."
 
 #: src/routes/explorer/components/ReferenceFilters.tsx
 #: src/routes/stats/StatsPage.tsx

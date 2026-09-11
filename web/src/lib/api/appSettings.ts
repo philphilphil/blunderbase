@@ -28,7 +28,6 @@ export const SETTING_DEFAULTS = {
   mistake_threshold: 10,
   blunder_threshold: 15,
   correspondence_enabled: 0,
-  correspondence_days_per_move: 10,
   correspondence_multipv: 3,
   correspondence_slots: 2,
   correspondence_task_nodes: 40_000_000,
@@ -70,7 +69,6 @@ export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
     // whole for the same reason `maia_elos` is: a save of the Engine passes page must not
     // empty the search picker or unassign the engine the tasks run on.
     correspondence_enabled: settings.correspondence_enabled ?? null,
-    correspondence_days_per_move: settings.correspondence_days_per_move ?? null,
     correspondence_multipv: settings.correspondence_multipv ?? null,
     correspondence_slots: settings.correspondence_slots ?? null,
     correspondence_search_engine_ids: settings.correspondence_search_engine_ids ?? [],

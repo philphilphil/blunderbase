@@ -78,7 +78,6 @@ def create_game(session: SessionDep, body: CorrespondenceGameCreate) -> Any:
         iccf_id=body.iccf_id,
         time_control=body.time_control,
         start_fen=body.start_fen,
-        days_per_move=body.days_per_move,
         reply_due=body.reply_due,
         white_rating=body.white_rating,
         black_rating=body.black_rating,
@@ -100,7 +99,6 @@ def import_game(session: SessionDep, body: CorrespondencePgnImport) -> Any:
         event=body.event,
         url=body.url,
         iccf_id=body.iccf_id,
-        days_per_move=body.days_per_move,
         reply_due=body.reply_due,
     )
 
@@ -134,7 +132,6 @@ def update_game(session: SessionDep, game_id: int, body: CorrespondenceGameUpdat
         event=body.event if "event" in given else unchanged,
         url=body.url if "url" in given else unchanged,
         reply_due=body.reply_due if "reply_due" in given else unchanged,
-        days_per_move=body.days_per_move if "days_per_move" in given else unchanged,
     )
 
 

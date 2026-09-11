@@ -4,7 +4,6 @@ import type { CorrespondenceTreeNode } from '@/lib/api/types'
 
 import {
   backedDirection,
-  candidatesOf,
   countEvaluated,
   countNodes,
   indexTree,
@@ -76,45 +75,6 @@ describe('inWhiteFrame', () => {
     expect(inWhiteFrame({ cp: null, mate: 3 }, 'black')).toEqual({ cp: null, mate: -3 })
     expect(inWhiteFrame({ cp: null, mate: null }, 'black')).toEqual({ cp: null, mate: null })
     expect(inWhiteFrame(null, 'black')).toBeNull()
-  })
-})
-
-describe('candidatesOf', () => {
-  it('sorts by the backed evaluation, best first — not by the engine\'s own number', () => {
-    const best = node({ id: 10, san: 'Nf5', own: { cp: 34 }, backed: { cp: 12 } })
-    const solid = node({ id: 11, san: 'Rad1', own: { cp: 10 }, backed: { cp: 20 } })
-    const parent = withChildren(node({ id: 1, uci: null, san: null }), [best, solid])
-
-    expect(candidatesOf(parent).map((child) => child.san)).toEqual(['Rad1', 'Nf5'])
-  })
-
-  it('falls back to a move\'s own number where nothing has been backed up yet', () => {
-    const rich = node({ id: 10, san: 'Nf5', own: { cp: 5 } })
-    const poor = node({ id: 11, san: 'h4', own: { cp: -40 } })
-    const parent = withChildren(node({ id: 1 }), [poor, rich])
-
-    expect(candidatesOf(parent).map((child) => child.san)).toEqual(['Nf5', 'h4'])
-  })
-
-  it('sinks an excluded move below everything, whatever its number says', () => {
-    const ruled = node({ id: 10, san: 'Bxf6', own: { cp: 300 }, mark: 'excluded' })
-    const played = node({ id: 11, san: 'Nf5', own: { cp: 10 } })
-    const parent = withChildren(node({ id: 1 }), [ruled, played])
-
-    expect(candidatesOf(parent).map((child) => child.san)).toEqual(['Nf5', 'Bxf6'])
-  })
-
-  it('keeps the tree\'s own order among moves nothing has evaluated', () => {
-    const first = node({ id: 10, san: 'a3', rank: 0 })
-    const second = node({ id: 11, san: 'b3', rank: 1 })
-    const parent = withChildren(node({ id: 1 }), [second, first])
-
-    expect(candidatesOf(parent).map((child) => child.san)).toEqual(['a3', 'b3'])
-  })
-
-  it('answers with nothing for a node that has no children and for no node at all', () => {
-    expect(candidatesOf(node())).toEqual([])
-    expect(candidatesOf(null)).toEqual([])
   })
 })
 

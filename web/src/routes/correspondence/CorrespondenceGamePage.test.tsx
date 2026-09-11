@@ -119,7 +119,6 @@ function detail(patch: Partial<CorrespondenceGameSummary> = {}): CorrespondenceG
       moves_uci: [],
       moves_san: [],
       start_fen: START,
-      days_per_move: 10,
       reply_due: '2026-09-14T12:00:00+00:00',
       days_left: 3,
       created_at: '2026-06-03T10:00:00+00:00',
@@ -208,15 +207,6 @@ describe('the correspondence game view', () => {
     expect(screen.getByLabelText('Reply due')).toHaveValue('2026-09-14')
   })
 
-  it('orders the candidates by what the tree has backed up, not by the engine\'s own number', async () => {
-    draw()
-    await screen.findByTestId('candidate-2')
-    const moves = screen
-      .getAllByTestId(/^candidate-/)
-      .map((row) => within(row).getAllByRole('cell')[0].textContent)
-    expect(moves).toEqual(['d4', 'e4', 'Nf3'])
-  })
-
   it('says that no engine has been here, which is the whole of step one', async () => {
     draw()
     expect(
@@ -226,7 +216,7 @@ describe('the correspondence game view', () => {
 
   it('plays the candidate the tree is standing on', async () => {
     draw()
-    await userEvent.click(await screen.findByTestId('candidate-3'))
+    await userEvent.click(await screen.findByTestId('tree-node-3'))
     await userEvent.click(screen.getByRole('button', { name: 'Play d4' }))
 
     await waitFor(() => expect(posted).toHaveLength(1))

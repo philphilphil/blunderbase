@@ -170,7 +170,6 @@ export interface AppSettings {
    * the mode.
    */
   correspondence_enabled?: number | null
-  correspondence_days_per_move?: number | null
   correspondence_multipv?: number | null
   /**
    * How many correspondence searches this host runs at once, 1 to 16. Read by the server
@@ -2084,6 +2083,8 @@ export interface CorrespondenceTreeNode extends CorrespondenceNode {
   /** The task waiting on, or running over, this position: the queue mark and the spinner. */
   task?: CorrespondenceTask | null
   flags: CorrespondenceNodeFlags
+  /** Notes pinned to this position, the move comment aside. The tree marks the move. */
+  notes?: number
   /** In rank order, 0 first; the played child is promoted to rank 0. */
   children: CorrespondenceTreeNode[]
 }
@@ -2114,7 +2115,7 @@ export interface CorrespondenceGameSummary extends Extra {
   last_move_san?: string | null
   /** Always a full FEN — the initial array for a game that started from one. */
   start_fen: string
-  days_per_move: number
+  /** Typed by the owner off the server's page; never computed. Cleared when they move. */
   reply_due?: string | null
   /** Negative when the reply is late. */
   days_left?: number | null
@@ -2168,7 +2169,6 @@ export interface CorrespondenceGameCreate {
   iccf_id?: string | null
   time_control?: string | null
   start_fen?: string | null
-  days_per_move?: number | null
   reply_due?: string | null
   white_rating?: number | null
   black_rating?: number | null
@@ -2180,7 +2180,6 @@ export interface CorrespondencePgnImport {
   event?: string | null
   url?: string | null
   iccf_id?: string | null
-  days_per_move?: number | null
   reply_due?: string | null
 }
 
@@ -2189,7 +2188,6 @@ export interface CorrespondenceGameUpdate {
   event?: string | null
   url?: string | null
   reply_due?: string | null
-  days_per_move?: number | null
 }
 
 export interface CorrespondenceFinishRequest {

@@ -39,7 +39,6 @@ function game(patch: Partial<CorrespondenceGameSummary> = {}): CorrespondenceGam
     moves_uci: [],
     moves_san: [],
     start_fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-    days_per_move: 10,
     created_at: '2026-06-03T10:00:00+00:00',
     updated_at: '2026-09-08T10:00:00+00:00',
     ...patch,

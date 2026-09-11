@@ -43,13 +43,11 @@ PGN** and **Pause all**.
 | **ICCF id** | The game number. With one the game's source is **ICCF** and the number identifies it; without one it is a manual game and otherwise identical |
 | **Time control** | Free text, as the tournament states it — `10 days/move`, `40 days/10 moves` |
 | **Starting position** | A FEN, for a thematic tournament. Blank is the ordinary array |
-| **Days per move** | The reply window this game is given. Blank takes the default from the settings |
-| **Reply due** | When your next move is due, if you already know. Left blank, a game that starts on your move gets a deadline of today plus days per move |
+| **Reply due** | When your next move is due, as the server shows it. Blank is no deadline — Blunderbase never computes one, see [Enter the moves](#enter-the-moves) |
 
 **Import PGN** takes the text the server exports — pasted into the box — and fills the same
-fields from its headers: the moves become the played line, `Event` and `Site` come from the PGN unless
-you type over them, and when it lands on your move you get a deadline computed from days per
-move. It is the quicker way in for a game already under way.
+fields from its headers: the moves become the played line, and `Event` and `Site` come from
+the PGN unless you type over them. It is the quicker way in for a game already under way.
 
 A game the library already holds is refused rather than stored twice — the same ICCF number,
 or the same two names on the same day with the same moves.
@@ -63,10 +61,12 @@ Two buttons in the header move the game, and both take one move:
   making. It plays it on the board here; the server the game is on stays where you actually
   submit it.
 
-When it becomes your move the deadline is set to now plus the game's days per move; while
-the opponent is thinking there is no deadline. The deadline itself is editable in the
-header; days per move is fixed when the game is created, so changing the default in the
-settings later leaves games already under way alone.
+The deadline is yours to type. The server the game is played on is the only clock there
+is — ICCF banks days and adds an increment per move, other servers do it their own way —
+and a number guessed here would sort **Your move** and the task queue by fiction. So when
+the opponent's move arrives, read the date off the server's page and put it in the box in
+the header; nothing is due until you do. When you play your move the deadline is cleared:
+it was the deadline for that move, and while the opponent is thinking there is none.
 
 **Take back the last move** undoes a move entered by mistake. The move stays in the tree with
 its comments and everything analysed under it; it is only no longer part of the played line.
@@ -92,6 +92,9 @@ Each node shows its move, its evaluation and the evaluation its own branches bac
   **queue mark** while a task waits its turn, and a **stale mark** when the number shown was
   reached too shallow or by an engine you no longer have — see
   [Tasks and expansion](#tasks-and-expansion).
+- A **note mark** says you have written about this position — notes, as distinct from the
+  move comment, which is printed under the row itself. Select the move and the notes are
+  under the board, see [Notes and the book](#notes-and-the-book).
 
 Every number on these screens is White's, as an evaluation bar always is: `+0.41` means
 White stands better whoever made the move, and `−0.30` after a Black move means Black
@@ -332,7 +335,7 @@ resumed while their processes are still parked come back at the depth they stopp
 
 ## Notes and the book
 
-Bottom right, three tabs about the node you have selected:
+Under the board, three tabs about the node you have selected:
 
 - **This position** — notes pinned to the position the selected node stands in, so they come
   back in any game of yours that reaches it, and in the explorer. The node's **comment** —
@@ -347,8 +350,10 @@ Bottom right, three tabs about the node you have selected:
   opening phase is played here: read the theory and keep what you read, in one click.
 
 The first two are the notes described in [Notes](notes.md), written with the same composer.
-Notes can still be written on a game that is over; the move comment cannot, because it
-belongs to the frozen tree, and a finished game shows it as text instead.
+A move whose position has notes carries a note mark in the tree, so what you wrote weeks
+ago is found again when the game walks back into it. Notes can still be written on a game
+that is over; the move comment cannot, because it belongs to the frozen tree, and a finished
+game shows it as text instead.
 
 ## Finish a game
 

@@ -106,13 +106,15 @@ describe('invalidationsFor — notes', () => {
     expect(has(keys, queryKeys.games())).toBe(false)
   })
 
-  it('refetches the notes and the explorer for a standalone note', () => {
+  it('refetches the notes, the explorer and correspondence for a standalone note', () => {
     // The explorer whatever the note hangs on: its move rows carry the newest note on the
     // position each move leads to, and a note that names no game still names a position.
+    // Correspondence for the same reason: a tree node counts the notes on its position.
     const keys = invalidationsFor({ ...note, event: 'note.created', game_id: null })
     expect(names(keys)).toEqual([
       JSON.stringify(queryKeys.notes()),
       JSON.stringify(queryKeys.explorer()),
+      JSON.stringify(queryKeys.correspondence()),
     ])
   })
 

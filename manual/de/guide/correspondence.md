@@ -45,13 +45,12 @@ Partie**, **PGN importieren** und **Alles pausieren**.
 | **ICCF-Nummer** | Die Partienummer. Mit ihr ist die Quelle der Partie **ICCF** und die Nummer identifiziert sie; ohne sie ist es eine manuelle Partie und sonst dasselbe |
 | **Bedenkzeit** | Freier Text, wie das Turnier sie angibt: `10 Tage/Zug`, `40 Tage/10 Züge` |
 | **Startstellung** | Eine FEN, für ein Thematurnier. Leer ist die gewöhnliche Grundstellung |
-| **Tage pro Zug** | Das Antwortfenster dieser Partie. Leer nimmt die Voreinstellung aus den Einstellungen |
-| **Antwort fällig** | Wann dein nächster Zug fällig ist, falls du es schon weißt. Leer gelassen, bekommt eine Partie, in der du am Zug beginnst, eine Frist von heute plus Tage pro Zug |
+| **Antwort fällig** | Wann dein nächster Zug fällig ist, so wie der Server es anzeigt. Leer heißt keine Frist – Blunderbase rechnet nie eine aus, siehe [Die Züge eintragen](#enter-the-moves) |
 
 **PGN importieren** nimmt den Text, den der Server exportiert – eingefügt in das Feld –, und
-füllt dieselben Felder aus den Headern: die Züge werden die gespielte Linie, `Event` und `Site`
-kommen aus dem PGN, solange du sie nicht überschreibst, und wenn du am Zug bist, bekommst du
-eine Frist aus Tage pro Zug. Für eine laufende Partie ist das der schnellere Weg.
+füllt dieselben Felder aus den Headern: die Züge werden die gespielte Linie, `Event` und
+`Site` kommen aus dem PGN, solange du sie nicht überschreibst. Für eine laufende Partie ist
+das der schnellere Weg.
 
 Eine Partie, die die Bibliothek schon hat, wird abgewiesen statt doppelt gespeichert –
 dieselbe ICCF-Nummer, oder dieselben zwei Namen am selben Tag mit denselben Zügen.
@@ -65,10 +64,13 @@ Zwei Schaltflächen in der Kopfzeile bewegen die Partie, beide um genau einen Zu
   Zug. Hier wird er aufs Brett gelegt; abgeschickt wird er weiterhin dort, wo die Partie
   läuft.
 
-Sobald du am Zug bist, wird die Frist auf jetzt plus Tage pro Zug gesetzt; solange der
-Gegner denkt, gibt es keine. Die Frist selbst lässt sich in der Kopfzeile ändern; Tage pro
-Zug steht mit dem Anlegen der Partie fest – änderst du die Voreinstellung in den
-Einstellungen später, bleiben laufende Partien also, wie sie sind.
+Die Frist trägst du selbst ein. Die einzige Uhr ist die des Servers, auf dem die Partie
+läuft – der ICCF führt ein Konto an Tagen und schreibt pro Zug etwas gut, andere Server
+machen es auf ihre Weise –, und eine hier geratene Zahl würde **Du bist am Zug** und die
+Warteschlange nach einer Fiktion sortieren. Kommt also der Zug des Gegners an, lies das
+Datum von der Seite des Servers ab und trag es in das Feld in der Kopfzeile ein; bis dahin
+ist nichts fällig. Spielst du deinen Zug, wird die Frist gelöscht: Sie galt diesem Zug, und
+solange der Gegner denkt, gibt es keine.
 
 **Letzten Zug zurücknehmen** macht einen versehentlich eingetragenen Zug rückgängig. Der Zug
 bleibt im Baum, mit seinen Kommentaren und allem, was darunter analysiert wurde; er gehört
@@ -97,6 +99,9 @@ zurückgeben:
   auf ihm sitzt, eine **Warteschlangenmarke**, solange eine Aufgabe wartet, und eine
   **Veraltet-Marke**, wenn die gezeigte Zahl zu flach erreicht wurde oder von einer Engine
   stammt, die du nicht mehr hast – siehe [Aufgaben und Erweitern](#tasks-and-expansion).
+- Eine **Notizmarke** sagt, dass du zu dieser Stellung etwas geschrieben hast – Notizen, im
+  Unterschied zum Zugkommentar, der unter der Zeile selbst steht. Wähl den Zug aus, und die
+  Notizen stehen unter dem Brett, siehe [Notizen und das Buch](#notes-and-the-book).
 
 Jede Zahl auf diesen Bildschirmen steht aus Weiß' Sicht, wie ein Bewertungsbalken immer:
 `+0,41` heißt, Weiß steht besser, wer auch immer gezogen hat, und `−0,30` nach einem
@@ -357,7 +362,7 @@ Tiefe zurück, bei der sie aufgehört haben.
 
 ## Notizen und das Buch { #notes-and-the-book }
 
-Unten rechts drei Reiter zum ausgewählten Knoten:
+Unter dem Brett drei Reiter zum ausgewählten Knoten:
 
 - **Diese Stellung** – Notizen, an die Stellung des ausgewählten Knotens geheftet. Sie
   tauchen damit in jeder deiner Partien wieder auf, die diese Stellung erreicht, und im
@@ -374,6 +379,8 @@ Unten rechts drei Reiter zum ausgewählten Knoten:
   behalten, in einem Klick.
 
 Die ersten beiden sind die Notizen aus [Notizen](notes.md), geschrieben mit demselben Editor.
+Ein Zug, zu dessen Stellung Notizen vorliegen, trägt im Baum eine Notizmarke, damit das vor
+Wochen Geschriebene wiedergefunden wird, wenn die Partie in die Stellung zurückkehrt.
 Notizen lassen sich auch zu einer beendeten Partie noch schreiben; der Zugkommentar nicht –
 er gehört zum eingefrorenen Baum, und eine beendete Partie zeigt ihn nur noch als Text.
 

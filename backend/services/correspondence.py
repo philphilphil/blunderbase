@@ -40,7 +40,7 @@ from __future__ import annotations
 import io
 import logging
 from collections.abc import Callable, Iterable, Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, NamedTuple
 
 from sqlalchemy import delete, func, select
@@ -67,6 +67,8 @@ from backend.db.models import (
     Engine,
     Game,
     MoveEval,
+    Note,
+    Position,
 )
 from backend.db.types import utcnow
 from backend.services import analysis as analysis_service
@@ -296,7 +298,6 @@ def create_game(
     iccf_id: str | None = None,
     time_control: str | None = None,
     start_fen: str | None = None,
-    days_per_move: int | None = None,
     reply_due: datetime | None = None,
     white_rating: int | None = None,
     black_rating: int | None = None,
@@ -356,19 +357,8 @@ def create_game(
         ref=f"correspondence: {names[0]} vs {names[1]}",
     )
     game = _store(session, parsed, color)
-    row = _new_row(
-        session,
-        game,
-        event=event,
-        url=url,
-        days_per_move=days_per_move,
-        reply_due=reply_due,
-    )
+    row = _new_row(session, game, event=event, url=url, reply_due=reply_due)
     _seed_tree(session, game, chess.Board(board.fen()))
-    # A game that starts on the owner's move is already owed a reply, the same way an
-    # imported one is; a date the owner typed outranks the one the window would compute.
-    if reply_due is None:
-        _settle_due(row, game)
     session.commit()
     _announce(game.id)
     return get_game(session, row.game_id)
@@ -382,7 +372,6 @@ def import_game(
     event: str | None = None,
     url: str | None = None,
     iccf_id: str | None = None,
-    days_per_move: int | None = None,
     reply_due: datetime | None = None,
 ) -> dict[str, Any]:
     """Start a correspondence game from the PGN the server it is played on exports.
@@ -440,16 +429,11 @@ def import_game(
         game,
         event=event or read.headers.get("Event") or None,
         url=url or _given(read.headers.get("Site")),
-        days_per_move=days_per_move,
-        reply_due=reply_due,
+        reply_due=reply_due if game.result is Result.UNKNOWN else None,
     )
     if game.ply_count:
         row.last_move_at = game.played_at or utcnow()
     _seed_tree(session, game, read.board())
-    # A date the owner typed outranks the one the window would compute: the server the game
-    # is played on is the authority on the clock, and they are copying it off that page.
-    if reply_due is None and game.result is Result.UNKNOWN:
-        _settle_due(row, game)
     session.commit()
     _announce(game.id)
     return get_game(session, row.game_id)
@@ -462,12 +446,13 @@ def update_game(
     event: str | None = UNCHANGED,
     url: str | None = UNCHANGED,
     reply_due: datetime | None = UNCHANGED,
-    days_per_move: int | None = UNCHANGED,
 ) -> dict[str, Any]:
-    """Change what the owner keeps about a game: the tournament, the link, the deadlines.
+    """Change what the owner keeps about a game: the tournament, the link, the deadline.
 
     A field left out is left alone and a field given as null is cleared, which is why the
-    caller has to spell the difference rather than send a None for both.
+    caller has to spell the difference rather than send a None for both. The deadline is
+    the one field that changes every few days: the owner reads it off the server's page
+    and types it here, and nothing in this module ever computes one for them.
     """
     row, game = _load(session, game_id)
     if event is not UNCHANGED:
@@ -476,8 +461,6 @@ def update_game(
         row.url = _text(url, limit=512)
     if reply_due is not UNCHANGED:
         row.reply_due = _moment(reply_due)
-    if days_per_move is not UNCHANGED and days_per_move is not None:
-        row.days_per_move = _days(session, days_per_move)
     if event is not UNCHANGED or url is not UNCHANGED:
         # The PGN carries both, and it is what an export hands over.
         game.pgn = _with_given(games_service.rebuild_pgn(game), row)
@@ -498,8 +481,9 @@ def play_move(session: Session, game_id: int, uci: str) -> dict[str, Any]:
     already analysed it — which is the ordinary case, and the point of the tree — and is
     promoted to the front of its siblings, because the game's own line is the main line.
 
-    When the move leaves it as the owner's turn, the reply is due `days_per_move` from now;
-    when it does not, there is nothing to be due.
+    A move that hands the turn to the opponent clears the deadline: it was the deadline for
+    the move just made. A move that hands it to the owner sets none — the server the game
+    is played on says when the reply is due, and the owner types that into the header.
     """
     row, game = _load(session, game_id)
     _require_open(game)
@@ -648,7 +632,8 @@ def get_game(session: Session, game_id: int) -> dict[str, Any]:
         list(searches.values()),
     )
 
-    tree, by_id = _assemble(game, nodes, evals, searches, reading)
+    notes = _note_counts(session, {node.epd for node in nodes})
+    tree, by_id = _assemble(game, nodes, evals, searches, reading, notes)
     tip = _tip(nodes)
     return {
         "game": _game_payload(row, game, by_id.get(tip.id)),
@@ -2293,15 +2278,13 @@ def _new_row(
     *,
     event: str | None,
     url: str | None,
-    days_per_move: int | None,
     reply_due: datetime | None,
 ) -> CorrespondenceGame:
-    """The live state of a game that is starting, with the deployment's defaults in it."""
+    """The live state of a game that is starting."""
     row = CorrespondenceGame(
         game_id=game.id,
         event=_text(event, limit=128),
         url=_text(url, limit=512),
-        days_per_move=_days(session, days_per_move),
         reply_due=_moment(reply_due),
     )
     session.add(row)
@@ -2359,14 +2342,15 @@ def _queue_passes(session: Session, game: Game) -> list[Any]:
 
 
 def _settle_due(row: CorrespondenceGame, game: Game) -> None:
-    """The reply date after the move list changed: a deadline while it is the owner's turn.
+    """The reply date after the move list changed.
 
-    Nothing is due while the opponent is thinking, which is why the other branch clears it
-    rather than leaving yesterday's date on the row for the list page to colour red.
+    Nothing is due while the opponent is thinking, so the date is cleared rather than left
+    on the row for the list page to colour red. When the turn comes back to the owner the
+    row is left alone: no number here can say when the server wants the reply — ICCF banks
+    days and adds increments per move — and a guess would sort the list and the task queue
+    by fiction. The owner reads the date off the server and types it into the header.
     """
-    if _owner_to_move(game):
-        row.reply_due = utcnow() + timedelta(days=row.days_per_move)
-    else:
+    if not _owner_to_move(game):
         row.reply_due = None
 
 
@@ -3043,7 +3027,6 @@ def _game_payload(
         "moves_san": list(game.moves_san),
         "last_move_san": game.moves_san[-1] if game.moves_san else None,
         "start_fen": board.fen(),
-        "days_per_move": row.days_per_move,
         "reply_due": _stamp(row.reply_due),
         "days_left": _days_left(row.reply_due),
         "last_move_at": _stamp(row.last_move_at),
@@ -3187,12 +3170,33 @@ def _search_payload(row: CorrespondenceSearch, names: dict[int, str]) -> dict[st
     }
 
 
+def _note_counts(session: Session, epds: set[str]) -> dict[str, int]:
+    """How many notes are pinned to each of these positions, by normalised FEN.
+
+    A note names a `Position`, and a position's `fen` is the same normalised string a
+    node's `epd` is — the rule `notes.search_notes(fen=…)` reads by — so one grouped query
+    answers for the whole tree. The tree draws a mark on a move that has notes, because a
+    remark written weeks ago about a position is exactly what the player walking back into
+    it has forgotten.
+    """
+    if not epds:
+        return {}
+    rows = session.execute(
+        select(Position.fen, func.count(Note.id))
+        .join(Note, Note.position_id == Position.id)
+        .where(Position.fen.in_(sorted(epds)))
+        .group_by(Position.fen)
+    ).all()
+    return {fen: int(count) for fen, count in rows}
+
+
 def _assemble(
     game: Game,
     nodes: Sequence[CorrespondenceNode],
     evals: dict[str, list[CorrespondenceEval]],
     searches: dict[int, list[CorrespondenceSearch]],
     reading: _Reading,
+    notes: dict[str, int] | None = None,
 ) -> tuple[dict[str, Any] | None, dict[int, dict[str, Any]]]:
     """The whole tree as nested payloads, with the two numbers and the draw flags on each.
 
@@ -3264,6 +3268,9 @@ def _assemble(
                 # searches' business, and a queue mark says "something is coming".
                 "task": _task_state(searches.get(node.id, []), reading.names),
                 "flags": _flags(board, seen[node.epd]),
+                # Notes pinned to this position — the owner's, in the notes table, as
+                # distinct from the node's PGN comment. The tree marks the move.
+                "notes": (notes or {}).get(node.epd, 0),
                 "children": kids,
             }
         )
@@ -3510,14 +3517,6 @@ def _engine(session: Session, engine_id: int | None) -> int | None:
     if session.get(Engine, int(engine_id)) is None:
         raise CorrespondenceError(f"no engine with id {engine_id} to pin")
     return int(engine_id)
-
-
-def _days(session: Session, days: int | None) -> int:
-    """The reply window a game is created with, pulled inside what a window can be."""
-    if days is None:
-        return app_settings_service.get_correspondence_days_per_move(session)
-    setting = app_settings_service.BY_KEY[app_settings_service.CORRESPONDENCE_DAYS_PER_MOVE]
-    return int(setting.clamp(int(days)))
 
 
 def _state(value: str | None) -> str | None:

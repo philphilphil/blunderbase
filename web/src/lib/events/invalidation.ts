@@ -67,11 +67,13 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     // carry, which is its own prefix — so only a note that names a line pays for it.
     // The explorer is unconditional: every move row in its tree carries the newest note on
     // the position that move leads to, and a note is written against a position whether or
-    // not it names a game, so any note event can have changed one of those rows.
+    // not it names a game, so any note event can have changed one of those rows. So is
+    // correspondence, for the same reason: a tree node carries how many notes its position
+    // has, and a position note names no game.
     case 'note.created':
     case 'note.updated':
     case 'note.deleted': {
-      const keys: QueryKey[] = [queryKeys.notes(), queryKeys.explorer()]
+      const keys: QueryKey[] = [queryKeys.notes(), queryKeys.explorer(), queryKeys.correspondence()]
       const anchors = event as { game_id?: number | null; line_id?: number | null }
       if (typeof anchors.line_id === 'number') keys.push(queryKeys.lines())
       if (typeof anchors.game_id === 'number') keys.push(['games', 'detail', anchors.game_id])

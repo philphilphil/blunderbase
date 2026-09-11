@@ -204,18 +204,14 @@ def test_a_game_that_starts_with_black_to_move_is_counted_from_there(session: Se
     assert payload["game"]["to_move"] == "black"
     assert payload["game"]["your_move"] is True
     assert payload["game"]["move_number"] == 1
-    assert payload["game"]["reply_due"] is not None
 
     answered = correspondence_service.play_move(session, game_id, "e7e5")
     assert answered["game"]["to_move"] == "white"
     assert answered["game"]["your_move"] is False
     assert answered["game"]["move_number"] == 2
-    # Nothing is due while the opponent is thinking, and the clock starts again on the move
-    # that hands the turn back.
     assert answered["game"]["reply_due"] is None
     back = correspondence_service.play_move(session, game_id, "g1f3")
     assert back["game"]["your_move"] is True
-    assert back["game"]["reply_due"] is not None
     # 1…e5 is Black's move and is written with White's number, and its numbers read in
     # Black's frame — the side that played it.
     node = node_at(answered, "e5")
@@ -235,9 +231,10 @@ def test_a_pgn_arrives_as_the_played_path(session: Session) -> None:
     # Five nodes, all played, one path.
     walked = correspondence_service.verify_played_path(session, game_id)
     assert [node.move_san for node in walked] == [None, "e4", "e5", "Nf3", "Nc6"]
-    # It is the owner's move, so a deadline was computed from the reply window.
-    assert payload["game"]["reply_due"] is not None
-    assert 9 < (payload["game"]["days_left"] or 0) <= 10
+    # It is the owner's move, and still nothing is due until they say when: the server's
+    # clock is the only one there is.
+    assert payload["game"]["reply_due"] is None
+    assert payload["game"]["days_left"] is None
 
 
 def test_a_pgn_that_is_not_a_game_is_refused(session: Session) -> None:
@@ -269,14 +266,24 @@ def test_a_move_moves_the_game_and_the_tree_together(session: Session) -> None:
     correspondence_service.verify_played_path(session, game_id)
 
 
-def test_the_opponents_move_starts_the_clock(session: Session) -> None:
-    payload = make_game(session, days_per_move=3)
+def test_the_opponents_move_sets_no_deadline_and_the_owners_clears_it(session: Session) -> None:
+    """The server the game is played on owns the clock; nothing here guesses at it."""
+    payload = make_game(session, reply_due=datetime.now(UTC) + timedelta(days=3))
     game_id = payload["game"]["game_id"]
-    correspondence_service.play_move(session, game_id, "e2e4")
-    after = correspondence_service.play_move(session, game_id, "e7e5")
+    assert payload["game"]["reply_due"] is not None
 
-    assert after["game"]["your_move"] is True
-    assert 2 < (after["game"]["days_left"] or 0) <= 3
+    after_mine = correspondence_service.play_move(session, game_id, "e2e4")
+    assert after_mine["game"]["reply_due"] is None
+
+    after_theirs = correspondence_service.play_move(session, game_id, "e7e5")
+    assert after_theirs["game"]["your_move"] is True
+    assert after_theirs["game"]["reply_due"] is None
+    assert after_theirs["game"]["days_left"] is None
+
+    typed = correspondence_service.update_game(
+        session, game_id, reply_due=datetime.now(UTC) + timedelta(days=5)
+    )
+    assert 4 < (typed["game"]["days_left"] or 0) <= 5
 
 
 def test_a_move_already_in_the_tree_is_reused_and_promoted(session: Session) -> None:
@@ -855,12 +862,18 @@ def test_a_finished_game_takes_no_more_moves(session: Session) -> None:
 def test_listing_puts_your_move_first_and_soonest_first(session: Session) -> None:
     waiting = make_game(session, iccf_id="1", url=None)
     correspondence_service.play_move(session, waiting["game"]["game_id"], "e2e4")
-    urgent = make_game(session, iccf_id="2", url=None, days_per_move=1)
+    urgent = make_game(session, iccf_id="2", url=None)
     correspondence_service.play_move(session, urgent["game"]["game_id"], "e2e4")
     correspondence_service.play_move(session, urgent["game"]["game_id"], "e7e5")
-    later = make_game(session, iccf_id="3", url=None, days_per_move=20)
+    correspondence_service.update_game(
+        session, urgent["game"]["game_id"], reply_due=datetime.now(UTC) + timedelta(days=1)
+    )
+    later = make_game(session, iccf_id="3", url=None)
     correspondence_service.play_move(session, later["game"]["game_id"], "e2e4")
     correspondence_service.play_move(session, later["game"]["game_id"], "e7e5")
+    correspondence_service.update_game(
+        session, later["game"]["game_id"], reply_due=datetime.now(UTC) + timedelta(days=20)
+    )
     done = make_game(session, iccf_id="4", url=None)
     correspondence_service.finish_game(session, done["game"]["game_id"], result=Result.DRAW)
 
@@ -917,10 +930,8 @@ def test_the_event_and_the_link_are_editable_and_reach_the_pgn(session: Session)
         game_id,
         event="WS/O/999",
         url="https://example.invalid/game/2",
-        days_per_move=4,
     )
     assert updated["game"]["event"] == "WS/O/999"
-    assert updated["game"]["days_per_move"] == 4
     game = session.get(Game, game_id)
     assert game is not None
     assert '[Event "WS/O/999"]' in game.pgn
@@ -988,24 +999,24 @@ def test_an_unknown_game_is_a_lookup_failure(session: Session) -> None:
 # --- the settings ----------------------------------------------------------
 
 
-def test_the_three_settings_have_defaults_and_clamp(session: Session) -> None:
+def test_the_two_settings_have_defaults_and_clamp(session: Session) -> None:
     assert app_settings_service.get_correspondence_enabled(session) is False
-    assert app_settings_service.get_correspondence_days_per_move(session) == 10
     assert app_settings_service.get_correspondence_multipv(session) == 3
 
     app_settings_service.set_value(session, app_settings_service.CORRESPONDENCE_ENABLED, 1)
-    app_settings_service.set_value(session, app_settings_service.CORRESPONDENCE_DAYS_PER_MOVE, 900)
     app_settings_service.set_value(session, app_settings_service.CORRESPONDENCE_MULTIPV, 9)
 
     assert app_settings_service.get_correspondence_enabled(session) is True
-    assert app_settings_service.get_correspondence_days_per_move(session) == 365
     assert app_settings_service.get_correspondence_multipv(session) == 5
 
 
-def test_a_new_game_takes_the_deployments_reply_window(session: Session) -> None:
-    app_settings_service.set_value(session, app_settings_service.CORRESPONDENCE_DAYS_PER_MOVE, 5)
-    payload = make_game(session)
-    assert payload["game"]["days_per_move"] == 5
+def test_a_new_game_has_no_deadline_unless_one_was_typed(session: Session) -> None:
+    """A guess at the server's clock would sort the list by fiction, so there is none."""
+    assert make_game(session)["game"]["reply_due"] is None
+    dated = make_game(
+        session, iccf_id="2", reply_due=datetime(2026, 12, 24, 12, tzinfo=UTC)
+    )
+    assert dated["game"]["reply_due"] == "2026-12-24T12:00:00+00:00"
 
 
 # --- the migration ---------------------------------------------------------
@@ -1189,7 +1200,6 @@ def test_the_settings_survive_a_save_of_the_form(api: TestClient) -> None:
         "/settings",
         json={
             "correspondence_enabled": 1,
-            "correspondence_days_per_move": 7,
             "correspondence_multipv": 4,
             "quick_nodes": 250_000,
         },
@@ -1197,6 +1207,5 @@ def test_the_settings_survive_a_save_of_the_form(api: TestClient) -> None:
     assert saved.status_code == 200
     body = saved.json()
     assert body["correspondence_enabled"] == 1
-    assert body["correspondence_days_per_move"] == 7
     assert body["correspondence_multipv"] == 4
-    assert api.get("/settings").json()["correspondence_days_per_move"] == 7
+    assert api.get("/settings").json()["correspondence_multipv"] == 4
