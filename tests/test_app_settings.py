@@ -35,6 +35,10 @@ UNCONFIGURED: dict[str, Any] = {
     **NOTHING_SET,
     app_settings.MAIA_TARGET_ELO: MAIA_MAX_RATING,
     app_settings.MAIA_ELOS: [MAIA_MAX_RATING],
+    # The other list. Empty is its real state — every eligible engine is offered — rather
+    # than a default standing in for an unset row, so it answers with the row and not a
+    # fallback.
+    app_settings.CORRESPONDENCE_SEARCH_ENGINE_IDS: [],
 }
 
 # --- the service ----------------------------------------------------------
@@ -379,7 +383,7 @@ def test_a_put_stores_the_values_and_answers_with_them(api: TestClient) -> None:
     # The one level asked for is the whole of the levels in force. Every key the body left
     # out is cleared, which is what a PUT means, so they answer null.
     assert response.json() == {
-        **NOTHING_SET,
+        **UNCONFIGURED,
         **body,
         "inaccuracy_threshold": 5.0,
         "maia_elos": [1700],

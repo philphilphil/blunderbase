@@ -220,5 +220,18 @@ export const queryKeys = {
     'list',
     state ?? null,
   ],
+  /**
+   * Every cached cut of the list at once — what a snapshot patches, since each row carries
+   * the game's running searches as engine chips and the state is part of the key.
+   */
+  correspondenceGameLists: (): QueryKey => ['correspondence', 'list'],
   correspondenceGame: (gameId: number): QueryKey => ['correspondence', 'game', gameId],
+  /**
+   * Every search over every game — what "Running now" reads. Under the same root as the
+   * games, so `correspondence.search` invalidating `['correspondence']` catches the list,
+   * the trees and this at once.
+   */
+  correspondenceSearches: (active = true): QueryKey => ['correspondence', 'searches', active],
+  /** Slots, parked processes, hosts and the engines the picker offers. */
+  correspondenceStatus: (): QueryKey => ['correspondence', 'status'],
 } as const

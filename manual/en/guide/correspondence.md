@@ -11,19 +11,24 @@ under **Live**; with it off there is no entry and the pages send you home.
 
 ## The list
 
-Three sections, always in this order, with a count on each:
+Four sections, always in this order, the three lists of games with a count on each:
 
 | Section | Holds |
 |---|---|
 | **Your move** | Games waiting on you, soonest deadline first |
 | **Waiting for the opponent** | Your move is sent; nothing to do |
+| **Running now** | Every engine on every game, one line each — see [Running now](#running-now) |
 | **Finished** | The last few, each a link to the game in your library |
 
 A row carries the two players and which colour is yours, the event, the move number and the
 last move played, how many days are left before your reply is due — red under two, negative
 when you are late — and the evaluation of the position the game stands in, from White's
-point of view whichever colour you have. The title bar offers **New game** and **Import
-PGN**.
+point of view whichever colour you have. It also carries a chip per engine at work on that
+game, with the depth or the node count it is at, so the list says at a glance where your
+machine's attention is.
+
+Under the heading is the **capacity strip**, and the title bar offers **New game**, **Import
+PGN** and **Pause all**.
 
 ## Start a game
 
@@ -92,6 +97,7 @@ A node's own menu carries the verbs:
 
 | Verb | |
 |---|---|
+| **Search with…** | Set an engine on this position, see [Search a position](#search-a-position) |
 | **Comment** | Your note on the move; it goes into the PGN as a comment |
 | **Mark** | Your verdict on the move, below |
 | **Promote to first** | Make this the first of its alternatives, so it reads as the main one |
@@ -116,9 +122,127 @@ as a variation under the move it answers, your comments as comments, your marks 
 each node's evaluation as `{[%eval 0.25]}` — the spelling Lichess uses, so any reader that
 knows the convention shows the numbers. A starting position survives as a `FEN` header.
 
-Nothing on this screen starts an engine yet. Searching a position, the engine panes beside
-the tree, pausing them and what survives a restart arrive with the next step, and get their
-own heading in this chapter then.
+## Search a position
+
+The right column is the engines: one pane per engine that is searching the selected node or
+has already left a verdict on it, stacked one under the other. **Search with…** at the top
+of the column puts another engine on the position.
+
+The picker offers the engines you chose under **Analysis → Correspondence → Search
+engines**, in your order, the first one suggested; choose none there and every engine that
+is eligible is offered — switched on, UCI, able to drive a board, and on this machine. Maia
+is never among them: one look and no search gives a spread of moves, not a line. An engine
+that lives on a [remote runner](../operate/runners.md) cannot take a search yet, and an
+engine whose binary has gone missing is refused with the reason.
+
+Under the engine's name the search itself is set:
+
+| | |
+|---|---|
+| **Lines** | How many candidate lines to keep, 1 to 5. Blank takes **Lines per search** from the settings |
+| **Stop it at** | Where to stop: a **depth**, a number of **nodes**, or a number of **seconds**. **Nothing** — the ordinary correspondence case, and what it opens on — means the search runs until you stop it |
+
+A limit that is reached ends the search tidily: the last checkpoint is written, the process
+quits, the slot goes back and a toast says the position is done, whether or not you are
+looking at that game.
+
+**Only the marked moves** in the same dialog hands the engine a list of the moves already
+under this node, and it considers nothing else, so all of its time goes to the three candidates you actually care about. It restricts
+this one search and changes nothing in the tree; the moves have to be legal in the position.
+Its numbers stay in the pane and are never written into the tree: the best of a shortlist is
+not the position's evaluation, and a stored one would be a number no later search could take
+back. Use it to compare candidates you have already chosen, and an unrestricted search when
+you want the position's own verdict.
+
+One engine on one node has one search: asking the same engine again while it is queued,
+running or paused there is refused, and a finished game takes no searches at all — its tree
+is frozen.
+
+Each search holds one of this machine's **search slots** — two by default, under **Analysis
+→ Correspondence → Search slots**. With all of them busy a new search is **queued** and
+starts by itself the moment one comes free. Searches have their own slots, so one that runs
+for three days never takes the slot an imported game's quick pass is waiting for.
+
+**Stockfish and Leela at the same time** is the point of the stack: two engines on the same
+position, two slots, two live panes, two verdicts you can compare. Read Stockfish by its
+depth and Leela by its node count — the pane shows both, because a Leela at depth 22 and a
+Stockfish at depth 51 are not the same measure. Two Leela searches at once are two processes
+on one GPU, each slower for it; nothing stops you, and
+[Engines](../operate/engines.md#an-engine-for-correspondence) says what to weigh.
+
+While it searches, a pane shows the depth, the nodes, the speed and how long it has been
+going — counted from its last start, so a search resumed after a pause shows the stretch it
+is in and not the days it stood parked — and its candidate lines with their evaluations,
+twice a second; hovering a line draws it on the board. When it is not searching, the pane keeps what the engine last said: the
+stored lines, the depth it reached, and a sparkline of how the number moved as the search
+grew — a point at every new depth, and for an engine like Leela, whose depth stands still
+for hours while its node count climbs, a point every time that count has grown
+materially — which is how you tell an evaluation that has settled from one still walking.
+
+Nothing waits for the end. What the engine has found is written into the tree as it goes, at
+every new depth and at least once a minute, so closing the browser, shutting the lid or
+restarting the server costs you the last minute at worst. A checkpoint only ever moves a
+position forward: a short look never overwrites what a three-day search established.
+
+When two engines have a verdict on one node, the tree reads the **deepest** of them, unless
+you **pin** one — **Pin** in its pane, and the same button, then reading **Pinned**, hands
+the node back to the deepest. The pin is per node, so you can trust Leela in the one position where you think it is right
+without changing anything else. The amber **≠** on a node is the sign to read both panes
+before believing either number.
+
+## Pause, stop and what survives
+
+Every pane carries **Pause** and **Stop**, and they are not the same thing:
+
+| | |
+|---|---|
+| **Pause** | The slot goes back at once, the process stays. It is parked with its hash intact, so **Resume** — which takes the next free slot — picks up where it stopped, in seconds rather than hours. A parked engine costs the memory of its `Hash` and no CPU |
+| **Stop** | The search ends and the process quits. The memory comes back and the row is closed: a stopped search is not resumed, you start a new one, and that one begins cold |
+
+The pause takes effect immediately; the pane says *parked, warm* a moment later, when the
+engine has actually been put aside. The capacity strip counts what is parked and how much it
+holds, which is how you decide when parked is too much.
+
+A **restart** — of the server, the container, the machine — is the third case. Searches that
+were running start again by themselves once the server is up, provided their engine is still
+configured; the rest come back paused, with the reason on the row. No process survives a
+restart, so every search is cold — a pane that reads *paused, cold* instead of *parked,
+warm* is one whose engine has been put down: the engine starts from the depth of its last checkpoint
+and needs roughly as long to reach its old depth as it did the first time, because the last
+iterations are where the time goes.
+
+What survives all three, always, is the tree — the evaluation, the depth, the node count,
+the lines and the history on every node it had reached. A pause keeps the engine's hash
+table; a stop and a restart lose it. That is time, not knowledge.
+
+A search that fails — a binary that has gone, an engine that died mid-search — is marked
+failed and keeps its error on the pane. The tree keeps every checkpoint it had made until
+then.
+
+## Running now
+
+Back on the list page, between **Waiting for the opponent** and **Finished**, is every
+engine on every game, one card each: the engine and the host it runs on, the game it is
+working for, the evaluation it is at, the depth and the node count, and how long it has been
+going. A parked search is in the list too, greyed and marked warm, and so is one waiting for
+a slot. Each card is a link into the game it belongs to.
+
+The **capacity strip** under the page heading counts the same work over the whole
+installation: search slots in use of the slots this machine has, searches waiting for one,
+engines parked warm and the memory they hold, and a line per remote host. The same figures
+sit along the foot of the sidebar, so they are answered from every screen. Both the strip
+and the list follow the searches as they report — there is no page here to refresh.
+
+## Pause all
+
+**Pause all** in the title bar is for the moment the laptop closes or the machine is wanted
+for something else. It pauses every search on every game, warm exactly as pausing one is,
+and turns into **Resume all**, which sets them all going again: each takes a slot as one
+comes free. A paused search whose engine has since been switched off or removed stays
+paused, and says so.
+
+Neither is destructive. The tree keeps what every search had checkpointed, and searches
+resumed while their processes are still parked come back at the depth they stopped at.
 
 ## Notes and the book
 
@@ -150,7 +274,9 @@ belongs to the frozen tree, and a finished game shows it as text instead.
   finishes, and you can ask for the pass later.
 - The deadline is cleared and the game leaves **Your move**.
 - The tree freezes. It is kept with the game and stays readable, but nothing in it can be
-  changed again.
+  changed again, and it takes no new searches.
+- A search still running on the game is not stopped for you — it is your engine time to
+  spend. **Stop** it in its pane when the game is over.
 
 From there it is a library game like any other: on the evaluation graph, in **Games** under
 its source and the correspondence time control, and in the statistics. Its game page keeps a

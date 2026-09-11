@@ -3,6 +3,7 @@
  * per frame, flat, with the `event` key naming it.
  */
 import type {
+  CorrespondenceSearchStatus,
   JobStatus,
   LineResponse,
   LiveState,
@@ -41,6 +42,8 @@ export const EVENT_NAMES = [
   'runner.disconnected',
   'runner.updated',
   'correspondence.updated',
+  'correspondence.search',
+  'correspondence.snapshot',
 ] as const
 
 export type EventName = (typeof EVENT_NAMES)[number]
@@ -301,6 +304,43 @@ export interface CorrespondenceUpdatedEvent {
   game_id: number
 }
 
+/**
+ * One search changed state — queued, running, paused, done, stopped or failed. One frame
+ * per transition, so it is both the "refetch the correspondence keys" signal and the
+ * "your search finished" toast; `warm` flips in a frame of its own a moment after a pause,
+ * when the worker has actually parked the process.
+ */
+export interface CorrespondenceSearchEvent {
+  event: 'correspondence.search'
+  search_id: number
+  node_id: number
+  game_id: number | null
+  engine_id: number | null
+  status: CorrespondenceSearchStatus
+  warm: boolean
+}
+
+/**
+ * ~2 per second per running search. Written into the query cache by `search_id` and never
+ * refetched on — a tree of two hundred nodes refetched twice a second for three days is
+ * exactly what this event exists to avoid. `seq` rises per search, so a frame that arrived
+ * after a newer one is discardable.
+ */
+export interface CorrespondenceSnapshotEvent {
+  event: 'correspondence.snapshot'
+  search_id: number
+  node_id: number | null
+  game_id: number | null
+  engine_id: number | null
+  engine_name: string | null
+  seq: number
+  depth: number | null
+  nodes: number | null
+  nps: number | null
+  time_ms: number | null
+  lines: StreamLine[]
+}
+
 export type BlunderbaseEvent =
   | PingEvent
   | ImportEvent
@@ -311,6 +351,8 @@ export type BlunderbaseEvent =
   | StreamEvent
   | RunnerEvent
   | CorrespondenceUpdatedEvent
+  | CorrespondenceSearchEvent
+  | CorrespondenceSnapshotEvent
 
 /** A frame carrying an event name we do not model yet. */
 export interface UnknownEvent {

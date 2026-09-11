@@ -52,7 +52,25 @@ function game(patch: Partial<CorrespondenceGameSummary> = {}): CorrespondenceGam
 
 const LIST = {
   games: [
-    game({ game_id: 1, black: 'Kowalski, Marek', your_move: true }),
+    game({
+      game_id: 1,
+      black: 'Kowalski, Marek',
+      your_move: true,
+      searches: [
+        {
+          id: 7,
+          node_id: 4,
+          game_id: 1,
+          engine_id: 1,
+          engine_name: 'Stockfish 17',
+          kind: 'search',
+          status: 'running',
+          warm: false,
+          multipv: 3,
+          snapshot: { search_id: 7, seq: 12, depth: 51, nodes: 7_200_000_000, lines: [] },
+        },
+      ],
+    }),
     game({ game_id: 2, black: 'Jansen, Dirk', your_move: false, days_left: null }),
     game({
       game_id: 3,
@@ -64,6 +82,56 @@ const LIST = {
     }),
   ],
   counts: { ongoing: 2, finished: 1, your_move: 1 },
+}
+
+const STATUS = {
+  slots: 2,
+  in_use: 1,
+  queued: 0,
+  paused: 1,
+  parked: [
+    { search_id: 8, node_id: 4, engine_id: 1, engine_name: 'Stockfish 17', hash_mb: 8192 },
+  ],
+  hosts: [
+    { runner_id: null, host: 'this host', slots: 2, in_use: 1, parked: 1 },
+    { runner_id: 3, host: 'studio', slots: 2, in_use: 1, parked: 0 },
+  ],
+  engines: [{ engine_id: 1, name: 'Stockfish 17', version: '17', default: true }],
+}
+
+const SEARCHES = {
+  searches: [
+    {
+      id: 7,
+      node_id: 4,
+      game_id: 1,
+      engine_id: 1,
+      engine_name: 'Stockfish 17',
+      kind: 'search',
+      status: 'running',
+      warm: false,
+      multipv: 3,
+      started_at: '2026-09-09T10:00:00+00:00',
+      snapshot: {
+        search_id: 7,
+        seq: 12,
+        depth: 51,
+        nodes: 7_200_000_000,
+        lines: [{ multipv: 1, cp: 34, pv: ['e7e6'] }],
+      },
+    },
+    {
+      id: 8,
+      node_id: 9,
+      game_id: 2,
+      engine_id: 1,
+      engine_name: 'Stockfish 17',
+      kind: 'search',
+      status: 'paused',
+      warm: true,
+      multipv: 3,
+    },
+  ],
 }
 
 let posted: { path: string; body: unknown }[]
@@ -84,9 +152,13 @@ beforeEach(() => {
       const path = String(input)
       const method = init?.method ?? 'GET'
       if (method !== 'GET') {
-        posted.push({ path, body: JSON.parse(String(init?.body)) })
+        // Pause all and Resume all are bodyless posts; everything else carries JSON.
+        posted.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
+        if (path.includes('/correspondence/searches')) return json({ searches: [] })
         return json({ game: game({ game_id: 42 }), tree: null, searches: [] }, 201)
       }
+      if (path.includes('/correspondence/status')) return json(STATUS)
+      if (path.includes('/correspondence/searches')) return json(SEARCHES)
       if (path.includes('/correspondence/games')) return json(LIST)
       return json({})
     }),
@@ -126,11 +198,45 @@ describe('the correspondence list', () => {
     expect(screen.getByRole('link', { name: /Open in Games/ })).toHaveAttribute('href', '/games/3')
   })
 
-  it('holds the capacity strip open for the searches that are not built yet', async () => {
+  it('reads the capacity strip off the status: slots, parked memory and the other host', async () => {
     draw()
-    expect(await screen.findByTestId('correspondence-capacity')).toHaveTextContent(
-      'No engine is searching a correspondence position yet.',
-    )
+    const strip = await screen.findByTestId('correspondence-capacity')
+    await waitFor(() => expect(strip).toHaveTextContent('1 of 2'))
+    expect(strip).toHaveTextContent('1 engine parked')
+    // 8192 MB is read as GB, because nobody thinks about a parked hash in megabytes.
+    expect(strip).toHaveTextContent('8 GB')
+    expect(strip).toHaveTextContent('studio')
+    // The local host is the sentence, not a row: repeating it would say the same thing twice.
+    expect(strip).not.toHaveTextContent('this host')
+  })
+
+  it('lists every engine on every game under Running now, parked ones marked', async () => {
+    draw()
+    const running = await screen.findByTestId('correspondence-running')
+    const live = within(running).getByTestId('running-search-7')
+    expect(live).toHaveTextContent('Stockfish 17')
+    expect(live).toHaveTextContent('depth 51')
+    expect(live).toHaveTextContent('+0.34')
+    expect(within(running).getByTestId('running-search-8')).toHaveTextContent('parked, warm')
+  })
+
+  it('offers Pause all while anything is running, and asks the server for it', async () => {
+    draw()
+    const pause = await screen.findByRole('button', { name: /Pause all/ })
+    // Enabled only once the search list has landed — with nothing running there is nothing
+    // to pause, and the button says so by staying off.
+    await waitFor(() => expect(pause).toBeEnabled())
+    await userEvent.click(pause)
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].path).toContain('/correspondence/searches/pause-all')
+  })
+
+  it('puts an engine chip with its depth on the row that is being searched', async () => {
+    draw()
+    await screen.findByText('Kowalski, Marek')
+    const chip = await screen.findByTestId('engine-chip-7')
+    expect(chip).toHaveTextContent('Stockfish 17')
+    expect(chip).toHaveTextContent('d51')
   })
 })
 

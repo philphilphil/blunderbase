@@ -30,19 +30,26 @@ import { SetPageChrome } from '@/components/shell/PageChrome'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { saveDownload } from '@/lib/api/client'
+import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
   useAddCorrespondenceNode,
+  useAppSettings,
   useCorrespondenceGame,
+  useCorrespondenceStatus,
   useDeleteCorrespondenceNode,
   useExportCorrespondencePgn,
   useFinishCorrespondenceGame,
+  usePauseCorrespondenceSearch,
   usePlayCorrespondenceMove,
+  useResumeCorrespondenceSearch,
+  useStartCorrespondenceSearch,
+  useStopCorrespondenceSearch,
   useUndoCorrespondenceMove,
   useUpdateCorrespondenceGame,
   useUpdateCorrespondenceNode,
 } from '@/lib/api/queries'
-import type { Result } from '@/lib/api/types'
-import { useLinePreview } from '@/lib/board/useLinePreview'
+import type { CorrespondenceTreeNode, Result } from '@/lib/api/types'
+import { useLinePreview, type HoveredLine } from '@/lib/board/useLinePreview'
 import { useLinePreviewPrefs } from '@/lib/board/linePreviewPrefs'
 import { whiteWinPercent } from '@/lib/chess/evaluation'
 import { useIsMobile } from '@/lib/ui/media'
@@ -52,12 +59,15 @@ import { EvalBar } from '@/routes/game/components/EvalBar'
 
 import { BookPane, type BookSource } from './components/BookPane'
 import { CandidatesTable } from './components/CandidatesTable'
+import { Frame } from './components/DialogFrame'
 import { EnginesPane } from './components/EnginesPane'
 import { FinishDialog, GameHeader, OpponentMoveDialog } from './components/GameHeader'
 import { NotesPane, type NotesTab } from './components/NotesPane'
+import { SearchDialog } from './components/SearchDialog'
 import { TreePane } from './components/TreePane'
 import { opponentOf } from './format'
 import { destsFor, uciFor } from './moves'
+import { countPruned, prunableNodes } from './searches'
 import {
   countEvaluated,
   countNodes,
@@ -103,11 +113,13 @@ export function CorrespondenceGamePage() {
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [flipped, setFlipped] = useState(false)
-  const [dialog, setDialog] = useState<'opponent' | 'finish' | null>(null)
+  const [dialog, setDialog] = useState<'opponent' | 'finish' | 'search' | 'prune' | null>(null)
+  /** The node the search dialog is about, which need not be the selected one. */
+  const [searchNodeId, setSearchNodeId] = useState<number | null>(null)
   const [notesTab, setNotesTab] = useState<NotesTab>('position')
   const [bookSource, setBookSource] = useState<BookSource>('masters')
   const [pane, setPane] = useState<MobilePane>('board')
-  const [hover, setHover] = useState<{ id: number; pv: string[] } | null>(null)
+  const [hover, setHover] = useState<HoveredLine | null>(null)
 
   const updateGame = useUpdateCorrespondenceGame()
   const playMove = usePlayCorrespondenceMove({ onSuccess: () => setDialog(null) })
@@ -117,6 +129,14 @@ export function CorrespondenceGamePage() {
   const updateNode = useUpdateCorrespondenceNode()
   const deleteNode = useDeleteCorrespondenceNode()
   const exportPgn = useExportCorrespondencePgn({ onSuccess: (file) => saveDownload(file) })
+  const startSearch = useStartCorrespondenceSearch({ onSuccess: () => setDialog(null) })
+  const pauseSearch = usePauseCorrespondenceSearch()
+  const resumeSearch = useResumeCorrespondenceSearch()
+  const stopSearch = useStopCorrespondenceSearch()
+  // The picker's engines and the deployment's default line count. Both are read once and
+  // are what the search dialog is filled from; neither is worth a request per open.
+  const status = useCorrespondenceStatus()
+  const settings = useAppSettings()
 
   const game = detail.data?.game ?? null
   const tree = detail.data?.tree ?? null
@@ -134,6 +154,9 @@ export function CorrespondenceGamePage() {
   }, [tree, index, tipId])
 
   const selected = selectedId !== null ? (index.get(selectedId)?.node ?? null) : null
+  // The search dialog stands on the node its verb was raised from, which is the selected
+  // one from the column's button and the right-clicked one from the tree's menu.
+  const searchNode = searchNodeId !== null ? (index.get(searchNodeId)?.node ?? null) : null
   const node = selected ?? tree
   const played = useMemo(() => playedPath(tree), [tree])
   const tip = played.at(-1) ?? tree
@@ -211,12 +234,10 @@ export function CorrespondenceGamePage() {
     [node],
   )
 
-  const preview = useLinePreview(
-    node?.fen ?? null,
-    hover ? { line: `cand:${hover.id}`, ply: null, pv: hover.pv } : null,
-    prefs,
-    node?.ply ?? 0,
-  )
+  const preview = useLinePreview(node?.fen ?? null, hover, prefs, node?.ply ?? 0)
+
+  /** What Prune weak would delete, worked out once per payload rather than per render. */
+  const prunable = useMemo(() => prunableNodes(tree), [tree])
 
   if (!Number.isFinite(gameId)) {
     return <Missing />
@@ -238,7 +259,14 @@ export function CorrespondenceGamePage() {
   const busy =
     playMove.isPending || undoMove.isPending || finish.isPending || updateGame.isPending
   const writeError =
-    addNode.error ?? updateNode.error ?? deleteNode.error ?? updateGame.error ?? undoMove.error
+    addNode.error ??
+    updateNode.error ??
+    deleteNode.error ??
+    updateGame.error ??
+    undoMove.error ??
+    pauseSearch.error ??
+    resumeSearch.error ??
+    stopSearch.error
 
   /** The candidate the header would play: a child of the position the game stands in. */
   const playable =
@@ -337,7 +365,9 @@ export function CorrespondenceGamePage() {
           node={node}
           selectedId={selectedId}
           onSelect={select}
-          onHover={setHover}
+          onHover={(line) =>
+            setHover(line ? { line: `cand:${line.id}`, ply: null, pv: line.pv } : null)
+          }
         />
       </div>
     </div>
@@ -363,8 +393,13 @@ export function CorrespondenceGamePage() {
               type="button"
               variant="ghost"
               size="sm"
-              disabled
-              title={t`Pruning arrives in the next step`}
+              disabled={Boolean(game.finished) || prunable.length === 0}
+              title={
+                prunable.length === 0
+                  ? t`Nothing in this tree has fallen far enough behind to prune`
+                  : t`Delete the faded lines — never automatic, and always after a confirm`
+              }
+              onClick={() => setDialog('prune')}
             >
               <Trans>Prune weak</Trans>
             </Button>
@@ -394,6 +429,14 @@ export function CorrespondenceGamePage() {
         }}
         onPromote={(id) => updateNode.mutate({ id, body: { promote: true } })}
         onDelete={(id) => deleteNode.mutate(id)}
+        onSearch={
+          game.finished
+            ? undefined
+            : (searched) => {
+                setSearchNodeId(searched.id)
+                setDialog('search')
+              }
+        }
       />
     </div>
   )
@@ -404,12 +447,35 @@ export function CorrespondenceGamePage() {
         title={<Trans>Engines</Trans>}
         detail={node.san ? `· ${node.san}` : undefined}
         end={
-          <Button type="button" variant="ghost" size="sm" disabled title={t`Searches arrive in the next step`}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={Boolean(game.finished)}
+            onClick={() => {
+              setSearchNodeId(node.id)
+              setDialog('search')
+            }}
+          >
             <Trans>Search with…</Trans>
           </Button>
         }
       />
-      <EnginesPane node={node} />
+      <EnginesPane
+        node={node}
+        previewLine={preview.line}
+        onHover={setHover}
+        onPause={(id) => pauseSearch.mutate(id)}
+        onResume={(id) => resumeSearch.mutate(id)}
+        onStop={(id) => stopSearch.mutate(id)}
+        onPin={
+          game.finished
+            ? undefined
+            : (engineId) =>
+                updateNode.mutate({ id: node.id, body: { pinned_engine_id: engineId } })
+        }
+        busy={pauseSearch.isPending || resumeSearch.isPending || stopSearch.isPending}
+      />
     </div>
   )
 
@@ -431,7 +497,7 @@ export function CorrespondenceGamePage() {
             onPlay={game.finished ? () => {} : playInto}
             // A book row rides the same preview machinery a candidate does; the id is a
             // constant nothing else uses, because the line is the book's and not a node's.
-            onPreview={(line) => setHover(line ? { id: -1, pv: line } : null)}
+            onPreview={(line) => setHover(line ? { line: 'book', ply: null, pv: line } : null)}
           />
         }
       />
@@ -533,7 +599,89 @@ export function CorrespondenceGamePage() {
           onClose={() => setDialog(null)}
         />
       ) : null}
+      {dialog === 'search' && searchNode ? (
+        <SearchDialog
+          node={searchNode}
+          engines={status.data?.engines ?? []}
+          defaultMultipv={
+            settings.data?.correspondence_multipv ?? SETTING_DEFAULTS.correspondence_multipv
+          }
+          pending={startSearch.isPending}
+          error={startSearch.error?.message ?? null}
+          onStart={(body) => startSearch.mutate(body)}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+      {dialog === 'prune' ? (
+        <PruneDialog
+          nodes={prunable}
+          pending={deleteNode.isPending}
+          error={deleteNode.error?.message ?? null}
+          onPrune={() => {
+            for (const doomed of prunable) deleteNode.mutate(doomed.id)
+            setDialog(null)
+          }}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
     </div>
+  )
+}
+
+/**
+ * **Prune weak**, behind a confirm and never automatic.
+ *
+ * The tree is the thing the mode accumulates, and a line faded today can be the
+ * transposition that matters next week — so nothing is ever deleted because a number said
+ * so. The dialog names exactly what would go, and the moves themselves, because "12
+ * positions" is not something anyone can check.
+ */
+function PruneDialog({
+  nodes,
+  pending,
+  error,
+  onPrune,
+  onClose,
+}: {
+  nodes: CorrespondenceTreeNode[]
+  pending: boolean
+  error: string | null
+  onPrune: () => void
+  onClose: () => void
+}) {
+  const { t } = useLingui()
+  const total = countPruned(nodes)
+  return (
+    <Frame
+      labelledBy="correspondence-prune-title"
+      title={t`Prune the weak lines`}
+      onClose={onClose}
+      description={t`${nodes.length} lines and everything under them — ${total} positions in all. Their evaluations stay in the library; only these nodes go.`}
+    >
+      <ul className="flex flex-wrap gap-1.5">
+        {nodes.map((node) => (
+          <li
+            key={node.id}
+            className="rounded-sm border border-edge px-1.5 py-0.5 font-mono text-[0.6875rem] text-dim"
+          >
+            {node.san ?? node.uci}
+          </li>
+        ))}
+      </ul>
+      {error ? (
+        <p role="alert" className="text-[0.6875rem] text-blunder">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onClose}>
+          <Trans>Cancel</Trans>
+        </Button>
+        <Button type="button" variant="destructive" disabled={pending} onClick={onPrune}>
+          <Trans>Prune</Trans>
+        </Button>
+      </div>
+    </Frame>
   )
 }
 

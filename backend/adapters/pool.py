@@ -129,6 +129,7 @@ class _Slot:
         self._lock = asyncio.Lock()
         self._engine: Adapter | None = None
         self._stopping = False
+        self._detached = False
         self._last_used = clock()
 
     @property
@@ -138,6 +139,24 @@ class _Slot:
     @property
     def busy(self) -> bool:
         return self._lock.locked()
+
+    @property
+    def detached(self) -> bool:
+        """The process this slot held now belongs to its caller; the slot is finished."""
+        return self._detached
+
+    def holds(self, adapter: Adapter) -> bool:
+        return self._engine is adapter
+
+    def detach(self) -> None:
+        """Give the process away: the slot forgets it and is never used again.
+
+        Nothing is stopped and nothing is closed — the caller is inside `acquire` and goes
+        on driving the same process. Clearing `_engine` is what keeps the pool's reaper and
+        its own `close()` off a process that is no longer theirs to end.
+        """
+        self._detached = True
+        self._engine = None
 
     @asynccontextmanager
     async def acquire(self) -> AsyncIterator[Adapter]:
@@ -249,8 +268,23 @@ class _SlotGroup:
             async with slot.acquire() as engine:
                 yield engine
         finally:
-            if slot not in self._free:
+            # A slot whose process was given away during the call is gone from the group
+            # already; putting it back would hand the next caller a slot with no engine and
+            # no owner.
+            if not slot.detached and slot not in self._free:
                 self._free.append(slot)
+
+    def detach(self, adapter: Adapter) -> bool:
+        """Take the slot holding `adapter` out of this group. True if one did."""
+        for slot in list(self.slots):
+            if not slot.holds(adapter):
+                continue
+            slot.detach()
+            self.slots.remove(slot)
+            if slot in self._free:
+                self._free.remove(slot)
+            return True
+        return False
 
     def drop_cold(self) -> None:
         """Forget the processes that have been shut down. A new one is started on demand."""
@@ -326,6 +360,20 @@ class EnginePool:
     def warm(self) -> list[str]:
         """One entry per running process, so an engine serving two callers appears twice."""
         return [key for key, group in self._groups.items() for _slot in group.warm]
+
+    def detach(self, adapter: Adapter) -> bool:
+        """Hand one warm process over to the caller that is holding it. True if it was ours.
+
+        The correspondence worker is the reason this exists. A paused search keeps its
+        process so that resuming it costs nothing — the hash is the whole point — and a
+        process that is still in the pool would be handed to the next search of the same
+        engine or quietly reaped after ten idle minutes. Detaching makes the caller its
+        owner: nothing here starts it, stops it or counts it again, and closing it is the
+        caller's job.
+
+        Called from inside `acquire`, before the slot is given back.
+        """
+        return any(group.detach(adapter) for group in list(self._groups.values()))
 
     async def reap_idle(self) -> list[str]:
         reaped: list[str] = []

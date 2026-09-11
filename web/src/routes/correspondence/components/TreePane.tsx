@@ -22,10 +22,11 @@
  * them, rather than left out: a menu that grows new items later teaches the reader twice.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Pin } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
 import type { CorrespondenceMark, CorrespondenceTreeNode } from '@/lib/api/types'
-import { formatScore } from '@/lib/chess/evaluation'
+import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +35,7 @@ import {
   MARK_GLYPHS,
   MARK_LABELS,
 } from '../format'
+import { isActive, isLive, isWarm, weakNodes } from '../searches'
 import { backedDirection, isLeftBehind, sortSiblings } from '../tree'
 
 export interface TreeMenu {
@@ -50,6 +52,8 @@ export interface TreePaneProps {
   onComment: (node: CorrespondenceTreeNode) => void
   onPromote: (id: number) => void
   onDelete: (id: number) => void
+  /** Open the search dialog on this node — the menu's first verb. */
+  onSearch?: (node: CorrespondenceTreeNode) => void
   /** A finished game's tree is read-only: every verb that writes is gone. */
   readOnly?: boolean
 }
@@ -63,11 +67,14 @@ function moveNumber(node: CorrespondenceTreeNode): string {
 function Chip({
   node,
   selected,
+  weak,
   onSelect,
   onMenu,
 }: {
   node: CorrespondenceTreeNode
   selected: boolean
+  /** Far enough behind its best sibling to have left the decision — see `searches.ts`. */
+  weak: boolean
   onSelect: () => void
   onMenu: (event: MouseEvent) => void
 }) {
@@ -75,8 +82,13 @@ function Chip({
   const notate = useNotation()
   const direction = backedDirection(node)
   const depth = node.own?.depth ?? null
-  const searching = node.searches.some((search) => search.status === 'running')
-  const queued = node.searches.some((search) => search.status === 'queued')
+  const searches = node.searches ?? []
+  const searching = searches.some(isLive)
+  const parked = searches.some(isWarm)
+  const queued = searches.some((search) => search.status === 'queued')
+  // Leela's depth means little and its node count means a lot, so a node whose verdict
+  // came with one prints both — `docs/correspondence.md`, decision 5.
+  const nodeCount = node.own?.nodes ?? null
   const mark = node.mark ?? null
 
   return (
@@ -90,7 +102,7 @@ function Chip({
       className={cn(
         'inline-flex cursor-pointer items-baseline gap-1 rounded-sm px-1 py-px align-baseline whitespace-nowrap hover:bg-raised',
         selected && 'bg-selected outline outline-accent-teal',
-        mark === 'excluded' && 'opacity-60',
+        (mark === 'excluded' || weak) && 'opacity-60',
       )}
     >
       <span className={cn('text-ink', node.played && 'font-semibold')}>
@@ -117,9 +129,19 @@ function Chip({
           d<span className="text-body">{depth}</span>
         </span>
       ) : null}
+      {nodeCount ? (
+        <span className="rounded-sm border border-edge px-1 text-[0.5625rem] leading-[0.875rem] text-dim">
+          <span className="text-body">{formatNodes(nodeCount)}</span>
+        </span>
+      ) : null}
       {node.disagree ? (
         <span className="text-[0.625rem] text-mistake" title={t`Two engines disagree here`}>
           ≠
+        </span>
+      ) : null}
+      {node.pinned_engine_id ? (
+        <span title={t`One engine's verdict is pinned here`}>
+          <Pin className="size-2.5 text-accent-teal" aria-label={t`one engine's verdict is pinned here`} />
         </span>
       ) : null}
       {searching ? (
@@ -128,8 +150,15 @@ function Chip({
           className="inline-block size-2 animate-spin rounded-full border-[0.09375rem] border-good border-r-transparent align-[-0.0625rem]"
         />
       ) : null}
+      {parked ? (
+        <span
+          aria-label={t`parked`}
+          className="inline-block size-2 rounded-full border-[0.09375rem] border-mistake align-[-0.0625rem]"
+          title={t`An engine is parked here, warm — resuming costs seconds`}
+        />
+      ) : null}
       {queued ? (
-        <span className="text-[0.625rem] text-accent-teal" title={t`a task is waiting`}>
+        <span className="text-[0.625rem] text-accent-teal" title={t`waiting for a slot`}>
           ◌
         </span>
       ) : null}
@@ -155,12 +184,14 @@ function Comment({ text }: { text: string }) {
 function Line({
   start,
   selectedId,
+  weak,
   onSelect,
   onMenu,
   leftBehind,
 }: {
   start: CorrespondenceTreeNode
   selectedId: number | null
+  weak: Set<number>
   onSelect: (id: number) => void
   onMenu: (node: CorrespondenceTreeNode, event: MouseEvent) => void
   leftBehind: boolean
@@ -186,6 +217,7 @@ function Line({
           key={`c${current.id}`}
           node={current}
           selected={current.id === selectedId}
+          weak={weak.has(current.id)}
           onSelect={() => onSelect(current.id)}
           onMenu={(event) => onMenu(current, event)}
         />,
@@ -204,15 +236,18 @@ function Line({
       parts.push(
         <div
           key={`v${alternative.id}`}
+          data-weak={weak.has(alternative.id) ? 'true' : undefined}
           className={cn(
             'my-0.5 border-l border-hairline pl-3',
             (leftBehind || isLeftBehind(current, alternative)) && 'opacity-55',
             alternative.mark === 'excluded' && 'opacity-55',
+            weak.has(alternative.id) && 'opacity-55',
           )}
         >
           <Line
             start={alternative}
             selectedId={selectedId}
+            weak={weak}
             onSelect={onSelect}
             onMenu={onMenu}
             leftBehind={leftBehind || isLeftBehind(current, alternative)}
@@ -267,11 +302,15 @@ export function TreePane({
   onComment,
   onPromote,
   onDelete,
+  onSearch,
   readOnly = false,
 }: TreePaneProps) {
   const { i18n, t } = useLingui()
   const [menu, setMenu] = useState<TreeMenu | null>(null)
   const host = useRef<HTMLDivElement>(null)
+  // One walk of the payload rather than one per node: which moves have fallen far enough
+  // behind their best sibling to have stopped being part of the decision.
+  const weak = useMemo(() => weakNodes(tree), [tree])
 
   useEffect(() => {
     if (!menu) return
@@ -300,6 +339,7 @@ export function TreePane({
         <Line
           start={tree}
           selectedId={selectedId}
+          weak={weak}
           onSelect={onSelect}
           onMenu={(node, event) => {
             if (readOnly) return
@@ -324,7 +364,13 @@ export function TreePane({
           onClick={(event) => event.stopPropagation()}
           className="absolute z-30 w-56 rounded-md border border-edge-strong bg-panel p-1 shadow-[0_0.375rem_1.125rem_var(--bb-shadow)]"
         >
-          <MenuItem disabled title={t`Searches arrive in the next step`}>
+          <MenuItem
+            disabled={!onSearch}
+            onClick={() => {
+              onSearch?.(menuNode)
+              setMenu(null)
+            }}
+          >
             <Trans>Search with…</Trans>
           </MenuItem>
           <MenuItem disabled title={t`Tasks arrive in a later step`}>
@@ -385,8 +431,18 @@ export function TreePane({
           <hr className="my-1 border-0 border-t border-line" />
           <MenuItem
             danger
-            disabled={menuNode.parent_id === null || menuNode.played}
-            title={menuNode.played ? t`A move the game played cannot be deleted` : undefined}
+            disabled={
+              menuNode.parent_id === null ||
+              menuNode.played ||
+              (menuNode.searches ?? []).some(isActive)
+            }
+            title={
+              menuNode.played
+                ? t`A move the game played cannot be deleted`
+                : (menuNode.searches ?? []).some(isActive)
+                  ? t`An engine is still on this line`
+                  : undefined
+            }
             onClick={() => {
               onDelete(menuNode.id)
               setMenu(null)

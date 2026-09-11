@@ -53,15 +53,19 @@ Maia nie: ein Blick ohne Suche ergibt eine Verteilung von Zügen, keine Fortsetz
 
 ## Fernschach { #correspondence }
 
-**Analyse → Fernschach** schaltet den Fernschachmodus ein und hält die zwei Zahlen, mit
-denen eine neue Partie startet. Ist er aus – die Voreinstellung –, gibt es **Fernschach**
+**Analyse → Fernschach** schaltet den Fernschachmodus ein, hält die Zahlen, mit denen eine
+neue Partie und eine neue Suche starten, und legt fest, welche Engines auf eine Stellung
+angesetzt werden dürfen. Ist er aus – die Voreinstellung –, gibt es **Fernschach**
 nicht in der Seitenleiste, und seine Seiten schicken dich zur Übersicht zurück.
 
 | Einstellung | |
 |---|---|
 | **Fernschachmodus** | An ergänzt den Eintrag in der Seitenleiste unter **Live** |
 | **Tage pro Zug** | Das Antwortfenster, das eine neue Partie bekommt, 1 bis 365, voreingestellt zehn. Es wird beim Anlegen auf die Partie kopiert; änderst du es hier, bleiben laufende Partien also unberührt |
-| **Varianten je Stellung** | Wie viele Kandidatenvarianten eine Engine behält, wenn sie auf eine Stellung eines Fernschachbaums angesetzt wird, 1 bis 5, voreingestellt drei |
+| **Linien pro Suche** | Wie viele Kandidatenvarianten eine Engine behält, wenn sie auf eine Stellung eines Fernschachbaums angesetzt wird, 1 bis 5, voreingestellt drei |
+| **Suchplätze** | Wie viele Suchen dieser Rechner gleichzeitig laufen lässt, 1 bis 16, voreingestellt zwei – eine CPU-Engine und eine GPU-Engine ist das übliche Paar. Suchen haben eigene Plätze: eine Suche, die tagelang läuft, nimmt also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet. Der Wert wird beim Start des Servers gelesen: **ändern und neu starten** |
+| **Such-Engines** | Welche Engines die Auswahl **Suchen mit …** anbietet, in deiner Reihenfolge; die erste wird vorgeschlagen. Wählst du keine, werden alle geeigneten angeboten – eingeschaltet, UCI, brettfähig und auf diesem Rechner. Eine Engine auf einem entfernten Runner kann noch keine Suche übernehmen |
 
 Ein leeres Feld heißt: die Voreinstellung gilt. Was der Modus selbst tut, steht unter
-[Fernschach](correspondence.md).
+[Fernschach](correspondence.md); wie du ihm eine eigene Engine gibst, unter
+[Engines](../operate/engines.md).

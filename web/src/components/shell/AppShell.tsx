@@ -11,6 +11,7 @@ import { NativeFeedback } from '@/lib/desktop/NativeFeedback'
 import { PgnDropOverlay } from '@/lib/desktop/PgnDropOverlay'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 import { TourProvider } from '@/lib/tour/TourProvider'
+import { useCorrespondenceSearchToasts } from '@/routes/correspondence/useSearchToasts'
 
 import { CommandPaletteProvider } from './CommandPalette'
 import { ShortcutsOverlayProvider } from './ShortcutsOverlay'
@@ -101,6 +102,11 @@ export function AppShell() {
       ),
     [refusedTitle, refusedDetail, refusedAction],
   )
+
+  // A correspondence search ends after hours or days, whatever screen the owner is on by
+  // then, so the announcement belongs to the shell rather than to the correspondence pages.
+  // Silent while the mode is off.
+  useCorrespondenceSearchToasts()
 
   const [navOpen, setNavOpen] = useState(false)
   const main = useRef<HTMLElement>(null)

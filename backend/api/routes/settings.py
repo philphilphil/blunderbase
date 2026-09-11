@@ -1,9 +1,11 @@
 """`/settings` — analysis configuration shared by the focused UI pages.
 
-Fourteen settings live here: the Maia levels (a list of one to five), the three 0/1 flags
-over the Maia pass itself, the two node budgets and the deep line count, the three
-classification thresholds, and the three that correspondence mode is configured with —
-whether it exists at all, the default reply window and how many lines a search keeps. They
+Everything the focused pages edit lives here: the Maia levels (a list of one to five), the
+three 0/1 flags over the Maia pass itself, the two node budgets and the deep line count,
+the three classification thresholds, and the five that correspondence mode is configured
+with — whether it exists at all, the default reply window, how many lines a search keeps,
+how many searches this host runs at once, and which engines the search picker offers (the
+second list here, written like the Maia levels). They
 are stored settings rather than environment variables
 because they are the ones an owner changes as their play changes, and a restart is not a
 thing to ask of them for that. `services/app_settings.py` owns what they mean; this is the
@@ -58,6 +60,12 @@ def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
         app_settings_service.set_maia_elos(session, [body.maia_target_elo])
     else:
         app_settings_service.set_maia_elos(session, None)
+    # The correspondence picker's engines are the other list here, and are written the same
+    # way and for the same reason: a body that names them sets them, and one that does not
+    # clears them — a PUT is the whole of the settings.
+    app_settings_service.set_correspondence_search_engine_ids(
+        session, body.correspondence_search_engine_ids
+    )
     return _answer(session, stored)
 
 
@@ -86,5 +94,11 @@ def _answer(session: Session, values: dict[str, int | float | None]) -> AppSetti
             **values,
             app_settings_service.MAIA_TARGET_ELO: elos[0],
             app_settings_service.MAIA_ELOS: elos,
+            # The engines chosen for correspondence searches answer with the row, empty
+            # list and all: empty is a real state there — every eligible engine — rather
+            # than a default standing in for one.
+            app_settings_service.CORRESPONDENCE_SEARCH_ENGINE_IDS: (
+                app_settings_service.get_correspondence_search_engine_ids(session)
+            ),
         }
     )

@@ -11,14 +11,18 @@
  * sends the list already sorted (`format.ts`'s `sections`), so the page decides which
  * heading a row falls under and nothing else.
  *
- * The capacity strip under the heading is a placeholder in this step. Step 2 of
- * `docs/correspondence.md` brings the searches that make it say something — slots in use,
- * parked engines, hosts — and until there is a worker behind it, it says what the mode can
- * and cannot do yet rather than four zeroes pretending to be a readout.
+ * Under the heading is the capacity strip — slots in use, parked engines and their memory,
+ * hosts — and between **Waiting for the opponent** and **Finished** is **Running now**:
+ * every engine on every game, one card each. Those two are about the machine rather than
+ * about a game, which is why they are not columns in the tables.
+ *
+ * **Pause all** / **Resume all** are in the titlebar because they are one gesture for the
+ * whole install: the laptop is closing, or it has been opened again. The button that shows
+ * is the one that would do something — with nothing running there is nothing to pause.
  */
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { ArrowRight, FileText, Plus } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { ArrowRight, FileText, Pause, Play, Plus } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
@@ -28,15 +32,22 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   useCorrespondenceGames,
+  useCorrespondenceSearches,
+  useCorrespondenceStatus,
   useCreateCorrespondenceGame,
   useImportCorrespondenceGame,
+  usePauseAllCorrespondenceSearches,
+  useResumeAllCorrespondenceSearches,
 } from '@/lib/api/queries'
 import type { CorrespondenceGameSummary } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
-import { formatScore } from '@/lib/chess/evaluation'
+import { formatNodes, formatScore } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
 
+import { CapacityStrip } from './components/CapacityStrip'
 import { ImportPgnDialog, NewGameDialog } from './components/NewGameDialog'
+import { RunningNow } from './components/RunningNow'
+import { isLive, isWarm } from './searches'
 import {
   duePhrase,
   dueTone,
@@ -88,33 +99,50 @@ function Due({ game }: { game: CorrespondenceGameSummary }) {
 }
 
 /**
- * One engine chip per search on the game. In this step the list is always empty — nothing
- * creates a search yet — so the column simply prints nothing rather than a placeholder.
+ * One chip per engine at work on the game, with the counter it is measured by.
+ *
+ * Depth for a Stockfish, nodes for a Leela: the chip prints whichever the snapshot has and
+ * both when it has both, because a Leela chip reading "d22" would say nothing at all. A
+ * parked engine keeps its chip and turns amber — it is still holding memory, and the row
+ * would otherwise look idle.
  */
 function EngineChips({ game }: { game: CorrespondenceGameSummary }) {
+  const { t } = useLingui()
   const searches = game.searches ?? []
   if (searches.length === 0) return null
   return (
     <span className="flex flex-wrap gap-1">
-      {searches.map((search) => (
-        <span
-          key={search.id}
-          className="inline-flex items-center gap-1.5 rounded-sm border border-edge px-1.5 py-px font-mono text-[0.625rem] text-body"
-        >
+      {searches.map((search) => {
+        const live = isLive(search)
+        const snapshot = live ? (search.snapshot ?? null) : null
+        const counter = [
+          snapshot?.depth ? `d${snapshot.depth}` : null,
+          snapshot?.nodes ? formatNodes(snapshot.nodes) : null,
+        ]
+          .filter(Boolean)
+          .join(' ')
+        return (
           <span
-            aria-hidden
+            key={search.id}
+            data-testid={`engine-chip-${search.id}`}
+            title={isWarm(search) ? t`parked, warm` : undefined}
             className={cn(
-              'size-[0.3125rem] rounded-full',
-              search.status === 'running'
-                ? 'bg-good'
-                : search.status === 'paused'
-                  ? 'bg-mistake'
-                  : 'bg-accent-teal',
+              'inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-px font-mono text-[0.625rem] text-body',
+              search.status === 'queued' ? 'border-dashed border-edge text-dim' : 'border-edge',
             )}
-          />
-          {search.engine_name ?? '—'}
-        </span>
-      ))}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'size-[0.3125rem] rounded-full',
+                live ? 'bg-good' : search.status === 'paused' ? 'bg-mistake' : 'bg-accent-teal',
+              )}
+            />
+            {search.engine_name ?? '—'}
+            {counter ? <span className="text-dim">{counter}</span> : null}
+          </span>
+        )
+      })}
     </span>
   )
 }
@@ -245,7 +273,21 @@ export function CorrespondencePage() {
   const { t } = useLingui()
   const navigate = useNavigate()
   const games = useCorrespondenceGames()
+  const status = useCorrespondenceStatus()
+  const searches = useCorrespondenceSearches()
+  const pauseAll = usePauseAllCorrespondenceSearches()
+  const resumeAll = useResumeAllCorrespondenceSearches()
   const [dialog, setDialog] = useState<'new' | 'import' | null>(null)
+
+  // One clock for the section rather than one per card: the only thing on this page that
+  // moves on its own is "2d 4h", and it moves once a minute.
+  const running = (searches.data?.searches ?? []).some(isLive)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!running) return
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [running])
 
   const opened = (gameId: number) => {
     setDialog(null)
@@ -261,6 +303,11 @@ export function CorrespondencePage() {
   const cut = sections(games.data?.games ?? [])
   const counts = games.data?.counts ?? {}
   const ongoing = counts.ongoing ?? cut.yourMove.length + cut.waiting.length
+  const rows = searches.data?.searches ?? []
+  // What Pause all would move, and what Resume all would bring back. With neither there is
+  // one button and it is disabled, rather than two that both do nothing.
+  const active = rows.filter((search) => search.status !== 'paused').length
+  const parked = rows.filter((search) => search.status === 'paused').length
 
   return (
     <PageBody>
@@ -277,6 +324,28 @@ export function CorrespondencePage() {
         }
         actions={
           <div className="flex gap-2">
+            {parked > 0 && active === 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={resumeAll.isPending}
+                onClick={() => resumeAll.mutate()}
+              >
+                <Play aria-hidden />
+                <Trans>Resume all</Trans>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={active === 0 || pauseAll.isPending}
+                title={t`Every search gives its slot back and keeps its process`}
+                onClick={() => pauseAll.mutate()}
+              >
+                <Pause aria-hidden />
+                <Trans>Pause all</Trans>
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={() => setDialog('import')}>
               <FileText aria-hidden />
               <Trans>Import PGN</Trans>
@@ -289,22 +358,7 @@ export function CorrespondencePage() {
         }
       />
 
-      {/*
-        The capacity strip. Empty of numbers until there is a worker to report any: step 2
-        fills it with slots in use, parked engines and hosts. It keeps its place now so the
-        page does not rearrange itself when that lands.
-      */}
-      <div
-        data-testid="correspondence-capacity"
-        className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-hairline py-2 text-[0.6875rem] text-dim"
-      >
-        <span>
-          <Trans>No engine is searching a correspondence position yet.</Trans>
-        </span>
-        <span className="text-dim-2">
-          <Trans>Searches, tasks and the capacity they use arrive in the next step.</Trans>
-        </span>
-      </div>
+      <CapacityStrip status={status.data} />
 
       {games.isPending ? <Skeleton className="h-24 w-full" data-testid="correspondence-loading" /> : null}
       {games.error ? (
@@ -352,6 +406,14 @@ export function CorrespondencePage() {
             ) : (
               <OngoingTable games={cut.waiting} dueHeading={t`Sent`} />
             )}
+          </Section>
+
+          <Section
+            title={<Trans>Running now</Trans>}
+            detail={t`every engine on every game`}
+            end={<span className="font-mono text-[0.6875rem] text-dim">{rows.length}</span>}
+          >
+            <RunningNow searches={rows} games={games.data.games} now={now} />
           </Section>
 
           <Section title={<Trans>Finished</Trans>} detail={t`in the library now`}>

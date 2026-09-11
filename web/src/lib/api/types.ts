@@ -172,6 +172,18 @@ export interface AppSettings {
   correspondence_enabled?: number | null
   correspondence_days_per_move?: number | null
   correspondence_multipv?: number | null
+  /**
+   * How many correspondence searches this host runs at once, 1 to 16. Read by the server
+   * when it starts — it sizes an engine pool — so a change here takes a restart, which is
+   * the one setting on the page that does.
+   */
+  correspondence_slots?: number | null
+  /**
+   * The engines the search picker offers, in the owner's order; the first is its default.
+   * Empty is not "no engines": it is an install that has never chosen, and then every
+   * eligible engine (enabled, UCI, drives a board, on this host) is offered.
+   */
+  correspondence_search_engine_ids?: number[]
 }
 
 /**
@@ -1803,10 +1815,34 @@ export interface CorrespondenceEval extends Extra {
   updated_at?: string | null
 }
 
-/** One engine at work on one node, or parked on it. Nothing in step 1 creates one. */
+/**
+ * One picture of a running search — what `correspondence.snapshot` carries, and what a
+ * search row arrives with when the worker in this process still holds one.
+ *
+ * The lines speak the same vocabulary as `stream.snapshot` and `MoveEval.best_lines`: from
+ * the SIDE TO MOVE's point of view, so a pane drawing them beside a node's `own` turns them
+ * first (`routes/correspondence/format.ts`'s `inNodeFrame`). `seq` rises per search, which
+ * is what lets a frame that overtook another one be dropped.
+ */
+export interface CorrespondenceSnapshot extends Extra {
+  search_id: number
+  node_id?: number | null
+  game_id?: number | null
+  engine_id?: number | null
+  engine_name?: string | null
+  seq: number
+  depth?: number | null
+  nodes?: number | null
+  nps?: number | null
+  time_ms?: number | null
+  lines: { multipv: number; cp?: number | null; mate?: number | null; pv: string[] }[]
+}
+
+/** One engine at work on one node, or parked on it. */
 export interface CorrespondenceSearch extends Extra {
   id: number
   node_id: number
+  game_id?: number | null
   engine_id?: number | null
   engine_name?: string | null
   kind: CorrespondenceSearchKind
@@ -1825,6 +1861,76 @@ export interface CorrespondenceSearch extends Extra {
   finished_at?: string | null
   heartbeat_at?: string | null
   error?: string | null
+  stderr?: string | null
+  /**
+   * The worker's last picture, merged onto the row by the server so a pane opened
+   * mid-search draws numbers at once instead of waiting for the next frame. Absent for
+   * anything not running on this host, and for every search once its process has ended.
+   */
+  snapshot?: CorrespondenceSnapshot | null
+}
+
+export interface CorrespondenceSearchList {
+  /** Newest first. */
+  searches: CorrespondenceSearch[]
+}
+
+/** What to put on a position, and what — if anything — should end it. */
+export interface CorrespondenceSearchCreate {
+  node_id: number
+  engine_id: number
+  /** null is the deployment's `correspondence_multipv`. */
+  multipv?: number | null
+  limit_depth?: number | null
+  limit_nodes?: number | null
+  limit_seconds?: number | null
+  /** UCI `searchmoves`, legal in the node's position; null searches everything. */
+  root_moves?: string[] | null
+}
+
+/** One paused search whose process is still here, and what it is holding. */
+export interface CorrespondenceParked extends Extra {
+  search_id: number
+  node_id: number
+  engine_id?: number | null
+  engine_name?: string | null
+  hash_mb?: number | null
+}
+
+/** One machine's share of the searching. Only this one, until runners join in. */
+export interface CorrespondenceHost extends Extra {
+  runner_id?: number | null
+  host: string
+  slots: number
+  in_use?: number
+  parked?: number
+}
+
+/** One engine a search can run on; `default` marks the picker's first. */
+export interface CorrespondenceSearchEngine extends Extra {
+  engine_id: number
+  name: string
+  version?: string | null
+  hash_mb?: number | null
+  default?: boolean
+}
+
+/** The capacity strip: slots, what is in them, what is parked, and where. */
+export interface CorrespondenceStatus extends Extra {
+  /** `correspondence_slots` in force on this host. */
+  slots: number
+  in_use: number
+  queued: number
+  paused: number
+  parked: CorrespondenceParked[]
+  hosts: CorrespondenceHost[]
+  /** What the picker offers, in the owner's order; the first carries `default`. */
+  engines: CorrespondenceSearchEngine[]
+  /**
+   * Every engine on this host a search could run on. The superset the settings page
+   * chooses `engines` out of — which is why it is a second list and not the same one.
+   */
+  eligible_engines: CorrespondenceSearchEngine[]
 }
 
 /** What a node create or a node patch answers with: the node alone, no tree around it. */
@@ -1872,6 +1978,8 @@ export interface CorrespondenceTreeNode extends CorrespondenceNode {
   frame: Color
   own?: CorrespondenceScore | null
   backed?: CorrespondenceScore | null
+  /** Whose verdict `own` is: `pinned_engine_id` when one is set, else the deepest. */
+  chosen_engine_id?: number | null
   evals: CorrespondenceEval[]
   searches: CorrespondenceSearch[]
   /** Two engines more than 50 cp apart on this position. */

@@ -27,7 +27,7 @@ from __future__ import annotations
 import contextlib
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -203,6 +203,7 @@ class InfiniteSearch:
         board: chess.Board,
         *,
         multipv: int = 1,
+        root_moves: Sequence[str] | None = None,
         on_snapshot: Callable[[Snapshot], None],
         stop: threading.Event,
     ) -> bool:
@@ -211,6 +212,12 @@ class InfiniteSearch:
         The engine is left idle either way: the search is stopped and waited out before
         this returns, because the next thing the caller does with that process is start
         another search on it — a restart at a new position, on the same slot.
+
+        `root_moves` is UCI `searchmoves`: the moves the engine is allowed to consider from
+        this position, and nothing else. An analysis board never passes any and behaves
+        exactly as it did; a correspondence search passes the candidates the player is
+        deciding between, which is how a week of engine time goes on the three moves that
+        matter rather than on the twenty that do not.
 
         A finished game is answered here rather than by the engine. There is nothing to
         search, and engines disagree about how to say so: Stockfish answers
@@ -225,6 +232,8 @@ class InfiniteSearch:
 
         buffer = SnapshotBuffer(board, multipv=multipv, interval=self.interval)
         kwargs: dict[str, Any] = {"multipv": multipv} if multipv else {}
+        if root_moves:
+            kwargs["root_moves"] = _moves(board, root_moves)
         try:
             search = self.adapter.engine.analysis(board, **kwargs)
         except START_ERRORS as exc:
@@ -262,6 +271,23 @@ class InfiniteSearch:
     def _offer(self, snapshot: Snapshot | None, on_snapshot: Callable[[Snapshot], None]) -> None:
         if snapshot is not None:
             on_snapshot(snapshot)
+
+
+def _moves(board: chess.Board, ucis: Sequence[str]) -> list[Any]:
+    """`searchmoves` as the engine takes them: parsed against the board they are legal on.
+
+    A move that is not legal here is refused rather than dropped. Restricting a search to
+    three moves and silently searching the two that parsed would answer a question nobody
+    asked, and the caller can only find that out from the numbers weeks later.
+    """
+    parsed = []
+    for uci in ucis:
+        try:
+            move = board.parse_uci(str(uci))
+        except ValueError as exc:
+            raise EngineError(f"{uci!r} cannot be searched in this position: {exc}") from None
+        parsed.append(move)
+    return parsed
 
 
 def _quieten(search: Any, timeout: float) -> bool:

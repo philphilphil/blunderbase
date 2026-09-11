@@ -24,7 +24,7 @@ from backend.runtime import capabilities_for
 from backend.services import explorer, import_service, maia_live, stats
 from backend.services import runners as runners_service
 from backend.services.streams import StreamBroker
-from backend.workers import AnalysisWorkers
+from backend.workers import AnalysisWorkers, CorrespondenceSearches
 from backend.workers.auto_sync import AutoSync
 from backend.workers.local_streams import LocalStreamBackend
 from backend.workers.runner_gateway import RunnerGateway
@@ -87,6 +87,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     streams = _analysis_boards(settings, workers, gateway)
     app.state.streams = streams
     await streams.start()
+    # Correspondence searches run in a pool of their own — a days-long search must never
+    # take a slot the quick tier is counting on — and they start even when the mode is
+    # switched off: a deployment that turns it off with searches in flight has rows that
+    # still have to be recovered, parked and answered for. `analysis_workers` covers both
+    # sets, because it is the answer to "does this process drive engines at all".
+    searches = (
+        CorrespondenceSearches(settings=settings)
+        if settings.analysis_workers and not capabilities.read_only and not settings.demo
+        else None
+    )
+    app.state.searches = searches
+    if searches is not None:
+        await searches.start()
     # The scheduled sync is the Sync button on a clock, so it has no business in a library
     # nothing may write to. Off by default everywhere else; the import page switches it on.
     auto_sync = AutoSync(settings=settings, broker=events) if not capabilities.read_only else None
@@ -117,6 +130,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await auto_sync.stop()
         app.state.auto_sync = None
         await wait_for_imports(app.state.imports)
+        # Before the streams, the gateway and the workers: a search holds a process of its
+        # own and its own database thread, and both are this set's to shut down.
+        if searches is not None:
+            await searches.stop()
+        app.state.searches = None
         # Before the gateway and the workers, in that order: an analysis board holds a slot
         # on one of them, and both have to still be there for it to give the slot back to.
         await streams.stop()
@@ -284,6 +302,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.workers = None
     app.state.gateway = None
     app.state.streams = None
+    app.state.searches = None
     app.state.auto_sync = None
     app.state.loop = None
     app.state.mcp = None

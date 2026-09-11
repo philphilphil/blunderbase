@@ -159,6 +159,16 @@ class AppSettings(BaseModel):
     correspondence_multipv: int | None = Field(
         default=None, description="how many lines a correspondence search keeps, 1 to 5"
     )
+    correspondence_slots: int | None = Field(
+        default=None,
+        description="how many correspondence searches this host runs at once, 1 to 16; "
+        "read when the server starts, so a change takes a restart",
+    )
+    correspondence_search_engine_ids: list[int] = Field(
+        default_factory=list,
+        description="the engines the search picker offers, in order; the first is its "
+        "default, and an empty list means every eligible engine",
+    )
 
 
 class AppSettingsUpdate(Input):
@@ -203,6 +213,14 @@ class AppSettingsUpdate(Input):
     )
     correspondence_multipv: int | None = Field(
         default=None, description="1 to 5 lines per correspondence search"
+    )
+    correspondence_slots: int | None = Field(
+        default=None, description="1 to 16 searches at once on this host"
+    )
+    correspondence_search_engine_ids: list[int] | None = Field(
+        default=None,
+        description="the engines the search picker offers, in order; null or empty is "
+        "every eligible engine",
     )
 
 
@@ -1699,10 +1717,17 @@ class CorrespondenceEvalRow(Payload):
 
 
 class CorrespondenceSearchRow(Payload):
-    """One engine at work on one node, or parked on it."""
+    """One engine at work on one node, or parked on it.
+
+    Row plus picture: `snapshot` is the worker's last `correspondence.snapshot` for this
+    search, merged in so that a pane opened mid-search draws numbers immediately instead of
+    waiting for the next one to arrive over `/events`. It is absent for a search that is
+    not running here, and for every search once the process has ended.
+    """
 
     id: int
     node_id: int
+    game_id: int | None = None
     engine_id: int | None = None
     engine_name: str | None = None
     kind: str
@@ -1711,6 +1736,116 @@ class CorrespondenceSearchRow(Payload):
     multipv: int = 1
     run_id: int | None = None
     runner_id: int | None = None
+    limit_depth: int | None = None
+    limit_nodes: int | None = None
+    limit_seconds: int | None = None
+    root_moves: list[str] | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    paused_at: str | None = None
+    finished_at: str | None = None
+    heartbeat_at: str | None = None
+    error: str | None = None
+    stderr: str | None = Field(default=None, description="a failed engine's dying words")
+    snapshot: CorrespondenceSnapshot | None = None
+
+
+class CorrespondenceSnapshot(Payload):
+    """One picture of a running search — the shape `correspondence.snapshot` carries.
+
+    The same vocabulary the analysis board's snapshots speak (`MoveEval.best_lines`, from
+    the side to move's point of view), with the search, node and engine named so a page
+    can place it without asking anything.
+    """
+
+    search_id: int
+    node_id: int | None = None
+    game_id: int | None = None
+    engine_id: int | None = None
+    engine_name: str | None = None
+    seq: int = 0
+    depth: int | None = None
+    nodes: int | None = None
+    nps: int | None = None
+    time_ms: int | None = None
+    lines: list[dict[str, Any]] = Field(default_factory=list)
+
+
+CorrespondenceSearchRow.model_rebuild()
+
+
+class CorrespondenceSearchCreate(Input):
+    """Put one engine on one node, with or without an end to it.
+
+    All three limits left out is the ordinary case: a correspondence search runs until the
+    owner has decided, which may be next Tuesday. `root_moves` restricts it to the
+    candidates being decided between — UCI, legal in that position, refused if not.
+    """
+
+    node_id: int
+    engine_id: int
+    multipv: int | None = Field(default=None, ge=1, description="null is the deployment's default")
+    limit_depth: int | None = Field(default=None, ge=1)
+    limit_nodes: int | None = Field(default=None, ge=1)
+    limit_seconds: int | None = Field(default=None, ge=1)
+    root_moves: list[str] | None = Field(
+        default=None, description="UCI `searchmoves`; null searches everything"
+    )
+
+
+class CorrespondenceSearchList(Payload):
+    """Searches, newest first. `active` is the queued, running and parked ones."""
+
+    searches: list[CorrespondenceSearchRow] = Field(default_factory=list)
+
+
+class CorrespondenceParked(Payload):
+    """One paused search whose process is still here, and what it is holding."""
+
+    search_id: int
+    node_id: int
+    engine_id: int | None = None
+    engine_name: str | None = None
+    hash_mb: int | None = Field(default=None, description="the engine's `Hash` option, in MB")
+
+
+class CorrespondenceHost(Payload):
+    """One machine's share of the searching. Only this one, until runners join in."""
+
+    runner_id: int | None = None
+    host: str
+    slots: int
+    in_use: int = 0
+    parked: int = 0
+
+
+class CorrespondenceSearchEngine(Payload):
+    """One engine a search can run on; `default` marks the picker's first."""
+
+    engine_id: int
+    name: str
+    version: str | None = None
+    hash_mb: int | None = None
+    default: bool = False
+
+
+class CorrespondenceStatus(Payload):
+    """The capacity strip: slots, what is in them, what is parked, and where."""
+
+    slots: int
+    in_use: int = 0
+    queued: int = 0
+    paused: int = 0
+    parked: list[CorrespondenceParked] = Field(default_factory=list)
+    hosts: list[CorrespondenceHost] = Field(default_factory=list)
+    engines: list[CorrespondenceSearchEngine] = Field(
+        default_factory=list,
+        description="what the picker offers, in the owner's order; the first is its default",
+    )
+    eligible_engines: list[CorrespondenceSearchEngine] = Field(
+        default_factory=list,
+        description="every engine here a search could run on, whether or not it is offered",
+    )
 
 
 class CorrespondenceNodeResponse(Payload):
@@ -1744,6 +1879,9 @@ class CorrespondenceTreeNode(CorrespondenceNodeResponse):
     frame: Color = Field(description="whose point of view `own` and `backed` are from")
     own: CorrespondenceScore | None = None
     backed: CorrespondenceScore | None = None
+    chosen_engine_id: int | None = Field(
+        default=None, description="whose verdict `own` is: the pin, else the deepest"
+    )
     evals: list[CorrespondenceEvalRow] = Field(default_factory=list)
     searches: list[CorrespondenceSearchRow] = Field(default_factory=list)
     disagree: bool = False

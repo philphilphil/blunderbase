@@ -1,36 +1,64 @@
 /**
- * The right column's top half: what the engines say about the selected node.
+ * The right column: one pane per engine that is searching this node or has a verdict on it,
+ * stacked.
  *
- * In this step there is nothing to say. No worker starts a search and no task writes an
- * evaluation, so the pane's whole job is to hold its place and be honest about why it is
- * empty — the stack of live panes, one per engine, with their lines and their Pause arrives
- * with step 2 of `docs/correspondence.md`.
+ * The stack is what "Stockfish and Leela at the same time" looks like — both thinking, both
+ * visible, both hoverable — and it is the shape the mode is for. A position can carry two
+ * verdicts that disagree, and the disagreement is the most valuable thing on the screen; a
+ * column that showed one engine at a time would hide it behind a tab.
  *
- * It does draw a stored verdict where one exists, because an evaluation is keyed by
- * position: a node whose position was reached in an already-analysed game can carry a
- * number before this mode has run a single engine of its own.
+ * The order is `searches.ts`'s: running first, then parked and queued, then the stored
+ * verdicts nothing is working on. What a pane draws is `EnginePane`'s business; this decides
+ * only which panes there are and what a node with none of them says instead.
  *
- * Every number here goes through `inNodeFrame` first. The rows arrive from the side to
- * move's point of view, the way `MoveEval` stores a score, and the tree, the candidates
- * table and this pane are read side by side — so they are turned into the node's frame
- * once, here, rather than appearing with opposite signs in adjacent columns.
+ * The clock ticks here rather than in each pane: a running search's "2d 4h" is the only
+ * thing on the column that moves on its own, and one interval for the stack is one
+ * re-render a minute instead of one per engine.
  */
-import { Trans, useLingui } from '@lingui/react/macro'
+import { Trans } from '@lingui/react/macro'
+import { useEffect, useState } from 'react'
 
 import type { CorrespondenceTreeNode } from '@/lib/api/types'
-import { formatVariation } from '@/lib/analysis/streamModel'
-import { cachedReplay } from '@/lib/board/linePreview'
-import { formatNodes, formatScore } from '@/lib/chess/evaluation'
-import { useNotation } from '@/lib/chess/notationPrefs'
+import type { HoveredLine } from '@/lib/board/useLinePreview'
 
-import { inNodeFrame } from '../format'
+import { enginePanes, isLive } from '../searches'
+import { EnginePane } from './EnginePane'
 
-export function EnginesPane({ node }: { node: CorrespondenceTreeNode | null }) {
-  const { t } = useLingui()
-  const notate = useNotation()
-  const evals = node?.evals ?? []
+export interface EnginesPaneProps {
+  node: CorrespondenceTreeNode | null
+  previewLine?: string | null
+  onHover: (line: HoveredLine | null) => void
+  onPause: (id: number) => void
+  onResume: (id: number) => void
+  onStop: (id: number) => void
+  onPin?: (engineId: number | null) => void
+  busy?: boolean
+}
 
-  if (evals.length === 0) {
+/** A minute: the coarsest unit `formatSpan` prints under a day, so nothing lags visibly. */
+const TICK_MS = 30_000
+
+export function EnginesPane({
+  node,
+  previewLine,
+  onHover,
+  onPause,
+  onResume,
+  onStop,
+  onPin,
+  busy,
+}: EnginesPaneProps) {
+  const panes = enginePanes(node)
+  const running = panes.some((pane) => pane.search && isLive(pane.search))
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!running) return
+    const timer = setInterval(() => setNow(Date.now()), TICK_MS)
+    return () => clearInterval(timer)
+  }, [running])
+
+  if (!node || panes.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 px-4 py-6 text-center">
         <p className="text-[0.75rem] text-dim">
@@ -38,8 +66,8 @@ export function EnginesPane({ node }: { node: CorrespondenceTreeNode | null }) {
         </p>
         <p className="text-[0.6875rem] leading-[1.55] text-dim-2">
           <Trans>
-            Searches — one engine on one position for as long as you let it, several at once
-            — arrive in the next step. Until then the tree is where the thinking is kept.
+            Search with… puts one on it for as long as you let it. Several engines can work
+            on the same position at once, each in a pane of its own.
           </Trans>
         </p>
       </div>
@@ -47,43 +75,21 @@ export function EnginesPane({ node }: { node: CorrespondenceTreeNode | null }) {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto">
-      {evals.map((one) => (
-        <div key={`${one.engine_id ?? one.engine_name}`} className="border-b border-hairline">
-          <div className="flex items-center gap-2 bg-panel px-2.5 py-1.5">
-            <strong className="text-[0.6875rem] font-semibold text-ink">{one.engine_name}</strong>
-            <span className="font-mono text-[0.625rem] text-dim">
-              {one.depth ? t`depth ${one.depth}` : null}
-            </span>
-            <span className="flex-1" />
-            <span className="font-mono text-[0.6875rem] font-semibold text-body">
-              {formatScore(inNodeFrame(one, node))}
-            </span>
-          </div>
-          {(one.best_lines ?? []).map((line) => (
-            <div
-              key={line.multipv}
-              className="grid grid-cols-[3rem_minmax(0,1fr)] gap-2 border-t border-hairline px-2.5 py-1.5"
-            >
-              <span className="font-mono text-[0.6875rem] font-semibold text-body">
-                {formatScore(inNodeFrame(line, node))}
-              </span>
-              <span className="font-mono text-[0.625rem] leading-[1.55] text-soft">
-                {node
-                  ? formatVariation(
-                      node.ply,
-                      cachedReplay(node.fen, line.pv).moves.map((move) => notate(move.san)),
-                    )
-                  : line.pv.join(' ')}
-              </span>
-            </div>
-          ))}
-          {one.nodes ? (
-            <div className="border-t border-hairline px-2.5 py-1 font-mono text-[0.625rem] text-dim-2">
-              {formatNodes(one.nodes)} <Trans>nodes</Trans>
-            </div>
-          ) : null}
-        </div>
+    <div className="min-h-0 flex-1 overflow-auto" data-testid="correspondence-engines">
+      {panes.map((pane) => (
+        <EnginePane
+          key={pane.key}
+          pane={pane}
+          node={node}
+          now={now}
+          previewLine={previewLine}
+          onHover={onHover}
+          onPause={onPause}
+          onResume={onResume}
+          onStop={onStop}
+          onPin={onPin}
+          busy={busy}
+        />
       ))}
     </div>
   )

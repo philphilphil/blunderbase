@@ -1,7 +1,7 @@
 /**
  * The deployment's `AppSettings`, as the screens that edit a slice of it need them.
  *
- * Three screens own part of these fourteen values — Engine passes, Maia and Correspondence
+ * Three screens own part of these values — Engine passes, Maia and Correspondence
  * — and `PUT /settings` replaces the lot: an omitted field is a cleared one. So none of
  * them may send just what it edits, and `completeUpdate` is the one place that says what
  * "everything else, untouched" means. The rest is the reading and writing of a number in a
@@ -30,6 +30,7 @@ export const SETTING_DEFAULTS = {
   correspondence_enabled: 0,
   correspondence_days_per_move: 10,
   correspondence_multipv: 3,
+  correspondence_slots: 2,
 } as const
 
 /** What a box holds: a number, or the empty string that means "nobody has set this". */
@@ -46,7 +47,7 @@ export function settingText(settings: AppSettings | undefined, key: keyof AppSet
   return value === null || value === undefined || Array.isArray(value) ? '' : String(value)
 }
 
-/** Every setting as it stands, so a page that changes one does not clear the other eleven. */
+/** Every setting as it stands, so a page that changes one does not clear the others. */
 export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
   return {
     maia_target_elo: null,
@@ -60,10 +61,14 @@ export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
     inaccuracy_threshold: settings.inaccuracy_threshold,
     mistake_threshold: settings.mistake_threshold,
     blunder_threshold: settings.blunder_threshold,
-    // Correspondence mode's three. A settings form that left them out would switch the
+    // Correspondence mode's five. A settings form that left them out would switch the
     // mode off on its next save — the PUT is a replace, and an absent key is a cleared one.
+    // The engine list is the second list here, and is carried whole for the same reason
+    // `maia_elos` is: a save of the Engine passes page must not empty the search picker.
     correspondence_enabled: settings.correspondence_enabled ?? null,
     correspondence_days_per_move: settings.correspondence_days_per_move ?? null,
     correspondence_multipv: settings.correspondence_multipv ?? null,
+    correspondence_slots: settings.correspondence_slots ?? null,
+    correspondence_search_engine_ids: settings.correspondence_search_engine_ids ?? [],
   }
 }

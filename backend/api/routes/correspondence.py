@@ -1,10 +1,15 @@
 """`/correspondence` — the games the owner is playing, and the tree behind each of them.
 
-Three groups of routes under one prefix: the games (list, create, import, read, patch, the
-two that move the game, finish), the tree's nodes (create, patch, delete), and the export.
-A node is addressed by its own id rather than under its game, because an id is enough to
-find it and making the client repeat the game would let the two disagree — the repertoire's
-rule, for the same reason.
+Four groups of routes under one prefix: the games (list, create, import, read, patch, the
+two that move the game, finish), the tree's nodes (create, patch, delete), the export, and
+the searches (start, pause, resume, stop, the two "everything" buttons, and the capacity
+this host has for them). A node — and a search — is addressed by its own id rather than
+under its game, because an id is enough to find it and making the client repeat the game
+would let the two disagree — the repertoire's rule, for the same reason.
+
+Starting a search writes a row and answers; `workers/correspondence_searches.py` is what
+notices and takes a slot. So a 201 here means "this is going to be searched", not "an
+engine is now running" — which is what the `correspondence.search` events are for.
 
 Every handler is a thin call into `services.correspondence`, which owns what a
 correspondence game is; the typed failures it raises are turned into status codes by
@@ -32,6 +37,10 @@ from backend.api.schemas import (
     CorrespondenceNodeResponse,
     CorrespondenceNodeUpdate,
     CorrespondencePgnImport,
+    CorrespondenceSearchCreate,
+    CorrespondenceSearchList,
+    CorrespondenceSearchRow,
+    CorrespondenceStatus,
 )
 from backend.services import correspondence as correspondence_service
 
@@ -216,3 +225,101 @@ def delete_node(session: SessionDep, node_id: int) -> Response:
     """Refused for the root, for a move the game has played, and while a search is inside it."""
     correspondence_service.delete_node(session, node_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/searches",
+    response_model=CorrespondenceSearchRow,
+    status_code=status.HTTP_201_CREATED,
+    summary="Set an engine on a position",
+)
+def start_search(session: SessionDep, body: CorrespondenceSearchCreate) -> Any:
+    """The row is the request; the worker takes a slot and starts the process.
+
+    Answered as soon as the row is written rather than when the engine is going: a search
+    may wait for a slot for as long as the searches ahead of it take, and a POST that hung
+    for three days would be a strange thing.
+    """
+    return correspondence_service.start_search(
+        session,
+        node_id=body.node_id,
+        engine_id=body.engine_id,
+        multipv=body.multipv,
+        limit_depth=body.limit_depth,
+        limit_nodes=body.limit_nodes,
+        limit_seconds=body.limit_seconds,
+        root_moves=body.root_moves,
+    )
+
+
+@router.get("/searches", response_model=CorrespondenceSearchList, summary="What is searching")
+def list_searches(
+    session: SessionDep,
+    active: bool = True,
+    game_id: int | None = None,
+    node_id: int | None = None,
+) -> Any:
+    """`active` is the queued, running and parked ones; `active=false` is the history too."""
+    return correspondence_service.list_searches(
+        session, active=active, game_id=game_id, node_id=node_id
+    )
+
+
+@router.post(
+    "/searches/pause-all",
+    response_model=CorrespondenceSearchList,
+    summary="Park every search",
+)
+def pause_all(session: SessionDep) -> Any:
+    """The laptop is closing: every search gives its slot back and keeps its process."""
+    return correspondence_service.pause_all(session)
+
+
+@router.post(
+    "/searches/resume-all",
+    response_model=CorrespondenceSearchList,
+    summary="Start every parked search again",
+)
+def resume_all(session: SessionDep) -> Any:
+    """Warm where the process survived, cold where a restart took it."""
+    return correspondence_service.resume_all(session)
+
+
+@router.post(
+    "/searches/{search_id}/pause",
+    response_model=CorrespondenceSearchRow,
+    summary="Park one search",
+)
+def pause_search(session: SessionDep, search_id: int) -> Any:
+    """Keeps the process and its hash where the machine can afford the memory."""
+    return correspondence_service.pause_search(session, search_id)
+
+
+@router.post(
+    "/searches/{search_id}/resume",
+    response_model=CorrespondenceSearchRow,
+    summary="Start one parked search again",
+)
+def resume_search(session: SessionDep, search_id: int) -> Any:
+    """The same process where it is still parked, which is why resuming costs seconds."""
+    return correspondence_service.resume_search(session, search_id)
+
+
+@router.post(
+    "/searches/{search_id}/stop",
+    response_model=CorrespondenceSearchRow,
+    summary="End one search",
+)
+def stop_search(session: SessionDep, search_id: int) -> Any:
+    """A parked process is quit; a running one goes back into the pool warm."""
+    return correspondence_service.stop_search(session, search_id)
+
+
+@router.get(
+    "/status",
+    response_model=CorrespondenceStatus,
+    summary="Slots, parked processes, and which host",
+)
+def search_status(session: SessionDep) -> Any:
+    """What the capacity strip draws, and the engines the search picker offers."""
+    return correspondence_service.status(session)

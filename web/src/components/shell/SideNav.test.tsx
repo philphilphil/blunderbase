@@ -11,21 +11,28 @@ import { ThemeProvider } from '@/lib/ui/theme'
 
 import { NavDrawer, SideNav } from './SideNav'
 
-const { useEngines, useGames, useLiveState, useAppSettings, useCorrespondenceGames } = vi.hoisted(
-  () => ({
-    useEngines: vi.fn(),
-    useGames: vi.fn(),
-    useLiveState: vi.fn(),
-    useAppSettings: vi.fn(),
-    useCorrespondenceGames: vi.fn(),
-  }),
-)
+const {
+  useEngines,
+  useGames,
+  useLiveState,
+  useAppSettings,
+  useCorrespondenceGames,
+  useCorrespondenceStatus,
+} = vi.hoisted(() => ({
+  useEngines: vi.fn(),
+  useGames: vi.fn(),
+  useLiveState: vi.fn(),
+  useAppSettings: vi.fn(),
+  useCorrespondenceGames: vi.fn(),
+  useCorrespondenceStatus: vi.fn(),
+}))
 vi.mock('@/lib/api/queries', () => ({
   useEngines,
   useGames,
   useLiveState,
   useAppSettings,
   useCorrespondenceGames,
+  useCorrespondenceStatus,
 }))
 
 const { useEvents } = vi.hoisted(() => ({ useEvents: vi.fn() }))
@@ -41,6 +48,7 @@ function stub(status: ConnectionStatus, reconnects: number) {
   // Correspondence mode off, which is the default and what every test but its own wants.
   useAppSettings.mockReturnValue(pending)
   useCorrespondenceGames.mockReturnValue(pending)
+  useCorrespondenceStatus.mockReturnValue(pending)
   useEvents.mockReturnValue({ status, reconnects })
 }
 
@@ -69,6 +77,7 @@ describe('the rail footer', () => {
     useLiveState.mockReturnValue(pending)
     useAppSettings.mockReturnValue(pending)
     useCorrespondenceGames.mockReturnValue(pending)
+    useCorrespondenceStatus.mockReturnValue(pending)
     useEvents.mockReturnValue({ status: 'open', reconnects: 0 })
     useGames.mockImplementation((query) => ({
       data: { total: query.analyzed ? 2 : 9_553 },
@@ -217,6 +226,40 @@ describe('the correspondence entry', () => {
   it('asks for no correspondence games while the mode is off', () => {
     withMode(0)
     expect(useCorrespondenceGames).toHaveBeenCalledWith(undefined, { enabled: false })
+  })
+
+  /** The mode on, with what `GET /correspondence/status` is answering right now. */
+  function withStatus(data: Record<string, unknown>) {
+    stub('open', 0)
+    useAppSettings.mockReturnValue({ data: { correspondence_enabled: 1 }, isPending: false })
+    useCorrespondenceGames.mockReturnValue({
+      data: { games: [], counts: { ongoing: 1, finished: 0, your_move: 0 } },
+      isPending: false,
+    })
+    useCorrespondenceStatus.mockReturnValue({ data, isPending: false })
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <SideNav />
+        </MemoryRouter>
+      </ThemeProvider>,
+    )
+  }
+
+  it('counts the warm processes along the foot, and not the cold paused rows', () => {
+    // A restart leaves every paused search cold: the rows are still paused and no process
+    // exists, so `parked, warm` — a claim about this machine's memory — has to read the
+    // parked list rather than the count of paused rows.
+    const base = { slots: 2, in_use: 1, queued: 0, paused: 3, hosts: [], engines: [] }
+    withStatus({ ...base, parked: [] })
+    expect(screen.queryByText('parked, warm')).not.toBeInTheDocument()
+    cleanup()
+
+    withStatus({
+      ...base,
+      parked: [{ search_id: 8, node_id: 4, engine_id: 1, engine_name: 'SF', hash_mb: 4096 }],
+    })
+    expect(screen.getByText('parked, warm')).toBeInTheDocument()
   })
 })
 

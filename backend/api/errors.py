@@ -135,15 +135,17 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     # A line that could not be played is the request being wrong, not the tree: nothing is
     # written, so the client can fix the moves and send the same body again.
     (repertoire_service.RepertoireError, 422, "repertoire_invalid_line"),
-    # Correspondence. The three conflicts are states rather than bad requests: the library
-    # already holds the game, the game has a result and its tree is frozen, or a search is
-    # still parked inside the subtree somebody asked to delete — each one is something the
-    # caller can act on, and none of them is a retry.
+    # Correspondence. The four conflicts are states rather than bad requests: the library
+    # already holds the game, the game has a result and its tree is frozen, a search is
+    # still parked inside the subtree somebody asked to delete, or that engine is already
+    # on that position — each one is something the caller can act on, and none is a retry.
     (correspondence_service.GameAlreadyStoredError, 409, "duplicate_correspondence_game"),
     (correspondence_service.TreeLockedError, 409, "correspondence_finished"),
     (correspondence_service.NodeBusyError, 409, "correspondence_node_busy"),
+    (correspondence_service.SearchBusyError, 409, "correspondence_search_busy"),
     (correspondence_service.UnknownCorrespondenceGameError, 404, "unknown_correspondence_game"),
     (correspondence_service.UnknownNodeError, 404, "unknown_correspondence_node"),
+    (correspondence_service.UnknownSearchError, 404, "unknown_correspondence_search"),
     (correspondence_service.CorrespondenceError, 422, "correspondence_invalid"),
     # A move a game cannot take. The finished game is the same conflict as above by another
     # route (`games.append_move` is what refuses it), and an illegal move is the request

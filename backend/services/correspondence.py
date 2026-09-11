@@ -27,15 +27,19 @@ The shapes worth knowing before reading the code:
   engine's, else the deepest); *backed* is the minimax over the children that have a value.
   The gap between them is the whole point: a root that disagrees with the minimax of its
   children is an engine's first choice refuted further down.
-* **Nothing here touches an engine process.** Searches are rows; the worker that runs them
-  arrives in the next step, and reads and writes exactly these rows.
+* **Nothing here touches an engine process.** Searches are rows and events: starting,
+  pausing, resuming and stopping one writes a row and emits `correspondence.search`, and
+  `workers/correspondence_searches.py` is what reacts — takes a slot, drives the engine,
+  and comes back here to `checkpoint` and to the `mark_*` writers. The same split as
+  `analysis.py` and `workers/analysis_queue.py`, and the reason the browser and an MCP
+  client can never disagree about what is running.
 """
 
 from __future__ import annotations
 
 import io
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, NamedTuple
 
@@ -45,7 +49,9 @@ from sqlalchemy.orm import Session
 from backend.db.enums import (
     Color,
     CorrespondenceMark,
+    EngineKind,
     Result,
+    SearchKind,
     SearchStatus,
     Source,
     Speed,
@@ -70,6 +76,31 @@ from backend.services.explorer import normalize_fen
 logger = logging.getLogger(__name__)
 
 EVENT_UPDATED = "correspondence.updated"
+# One event per transition of a search row: started, running, parked, resumed, ended. The
+# page draws from it and the worker acts on it — which is what keeps the service from ever
+# touching a process. `correspondence.snapshot` is the worker's own, and is never written
+# to the database; its name lives here so that the two halves cannot drift apart.
+EVENT_SEARCH = "correspondence.search"
+EVENT_SNAPSHOT = "correspondence.snapshot"
+
+# How many points an eval's history keeps. Eighty is deeper than any engine reaches on a
+# position a person is waiting for, so in practice nothing is ever dropped — the cap is
+# there so that a row cannot grow without bound over a month of resumes.
+HISTORY_LIMIT = 80
+# How much the node count has to grow before a picture at a depth already in the history
+# becomes a second point rather than replacing the first. The history keys on depth *and*
+# nodes (`docs/correspondence.md`, decision 5), because a Leela sits at depth 19 for a day
+# while its node count goes from one million to four hundred: keyed on depth alone that
+# search would end with a single point, and the trajectory — the whole reason the history
+# is kept — would be a flat line. A quarter more nodes is a stretch of real work, and a
+# search that only ever climbs in depth writes exactly one entry per depth as before.
+# The test is against the last point kept rather than a fixed step, so the points thin out
+# as the search goes: a million nodes to four hundred million is about thirty of them,
+# which is a trajectory rather than a log of the last hour under `HISTORY_LIMIT`.
+HISTORY_NODE_GROWTH = 1.25
+# As much of a failed engine's dying words as is worth keeping on the row, as `AnalysisRun`
+# keeps them.
+STDERR_LIMIT = 4000
 
 # What "the caller said nothing about this field" looks like, the repertoire's rule: `None`
 # cannot be it, because `None` already means "clear it".
@@ -105,6 +136,16 @@ MATE_SCORE = 1_000_000
 # The states in which a search still owns its node: it is queued for a slot, running in
 # one, or parked with its process warm. A subtree holding one of these cannot be deleted.
 LIVE_SEARCH_STATES = (SearchStatus.QUEUED, SearchStatus.RUNNING, SearchStatus.PAUSED)
+# And the states it is over in. A row in one of these is history: nothing restarts it, and
+# a second `stop` or a late answer from a worker leaves it exactly as it is.
+TERMINAL_SEARCH_STATES = (SearchStatus.DONE, SearchStatus.STOPPED, SearchStatus.FAILED)
+
+# The worker's last picture of each search it is running, if a worker is running at all.
+# Set by `register_snapshots`; see there for why this is not a row.
+_SNAPSHOT_SOURCE: Callable[[], dict[int, dict[str, Any]]] | None = None
+# What the worker in this process actually sized itself to. Set by `register_capacity`;
+# see `_running_slots` for why the setting is not the answer.
+_CAPACITY_SOURCE: Callable[[], dict[str, Any]] | None = None
 
 # A score in White's frame as the tree passes it around: `(cp, mate)`, exactly one of them
 # set, and None where nothing has evaluated the node at all.
@@ -161,6 +202,14 @@ class TreeLockedError(CorrespondenceConflict):
 
 class NodeBusyError(CorrespondenceConflict):
     """A search is queued, running or parked inside the subtree that was to be deleted."""
+
+
+class UnknownSearchError(LookupError):
+    """No search with that id."""
+
+
+class SearchBusyError(CorrespondenceConflict):
+    """That engine is already queued, running or parked on that node."""
 
 
 # --- games -----------------------------------------------------------------
@@ -726,6 +775,602 @@ def export_pgn(session: Session, game_id: int) -> str:
     return str(out.accept(exporter))
 
 
+# --- searches --------------------------------------------------------------
+
+
+def eligible_engines(session: Session) -> list[Engine]:
+    """The engines a search may run on: enabled, UCI, able to drive a board, on this host.
+
+    "Able to drive a board" is `Engine.streams`, the host's own word about whether it
+    answers a `stream_open` — a runner that does queue work and no analysis boards says so
+    in its `hello`, and offering the owner a search it will never serve is worse than not
+    offering it. Maia is excluded by kind: a policy model answers a position rather than a
+    search, so there is nothing for it to do for three days.
+
+    Local only, for now: a search on a runner's engine needs the sink refactor that step 4
+    of `docs/correspondence.md` brings, so `start_search` refuses one by name.
+    """
+    return list(
+        session.scalars(
+            select(Engine)
+            .where(
+                Engine.enabled.is_(True),
+                Engine.kind == EngineKind.UCI,
+                Engine.streams.is_(True),
+                Engine.runner_id.is_(None),
+            )
+            .order_by(Engine.id)
+        )
+    )
+
+
+def search_engines(session: Session) -> list[Engine]:
+    """The engines the picker offers, in the owner's order; the first is its default.
+
+    The setting is a list of ids the owner arranged on the Correspondence page, filtered to
+    the ones that are still eligible — an engine deleted or switched off since simply stops
+    being offered, and nothing has to be cleaned up when it is. An empty setting is not an
+    empty picker: it is an install that has never opened the page, and then every eligible
+    engine is offered.
+    """
+    engines = {engine.id: engine for engine in eligible_engines(session)}
+    wanted = app_settings_service.get_correspondence_search_engine_ids(session)
+    if not wanted:
+        return list(engines.values())
+    return [engines[engine_id] for engine_id in wanted if engine_id in engines]
+
+
+def start_search(
+    session: Session,
+    *,
+    node_id: int,
+    engine_id: int,
+    multipv: int | None = None,
+    limit_depth: int | None = None,
+    limit_nodes: int | None = None,
+    limit_seconds: int | None = None,
+    root_moves: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Put one engine on one node. The row is the request; the worker does the rest.
+
+    Everything that can be refused is refused here, while there is a person to tell: the
+    engine has to be one a search can run on, the moves a search is restricted to have to
+    be legal in the position, and the node may not already have this engine on it — one
+    verdict per engine per position is the whole point of the eval table, and two processes
+    writing one row would be two searches paying for each other's depth.
+
+    All three limits left out is a search with no end but the owner's, which is the
+    ordinary case: a correspondence search runs until the move is sent.
+    """
+    node = _node(session, node_id)
+    _row, game = _load(session, node.game_id)
+    _require_open(game, tree=True)
+
+    engine = _search_engine(session, engine_id)
+    live = session.scalars(
+        select(CorrespondenceSearch).where(
+            CorrespondenceSearch.node_id == node.id,
+            CorrespondenceSearch.engine_id == engine.id,
+            CorrespondenceSearch.status.in_(LIVE_SEARCH_STATES),
+        )
+    ).first()
+    if live is not None:
+        raise SearchBusyError(
+            f"{engine.name!r} is already on that position ({live.status}); "
+            f"pause or stop that search before starting another"
+        )
+
+    row = CorrespondenceSearch(
+        node_id=node.id,
+        engine_id=engine.id,
+        multipv=_multipv(session, multipv),
+        kind=SearchKind.SEARCH,
+        limit_depth=_limit(limit_depth, "depth"),
+        limit_nodes=_limit(limit_nodes, "nodes"),
+        limit_seconds=_limit(limit_seconds, "seconds"),
+        root_moves=_root_moves(session, node, game, root_moves),
+        status=SearchStatus.QUEUED,
+    )
+    session.add(row)
+    session.commit()
+    return _announce_search(session, row, {engine.id: engine.name})
+
+
+def pause_search(session: Session, search_id: int) -> dict[str, Any]:
+    """Stop searching but keep what the process holds: the hash is what resuming buys.
+
+    Whether the process really is parked is the worker's answer, which arrives as a second
+    event once it has let go of its slot — `warm` on the row is written there and never
+    here, because this module is not allowed to know whether a process exists.
+    """
+    row = _search(session, search_id)
+    if row.status is SearchStatus.PAUSED:
+        return _search_payload(row, _names_for(session, [row]))
+    _require_live(row, "paused")
+    row.status = SearchStatus.PAUSED
+    row.paused_at = utcnow()
+    session.commit()
+    return _announce_search(session, row)
+
+
+def resume_search(session: Session, search_id: int) -> dict[str, Any]:
+    """Queue a paused search again. Warm if its process survived, cold if it did not."""
+    row = _search(session, search_id)
+    if row.status is SearchStatus.QUEUED:
+        return _search_payload(row, _names_for(session, [row]))
+    if row.status is not SearchStatus.PAUSED:
+        raise CorrespondenceError(
+            f"that search is {row.status} and cannot be resumed; start a new one"
+        )
+    _search_engine(session, row.engine_id)
+    row.status = SearchStatus.QUEUED
+    row.paused_at = None
+    row.error = None
+    session.commit()
+    return _announce_search(session, row)
+
+
+def stop_search(session: Session, search_id: int) -> dict[str, Any]:
+    """End a search for good. A parked process is quit; a running one goes back warm.
+
+    `warm` goes false here rather than when the worker has answered, because it is what the
+    page prints about memory this deployment is holding, and a row that still claimed a
+    process after the owner stopped it would be a strip the owner cannot act on.
+    """
+    row = _search(session, search_id)
+    if row.status in TERMINAL_SEARCH_STATES:
+        return _search_payload(row, _names_for(session, [row]))
+    row.status = SearchStatus.STOPPED
+    row.warm = False
+    row.finished_at = utcnow()
+    session.commit()
+    return _announce_search(session, row)
+
+
+def pause_all(session: Session) -> dict[str, Any]:
+    """The laptop is closing: every search parks, and the slots go back."""
+    rows = _live_searches(session, (SearchStatus.QUEUED, SearchStatus.RUNNING))
+    moment = utcnow()
+    for row in rows:
+        row.status = SearchStatus.PAUSED
+        row.paused_at = moment
+    session.commit()
+    return {"searches": [_announce_search(session, row) for row in rows]}
+
+
+def resume_all(session: Session) -> dict[str, Any]:
+    """Every parked search queued again, warm where its process is still there.
+
+    A search whose engine has been switched off or taken away since it was paused stays
+    paused — and says why. Resuming one search raises, and the sentence lands in the
+    dialog; a bulk resume has nobody to raise at, so the reason goes on the row and the row
+    is announced like any other transition. Without that, a pane would sit at *paused,
+    cold* with nothing on it to explain why the button the owner just pressed did nothing
+    to it.
+    """
+    rows = _live_searches(session, (SearchStatus.PAUSED,))
+    for row in rows:
+        trouble = _engine_trouble(session, row.engine_id)
+        if trouble is not None:
+            row.error = trouble
+            continue
+        row.status = SearchStatus.QUEUED
+        row.paused_at = None
+        row.error = None
+    session.commit()
+    return {"searches": [_announce_search(session, row) for row in rows]}
+
+
+def list_searches(
+    session: Session,
+    *,
+    active: bool = True,
+    game_id: int | None = None,
+    node_id: int | None = None,
+) -> dict[str, Any]:
+    """The searches, newest first, with the last picture the worker has of each.
+
+    `active` is the queued, running and parked ones — what the "Running now" strip is —
+    and everything else is history. The snapshot is merged in from the worker's memory
+    rather than from a row: a picture every half second is not a thing to write to SQLite,
+    and a page that has just been opened would otherwise show nothing until the next one
+    arrives over `/events`.
+    """
+    statement = select(CorrespondenceSearch, CorrespondenceNode.game_id).join(
+        CorrespondenceNode, CorrespondenceNode.id == CorrespondenceSearch.node_id
+    )
+    if active:
+        statement = statement.where(CorrespondenceSearch.status.in_(LIVE_SEARCH_STATES))
+    if game_id is not None:
+        statement = statement.where(CorrespondenceNode.game_id == int(game_id))
+    if node_id is not None:
+        statement = statement.where(CorrespondenceSearch.node_id == int(node_id))
+    found = list(session.execute(statement.order_by(CorrespondenceSearch.id.desc())).all())
+    rows = [row for row, _game_id in found]
+    names = _names_for(session, rows)
+    searches = []
+    for row, owner in found:
+        payload = _search_payload(row, names)
+        payload["game_id"] = owner
+        searches.append(payload)
+    return {"searches": searches}
+
+
+def status(session: Session) -> dict[str, Any]:
+    """What the capacity strip shows: slots, what is in them, and what is parked.
+
+    Per host, even though every search is on this one until step 4 puts them on runners —
+    the shape is what the strip draws, and a version of it that had to change when runners
+    arrive would be a second thing to get right later.
+    """
+    rows = _live_searches(session, LIVE_SEARCH_STATES)
+    names = _names_for(session, rows)
+    options = _engine_options(session, rows)
+    slots = _running_slots(session)
+    running = [row for row in rows if row.status is SearchStatus.RUNNING]
+    parked = [row for row in rows if row.status is SearchStatus.PAUSED and row.warm]
+    return {
+        "slots": slots,
+        "in_use": len(running),
+        "queued": sum(1 for row in rows if row.status is SearchStatus.QUEUED),
+        "paused": sum(1 for row in rows if row.status is SearchStatus.PAUSED),
+        "parked": [
+            {
+                "search_id": row.id,
+                "node_id": row.node_id,
+                "engine_id": row.engine_id,
+                "engine_name": names.get(row.engine_id or -1),
+                # What the parked process is actually holding on to, which is the number
+                # the owner needs in order to decide it is too much.
+                "hash_mb": _hash_mb(options.get(row.engine_id or -1)),
+            }
+            for row in parked
+        ],
+        "hosts": [
+            {
+                "runner_id": None,
+                "host": "this host",
+                "slots": slots,
+                "in_use": len(running),
+                "parked": len(parked),
+            }
+        ],
+        # Two lists, because the two readers want different things. The picker wants what
+        # the owner chose, in order, with a default; the settings page wants everything a
+        # search *could* run on, or choosing one engine would be a one-way door — the
+        # picker list is the chosen list, so the page could never offer the engines that
+        # were left out, nor name one it holds that has since been switched off.
+        "engines": [
+            _engine_entry(engine, default=index == 0)
+            for index, engine in enumerate(search_engines(session))
+        ],
+        "eligible_engines": [_engine_entry(engine) for engine in eligible_engines(session)],
+    }
+
+
+def _running_slots(session: Session) -> int:
+    """How many searches this process can actually run at once.
+
+    The worker's number, not the setting's: `correspondence_slots` is read once, when the
+    pool and the semaphore are sized, so raising it and saving changes what the settings
+    page holds and nothing about what the machine will do until a restart — which the page
+    says. The strip is the readout the owner acts on ("is there a slot free?"), and one
+    reading "2 of 6 in use" with four slots that do not exist would be worse than no strip
+    at all. With no worker in this process — a test, the CLI, a read-only deployment — the
+    setting is the best answer there is.
+    """
+    source = _CAPACITY_SOURCE
+    if source is not None:
+        try:
+            running = source().get("slots")
+        except Exception:  # pragma: no cover - a reader must never fail a payload
+            running = None
+        if isinstance(running, int) and running > 0:
+            return running
+    return app_settings_service.get_correspondence_slots(session)
+
+
+def _engine_entry(engine: Engine, *, default: bool = False) -> dict[str, Any]:
+    """One engine as the picker and the settings page draw it."""
+    return {
+        "engine_id": engine.id,
+        "name": engine.name,
+        "version": engine.version,
+        "hash_mb": _hash_mb(engine.options),
+        "default": default,
+    }
+
+
+# --- searches: what the worker calls ---------------------------------------
+
+
+def search_context(session: Session, search_id: int) -> dict[str, Any] | None:
+    """Everything the worker needs in order to start one search, read off the rows once.
+
+    The worker owns processes and nothing else — no query, no model, no session of its
+    own — so this is where a row becomes a position, a pool key and a set of limits. None
+    means the row is no longer one to start: it was stopped, or it is already running,
+    and the worker simply lets go.
+
+    A search whose engine cannot run it raises, and the worker fails the row with the
+    sentence this gives it.
+    """
+    from backend.services import engines as engines_service
+
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None or row.status is not SearchStatus.QUEUED:
+        return None
+    node = _node(session, row.node_id)
+    _row, game = _load(session, node.game_id)
+    trouble = _engine_trouble(session, row.engine_id)
+    if trouble is not None:
+        raise CorrespondenceError(trouble)
+    engine = session.get(Engine, row.engine_id)
+    board = _board_at(game, node, _nodes(session, node.game_id))
+    return {
+        "search_id": row.id,
+        "node_id": node.id,
+        "game_id": node.game_id,
+        "engine_id": row.engine_id,
+        "engine_name": engine.name if engine else None,
+        "spec": engines_service.spec_for(engine),  # type: ignore[arg-type]
+        "fen": board.fen(),
+        "multipv": row.multipv,
+        "root_moves": list(row.root_moves) if row.root_moves else None,
+        "limit_depth": row.limit_depth,
+        "limit_nodes": row.limit_nodes,
+        "limit_seconds": row.limit_seconds,
+    }
+
+
+def search_state(session: Session, search_id: int) -> str | None:
+    """The row's status as it stands, or None when the row is gone.
+
+    The one question the worker asks about a row it is not driving: whether a process it is
+    holding is still one a resume would want. Spelled apart from `search_context`, which
+    answers "not one to start" for a stopped row and a running one alike — and the two
+    deserve opposite treatment of the warm process in the worker's hand.
+    """
+    row = session.get(CorrespondenceSearch, int(search_id))
+    return None if row is None else row.status.value
+
+
+def mark_running(session: Session, search_id: int) -> dict[str, Any] | None:
+    """The worker has a process and the search is going. None if the row moved on.
+
+    `started_at` is the start of *this* stretch, not of the search: it is what the page's
+    clock counts up from, and a search paused on Monday and resumed on Friday did not spend
+    those four days searching. What the engine really spent is accumulated on the eval row
+    by `checkpoint`, which is where a total belongs.
+    """
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None or row.status in TERMINAL_SEARCH_STATES:
+        return None
+    row.status = SearchStatus.RUNNING
+    row.warm = False
+    row.error = None
+    row.started_at = utcnow()
+    row.heartbeat_at = utcnow()
+    session.commit()
+    return _announce_search(session, row)
+
+
+def mark_parked(session: Session, search_id: int, *, warm: bool) -> dict[str, Any] | None:
+    """The search has let go of its slot; `warm` says whether its process is still there.
+
+    A row that has gone back to `queued` while the engine was stopping is left queued: the
+    owner pressed Resume in the second it took to park, and writing `paused` over that
+    would leave a search nobody restarts. The worker reads the status back and relaunches.
+    """
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None or row.status in TERMINAL_SEARCH_STATES:
+        return None
+    if row.status is not SearchStatus.QUEUED:
+        row.status = SearchStatus.PAUSED
+        row.paused_at = row.paused_at or utcnow()
+    row.warm = bool(warm)
+    session.commit()
+    return _announce_search(session, row)
+
+
+def mark_finished(
+    session: Session,
+    search_id: int,
+    *,
+    status: SearchStatus | str = SearchStatus.DONE,
+    error: str | None = None,
+    stderr: str | None = None,
+) -> dict[str, Any] | None:
+    """The search is over: it reached its limit, was stopped, or the engine failed.
+
+    A row somebody has already stopped keeps that word — `stopped` is the owner's account
+    of why a search ended and `done` is the engine's, and the owner's is the one worth
+    keeping when both are true.
+    """
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None:
+        return None
+    wanted = SearchStatus(status)
+    if row.status not in TERMINAL_SEARCH_STATES:
+        row.status = wanted
+    row.warm = False
+    row.finished_at = row.finished_at or utcnow()
+    if error:
+        row.error = error
+    if stderr:
+        row.stderr = stderr[-STDERR_LIMIT:]
+    session.commit()
+    return _announce_search(session, row)
+
+
+def checkpoint(
+    session: Session,
+    search_id: int,
+    snapshot: dict[str, Any] | None = None,
+    *,
+    time_delta_ms: int = 0,
+    final: bool = False,
+) -> dict[str, Any] | None:
+    """Write what the engine has reached into the (position, engine) eval row.
+
+    Four rules, and they are the whole of why a three-day search is worth anything:
+
+    * **Forward only.** A picture shallower than what the row already holds changes none of
+      its numbers, so a thirty-second task landing on a position this search has settled —
+      or the first seconds after a resume, before the process is back at its depth — cannot
+      undo it.
+    * **Full width only.** A search restricted to a few moves has not judged the position;
+      it has judged a shortlist. Its number is the best of the moves it was allowed, which
+      is a *lower* bound on the position and usually far below it, and the row it would be
+      written into is shared by every node, every game and every transposition that reaches
+      this position. Forward-only would then make that number permanent: no later
+      full-width search under its depth could correct it. So a restricted search
+      checkpoints nothing but its heartbeat; its numbers live on the screen, as
+      `correspondence.snapshot`, and end with it.
+    * **One history entry per completed depth**, capped: the trajectory is how a player
+      judges whether a number has settled, and the last `HISTORY_LIMIT` depths are all of
+      it anybody reads.
+    * **Time accumulates.** `time_delta_ms` is what this stretch has spent since the last
+      checkpoint, so an eval's time is every second every process ever spent on that
+      position with that engine, across pauses and restarts.
+
+    `heartbeat_at` is touched whatever the picture said, because a search that is alive and
+    has learned nothing new is still alive.
+    """
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None:
+        return None
+    node = session.get(CorrespondenceNode, row.node_id)
+    if node is None:  # pragma: no cover - the foreign key cascades
+        return None
+    row.heartbeat_at = utcnow()
+    if row.root_moves:
+        # Nothing written, so nothing for the tree to refetch either: the row's own
+        # transition is announced by whoever ended the search.
+        session.commit()
+        return None
+
+    engine = session.get(Engine, row.engine_id) if row.engine_id else None
+    picture = _picture(snapshot)
+    stored = session.scalars(
+        select(CorrespondenceEval).where(
+            CorrespondenceEval.epd == node.epd,
+            CorrespondenceEval.engine_id == row.engine_id,
+        )
+    ).first()
+    if stored is None:
+        if picture is None:
+            # No row for a search that has not said anything yet. A checkmate, a stop
+            # inside the first snapshot interval: the engine has judged nothing, and a row
+            # written here would be a permanent all-NULL verdict keyed by (position,
+            # engine) — a pane with no number on it in every game that ever reaches this
+            # position, and an empty answer for `chosen_eval` if the owner pinned it.
+            session.commit()
+            return None
+        stored = CorrespondenceEval(
+            epd=node.epd,
+            engine_id=row.engine_id,
+            engine_name=engine.name if engine else "engine",
+            engine_version=engine.version if engine else None,
+            history=[],
+        )
+        session.add(stored)
+    if engine is not None:
+        # An engine that has been upgraded under a running search: the verdict is the new
+        # binary's from here on, and the row says which one wrote it.
+        stored.engine_name = engine.name
+        stored.engine_version = engine.version
+    stored.time_ms = (stored.time_ms or 0) + max(0, int(time_delta_ms))
+
+    if picture is not None and picture["depth"] >= (stored.depth or 0):
+        stored.cp = picture["cp"]
+        stored.mate = picture["mate"]
+        stored.depth = picture["depth"]
+        stored.nodes = picture["nodes"]
+        stored.best_lines = picture["lines"]
+        _append_history(stored, picture)
+    stored.updated_at = utcnow()
+    session.commit()
+    if final:
+        # The tree reads the eval table, so the page has to refetch once the search has
+        # stopped writing to it. Not on every checkpoint: the live numbers travel as
+        # `correspondence.snapshot`, and a tree refetch every few seconds for three days
+        # would be the one thing this mode must not cost.
+        _announce(node.game_id)
+    return _eval_payload(stored, {stored.engine_id or -1: stored.engine_name})
+
+
+def recover_at_boot(session: Session) -> dict[str, Any]:
+    """What a restart makes of the searches the last process was running.
+
+    The tree lost nothing and the rows say what the engines lost: a search whose engine is
+    still here is queued again and starts cold at the depth its last checkpoint reached,
+    and one whose engine is gone is parked with the reason where the owner will read it.
+    `warm` is cleared on every row, because no process survives a restart and a row
+    claiming one would have the capacity strip lying about this deployment's memory.
+    """
+    rows = _live_searches(session, LIVE_SEARCH_STATES)
+    relaunch: list[int] = []
+    parked: list[int] = []
+    for row in rows:
+        row.warm = False
+        trouble = _engine_trouble(session, row.engine_id)
+        if row.status is SearchStatus.PAUSED:
+            parked.append(row.id)
+            continue
+        if trouble is None:
+            row.status = SearchStatus.QUEUED
+            relaunch.append(row.id)
+        else:
+            row.status = SearchStatus.PAUSED
+            row.paused_at = utcnow()
+            row.error = trouble
+            parked.append(row.id)
+    session.commit()
+    for row in rows:
+        _announce_search(session, row)
+    if relaunch:
+        logger.info("correspondence: relaunching %s search(es) after a restart", len(relaunch))
+    return {"relaunch": relaunch, "paused": parked}
+
+
+def register_snapshots(source: Callable[[], dict[int, dict[str, Any]]]) -> None:
+    """Let the worker offer its last picture of every search it is running.
+
+    The one thing this module reads that is not a row. A search's numbers change twice a
+    second and belong in no database; a page that has just been opened still has to show
+    them, so the worker registers a reader and `list_searches` merges what it finds. The
+    dependency points the right way — the worker knows the service, not the other way
+    round — and with no worker registered (a test, the CLI) every payload simply has no
+    snapshot in it.
+    """
+    global _SNAPSHOT_SOURCE
+    _SNAPSHOT_SOURCE = source
+
+
+def clear_snapshots() -> None:
+    global _SNAPSHOT_SOURCE
+    _SNAPSHOT_SOURCE = None
+
+
+def register_capacity(source: Callable[[], dict[str, Any]]) -> None:
+    """Let the worker say what it sized itself to, for the capacity strip to read.
+
+    `register_snapshots`' reason again, for a different number: the setting is what the
+    owner has asked for and the pool is what this process is running, and between a save
+    and a restart those are two different numbers. The strip wants the second one. The
+    dependency points the same way — the worker knows the service — and with no worker
+    registered `status` falls back to the setting.
+    """
+    global _CAPACITY_SOURCE
+    _CAPACITY_SOURCE = source
+
+
+def clear_capacity() -> None:
+    global _CAPACITY_SOURCE
+    _CAPACITY_SOURCE = None
+
+
 # --- the read model --------------------------------------------------------
 
 
@@ -1157,6 +1802,267 @@ def _running(session: Session, game_ids: Sequence[int]) -> dict[int, list[dict[s
     return found
 
 
+# --- internals: searches ---------------------------------------------------
+
+
+def _search(session: Session, search_id: int) -> CorrespondenceSearch:
+    row = session.get(CorrespondenceSearch, int(search_id))
+    if row is None:
+        raise UnknownSearchError(f"no correspondence search with id {search_id}")
+    return row
+
+
+def _require_live(row: CorrespondenceSearch, verb: str) -> None:
+    if row.status in TERMINAL_SEARCH_STATES:
+        raise CorrespondenceError(f"that search is {row.status} and cannot be {verb}")
+
+
+def _live_searches(
+    session: Session, statuses: Sequence[SearchStatus]
+) -> list[CorrespondenceSearch]:
+    """Every infinite search in one of these states. Tasks are the analysis queue's."""
+    return list(
+        session.scalars(
+            select(CorrespondenceSearch)
+            .where(
+                CorrespondenceSearch.kind == SearchKind.SEARCH,
+                CorrespondenceSearch.status.in_(list(statuses)),
+            )
+            .order_by(CorrespondenceSearch.id)
+        )
+    )
+
+
+def _search_engine(session: Session, engine_id: int | None) -> Engine:
+    """The engine a search is being started on, or the reason it cannot be."""
+    if engine_id is None:
+        raise CorrespondenceError("a search needs an engine to run on")
+    engine = session.get(Engine, int(engine_id))
+    if engine is None:
+        raise CorrespondenceError(f"no engine with id {engine_id}")
+    trouble = _engine_trouble(session, engine.id, engine=engine)
+    if trouble is not None:
+        raise CorrespondenceError(trouble)
+    return engine
+
+
+def _engine_trouble(
+    session: Session, engine_id: int | None, *, engine: Engine | None = None
+) -> str | None:
+    """Why this engine cannot run a search here, phrased for somebody who has to act on it.
+
+    None means it can. Every caller that starts or relaunches a search asks this and
+    nothing else, so "which engines a search may run on" is decided once — and a runner's
+    engine is refused by name rather than silently, because the answer for it is "not yet":
+    step 4 of `docs/correspondence.md` is what puts searches on other hosts.
+    """
+    from backend.services import engines as engines_service
+
+    if engine is None:
+        if engine_id is None:
+            return "that search has no engine any more"
+        engine = session.get(Engine, int(engine_id))
+    if engine is None:
+        return f"the engine that search was started on (id {engine_id}) is gone"
+    if engine.runner_id is not None:
+        host = engines_service.engine_host(session, engine)
+        return (
+            f"{engine.name!r} lives on {host}, and correspondence searches run on this host "
+            f"only for now; give this deployment an engine of its own to search with"
+        )
+    if not engine.enabled:
+        return f"{engine.name!r} is switched off"
+    if engine.kind is not EngineKind.UCI:
+        return f"{engine.name!r} is a human-move model, and a search needs a UCI engine"
+    if not engine.streams:
+        return f"{engine.name!r} does not drive a board, so it cannot run a search"
+    if not engines_service.binary_present(engine.path):
+        return f"the binary for {engine.name!r} is no longer at {engine.path}"
+    return None
+
+
+def _names_for(session: Session, rows: Sequence[CorrespondenceSearch]) -> dict[int, str]:
+    ids = sorted({row.engine_id for row in rows if row.engine_id})
+    if not ids:
+        return {}
+    return {
+        engine.id: engine.name
+        for engine in session.scalars(select(Engine).where(Engine.id.in_(ids)))
+    }
+
+
+def _engine_options(
+    session: Session, rows: Sequence[CorrespondenceSearch]
+) -> dict[int, dict[str, Any]]:
+    ids = sorted({row.engine_id for row in rows if row.engine_id})
+    if not ids:
+        return {}
+    return {
+        engine.id: engine.options or {}
+        for engine in session.scalars(select(Engine).where(Engine.id.in_(ids)))
+    }
+
+
+def _hash_mb(options: dict[str, Any] | None) -> int | None:
+    """What one parked process is holding, as its `Hash` option says. None if it does not."""
+    value = (options or {}).get("Hash")
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        return None
+    try:
+        return int(float(value))
+    except ValueError:
+        return None
+
+
+def _multipv(session: Session, value: int | None) -> int:
+    """How many lines this search keeps: what was asked for, or the deployment's default."""
+    if value is None:
+        return app_settings_service.get_correspondence_multipv(session)
+    setting = app_settings_service.BY_KEY[app_settings_service.CORRESPONDENCE_MULTIPV]
+    return int(setting.clamp(int(value)))
+
+
+def _limit(value: int | None, what: str) -> int | None:
+    """One of a search's three stopping points. None is "no limit of this kind"."""
+    if value is None:
+        return None
+    number = int(value)
+    if number <= 0:
+        raise CorrespondenceError(f"a limit of {number} {what} is not a limit; leave it out")
+    return number
+
+
+def _root_moves(
+    session: Session, node: CorrespondenceNode, game: Game, ucis: Sequence[str] | None
+) -> list[str] | None:
+    """`searchmoves`, checked against the node's own board and spelled as the engine takes them.
+
+    Checked here rather than by the driver because this is where there is somebody to tell:
+    a search restricted to a move that is not legal in the position would start, find
+    nothing to search and end as a failure three seconds later.
+    """
+    wanted = [str(uci).strip() for uci in ucis or ()]
+    wanted = [uci for uci in wanted if uci]
+    if not wanted:
+        return None
+    board = _board_at(game, node, _nodes(session, node.game_id))
+    spelled: list[str] = []
+    for uci in wanted:
+        try:
+            move = board.parse_uci(uci)
+        except ValueError as exc:
+            raise CorrespondenceError(f"{uci!r} cannot be searched here: {exc}") from None
+        if board.uci(move) not in spelled:
+            spelled.append(board.uci(move))
+    return spelled
+
+
+def _picture(snapshot: dict[str, Any] | None) -> dict[str, Any] | None:
+    """One snapshot as the numbers an eval row holds, or None if it said nothing yet.
+
+    A search's first pictures carry a depth and no line, and a terminal position carries
+    nothing at all; neither is a verdict, and writing one would give the tree a node with a
+    depth and no evaluation.
+    """
+    if not snapshot:
+        return None
+    lines = [dict(entry) for entry in snapshot.get("lines") or ()]
+    if not lines:
+        return None
+    first = min(lines, key=lambda entry: entry.get("multipv") or 1)
+    if first.get("cp") is None and first.get("mate") is None:
+        return None
+    depth = snapshot.get("depth")
+    nodes = snapshot.get("nodes")
+    return {
+        "depth": int(depth) if isinstance(depth, int) else 0,
+        "nodes": int(nodes) if isinstance(nodes, int) else None,
+        "cp": first.get("cp"),
+        "mate": first.get("mate"),
+        "lines": lines,
+        "best": (first.get("pv") or [None])[0],
+    }
+
+
+def _append_history(stored: CorrespondenceEval, picture: dict[str, Any]) -> None:
+    """One entry per completed depth *and* per stretch of nodes, the last `HISTORY_LIMIT`.
+
+    A depth reached again — the same search after a resume, or a second engine pass —
+    replaces its entry rather than adding a second one, so the trajectory a player reads is
+    one line per depth for an engine whose depth is what moves. An engine whose depth means
+    little and whose node count means everything is the case the second key exists for: a
+    Leela at depth 19 for a day would otherwise leave one point behind and no trajectory at
+    all, which is exactly the readout a correspondence player uses to tell a settled number
+    from a moving one.
+    """
+    entry = {
+        "depth": picture["depth"],
+        "nodes": picture["nodes"],
+        "cp": picture["cp"],
+        "mate": picture["mate"],
+        "best": picture["best"],
+    }
+    history = [dict(item) for item in stored.history or []]
+    if history and _same_history_point(history[-1], entry):
+        history[-1] = entry
+    else:
+        history.append(entry)
+    stored.history = history[-HISTORY_LIMIT:]
+
+
+def _same_history_point(last: dict[str, Any], entry: dict[str, Any]) -> bool:
+    """Whether this picture is the last one again rather than a point of its own.
+
+    The same depth with materially more nodes behind it is a new point; the same depth a
+    second later is the same one, written over. An engine that reports no node count at all
+    keys on its depth alone, which is what the history did before Leela was thought about.
+    """
+    if last.get("depth") != entry.get("depth"):
+        return False
+    nodes, before = entry.get("nodes"), last.get("nodes")
+    if not isinstance(nodes, int) or not isinstance(before, int) or before <= 0:
+        return True
+    return nodes < before * HISTORY_NODE_GROWTH
+
+
+def _announce_search(
+    session: Session, row: CorrespondenceSearch, names: dict[int, str] | None = None
+) -> dict[str, Any]:
+    """Say that a search moved, and answer with the row the caller asked about.
+
+    One event per transition, with everything a surface needs to place it — which game,
+    which node, which engine — so that neither the page nor the worker has to go and look
+    the row up before it can act.
+    """
+    node = session.get(CorrespondenceNode, row.node_id)
+    game_id = node.game_id if node is not None else None
+    payload = _search_payload(row, names if names is not None else _names_for(session, [row]))
+    payload["game_id"] = game_id
+    events_service.emit(
+        {
+            "event": EVENT_SEARCH,
+            "search_id": row.id,
+            "node_id": row.node_id,
+            "game_id": game_id,
+            "engine_id": row.engine_id,
+            "status": str(row.status),
+            "warm": bool(row.warm),
+        }
+    )
+    return payload
+
+
+def _snapshot_of(search_id: int) -> dict[str, Any] | None:
+    """The worker's last picture of this search, if a worker is running in this process."""
+    source = _SNAPSHOT_SOURCE
+    if source is None:
+        return None
+    try:
+        return source().get(int(search_id))
+    except Exception:  # pragma: no cover - a reader must never fail a payload
+        return None
+
+
 # --- internals: payloads ---------------------------------------------------
 
 
@@ -1297,6 +2203,13 @@ def _eval_payload(row: CorrespondenceEval, names: dict[int, str]) -> dict[str, A
 
 
 def _search_payload(row: CorrespondenceSearch, names: dict[int, str]) -> dict[str, Any]:
+    """One search row, with the worker's last picture of it where there is one.
+
+    The snapshot is the live half and the row is the durable half, in one object, because
+    an engine pane draws both at once and has no way to join them itself: a search that has
+    been running for an hour is a row that says so and a picture that says where it has
+    got to.
+    """
     return {
         "id": row.id,
         "node_id": row.node_id,
@@ -1318,6 +2231,8 @@ def _search_payload(row: CorrespondenceSearch, names: dict[int, str]) -> dict[st
         "finished_at": _stamp(row.finished_at),
         "heartbeat_at": _stamp(row.heartbeat_at),
         "error": row.error,
+        "stderr": row.stderr,
+        "snapshot": _snapshot_of(row.id),
     }
 
 
@@ -1374,6 +2289,11 @@ def _assemble(
                 "frame": str(frame),
                 "own": _score_payload(chosen, frame),
                 "backed": _framed(backed_white, frame),
+                # Which engine `own` came from: the pinned one where there is a pin, the
+                # deepest otherwise. The pane that is showing the number has to be able to
+                # say whose it is, and working it out a second time in the client is how
+                # the two would come to disagree.
+                "chosen_engine_id": chosen.engine_id if chosen is not None else None,
                 "evals": [_eval_payload(row, names) for row in rows],
                 "searches": [_search_payload(row, names) for row in searches.get(node.id, [])],
                 "disagree": disagreement(rows),

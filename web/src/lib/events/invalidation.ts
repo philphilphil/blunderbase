@@ -115,11 +115,21 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'correspondence.updated':
       return [queryKeys.correspondence(), queryKeys.games(), queryKeys.explorer()]
 
+    // A search changed state: queued, started, parked, ended. The correspondence root
+    // only — a search touches the tree's stored evals at its FINAL checkpoint and says so
+    // with its own `correspondence.updated`, so the library and the explorer stay out of
+    // this. Six frames over three days, one per transition.
+    case 'correspondence.search':
+      return [queryKeys.correspondence()]
+
     // Carried whole on the socket, and a keepalive is not news. `stream.snapshot` arrives
-    // twice a second per open board — refetching on it would be a refetch loop.
+    // twice a second per open board — refetching on it would be a refetch loop, and
+    // `correspondence.snapshot` is the same thing over a search that runs for days. Both
+    // are written into the cache instead: `lib/events/correspondenceSnapshots.ts`.
     case 'stream.started':
     case 'stream.snapshot':
     case 'stream.ended':
+    case 'correspondence.snapshot':
     case 'live.updated':
     case 'ping':
       return []

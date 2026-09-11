@@ -12,6 +12,7 @@
  * "what happens after this" is a pointer rather than four clicks.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Pin } from 'lucide-react'
 
 import type { CorrespondenceTreeNode } from '@/lib/api/types'
 import { formatScore } from '@/lib/chess/evaluation'
@@ -117,8 +118,20 @@ export function CandidatesTable({
                   {child.own?.depth ?? '—'}
                 </td>
                 <td className="px-2.5 font-mono text-[0.625rem] text-dim">
+                  {child.pinned_engine_id ? (
+                    <span title={t`One engine's verdict is pinned here`}>
+                      <Pin
+                        className="mr-1 inline size-2.5 align-[-0.0625rem] text-accent-teal"
+                        aria-label={t`one engine's verdict is pinned here`}
+                      />
+                    </span>
+                  ) : null}
                   {engines.length > 0 ? engines.join(' ') : '—'}
-                  {child.disagree ? <span className="ml-1 text-mistake">≠</span> : null}
+                  {child.disagree ? (
+                    <span className="ml-1 text-mistake" title={t`Two engines disagree here`}>
+                      ≠
+                    </span>
+                  ) : null}
                 </td>
                 <td className={cn('px-2.5 font-mono', child.mark ? MARK_CLASS[child.mark] : '')}>
                   {child.mark ? MARK_GLYPHS[child.mark] : ''}

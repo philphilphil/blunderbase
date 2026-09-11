@@ -34,6 +34,8 @@ msgid "nothing is on the board"
 msgstr "auf dem Brett steht nichts"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
 #: src/routes/engines/EngineBadges.tsx
 #: src/routes/game/components/MobileGameView.tsx
 msgid "Engine"
@@ -48,6 +50,7 @@ msgid "deep tier"
 msgstr "Tiefenanalyse"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
 #: src/routes/engines/EngineDetail.tsx
 msgid "Lines"
 msgstr "Varianten"
@@ -77,6 +80,7 @@ msgid "Analyse this position continuously."
 msgstr "Diese Stellung fortlaufend analysieren."
 
 #: src/components/analysis/InfiniteAnalysisPanel.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
 msgid "this machine"
 msgstr "dieser Rechner"
 
@@ -119,6 +123,7 @@ msgid "Peek board"
 msgstr "Kleines Brett"
 
 #: src/components/analysis/LinePreviewSettings.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Nothing"
 msgstr "Nichts"
 
@@ -259,8 +264,10 @@ msgstr "Browser-Engine einrichten"
 #: src/components/analysis/useEngineSetup.tsx
 #: src/lib/desktop/PgnDropOverlay.tsx
 #: src/routes/auth/ChangePasswordDialog.tsx
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
 #: src/routes/engines/AddEngineForm.tsx
 #: src/routes/engines/BrowserRunnerSection.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
@@ -957,6 +964,21 @@ msgid "Coverage"
 msgstr "Abdeckung"
 
 #: src/components/shell/SideNav.tsx
+msgid "searches"
+msgstr "Suchen"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "parked, warm"
+msgstr "geparkt, warm"
+
+#: src/components/shell/SideNav.tsx
+msgid "waiting"
+msgstr "wartet"
+
+#: src/components/shell/SideNav.tsx
 msgid "No engines configured"
 msgstr "Keine Engines eingerichtet"
 
@@ -1144,16 +1166,18 @@ msgid "under a minute"
 msgstr "unter einer Minute"
 
 #: src/lib/analysis/duration.ts
+#: src/routes/correspondence/searches.ts
 msgid "{minutes}m"
 msgstr "{minutes} Min."
 
 #: src/lib/analysis/duration.ts
-msgid "{hours}h"
-msgstr "{hours} Std."
-
-#: src/lib/analysis/duration.ts
+#: src/routes/correspondence/searches.ts
 msgid "{hours}h {rest}m"
 msgstr "{hours} Std. {rest} Min."
+
+#: src/lib/analysis/duration.ts
+msgid "{hours}h"
+msgstr "{hours} Std."
 
 #: src/lib/analysis/useStreamSession.ts
 msgid "Another analysis board took this position over."
@@ -1729,6 +1753,18 @@ msgid "Default 3"
 msgstr "Standard 3"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Search slots"
+msgstr "Suchplätze"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Default 2"
+msgstr "Standard 2"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Engine {id}"
+msgstr "Engine {id}"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Correspondence mode"
 msgstr "Fernschachmodus"
 
@@ -1755,6 +1791,55 @@ msgstr "Voreinstellungen für eine neue Partie"
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "What a game created here is given, and how many lines a search over one position keeps. Both can be changed per game."
 msgstr "Was eine hier angelegte Partie mitbekommt, und wie viele Linien eine Suche über eine Stellung behält. Beides lässt sich pro Partie ändern."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Searches"
+msgstr "Suchen"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "A search is one engine on one position for as long as you let it. They have slots of their own, so a search that runs for days never takes one an imported game’s quick pass is waiting for."
+msgstr "Eine Suche ist eine Engine auf einer Stellung, so lange du sie lässt. Suchen haben eigene Plätze, damit eine Suche über Tage nie einen Platz belegt, auf den der schnelle Durchgang einer importierten Partie wartet."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Two is one CPU engine and one GPU engine at once. The server reads this when it starts, so a change here takes effect after a restart."
+msgstr "Zwei sind eine CPU-Engine und eine GPU-Engine gleichzeitig. Der Server liest das beim Start, eine Änderung hier wirkt also erst nach einem Neustart."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Engines the picker offers"
+msgstr "Engines, die zur Auswahl stehen"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "In your order; the first is the one Search with… suggests. Choose none and every eligible engine is offered."
+msgstr "In deiner Reihenfolge; die erste schlägt „Suchen mit…“ vor. Wählst du keine, stehen alle geeigneten Engines zur Auswahl."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Every eligible engine is offered."
+msgstr "Alle geeigneten Engines stehen zur Auswahl."
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+#: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default"
+msgstr "Standard"
+
+#. placeholder {0}: nameOf(id)
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Move {0} up"
+msgstr "{0} nach oben"
+
+#. placeholder {0}: nameOf(id)
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Move {0} down"
+msgstr "{0} nach unten"
+
+#. placeholder {0}: nameOf(id)
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "Remove {0}"
+msgstr "{0} entfernen"
+
+#: src/routes/analysis/CorrespondenceSettings.tsx
+msgid "No engine here can run a search: one is needed that is switched on, speaks UCI and can drive a board."
+msgstr "Keine Engine hier kann suchen: nötig ist eine, die eingeschaltet ist, UCI spricht und ein Brett bedienen kann."
 
 #: src/routes/analysis/CoverageSplit.tsx
 msgid "Deep pass"
@@ -2144,8 +2229,12 @@ msgid "Expand"
 msgstr "Ausweiten"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
-msgid "Pruning arrives in the next step"
-msgstr "Das Kürzen kommt im nächsten Schritt"
+msgid "Nothing in this tree has fallen far enough behind to prune"
+msgstr "Nichts in diesem Baum liegt weit genug zurück, um gekürzt zu werden"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Delete the faded lines — never automatic, and always after a confirm"
+msgstr "Die verblassten Varianten löschen — nie automatisch und immer erst nach einer Rückfrage"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "Prune weak"
@@ -2157,14 +2246,23 @@ msgid "Export PGN"
 msgstr "PGN exportieren"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Searches arrive in the next step"
-msgstr "Suchen kommen im nächsten Schritt"
-
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Search with…"
 msgstr "Suchen mit…"
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Prune the weak lines"
+msgstr "Schwache Varianten kürzen"
+
+#. placeholder {0}: nodes.length
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "{0} lines and everything under them — {total} positions in all. Their evaluations stay in the library; only these nodes go."
+msgstr "{0} Varianten und alles darunter — {total} Stellungen insgesamt. Ihre Bewertungen bleiben in der Bibliothek; nur diese Knoten verschwinden."
+
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+msgid "Prune"
+msgstr "Kürzen"
 
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 msgid "That correspondence game is not here."
@@ -2224,6 +2322,18 @@ msgid "{ongoing, plural, =0 {No games running} one {1 game running} other {# gam
 msgstr "{ongoing, plural, =0 {Keine laufende Partie} one {1 laufende Partie} other {# laufende Partien}}"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Resume all"
+msgstr "Alle fortsetzen"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Every search gives its slot back and keeps its process"
+msgstr "Jede Suche gibt ihren Platz zurück und behält ihren Prozess"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Pause all"
+msgstr "Alle pausieren"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
 #: src/routes/dashboard/DashboardPage.tsx
 msgid "Import PGN"
 msgstr "PGN importieren"
@@ -2231,14 +2341,6 @@ msgstr "PGN importieren"
 #: src/routes/correspondence/CorrespondencePage.tsx
 msgid "New game"
 msgstr "Neue Partie"
-
-#: src/routes/correspondence/CorrespondencePage.tsx
-msgid "No engine is searching a correspondence position yet."
-msgstr "Noch sucht keine Engine an einer Fernschachstellung."
-
-#: src/routes/correspondence/CorrespondencePage.tsx
-msgid "Searches, tasks and the capacity they use arrive in the next step."
-msgstr "Suchen, Aufgaben und die Kapazität, die sie belegen, kommen im nächsten Schritt."
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 msgid "The correspondence games could not be read."
@@ -2272,6 +2374,14 @@ msgstr "Kein Zug von dir ist bei einem Gegner."
 #: src/routes/correspondence/CorrespondencePage.tsx
 msgid "Sent"
 msgstr "Gesendet"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "Running now"
+msgstr "Läuft gerade"
+
+#: src/routes/correspondence/CorrespondencePage.tsx
+msgid "every engine on every game"
+msgstr "jede Engine in jeder Partie"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 #: src/routes/import/JobProgress.tsx
@@ -2337,6 +2447,7 @@ msgid "Backed"
 msgstr "Zurückgerechnet"
 
 #: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Depth"
 msgstr "Tiefe"
 
@@ -2349,6 +2460,63 @@ msgstr "Zeichen"
 msgid "The minimax under this move disagrees with its own number"
 msgstr "Das Minimax unter diesem Zug widerspricht seiner eigenen Zahl"
 
+#: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "One engine's verdict is pinned here"
+msgstr "Hier ist das Urteil einer Engine angeheftet"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "one engine's verdict is pinned here"
+msgstr "hier ist das Urteil einer Engine angeheftet"
+
+#: src/routes/correspondence/components/CandidatesTable.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Two engines disagree here"
+msgstr "Zwei Engines sind hier uneins"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{gb} GB"
+msgstr "{gb} GB"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{mb} MB"
+msgstr "{mb} MB"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "Reading what the engines are doing…"
+msgstr "Lese, was die Engines tun…"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{inUse} of {slots}"
+msgstr "{inUse} von {slots}"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "search slots in use on this machine"
+msgstr "Suchplätze auf diesem Rechner belegt"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{parked, plural, one {# engine parked} other {# engines parked}}"
+msgstr "{parked, plural, one {# Engine geparkt} other {# Engines geparkt}}"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{queued, plural, one {# search waiting} other {# searches waiting}}"
+msgstr "{queued, plural, one {# Suche wartet} other {# Suchen warten}}"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "for a slot"
+msgstr "auf einen Platz"
+
+#. placeholder {0}: host.in_use ?? 0
+#. placeholder {1}: host.slots
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "{0} of {1} in use"
+msgstr "{0} von {1} belegt"
+
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "Nothing is searching. Open a game and set an engine on a position."
+msgstr "Es sucht nichts. Öffne eine Partie und setze eine Engine auf eine Stellung."
+
 #: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
 #: src/routes/game/components/StudioActions.tsx
 msgid "Correspondence tree"
@@ -2358,22 +2526,134 @@ msgstr "Fernschachbaum"
 msgid "what was considered while the game ran"
 msgstr "was während der Partie erwogen wurde"
 
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "searching"
+msgstr "sucht"
+
+#. placeholder {0}: formatSpan(elapsed)
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "searching · {0}"
+msgstr "sucht · {0}"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "The process is parked with its hash intact — resuming costs seconds"
+msgstr "Der Prozess ist mit intaktem Hash geparkt — das Fortsetzen kostet Sekunden"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "paused, cold"
+msgstr "pausiert, kalt"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "waiting for a slot"
+msgstr "wartet auf einen Platz"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "stored"
+msgstr "gespeichert"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "depth {depth}"
+msgstr "Tiefe {depth}"
+
+#. placeholder {0}: formatNodes(nodes)
+#. placeholder {0}: formatNodes(snapshot.nodes)
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "{0} nodes"
+msgstr "{0} Knoten"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "The tree reads this engine here. Click to go back to the deepest."
+msgstr "Der Baum liest hier diese Engine. Klicken, um wieder die tiefste zu nehmen."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Make this engine's verdict the one the tree reads here"
+msgstr "Das Urteil dieser Engine zu dem machen, das der Baum hier liest"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pinned"
+msgstr "Angeheftet"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pin"
+msgstr "Anheften"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Resume"
+msgstr "Fortsetzen"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pause"
+msgstr "Pausieren"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/import/JobProgress.tsx
+msgid "Stop"
+msgstr "Stoppen"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "The engine has not sent a line yet."
+msgstr "Die Engine hat noch keine Variante geschickt."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "No lines were kept for this verdict."
+msgstr "Zu diesem Urteil wurden keine Varianten aufbewahrt."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "No limit — this runs until you stop it."
+msgstr "Kein Limit — das läuft, bis du es stoppst."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "No history yet: an entry lands as the depth or the node count moves."
+msgstr "Noch kein Verlauf: Ein Eintrag entsteht, sobald Tiefe oder Knotenzahl sich bewegen."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "{from} at depth {atFrom} → {to} at depth {atTo}"
+msgstr "{from} bei Tiefe {atFrom} → {to} bei Tiefe {atTo}"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "{from} → {to}"
+msgstr "{from} → {to}"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "settled"
+msgstr "stabil"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "best move steady for {stable} depths"
+msgstr "bester Zug seit {stable} Tiefen unverändert"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "still moving"
+msgstr "bewegt sich noch"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "to depth {depth}"
+msgstr "bis Tiefe {depth}"
+
+#. placeholder {0}: formatNodes(nodes)
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "to {0} nodes"
+msgstr "bis {0} Knoten"
+
+#. placeholder {0}: formatSpan(seconds)
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "for {0}"
+msgstr "für {0}"
+
 #: src/routes/correspondence/components/EnginesPane.tsx
 msgid "No engine has looked at this position yet."
 msgstr "Noch hat keine Engine diese Stellung angesehen."
 
 #: src/routes/correspondence/components/EnginesPane.tsx
-msgid "Searches — one engine on one position for as long as you let it, several at once — arrive in the next step. Until then the tree is where the thinking is kept."
-msgstr "Suchen – eine Engine an einer Stellung, so lange du willst, auch mehrere gleichzeitig – kommen im nächsten Schritt. Bis dahin ist der Baum der Ort, an dem das Denken aufgehoben wird."
-
-#. placeholder {0}: one.depth
-#: src/routes/correspondence/components/EnginesPane.tsx
-msgid "depth {0}"
-msgstr "Tiefe {0}"
-
-#: src/routes/correspondence/components/EnginesPane.tsx
-msgid "nodes"
-msgstr "Knoten"
+msgid "Search with… puts one on it for as long as you let it. Several engines can work on the same position at once, each in a pane of its own."
+msgstr "„Suchen mit…“ setzt eine darauf, so lange du sie lässt. Mehrere Engines können gleichzeitig an derselben Stellung arbeiten, jede in einem eigenen Feld."
 
 #: src/routes/correspondence/components/GameHeader.tsx
 msgid "The move that arrived"
@@ -2537,11 +2817,6 @@ msgid "FEN — leave empty for the normal array"
 msgstr "FEN – leer lassen für die Grundstellung"
 
 #: src/routes/correspondence/components/NewGameDialog.tsx
-#: src/routes/engines/OptionsEditor.tsx
-msgid "default"
-msgstr "Standard"
-
-#: src/routes/correspondence/components/NewGameDialog.tsx
 msgid "Create game"
 msgstr "Partie anlegen"
 
@@ -2637,21 +2912,85 @@ msgstr "Zu dieser Stellung ist noch nichts geschrieben."
 msgid "Nothing written about this game yet."
 msgstr "Zu dieser Partie ist noch nichts geschrieben."
 
+#. placeholder {0}: snapshot.depth
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "depth {0}"
+msgstr "Tiefe {0}"
+
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "from the side to move's point of view"
+msgstr "aus Sicht der Seite am Zug"
+
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "No engine is on a correspondence position right now."
+msgstr "Gerade sitzt keine Engine auf einer Fernschach-Stellung."
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/game/notesModel.ts
+msgid "the starting position"
+msgstr "die Ausgangsstellung"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "One engine on {where}, for as long as you let it. It keeps its slot until it finishes or you pause it."
+msgstr "Eine Engine auf {where}, so lange du sie lässt. Sie behält ihren Platz, bis sie fertig ist oder du sie pausierst."
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "No engine here can run a search. One is needed that is switched on, speaks UCI and can drive a board — Analysis → Correspondence says which are offered."
+msgstr "Keine Engine hier kann suchen. Nötig ist eine, die eingeschaltet ist, UCI spricht und ein Brett bedienen kann — unter Analyse → Fernschach steht, welche zur Auswahl stehen."
+
+#. placeholder {0}: engine.hash_mb
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "{0} MB"
+msgstr "{0} MB"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "Stop it at"
+msgstr "Beenden bei"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Nodes"
+msgstr "Knoten"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "Seconds"
+msgstr "Sekunden"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "Limit"
+msgstr "Limit"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "It runs until you pause or stop it — the ordinary case."
+msgstr "Sie läuft, bis du sie pausierst oder stoppst — der Normalfall."
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "Left empty, the limit is ignored and it runs on."
+msgstr "Bleibt das Feld leer, wird das Limit ignoriert und sie läuft weiter."
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "Only the marked moves"
+msgstr "Nur die markierten Züge"
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "The engine spends everything on the moves you pick and answers nothing about the rest."
+msgstr "Die Engine steckt alles in die Züge, die du wählst, und sagt zum Rest nichts."
+
+#: src/routes/correspondence/components/SearchDialog.tsx
+msgid "Start searching"
+msgstr "Suche starten"
+
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "The minimax under this move disagrees with the engine's own number here"
 msgstr "Das Minimax unter diesem Zug widerspricht hier der eigenen Zahl der Engine"
 
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "Two engines disagree here"
-msgstr "Zwei Engines sind hier uneins"
+msgid "parked"
+msgstr "geparkt"
 
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "searching"
-msgstr "sucht"
-
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "a task is waiting"
-msgstr "eine Aufgabe wartet"
+msgid "An engine is parked here, warm — resuming costs seconds"
+msgstr "Hier ist eine Engine geparkt, warm — das Fortsetzen kostet Sekunden"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "This game has no tree yet."
@@ -2676,6 +3015,10 @@ msgstr "Nach vorn holen"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "A move the game played cannot be deleted"
 msgstr "Ein Zug, den die Partie gespielt hat, lässt sich nicht löschen"
+
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "An engine is still on this line"
+msgstr "In dieser Variante sitzt noch eine Engine"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Delete subtree"
@@ -2712,6 +3055,39 @@ msgstr "Schlecht"
 #: src/routes/correspondence/format.ts
 msgid "Excluded"
 msgstr "Ausgeschlossen"
+
+#: src/routes/correspondence/searches.ts
+msgid "{whole}s"
+msgstr "{whole} Sek."
+
+#: src/routes/correspondence/searches.ts
+msgid "{days}d {rest}h"
+msgstr "{days} T. {rest} Std."
+
+#: src/routes/correspondence/useSearchToasts.ts
+msgid "The engine"
+msgstr "Die Engine"
+
+#: src/routes/correspondence/useSearchToasts.ts
+msgid "this position"
+msgstr "dieser Stellung"
+
+#. placeholder {0}: search.error
+#: src/routes/correspondence/useSearchToasts.ts
+msgid "{engine} stopped on {where}: {0}"
+msgstr "{engine} hat auf {where} aufgehört: {0}"
+
+#: src/routes/correspondence/useSearchToasts.ts
+msgid "{engine} stopped on {where}."
+msgstr "{engine} hat auf {where} aufgehört."
+
+#: src/routes/correspondence/useSearchToasts.ts
+msgid "{engine} reached its limit on {where}."
+msgstr "{engine} hat auf {where} ihr Limit erreicht."
+
+#: src/routes/correspondence/useSearchToasts.ts
+msgid "{engine} finished on {where}."
+msgstr "{engine} ist auf {where} fertig."
 
 #: src/routes/dashboard/DashboardPage.tsx
 msgid "The backend is not answering. Nothing below will be current."
@@ -3131,11 +3507,6 @@ msgid "Start"
 msgstr "Starten"
 
 #: src/routes/engines/BrowserRunnerSection.tsx
-#: src/routes/import/JobProgress.tsx
-msgid "Stop"
-msgstr "Stoppen"
-
-#: src/routes/engines/BrowserRunnerSection.tsx
 msgid "Uninstall"
 msgstr "Deinstallieren"
 
@@ -3493,10 +3864,6 @@ msgstr "Anfangsstellung"
 #: src/routes/engines/EngineDetail.tsx
 msgid "Ratings"
 msgstr "Wertungen"
-
-#: src/routes/engines/EngineDetail.tsx
-msgid "Nodes"
-msgstr "Knoten"
 
 #: src/routes/engines/EngineDetail.tsx
 msgid "Runs whether the engine is enabled or not — the point of the button is to decide."
@@ -4738,10 +5105,6 @@ msgstr "{move} (Variante)"
 #: src/routes/game/notesModel.ts
 msgid "a variation"
 msgstr "eine Variante"
-
-#: src/routes/game/notesModel.ts
-msgid "the starting position"
-msgstr "die Ausgangsstellung"
 
 #: src/routes/game/notesModel.ts
 msgid "ply {count}"

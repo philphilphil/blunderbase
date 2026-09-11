@@ -81,8 +81,46 @@ board.
 On the server itself, `BLUNDERBASE_ANALYSIS_CONCURRENCY` caps how many engine processes run
 at once across all tiers. It defaults to the machine's cores minus two.
 `BLUNDERBASE_ANALYSIS_WORKERS` turns the in-process workers off entirely, for an
-installation that drains the queue from `blunderbase analyze` on its own schedule. See
-[Configuration](configuration.md).
+installation that drains the queue from `blunderbase analyze` on its own schedule — the
+correspondence searches go with them. See [Configuration](configuration.md).
+
+## An engine for correspondence
+
+A correspondence search is not a queue job: it is one engine sitting on one position for
+hours or days, and it is counted separately. **Analysis → Correspondence → Search slots**
+says how many of those may run at once here — two by default — and they are slots of their
+own, so a search never takes the one an imported game's quick pass is waiting for. Give
+correspondence **its own engine row** rather than the one your passes use: a row with
+`Threads` set high and `Hash` set to as much memory as you can spare, chosen under **Search
+engines** on the same page. Editing the options of an engine starts a fresh process, so the
+two rows never fight over one.
+
+A search slot is not the same unit as `BLUNDERBASE_ANALYSIS_CONCURRENCY` above, and the two
+are added rather than shared: that variable caps the engine processes the *queue* runs
+across all tiers, **Search slots** caps the searches beside them. Two slots and a
+concurrency of six are up to eight engine processes on this machine at once, so set
+`Threads` on the correspondence row against what the queue is already using — a row that
+takes every core, twice over, is how a machine ends up thrashing.
+
+Two things about memory are worth knowing before you set `Hash` to something large. A
+**paused** search keeps its process, hash and all, so that resuming it costs seconds
+instead of hours — the correspondence page's capacity strip says how many are parked and
+what each is holding, and stopping one is what gives that memory back. And **a restart
+loses every hash**: the searches come back, the evaluations in the tree come back, but each
+engine starts again from the depth its last checkpoint recorded. Nothing about the tree is
+lost either way; the whole of it is
+[Correspondence](../guide/correspondence.md#pause-stop-and-what-survives).
+
+A GPU engine is counted the same way and shares differently. Two Leela searches at once are
+two `lc0` processes on one card, sharing its memory and its time, so each is slower than one
+would be and a card that holds one network comfortably may not hold two. Nothing stops you —
+a local engine carries no limit on how many copies of it run — but the setup two slots are
+meant for is one CPU engine and one GPU engine, each on its own hardware.
+
+The ideal is a machine of its own. A [remote runner](runners.md) is how you get one for the
+queue today; a search still runs on this server only. An engine a runner advertises is not
+offered in the **Search with…** picker and a search asked for on one is refused, so a
+machine bought for correspondence is best made the server.
 
 ## The engine in your browser
 

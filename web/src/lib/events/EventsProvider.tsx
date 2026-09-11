@@ -15,8 +15,14 @@ import { queryKeys } from '@/lib/api/keys'
 import type { LiveState } from '@/lib/api/types'
 import { onSessionRestored, reportSessionLost } from '@/lib/auth/session'
 
+import { applyCorrespondenceSnapshot } from './correspondenceSnapshots'
 import { dedupeKeys, invalidationsFor } from './invalidation'
-import { parseEvent, type AnyEvent, type EventName } from './types'
+import {
+  parseEvent,
+  type AnyEvent,
+  type CorrespondenceSnapshotEvent,
+  type EventName,
+} from './types'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
 
@@ -228,6 +234,13 @@ export function EventsProvider({
         if (event.event === 'live.updated') {
           const { event: _name, ...state } = event as { event: string } & LiveState
           queryClient.setQueryData(queryKeys.live(), state as LiveState)
+        }
+
+        // The other frame carried whole: a running correspondence search's picture, twice
+        // a second for as long as it runs. Written into the rows that hold it rather than
+        // refetched — see `correspondenceSnapshots.ts`.
+        if (event.event === 'correspondence.snapshot') {
+          applyCorrespondenceSnapshot(queryClient, event as CorrespondenceSnapshotEvent)
         }
 
         const keys = invalidationsFor(event)

@@ -54,6 +54,7 @@ import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
   useAppSettings,
   useCorrespondenceGames,
+  useCorrespondenceStatus,
   useEngines,
   useGames,
   useLiveState,
@@ -306,6 +307,50 @@ function DotRow({
         </>
       ) : null}
     </NavLink>
+  )
+}
+
+/**
+ * What the correspondence engines are doing, along the foot of the rail.
+ *
+ * A search runs for days, so the owner is usually on some other screen while their machine
+ * is busy — and "are both slots taken" is a question they have from every one of them. Four
+ * short lines under the engine roster is cheap enough to keep it answered everywhere.
+ *
+ * Only while the mode is on, and only while there is something to say: an install with no
+ * search running gets its rail back.
+ */
+function CorrespondenceStrip() {
+  const { t } = useLingui()
+  const status = useCorrespondenceStatus()
+  const data = status.data
+  if (!data) return null
+  const remote = (data.hosts ?? []).filter((host) => host.runner_id !== null)
+  const inUse = data.in_use ?? 0
+  // The warm processes, not the paused rows: a restart makes every paused search cold, and
+  // `parked, warm` is a claim about memory this machine is actually holding.
+  const parked = (data.parked ?? []).length
+  const paused = data.paused ?? 0
+  const queued = data.queued ?? 0
+  if (inUse === 0 && paused === 0 && queued === 0 && remote.length === 0) return null
+  const row = (dot: string, label: string, value: string) => (
+    <div key={label} className="mt-1 flex items-center justify-between gap-2">
+      <span className="flex min-w-0 items-center gap-1.5 truncate">
+        <span aria-hidden className={cn('size-[0.4375rem] flex-none rounded-full', dot)} />
+        {label}
+      </span>
+      <span className="flex-none font-mono tabular text-soft">{value}</span>
+    </div>
+  )
+  return (
+    <div className="mt-2 border-t border-line px-1.5 pt-2 text-[0.625rem] text-dim">
+      {row('bg-good', t`searches`, `${inUse} / ${data.slots ?? 0}`)}
+      {parked > 0 ? row('bg-mistake', t`parked, warm`, String(parked)) : null}
+      {queued > 0 ? row('bg-accent-teal', t`waiting`, String(queued)) : null}
+      {remote.map((host) =>
+        row('bg-faint', host.host, `${host.in_use ?? 0} / ${host.slots}`),
+      )}
+    </div>
   )
 }
 
@@ -686,6 +731,7 @@ function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
       <div className="flex-1" />
       {/* Names and status dots, so it goes with everything else made of words. */}
       {collapsed ? null : <EngineRoster />}
+      {collapsed || !correspondence ? null : <CorrespondenceStrip />}
       <NavFooter collapsed={collapsed} onToggle={onToggle} />
     </>
   )

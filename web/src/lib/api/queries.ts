@@ -31,6 +31,7 @@ import type {
   CorrespondenceNodeCreate,
   CorrespondenceNodeUpdate,
   CorrespondencePgnImport,
+  CorrespondenceSearchCreate,
   CorrespondenceState,
   EngineCreate,
   EngineDeleteResult,
@@ -187,6 +188,11 @@ export function useAppSettings(options?: Options<Awaited<ReturnType<typeof api.g
  * changed: which of them the library carries, how many games are missing one, and what a
  * fill would therefore cost. The game page and the Analysis page both catch up without a
  * reload.
+ *
+ * `correspondence` goes too, for the same reason one step further out: the search picker
+ * and its default are `GET /correspondence/status` read through the engine list this form
+ * writes, so a save that left that key cached would leave the picker offering the order
+ * that was just replaced.
  */
 export function useSaveAppSettings(
   options?: UseMutationOptions<AppSettings, Error, AppSettingsUpdate>,
@@ -200,6 +206,7 @@ export function useSaveAppSettings(
       void client.invalidateQueries({ queryKey: queryKeys.auth() })
       void client.invalidateQueries({ queryKey: queryKeys.maia() })
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      void client.invalidateQueries({ queryKey: queryKeys.correspondence() })
       options?.onSuccess?.(...args)
     },
   })
@@ -1663,6 +1670,101 @@ export function useDeleteCorrespondenceNode(
   options?: UseMutationOptions<void, Error, number>,
 ) {
   return useCorrespondenceWrite(api.deleteCorrespondenceNode, options)
+}
+
+/**
+ * Every search over every game — what "Running now" on the list page is made of.
+ *
+ * Nothing polls: `correspondence.search` invalidates the whole correspondence root on
+ * every transition, and `correspondence.snapshot` is written straight into the cache
+ * (`lib/events/correspondenceSnapshots.ts`) rather than refetching twice a second.
+ */
+export function useCorrespondenceSearches(
+  active = true,
+  options?: Options<Awaited<ReturnType<typeof api.listCorrespondenceSearches>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.correspondenceSearches(active),
+    queryFn: () => api.listCorrespondenceSearches({ active }),
+    ...options,
+  })
+}
+
+/** Slots, parked processes, hosts, and the engines the search picker offers. */
+export function useCorrespondenceStatus(
+  options?: Options<Awaited<ReturnType<typeof api.getCorrespondenceStatus>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.correspondenceStatus(),
+    queryFn: api.getCorrespondenceStatus,
+    ...options,
+  })
+}
+
+/**
+ * Put an engine on a position. 409 `correspondence_search_busy` means that engine is
+ * already queued, running or parked here; 422 `correspondence_invalid` means the engine
+ * cannot run a search at all.
+ */
+export function useStartCorrespondenceSearch(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.startCorrespondenceSearch>>,
+    Error,
+    CorrespondenceSearchCreate
+  >,
+) {
+  return useCorrespondenceWrite(api.startCorrespondenceSearch, options)
+}
+
+export function usePauseCorrespondenceSearch(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.pauseCorrespondenceSearch>>,
+    Error,
+    number
+  >,
+) {
+  return useCorrespondenceWrite(api.pauseCorrespondenceSearch, options)
+}
+
+export function useResumeCorrespondenceSearch(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.resumeCorrespondenceSearch>>,
+    Error,
+    number
+  >,
+) {
+  return useCorrespondenceWrite(api.resumeCorrespondenceSearch, options)
+}
+
+export function useStopCorrespondenceSearch(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.stopCorrespondenceSearch>>,
+    Error,
+    number
+  >,
+) {
+  return useCorrespondenceWrite(api.stopCorrespondenceSearch, options)
+}
+
+/** The laptop is closing, and the other way back. Both answer with the rows they moved. */
+export function usePauseAllCorrespondenceSearches(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.pauseAllCorrespondenceSearches>>,
+    Error,
+    void
+  >,
+) {
+  return useCorrespondenceWrite(api.pauseAllCorrespondenceSearches, options)
+}
+
+export function useResumeAllCorrespondenceSearches(
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof api.resumeAllCorrespondenceSearches>>,
+    Error,
+    void
+  >,
+) {
+  return useCorrespondenceWrite(api.resumeAllCorrespondenceSearches, options)
 }
 
 /** The tree as an annotated PGN. Hand the result to `saveDownload`. */

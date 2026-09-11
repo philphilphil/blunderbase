@@ -12,19 +12,25 @@ unter **Live**; ist er aus, gibt es den Eintrag nicht und die Seiten schicken di
 
 ## Die Liste { #the-list }
 
-Drei Abschnitte, immer in dieser Reihenfolge, jeder mit seiner Anzahl:
+Vier Abschnitte, immer in dieser Reihenfolge, die drei Partielisten jeweils mit ihrer
+Anzahl:
 
 | Abschnitt | Enthält |
 |---|---|
 | **Du bist am Zug** | Partien, die auf dich warten, nächste Frist zuerst |
 | **Warten auf den Gegner** | Dein Zug ist abgeschickt, es ist nichts zu tun |
+| **Läuft gerade** | Jede Engine auf jeder Partie, eine Zeile je Suche – siehe [Läuft gerade](#running-now) |
 | **Beendet** | Die letzten paar, jede ein Link auf die Partie in deiner Bibliothek |
 
 Eine Zeile nennt beide Spieler und welche Farbe deine ist, das Turnier, Zugnummer und
 letzten Zug, wie viele Tage dir bis zur Antwort bleiben – rot unter zwei, negativ, wenn du
 zu spät bist – und die Bewertung der Stellung, in der die Partie steht, aus Weiß' Sicht,
-welche Farbe du auch hast. In der Titelleiste stehen **Neue Partie** und
-**PGN importieren**.
+welche Farbe du auch hast. Dazu ein Chip je Engine, die an dieser Partie arbeitet, mit der
+Tiefe oder Knotenzahl, bei der sie steht – so sagt die Liste auf einen Blick, wohin die
+Rechenzeit deines Rechners geht.
+
+Unter der Überschrift steht die **Kapazitätsleiste**; in der Titelleiste stehen **Neue
+Partie**, **PGN importieren** und **Alles pausieren**.
 
 ## Eine Partie anlegen { #start-a-game }
 
@@ -96,6 +102,7 @@ Das Menü eines Knotens trägt die Verben:
 
 | Verb | |
 |---|---|
+| **Suchen mit …** | Eine Engine auf diese Stellung ansetzen, siehe [Eine Stellung rechnen lassen](#search-a-position) |
 | **Kommentieren** | Deine Anmerkung zum Zug; sie geht als Kommentar ins PGN |
 | **Markieren** | Dein Urteil über den Zug, siehe unten |
 | **Nach vorn holen** | Diesen Zug zur ersten seiner Alternativen machen, damit er als Hauptzug gelesen wird |
@@ -122,9 +129,137 @@ Kommentare, deine Markierungen als NAGs und die Bewertung jedes Knotens als
 `{[%eval 0.25]}` – in der Schreibweise von Lichess, damit jedes Programm, das sie kennt, die
 Zahlen anzeigt. Eine Startstellung bleibt als `FEN`-Header erhalten.
 
-Auf diesem Bildschirm startet noch keine Engine. Eine Stellung rechnen lassen, die
-Engine-Felder neben dem Baum, das Anhalten und was ein Neustart überlebt, kommen mit dem
-nächsten Schritt und bekommen dann eine eigene Überschrift in diesem Kapitel.
+## Eine Stellung rechnen lassen { #search-a-position }
+
+Die rechte Spalte sind die Engines: ein Feld je Engine, die den ausgewählten Knoten gerade
+rechnet oder schon ein Urteil zu ihm hinterlassen hat, gestapelt untereinander.
+**Suchen mit …** oben in der Spalte setzt eine weitere Engine auf die Stellung.
+
+Zur Auswahl stehen die Engines, die du unter **Analyse → Fernschach → Such-Engines**
+ausgewählt hast, in deiner Reihenfolge, die erste vorgeschlagen; hast du dort keine
+ausgewählt, werden alle geeigneten angeboten – eingeschaltet, UCI, brettfähig und auf diesem
+Rechner. Maia ist nie dabei: ein Blick ohne Suche ergibt eine Verteilung von Zügen, keine
+Variante. Eine Engine auf einem [Remote Runner](../operate/runners.md) kann noch keine Suche
+übernehmen, und eine Engine, deren Programmdatei verschwunden ist, wird mit Begründung
+abgewiesen.
+
+Unter dem Namen der Engine wird die Suche selbst eingestellt:
+
+| | |
+|---|---|
+| **Varianten** | Wie viele Kandidatenvarianten behalten werden, 1 bis 5. Leer nimmt **Linien pro Suche** aus den Einstellungen |
+| **Beenden bei** | Wo Schluss ist: einer **Tiefe**, einer Zahl **Knoten** oder einer Zahl **Sekunden**. **Nichts** – der gewöhnliche Fernschachfall und die Voreinstellung – heißt, die Suche läuft, bis du sie stoppst |
+
+Ein erreichtes Limit beendet die Suche sauber: letzter Checkpoint geschrieben, Prozess
+beendet, Platz zurückgegeben, und eine Meldung sagt, dass die Stellung fertig ist – auch
+wenn du gerade eine andere Partie ansiehst.
+
+**Nur die markierten Züge** im selben Dialog gibt der Engine eine Liste der Züge, die schon
+unter diesem Knoten stehen, und sie sieht sich
+nichts anderes an: die ganze Rechenzeit geht an die drei Kandidaten, um die es dir wirklich
+geht. Das schränkt diese eine Suche ein und ändert nichts am Baum; die Züge müssen in der
+Stellung legal sein. Ihre Zahlen bleiben im Feld und wandern nie in den Baum: der beste Zug
+einer Auswahl ist nicht die Bewertung der Stellung, und gespeichert wäre er eine Zahl, die
+keine spätere Suche mehr zurücknehmen könnte. Nimm sie, um schon gewählte Kandidaten zu
+vergleichen, und eine uneingeschränkte Suche, wenn du das Urteil über die Stellung selbst
+willst.
+
+Eine Engine auf einem Knoten hat eine Suche: dieselbe Engine dort noch einmal anzusetzen,
+solange sie eingereiht, laufend oder pausiert ist, wird abgewiesen – und eine beendete
+Partie nimmt gar keine Suche mehr an, ihr Baum ist eingefroren.
+
+Jede Suche belegt einen **Suchplatz** dieses Rechners – voreingestellt zwei, unter **Analyse
+→ Fernschach → Suchplätze**. Sind alle belegt, wird die Suche **eingereiht** und startet von
+selbst, sobald einer frei wird. Suchen haben eigene Plätze: eine, die drei Tage läuft, nimmt
+also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet.
+
+**Stockfish und Leela gleichzeitig** ist der Sinn des Stapels: zwei Engines auf derselben
+Stellung, zwei Plätze, zwei laufende Felder, zwei Urteile zum Vergleichen. Stockfish liest
+man an der Tiefe, Leela an der Knotenzahl – das Feld zeigt beides, denn Leela auf Tiefe 22
+und Stockfish auf Tiefe 51 sind nicht dasselbe Maß. Zwei Leela-Suchen gleichzeitig sind zwei
+Prozesse auf einer GPU, jeder dadurch langsamer; niemand hindert dich daran, und
+[Engines](../operate/engines.md#an-engine-for-correspondence) sagt, was dabei abzuwägen ist.
+
+Während sie rechnet, zeigt ein Feld Tiefe, Knoten, Geschwindigkeit und wie lange sie schon
+läuft – gezählt ab dem letzten Start, eine nach einer Pause fortgesetzte Suche zeigt also
+den laufenden Abschnitt und nicht die Tage, die sie geparkt stand –, dazu ihre
+Kandidatenvarianten mit Bewertung, zweimal pro Sekunde aufgefrischt; zeigst du auf eine
+Variante, wird sie aufs Brett gelegt. Rechnet sie nicht, behält das Feld, was
+die Engine zuletzt gesagt hat: die gespeicherten Varianten, die erreichte Tiefe und eine
+kleine Kurve, wie sich die Zahl im Lauf der Suche bewegt hat – ein Punkt bei jeder neuen
+Tiefe, und bei einer Engine wie Leela, deren Tiefe stundenlang stillsteht, während die
+Knotenzahl klettert, ein Punkt, sobald diese Zahl deutlich gewachsen ist. Daran erkennst du
+eine Bewertung, die steht, und eine, die noch wandert.
+
+Nichts wartet aufs Ende. Was die Engine findet, wird laufend in den Baum geschrieben, bei
+jeder neuen Tiefe und mindestens einmal pro Minute; den Browser schließen, den Deckel
+zuklappen oder den Server neu starten kostet dich also schlimmstenfalls die letzte Minute.
+Ein Checkpoint bewegt eine Stellung außerdem immer nur vorwärts: ein kurzer Blick
+überschreibt nie, was eine dreitägige Suche festgestellt hat.
+
+Haben zwei Engines ein Urteil zu einem Knoten, liest der Baum das **tiefste** – es sei denn,
+du **heftest** eines an: **Anheften** im Feld, und dieselbe Schaltfläche – sie liest sich
+dann **Angeheftet** – gibt den Knoten zurück an das tiefste. Die Anheftung gilt je Knoten, du kannst Leela also genau in der Stellung glauben, in der du
+sie für richtig hältst, ohne sonst etwas zu ändern. Das bernsteinfarbene **≠** an einem
+Knoten ist der Hinweis, beide Felder zu lesen, bevor du einer der Zahlen traust.
+
+## Pausieren, stoppen und was überlebt { #pause-stop-and-what-survives }
+
+Jedes Feld trägt **Pause** und **Stopp**, und das ist nicht dasselbe:
+
+| | |
+|---|---|
+| **Pause** | Der Platz ist sofort zurück, der Prozess bleibt. Er wird mit intaktem Hash geparkt, **Fortsetzen** – es nimmt den nächsten freien Platz – macht also in Sekunden weiter statt in Stunden. Eine geparkte Engine kostet den Speicher ihres `Hash` und keine CPU |
+| **Stopp** | Die Suche endet und der Prozess wird beendet. Der Speicher kommt zurück, die Zeile ist abgeschlossen: Eine gestoppte Suche wird nicht fortgesetzt, du startest eine neue, und die beginnt kalt |
+
+Die Pause wirkt sofort; *geparkt, warm* sagt das Feld einen Moment später, wenn die Engine
+wirklich beiseitegelegt ist. Die Kapazitätsleiste zählt, was geparkt ist und wie viel es
+hält – daran entscheidest du, wann geparkt zu viel ist.
+
+Ein **Neustart** – des Servers, des Containers, der Maschine – ist der dritte Fall. Suchen,
+die liefen, starten von selbst wieder, sobald der Server oben ist, sofern ihre Engine noch
+eingerichtet ist; der Rest kommt pausiert zurück, mit dem Grund in der Zeile. Kein Prozess
+überlebt einen Neustart, jede Suche ist danach also kalt – ein Feld, das *pausiert, kalt*
+statt *geparkt, warm* meldet, ist eines, dessen Prozess es nicht mehr gibt: Die Engine
+beginnt bei der Tiefe
+ihres letzten Checkpoints und braucht bis zur alten Tiefe ungefähr so lange wie beim ersten
+Mal, weil die letzten Iterationen die Zeit fressen.
+
+Was alle drei Fälle immer überlebt, ist der Baum – Bewertung, Tiefe, Knotenzahl, Varianten
+und Verlauf an jedem Knoten, so weit sie gekommen waren. Eine Pause behält die Hashtabelle
+der Engine, ein Stopp und ein Neustart verlieren sie. Das ist Zeit, kein Wissen.
+
+Eine Suche, die scheitert – eine verschwundene Programmdatei, eine mitten im Rechnen
+gestorbene Engine –, wird als gescheitert markiert und behält ihren Fehler im Feld. Der Baum
+behält jeden Checkpoint, den sie bis dahin gesetzt hat.
+
+## Läuft gerade { #running-now }
+
+Zurück auf der Liste, zwischen **Warten auf den Gegner** und **Beendet**, steht jede Engine
+auf jeder Partie, eine Karte je Suche: die Engine und der Rechner, auf dem sie läuft, die
+Partie, für die sie arbeitet, die Bewertung, bei der sie steht, Tiefe und Knotenzahl und wie
+lange sie schon läuft. Eine geparkte Suche steht ebenfalls in der Liste, blass und mit dem
+Vermerk warm, und eine, die auf einen Platz wartet, auch. Jede Karte ist ein Link in die
+Partie, zu der sie gehört.
+
+Die **Kapazitätsleiste** unter der Seitenüberschrift zählt dieselbe Arbeit über die ganze
+Installation: belegte Suchplätze von denen, die dieser Rechner hat, Suchen, die auf einen
+warten, warm geparkte Engines und der Speicher, den sie halten, und eine Zeile je entferntem
+Rechner. Dieselben Zahlen stehen am Fuß der Seitenleiste, damit sie von jedem Bildschirm aus
+beantwortet sind. Leiste und Liste folgen den Suchen, wie sie melden – hier gibt es nichts
+nachzuladen.
+
+## Alles pausieren { #pause-all }
+
+**Alles pausieren** in der Titelleiste ist für den Moment, in dem der Laptop zugeht oder die
+Maschine für etwas anderes gebraucht wird. Es pausiert jede Suche in jeder Partie, warm,
+genau wie das Pausieren einer einzelnen, und wird zu **Alle fortsetzen**, das sie alle wieder
+in Gang setzt: Jede nimmt einen Platz, sobald einer frei wird. Eine pausierte Suche, deren
+Engine inzwischen ausgeschaltet oder entfernt wurde, bleibt pausiert und sagt es.
+
+Beides zerstört nichts. Der Baum behält, was jede Suche als Checkpoint gesetzt hat, und
+Suchen, die fortgesetzt werden, während ihre Prozesse noch geparkt sind, kommen bei der
+Tiefe zurück, bei der sie aufgehört haben.
 
 ## Notizen und das Buch { #notes-and-the-book }
 
@@ -159,7 +294,9 @@ Partie ausging (Aufgabe, Schiedsspruch, Zeit). Danach:
   nachholen.
 - Die Frist wird gelöscht und die Partie verlässt **Du bist am Zug**.
 - Der Baum friert ein. Er bleibt bei der Partie und lesbar, aber nichts darin lässt sich
-  noch ändern.
+  noch ändern, und er nimmt keine neue Suche mehr an.
+- Eine Suche, die noch auf der Partie läuft, wird dir nicht abgenommen – es ist deine
+  Rechenzeit. **Stopp** in ihrem Feld beendet sie, wenn die Partie vorbei ist.
 
 Ab da ist es eine Partie wie jede andere: im Bewertungsverlauf, unter **Partien** bei ihrer
 Quelle und der Bedenkzeit Fernschach, und in den Statistiken. Ihre Partieseite behält in der

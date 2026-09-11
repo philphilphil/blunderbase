@@ -32,7 +32,11 @@ import type {
   CorrespondenceNodeCreate,
   CorrespondenceNodeUpdate,
   CorrespondencePgnImport,
+  CorrespondenceSearch,
+  CorrespondenceSearchCreate,
+  CorrespondenceSearchList,
   CorrespondenceState,
+  CorrespondenceStatus,
   DimensionList,
   EngineCreate,
   EngineDeleteResult,
@@ -772,3 +776,48 @@ export const updateCorrespondenceNode = (id: number, body: CorrespondenceNodeUpd
 /** The subtree, and the surviving siblings renumbered. Refused while a search runs inside. */
 export const deleteCorrespondenceNode = (id: number) =>
   http.delete<void>(`/correspondence/nodes/${id}`)
+
+/**
+ * Put one engine on one node.
+ *
+ * A 201 means the row is written and it *will* be searched, not that an engine is already
+ * going: the worker takes a slot when there is one, and `correspondence.search` says
+ * `running` when it has. A search that waited three days for a slot would be a strange
+ * thing for a POST to hang on.
+ */
+export const startCorrespondenceSearch = (body: CorrespondenceSearchCreate) =>
+  http.post<CorrespondenceSearch>('/correspondence/searches', { body })
+
+/** `active` is queued + running + paused; `false` adds the done, stopped and failed ones. */
+export const listCorrespondenceSearches = (query?: {
+  active?: boolean
+  game_id?: number
+  node_id?: number
+}) => http.get<CorrespondenceSearchList>('/correspondence/searches', { query })
+
+/**
+ * Park one search: the status is `paused` at once, and `warm` flips a moment later — when
+ * the worker has actually got the process out of the pool — as a second event.
+ */
+export const pauseCorrespondenceSearch = (id: number) =>
+  http.post<CorrespondenceSearch>(`/correspondence/searches/${id}/pause`)
+
+/** Back to `queued`. Refused for a search that is already done, stopped or failed. */
+export const resumeCorrespondenceSearch = (id: number) =>
+  http.post<CorrespondenceSearch>(`/correspondence/searches/${id}/resume`)
+
+/** The end of it: `stopped`, and the process quit or handed back to the pool. */
+export const stopCorrespondenceSearch = (id: number) =>
+  http.post<CorrespondenceSearch>(`/correspondence/searches/${id}/stop`)
+
+/** The laptop is closing. Answers with the rows it moved, which may be none. */
+export const pauseAllCorrespondenceSearches = () =>
+  http.post<CorrespondenceSearchList>('/correspondence/searches/pause-all')
+
+/** Every parked search whose engine is still usable. */
+export const resumeAllCorrespondenceSearches = () =>
+  http.post<CorrespondenceSearchList>('/correspondence/searches/resume-all')
+
+/** Slots, what is in them, what is parked, and the engines the picker offers. */
+export const getCorrespondenceStatus = () =>
+  http.get<CorrespondenceStatus>('/correspondence/status')

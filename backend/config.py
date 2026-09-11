@@ -68,8 +68,9 @@ class Settings(BaseSettings):
     # Engine processes running at once, shared across tiers. Workers are asyncio tasks in
     # the API process, so this caps CPU rather than connections.
     analysis_concurrency: int = Field(default_factory=default_analysis_concurrency, ge=1)
-    # Whether the API process runs the analysis workers itself. Off is for a deployment
-    # that drives the queue from `blunderbase analyze` on another schedule.
+    # Whether the API process drives engines itself: the analysis workers and, beside them,
+    # the correspondence searches. Off is for a deployment that drives the queue from
+    # `blunderbase analyze` on another schedule.
     analysis_workers: bool = True
     # How long an idle worker waits before looking at the queue again.
     analysis_poll_seconds: float = Field(default=1.0, gt=0)

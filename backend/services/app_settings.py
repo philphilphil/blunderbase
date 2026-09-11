@@ -5,7 +5,7 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are seventeen of them, in six groups, plus two rows that are not settings at all
+There are nineteen of them, in six groups, plus two rows that are not settings at all
 (`queue_paused` and `tour_seen`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
@@ -37,12 +37,20 @@ points lost by the mover. Read per plan, which means a game re-analysed after th
 is judged by the new ones and one analysed before it keeps what it was judged by.
 
 **Correspondence** — `correspondence_enabled`, `correspondence_days_per_move`,
-`correspondence_multipv`. Whether the mode exists at all for this owner (off by default,
-because most owners never play correspondence and should never see the rail entry), how
-long the owner gives themselves after the opponent's move, and how many lines a search over
-one node keeps. Ordinary members of `SETTINGS`: three numbers with a range, read where they
-are used — the first by the rail and the router, the other two as the defaults a new game
-and a new search are created with, so changing one never moves a game already being played.
+`correspondence_multipv`, `correspondence_slots`. Whether the mode exists at all for this
+owner (off by default, because most owners never play correspondence and should never see
+the rail entry), how long the owner gives themselves after the opponent's move, how many
+lines a search over one node keeps, and how many searches this host runs at once. Ordinary
+members of `SETTINGS`: four numbers with a range, read where they are used — the first by
+the rail and the router, the next two as the defaults a new game and a new search are
+created with, so changing one never moves a game already being played. The slot count is
+the exception to "read where it is used": it sizes the search worker's engine pool, so it
+is read once at startup and a change takes a restart.
+
+`correspondence_search_engine_ids` is the mode's fifth setting and is not one of those: a
+list of engine ids in the owner's own order, the engines the search picker offers, with the
+first as its default. A list of identities rather than a number with a clamp, so it has its
+own accessor pair exactly as `maia_elos` does, and empty means "every eligible engine".
 
 **The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
 engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
@@ -59,7 +67,7 @@ takes effect on the next lookup. Nothing echoes it back — the surfaces answer 
 is stored, never what it is.
 
 **Whether the queue is draining at all** — `queue_paused`, the top bar's pause button.
-Not one of the fourteen and deliberately not a member of `SETTINGS`: it is a switch over
+Not one of the settings proper and deliberately not a member of `SETTINGS`: it is a switch over
 the *queue* rather than a number with a clamp, nobody sets it from the analysis form, and
 `replace` rewrites the whole set of keys it knows — so a member would be un-paused by the
 next save of the Engine passes page, which is exactly the bug a pause button must not have.
@@ -67,7 +75,7 @@ Its own read/write pair goes at the row directly, the way the engine roles and `
 do. `services.analysis.claim_next_run` is the only thing that reads it in anger.
 
 **Whether the owner has seen the app explained** — `tour_seen`, set once the orientation
-tour has been finished or skipped. Not one of the fourteen and outside `replace` for the
+tour has been finished or skipped. Not one of the settings proper and outside `replace` for the
 reason `queue_paused` is. It lives here rather than in the browser because it is a fact
 about the owner and not about a browser: a tour that came back on a second machine, or
 after clearing site data, would be a tour that had not run once.
@@ -119,6 +127,17 @@ BLUNDER_THRESHOLD = "blunder_threshold"
 CORRESPONDENCE_ENABLED = "correspondence_enabled"
 CORRESPONDENCE_DAYS_PER_MOVE = "correspondence_days_per_move"
 CORRESPONDENCE_MULTIPV = "correspondence_multipv"
+# How many correspondence searches this host may run at once. A member of `SETTINGS` like
+# the rest: a number with a range. Read when the search worker starts rather than per
+# search, because it sizes an engine pool — changing it takes a restart, and the manual
+# says so.
+CORRESPONDENCE_SLOTS = "correspondence_slots"
+# Which engines the search picker offers, in the owner's own order; the first is the
+# default. A list of engine ids, so it is outside `SETTINGS` and gets its own accessor
+# pair the way `maia_elos` does — there is no clamp that rescues an engine id, and the
+# nearest sensible engine to one that is gone is no engine. Empty means "every engine that
+# is eligible", which is what an install that has never opened the page wants.
+CORRESPONDENCE_SEARCH_ENGINE_IDS = "correspondence_search_engine_ids"
 # The three role assignments, each a nullable engine id. Not in `SETTINGS` for the same
 # reason `MAIA_ELOS` is not: those are single numbers with a range and a clamp, and an
 # engine id has neither — the nearest sensible engine to one that is gone is no engine.
@@ -181,6 +200,10 @@ CORRESPONDENCE_DAYS_PER_MOVE_DEFAULT = 10
 # Three candidate moves is the shape of correspondence work: the question is which of a
 # handful of moves survives a week of looking, not what the single best move is.
 CORRESPONDENCE_MULTIPV_DEFAULT = 3
+# Two searches at once: one CPU engine and one GPU engine, which is the ordinary
+# correspondence setup. A one-slot install can still run one, and a machine with cores to
+# spare can say so.
+CORRESPONDENCE_SLOTS_DEFAULT = 2
 
 # A budget of no nodes at all is not a cheaper pass, it is no pass; there is deliberately
 # no ceiling, because how long the owner is willing to wait is theirs to decide.
@@ -200,6 +223,12 @@ MAX_DAYS_PER_MOVE = 365
 # Five candidates is as many as the candidates table can be read at a glance, and every
 # extra line is engine time taken off the ones that matter.
 MAX_CORRESPONDENCE_MULTIPV = 5
+# A deployment with no search slot at all cannot search anything, and sixteen long
+# searches on one machine is already more processes than any owner's cores.
+MIN_CORRESPONDENCE_SLOTS = 1
+MAX_CORRESPONDENCE_SLOTS = 16
+# As many engines as the picker can be read at a glance, and more than anyone has.
+MAX_CORRESPONDENCE_SEARCH_ENGINES = 10
 # How many Maia levels one deployment may carry. Every level is a full extra policy query
 # per ply of every run, so this is a budget as much as a UI limit; five columns is also
 # about as many as the game panel can put side by side and still be read.
@@ -306,6 +335,13 @@ SETTINGS: tuple[Setting, ...] = (
         default=CORRESPONDENCE_MULTIPV_DEFAULT,
         low=MIN_MULTIPV,
         high=MAX_CORRESPONDENCE_MULTIPV,
+        whole=True,
+    ),
+    Setting(
+        key=CORRESPONDENCE_SLOTS,
+        default=CORRESPONDENCE_SLOTS_DEFAULT,
+        low=MIN_CORRESPONDENCE_SLOTS,
+        high=MAX_CORRESPONDENCE_SLOTS,
         whole=True,
     ),
 )
@@ -608,6 +644,73 @@ def get_correspondence_multipv(session: Session) -> int:
     """How many lines a correspondence search over one node keeps, unless it says otherwise."""
     value = stored(session, CORRESPONDENCE_MULTIPV)
     return CORRESPONDENCE_MULTIPV_DEFAULT if value is None else int(value)
+
+
+def get_correspondence_slots(session: Session) -> int:
+    """How many correspondence searches this host runs at once.
+
+    Read once, when the search worker starts: it sizes an engine pool and a semaphore, and
+    a cap that changed under a search already running would be a cap nothing enforced. A
+    change takes effect on the next restart, which is what the manual says.
+    """
+    value = stored(session, CORRESPONDENCE_SLOTS)
+    return CORRESPONDENCE_SLOTS_DEFAULT if value is None else int(value)
+
+
+def clean_engine_ids(values: object) -> list[int]:
+    """Whatever was given as a list of engine ids, as ids. Order is kept: the first is the
+    default the picker offers.
+
+    Anything that is not a positive id is dropped rather than refused — this is JSON in a
+    database a person can open — and duplicates go, because an engine offered twice is one
+    engine.
+    """
+    if isinstance(values, bool) or isinstance(values, int):
+        values = [values]
+    if not isinstance(values, list | tuple):
+        return []
+    kept: list[int] = []
+    for value in values:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            continue
+        if value not in kept:
+            kept.append(value)
+    return kept[:MAX_CORRESPONDENCE_SEARCH_ENGINES]
+
+
+def get_correspondence_search_engine_ids(session: Session) -> list[int]:
+    """The engines the search picker offers, in the owner's order; empty means all of them.
+
+    Empty is not a deployment that can search nothing: it is one that has never opened the
+    page, and `services.correspondence` then offers every engine that is eligible. Which
+    engines are eligible at all — enabled, UCI, able to drive a board, on this host — is
+    that module's question and is asked at the moment a search starts, so an engine deleted
+    or switched off after it was chosen here simply stops being offered.
+    """
+    row = session.get(AppSetting, CORRESPONDENCE_SEARCH_ENGINE_IDS)
+    return [] if row is None else clean_engine_ids(row.value)
+
+
+def set_correspondence_search_engine_ids(session: Session, values: object | None) -> list[int]:
+    """Store the engines the picker offers, or clear them. Returns what is in force after.
+
+    Clearing writes no row, as every other write here treats "the owner has not chosen":
+    there is one fallback and it is the absence of a row — here, every eligible engine.
+    """
+    cleaned = [] if values is None else clean_engine_ids(values)
+    if not cleaned:
+        session.execute(
+            delete(AppSetting).where(AppSetting.key == CORRESPONDENCE_SEARCH_ENGINE_IDS)
+        )
+        session.commit()
+        return []
+    row = session.get(AppSetting, CORRESPONDENCE_SEARCH_ENGINE_IDS)
+    if row is None:
+        session.add(AppSetting(key=CORRESPONDENCE_SEARCH_ENGINE_IDS, value=cleaned))
+    else:
+        row.value = cleaned
+    session.commit()
+    return cleaned
 
 
 def get_thresholds(session: Session) -> tuple[float, float, float]:

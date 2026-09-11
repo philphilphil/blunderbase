@@ -86,7 +86,49 @@ Auf dem Server selbst begrenzt `BLUNDERBASE_ANALYSIS_CONCURRENCY`, wie viele
 Engine-Prozesse über alle Stufen hinweg gleichzeitig laufen. Voreingestellt sind die Kerne
 der Maschine minus zwei. `BLUNDERBASE_ANALYSIS_WORKERS` schaltet die Worker im Prozess ganz
 ab, für eine Installation, die die Warteschlange mit `blunderbase analyze` nach eigenem
-Zeitplan abarbeitet. Siehe [Konfiguration](configuration.md).
+Zeitplan abarbeitet – die Fernschachsuchen gehen mit ab. Siehe
+[Konfiguration](configuration.md).
+
+## Eine Engine fürs Fernschach { #an-engine-for-correspondence }
+
+Eine Fernschachsuche ist kein Auftrag aus der Warteschlange: Sie ist eine Engine, die
+stunden- oder tagelang auf einer Stellung sitzt, und sie wird getrennt gezählt. **Analyse →
+Fernschach → Suchplätze** legt fest, wie viele davon hier gleichzeitig laufen dürfen –
+voreingestellt zwei –, und es sind eigene Plätze: Eine Suche nimmt nie den weg, auf den die
+Schnellanalyse einer importierten Partie wartet. Gib dem Fernschach **eine eigene
+Engine-Zeile** statt der, die deine Durchläufe benutzen: eine Zeile mit hohem `Threads` und
+so viel `Hash`, wie du entbehren kannst, ausgewählt unter **Such-Engines** auf derselben
+Seite. Ändern der Optionen startet ohnehin einen frischen Prozess, die beiden Zeilen kommen
+sich also nie in die Quere.
+
+Ein Suchplatz ist nicht dieselbe Einheit wie `BLUNDERBASE_ANALYSIS_CONCURRENCY` weiter oben,
+und die beiden addieren sich, statt sich zu teilen: Die Variable begrenzt die
+Engine-Prozesse der *Warteschlange* über alle Stufen, **Suchplätze** begrenzt die Suchen
+daneben. Zwei Plätze und eine Nebenläufigkeit von sechs sind bis zu acht Engine-Prozesse
+gleichzeitig auf diesem Rechner; setz `Threads` in der Fernschach-Zeile also gegen das, was
+die Warteschlange ohnehin schon belegt – eine Zeile, die alle Kerne nimmt, nimmt sie zum
+zweiten Mal, und die Maschine kommt nur noch ins Schwimmen.
+
+Zwei Dinge zum Speicher, bevor du `Hash` groß setzt. Eine **pausierte** Suche behält ihren
+Prozess samt Hash, damit das Fortsetzen Sekunden statt Stunden kostet – die Kapazitätsleiste
+der Fernschachseite sagt, wie viele geparkt sind und was jede hält, und Stoppen ist, was den
+Speicher zurückgibt. Und **ein Neustart verliert jeden Hash**: Die Suchen kommen wieder, die
+Bewertungen im Baum kommen wieder, aber jede Engine beginnt bei der Tiefe, die ihr letzter
+Checkpoint festgehalten hat. Am Baum geht so oder so nichts verloren; das Ganze steht unter
+[Fernschach](../guide/correspondence.md#pause-stop-and-what-survives).
+
+Eine GPU-Engine wird genauso gezählt und teilt sich anders. Zwei Leela-Suchen gleichzeitig
+sind zwei `lc0`-Prozesse auf einer Karte; sie teilen sich deren Speicher und deren Zeit,
+jede ist also langsamer als eine allein, und eine Karte, die ein Netz bequem hält, hält
+zwei vielleicht nicht. Verhindert wird es nicht – für eine lokale Engine gibt es keine
+Grenze, wie viele Kopien laufen –, aber gedacht sind zwei Plätze für eine CPU-Engine und
+eine GPU-Engine, jede auf ihrer eigenen Hardware.
+
+Ideal ist eine eigene Maschine. Ein [Remote Runner](runners.md) ist heute der Weg zu einer
+für die Warteschlange; eine Suche läuft weiterhin nur auf diesem Server. Eine Engine, die
+ein Runner anbietet, taucht in der Auswahl **Suchen mit …** nicht auf, und eine Suche, die
+auf ihr angefordert wird, wird abgewiesen – eine für Fernschach gekaufte Maschine wird also
+am besten der Server.
 
 ## Die Engine im Browser { #the-engine-in-your-browser }
 
