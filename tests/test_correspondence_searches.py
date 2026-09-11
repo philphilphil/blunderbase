@@ -856,47 +856,43 @@ def test_an_engine_that_does_not_drive_a_board_is_refused(session: Session) -> N
     assert "does not drive a board" in str(failure.value)
 
 
-def test_the_picker_offers_the_chosen_engines_in_order(session: Session) -> None:
+def test_the_pickers_offer_every_engine_and_say_which_cannot_search(session: Session) -> None:
+    """One list for both modes: a task may run on any of them, a search on the ones with no
+    `search_trouble`. The deep role's engine is the default; a runner's is offered with the
+    reason it cannot search yet rather than hidden; Maia is offered to neither."""
+    from backend.services import engines as engines_service
+
     first = Engine(name="One", kind=EngineKind.UCI, path=sys.executable)
     second = Engine(name="Two", kind=EngineKind.UCI, path=sys.executable)
     maia = Engine(name="Maia", kind=EngineKind.MAIA, path=sys.executable)
-    session.add_all([first, second, maia])
+    runner = Runner(name="attic", token_hash="x" * 64, slots=2)
+    session.add_all([first, second, maia, runner])
     session.commit()
-
-    # Nobody has chosen: every eligible engine, and the policy model is not one.
-    offered = correspondence_service.search_engines(session)
-    assert [engine.name for engine in offered] == ["One", "Two"]
-
-    app_settings_service.set_correspondence_search_engine_ids(session, [second.id, first.id])
-    assert [engine.name for engine in correspondence_service.search_engines(session)] == [
-        "Two",
-        "One",
-    ]
-    # An engine that has gone simply stops being offered.
-    session.delete(second)
+    remote = Engine(name="Attic", kind=EngineKind.UCI, path="runner:sf", runner_id=runner.id)
+    session.add(remote)
     session.commit()
-    assert [engine.name for engine in correspondence_service.search_engines(session)] == ["One"]
-
-
-def test_the_status_payload_carries_the_pool_the_picker_is_chosen_from(session: Session) -> None:
-    """`engines` is the setting applied; `eligible_engines` is what it was chosen out of.
-
-    One list for both would make the setting a one-way door: the page that offers `+ Leela`
-    reads the same payload the picker does, so the moment Stockfish alone is saved, Leela
-    would never be offered anywhere again — and a chosen engine that has since been
-    switched off would take the whole add row down with it.
-    """
-    first = Engine(name="One", kind=EngineKind.UCI, path=sys.executable)
-    second = Engine(name="Two", kind=EngineKind.UCI, path=sys.executable)
-    session.add_all([first, second])
-    session.commit()
-    app_settings_service.set_correspondence_search_engine_ids(session, [second.id])
+    engines_service.assign_default_roles(session, second)
 
     body = correspondence_service.status(session)
-    assert [engine["name"] for engine in body["engines"]] == ["Two"]
-    assert body["engines"][0]["default"] is True
-    assert [engine["name"] for engine in body["eligible_engines"]] == ["One", "Two"]
-    assert [engine["default"] for engine in body["eligible_engines"]] == [False, False]
+    assert [engine["name"] for engine in body["engines"]] == ["One", "Two", "Attic"]
+    assert [engine["default"] for engine in body["engines"]] == [False, True, False]
+    assert [engine["host"] for engine in body["engines"]] == [
+        "this host",
+        "this host",
+        "runner 'attic'",
+    ]
+    assert body["engines"][0]["search_trouble"] is None
+    assert "runner 'attic'" in body["engines"][2]["search_trouble"]
+    assert "eligible_engines" not in body
+
+    # An engine switched off stops being offered; the default falls to one that can search.
+    second.enabled = False
+    session.commit()
+    body = correspondence_service.status(session)
+    assert [(engine["name"], engine["default"]) for engine in body["engines"]] == [
+        ("One", True),
+        ("Attic", False),
+    ]
 
 
 def test_the_status_payload_counts_slots_and_parked_processes(session: Session) -> None:
@@ -930,6 +926,9 @@ def test_the_status_payload_counts_slots_and_parked_processes(session: Session) 
             "version": None,
             "hash_mb": 4096,
             "default": True,
+            "runner_id": None,
+            "host": "this host",
+            "search_trouble": None,
         }
     ]
 
@@ -1148,16 +1147,10 @@ def test_a_root_move_that_is_not_legal_is_refused(session: Session) -> None:
         )
 
 
-def test_the_slot_count_and_the_engine_list_are_settings(session: Session) -> None:
+def test_the_slot_count_is_a_setting(session: Session) -> None:
     assert app_settings_service.get_correspondence_slots(session) == 2
     app_settings_service.set_value(session, app_settings_service.CORRESPONDENCE_SLOTS, 99)
     assert app_settings_service.get_correspondence_slots(session) == 16
-
-    assert app_settings_service.get_correspondence_search_engine_ids(session) == []
-    app_settings_service.set_correspondence_search_engine_ids(session, [3, 3, "x", 0, 7])
-    assert app_settings_service.get_correspondence_search_engine_ids(session) == [3, 7]
-    app_settings_service.set_correspondence_search_engine_ids(session, None)
-    assert app_settings_service.get_correspondence_search_engine_ids(session) == []
 
 
 # --- the HTTP surface ------------------------------------------------------
@@ -1305,29 +1298,20 @@ def test_the_status_route_answers_the_capacity_strip(
     assert body["hosts"][0]["host"] == "this host"
     assert body["engines"][0]["default"] is True
     assert body["engines"][0]["hash_mb"] == 2048
-    assert [engine["engine_id"] for engine in body["eligible_engines"]] == [
-        engine["engine_id"] for engine in body["engines"]
-    ]
+    assert body["engines"][0]["search_trouble"] is None
 
 
-def test_the_settings_carry_the_slots_and_the_search_engines(
-    api: TestClient, settings_for_api: Settings
-) -> None:
-    engine_id = api_engine(settings_for_api)
+def test_the_settings_carry_the_slots(api: TestClient) -> None:
     before = api.get("/settings").json()
     assert before["correspondence_slots"] is None
-    assert before["correspondence_search_engine_ids"] == []
+    assert "correspondence_search_engine_ids" not in before
+    assert "correspondence_task_engine_id" not in before
 
-    saved = api.put(
-        "/settings",
-        json={"correspondence_slots": 4, "correspondence_search_engine_ids": [engine_id]},
-    ).json()
+    saved = api.put("/settings", json={"correspondence_slots": 4}).json()
     assert saved["correspondence_slots"] == 4
-    assert saved["correspondence_search_engine_ids"] == [engine_id]
-    # A save that leaves them out clears them, which is what `completeUpdate` is for.
+    # A save that leaves it out clears it, which is what `completeUpdate` is for.
     cleared = api.put("/settings", json={}).json()
     assert cleared["correspondence_slots"] is None
-    assert cleared["correspondence_search_engine_ids"] == []
 
 
 # --- helpers that need the module's names ----------------------------------

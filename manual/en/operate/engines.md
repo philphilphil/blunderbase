@@ -91,8 +91,8 @@ hours or days, and it is counted separately. **Analysis → Correspondence → S
 says how many of those may run at once here — two by default — and they are slots of their
 own, so a search never takes the one an imported game's quick pass is waiting for. Give
 correspondence **its own engine row** rather than the one your passes use: a row with
-`Threads` set high and `Hash` set to as much memory as you can spare, chosen under **Search
-engines** on the same page. Editing the options of an engine starts a fresh process, so the
+`Threads` set high and `Hash` set to as much memory as you can spare, and pick it in **Search
+with…** on the position. Editing the options of an engine starts a fresh process, so the
 two rows never fight over one.
 
 A search slot is not the same unit as `BLUNDERBASE_ANALYSIS_CONCURRENCY` above, and the two
@@ -123,8 +123,9 @@ bounded look at one position, and what an
 `AnalysisRun` like any other: it takes no search slot, it counts against
 `BLUNDERBASE_ANALYSIS_CONCURRENCY` along with the quick and deep passes, and it runs on
 whichever host the queue hands it to, [remote runners](runners.md) included. So the engine
-picked under **Analysis → Correspondence → Task engine** may live on a runner — unlike a
-search engine, which has to be here — and where you have a runner that is where it belongs:
+picked for a task — in **Queue task…**, **Expand…** or **Refresh subtree…** — may live on a
+runner, unlike a search engine, which has to be here, and where you have a runner that is
+where it belongs:
 the tasks go to the other machine and this one keeps its cores for the searches and for the
 passes. Tasks sit between the tiers in the queue, ahead of the quick pass every import gets
 and behind a deep pass somebody is waiting on, and among themselves the game with the
@@ -133,8 +134,8 @@ still waiting along with everything else waiting, and each of their nodes says s
 
 The ideal is a machine of its own. A [remote runner](runners.md) is how you get one for the
 queue today, and tasks use it already; a search still runs on this server only. An engine a
-runner advertises is not offered in the **Search with…** picker and a search asked for on
-one is refused, so a machine bought for correspondence is best made the server.
+runner advertises is greyed in the **Search with…** picker with that reason, and a search
+asked for on one is refused, so a machine bought for correspondence is best made the server.
 
 ## The engine in your browser
 

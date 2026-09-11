@@ -34,8 +34,11 @@ msgid "nothing is on the board"
 msgstr "nothing is on the board"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/routes/correspondence/components/EnginePicker.tsx
+#: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/RunningNow.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TaskDialog.tsx
 #: src/routes/engines/EngineBadges.tsx
 #: src/routes/game/components/MobileGameView.tsx
 msgid "Engine"
@@ -270,6 +273,7 @@ msgstr "Set up browser engine"
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TaskDialog.tsx
 #: src/routes/engines/AddEngineForm.tsx
 #: src/routes/engines/BrowserRunnerSection.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
@@ -1780,10 +1784,6 @@ msgid "Default 30"
 msgstr "Default 30"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Engine {id}"
-msgstr "Engine {id}"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Correspondence mode"
 msgstr "Correspondence mode"
 
@@ -1824,64 +1824,16 @@ msgid "Two is one CPU engine and one GPU engine at once. The server reads this w
 msgstr "Two is one CPU engine and one GPU engine at once. The server reads this when it starts, so a change here takes effect after a restart."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Engines the picker offers"
-msgstr "Engines the picker offers"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "In your order; the first is the one Search with… suggests. Choose none and every eligible engine is offered."
-msgstr "In your order; the first is the one Search with… suggests. Choose none and every eligible engine is offered."
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Every eligible engine is offered."
-msgstr "Every eligible engine is offered."
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-#: src/routes/engines/OptionsEditor.tsx
-msgid "default"
-msgstr "default"
-
-#. placeholder {0}: nameOf(id)
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Move {0} up"
-msgstr "Move {0} up"
-
-#. placeholder {0}: nameOf(id)
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Move {0} down"
-msgstr "Move {0} down"
-
-#. placeholder {0}: nameOf(id)
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Remove {0}"
-msgstr "Remove {0}"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "No engine here can run a search: one is needed that is switched on, speaks UCI and can drive a board."
-msgstr "No engine here can run a search: one is needed that is switched on, speaks UCI and can drive a board."
+msgid "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
+msgstr "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Tasks"
 msgstr "Tasks"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner."
-msgstr "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner."
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Task engine"
-msgstr "Task engine"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Whichever engine holds the deep role"
-msgstr "Whichever engine holds the deep role"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Engine {taskEngineId}"
-msgstr "Engine {taskEngineId}"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Every engine that is switched on and speaks UCI, on this machine and on your runners. A machine of its own is the setup this mode is happiest in."
-msgstr "Every engine that is switched on and speaks UCI, on this machine and on your runners. A machine of its own is the setup this mode is happiest in."
+msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
+msgstr "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
@@ -2723,6 +2675,15 @@ msgstr "to {0} nodes"
 msgid "for {0}"
 msgstr "for {0}"
 
+#: src/routes/correspondence/components/EnginePicker.tsx
+msgid "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
+msgstr "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
+
+#. placeholder {0}: engine.hash_mb
+#: src/routes/correspondence/components/EnginePicker.tsx
+msgid "{0} MB"
+msgstr "{0} MB"
+
 #: src/routes/correspondence/components/EnginesPane.tsx
 msgid "No engine has looked at this position yet."
 msgstr "No engine has looked at this position yet."
@@ -2733,6 +2694,7 @@ msgstr "Search with… puts one on it for as long as you let it. Several engines
 
 #: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TaskDialog.tsx
 #: src/routes/game/notesModel.ts
 msgid "the starting position"
 msgstr "the starting position"
@@ -2761,6 +2723,10 @@ msgstr "Queue tasks"
 #: src/routes/correspondence/components/ExpandDialog.tsx
 msgid "Off, the moves go into the tree and nothing is calculated."
 msgstr "Off, the moves go into the tree and nothing is calculated."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Every task of this expansion runs on it, the later stages too. A runner's engine is allowed: a task is ordinary queue work."
+msgstr "Every task of this expansion runs on it, the later stages too. A runner's engine is allowed: a task is ordinary queue work."
 
 #: src/routes/correspondence/components/ExpandDialog.tsx
 msgid "No engine has looked at this position yet, so one task is queued on the move itself and the branches appear when it answers."
@@ -3058,13 +3024,8 @@ msgid "One engine on {where}, for as long as you let it. It keeps its slot until
 msgstr "One engine on {where}, for as long as you let it. It keeps its slot until it finishes or you pause it."
 
 #: src/routes/correspondence/components/SearchDialog.tsx
-msgid "No engine here can run a search. One is needed that is switched on, speaks UCI and can drive a board — Analysis → Correspondence says which are offered."
-msgstr "No engine here can run a search. One is needed that is switched on, speaks UCI and can drive a board — Analysis → Correspondence says which are offered."
-
-#. placeholder {0}: engine.hash_mb
-#: src/routes/correspondence/components/SearchDialog.tsx
-msgid "{0} MB"
-msgstr "{0} MB"
+msgid "None of these can run a search here: one is needed on this machine that can drive a board. Each greyed engine says why under the pointer."
+msgstr "None of these can run a search here: one is needed on this machine that can drive a board. Each greyed engine says why under the pointer."
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Stop it at"
@@ -3108,6 +3069,36 @@ msgstr "The engine spends everything on the moves you pick and answers nothing a
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Start searching"
 msgstr "Start searching"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Queue task…"
+msgstr "Queue task…"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Refresh subtree…"
+msgstr "Refresh subtree…"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "One bounded look at {where}, through the analysis queue. It takes no search slot and runs wherever the queue has room."
+msgstr "One bounded look at {where}, through the analysis queue. It takes no search slot and runs wherever the queue has room."
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "A task on every stale position from {where} down: too shallow, or judged by a version of the engine you no longer have."
+msgstr "A task on every stale position from {where} down: too shallow, or judged by a version of the engine you no longer have."
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "Any engine that is switched on, on this machine or on a runner. The budget and the line count are the ones under Analysis → Correspondence."
+msgstr "Any engine that is switched on, on this machine or on a runner. The budget and the line count are the ones under Analysis → Correspondence."
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "Queue task"
+msgstr "Queue task"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "Refresh"
+msgstr "Refresh"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Refuted further down: the minimax under this move is worse for the side that played it than the engine's own number here"
@@ -3211,10 +3202,6 @@ msgid "One bounded look at this position, through the analysis queue"
 msgstr "One bounded look at this position, through the analysis queue"
 
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "Queue task"
-msgstr "Queue task"
-
-#: src/routes/correspondence/components/TreePane.tsx
 msgid "An excluded move is never expanded"
 msgstr "An excluded move is never expanded"
 
@@ -3225,10 +3212,6 @@ msgstr "Make the best moves here into children and put a task under each"
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Queue a task on every stale position from here down"
 msgstr "Queue a task on every stale position from here down"
-
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Refresh subtree"
-msgstr "Refresh subtree"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Take this waiting task back out of the queue"
@@ -4257,6 +4240,10 @@ msgstr "action"
 #: src/routes/engines/OptionsEditor.tsx
 msgid "default ({fallback})"
 msgstr "default ({fallback})"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default"
+msgstr "default"
 
 #: src/routes/engines/OptionsEditor.tsx
 msgid "Filter options"

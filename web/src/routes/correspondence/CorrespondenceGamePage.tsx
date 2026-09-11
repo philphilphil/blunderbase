@@ -72,6 +72,7 @@ import { ExpandDialog } from './components/ExpandDialog'
 import { FinishDialog, GameHeader, OpponentMoveDialog } from './components/GameHeader'
 import { NotesPane, type NotesTab } from './components/NotesPane'
 import { SearchDialog } from './components/SearchDialog'
+import { TaskDialog } from './components/TaskDialog'
 import { TreePane } from './components/TreePane'
 import { opponentOf } from './format'
 import { destsFor, uciFor } from './moves'
@@ -122,7 +123,7 @@ export function CorrespondenceGamePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [flipped, setFlipped] = useState(false)
   const [dialog, setDialog] = useState<
-    'opponent' | 'finish' | 'search' | 'expand' | 'prune' | null
+    'opponent' | 'finish' | 'search' | 'task' | 'refresh' | 'expand' | 'prune' | null
   >(null)
   /** The node the search or expand dialog is about, which need not be the selected one. */
   const [searchNodeId, setSearchNodeId] = useState<number | null>(null)
@@ -164,27 +165,30 @@ export function CorrespondenceGamePage() {
     },
   })
   const refresh = useRefreshCorrespondenceSubtree({
-    onSuccess: (answer) =>
+    onSuccess: (answer) => {
+      setDialog(null)
       toast.success(
         answer.queued > 0
           ? t`${answer.queued} stale positions queued for an engine.`
           : t`Nothing under there is stale.`,
-      ),
-    onError: (failed) => toast.error(failed.message),
+      )
+    },
   })
-  /** Open the search picker on a node, forgetting the last refusal.
+  /**
+   * Open one of the engine dialogs on a node, forgetting the last refusal.
    *
-   * "Queue task" in the tree menu drives the same mutation without a dialog, so a task the
-   * deployment could not queue would otherwise greet the next opening of this dialog with
-   * an error about something the owner did somewhere else.
+   * Search and task share one mutation, so a task the deployment could not queue would
+   * otherwise greet the next opening of the search dialog with an error about something
+   * the owner did somewhere else — and the other way round.
    */
-  const openSearch = (nodeId: number) => {
+  const openOn = (nodeId: number, which: 'search' | 'task' | 'refresh' | 'expand') => {
     startSearch.reset()
+    refresh.reset()
     setSearchNodeId(nodeId)
-    setDialog('search')
+    setDialog(which)
   }
-  // The picker's engines and the deployment's default line count. Both are read once and
-  // are what the search dialog is filled from; neither is worth a request per open.
+  // The pickers' engines and the deployment's default line counts. Both are read once and
+  // are what the dialogs are filled from; neither is worth a request per open.
   const status = useCorrespondenceStatus()
   const settings = useAppSettings()
 
@@ -424,10 +428,7 @@ export function CorrespondenceGamePage() {
               size="sm"
               disabled={Boolean(game.finished) || node.mark === 'excluded'}
               title={t`Make the best moves after the selected position into branches, with an engine on each`}
-              onClick={() => {
-                setSearchNodeId(node.id)
-                setDialog('expand')
-              }}
+              onClick={() => openOn(node.id, 'expand')}
             >
               <Trans>Expand…</Trans>
             </Button>
@@ -472,42 +473,10 @@ export function CorrespondenceGamePage() {
         onPromote={(id) => updateNode.mutate({ id, body: { promote: true } })}
         onDelete={(id) => deleteNode.mutate(id)}
         onFold={(id, collapsed) => updateNode.mutate({ id, body: { collapsed } })}
-        onSearch={
-          game.finished
-            ? undefined
-            : (searched) => openSearch(searched.id)
-        }
-        onQueueTask={
-          game.finished
-            ? undefined
-            : (asked) => {
-                select(asked.id)
-                // No engine and no limits: a task takes the deployment's task engine, its
-                // node budget and its line count, which is the whole difference between
-                // asking for one and setting a search on a position.
-                //
-                // No dialog is open to hold the refusal, so it is toasted here: the first
-                // thing this verb does on a deployment with no task engine and no deep role
-                // is fail, and a menu item that silently did nothing would read as broken.
-                startSearch.mutate(
-                  { node_id: asked.id, kind: 'task' },
-                  { onError: (failed) => toast.error(failed.message) },
-                )
-              }
-        }
-        onExpand={
-          game.finished
-            ? undefined
-            : (expanded) => {
-                setSearchNodeId(expanded.id)
-                setDialog('expand')
-              }
-        }
-        onRefresh={
-          game.finished
-            ? undefined
-            : (refreshed) => refresh.mutate({ id: refreshed.id, body: {} })
-        }
+        onSearch={game.finished ? undefined : (searched) => openOn(searched.id, 'search')}
+        onQueueTask={game.finished ? undefined : (asked) => openOn(asked.id, 'task')}
+        onExpand={game.finished ? undefined : (expanded) => openOn(expanded.id, 'expand')}
+        onRefresh={game.finished ? undefined : (refreshed) => openOn(refreshed.id, 'refresh')}
         onCancelTask={game.finished ? undefined : (searchId) => cancelTask.mutate(searchId)}
       />
     </div>
@@ -524,7 +493,7 @@ export function CorrespondenceGamePage() {
             variant="ghost"
             size="sm"
             disabled={Boolean(game.finished)}
-            onClick={() => openSearch(node.id)}
+            onClick={() => openOn(node.id, 'search')}
           >
             <Trans>Search with…</Trans>
           </Button>
@@ -690,9 +659,29 @@ export function CorrespondenceGamePage() {
           onClose={() => setDialog(null)}
         />
       ) : null}
+      {(dialog === 'task' || dialog === 'refresh') && searchNode ? (
+        <TaskDialog
+          node={searchNode}
+          verb={dialog}
+          engines={status.data?.engines ?? []}
+          pending={dialog === 'task' ? startSearch.isPending : refresh.isPending}
+          error={
+            dialog === 'task'
+              ? (startSearch.error?.message ?? null)
+              : (refresh.error?.message ?? null)
+          }
+          onQueue={(engineId) =>
+            dialog === 'task'
+              ? startSearch.mutate({ node_id: searchNode.id, kind: 'task', engine_id: engineId })
+              : refresh.mutate({ id: searchNode.id, body: { engine_id: engineId } })
+          }
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
       {dialog === 'expand' && searchNode ? (
         <ExpandDialog
           node={searchNode}
+          engines={status.data?.engines ?? []}
           defaultWidth={
             settings.data?.correspondence_task_multipv ??
             SETTING_DEFAULTS.correspondence_task_multipv

@@ -327,12 +327,8 @@ def delete_engine(session: Session, engine_id: int, *, unqueue: bool = True) -> 
     job yet — `_prepare` stands its tier's own engine in where this host has one, same as
     it would if the runner had merely gone offline.
 
-    Any role the engine was assigned to becomes unassigned, and so is the correspondence
-    task engine if it was this one. A setting pointing at a row that is gone would be a job
-    that cannot run and cannot name what it was waiting for — and the task engine is the
-    worse of the two, because it is read on every task, expansion and refresh, and each of
-    them would fail with "no engine with id 7" until the owner thought to look at Analysis →
-    Correspondence.
+    Any role the engine was assigned to becomes unassigned. A setting pointing at a row
+    that is gone would be a job that cannot run and cannot name what it was waiting for.
 
     A dropped run may be a correspondence task, and a task's search row is the thing every
     correspondence surface reads. So the searches behind the runs about to go are collected
@@ -344,7 +340,6 @@ def delete_engine(session: Session, engine_id: int, *, unqueue: bool = True) -> 
     if engine is None:
         return False, 0
     clear_role_engine(session, engine_id)
-    clear_correspondence_task_engine(session, engine_id)
     unqueued = 0
     tasks: list[int] = []
     if unqueue:
@@ -731,21 +726,6 @@ def clear_role_engine(session: Session, engine_id: int) -> list[EngineRole]:
         app_settings_service.set_role_engine_id(session, role, None)
         cleared.append(role)
     return cleared
-
-
-def clear_correspondence_task_engine(session: Session, engine_id: int) -> bool:
-    """Unchoose this engine for correspondence tasks if it was the chosen one. Whether it was.
-
-    The task engine is a fourth thing an id is stored for, outside `EngineRole` because it
-    is not a role — it is correspondence's own choice, and unlike the three roles it accepts
-    an engine on a runner. It still has the roles' one rule: an id that no longer resolves
-    is worse than no choice at all. With the row deleted, `correspondence.task_engine`
-    falls back to the deep tier's engine, which is what an install that never chose gets.
-    """
-    if app_settings_service.get_correspondence_task_engine_id(session) != engine_id:
-        return False
-    app_settings_service.set_correspondence_task_engine_id(session, None)
-    return True
 
 
 def role_for_tier(tier: Tier) -> EngineRole:

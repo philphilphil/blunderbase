@@ -178,12 +178,6 @@ export interface AppSettings {
    */
   correspondence_slots?: number | null
   /**
-   * The engines the search picker offers, in the owner's order; the first is its default.
-   * Empty is not "no engines": it is an install that has never chosen, and then every
-   * eligible engine (enabled, UCI, drives a board, on this host) is offered.
-   */
-  correspondence_search_engine_ids?: number[]
-  /**
    * The bounded half of the mode. A *task* is one `AnalysisRun` over one node's position,
    * so these two are its budget in the sense `quick_nodes` is a pass's: read when the task
    * is queued and copied onto its run. The line count doubles as how wide an expansion can
@@ -197,12 +191,6 @@ export interface AppSettings {
    * comparison and needs no setting.
    */
   correspondence_stale_depth?: number | null
-  /**
-   * The engine tasks run on. Null is a real state and not "not loaded": nobody has chosen
-   * one, and then whichever engine holds the deep role runs them. Unlike a search's
-   * engine, this one may live on a remote runner — a task is ordinary queue work.
-   */
-  correspondence_task_engine_id?: number | null
 }
 
 /**
@@ -1910,7 +1898,7 @@ export interface CorrespondenceSearchCreate {
    * `search`, which is what the dialog sends.
    */
   kind?: CorrespondenceSearchKind
-  /** Required for a search; for a task, null is the deployment's task engine. */
+  /** Required for a search; for a task, null is the deep role's engine. */
   engine_id?: number | null
   /** null is the deployment's `correspondence_multipv`. */
   multipv?: number | null
@@ -1933,9 +1921,11 @@ export interface CorrespondenceExpand {
   /** 1 to 3. */
   stages?: number
   tasks?: boolean
+  /** The engine every task of the expansion runs on, later stages too; null is the deep role's. */
+  engine_id?: number | null
 }
 
-/** Which engine a refresh queues its tasks on; null is the deployment's task engine. */
+/** Which engine a refresh queues its tasks on; null is the deep role's engine. */
 export interface CorrespondenceRefresh {
   engine_id?: number | null
 }
@@ -1977,7 +1967,13 @@ export interface CorrespondenceSearchEngine extends Extra {
   name: string
   version?: string | null
   hash_mb?: number | null
+  /** The deep role's engine, which every picker opens on. */
   default?: boolean
+  runner_id?: number | null
+  /** Where it lives, in the backend's words: `this host` or the runner's name. */
+  host?: string
+  /** Why a search cannot run on it, or null where one can. A task can run on any. */
+  search_trouble?: string | null
 }
 
 /** The capacity strip: slots, what is in them, what is parked, and where. */
@@ -1994,13 +1990,11 @@ export interface CorrespondenceStatus extends Extra {
   tasks?: { queued: number; running: number } & Extra
   parked: CorrespondenceParked[]
   hosts: CorrespondenceHost[]
-  /** What the picker offers, in the owner's order; the first carries `default`. */
-  engines: CorrespondenceSearchEngine[]
   /**
-   * Every engine on this host a search could run on. The superset the settings page
-   * chooses `engines` out of — which is why it is a second list and not the same one.
+   * Every enabled UCI engine the deployment has, this host's first. The deep role's
+   * carries `default`; the ones a search cannot run on carry `search_trouble`.
    */
-  eligible_engines: CorrespondenceSearchEngine[]
+  engines: CorrespondenceSearchEngine[]
 }
 
 /** What a node create or a node patch answers with: the node alone, no tree around it. */

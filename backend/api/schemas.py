@@ -160,11 +160,6 @@ class AppSettings(BaseModel):
         description="how many correspondence searches this host runs at once, 1 to 16; "
         "read when the server starts, so a change takes a restart",
     )
-    correspondence_search_engine_ids: list[int] = Field(
-        default_factory=list,
-        description="the engines the search picker offers, in order; the first is its "
-        "default, and an empty list means every eligible engine",
-    )
     correspondence_task_nodes: int | None = Field(
         default=None, description="the node budget one correspondence task is queued with"
     )
@@ -176,11 +171,6 @@ class AppSettings(BaseModel):
     correspondence_stale_depth: int | None = Field(
         default=None,
         description="below this depth a stored verdict is marked stale, 1 to 100",
-    )
-    correspondence_task_engine_id: int | None = Field(
-        default=None,
-        description="the engine tasks run on; null falls back to whichever engine holds "
-        "the deep role, and a runner's engine is allowed here",
     )
 
 
@@ -227,11 +217,6 @@ class AppSettingsUpdate(Input):
     correspondence_slots: int | None = Field(
         default=None, description="1 to 16 searches at once on this host"
     )
-    correspondence_search_engine_ids: list[int] | None = Field(
-        default=None,
-        description="the engines the search picker offers, in order; null or empty is "
-        "every eligible engine",
-    )
     correspondence_task_nodes: int | None = Field(
         default=None, description="the node budget of one task; at least 1"
     )
@@ -240,9 +225,6 @@ class AppSettingsUpdate(Input):
     )
     correspondence_stale_depth: int | None = Field(
         default=None, description="1 to 100; below this depth a verdict is stale"
-    )
-    correspondence_task_engine_id: int | None = Field(
-        default=None, description="the engine tasks run on; null is the deep role's engine"
     )
 
 
@@ -1813,8 +1795,8 @@ class CorrespondenceSearchCreate(Input):
     candidates being decided between — UCI, legal in that position, refused if not.
 
     `kind: "task"` is the other engine mode and takes none of that: a bounded run through
-    the analysis queue, with the deployment's task engine, node budget and line count, so
-    the only field it reads besides `node_id` is an optional `engine_id`.
+    the analysis queue, with the deployment's node budget and line count, so the only field
+    it reads besides `node_id` is `engine_id` — and that one may name a runner's engine.
     """
 
     node_id: int
@@ -1826,7 +1808,7 @@ class CorrespondenceSearchCreate(Input):
     )
     engine_id: int | None = Field(
         default=None,
-        description="required for a search; for a task, null is the deployment's task engine",
+        description="required for a search; for a task, null is the deep role's engine",
     )
     multipv: int | None = Field(default=None, ge=1, description="null is the deployment's default")
     limit_depth: int | None = Field(default=None, ge=1)
@@ -1864,13 +1846,19 @@ class CorrespondenceHost(Payload):
 
 
 class CorrespondenceSearchEngine(Payload):
-    """One engine a search can run on; `default` marks the picker's first."""
+    """One engine the mode's pickers offer: every enabled UCI engine, this host's and the
+    runners'. `default` marks the deep role's engine, which every picker preselects;
+    `search_trouble` says why a *search* cannot run on it (a runner's engine, no board
+    driving, a missing binary) and is null where one can — a task can run on any of them."""
 
     engine_id: int
     name: str
     version: str | None = None
     hash_mb: int | None = None
     default: bool = False
+    runner_id: int | None = None
+    host: str = "this host"
+    search_trouble: str | None = None
 
 
 class CorrespondenceTasks(Payload):
@@ -1897,11 +1885,9 @@ class CorrespondenceStatus(Payload):
     hosts: list[CorrespondenceHost] = Field(default_factory=list)
     engines: list[CorrespondenceSearchEngine] = Field(
         default_factory=list,
-        description="what the picker offers, in the owner's order; the first is its default",
-    )
-    eligible_engines: list[CorrespondenceSearchEngine] = Field(
-        default_factory=list,
-        description="every engine here a search could run on, whether or not it is offered",
+        description="every enabled UCI engine the deployment has, this host's first; the "
+        "deep role's carries `default`, and `search_trouble` names the ones a search "
+        "cannot run on",
     )
 
 
@@ -2035,6 +2021,11 @@ class CorrespondenceExpand(Input):
     )
     stages: int = Field(default=1, ge=1, le=3)
     tasks: bool = True
+    engine_id: int | None = Field(
+        default=None,
+        description="the engine every task of this expansion runs on, later stages "
+        "included; null is the deep role's engine",
+    )
 
 
 class CorrespondenceExpansion(Payload):
@@ -2050,7 +2041,7 @@ class CorrespondenceExpansion(Payload):
 
 
 class CorrespondenceRefresh(Input):
-    """Which engine a refresh queues its tasks on. Null is the deployment's task engine."""
+    """Which engine a refresh queues its tasks on. Null is the deep role's engine."""
 
     engine_id: int | None = None
 

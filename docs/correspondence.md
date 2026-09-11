@@ -271,8 +271,10 @@ Python, refused while a search runs inside it), `get_tree` — the whole tree in
 with its evals and active searches, assembled in memory as the repertoire is.
 
 Tasks: `queue_task` writes a `task` search row and an `AnalysisRun` with the node's
-position, the task engine, `correspondence_task_nodes` as its budget and
-`correspondence_task_multipv`, at a priority between quick and deep. `analysis.complete_run`
+position, the engine asked for (else the deep role's), `correspondence_task_nodes` as its
+budget and `correspondence_task_multipv`, at a priority between quick and deep. An
+expansion's engine rides on each task's row, and `_expand_after` queues the next stage on
+it, so an expansion started on Leela stays on Leela. `analysis.complete_run`
 calls `correspondence.absorb_run` when the run names a search: the eval row is written from
 the run's one `MoveEval`, the search is `done`, and if the task was queued by an expansion
 with stages left, the top alternatives become children and get tasks of their own. Failure
@@ -401,8 +403,14 @@ has to be in both or the next save of any settings form wipes it:
 | `correspondence_task_nodes` | one task's node budget (default 40,000,000) |
 | `correspondence_task_multipv` | lines a task keeps, and therefore how wide an expansion can be (default 3) |
 | `correspondence_stale_depth` | below what depth a stored verdict is stale, whatever engine wrote it (default 30) |
-| `correspondence_search_engine_ids` | the engines the search picker offers, in order; the first is the default. A JSON list, not in the numeric registry |
-| `correspondence_task_engine_id` | the engine tasks run on; absent means the deep tier's. A JSON id, not in the numeric registry, and cleared when that engine is deleted |
+
+There is no engine setting. `GET /correspondence/status` lists every enabled UCI engine,
+this host's and the runners', with the deep role's flagged `default` and a
+`search_trouble` sentence on the ones a search cannot run on; every picker — **Search
+with…**, **Queue task…**, **Expand…**, **Refresh subtree…** — draws that one list, greying
+by mode. Two settings that narrowed it (a search list, a task engine) shipped in 1.2.0 and
+were removed the same day: they were a second place for a choice the dialog makes, and hid
+engines from it.
 
 **Correspondence** (`/correspondence`). Three sections, in this order: **Your move**
 sorted by due date, **Waiting for the opponent**, **Finished** (the last few, each a link

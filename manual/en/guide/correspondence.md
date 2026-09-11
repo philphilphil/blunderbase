@@ -108,9 +108,9 @@ A node's own menu carries the verbs:
 | Verb | |
 |---|---|
 | **Search with…** | Set an engine on this position, see [Search a position](#search-a-position) |
-| **Queue task** | One bounded look at this position, through the analysis queue, see [Tasks and expansion](#tasks-and-expansion) |
+| **Queue task…** | One bounded look at this position, through the analysis queue, on the engine you pick, see [Tasks and expansion](#tasks-and-expansion) |
 | **Expand…** | Make the best moves here into children and put a task under each |
-| **Refresh subtree** | Queue a task on every stale position from here down |
+| **Refresh subtree…** | Queue a task on every stale position from here down, on the engine you pick |
 | **Comment** | Your note on the move; it goes into the PGN as a comment |
 | **Mark** | Your verdict on the move, below |
 | **Promote to first** | Make this the first of its alternatives, so it reads as the main one |
@@ -147,12 +147,12 @@ The right column is the engines: one pane per engine that is searching the selec
 has already left a verdict on it, stacked one under the other. **Search with…** at the top
 of the column puts another engine on the position.
 
-The picker offers the engines you chose under **Analysis → Correspondence → Search
-engines**, in your order, the first one suggested; choose none there and every engine that
-is eligible is offered — switched on, UCI, able to drive a board, and on this machine. Maia
-is never among them: one look and no search gives a spread of moves, not a line. An engine
-that lives on a [remote runner](../operate/runners.md) cannot take a search yet, and an
-engine whose binary has gone missing is refused with the reason.
+The picker offers every engine that is switched on and speaks UCI, on this machine and on
+your runners, with the one holding the deep role suggested. The ones a search cannot run
+on are greyed rather than hidden, and say why under the pointer: an engine on a
+[remote runner](../operate/runners.md) cannot take a search yet, one that cannot drive a
+board never will, and one whose binary has gone missing says where it was looked for. Maia
+is never among them: one look and no search gives a spread of moves, not a line.
 
 Under the engine's name the search itself is set:
 
@@ -224,14 +224,17 @@ A search is one engine thinking about one position for as long as you let it. A 
 the other half: a bounded look — forty million nodes by default, a minute or two — over one
 position, queued into the ordinary analysis queue. It takes no search slot, so it never
 stands in the way of a search, and it runs wherever the queue has room, including on a
-[remote runner](../operate/runners.md). Which engine works them is **Analysis →
-Correspondence → Task engine**; with none chosen, whichever engine holds the deep role does.
+[remote runner](../operate/runners.md). Which engine works it is chosen when it is queued,
+from the same list the search picker shows — and here a runner's engine is not greyed,
+because a task is ordinary queue work and the machine bought for correspondence is usually
+that runner. The engine holding the deep role is suggested.
 
-A node's menu carries both. **Queue task** asks for one look at that position. **Expand…**
-is the one that does the work of an evening:
+A node's menu carries both. **Queue task…** asks for one look at that position and which
+engine should take it. **Expand…** is the one that does the work of an evening:
 
 | | |
 |---|---|
+| **Engine** | Every task of the expansion runs on it, the later stages included, however many hours they take |
 | **Width** | How many moves each stage keeps — the first moves of the position's best lines, strongest first. Blank takes **Lines per task** from the settings |
 | **Stages** | How many levels deep to go, 1 to 3. Width 3 and 2 stages is up to twelve positions; width 3 and 3 stages is up to thirty-nine |
 | **Queue tasks** | On, each new move gets an engine. Off, the moves go into the tree and nothing is calculated |
@@ -263,11 +266,11 @@ Your **marks** steer all of it, which is the reason to make them:
 | **! Good**, **!? Interesting** | One stage more and one sibling more than its neighbours |
 | No mark | The width and the stages you asked for |
 
-**Refresh subtree** in the same menu is the maintenance verb. A verdict is **stale** when it
+**Refresh subtree…** in the same menu is the maintenance verb. A verdict is **stale** when it
 is shallower than **Stale below depth** — thirty by default — or when it was written by a
 version of the engine that is no longer installed, which is the one people forget: a
 Stockfish upgraded in January makes every verdict from December somebody else's. Stale
-verdicts are marked on the tree, and **Refresh subtree** queues a task on every stale
+verdicts are marked on the tree, and **Refresh subtree…** queues a task on every stale
 position from that node down, holes in the branch included. It refuses, and says how many
 it found, when there are more than fifty: refresh a branch at a time rather than a whole
 game's tree at once.

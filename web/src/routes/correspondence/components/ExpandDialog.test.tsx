@@ -35,9 +35,21 @@ function node(patch: Partial<CorrespondenceTreeNode> = {}): CorrespondenceTreeNo
   }
 }
 
+const ENGINES = [
+  { engine_id: 1, name: 'Stockfish 17', default: true, host: 'this host', search_trouble: null },
+  {
+    engine_id: 9,
+    name: 'Stockfish 17',
+    runner_id: 4,
+    host: "runner 'gpu-box'",
+    search_trouble: "'Stockfish 17' lives on runner 'gpu-box', and correspondence searches run on this host only for now",
+  },
+]
+
 function draw(overrides: Partial<Parameters<typeof ExpandDialog>[0]> = {}) {
   const props = {
     node: node(),
+    engines: ENGINES,
     defaultWidth: 3,
     pending: false,
     error: null,
@@ -58,7 +70,12 @@ describe('the expand dialog', () => {
     const props = draw()
     expect(screen.getByLabelText('Width')).toHaveAttribute('placeholder', '3')
     await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
-    expect(props.onExpand).toHaveBeenCalledWith({ width: null, stages: 1, tasks: true })
+    expect(props.onExpand).toHaveBeenCalledWith({
+      width: null,
+      stages: 1,
+      tasks: true,
+      engine_id: 1,
+    })
   })
 
   it('sends the width and the stages that were chosen', async () => {
@@ -66,14 +83,31 @@ describe('the expand dialog', () => {
     await userEvent.type(screen.getByLabelText('Width'), '4')
     await userEvent.click(screen.getByRole('button', { name: '2' }))
     await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
-    expect(props.onExpand).toHaveBeenCalledWith({ width: 4, stages: 2, tasks: true })
+    expect(props.onExpand).toHaveBeenCalledWith({ width: 4, stages: 2, tasks: true, engine_id: 1 })
   })
 
-  it('can put the moves in the tree and calculate nothing', async () => {
+  it('offers a runner’s engine for the tasks, which a search could never use', async () => {
+    // A task is ordinary queue work: the remote engine is live here, with its host beside
+    // it, where the search dialog would grey it out.
+    const props = draw()
+    const remote = screen.getByRole('button', { name: /gpu-box/ })
+    expect(remote).toBeEnabled()
+    await userEvent.click(remote)
+    await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
+    expect(props.onExpand).toHaveBeenCalledWith(expect.objectContaining({ engine_id: 9 }))
+  })
+
+  it('can put the moves in the tree and calculate nothing, and then asks for no engine', async () => {
     const props = draw()
     await userEvent.click(screen.getByRole('checkbox'))
+    expect(screen.queryByRole('group', { name: 'Engine' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Expand' }))
-    expect(props.onExpand).toHaveBeenCalledWith({ width: null, stages: 1, tasks: false })
+    expect(props.onExpand).toHaveBeenCalledWith({
+      width: null,
+      stages: 1,
+      tasks: false,
+      engine_id: null,
+    })
   })
 
   it('says how many positions the two numbers come to, because nobody does that sum', async () => {

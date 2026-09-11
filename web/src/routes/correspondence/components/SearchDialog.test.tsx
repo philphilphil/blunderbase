@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/lib/i18n/I18nProvider'
-import type { CorrespondenceTreeNode } from '@/lib/api/types'
+import type { CorrespondenceSearchEngine, CorrespondenceTreeNode } from '@/lib/api/types'
 
 import { SearchDialog } from './SearchDialog'
 
@@ -58,16 +58,23 @@ const ROOT: CorrespondenceTreeNode = {
 }
 
 const ENGINES = [
-  { engine_id: 1, name: 'Stockfish 17', version: '17', default: true },
-  { engine_id: 2, name: 'Leela 0.31', version: '0.31' },
+  { engine_id: 1, name: 'Stockfish 17', version: '17', default: true, search_trouble: null },
+  { engine_id: 2, name: 'Leela 0.31', version: '0.31', search_trouble: null },
+  {
+    engine_id: 9,
+    name: 'Stockfish 17',
+    runner_id: 4,
+    host: "runner 'gpu-box'",
+    search_trouble: "'Stockfish 17' lives on runner 'gpu-box', and correspondence searches run on this host only for now",
+  },
 ]
 
-function draw(onStart = vi.fn()) {
+function draw(engines: CorrespondenceSearchEngine[] = ENGINES, onStart = vi.fn()) {
   render(
     <I18nProvider>
       <SearchDialog
         node={ROOT}
-        engines={ENGINES}
+        engines={engines}
         defaultMultipv={3}
         pending={false}
         error={null}
@@ -92,6 +99,22 @@ describe('SearchDialog', () => {
       limit_seconds: 3600,
       root_moves: null,
     })
+  })
+
+  it('shows a runner’s engine greyed with the reason, rather than hiding it', async () => {
+    draw()
+    const remote = screen.getByRole('button', { name: /gpu-box/ })
+    expect(remote).toBeDisabled()
+    expect(remote).toHaveAttribute('title', expect.stringContaining('run on this host only'))
+  })
+
+  it('opens on the first engine that can search when the default cannot', async () => {
+    const onStart = draw([
+      { ...ENGINES[2], default: true },
+      { engine_id: 2, name: 'Leela 0.31', search_trouble: null },
+    ])
+    await userEvent.click(screen.getByRole('button', { name: /Start searching/ }))
+    expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ engine_id: 2 }))
   })
 
   it('Nothing is a choice: no limit at all', async () => {

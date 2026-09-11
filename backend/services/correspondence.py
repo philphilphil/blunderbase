@@ -862,46 +862,43 @@ def export_pgn(session: Session, game_id: int) -> str:
 # --- searches --------------------------------------------------------------
 
 
-def eligible_engines(session: Session) -> list[Engine]:
-    """The engines a search may run on: enabled, UCI, able to drive a board, on this host.
+def offered_engines(session: Session) -> list[Engine]:
+    """Every engine the mode's pickers offer: enabled and UCI, this host's first, then the
+    runners'.
 
-    "Able to drive a board" is `Engine.streams`, the host's own word about whether it
-    answers a `stream_open` — a runner that does queue work and no analysis boards says so
-    in its `hello`, and offering the owner a search it will never serve is worse than not
-    offering it. Maia is excluded by kind: a policy model answers a position rather than a
-    search, so there is nothing for it to do for three days.
-
-    Local only, for now: a search on a runner's engine needs the sink refactor that step 4
-    of `docs/correspondence.md` brings, so `start_search` refuses one by name.
+    One list for both engine modes, on purpose. A task can run on any of these — it is
+    ordinary queue work — while a search is refused on some of them by `_engine_trouble`,
+    and the picker greys those out with the reason rather than hiding them: an owner who
+    sees their runner's Stockfish in the list and reads why it cannot search yet knows more
+    than one who never sees it. Maia is excluded by kind: a policy model answers a position
+    rather than searching it, so there is nothing for it to do in either mode.
     """
     return list(
         session.scalars(
             select(Engine)
-            .where(
-                Engine.enabled.is_(True),
-                Engine.kind == EngineKind.UCI,
-                Engine.streams.is_(True),
-                Engine.runner_id.is_(None),
-            )
-            .order_by(Engine.id)
+            .where(Engine.enabled.is_(True), Engine.kind == EngineKind.UCI)
+            .order_by(Engine.runner_id.is_not(None), Engine.id)
         )
     )
 
 
-def search_engines(session: Session) -> list[Engine]:
-    """The engines the picker offers, in the owner's order; the first is its default.
+def default_engine(session: Session, engines: Sequence[Engine]) -> Engine | None:
+    """The engine every picker preselects: the deep role's if it is offered, else the first
+    a search could run on, else the first at all.
 
-    The setting is a list of ids the owner arranged on the Correspondence page, filtered to
-    the ones that are still eligible — an engine deleted or switched off since simply stops
-    being offered, and nothing has to be cleaned up when it is. An empty setting is not an
-    empty picker: it is an install that has never opened the page, and then every eligible
-    engine is offered.
+    The deep role because a task is a bounded search and that is the role a bounded search
+    already has; and the same default for searches so that the two modes never suggest
+    different engines for the same position.
     """
-    engines = {engine.id: engine for engine in eligible_engines(session)}
-    wanted = app_settings_service.get_correspondence_search_engine_ids(session)
-    if not wanted:
-        return list(engines.values())
-    return [engines[engine_id] for engine_id in wanted if engine_id in engines]
+    from backend.services import engines as engines_service
+
+    deep = engines_service.engine_for_tier(session, Tier.DEEP)
+    if deep is not None and any(engine.id == deep.id for engine in engines):
+        return deep
+    for engine in engines:
+        if _engine_trouble(session, engine.id, engine=engine) is None:
+            return engine
+    return engines[0] if engines else None
 
 
 def start_search(
@@ -1142,16 +1139,9 @@ def status(session: Session) -> dict[str, Any]:
                 "parked": len(parked),
             }
         ],
-        # Two lists, because the two readers want different things. The picker wants what
-        # the owner chose, in order, with a default; the settings page wants everything a
-        # search *could* run on, or choosing one engine would be a one-way door — the
-        # picker list is the chosen list, so the page could never offer the engines that
-        # were left out, nor name one it holds that has since been switched off.
-        "engines": [
-            _engine_entry(engine, default=index == 0)
-            for index, engine in enumerate(search_engines(session))
-        ],
-        "eligible_engines": [_engine_entry(engine) for engine in eligible_engines(session)],
+        # One list for every picker on the mode's screens: the search dialog greys out the
+        # entries with `search_trouble`, the task and expand dialogs take any of them.
+        "engines": _engine_entries(session),
     }
 
 
@@ -1201,22 +1191,33 @@ def _running_slots(session: Session) -> int:
     return app_settings_service.get_correspondence_slots(session)
 
 
-def _engine_entry(engine: Engine, *, default: bool = False) -> dict[str, Any]:
-    """One engine as the picker and the settings page draw it."""
-    return {
-        "engine_id": engine.id,
-        "name": engine.name,
-        "version": engine.version,
-        "hash_mb": _hash_mb(engine.options),
-        "default": default,
-    }
+def _engine_entries(session: Session) -> list[dict[str, Any]]:
+    """Every offered engine as the pickers draw it: where it lives, whether it is the one
+    preselected, and why a search could not run on it where one could not."""
+    from backend.services import engines as engines_service
+
+    engines = offered_engines(session)
+    chosen = default_engine(session, engines)
+    return [
+        {
+            "engine_id": engine.id,
+            "name": engine.name,
+            "version": engine.version,
+            "hash_mb": _hash_mb(engine.options),
+            "default": chosen is not None and engine.id == chosen.id,
+            "runner_id": engine.runner_id,
+            "host": engines_service.engine_host(session, engine),
+            "search_trouble": _engine_trouble(session, engine.id, engine=engine),
+        }
+        for engine in engines
+    ]
 
 
 # --- tasks and expansion ---------------------------------------------------
 
 
 def task_engine(session: Session, engine_id: int | None = None) -> Engine:
-    """The engine a task runs on: the one asked for, the one chosen, else the deep tier's.
+    """The engine a task runs on: the one asked for, else the deep tier's.
 
     Unlike a search, a task is an ordinary `AnalysisRun` and goes through the ordinary
     queue — so a runner's engine is not only allowed, it is the point: a correspondence
@@ -1228,13 +1229,11 @@ def task_engine(session: Session, engine_id: int | None = None) -> Engine:
 
     wanted = engine_id
     if wanted is None:
-        wanted = app_settings_service.get_correspondence_task_engine_id(session)
-    if wanted is None:
         chosen = engines_service.engine_for_tier(session, Tier.DEEP)
         if chosen is None:
             raise CorrespondenceError(
-                "no engine is set for correspondence tasks, and no engine holds the deep "
-                "role either; choose one on Analysis → Correspondence"
+                "no engine was named for this task, and no engine holds the deep role to "
+                "fall back on; pick one in the dialog or assign the role on Analysis → Engines"
             )
         return chosen
     engine = session.get(Engine, int(wanted))
@@ -1351,8 +1350,14 @@ def expand_node(
     width: int | None = None,
     stages: int = 1,
     tasks: bool = True,
+    engine_id: int | None = None,
 ) -> dict[str, Any]:
     """Turn the first moves of a node's best lines into children, and set engines on them.
+
+    `engine_id` is the engine every task of this expansion runs on, the later stages
+    included: it rides on each task's row and `_expand_after` reads it back, so an
+    expansion started on Leela stays on Leela however many hours the stages take. None is
+    the deep role's engine.
 
     IDeA's expansion, and the reason the analysis queue was worth reusing: one call ends,
     an hour later and on whatever hosts the queue has, with a dozen evaluated positions
@@ -1384,14 +1389,21 @@ def expand_node(
                 "no engine has looked at that position yet, so there are no lines to expand; "
                 "queue a task on it first"
             )
-        search = queue_task(session, node_id=node.id, width=wide, stages=deep, commit=False)
+        search = queue_task(
+            session,
+            node_id=node.id,
+            engine_id=engine_id,
+            width=wide,
+            stages=deep,
+            commit=False,
+        )
         session.commit()
         announced = _announce_all(session, [search])
         _announce(node.game_id, scope=SCOPE_TREE)
         return {"game_id": node.game_id, "created": 0, "queued": 1, "searches": announced}
 
     created, searches = _expand_from(
-        session, node, game, lines, width=wide, stages=deep, tasks=tasks
+        session, node, game, lines, width=wide, stages=deep, tasks=tasks, engine_id=engine_id
     )
     session.commit()
     announced = _announce_all(session, searches)
@@ -1708,6 +1720,7 @@ def _expand_from(
     width: int,
     stages: int,
     tasks: bool,
+    engine_id: int | None = None,
 ) -> tuple[int, list[dict[str, Any]]]:
     """One stage: the top `width` first moves become children, each with a task under it.
 
@@ -1743,6 +1756,7 @@ def _expand_from(
                 queue_task(
                     session,
                     node_id=child.id,
+                    engine_id=engine_id,
                     width=_width_for(child, width),
                     stages=left,
                     commit=False,
@@ -1778,9 +1792,24 @@ def _expand_after(
         # the verdict this run brought is the last thing that will be written into it.
         return
     width = _expand_width(session, row.expand_width)
+    # The next stage runs on the engine this task ran on, which is the engine the owner
+    # picked when they asked for the expansion. Unless that engine has gone or been switched
+    # off in the hours since — then the deep role's stands in rather than the stage failing.
+    engine_id: int | None = row.engine_id
+    try:
+        task_engine(session, engine_id)
+    except CorrespondenceError:
+        engine_id = None
     try:
         _created, queued = _expand_from(
-            session, node, game, picture["lines"], width=width, stages=stages, tasks=True
+            session,
+            node,
+            game,
+            picture["lines"],
+            width=width,
+            stages=stages,
+            tasks=True,
+            engine_id=engine_id,
         )
     except CorrespondenceError:
         logger.warning("correspondence: expansion below node %s could not continue", node.id)

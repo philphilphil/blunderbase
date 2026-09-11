@@ -143,6 +143,26 @@ const MASTERS = {
   top_games: [],
 }
 
+/** The capacity strip's answer: one engine on this host, which every picker opens on. */
+const STATUS = {
+  slots: 2,
+  in_use: 0,
+  queued: 0,
+  paused: 0,
+  parked: [],
+  hosts: [{ runner_id: null, host: 'this host', slots: 2, in_use: 0, parked: 0 }],
+  engines: [
+    {
+      engine_id: 1,
+      name: 'Stockfish 17',
+      default: true,
+      runner_id: null,
+      host: 'this host',
+      search_trouble: null,
+    },
+  ],
+}
+
 let payload: CorrespondenceGameDetail
 let posted: { path: string; method: string; body: unknown }[]
 /** When set, every search write is refused with this sentence, as the service would. */
@@ -178,6 +198,7 @@ beforeEach(() => {
         return json({ ...payload, queued_runs: [] })
       }
       if (path.includes('/correspondence/games/7')) return json(payload)
+      if (path.includes('/correspondence/status')) return json(STATUS)
       if (path.includes('/notes')) return json([])
       if (path.includes('/reference/token')) return json({ configured: true })
       if (path.includes('/reference/explorer')) return json(MASTERS)
@@ -366,58 +387,60 @@ describe('the correspondence game view', () => {
 })
 
 describe('the correspondence game view: tasks and expansion', () => {
-  it('queues a task from the tree menu with no engine and no limits of its own', async () => {
+  it('queues a task from the tree menu on the engine the dialog opened on', async () => {
     draw()
     await userEvent.pointer({
       keys: '[MouseRight]',
       target: await screen.findByTestId('tree-node-2'),
     })
     await userEvent.click(
-      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task…' }),
     )
+    expect(screen.getByRole('button', { name: 'Stockfish 17' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Queue task' }))
 
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0].path).toContain('/correspondence/searches')
-    // The deployment's task engine, budget and line count: the body says which node and
-    // which of the two engine modes, and nothing else.
-    expect(posted[0].body).toEqual({ node_id: 2, kind: 'task' })
+    // The engine, and which of the two engine modes; the budget and the line count are
+    // the deployment's and are not sent.
+    expect(posted[0].body).toEqual({ node_id: 2, kind: 'task', engine_id: 1 })
   })
 
-  it('toasts why a task could not be queued, the menu having no dialog to hold it', async () => {
-    // The first thing this verb does on a deployment with no task engine is fail, and the
-    // menu item has nowhere of its own to say so.
-    refuseSearch = 'no engine is set for correspondence tasks'
+  it('shows in the dialog why a task could not be queued', async () => {
+    refuseSearch = 'no engine holds the deep role'
     draw()
     await userEvent.pointer({
       keys: '[MouseRight]',
       target: await screen.findByTestId('tree-node-2'),
     })
     await userEvent.click(
-      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task…' }),
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Queue task' }))
 
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('no engine is set for correspondence tasks'),
-    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('no engine holds the deep role')
   })
 
   it('opens the search picker without the refusal the last task earned', async () => {
-    refuseSearch = 'no engine is set for correspondence tasks'
+    refuseSearch = 'no engine holds the deep role'
     draw()
     await userEvent.pointer({
       keys: '[MouseRight]',
       target: await screen.findByTestId('tree-node-2'),
     })
     await userEvent.click(
-      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task…' }),
     )
-    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    await userEvent.click(screen.getByRole('button', { name: 'Queue task' }))
+    await screen.findByRole('alert')
+    await userEvent.keyboard('{Escape}')
 
     await userEvent.click(screen.getByRole('button', { name: 'Search with…' }))
 
-    expect(
-      screen.queryByText('no engine is set for correspondence tasks'),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText('no engine holds the deep role')).not.toBeInTheDocument()
   })
 
   it('expands the selected node from the pane’s own button', async () => {
@@ -428,22 +451,23 @@ describe('the correspondence game view: tasks and expansion', () => {
 
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0].path).toContain('/correspondence/nodes/1/expand')
-    expect(posted[0].body).toEqual({ width: null, stages: 2, tasks: true })
+    expect(posted[0].body).toEqual({ width: null, stages: 2, tasks: true, engine_id: 1 })
   })
 
-  it('refreshes a subtree from the menu, with the deployment’s task engine', async () => {
+  it('refreshes a subtree from the menu, on the engine the dialog opened on', async () => {
     draw()
     await userEvent.pointer({
       keys: '[MouseRight]',
       target: await screen.findByTestId('tree-node-3'),
     })
     await userEvent.click(
-      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Refresh subtree' }),
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Refresh subtree…' }),
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
 
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0].path).toContain('/correspondence/nodes/3/refresh')
-    expect(posted[0].body).toEqual({})
+    expect(posted[0].body).toEqual({ engine_id: 1 })
   })
 
   it('cancels a waiting task from the engine pane', async () => {

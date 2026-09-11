@@ -9,9 +9,10 @@
  * depth 50 — but it is a choice, not what happens by default. Switching the kind resets the
  * value to that kind's sensible default (depth 45, an hour), so two clicks still do.
  *
- * The engines offered are `GET /correspondence/status`'s `engines[]` — the deployment's
- * `correspondence_search_engine_ids` in the owner's order, or every eligible engine when
- * nobody has chosen — and the first is preselected, which is what `default: true` means.
+ * The engines offered are `GET /correspondence/status`'s `engines[]`, every enabled UCI
+ * engine the deployment has; the ones a search cannot run on yet (a runner's, one that
+ * drives no board) are greyed with the reason rather than hidden, and the deep role's is
+ * preselected (`EnginePicker`).
  *
  * **Only the marked moves** is `root_moves`: the candidates already under this node, chosen
  * by hand, sent as UCI `searchmoves`. It is offered rather than typed because the moves that
@@ -35,6 +36,7 @@ import { cn } from '@/lib/utils'
 
 import { sortSiblings } from '../tree'
 import { Field, Frame } from './DialogFrame'
+import { EnginePicker, preferredEngine } from './EnginePicker'
 
 type LimitKind = 'none' | 'depth' | 'nodes' | 'minutes'
 
@@ -51,7 +53,7 @@ function positive(value: string): number | null {
 
 export interface SearchDialogProps {
   node: CorrespondenceTreeNode
-  /** The picker, in the owner's order; the one flagged `default` is preselected. */
+  /** Every offered engine; the one flagged `default` is preselected where it can search. */
   engines: CorrespondenceSearchEngine[]
   /** The deployment's `correspondence_multipv`, shown as the placeholder. */
   defaultMultipv: number
@@ -72,8 +74,7 @@ export function SearchDialog({
 }: SearchDialogProps) {
   const { t } = useLingui()
   const notate = useNotation()
-  const preferred = engines.find((engine) => engine.default) ?? engines[0] ?? null
-  const [engineId, setEngineId] = useState<number | null>(preferred?.engine_id ?? null)
+  const [engineId, setEngineId] = useState<number | null>(preferredEngine(engines, 'search'))
   const [multipv, setMultipv] = useState('')
   const [limit, setLimit] = useState<LimitKind>(DEFAULT_LIMIT)
   const [limitValue, setLimitValue] = useState(LIMIT_DEFAULTS[DEFAULT_LIMIT])
@@ -121,38 +122,15 @@ export function SearchDialog({
           <Label>
             <Trans>Engine</Trans>
           </Label>
-          {engines.length === 0 ? (
+          <EnginePicker engines={engines} mode="search" value={engineId} onChange={setEngineId} />
+          {engines.length > 0 && engineId === null ? (
             <p className="text-[0.71875rem] text-mistake">
               <Trans>
-                No engine here can run a search. One is needed that is switched on, speaks
-                UCI and can drive a board — Analysis → Correspondence says which are offered.
+                None of these can run a search here: one is needed on this machine that can
+                drive a board. Each greyed engine says why under the pointer.
               </Trans>
             </p>
-          ) : (
-            <div role="group" aria-label={t`Engine`} className="flex flex-wrap gap-2">
-              {engines.map((engine) => (
-                <button
-                  key={engine.engine_id}
-                  type="button"
-                  aria-pressed={engineId === engine.engine_id}
-                  onClick={() => setEngineId(engine.engine_id)}
-                  className={cn(
-                    'flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-1.5 text-[0.75rem] transition-colors',
-                    engineId === engine.engine_id
-                      ? 'border-accent-teal/40 bg-selected text-ink'
-                      : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-                  )}
-                >
-                  <span className="truncate">{engine.name}</span>
-                  {engine.hash_mb ? (
-                    <span className="font-mono text-[0.625rem] text-dim-2">
-                      {t`${engine.hash_mb} MB`}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          )}
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-4">

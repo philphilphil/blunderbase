@@ -607,7 +607,7 @@ export function TreePane({
               setMenu(null)
             }}
           >
-            <Trans>Queue task</Trans>
+            <Trans>Queue task…</Trans>
           </MenuItem>
           <MenuItem
             disabled={!onExpand || menuNode.mark === 'excluded'}
@@ -631,7 +631,7 @@ export function TreePane({
               setMenu(null)
             }}
           >
-            <Trans>Refresh subtree</Trans>
+            <Trans>Refresh subtree…</Trans>
           </MenuItem>
           {menuNode.task && menuNode.task.status === 'queued' ? (
             <MenuItem

@@ -116,9 +116,9 @@ Das Menü eines Knotens trägt die Verben:
 | Verb | |
 |---|---|
 | **Suchen mit …** | Eine Engine auf diese Stellung ansetzen, siehe [Eine Stellung rechnen lassen](#search-a-position) |
-| **Aufgabe einreihen** | Ein begrenzter Blick auf diese Stellung, über die Analysewarteschlange, siehe [Aufgaben und Erweitern](#tasks-and-expansion) |
+| **Aufgabe einreihen …** | Ein begrenzter Blick auf diese Stellung, über die Analysewarteschlange, mit der Engine, die du wählst, siehe [Aufgaben und Erweitern](#tasks-and-expansion) |
 | **Erweitern …** | Die besten Züge hier zu Kindern machen und unter jedes eine Aufgabe legen |
-| **Teilbaum auffrischen** | Auf jeder veralteten Stellung von hier abwärts eine Aufgabe einreihen |
+| **Teilbaum auffrischen …** | Auf jeder veralteten Stellung von hier abwärts eine Aufgabe einreihen, mit der Engine, die du wählst |
 | **Kommentieren** | Deine Anmerkung zum Zug; sie geht als Kommentar ins PGN |
 | **Markieren** | Dein Urteil über den Zug, siehe unten |
 | **Nach vorn holen** | Diesen Zug zur ersten seiner Alternativen machen, damit er als Hauptzug gelesen wird |
@@ -158,13 +158,13 @@ Die rechte Spalte sind die Engines: ein Feld je Engine, die den ausgewählten Kn
 rechnet oder schon ein Urteil zu ihm hinterlassen hat, gestapelt untereinander.
 **Suchen mit …** oben in der Spalte setzt eine weitere Engine auf die Stellung.
 
-Zur Auswahl stehen die Engines, die du unter **Analyse → Fernschach → Such-Engines**
-ausgewählt hast, in deiner Reihenfolge, die erste vorgeschlagen; hast du dort keine
-ausgewählt, werden alle geeigneten angeboten – eingeschaltet, UCI, brettfähig und auf diesem
-Rechner. Maia ist nie dabei: ein Blick ohne Suche ergibt eine Verteilung von Zügen, keine
-Variante. Eine Engine auf einem [Remote Runner](../operate/runners.md) kann noch keine Suche
-übernehmen, und eine Engine, deren Programmdatei verschwunden ist, wird mit Begründung
-abgewiesen.
+Zur Auswahl steht jede Engine, die eingeschaltet ist und UCI spricht, auf diesem Rechner
+und auf deinen Runnern; vorgeschlagen wird die mit der Rolle Tiefenanalyse. Die, auf denen
+keine Suche laufen kann, sind ausgegraut statt versteckt und sagen unter dem Zeiger, warum:
+Eine Engine auf einem [Remote Runner](../operate/runners.md) kann noch keine Suche
+übernehmen, eine, die kein Brett bedienen kann, wird es nie, und eine, deren Programmdatei
+verschwunden ist, nennt den Ort, an dem sie gesucht wurde. Maia ist nie dabei: ein Blick
+ohne Suche ergibt eine Verteilung von Zügen, keine Variante.
 
 Unter dem Namen der Engine wird die Suche selbst eingestellt:
 
@@ -243,15 +243,19 @@ Eine Suche ist eine Engine, die über eine Stellung nachdenkt, solange du sie l�
 Knoten, ein bis zwei Minuten – auf eine Stellung, eingereiht in die gewöhnliche
 Analysewarteschlange. Sie belegt keinen Suchplatz, steht einer Suche also nie im Weg, und
 sie läuft dort, wo die Warteschlange Platz hat – auch auf einem
-[entfernten Runner](../operate/runners.md). Welche Engine sie abarbeitet, legst du unter
-**Analyse → Fernschach → Aufgaben-Engine** fest; wählst du keine, tut es die Engine mit der
-Rolle Tiefenanalyse.
+[entfernten Runner](../operate/runners.md). Welche Engine sie abarbeitet, wählst du beim
+Einreihen, aus derselben Liste, die auch die Suche zeigt – nur ist hier die Engine eines
+Runners nicht ausgegraut, denn eine Aufgabe ist gewöhnliche Warteschlangenarbeit, und die
+für Fernschach gekaufte Maschine ist meist dieser Runner. Vorgeschlagen wird die Engine mit
+der Rolle Tiefenanalyse.
 
-Das Menü eines Knotens trägt beides. **Aufgabe einreihen** bittet um einen Blick auf diese
-Stellung. **Erweitern …** ist das, was die Arbeit eines Abends erledigt:
+Das Menü eines Knotens trägt beides. **Aufgabe einreihen …** bittet um einen Blick auf diese
+Stellung und fragt, welche Engine ihn tun soll. **Erweitern …** ist das, was die Arbeit
+eines Abends erledigt:
 
 | | |
 |---|---|
+| **Engine** | Jede Aufgabe der Erweiterung läuft darauf, auch die späteren Stufen, wie viele Stunden sie auch brauchen |
 | **Breite** | Wie viele Züge jede Stufe behält – die ersten Züge der besten Varianten der Stellung, das stärkste zuerst. Leer nimmt **Linien pro Aufgabe** aus den Einstellungen |
 | **Stufen** | Wie viele Ebenen tief, 1 bis 3. Breite 3 und 2 Stufen sind bis zu zwölf Stellungen, Breite 3 und 3 Stufen bis zu neununddreißig |
 | **Aufgaben einreihen** | An bekommt jeder neue Zug eine Engine. Aus wandern die Züge in den Baum, und gerechnet wird nichts |
@@ -286,11 +290,11 @@ Deine **Markierungen** steuern das Ganze – der Grund, sie zu setzen:
 | **! Gut**, **!? Interessant** | Eine Stufe mehr und ein Geschwisterzug mehr als die Nachbarn |
 | Keine Markierung | Die Breite und die Stufen, um die du gebeten hast |
 
-**Teilbaum auffrischen** im selben Menü ist das Wartungsverb. Ein Urteil ist **veraltet**,
+**Teilbaum auffrischen …** im selben Menü ist das Wartungsverb. Ein Urteil ist **veraltet**,
 wenn es flacher ist als **Veraltet unter Tiefe** – voreingestellt dreißig – oder wenn es von
 einer Version der Engine stammt, die nicht mehr installiert ist. Das ist das, was man
 vergisst: Ein im Januar aktualisiertes Stockfish macht jedes Urteil vom Dezember zu dem
-eines anderen. Veraltete Urteile sind im Baum markiert, und **Teilbaum auffrischen** reiht
+eines anderen. Veraltete Urteile sind im Baum markiert, und **Teilbaum auffrischen …** reiht
 auf jeder veralteten Stellung von diesem Knoten abwärts eine Aufgabe ein, Lücken im Ast
 eingeschlossen. Sind es mehr als fünfzig, wird es abgelehnt und sagt, wie viele es sind:
 dann lieber Ast für Ast als den ganzen Baum einer Partie auf einmal.

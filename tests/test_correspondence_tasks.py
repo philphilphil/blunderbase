@@ -310,16 +310,35 @@ def test_an_excluded_move_never_gets_a_task(session: Session) -> None:
         correspondence_service.queue_task(session, node_id=added["tip"]["id"])
 
 
-def test_the_task_engine_setting_wins_over_the_deep_role(session: Session) -> None:
+def test_a_task_takes_the_engine_it_was_asked_for_else_the_deep_roles(session: Session) -> None:
+    deep = add_engine(session, name="Stockfish")
+    other = add_engine(session, name="Leela")
+    game = make_game(session)
+    root = game["tree"]["id"]
+
+    chosen = correspondence_service.queue_task(session, node_id=root, engine_id=other.id)
+    fallen = correspondence_service.queue_task(session, node_id=root)
+
+    assert session.get(AnalysisRun, chosen["run_id"]).engine_id == other.id
+    assert session.get(AnalysisRun, fallen["run_id"]).engine_id == deep.id
+
+
+def test_an_expansion_stays_on_the_engine_it_was_started_on(session: Session) -> None:
+    """The next stage is queued hours later by `absorb_run`, with nothing in memory: the
+    engine rides on the task's own row, so Leela's expansion does not finish on Stockfish."""
     add_engine(session, name="Stockfish")
     other = add_engine(session, name="Leela")
-    app_settings_service.set_correspondence_task_engine_id(session, other.id)
     game = make_game(session)
+    root = game["tree"]["id"]
+    correspondence_service.expand_node(session, root, width=2, stages=2, engine_id=other.id)
+    carried = tasks_on(session, root)[0]
+    assert carried.engine_id == other.id
 
-    search = correspondence_service.queue_task(session, node_id=game["tree"]["id"])
+    answer(session, {"run_id": carried.run_id}, cp=20, depth=35)
 
-    assert search["engine_id"] == other.id
-    assert session.get(AnalysisRun, search["run_id"]).engine_id == other.id
+    for san in ("e4", "d4"):
+        child = child_named(session, root, san)
+        assert [row.engine_id for row in tasks_on(session, child.id)] == [other.id]
 
 
 # --- absorbing the answer --------------------------------------------------
@@ -936,19 +955,25 @@ def test_deleting_a_runners_engine_leaves_its_queued_task_alone(session: Session
     assert session.get(CorrespondenceSearch, search["id"]).status is SearchStatus.QUEUED
 
 
-def test_deleting_the_task_engine_unchooses_it_rather_than_leaving_a_dead_id(
+def test_an_expansion_whose_engine_was_switched_off_continues_on_the_deep_roles(
     session: Session,
 ) -> None:
-    """A setting pointing at a row that is gone would refuse every task, expansion and
-    refresh with "no engine with id 2" until the owner thought to look at the settings."""
+    """Hours pass between the stages. An engine switched off in between must not make the
+    next stage fail on every child; the deep role's engine stands in for it."""
     deep = add_engine(session, name="Stockfish")
     chosen = add_engine(session, name="Leela")
-    app_settings_service.set_correspondence_task_engine_id(session, chosen.id)
+    game = make_game(session)
+    root = game["tree"]["id"]
+    correspondence_service.expand_node(session, root, width=2, stages=2, engine_id=chosen.id)
+    carried = tasks_on(session, root)[0]
 
-    engines_service.delete_engine(session, chosen.id)
+    chosen.enabled = False
+    session.commit()
+    answer(session, {"run_id": carried.run_id}, cp=20, depth=35)
 
-    assert app_settings_service.get_correspondence_task_engine_id(session) is None
-    assert correspondence_service.task_engine(session).id == deep.id
+    for san in ("e4", "d4"):
+        child = child_named(session, root, san)
+        assert [row.engine_id for row in tasks_on(session, child.id)] == [deep.id]
 
 
 def test_deleting_a_correspondence_game_takes_its_queued_tasks_runs(session: Session) -> None:

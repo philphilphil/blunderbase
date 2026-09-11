@@ -11,25 +11,17 @@
  * it starts, because it sizes an engine pool, and a pool cannot be resized under three
  * searches that are already in it. The field says so rather than pretending otherwise.
  *
- * **The search engines are a list, not a set of switches.** Their order is the picker's
- * order and the first is its default, which is why they are moved up and down rather than
- * ticked — and why an empty list is a real state meaning "offer every eligible engine"
- * rather than "offer none". Eligible is the backend's word: switched on, UCI, able to
- * drive a board, on this machine.
- *
- * **The task engine is chosen out of a wider pool than the search engines.** A search runs
- * in this process's own pool and must therefore be an engine that can drive a board here; a
- * task is an ordinary `AnalysisRun` and runs wherever the queue has room, so every enabled
- * UCI engine is offered, a runner's included. That is why this one list comes from
- * `/runners/status` rather than from `/correspondence/status`.
+ * **There is no engine setting here.** Every enabled UCI engine is offered wherever an
+ * engine is chosen — the search dialog, Queue task, Expand, Refresh — with the deep role's
+ * preselected; a search greys out the engines it cannot run on and says why. A list kept
+ * here was a second place for the same choice, and one that hid engines from the dialogs.
  *
  * The form saves through `completeUpdate` like the other two settings pages: `PUT
  * /settings` is a replace, so a page that sent only its own fields would clear everything
- * Maia and Engine passes hold — and, now, each other's list.
+ * Maia and Engine passes hold.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronDown, ChevronUp, X } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Toggle } from '@/components/analysis/AnalysisControls'
@@ -38,7 +30,6 @@ import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   completeUpdate,
@@ -46,14 +37,7 @@ import {
   settingText as storedText,
   SETTING_DEFAULTS as DEFAULTS,
 } from '@/lib/api/appSettings'
-import {
-  useAppSettings,
-  useCorrespondenceStatus,
-  useRunnersStatus,
-  useSaveAppSettings,
-} from '@/lib/api/queries'
-import { engineHosts } from '@/lib/engines/hosts'
-import { cn } from '@/lib/utils'
+import { useAppSettings, useSaveAppSettings } from '@/lib/api/queries'
 
 type NumberKey =
   | 'correspondence_multipv'
@@ -65,35 +49,10 @@ type NumberKey =
 export function CorrespondenceSettingsPage() {
   const { t } = useLingui()
   const settings = useAppSettings()
-  // The engines a search could run on, from the same endpoint the picker itself reads —
-  // `enabled && uci && streams && !runner_id`, decided once on the server so this page and
-  // the dialog cannot disagree about what "eligible" means. `status.engines` is the
-  // picker's list, which is this setting already applied; this page needs the pool it is
-  // chosen out of.
-  const status = useCorrespondenceStatus()
-  // The task engine is chosen out of a wider pool than the searches are: a task is
-  // ordinary queue work, so an engine on a remote runner is not only allowed, it is the
-  // sensible choice where there is one. `/runners/status` is the only place that knows a
-  // runner's engines, which is why this page reads it and the picker's own list does not.
-  const runners = useRunnersStatus()
-  const save = useSaveAppSettings({
-    onSuccess: () => {
-      setDraft({})
-      setChosen(null)
-      setTaskEngine(undefined)
-    },
-  })
+  const save = useSaveAppSettings({ onSuccess: () => setDraft({}) })
   const [draft, setDraft] = useState<
     Partial<Record<NumberKey | 'correspondence_enabled', string>>
   >({})
-  /** null while the stored list stands; an array as soon as the owner has moved anything. */
-  const [chosen, setChosen] = useState<number[] | null>(null)
-  /**
-   * `undefined` while the stored engine stands, and then the choice — which may itself be
-   * `null`, meaning "whichever engine holds the deep role". Two kinds of nothing, and a
-   * single null would make "not touched yet" indistinguishable from "deliberately none".
-   */
-  const [taskEngine, setTaskEngine] = useState<number | null | undefined>(undefined)
 
   const chrome = (
     <SetPageChrome
@@ -191,34 +150,7 @@ export function CorrespondenceSettingsPage() {
     ...taskFields.map((field) => field.key),
   ] as const
 
-  // `eligible_engines`, not `engines`: the latter is already this setting applied, so
-  // choosing one engine would hide every other one from this page for good.
-  const offered = status.data?.eligible_engines ?? []
-  const storedEngines = stored.correspondence_search_engine_ids ?? []
-  const engineIds = chosen ?? storedEngines
-  // Every enabled UCI engine the deployment knows, this machine's and every runner's — the
-  // one picker on these screens that is not limited to what can drive a board here.
-  const taskEngines = engineHosts(runners.data).filter(
-    (host) => host.enabled && host.kind === 'uci',
-  )
-  const storedTaskEngine = stored.correspondence_task_engine_id ?? null
-  const taskEngineId = taskEngine === undefined ? storedTaskEngine : taskEngine
-  const dirty =
-    keys.some((key) => text(key) !== storedText(stored, key)) ||
-    (chosen !== null && chosen.join(',') !== storedEngines.join(',')) ||
-    (taskEngine !== undefined && taskEngine !== storedTaskEngine)
-
-  /** Names for the ids on the list, including one whose engine row has since gone. */
-  const nameOf = (id: number) =>
-    offered.find((engine) => engine.engine_id === id)?.name ?? t`Engine ${id}`
-
-  const move = (at: number, by: number) => {
-    const next = [...engineIds]
-    const to = at + by
-    if (to < 0 || to >= next.length) return
-    ;[next[at], next[to]] = [next[to], next[at]]
-    setChosen(next)
-  }
+  const dirty = keys.some((key) => text(key) !== storedText(stored, key))
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -228,11 +160,9 @@ export function CorrespondenceSettingsPage() {
       correspondence_enabled: enabled ? 1 : 0,
       correspondence_multipv: parse(text('correspondence_multipv')),
       correspondence_slots: parse(text('correspondence_slots')),
-      correspondence_search_engine_ids: engineIds,
       correspondence_task_nodes: parse(text('correspondence_task_nodes')),
       correspondence_task_multipv: parse(text('correspondence_task_multipv')),
       correspondence_stale_depth: parse(text('correspondence_stale_depth')),
-      correspondence_task_engine_id: taskEngineId,
     })
   }
 
@@ -338,86 +268,12 @@ export function CorrespondenceSettingsPage() {
                 </Trans>
               </p>
             </div>
-
-            <div className="flex flex-col gap-2 border-t border-hairline pt-3">
-              <span className="text-[0.71875rem] text-body">
-                <Trans>Engines the picker offers</Trans>
-              </span>
-              <span className="text-[0.625rem] leading-[1.5] text-dim-2">
-                <Trans>
-                  In your order; the first is the one Search with… suggests. Choose none and
-                  every eligible engine is offered.
-                </Trans>
-              </span>
-              {engineIds.length === 0 ? (
-                <p className="text-[0.6875rem] text-dim">
-                  <Trans>Every eligible engine is offered.</Trans>
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1" data-testid="correspondence-engine-order">
-                  {engineIds.map((id, at) => (
-                    <li
-                      key={id}
-                      className="flex items-center gap-2 rounded-md border border-line bg-elevated px-2 py-1"
-                    >
-                      <span className="min-w-0 flex-1 truncate text-[0.71875rem] text-body">
-                        {nameOf(id)}
-                      </span>
-                      {at === 0 ? (
-                        <span className="font-mono text-[0.5625rem] text-dim-2 uppercase">
-                          <Trans>default</Trans>
-                        </span>
-                      ) : null}
-                      <OrderButton
-                        label={t`Move ${nameOf(id)} up`}
-                        disabled={at === 0}
-                        onClick={() => move(at, -1)}
-                      >
-                        <ChevronUp aria-hidden />
-                      </OrderButton>
-                      <OrderButton
-                        label={t`Move ${nameOf(id)} down`}
-                        disabled={at === engineIds.length - 1}
-                        onClick={() => move(at, 1)}
-                      >
-                        <ChevronDown aria-hidden />
-                      </OrderButton>
-                      <OrderButton
-                        label={t`Remove ${nameOf(id)}`}
-                        onClick={() => setChosen(engineIds.filter((one) => one !== id))}
-                      >
-                        <X aria-hidden />
-                      </OrderButton>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {offered
-                  .filter((engine) => !engineIds.includes(engine.engine_id))
-                  .map((engine) => (
-                    <button
-                      key={engine.engine_id}
-                      type="button"
-                      onClick={() => setChosen([...engineIds, engine.engine_id])}
-                      className={cn(
-                        'rounded-md border border-edge px-2 py-1 text-[0.6875rem] text-dim',
-                        'transition-colors hover:border-edge-hover hover:text-ink',
-                      )}
-                    >
-                      + {engine.name}
-                    </button>
-                  ))}
-                {offered.length === 0 ? (
-                  <span className="text-[0.6875rem] text-dim-2">
-                    <Trans>
-                      No engine here can run a search: one is needed that is switched on,
-                      speaks UCI and can drive a board.
-                    </Trans>
-                  </span>
-                ) : null}
-              </div>
-            </div>
+            <p className="border-t border-hairline pt-3 text-[0.625rem] leading-[1.6] text-dim-2">
+              <Trans>
+                Which engine searches is chosen on the position: Search with… offers every
+                engine that is switched on, with the one holding the deep role suggested.
+              </Trans>
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -429,45 +285,13 @@ export function CorrespondenceSettingsPage() {
               <Trans>
                 A task is one bounded look at one position, through the ordinary analysis
                 queue — it takes no search slot, and an expansion is a dozen of them at
-                once. Unlike a search, it can run on a remote runner.
+                once. Unlike a search, it can run on a remote runner; which engine is
+                chosen when the task is queued, with the deep role&rsquo;s suggested.
               </Trans>
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="flex max-w-md flex-col gap-1.5">
-              <Label htmlFor="correspondence-task-engine">
-                <Trans>Task engine</Trans>
-              </Label>
-              <select
-                id="correspondence-task-engine"
-                value={taskEngineId === null ? '' : String(taskEngineId)}
-                onChange={(event) =>
-                  setTaskEngine(event.target.value === '' ? null : Number(event.target.value))
-                }
-                className="h-8 w-full min-w-0 rounded-md border border-input bg-elevated px-2 text-xs text-ink outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50"
-              >
-                <option value="">{t`Whichever engine holds the deep role`}</option>
-                {/* An engine that was chosen and has since been switched off or deleted is
-                    still what is stored, and a select showing something else would be
-                    lying about that. */}
-                {taskEngineId !== null &&
-                !taskEngines.some((host) => host.engineId === taskEngineId) ? (
-                  <option value={String(taskEngineId)}>{t`Engine ${taskEngineId}`}</option>
-                ) : null}
-                {taskEngines.map((host) => (
-                  <option key={host.engineId} value={String(host.engineId)}>
-                    {host.runnerName ? `${host.name} · ${host.runnerName}` : host.name}
-                  </option>
-                ))}
-              </select>
-              <span className="text-[0.625rem] leading-[1.5] text-dim-2">
-                <Trans>
-                  Every engine that is switched on and speaks UCI, on this machine and on
-                  your runners. A machine of its own is the setup this mode is happiest in.
-                </Trans>
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-4 border-t border-hairline pt-3">
+            <div className="flex flex-wrap gap-4">
               {taskFields.map((field) => (
                 <SettingField
                   key={field.key}
@@ -495,39 +319,9 @@ export function CorrespondenceSettingsPage() {
         <SaveRow
           dirty={dirty}
           pending={save.isPending}
-          onRevert={() => {
-            setDraft({})
-            setChosen(null)
-            setTaskEngine(undefined)
-          }}
+          onRevert={() => setDraft({})}
         />
       </form>
     </PageBody>
-  )
-}
-
-/** A square icon press inside the engine list — three of them per row, all the same shape. */
-function OrderButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string
-  disabled?: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex size-5 flex-none items-center justify-center rounded-sm text-dim transition-colors hover:bg-raised hover:text-ink disabled:cursor-default disabled:opacity-30 [&_svg]:size-3"
-    >
-      {children}
-    </button>
   )
 }

@@ -11,6 +11,11 @@
  * per task**, the same rule every other correspondence number follows, and a box that
  * pre-filled the current default would quietly freeze it the first time the setting moved.
  *
+ * The engine is chosen here, once, for every task of the expansion — the later stages
+ * included, which the server carries on each task's row. Any enabled UCI engine will do,
+ * a runner's included: a task is ordinary queue work, and the machine bought for
+ * correspondence is usually the runner.
+ *
  * What the marks under the node do to both numbers is the manual's business
  * (`guide/correspondence`, *Tasks and expansion*) and the server's; the dialog says the one
  * sentence that stops it being a surprise and does not restate the table.
@@ -22,17 +27,24 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { CorrespondenceExpand, CorrespondenceTreeNode } from '@/lib/api/types'
+import type {
+  CorrespondenceExpand,
+  CorrespondenceSearchEngine,
+  CorrespondenceTreeNode,
+} from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { Field, Frame } from './DialogFrame'
+import { EnginePicker, preferredEngine } from './EnginePicker'
 
 /** 1 to 3, and the server clamps to the same — see `MAX_EXPAND_STAGES`. */
 const STAGES = [1, 2, 3] as const
 
 export interface ExpandDialogProps {
   node: CorrespondenceTreeNode
+  /** Every offered engine; the one flagged `default` is preselected. */
+  engines: CorrespondenceSearchEngine[]
   /** The deployment's `correspondence_task_multipv`, shown as the width placeholder. */
   defaultWidth: number
   pending: boolean
@@ -56,6 +68,7 @@ export function expansionSize(w: number, stages: number): number {
 
 export function ExpandDialog({
   node,
+  engines,
   defaultWidth,
   pending,
   error,
@@ -67,15 +80,18 @@ export function ExpandDialog({
   const [value, setValue] = useState('')
   const [stages, setStages] = useState(1)
   const [tasks, setTasks] = useState(true)
+  const [engineId, setEngineId] = useState<number | null>(preferredEngine(engines, 'task'))
 
   const chosen = width(value) ?? defaultWidth
   const where = node.san ? notate(node.san) : t`the starting position`
   const evaluated = (node.evals ?? []).length > 0
+  // With the tasks off no engine is needed; with them on, one has to be picked.
+  const ready = !tasks || engineId !== null
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (pending) return
-    onExpand({ width: width(value), stages, tasks })
+    if (pending || !ready) return
+    onExpand({ width: width(value), stages, tasks, engine_id: tasks ? engineId : null })
   }
 
   return (
@@ -148,6 +164,21 @@ export function ExpandDialog({
           </span>
         </label>
 
+        {tasks ? (
+          <div className="flex flex-col gap-1.5">
+            <Label>
+              <Trans>Engine</Trans>
+            </Label>
+            <EnginePicker engines={engines} mode="task" value={engineId} onChange={setEngineId} />
+            <p className="text-[0.625rem] leading-[1.5] text-dim-2">
+              <Trans>
+                Every task of this expansion runs on it, the later stages too. A runner's
+                engine is allowed: a task is ordinary queue work.
+              </Trans>
+            </p>
+          </div>
+        ) : null}
+
         {evaluated ? null : (
           <p className="text-[0.625rem] leading-[1.55] text-dim-2">
             <Trans>
@@ -166,7 +197,7 @@ export function ExpandDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || !ready}>
             {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
             <Trans>Expand</Trans>
           </Button>

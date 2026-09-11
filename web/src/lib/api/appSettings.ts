@@ -63,18 +63,13 @@ export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
     inaccuracy_threshold: settings.inaccuracy_threshold,
     mistake_threshold: settings.mistake_threshold,
     blunder_threshold: settings.blunder_threshold,
-    // Correspondence mode's nine. A settings form that left them out would switch the
+    // Correspondence mode's six. A settings form that left them out would switch the
     // mode off on its next save — the PUT is a replace, and an absent key is a cleared one.
-    // The engine list and the task engine are the two identities here, and are carried
-    // whole for the same reason `maia_elos` is: a save of the Engine passes page must not
-    // empty the search picker or unassign the engine the tasks run on.
     correspondence_enabled: settings.correspondence_enabled ?? null,
     correspondence_multipv: settings.correspondence_multipv ?? null,
     correspondence_slots: settings.correspondence_slots ?? null,
-    correspondence_search_engine_ids: settings.correspondence_search_engine_ids ?? [],
     correspondence_task_nodes: settings.correspondence_task_nodes ?? null,
     correspondence_task_multipv: settings.correspondence_task_multipv ?? null,
     correspondence_stale_depth: settings.correspondence_stale_depth ?? null,
-    correspondence_task_engine_id: settings.correspondence_task_engine_id ?? null,
   }
 }

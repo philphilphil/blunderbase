@@ -97,9 +97,9 @@ Fernschach → Suchplätze** legt fest, wie viele davon hier gleichzeitig laufen
 voreingestellt zwei –, und es sind eigene Plätze: Eine Suche nimmt nie den weg, auf den die
 Schnellanalyse einer importierten Partie wartet. Gib dem Fernschach **eine eigene
 Engine-Zeile** statt der, die deine Durchläufe benutzen: eine Zeile mit hohem `Threads` und
-so viel `Hash`, wie du entbehren kannst, ausgewählt unter **Such-Engines** auf derselben
-Seite. Ändern der Optionen startet ohnehin einen frischen Prozess, die beiden Zeilen kommen
-sich also nie in die Quere.
+so viel `Hash`, wie du entbehren kannst, und wähl sie unter **Suchen mit …** an der
+Stellung. Ändern der Optionen startet ohnehin einen frischen Prozess, die beiden Zeilen
+kommen sich also nie in die Quere.
 
 Ein Suchplatz ist nicht dieselbe Einheit wie `BLUNDERBASE_ANALYSIS_CONCURRENCY` weiter oben,
 und die beiden addieren sich, statt sich zu teilen: Die Variable begrenzt die
@@ -130,9 +130,9 @@ woraus eine [Erweiterung](../guide/correspondence.md#tasks-and-expansion) besteh
 `AnalysisRun` wie jeder andere: Sie belegt keinen Suchplatz, sie zählt zusammen mit der
 Schnell- und der Tiefenanalyse gegen `BLUNDERBASE_ANALYSIS_CONCURRENCY`, und sie läuft auf
 dem Host, dem die Warteschlange sie gibt – [Remote Runner](runners.md) eingeschlossen. Die
-Engine unter **Analyse → Fernschach → Aufgaben-Engine** darf also auf einem Runner liegen,
-anders als eine Such-Engine, die hier sein muss – und wo du einen Runner hast, gehört sie
-dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre Kerne für die
+Engine, die du für eine Aufgabe wählst – in **Aufgabe einreihen …**, **Erweitern …** oder
+**Teilbaum auffrischen …** –, darf also auf einem Runner liegen, anders als eine
+Such-Engine, die hier sein muss – und wo du einen Runner hast, gehört sie dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre Kerne für die
 Suchen und die Durchläufe. Aufgaben stehen in der Warteschlange zwischen den Stufen, vor der
 Schnellanalyse jeder importierten Partie und hinter einer Tiefenanalyse, auf die jemand
 wartet, und untereinander gilt: die nächste Frist zuerst. **Warteschlange leeren** auf der
@@ -142,9 +142,9 @@ Knoten sagt es.
 Ideal ist eine eigene Maschine. Ein [Remote Runner](runners.md) ist heute der Weg zu einer
 für die Warteschlange, und die Aufgaben nutzen ihn schon; eine Suche läuft weiterhin nur auf
 diesem Server. Eine Engine, die
-ein Runner anbietet, taucht in der Auswahl **Suchen mit …** nicht auf, und eine Suche, die
-auf ihr angefordert wird, wird abgewiesen – eine für Fernschach gekaufte Maschine wird also
-am besten der Server.
+ein Runner anbietet, ist in der Auswahl **Suchen mit …** mit dieser Begründung ausgegraut,
+und eine Suche, die auf ihr angefordert wird, wird abgewiesen – eine für Fernschach gekaufte
+Maschine wird also am besten der Server.
 
 ## Die Engine im Browser { #the-engine-in-your-browser }
 

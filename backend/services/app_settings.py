@@ -53,12 +53,8 @@ pool, so it is read once at startup and a change takes a restart, and the stale 
 read on every tree payload, because staleness is a reading of the eval table rather than
 something written into it.
 
-`correspondence_search_engine_ids` and `correspondence_task_engine_id` are the mode's
-other two and are not those: a list of engine ids in the owner's own order — the engines
-the search picker offers, with the first as its default — and the single engine tasks run
-on. Identities rather than numbers with a clamp, so each has its own accessor pair exactly
-as `maia_elos` does; empty means "every eligible engine" for the first and "the deep
-tier's engine" for the second.
+There is deliberately no engine setting for the mode: every enabled UCI engine is offered
+wherever an engine is chosen, and the deep role's engine is the one preselected.
 
 **The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
 engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
@@ -150,18 +146,6 @@ CORRESPONDENCE_TASK_MULTIPV = "correspondence_task_multipv"
 # half of "stale" is the engine's version, which is a comparison rather than a number and
 # so has no setting.
 CORRESPONDENCE_STALE_DEPTH = "correspondence_stale_depth"
-# Which engine tasks run on. An identity rather than a number, so it is outside `SETTINGS`
-# and has its own accessor pair, exactly as the three engine roles do: there is no clamp
-# that rescues an engine id, and the nearest sensible engine to one that is gone is none —
-# in which case `services.correspondence` falls back to the deep tier's engine, because a
-# task is a bounded search and that is the role a bounded search already has.
-CORRESPONDENCE_TASK_ENGINE_ID = "correspondence_task_engine_id"
-# Which engines the search picker offers, in the owner's own order; the first is the
-# default. A list of engine ids, so it is outside `SETTINGS` and gets its own accessor
-# pair the way `maia_elos` does — there is no clamp that rescues an engine id, and the
-# nearest sensible engine to one that is gone is no engine. Empty means "every engine that
-# is eligible", which is what an install that has never opened the page wants.
-CORRESPONDENCE_SEARCH_ENGINE_IDS = "correspondence_search_engine_ids"
 # The three role assignments, each a nullable engine id. Not in `SETTINGS` for the same
 # reason `MAIA_ELOS` is not: those are single numbers with a range and a clamp, and an
 # engine id has neither — the nearest sensible engine to one that is gone is no engine.
@@ -257,8 +241,6 @@ MAX_CORRESPONDENCE_MULTIPV = 5
 # searches on one machine is already more processes than any owner's cores.
 MIN_CORRESPONDENCE_SLOTS = 1
 MAX_CORRESPONDENCE_SLOTS = 16
-# As many engines as the picker can be read at a glance, and more than anyone has.
-MAX_CORRESPONDENCE_SEARCH_ENGINES = 10
 # A verdict is stale below this depth. One is "nothing is ever stale by depth"; a hundred
 # is deeper than any engine reaches on a position somebody is waiting for, which is
 # "everything is always stale" — both are states an owner may want, and neither is a number
@@ -723,101 +705,6 @@ def get_correspondence_stale_depth(session: Session) -> int:
     """
     value = stored(session, CORRESPONDENCE_STALE_DEPTH)
     return CORRESPONDENCE_STALE_DEPTH_DEFAULT if value is None else int(value)
-
-
-def get_correspondence_task_engine_id(session: Session) -> int | None:
-    """The engine the owner chose for correspondence tasks, or None because nobody has.
-
-    Only the id is stored and only the id is answered, as with the three engine roles:
-    whether that engine still exists, is switched on or can run a task is
-    `services.correspondence`'s question, and asking it here would put half of it in two
-    places.
-    """
-    row = session.get(AppSetting, CORRESPONDENCE_TASK_ENGINE_ID)
-    if row is None:
-        return None
-    value = row.value
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        # A hand-edited row. "Nobody chose" is the honest reading of a value that is not an
-        # id, and the fallback then decides.
-        return None
-    return value
-
-
-def set_correspondence_task_engine_id(session: Session, engine_id: int | None) -> int | None:
-    """Choose the engine tasks run on, or unchoose it. Returns what is chosen afterwards.
-
-    None deletes the row rather than writing a null, as every other write here treats "the
-    owner has not chosen": there is one fallback and it is the absence of a row — here, the
-    deep tier's engine.
-    """
-    if engine_id is None or int(engine_id) <= 0:
-        session.execute(delete(AppSetting).where(AppSetting.key == CORRESPONDENCE_TASK_ENGINE_ID))
-        session.commit()
-        return None
-    row = session.get(AppSetting, CORRESPONDENCE_TASK_ENGINE_ID)
-    if row is None:
-        session.add(AppSetting(key=CORRESPONDENCE_TASK_ENGINE_ID, value=int(engine_id)))
-    else:
-        row.value = int(engine_id)
-    session.commit()
-    return int(engine_id)
-
-
-def clean_engine_ids(values: object) -> list[int]:
-    """Whatever was given as a list of engine ids, as ids. Order is kept: the first is the
-    default the picker offers.
-
-    Anything that is not a positive id is dropped rather than refused — this is JSON in a
-    database a person can open — and duplicates go, because an engine offered twice is one
-    engine.
-    """
-    if isinstance(values, bool) or isinstance(values, int):
-        values = [values]
-    if not isinstance(values, list | tuple):
-        return []
-    kept: list[int] = []
-    for value in values:
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            continue
-        if value not in kept:
-            kept.append(value)
-    return kept[:MAX_CORRESPONDENCE_SEARCH_ENGINES]
-
-
-def get_correspondence_search_engine_ids(session: Session) -> list[int]:
-    """The engines the search picker offers, in the owner's order; empty means all of them.
-
-    Empty is not a deployment that can search nothing: it is one that has never opened the
-    page, and `services.correspondence` then offers every engine that is eligible. Which
-    engines are eligible at all — enabled, UCI, able to drive a board, on this host — is
-    that module's question and is asked at the moment a search starts, so an engine deleted
-    or switched off after it was chosen here simply stops being offered.
-    """
-    row = session.get(AppSetting, CORRESPONDENCE_SEARCH_ENGINE_IDS)
-    return [] if row is None else clean_engine_ids(row.value)
-
-
-def set_correspondence_search_engine_ids(session: Session, values: object | None) -> list[int]:
-    """Store the engines the picker offers, or clear them. Returns what is in force after.
-
-    Clearing writes no row, as every other write here treats "the owner has not chosen":
-    there is one fallback and it is the absence of a row — here, every eligible engine.
-    """
-    cleaned = [] if values is None else clean_engine_ids(values)
-    if not cleaned:
-        session.execute(
-            delete(AppSetting).where(AppSetting.key == CORRESPONDENCE_SEARCH_ENGINE_IDS)
-        )
-        session.commit()
-        return []
-    row = session.get(AppSetting, CORRESPONDENCE_SEARCH_ENGINE_IDS)
-    if row is None:
-        session.add(AppSetting(key=CORRESPONDENCE_SEARCH_ENGINE_IDS, value=cleaned))
-    else:
-        row.value = cleaned
-    session.commit()
-    return cleaned
 
 
 def get_thresholds(session: Session) -> tuple[float, float, float]:

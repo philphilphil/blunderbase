@@ -242,7 +242,12 @@ def expand_node(session: SessionDep, node_id: int, body: CorrespondenceExpand) -
     answers. The marks under the node steer both numbers as it goes.
     """
     return correspondence_service.expand_node(
-        session, node_id, width=body.width, stages=body.stages, tasks=body.tasks
+        session,
+        node_id,
+        width=body.width,
+        stages=body.stages,
+        tasks=body.tasks,
+        engine_id=body.engine_id,
     )
 
 

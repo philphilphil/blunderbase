@@ -34,8 +34,11 @@ msgid "nothing is on the board"
 msgstr "auf dem Brett steht nichts"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/routes/correspondence/components/EnginePicker.tsx
+#: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/RunningNow.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TaskDialog.tsx
 #: src/routes/engines/EngineBadges.tsx
 #: src/routes/game/components/MobileGameView.tsx
 msgid "Engine"
@@ -270,6 +273,7 @@ msgstr "Browser-Engine einrichten"
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TaskDialog.tsx
 #: src/routes/engines/AddEngineForm.tsx
 #: src/routes/engines/BrowserRunnerSection.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
@@ -1780,10 +1784,6 @@ msgid "Default 30"
 msgstr "Voreinstellung 30"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Engine {id}"
-msgstr "Engine {id}"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Correspondence mode"
 msgstr "Fernschachmodus"
 
@@ -1824,64 +1824,16 @@ msgid "Two is one CPU engine and one GPU engine at once. The server reads this w
 msgstr "Zwei sind eine CPU-Engine und eine GPU-Engine gleichzeitig. Der Server liest das beim Start, eine Änderung hier wirkt also erst nach einem Neustart."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Engines the picker offers"
-msgstr "Engines, die zur Auswahl stehen"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "In your order; the first is the one Search with… suggests. Choose none and every eligible engine is offered."
-msgstr "In deiner Reihenfolge; die erste schlägt „Suchen mit…“ vor. Wählst du keine, stehen alle geeigneten Engines zur Auswahl."
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Every eligible engine is offered."
-msgstr "Alle geeigneten Engines stehen zur Auswahl."
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-#: src/routes/engines/OptionsEditor.tsx
-msgid "default"
-msgstr "Standard"
-
-#. placeholder {0}: nameOf(id)
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Move {0} up"
-msgstr "{0} nach oben"
-
-#. placeholder {0}: nameOf(id)
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Move {0} down"
-msgstr "{0} nach unten"
-
-#. placeholder {0}: nameOf(id)
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Remove {0}"
-msgstr "{0} entfernen"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "No engine here can run a search: one is needed that is switched on, speaks UCI and can drive a board."
-msgstr "Keine Engine hier kann suchen: nötig ist eine, die eingeschaltet ist, UCI spricht und ein Brett bedienen kann."
+msgid "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
+msgstr "Welche Engine sucht, wird an der Stellung entschieden: Suchen mit … bietet jede eingeschaltete Engine an und schlägt die mit der Rolle Tiefenanalyse vor."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Tasks"
 msgstr "Aufgaben"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner."
-msgstr "Eine Aufgabe ist ein begrenzter Blick auf eine Stellung, über die gewöhnliche Analysewarteschlange – sie belegt keinen Suchplatz, und eine Erweiterung ist ein Dutzend davon auf einmal. Anders als eine Suche kann sie auf einem entfernten Runner laufen."
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Task engine"
-msgstr "Aufgaben-Engine"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Whichever engine holds the deep role"
-msgstr "Die Engine mit der Rolle Tiefenanalyse"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Engine {taskEngineId}"
-msgstr "Engine {taskEngineId}"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Every engine that is switched on and speaks UCI, on this machine and on your runners. A machine of its own is the setup this mode is happiest in."
-msgstr "Jede Engine, die eingeschaltet ist und UCI spricht, auf diesem Rechner und auf deinen Runnern. Am wohlsten ist diesem Modus ein eigener Rechner."
+msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
+msgstr "Eine Aufgabe ist ein begrenzter Blick auf eine Stellung, über die gewöhnliche Analysewarteschlange – sie belegt keinen Suchplatz, und eine Erweiterung ist ein Dutzend davon auf einmal. Anders als eine Suche kann sie auf einem entfernten Runner laufen; welche Engine, wird beim Einreihen gewählt, vorgeschlagen wird die mit der Rolle Tiefenanalyse."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
@@ -2723,6 +2675,15 @@ msgstr "bis {0} Knoten"
 msgid "for {0}"
 msgstr "für {0}"
 
+#: src/routes/correspondence/components/EnginePicker.tsx
+msgid "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
+msgstr "Keine eingeschaltete Engine spricht UCI. Leg eine unter Analyse → Engines an."
+
+#. placeholder {0}: engine.hash_mb
+#: src/routes/correspondence/components/EnginePicker.tsx
+msgid "{0} MB"
+msgstr "{0} MB"
+
 #: src/routes/correspondence/components/EnginesPane.tsx
 msgid "No engine has looked at this position yet."
 msgstr "Noch hat keine Engine diese Stellung angesehen."
@@ -2733,6 +2694,7 @@ msgstr "„Suchen mit…“ setzt eine darauf, so lange du sie lässt. Mehrere E
 
 #: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TaskDialog.tsx
 #: src/routes/game/notesModel.ts
 msgid "the starting position"
 msgstr "die Ausgangsstellung"
@@ -2761,6 +2723,10 @@ msgstr "Aufgaben einreihen"
 #: src/routes/correspondence/components/ExpandDialog.tsx
 msgid "Off, the moves go into the tree and nothing is calculated."
 msgstr "Aus wandern die Züge in den Baum, und gerechnet wird nichts."
+
+#: src/routes/correspondence/components/ExpandDialog.tsx
+msgid "Every task of this expansion runs on it, the later stages too. A runner's engine is allowed: a task is ordinary queue work."
+msgstr "Jede Aufgabe dieser Erweiterung läuft darauf, auch die späteren Stufen. Eine Engine auf einem Runner ist erlaubt: Eine Aufgabe ist gewöhnliche Warteschlangenarbeit."
 
 #: src/routes/correspondence/components/ExpandDialog.tsx
 msgid "No engine has looked at this position yet, so one task is queued on the move itself and the branches appear when it answers."
@@ -3058,13 +3024,8 @@ msgid "One engine on {where}, for as long as you let it. It keeps its slot until
 msgstr "Eine Engine auf {where}, so lange du sie lässt. Sie behält ihren Platz, bis sie fertig ist oder du sie pausierst."
 
 #: src/routes/correspondence/components/SearchDialog.tsx
-msgid "No engine here can run a search. One is needed that is switched on, speaks UCI and can drive a board — Analysis → Correspondence says which are offered."
-msgstr "Keine Engine hier kann suchen. Nötig ist eine, die eingeschaltet ist, UCI spricht und ein Brett bedienen kann — unter Analyse → Fernschach steht, welche zur Auswahl stehen."
-
-#. placeholder {0}: engine.hash_mb
-#: src/routes/correspondence/components/SearchDialog.tsx
-msgid "{0} MB"
-msgstr "{0} MB"
+msgid "None of these can run a search here: one is needed on this machine that can drive a board. Each greyed engine says why under the pointer."
+msgstr "Keine davon kann hier suchen: Dafür braucht es eine Engine auf diesem Rechner, die ein Brett bedienen kann. Jede ausgegraute sagt unter dem Zeiger, warum nicht."
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Stop it at"
@@ -3108,6 +3069,36 @@ msgstr "Die Engine steckt alles in die Züge, die du wählst, und sagt zum Rest 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Start searching"
 msgstr "Suche starten"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Queue task…"
+msgstr "Aufgabe einreihen …"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Refresh subtree…"
+msgstr "Teilbaum auffrischen …"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "One bounded look at {where}, through the analysis queue. It takes no search slot and runs wherever the queue has room."
+msgstr "Ein begrenzter Blick auf {where}, über die Analysewarteschlange. Er belegt keinen Suchplatz und läuft dort, wo die Warteschlange Platz hat."
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "A task on every stale position from {where} down: too shallow, or judged by a version of the engine you no longer have."
+msgstr "Eine Aufgabe auf jeder veralteten Stellung von {where} abwärts: zu flach, oder beurteilt von einer Version der Engine, die du nicht mehr hast."
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "Any engine that is switched on, on this machine or on a runner. The budget and the line count are the ones under Analysis → Correspondence."
+msgstr "Jede eingeschaltete Engine, auf diesem Rechner oder auf einem Runner. Budget und Linienzahl sind die unter Analyse → Fernschach."
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "Queue task"
+msgstr "Aufgabe einreihen"
+
+#: src/routes/correspondence/components/TaskDialog.tsx
+msgid "Refresh"
+msgstr "Auffrischen"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Refuted further down: the minimax under this move is worse for the side that played it than the engine's own number here"
@@ -3211,10 +3202,6 @@ msgid "One bounded look at this position, through the analysis queue"
 msgstr "Ein begrenzter Blick auf diese Stellung, über die Analysewarteschlange"
 
 #: src/routes/correspondence/components/TreePane.tsx
-msgid "Queue task"
-msgstr "Aufgabe einreihen"
-
-#: src/routes/correspondence/components/TreePane.tsx
 msgid "An excluded move is never expanded"
 msgstr "Ein ausgeschlossener Zug wird nie erweitert"
 
@@ -3225,10 +3212,6 @@ msgstr "Die besten Züge hier zu Kindern machen und unter jedes eine Aufgabe leg
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Queue a task on every stale position from here down"
 msgstr "Auf jeder veralteten Stellung von hier abwärts eine Aufgabe einreihen"
-
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Refresh subtree"
-msgstr "Teilbaum auffrischen"
 
 #: src/routes/correspondence/components/TreePane.tsx
 msgid "Take this waiting task back out of the queue"
@@ -4257,6 +4240,10 @@ msgstr "Aktion"
 #: src/routes/engines/OptionsEditor.tsx
 msgid "default ({fallback})"
 msgstr "Standard ({fallback})"
+
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default"
+msgstr "Standard"
 
 #: src/routes/engines/OptionsEditor.tsx
 msgid "Filter options"

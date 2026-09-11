@@ -315,7 +315,7 @@ describe('the tree pane and the tasks under it', () => {
     draw({ tree: tasked(), onQueueTask })
     await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-10') })
     expect(
-      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task…' }),
     ).toBeDisabled()
 
     await userEvent.keyboard('{Escape}')
@@ -323,7 +323,7 @@ describe('the tree pane and the tasks under it', () => {
     draw({ tree: node({ id: 1, uci: null, san: null, children: [plain] }), onQueueTask })
     await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-4') })
     await userEvent.click(
-      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task' }),
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Queue task…' }),
     )
     expect(onQueueTask).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }))
   })
@@ -337,7 +337,7 @@ describe('the tree pane and the tasks under it', () => {
     })
     await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-5') })
     const menu = screen.getByTestId('tree-menu')
-    expect(within(menu).getByRole('menuitem', { name: 'Queue task' })).toBeDisabled()
+    expect(within(menu).getByRole('menuitem', { name: 'Queue task…' })).toBeDisabled()
     expect(within(menu).getByRole('menuitem', { name: 'Expand…' })).toBeDisabled()
   })
 
@@ -357,7 +357,7 @@ describe('the tree pane and the tasks under it', () => {
     expect(onCancelTask).toHaveBeenCalledWith(31)
   })
 
-  it('offers Expand… and Refresh subtree, and hands over the node they were raised on', async () => {
+  it('offers Expand… and Refresh subtree…, and hands over the node they were raised on', async () => {
     const onExpand = vi.fn()
     const onRefresh = vi.fn()
     draw({ tree: tasked(), onExpand, onRefresh })
@@ -369,7 +369,7 @@ describe('the tree pane and the tasks under it', () => {
 
     await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-11') })
     await userEvent.click(
-      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Refresh subtree' }),
+      within(screen.getByTestId('tree-menu')).getByRole('menuitem', { name: 'Refresh subtree…' }),
     )
     expect(onRefresh).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }))
   })
