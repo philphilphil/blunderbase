@@ -137,6 +137,14 @@ struct NotesPane: View {
                             .strokeBorder(composerFocused ? Theme.accent.opacity(0.6) : Theme.edgeInput, lineWidth: 1)
                     )
                     .focused($composerFocused)
+                    // Return saves, as Enter does in every note box on the web. On a phone
+                    // the key is the send button under the thumb, and a labelled key is
+                    // what makes a vertical field submit instead of adding a line; a
+                    // paragraph is the rarer thing in a note.
+                    .submitLabel(.send)
+                    .onSubmit {
+                        if canSave { save() }
+                    }
 
                 Button {
                     save()

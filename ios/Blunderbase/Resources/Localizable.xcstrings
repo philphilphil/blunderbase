@@ -351,6 +351,9 @@
         }
       }
     },
+    "All time" : {
+
+    },
     "Analysed" : {
       "localizations" : {
         "de" : {
@@ -1085,6 +1088,9 @@
         }
       }
     },
+    "Last year" : {
+
+    },
     "Level" : {
       "localizations" : {
         "de" : {
@@ -1676,6 +1682,7 @@
       }
     },
     "Rating window" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2159,6 +2166,7 @@
 
     },
     "Trend window" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2291,6 +2299,9 @@
           }
         }
       }
+    },
+    "Window" : {
+
     },
     "Wins" : {
       "localizations" : {
