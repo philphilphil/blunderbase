@@ -147,7 +147,16 @@ Under the engine's name the search itself is set:
 | | |
 |---|---|
 | **Lines** | How many candidate lines to keep, 1 to 5. Blank takes **Lines per search** from the settings |
-| **Stop it at** | Where to stop: a **depth**, a number of **nodes**, or a number of **seconds**. **Nothing** — the ordinary correspondence case, and what it opens on — means the search runs until you stop it |
+| **Stop it at** | Where to stop: a number of **minutes** (it opens on an hour), a **depth** (45 when chosen), or a number of **nodes**. **Nothing** means the search runs until you stop it |
+
+An hour is the default because a long search is the least productive way to spend an
+engine. Each further ply costs about twice the last, so a day at one position buys three or
+four plies beyond what an hour gave, and in most positions the number and the best move have
+long since stopped moving. The same day spent on the positions at the end of the line and on
+the opponent's other tries changes the tree far more — that is what [tasks](#tasks-and-expansion)
+are for. **Nothing** is there for the few positions where the history under the engine
+pane shows the number still moving between depths: a fortress the engine is slowly seeing
+through, a sacrifice that only pays thirty plies on, an endgame near a tablebase.
 
 A limit that is reached ends the search tidily: the last checkpoint is written, the process
 quits, the slot goes back and a toast says the position is done, whether or not you are

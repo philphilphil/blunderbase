@@ -1,9 +1,13 @@
 /**
  * **Search with…** — one engine, one position, and what if anything should end it.
  *
- * The default is the whole point: pick the engine, press the button, and it runs until you
- * say otherwise. That is what a correspondence search *is*, so **Stop it at: Nothing** is
- * what the dialog opens on and it can be answered with two clicks.
+ * The default is bounded on purpose: the dialog opens on **Stop it at: Minutes, 60**, so
+ * pick the engine, press the button, and the slot is back in an hour. An engine left on one
+ * position for a day buys three or four plies; the same day spent on the positions at the
+ * end of its line and on the opponent's other tries moves the tree far more, which is what
+ * tasks are for. **Nothing** is still offered — some positions really are still moving at
+ * depth 50 — but it is a choice, not what happens by default. Switching the kind resets the
+ * value to that kind's sensible default (depth 45, an hour), so two clicks still do.
  *
  * The engines offered are `GET /correspondence/status`'s `engines[]` — the deployment's
  * `correspondence_search_engine_ids` in the owner's order, or every eligible engine when
@@ -32,7 +36,11 @@ import { cn } from '@/lib/utils'
 import { sortSiblings } from '../tree'
 import { Field, Frame } from './DialogFrame'
 
-type LimitKind = 'none' | 'depth' | 'nodes' | 'seconds'
+type LimitKind = 'none' | 'depth' | 'nodes' | 'minutes'
+
+/** What each kind opens on. Nodes has no sensible default: it depends on the engine. */
+const LIMIT_DEFAULTS: Record<LimitKind, string> = { none: '', depth: '45', nodes: '', minutes: '60' }
+const DEFAULT_LIMIT: LimitKind = 'minutes'
 
 function positive(value: string): number | null {
   const parsed = Number(value.trim())
@@ -67,8 +75,13 @@ export function SearchDialog({
   const preferred = engines.find((engine) => engine.default) ?? engines[0] ?? null
   const [engineId, setEngineId] = useState<number | null>(preferred?.engine_id ?? null)
   const [multipv, setMultipv] = useState('')
-  const [limit, setLimit] = useState<LimitKind>('none')
-  const [limitValue, setLimitValue] = useState('')
+  const [limit, setLimit] = useState<LimitKind>(DEFAULT_LIMIT)
+  const [limitValue, setLimitValue] = useState(LIMIT_DEFAULTS[DEFAULT_LIMIT])
+
+  function chooseLimit(kind: LimitKind) {
+    setLimit(kind)
+    setLimitValue(LIMIT_DEFAULTS[kind])
+  }
   const [restricted, setRestricted] = useState(false)
   const [moves, setMoves] = useState<string[]>([])
 
@@ -88,7 +101,8 @@ export function SearchDialog({
       multipv: positive(multipv),
       limit_depth: limit === 'depth' ? value : null,
       limit_nodes: limit === 'nodes' ? value : null,
-      limit_seconds: limit === 'seconds' ? value : null,
+      // The row counts seconds; a person thinks in minutes.
+      limit_seconds: limit === 'minutes' && value !== null ? value * 60 : null,
       root_moves: rootMoves,
     })
   }
@@ -160,12 +174,12 @@ export function SearchDialog({
             </Label>
             <div className="flex flex-wrap items-center gap-2">
               <div role="group" aria-label={t`Stop it at`} className="flex gap-1">
-                {(['none', 'depth', 'nodes', 'seconds'] as LimitKind[]).map((kind) => (
+                {(['minutes', 'depth', 'nodes', 'none'] as LimitKind[]).map((kind) => (
                   <button
                     key={kind}
                     type="button"
                     aria-pressed={limit === kind}
-                    onClick={() => setLimit(kind)}
+                    onClick={() => chooseLimit(kind)}
                     className={cn(
                       'rounded-md border px-2 py-1 text-[0.6875rem] transition-colors',
                       limit === kind
@@ -180,7 +194,7 @@ export function SearchDialog({
                     ) : kind === 'nodes' ? (
                       <Trans>Nodes</Trans>
                     ) : (
-                      <Trans>Seconds</Trans>
+                      <Trans>Minutes</Trans>
                     )}
                   </button>
                 ))}
@@ -199,7 +213,10 @@ export function SearchDialog({
             </div>
             <p className="text-[0.625rem] leading-[1.5] text-dim-2">
               {limit === 'none' ? (
-                <Trans>It runs until you pause or stop it — the ordinary case.</Trans>
+                <Trans>
+                  Runs until you pause or stop it. Worth it only where the number is still
+                  moving between depths; the tree gains more from the time than the root does.
+                </Trans>
               ) : (
                 <Trans>Left empty, the limit is ignored and it runs on.</Trans>
               )}

@@ -155,7 +155,17 @@ Unter dem Namen der Engine wird die Suche selbst eingestellt:
 | | |
 |---|---|
 | **Varianten** | Wie viele Kandidatenvarianten behalten werden, 1 bis 5. Leer nimmt **Linien pro Suche** aus den Einstellungen |
-| **Beenden bei** | Wo Schluss ist: einer **Tiefe**, einer Zahl **Knoten** oder einer Zahl **Sekunden**. **Nichts** – der gewöhnliche Fernschachfall und die Voreinstellung – heißt, die Suche läuft, bis du sie stoppst |
+| **Beenden bei** | Wo Schluss ist: nach einer Zahl **Minuten** (der Dialog öffnet mit einer Stunde), bei einer **Tiefe** (45, wenn gewählt) oder nach einer Zahl **Knoten**. **Nichts** heißt, die Suche läuft, bis du sie stoppst |
+
+Eine Stunde ist die Voreinstellung, weil eine lange Suche die unergiebigste Art ist, eine
+Engine zu beschäftigen. Jeder weitere Halbzug kostet etwa das Doppelte des letzten; ein Tag
+an einer Stellung bringt drei oder vier Halbzüge mehr als eine Stunde, und in den meisten
+Stellungen haben sich Zahl und bester Zug längst nicht mehr bewegt. Derselbe Tag, verbracht
+mit den Stellungen am Ende der Variante und mit den anderen Versuchen des Gegners, verändert
+den Baum weit mehr – dafür gibt es die [Aufgaben](#tasks-and-expansion). **Nichts** ist für
+die wenigen Stellungen da, in denen der Verlauf unter der Engine-Tafel die Zahl noch von
+Tiefe zu Tiefe wandern zeigt: eine Festung, die die Engine langsam durchschaut, ein Opfer,
+das sich erst dreißig Halbzüge später auszahlt, ein Endspiel nahe an der Tablebase.
 
 Ein erreichtes Limit beendet die Suche sauber: letzter Checkpoint geschrieben, Prozess
 beendet, Platz zurückgegeben, und eine Meldung sagt, dass die Stellung fertig ist – auch

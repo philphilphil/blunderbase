@@ -78,7 +78,7 @@ function draw(onStart = vi.fn()) {
 }
 
 describe('SearchDialog', () => {
-  it('sends the default engine and nothing else — no limit is the ordinary case', async () => {
+  it('opens on an hour: the default engine, and sixty minutes as seconds', async () => {
     const onStart = draw()
     await userEvent.click(screen.getByRole('button', { name: /Start searching/ }))
     expect(onStart).toHaveBeenCalledWith({
@@ -87,9 +87,18 @@ describe('SearchDialog', () => {
       multipv: null,
       limit_depth: null,
       limit_nodes: null,
-      limit_seconds: null,
+      limit_seconds: 3600,
       root_moves: null,
     })
+  })
+
+  it('Nothing is a choice: no limit at all', async () => {
+    const onStart = draw()
+    await userEvent.click(screen.getByRole('button', { name: 'Nothing' }))
+    await userEvent.click(screen.getByRole('button', { name: /Start searching/ }))
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ limit_depth: null, limit_nodes: null, limit_seconds: null }),
+    )
   })
 
   it('carries the chosen engine, the line count and one limit', async () => {
@@ -97,6 +106,8 @@ describe('SearchDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: /Leela 0.31/ }))
     await userEvent.type(screen.getByLabelText('Lines'), '4')
     await userEvent.click(screen.getByRole('button', { name: 'Depth' }))
+    expect(screen.getByLabelText('Limit')).toHaveValue(45)
+    await userEvent.clear(screen.getByLabelText('Limit'))
     await userEvent.type(screen.getByLabelText('Limit'), '50')
     await userEvent.click(screen.getByRole('button', { name: /Start searching/ }))
 

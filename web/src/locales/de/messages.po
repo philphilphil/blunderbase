@@ -3146,16 +3146,16 @@ msgid "Nodes"
 msgstr "Knoten"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
-msgid "Seconds"
-msgstr "Sekunden"
+msgid "Minutes"
+msgstr "Minuten"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Limit"
 msgstr "Limit"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
-msgid "It runs until you pause or stop it — the ordinary case."
-msgstr "Sie läuft, bis du sie pausierst oder stoppst — der Normalfall."
+msgid "Runs until you pause or stop it. Worth it only where the number is still moving between depths; the tree gains more from the time than the root does."
+msgstr "Läuft, bis du pausierst oder stoppst. Lohnt sich nur, wo die Zahl noch von Tiefe zu Tiefe wandert; der Baum gewinnt aus der Zeit mehr als die Wurzel."
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Left empty, the limit is ignored and it runs on."
