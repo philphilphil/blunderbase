@@ -4,6 +4,14 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.2.0 — 2026-09-11
+
+- Added correspondence mode: ongoing games, an analysis tree, engines searching for days (switch it on under Analysis → Correspondence)
+- Added Enter saves a note everywhere, Shift+Enter starts a new line
+- Added the iOS companion's dashboard, explorer and demo connection
+- Added a privacy policy on blunderbase.org
+- Fixed the dashboard's recent games ignoring ⇧E
+
 ## v1.1.0 — 2026-09-07
 
 - Added German move letters and figurines as notation choices
