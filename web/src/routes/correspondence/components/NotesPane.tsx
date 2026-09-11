@@ -29,6 +29,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useDeleteNote, useNotes, useSaveNote, useUpdateNote } from '@/lib/api/queries'
 import type { CorrespondenceTreeNode, NoteResponse } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
+import { commitsOnEnter } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
 const LIMIT = 8
@@ -62,6 +63,12 @@ function Composer({
         if (event.key === 'Escape') {
           event.stopPropagation()
           onAbandon()
+        }
+        // Enter saves; Shift+Enter is the new line — the same in every note box. Blurring
+        // the box is what commits it, so the save is one gesture whichever way it comes.
+        if (commitsOnEnter(event)) {
+          event.preventDefault()
+          event.currentTarget.blur()
         }
       }}
       placeholder={placeholder}
@@ -167,7 +174,13 @@ function CommentBox({
         disabled={pending}
         onChange={(event) => setText(event.target.value)}
         onBlur={() => dirty && onSave(text.trim())}
-        placeholder={t`Goes into the PGN beside the move. It saves when you click away.`}
+        onKeyDown={(event) => {
+          if (commitsOnEnter(event)) {
+            event.preventDefault()
+            event.currentTarget.blur()
+          }
+        }}
+        placeholder={t`Goes into the PGN beside the move. Enter saves, Shift+Enter breaks the line.`}
         aria-label={t`Comment on the move`}
         className="w-full resize-none rounded-md border border-input bg-raised px-2 py-1 text-[0.71875rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
       />
@@ -308,7 +321,7 @@ export function NotesPane({
             <Composer
               key={note.id}
               value={draft.text}
-              placeholder={t`It saves when you click away.`}
+              placeholder={t`Enter saves, Shift+Enter breaks the line.`}
               onChange={(text) => setDraft({ ...draft, text })}
               onCommit={() => commit(draft)}
               onAbandon={() => {

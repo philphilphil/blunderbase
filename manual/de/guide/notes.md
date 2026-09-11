@@ -7,6 +7,10 @@ und sie erscheint in jeder deiner Partien, die diese Stellung erreicht, egal in 
 Zugfolge. Eine Notiz kann Schlagwörter tragen. Auch eine Notiz, die du in einer Musterpartie
 oder einer Referenzvariante schreibst, gehört dir und bleibt erhalten.
 
+Wo immer eine Notiz geschrieben wird – Partie-Bildschirm, Explorer, Live-Brett,
+Fernschachpartie, Notizseite –, speichert **Enter** sie, und **Shift+Enter** beginnt eine
+neue Zeile. Ein Feld, das beim Wegklicken speichert, tut das weiterhin.
+
 ## Wo tauchen sie auf?
 
 Unter dem Brett jeder Partie, die die Stellung erreicht, im Explorer unter **Deine Notizen

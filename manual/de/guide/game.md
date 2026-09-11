@@ -52,8 +52,9 @@ ausschaltest; alles dazu steht unter [Einstellungen](settings.md#hide-the-engine
 
 ## Eine Notiz schreiben
 
-`N` öffnet eine Notiz zur Stellung auf dem Brett. Notizen erscheinen in jeder Partie, die
-diese Stellung erreicht – siehe [Notizen](notes.md).
+`N` öffnet eine Notiz zur Stellung auf dem Brett; **Enter** speichert sie, **Shift+Enter**
+ist eine neue Zeile. Notizen erscheinen in jeder Partie, die diese Stellung erreicht – siehe
+[Notizen](notes.md).
 
 ## Der Fernschachbaum { #the-correspondence-tree }
 

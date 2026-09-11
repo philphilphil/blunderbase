@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { useSaveNote } from '@/lib/api/queries'
+import { commitsOnEnter } from '@/lib/ui/shortcuts'
 
 export interface SaveMomentProps {
   /** Nothing on the board is nothing to save — the backend would have no position. */
@@ -107,7 +108,11 @@ export function SaveMoment({ active }: SaveMomentProps) {
             value={text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) commit()
+              // Enter saves; Shift+Enter is the new line — the same in every note box.
+              if (commitsOnEnter(event)) {
+                event.preventDefault()
+                commit()
+              }
             }}
             aria-label={t`Note about this position`}
             placeholder={t`What is worth remembering here?`}

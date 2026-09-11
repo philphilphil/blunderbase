@@ -41,6 +41,32 @@ export function isTyping(target: EventTarget | null): boolean {
   return !!element?.closest('input, textarea, select, [contenteditable="true"]')
 }
 
+/**
+ * Whether this keystroke in a note box means "save it".
+ *
+ * A bare Enter saves, and Shift+Enter is the new line — the messenger convention, because
+ * a note is a remark written in one breath far more often than it is an essay, and the
+ * hand that has just typed one reaches for Enter. ⌘/Ctrl+Enter still saves too: it was
+ * the binding before and costs nothing to keep. Alt+Enter is left to the platform, and a
+ * keystroke that is finishing an IME composition is not a save — the reader is still
+ * choosing the character.
+ *
+ * Here rather than in any one composer because five boxes take a note (the game page, the
+ * notes page, the live board's moment, the explorer's position notes and the
+ * correspondence pane with its move comment), and a second spelling of "which Enter" is
+ * how two of them end up disagreeing.
+ */
+export function commitsOnEnter(event: {
+  key: string
+  shiftKey: boolean
+  altKey: boolean
+  nativeEvent?: { isComposing?: boolean }
+}): boolean {
+  if (event.key !== 'Enter') return false
+  if (event.shiftKey || event.altKey) return false
+  return !event.nativeEvent?.isComposing
+}
+
 /** What a board shortcut asks the game view to do. */
 export type BoardAction =
   | 'step-back'

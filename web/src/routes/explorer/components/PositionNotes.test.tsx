@@ -153,6 +153,21 @@ describe('PositionNotes', () => {
     expect(screen.queryByLabelText('Note text')).not.toBeInTheDocument()
   })
 
+  it('saves a new note on Enter, and Shift+Enter only breaks the line', async () => {
+    const user = userEvent.setup()
+    draw()
+
+    await user.click(await screen.findByText('Add note'))
+    const box = screen.getByLabelText('Note text')
+    await user.type(box, 'the pawn on d5')
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    expect(writes).toEqual([])
+    await user.type(box, 'is the whole game{Enter}')
+
+    expect(writes.map((write) => write.method)).toEqual(['POST'])
+    expect(writes[0].body.text).toBe('the pawn on d5\nis the whole game')
+  })
+
   it('writes nothing when the box was opened and left alone', async () => {
     stored = [note()]
     const user = userEvent.setup()

@@ -62,20 +62,36 @@ describe('NoteComposer', () => {
     const user = userEvent.setup()
     const { onSave } = draw()
 
-    await user.type(screen.getByLabelText('Note text'), 'the bishop is loose here\n')
+    await user.type(screen.getByLabelText('Note text'), 'the bishop is loose here')
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
     await user.click(elsewhere())
 
     expect(onSave).toHaveBeenCalledTimes(1)
     expect(onSave).toHaveBeenCalledWith('the bishop is loose here', [], null)
   })
 
+  it('saves on Enter, and Shift+Enter is a new line rather than a save', async () => {
+    const user = userEvent.setup()
+    const { onSave } = draw()
+
+    const box = screen.getByLabelText('Note text')
+    await user.type(box, 'first line')
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    expect(onSave).not.toHaveBeenCalled()
+    await user.type(box, 'second line{Enter}')
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave).toHaveBeenCalledWith('first line\nsecond line', [], null)
+  })
+
   it('does not write it a second time when its own note comes back', async () => {
     const user = userEvent.setup()
     const { onSave, view } = draw()
 
-    // Typed with a trailing newline, which is what a bare Enter leaves — the box keeps it
+    // Typed with a trailing newline, which is what a Shift+Enter leaves — the box keeps it
     // and the server stores it trimmed, so the two texts are not equal on the way back.
-    await user.type(screen.getByLabelText('Note text'), 'the bishop is loose here\n')
+    await user.type(screen.getByLabelText('Note text'), 'the bishop is loose here')
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
     await user.click(elsewhere())
     expect(onSave).toHaveBeenCalledTimes(1)
 

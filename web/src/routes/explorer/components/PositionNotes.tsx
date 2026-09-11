@@ -54,6 +54,7 @@ import { Link } from 'react-router-dom'
 import { useDeleteNote, useNotes, useSaveNote, useUpdateNote } from '@/lib/api/queries'
 import type { NoteResponse } from '@/lib/api/types'
 import { MCP_SERVER_NAME, relative } from '@/lib/mcp/status'
+import { commitsOnEnter } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 import { gameHref, gameLabel, originLabel } from '@/routes/notes/presentation'
 
@@ -311,8 +312,14 @@ function Composer({
           event.stopPropagation()
           onAbandon()
         }
+        // Enter saves; Shift+Enter is the new line — the same in every note box. Blurring
+        // the box is what commits it, so the save is one gesture whichever way it comes.
+        if (commitsOnEnter(event)) {
+          event.preventDefault()
+          event.currentTarget.blur()
+        }
       }}
-      placeholder={t`What is worth remembering about this position? It saves when you click away.`}
+      placeholder={t`What is worth remembering about this position? Enter saves, Shift+Enter breaks the line.`}
       aria-label={t`Note text`}
       className="w-full resize-none rounded-md border border-input bg-raised px-2.5 py-1.5 text-[0.78125rem] leading-[1.5] text-ink outline-none placeholder:text-faint focus-visible:border-accent-teal/50"
     />

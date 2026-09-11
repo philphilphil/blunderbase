@@ -2,6 +2,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
+import { commitsOnEnter } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
 
 import type { GameNote } from '../gameModel'
@@ -114,7 +115,7 @@ export function NoteComposer({
     // be written again by the next blur — one note becoming two and then three.
     //
     // Compared **trimmed, and on the text alone**. What is stored is the trimmed text, so a
-    // box whose last character is the newline a bare Enter leaves does not hold the same
+    // box whose last character is the newline a Shift+Enter leaves does not hold the same
     // string the server does; and a tag typed but never committed rides along with the save
     // (see `save`) without ever entering `tags`, so the tag lists legitimately differ on the
     // way back. Either mismatch used to read as "the reader typed something new", which is
@@ -213,8 +214,8 @@ export function NoteComposer({
             onClose()
             return
           }
-          // ⌘/Ctrl-Enter saves; a bare Enter is a new paragraph, which a note wants.
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+          // Enter saves; Shift+Enter is the new line (`commitsOnEnter`).
+          if (commitsOnEnter(event)) {
             event.preventDefault()
             save()
           }

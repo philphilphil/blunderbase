@@ -49,8 +49,8 @@ holds until you press it again; the whole of it is under
 
 ## Write a note
 
-`N` writes a note about the position on the board. Notes come back in every game that
-reaches that position — see [Notes](notes.md).
+`N` writes a note about the position on the board; **Enter** saves it, **Shift+Enter** is a
+new line. Notes come back in every game that reaches that position — see [Notes](notes.md).
 
 ## The correspondence tree
 

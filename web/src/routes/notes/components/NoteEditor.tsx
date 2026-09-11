@@ -4,7 +4,7 @@
  *
  * They were inside `NoteCard` while the card was the only way to read a note. The table
  * needs exactly the same two things (in an expanded row rather than in the card's body),
- * and a second copy of "what ⌘+Enter does" or "which button is the destructive one" is how
+ * and a second copy of "what Enter does" or "which button is the destructive one" is how
  * two views of the same note end up behaving differently.
  *
  * Both own their own mutation. A note is edited in one place at a time, so there is nothing
@@ -17,6 +17,7 @@ import { Check, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useDeleteNote, useUpdateNote } from '@/lib/api/queries'
 import type { NoteResponse } from '@/lib/api/types'
+import { commitsOnEnter } from '@/lib/ui/shortcuts'
 import { useState } from 'react'
 
 import { TagEditor } from './TagEditor'
@@ -50,8 +51,11 @@ export function NoteEditor({ note, onDone, tagSuggestions = [] }: NoteEditorProp
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Escape') onDone()
-          // ⌘/Ctrl+Enter saves, the way every box that takes prose does.
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) save()
+          // Enter saves; Shift+Enter is the new line — the same in every note box.
+          if (commitsOnEnter(event)) {
+            event.preventDefault()
+            save()
+          }
         }}
         aria-label={t`Note`}
         rows={4}
