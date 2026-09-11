@@ -1,7 +1,7 @@
 {
   "name": "blunderbase-web",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/engine-assets.mjs fetch && vite",
