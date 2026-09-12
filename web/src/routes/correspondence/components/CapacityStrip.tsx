@@ -146,7 +146,13 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
       {remote.map((host) => (
         <span key={host.runner_id ?? host.host}>
           <b className="font-medium text-body">{host.host}</b>{' '}
-          {t`${host.in_use ?? 0} of ${host.slots} in use`}
+          {host.connected === false ? (
+            <span className="text-mistake">
+              <Trans>away</Trans>
+            </span>
+          ) : (
+            t`${host.in_use ?? 0} of ${host.slots} in use`
+          )}
         </span>
       ))}
       {/* `paused` rather than `parked`: a search paused cold after a restart is still work

@@ -127,20 +127,22 @@ woraus eine [Erweiterung](../guide/correspondence.md#tasks-and-expansion) besteh
 Schnell- und der Tiefenanalyse gegen die **Warteschlangenprozesse**, und sie läuft auf
 dem Host, dem die Warteschlange sie gibt – [Remote Runner](runners.md) eingeschlossen. Die
 Engine, die du für eine Aufgabe wählst – in **Aufgabe einreihen …**, **Erweitern …** oder
-**Teilbaum auffrischen …** –, darf also auf einem Runner liegen, anders als eine
-Such-Engine, die hier sein muss – und wo du einen Runner hast, gehört sie dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre Kerne für die
-Suchen und die Durchläufe. Aufgaben stehen in der Warteschlange zwischen den Stufen, vor der
+**Teilbaum auffrischen …** –, darf also auf einem Runner liegen, und wo du einen Runner
+hast, gehört sie dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre
+Kerne für die Suchen und die Durchläufe. Aufgaben stehen in der Warteschlange zwischen den Stufen, vor der
 Schnellanalyse jeder importierten Partie und hinter einer Tiefenanalyse, auf die jemand
 wartet, und untereinander gilt: die nächste Frist zuerst. **Warteschlange leeren** auf der
 Analyseseite wirft die noch wartenden Aufgaben mit allem anderen hinaus, und jeder betroffene
 Knoten sagt es.
 
-Ideal ist eine eigene Maschine. Ein [Remote Runner](runners.md) ist heute der Weg zu einer
-für die Warteschlange, und die Aufgaben nutzen ihn schon; eine Suche läuft weiterhin nur auf
-diesem Server. Eine Engine, die
-ein Runner anbietet, ist in der Auswahl **Suchen mit …** mit dieser Begründung ausgegraut,
-und eine Suche, die auf ihr angefordert wird, wird abgewiesen – eine für Fernschach gekaufte
-Maschine wird also am besten der Server.
+Ideal ist eine eigene Maschine, und ein [Remote Runner](runners.md) ist der Weg dorthin:
+Aufgaben werden ihm wie jeder Durchlauf zugeteilt, und eine Suche, die auf eine seiner
+Engines gesetzt wird, läuft ebenfalls dort drüben und belegt einen seiner Slots. Nur ein
+Runner, der über Polling verbunden ist, oder ein Browser-Tab nimmt keine Suche – seine
+Verbindung trägt Warteschlangenarbeit und sonst nichts –, und die Auswahl sagt es. Gib dem
+Runner dieselbe Sorgfalt wie einer lokalen Fernschach-Engine: eine Zeile in seiner
+`runner.yaml` mit `Threads` und `Hash` für eine lange Suche bemessen, und Slots, bei denen
+die Suchen mitgezählt sind.
 
 ## Die Engine im Browser { #the-engine-in-your-browser }
 

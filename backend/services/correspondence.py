@@ -69,6 +69,7 @@ from backend.db.models import (
     MoveEval,
     Note,
     Position,
+    Runner,
 )
 from backend.db.types import utcnow
 from backend.services import analysis as analysis_service
@@ -951,6 +952,9 @@ def start_search(
         limit_seconds=_limit(limit_seconds, "seconds"),
         root_moves=_root_moves(session, node, game, root_moves),
         status=SearchStatus.QUEUED,
+        # Which host runs it, written now rather than when it starts: the strip counts a
+        # queued search against the host it is waiting on.
+        runner_id=engine.runner_id,
     )
     session.add(row)
     session.commit()
@@ -1086,9 +1090,10 @@ def list_searches(
     found = list(session.execute(statement.order_by(CorrespondenceSearch.id.desc())).all())
     rows = [row for row, _game_id in found]
     names = _names_for(session, rows)
+    hosts = _hosts_for(session, rows)
     searches = []
     for row, owner in found:
-        payload = _search_payload(row, names)
+        payload = _search_payload(row, names, hosts)
         payload["game_id"] = owner
         searches.append(payload)
     return {"searches": searches}
@@ -1097,9 +1102,10 @@ def list_searches(
 def status(session: Session) -> dict[str, Any]:
     """What the capacity strip shows: slots, what is in them, and what is parked.
 
-    Per host, even though every search is on this one until step 4 puts them on runners —
-    the shape is what the strip draws, and a version of it that had to change when runners
-    arrive would be a second thing to get right later.
+    Per host: this one first, with the slots the worker was sized to, then each runner
+    with the slots it was registered with. A search on a runner holds one of that
+    runner's slots — shared with its queue work — and never one of this host's, so the two
+    counts are kept apart the way the machines are.
     """
     rows = _live_searches(session, LIVE_SEARCH_STATES)
     names = _names_for(session, rows)
@@ -1107,10 +1113,12 @@ def status(session: Session) -> dict[str, Any]:
     slots = _running_slots(session)
     running = [row for row in rows if row.status is SearchStatus.RUNNING]
     parked = [row for row in rows if row.status is SearchStatus.PAUSED and row.warm]
+    local_running = [row for row in running if row.runner_id is None]
+    local_parked = [row for row in parked if row.runner_id is None]
     tasks = _task_counts(session)
     return {
         "slots": slots,
-        "in_use": len(running),
+        "in_use": len(local_running),
         "queued": sum(1 for row in rows if row.status is SearchStatus.QUEUED),
         "paused": sum(1 for row in rows if row.status is SearchStatus.PAUSED),
         # Tasks are counted apart from searches and not against the slots, because they are
@@ -1135,9 +1143,21 @@ def status(session: Session) -> dict[str, Any]:
                 "runner_id": None,
                 "host": "this host",
                 "slots": slots,
-                "in_use": len(running),
-                "parked": len(parked),
-            }
+                "in_use": len(local_running),
+                "parked": len(local_parked),
+                "connected": True,
+            },
+            *(
+                {
+                    "runner_id": runner.id,
+                    "host": runner.name,
+                    "slots": runner.slots,
+                    "in_use": sum(1 for row in running if row.runner_id == runner.id),
+                    "parked": sum(1 for row in parked if row.runner_id == runner.id),
+                    "connected": bool(runner.connected),
+                }
+                for runner in session.scalars(select(Runner).order_by(Runner.id))
+            ),
         ],
         # One list for every picker on the mode's screens: the search dialog greys out the
         # entries with `search_trouble`, the task and expand dialogs take any of them.
@@ -2009,18 +2029,24 @@ def search_context(session: Session, search_id: int) -> dict[str, Any] | None:
         return None
     node = _node(session, row.node_id)
     _row, game = _load(session, node.game_id)
-    trouble = _engine_trouble(session, row.engine_id)
+    # A runner that is away is waited for, not failed: the worker holds the search until
+    # the link comes back, and the page says so.
+    trouble = _engine_trouble(session, row.engine_id, away_ok=True)
     if trouble is not None:
         raise CorrespondenceError(trouble)
     engine = session.get(Engine, row.engine_id)
     board = _board_at(game, node, _nodes(session, node.game_id))
+    remote = engine is not None and engine.runner_id is not None
     return {
         "search_id": row.id,
         "node_id": node.id,
         "game_id": node.game_id,
         "engine_id": row.engine_id,
         "engine_name": engine.name if engine else None,
-        "spec": engines_service.spec_for(engine),  # type: ignore[arg-type]
+        # A pool key is a promise this host can start the binary; a runner's engine is
+        # started over there, by name.
+        "spec": None if remote or engine is None else engines_service.spec_for(engine),
+        "runner_id": engine.runner_id if engine is not None else None,
         "fen": board.fen(),
         "multipv": row.multipv,
         "root_moves": list(row.root_moves) if row.root_moves else None,
@@ -2193,7 +2219,9 @@ def recover_at_boot(session: Session) -> dict[str, Any]:
     parked: list[int] = []
     for row in rows:
         row.warm = False
-        trouble = _engine_trouble(session, row.engine_id)
+        # A runner that has not reconnected yet is not a reason to park: the worker holds
+        # the search until the link is back, which is seconds after a restart.
+        trouble = _engine_trouble(session, row.engine_id, away_ok=True)
         if row.status is SearchStatus.PAUSED:
             parked.append(row.id)
             continue
@@ -2795,14 +2823,24 @@ def _search_engine(session: Session, engine_id: int | None) -> Engine:
 
 
 def _engine_trouble(
-    session: Session, engine_id: int | None, *, engine: Engine | None = None
+    session: Session,
+    engine_id: int | None,
+    *,
+    engine: Engine | None = None,
+    away_ok: bool = False,
 ) -> str | None:
-    """Why this engine cannot run a search here, phrased for somebody who has to act on it.
+    """Why this engine cannot run a search, phrased for somebody who has to act on it.
 
     None means it can. Every caller that starts or relaunches a search asks this and
-    nothing else, so "which engines a search may run on" is decided once — and a runner's
-    engine is refused by name rather than silently, because the answer for it is "not yet":
-    step 4 of `docs/correspondence.md` is what puts searches on other hosts.
+    nothing else, so "which engines a search may run on" is decided once. A runner's
+    engine can, since step 4 of `docs/correspondence.md`: the search goes out over that
+    runner's link as a stream. What is refused on one is what would make that impossible —
+    the engine switched off, a human-move model, a runner whose link carries queue work
+    but no stream (a poller, or a browser tab), and a runner that is not connected.
+
+    `away_ok` is the worker asking rather than a person: a search already on a runner
+    that has dropped off is not one to fail but one to wait for, so a launch and the boot
+    recovery let a disconnected runner through and the worker waits for its link.
     """
     from backend.services import engines as engines_service
 
@@ -2812,21 +2850,38 @@ def _engine_trouble(
         engine = session.get(Engine, int(engine_id))
     if engine is None:
         return f"the engine that search was started on (id {engine_id}) is gone"
-    if engine.runner_id is not None:
-        host = engines_service.engine_host(session, engine)
-        return (
-            f"{engine.name!r} lives on {host}, and correspondence searches run on this host "
-            f"only for now; give this deployment an engine of its own to search with"
-        )
     if not engine.enabled:
         return f"{engine.name!r} is switched off"
     if engine.kind is not EngineKind.UCI:
         return f"{engine.name!r} is a human-move model, and a search needs a UCI engine"
+    if engine.runner_id is not None:
+        runner = session.get(Runner, engine.runner_id)
+        if runner is None:
+            return f"{engine.name!r} belongs to a runner that is gone"
+        if not engine.streams:
+            return (
+                f"{engine.name!r} on runner {runner.name!r} takes queue work but no search: "
+                f"that link carries no stream"
+            )
+        if not runner.connected and not away_ok:
+            return f"{engine.name!r} lives on runner {runner.name!r}, which is not connected"
+        return None
     if not engine.streams:
         return f"{engine.name!r} does not drive a board, so it cannot run a search"
     if not engines_service.binary_present(engine.path):
         return f"the binary for {engine.name!r} is no longer at {engine.path}"
     return None
+
+
+def _hosts_for(session: Session, rows: Sequence[CorrespondenceSearch]) -> dict[int, bool]:
+    """Whether each runner these searches are on is connected right now, by runner id."""
+    ids = sorted({row.runner_id for row in rows if row.runner_id})
+    if not ids:
+        return {}
+    return {
+        runner.id: bool(runner.connected)
+        for runner in session.scalars(select(Runner).where(Runner.id.in_(ids)))
+    }
 
 
 def _names_for(session: Session, rows: Sequence[CorrespondenceSearch]) -> dict[int, str]:
@@ -2984,7 +3039,9 @@ def _announce_search(
     """
     node = session.get(CorrespondenceNode, row.node_id)
     game_id = node.game_id if node is not None else None
-    payload = _search_payload(row, names if names is not None else _names_for(session, [row]))
+    payload = _search_payload(
+        row, names if names is not None else _names_for(session, [row]), _hosts_for(session, [row])
+    )
     payload["game_id"] = game_id
     events_service.emit(
         {
@@ -3165,14 +3222,26 @@ def _eval_payload(row: CorrespondenceEval, reading: _Reading) -> dict[str, Any]:
     }
 
 
-def _search_payload(row: CorrespondenceSearch, names: dict[int, str]) -> dict[str, Any]:
+def _search_payload(
+    row: CorrespondenceSearch,
+    names: dict[int, str],
+    hosts: dict[int, bool] | None = None,
+) -> dict[str, Any]:
     """One search row, with the worker's last picture of it where there is one.
 
     The snapshot is the live half and the row is the durable half, in one object, because
     an engine pane draws both at once and has no way to join them itself: a search that has
     been running for an hour is a row that says so and a picture that says where it has
     got to.
+
+    `host_connected` is the third thing a pane needs for a search on a runner: a row that
+    says `running` with no picture arriving is a runner that has dropped off, and "waiting
+    for host" is the honest word for it. None for a search on this host, and for a caller
+    that did not look the runners up.
     """
+    connected = None
+    if row.runner_id is not None and hosts is not None:
+        connected = hosts.get(row.runner_id, False)
     return {
         "id": row.id,
         "node_id": row.node_id,
@@ -3184,6 +3253,7 @@ def _search_payload(row: CorrespondenceSearch, names: dict[int, str]) -> dict[st
         "multipv": row.multipv,
         "run_id": row.run_id,
         "runner_id": row.runner_id,
+        "host_connected": connected,
         "limit_depth": row.limit_depth,
         "limit_nodes": row.limit_nodes,
         "limit_seconds": row.limit_seconds,

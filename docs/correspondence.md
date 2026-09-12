@@ -1,8 +1,8 @@
 # Correspondence mode — design and plan
 
-Status: **steps 0–3 shipped, steps 4–5 planned** (2026-09-11) — the prototype, games and
-tree, searches on this host, and tasks and expansion are in; searches on runners and the
-list under step 5 are not. Where a table, a route, an event or a setting is named here it is
+Status: **steps 0–4 shipped, step 5 planned** (2026-09-12) — the prototype, games and
+tree, searches on this host and on runners (warm pause included), and tasks and expansion
+are in; the list under step 5 is not. Where a table, a route, an event or a setting is named here it is
 what the code actually has, so a later step can be built against this page. This is the
 target design for the
 correspondence (ICCF-style) mode: games the owner is playing over weeks, engines running on
@@ -324,16 +324,24 @@ goes again; the process's hash makes the first snapshots land where the last one
 next search of the same engine on a sibling position starts with a table full of relevant
 entries, which is a real win the pool gives for free.
 
-**Runners.** A search on a runner's engine goes out as the existing `stream_open` frame with
-the search id as its session id, holds one of that runner's slots through
-`reserve_slot`, and is never a preemption victim (the gateway learns to tell the two kinds
-of session apart). Snapshots come back through the same relay. The two stream backends
-grow a `sink` parameter — the broker is one sink, this worker another — so a frame finds
-its owner by session id. Pause on a runner is cold in the first version (`stream_close`
-and a later `stream_open`); warm pause needs `stream_pause` / `stream_resume` frames, added
-later behind the runner's version in `hello`, and a runner that lacks them gets the cold
-behaviour. A runner that disconnects leaves its searches `running` in the row; the gateway's
-reconnect hook re-opens them, and until then the page says "waiting for host".
+**Runners.** A search on a runner's engine goes out as the existing `stream_open` frame
+with `corr:<search id>` as its session id, now carrying `root_moves`, and holds one of that
+runner's slots through `reserve_slot(preempt=False)`: it waits for a free slot rather than
+taking one off a queue run, and is never a preemption victim, as no stream is. The
+analysis-board broker is not involved: `workers/correspondence_searches.py` registers its
+own handlers on the gateway's seam for `stream_started`, `stream_snapshot`,
+`stream_paused` and `stream_closed`, keyed on its own session prefix, so no sink refactor
+was needed — a frame finds its owner by who registered for that session id. Snapshots
+enter the same `_on_snapshot` as a local search's, so checkpoints and limits are one code
+path. Pause is `stream_pause` on a runner whose `hello` lists `stream_pause` in
+`features`; the runner detaches the process from its pool, answers `stream_paused
+{warm}`, and drives the same process again on `stream_resume`. A runner without the
+feature is paused cold (`stream_close`, and `stream_open` on resume). A runner without
+`root_moves` in `features` fails a shortlist search by name. A runner that disconnects
+leaves its searches `running` in the row and the worker waiting on its runner events;
+the reconnect opens them again cold, and the page says "waiting for host"
+(`host_connected` on the search payload). `CorrespondenceSearch.runner_id` is written
+when the search is started, and `status()` lists each runner as a host with its own slots.
 
 **Restart.** `recover_at_boot` relaunches every `running` row whose engine is available,
 marks the rest `paused` cold with the reason, and clears `warm` on every paused row. The
@@ -522,8 +530,9 @@ worker against `tests/fake_uci.py`, panes beside their files).
 3. **Tasks and expansion** *(shipped)*. The `AnalysisRun` link, `absorb_run`, `queue_task` with the
    nearest due date first, `expand` with stages and width steered by the marks, the queue
    marks on the tree, stale verdicts and "refresh subtree"; tasks run on runners for free.
-4. **Searches on runners.** `stream_open` with the sink refactor and no preemption;
-   reconnect re-open; the dashboard section.
+4. **Searches on runners** *(shipped)*. `stream_open` under the worker's own session
+   prefix, no preemption, reconnect re-open, warm pause behind `features` in `hello`, the
+   runners as hosts on the capacity strip.
 5. **Then, in this order as they earn it**: play-out from a node (a chain of tasks, the
    engine answering itself for *n* plies, each answer a node); auto mode (after every
    absorbed task, the next task goes to the shallowest node on the backed-up best line,
@@ -532,8 +541,7 @@ worker against `tests/fake_uci.py`, panes beside their files).
    explorer, asked once per node under eight pieces, with `SyzygyPath` documented as the
    engine option for local tables); conditional moves (a line marked as sent, and
    **Opponent played…** taking a sequence that advances the spine over both sides' moves
-   when it matches); `stream_pause` / `stream_resume` frames for warm pause on runners;
-   MCP tools; an ICCF PGN sync that reconciles a finished game by id; the companion app's
+   when it matches); MCP tools; an ICCF PGN sync that reconciles a finished game by id; the companion app's
    read-only view of the list and the tree.
 
 ## Settled

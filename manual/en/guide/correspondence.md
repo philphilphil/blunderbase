@@ -150,11 +150,21 @@ has already left a verdict on it, stacked one under the other. **Search with…*
 of the column puts another engine on the position.
 
 The picker offers every engine that is switched on and speaks UCI, on this machine and on
-your runners, with the one holding the deep role suggested. The ones a search cannot run
-on are greyed rather than hidden, and say why under the pointer: an engine on a
-[remote runner](../operate/runners.md) cannot take a search yet, one that cannot drive a
-board never will, and one whose binary has gone missing says where it was looked for. Maia
-is never among them: one look and no search gives a spread of moves, not a line.
+your runners, with the one holding the deep role suggested. A search on a
+[remote runner](../operate/runners.md)'s engine runs over there, holds one of that runner's
+slots rather than one of this machine's search slots, and is read here exactly as a local
+one. The ones a search cannot run on are greyed rather than hidden, and say why under the
+pointer: a runner that is not connected, one whose link carries queue work but no search
+(a browser tab, or a runner that fell back to polling), an engine that cannot drive a
+board, and one whose binary has gone missing says where it was looked for. Maia is never
+among them: one look and no search gives a spread of moves, not a line.
+
+A runner's search survives the runner going away. The pane says **waiting for host**, the
+row keeps its place, and when the runner reconnects the search starts again from its last
+checkpoint — the process over there died with the link, so the hash is what is lost. Pause
+on a runner is warm when the runner is current (the process is parked over there) and cold
+on an older runner, which is closed and opened again on resume. A shortlist of moves needs
+a current runner too; an older one refuses it and the pane says to update it.
 
 Under the engine's name the search itself is set:
 
@@ -188,8 +198,10 @@ One engine on one node has one search: asking the same engine again while it is 
 running or paused there is refused, and a finished game takes no searches at all — its tree
 is frozen.
 
-Each search holds one of this machine's **search slots** — two by default, under **Compute
-→ Machines** on this server's card. With all of them busy a new search is **queued** and
+Each search on this machine holds one of its **search slots** — two by default, under
+**Compute → Machines** on this server's card — and each search on a runner holds one of
+that runner's slots, shared with its queue work and never taken from a run already going.
+With all of them busy a new search is **queued** and
 starts by itself the moment one comes free. Searches have their own slots, so one that runs
 for three days never takes the slot an imported game's quick pass is waiting for.
 

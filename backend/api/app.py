@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # still have to be recovered, parked and answered for. `analysis_workers` covers both
     # sets, because it is the answer to "does this process drive engines at all".
     searches = (
-        CorrespondenceSearches(settings=settings)
+        CorrespondenceSearches(settings=settings, gateway=gateway)
         if settings.analysis_workers and not capabilities.read_only and not settings.demo
         else None
     )

@@ -822,13 +822,50 @@ def test_one_engine_on_one_node_at_a_time(session: Session, tmp_path: Path) -> N
     assert again["status"] == "queued"
 
 
-def test_a_runner_engine_is_refused_by_name(session: Session) -> None:
-    runner = Runner(name="attic", token_hash="x" * 64, slots=2)
+def _attic(session: Session, *, connected: bool, streams: bool = True) -> Engine:
+    """An engine advertised by a runner, with the runner in the given state."""
+    runner = Runner(name="attic", token_hash="x" * 64, slots=2, connected=connected)
     session.add(runner)
     session.commit()
-    engine = Engine(name="AtticFish", kind=EngineKind.UCI, path="runner:sf", runner_id=runner.id)
+    engine = Engine(
+        name="AtticFish",
+        kind=EngineKind.UCI,
+        path="runner:sf",
+        runner_id=runner.id,
+        streams=streams,
+    )
     session.add(engine)
     session.commit()
+    return engine
+
+
+def test_a_search_on_a_connected_runner_is_accepted_and_knows_its_host(session: Session) -> None:
+    """Step 4: a runner's engine is one a search may run on, and the row says which host."""
+    engine = _attic(session, connected=True)
+    game = correspondence_service.create_game(
+        session, white="A", black="B", owner_color=Color.WHITE
+    )
+
+    started = correspondence_service.start_search(
+        session, node_id=game["tree"]["id"], engine_id=engine.id
+    )
+
+    assert started["status"] == "queued"
+    assert started["runner_id"] == engine.runner_id
+    assert started["host_connected"] is True
+    entry = next(
+        row for row in correspondence_service.status(session)["engines"]
+        if row["engine_id"] == engine.id
+    )
+    assert entry["search_trouble"] is None
+    assert entry["host"] == "runner 'attic'"
+
+
+def test_a_runner_that_is_away_is_refused_by_name_and_waited_for_by_the_worker(
+    session: Session,
+) -> None:
+    """A person is told; the worker, asking with `away_ok`, is let through to wait."""
+    engine = _attic(session, connected=False)
     game = correspondence_service.create_game(
         session, white="A", black="B", owner_color=Color.WHITE
     )
@@ -838,7 +875,22 @@ def test_a_runner_engine_is_refused_by_name(session: Session) -> None:
             session, node_id=game["tree"]["id"], engine_id=engine.id
         )
     assert "runner 'attic'" in str(failure.value)
-    assert "this host only" in str(failure.value)
+    assert "not connected" in str(failure.value)
+    assert correspondence_service._engine_trouble(session, engine.id, away_ok=True) is None
+
+
+def test_a_runner_engine_that_carries_no_stream_is_refused(session: Session) -> None:
+    """A poller's engine takes queue work and nothing else, and the sentence says so."""
+    engine = _attic(session, connected=True, streams=False)
+    game = correspondence_service.create_game(
+        session, white="A", black="B", owner_color=Color.WHITE
+    )
+
+    with pytest.raises(correspondence_service.CorrespondenceError) as failure:
+        correspondence_service.start_search(
+            session, node_id=game["tree"]["id"], engine_id=engine.id
+        )
+    assert "no stream" in str(failure.value)
 
 
 def test_an_engine_that_does_not_drive_a_board_is_refused(session: Session) -> None:
@@ -918,6 +970,7 @@ def test_the_status_payload_counts_slots_and_parked_processes(session: Session) 
         "slots": 2,
         "in_use": 1,
         "parked": 0,
+        "connected": True,
     }
     assert live["engines"] == [
         {
@@ -1261,7 +1314,7 @@ def test_the_same_engine_twice_on_one_node_is_a_typed_409(
     assert refused.json()["error"] == "correspondence_search_busy"
 
 
-def test_a_search_on_a_runner_engine_is_a_typed_422(
+def test_a_search_on_an_engine_whose_runner_is_away_is_a_typed_422(
     api: TestClient, settings_for_api: Settings
 ) -> None:
     with get_sessionmaker(settings_for_api)() as session:

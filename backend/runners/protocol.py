@@ -59,6 +59,20 @@ STREAM_SNAPSHOT = "stream_snapshot"
 STREAM_RESTART = "stream_restart"
 STREAM_CLOSE = "stream_close"
 STREAM_CLOSED = "stream_closed"
+# A correspondence search on a runner is a stream that may be parked: the process kept
+# warm, hash and all, outside the slot count, and set going again later. A runner says in
+# its `hello` whether it speaks these (`FEATURE_STREAM_PAUSE`); one that does not is
+# paused cold — closed, and opened again on resume — by a server that never sends them.
+STREAM_PAUSE = "stream_pause"
+STREAM_PAUSED = "stream_paused"
+STREAM_RESUME = "stream_resume"
+
+# What a runner can do beyond the protocol version's baseline, named in its `hello` so a
+# server can tell an older runner from a newer one without bumping `PROTO_VERSION` — a
+# runner that lacks a feature still connects and takes everything else.
+FEATURE_ROOT_MOVES = "root_moves"
+FEATURE_STREAM_PAUSE = "stream_pause"
+FEATURES = (FEATURE_ROOT_MOVES, FEATURE_STREAM_PAUSE)
 
 # What a frame of each type has to carry beyond its `type`. Anything else on it is the
 # handler's business: a field one side does not know about is ignored, never fatal.
@@ -83,6 +97,9 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     STREAM_RESTART: ("session_id",),
     STREAM_CLOSE: ("session_id", "reason"),
     STREAM_CLOSED: ("session_id", "reason"),
+    STREAM_PAUSE: ("session_id",),
+    STREAM_PAUSED: ("session_id",),
+    STREAM_RESUME: ("session_id",),
 }
 
 # --- error codes -----------------------------------------------------------
@@ -181,8 +198,13 @@ def hello(
     engines: Sequence[Mapping[str, Any]] = (),
     active_runs: Sequence[Mapping[str, Any]] = (),
     browser: bool = False,
+    features: Sequence[str] = (),
 ) -> dict[str, Any]:
     """The runner's first frame. `active_runs` is what a reconnect is still executing.
+
+    `features` is what this runner can do beyond the baseline (`FEATURES`); a server reads
+    it to decide, per runner, whether a search may carry root moves and whether a pause is
+    warm or cold.
 
     `browser` is the runner saying what kind of host it is, and it is here rather than
     inferred from the transport because this frame is already where a runner describes
@@ -198,6 +220,7 @@ def hello(
         "engines": [dict(engine) for engine in engines],
         "active_runs": [dict(entry) for entry in active_runs],
         "browser": bool(browser),
+        "features": [str(feature) for feature in features],
     }
 
 
@@ -332,8 +355,17 @@ def run_cancelled(*, run_id: int) -> dict[str, Any]:
 
 
 def stream_open(
-    *, session_id: str, engine: str, fen: str, multipv: int = 1, interval_ms: int = 500
+    *,
+    session_id: str,
+    engine: str,
+    fen: str,
+    multipv: int = 1,
+    interval_ms: int = 500,
+    root_moves: Sequence[str] | None = None,
 ) -> dict[str, Any]:
+    """Start searching a position. `root_moves` restricts the search to those moves (UCI
+    `searchmoves`), which is what a correspondence search over a shortlist asks for; a
+    runner that does not announce `FEATURE_ROOT_MOVES` is never sent one."""
     return {
         "type": STREAM_OPEN,
         "session_id": session_id,
@@ -341,6 +373,7 @@ def stream_open(
         "fen": fen,
         "multipv": int(multipv),
         "interval_ms": int(interval_ms),
+        "root_moves": None if root_moves is None else [str(move) for move in root_moves],
     }
 
 
@@ -389,6 +422,35 @@ def stream_restart(*, session_id: str, fen: str, multipv: int | None = None) -> 
 
 def stream_close(*, session_id: str, reason: str = "closed") -> dict[str, Any]:
     return {"type": STREAM_CLOSE, "session_id": session_id, "reason": reason}
+
+
+def stream_pause(*, session_id: str) -> dict[str, Any]:
+    """Stop searching but keep the process, hash and all, until a resume or a close."""
+    return {"type": STREAM_PAUSE, "session_id": session_id}
+
+
+def stream_paused(*, session_id: str, warm: bool = True) -> dict[str, Any]:
+    """The runner's answer: the search has let go of its slot, and whether the process is
+    still there (`warm`) or was lost on the way."""
+    return {"type": STREAM_PAUSED, "session_id": session_id, "warm": bool(warm)}
+
+
+def stream_resume(
+    *,
+    session_id: str,
+    fen: str | None = None,
+    multipv: int | None = None,
+    root_moves: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Set a paused search going again on its kept process. Fields left None keep what the
+    search was opened with."""
+    return {
+        "type": STREAM_RESUME,
+        "session_id": session_id,
+        "fen": fen,
+        "multipv": None if multipv is None else int(multipv),
+        "root_moves": None if root_moves is None else [str(move) for move in root_moves],
+    }
 
 
 def stream_closed(

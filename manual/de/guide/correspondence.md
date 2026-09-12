@@ -162,12 +162,24 @@ rechnet oder schon ein Urteil zu ihm hinterlassen hat, gestapelt untereinander.
 **Suchen mit …** oben in der Spalte setzt eine weitere Engine auf die Stellung.
 
 Zur Auswahl steht jede Engine, die eingeschaltet ist und UCI spricht, auf diesem Rechner
-und auf deinen Runnern; vorgeschlagen wird die mit der Rolle Tiefenanalyse. Die, auf denen
-keine Suche laufen kann, sind ausgegraut statt versteckt und sagen unter dem Zeiger, warum:
-Eine Engine auf einem [Remote Runner](../operate/runners.md) kann noch keine Suche
-übernehmen, eine, die kein Brett bedienen kann, wird es nie, und eine, deren Programmdatei
-verschwunden ist, nennt den Ort, an dem sie gesucht wurde. Maia ist nie dabei: ein Blick
-ohne Suche ergibt eine Verteilung von Zügen, keine Variante.
+und auf deinen Runnern; vorgeschlagen wird die mit der Rolle Tiefenanalyse. Eine Suche auf
+der Engine eines [Remote Runners](../operate/runners.md) läuft dort drüben, belegt einen
+Slot dieses Runners statt einen Suchplatz dieses Rechners und wird hier genau wie eine
+lokale gelesen. Die, auf denen keine Suche laufen kann, sind ausgegraut statt versteckt und
+sagen unter dem Zeiger, warum: ein Runner, der nicht verbunden ist, einer, dessen
+Verbindung Warteschlangenarbeit trägt, aber keine Suche (ein Browser-Tab, oder ein Runner,
+der auf Polling zurückgefallen ist), eine Engine, die kein Brett bedienen kann, und eine,
+deren Programmdatei verschwunden ist, nennt den Ort, an dem sie gesucht wurde. Maia ist nie
+dabei: ein Blick ohne Suche ergibt eine Verteilung von Zügen, keine Variante.
+
+Eine Suche auf einem Runner überlebt es, wenn der Runner wegbleibt. Die Tafel sagt
+**wartet auf Host**, die Zeile behält ihren Platz, und wenn der Runner sich wieder
+verbindet, beginnt die Suche erneut an ihrem letzten Checkpoint – der Prozess dort drüben
+ist mit der Verbindung gestorben, verloren ist also der Hash. Pause auf einem Runner ist
+warm, wenn der Runner aktuell ist (der Prozess wird dort geparkt), und kalt auf einem
+älteren, der geschlossen und beim Fortsetzen neu geöffnet wird. Auch eine Auswahl von
+Zügen braucht einen aktuellen Runner; ein älterer lehnt sie ab, und die Tafel sagt, dass er
+aktualisiert werden muss.
 
 Unter dem Namen der Engine wird die Suche selbst eingestellt:
 
@@ -204,8 +216,10 @@ Eine Engine auf einem Knoten hat eine Suche: dieselbe Engine dort noch einmal an
 solange sie eingereiht, laufend oder pausiert ist, wird abgewiesen – und eine beendete
 Partie nimmt gar keine Suche mehr an, ihr Baum ist eingefroren.
 
-Jede Suche belegt einen **Suchplatz** dieses Rechners – voreingestellt zwei, unter
-**Rechenleistung → Maschinen** auf der Karte dieses Servers. Sind alle belegt, wird die Suche **eingereiht** und startet von
+Jede Suche auf diesem Rechner belegt einen seiner **Suchplätze** – voreingestellt zwei,
+unter **Rechenleistung → Maschinen** auf der Karte dieses Servers –, und jede Suche auf
+einem Runner belegt einen Slot dieses Runners, geteilt mit seiner Warteschlangenarbeit und
+nie einem laufenden Durchlauf weggenommen. Sind alle belegt, wird die Suche **eingereiht** und startet von
 selbst, sobald einer frei wird. Suchen haben eigene Plätze: eine, die drei Tage läuft, nimmt
 also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet.
 

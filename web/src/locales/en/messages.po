@@ -2519,6 +2519,10 @@ msgstr "being worked on"
 msgid "waiting in the analysis queue"
 msgstr "waiting in the analysis queue"
 
+#: src/routes/correspondence/components/CapacityStrip.tsx
+msgid "away"
+msgstr "away"
+
 #. placeholder {0}: host.in_use ?? 0
 #. placeholder {1}: host.slots
 #: src/routes/correspondence/components/CapacityStrip.tsx
@@ -2549,6 +2553,14 @@ msgstr "task running"
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "task waiting in the queue"
 msgstr "task waiting in the queue"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "The runner this search is on is not connected. It starts again from its last checkpoint when the runner comes back."
+msgstr "The runner this search is on is not connected. It starts again from its last checkpoint when the runner comes back."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "waiting for host"
+msgstr "waiting for host"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 #: src/routes/correspondence/components/RunningNow.tsx

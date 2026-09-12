@@ -118,18 +118,19 @@ bounded look at one position, and what an
 processes** along with the quick and deep passes, and it runs on whichever host the queue
 hands it to, [remote runners](runners.md) included. So the engine
 picked for a task — in **Queue task…**, **Expand…** or **Refresh subtree…** — may live on a
-runner, unlike a search engine, which has to be here, and where you have a runner that is
-where it belongs:
-the tasks go to the other machine and this one keeps its cores for the searches and for the
-passes. Tasks sit between the tiers in the queue, ahead of the quick pass every import gets
+runner, and where you have a runner that is where it belongs: the tasks go to the other
+machine and this one keeps its cores for the searches and for the passes. Tasks sit between the tiers in the queue, ahead of the quick pass every import gets
 and behind a deep pass somebody is waiting on, and among themselves the game with the
 nearest deadline is worked first. **Clear the queue** on the Analysis page drops the tasks
 still waiting along with everything else waiting, and each of their nodes says so.
 
-The ideal is a machine of its own. A [remote runner](runners.md) is how you get one for the
-queue today, and tasks use it already; a search still runs on this server only. An engine a
-runner advertises is greyed in the **Search with…** picker with that reason, and a search
-asked for on one is refused, so a machine bought for correspondence is best made the server.
+The ideal is a machine of its own, and a [remote runner](runners.md) is how you get one:
+tasks are queued to it like any run, and a search set on one of its engines runs over there
+too, holding one of the runner's slots. Only a runner connected over polling, or a browser
+tab, takes no search — its link carries queue work and nothing else — and the picker says
+so. Give the runner the same care a local correspondence engine gets: a row in its
+`runner.yaml` with `Threads` and `Hash` sized for one long search, and slots sized with
+the searches counted in.
 
 ## The engine in your browser
 

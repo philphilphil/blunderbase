@@ -31,6 +31,18 @@ milliseconds at a time.
 **Limits are a watchdog on the snapshot**, not a UCI `go depth`: depth, nodes or seconds
 reached means stop, a final checkpoint, `done`, and the slot back. One driver for every
 case, and a limit that is checked where the numbers already are.
+
+**A search on a runner's engine is the same search over a socket.** It goes out as a
+`stream_open` on that runner's link with `corr:<search id>` as its session id, holds one
+of the *runner's* slots — never one of this host's, and never by preempting a queue run,
+which is what `reserve_slot(preempt=False)` is for — and its snapshots come back through
+the gateway's handler seam into the same `_on_snapshot` the local searches use, so the
+checkpoints, the limits and the live pane cannot tell the two apart. Pause is a
+`stream_pause` on a runner that announced it can park a process, and a `stream_close`
+with a cold resume on one that cannot. A runner that drops off leaves the row `running`
+and the search waiting here for its link; the reconnect opens it again, cold, from the
+last checkpoint. The analysis-board broker is not involved: this worker is the second
+owner of the stream frames, keyed on its own session ids.
 """
 
 from __future__ import annotations
@@ -51,13 +63,18 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.config import Settings, get_settings
 from backend.db.enums import SearchKind, SearchStatus
 from backend.db.session import database_backpressure, get_sessionmaker
+from backend.runners import protocol
 from backend.services import app_settings as app_settings_service
 from backend.services import correspondence as correspondence_service
 from backend.services import events as events_service
+from backend.services import runners as runners_service
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Mapping
+
     from backend.adapters.infinite import Snapshot
     from backend.adapters.pool import Adapter, EnginePool
+    from backend.workers.runner_gateway import RunnerGateway, RunnerState
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +96,24 @@ CLOSE_TIMEOUT = 5.0
 # busy sleeps outside the database thread and tries again, backing off to this ceiling.
 DB_RETRY_INITIAL_SECONDS = 0.05
 DB_RETRY_MAX_SECONDS = 1.0
+# How long a search waiting for a runner's slot sleeps between looks when no runner event
+# wakes it. The events are what make it prompt; this is the backstop for a missed one.
+RUNNER_WAIT_SECONDS = 5.0
+# The session id a search travels under on a runner's link, apart from the analysis
+# boards' ids so neither owner ever mistakes the other's frame for its own.
+SESSION_PREFIX = "corr:"
+# Why a stream ended, as the runner and the gateway say it (`protocol.STREAM_REASONS`).
+REASON_RUNNER_GONE = "runner_gone"
 
 # The statuses that mean a search is over, as they arrive on the event — spelled once so
 # the worker and the service cannot come to disagree about which those are.
 _TERMINAL = {member.value for member in correspondence_service.TERMINAL_SEARCH_STATES}
+# The runner events a search on a runner is waiting to hear.
+_RUNNER_EVENTS = {
+    runners_service.EVENT_RUNNER_CONNECTED,
+    runners_service.EVENT_RUNNER_UPDATED,
+    runners_service.EVENT_RUNNER_DISCONNECTED,
+}
 
 T = TypeVar("T")
 
@@ -126,6 +157,27 @@ class _Run:
     error: str | None = None
     stderr: str | None = None
     background: set[asyncio.Task[Any]] = field(default_factory=set)
+    # The remote half: which runner, under which session id, and what its link has said.
+    # `signal` is what the task sleeps on — a frame, a runner event or an owner's verb
+    # sets it — and `outcome` is what the last stretch ended in: `paused`, `closed`, or
+    # `lost` (the link went, and the search waits for it to come back).
+    runner_id: int | None = None
+    session: str | None = None
+    signal: asyncio.Event | None = None
+    outcome: str | None = None
+    # A frame is out on the runner for this stretch: a pause or a stop has to be sent.
+    open: bool = False
+    # What the runner answered a pause with: whether it kept the process.
+    paused_warm: bool = False
+    ended_error: str | None = None
+
+
+@dataclass(slots=True)
+class _RemoteHold:
+    """A search parked warm on a runner: the process is over there, under this session."""
+
+    runner_id: int
+    session: str
 
 
 class CorrespondenceSearches:
@@ -140,10 +192,12 @@ class CorrespondenceSearches:
         slots: int | None = None,
         stop_grace: float = STOP_GRACE_SECONDS,
         checkpoint_seconds: float = CHECKPOINT_SECONDS,
+        gateway: RunnerGateway | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.stop_grace = stop_grace
         self.checkpoint_seconds = checkpoint_seconds
+        self.gateway = gateway
         self._sessions = sessions
         self._pool = pool
         self._owns_pool = pool is None
@@ -153,6 +207,10 @@ class CorrespondenceSearches:
         # The processes of paused searches: warm, holding their hash, outside the pool and
         # outside the cap. Nothing but a resume, a stop or this process ending touches one.
         self._parked: dict[int, Adapter] = {}
+        # The searches out on runners, by session id, and the ones parked warm over there.
+        self._remote: dict[str, _Run] = {}
+        self._remote_parked: dict[int, _RemoteHold] = {}
+        self._cancel_handlers: list[Callable[[], None]] = []
         self._db_executor: ThreadPoolExecutor | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._cancel_events: Callable[[], None] | None = None
@@ -194,6 +252,14 @@ class CorrespondenceSearches:
             # Subscribed before the recovery, so a row it queues is launched by its own
             # event; the explicit launch below is what makes that not a requirement.
             self._cancel_events = events_service.subscribe(self._on_event)
+            if self.gateway is not None:
+                register = self.gateway.register_handler
+                self._cancel_handlers = [
+                    register(protocol.STREAM_STARTED, self._on_started),
+                    register(protocol.STREAM_SNAPSHOT, self._on_remote_snapshot),
+                    register(protocol.STREAM_PAUSED, self._on_paused),
+                    register(protocol.STREAM_CLOSED, self._on_closed),
+                ]
             correspondence_service.register_snapshots(self.snapshots)
             correspondence_service.register_capacity(self.capacity)
             recovered = await self._service(correspondence_service.recover_at_boot)
@@ -210,6 +276,9 @@ class CorrespondenceSearches:
         cancel, self._cancel_events = self._cancel_events, None
         if cancel is not None:
             cancel()
+        for cancel_handler in self._cancel_handlers:
+            cancel_handler()
+        self._cancel_handlers = []
         correspondence_service.clear_snapshots()
         correspondence_service.clear_capacity()
 
@@ -218,6 +287,8 @@ class CorrespondenceSearches:
             run.closing = True
             if run.stop is not None:
                 run.stop.set()
+            if run.signal is not None:
+                run.signal.set()
         tasks = [run.task for run in runs if run.task is not None]
         if tasks:
             _done, pending = await asyncio.wait(tasks, timeout=self.stop_grace)
@@ -228,6 +299,10 @@ class CorrespondenceSearches:
         if self._background:
             await asyncio.gather(*list(self._background), return_exceptions=True)
         self._runs.clear()
+        # A process parked on a runner is that runner's to keep or drop: the link goes down
+        # with this process, and the runner quits what it held when the link goes.
+        self._remote.clear()
+        self._remote_parked.clear()
 
         for search_id in list(self._parked):
             await self._quit_parked(search_id)
@@ -297,8 +372,18 @@ class CorrespondenceSearches:
     # --- reacting ---------------------------------------------------------
 
     def _on_event(self, event: dict[str, Any]) -> None:
-        """One `correspondence.search` event, from whichever thread wrote the row."""
-        if event.get("event") != correspondence_service.EVENT_SEARCH:
+        """One `correspondence.search` event, from whichever thread wrote the row — or a
+        runner coming or going, which the searches on it are waiting to hear."""
+        name = event.get("event")
+        if name in _RUNNER_EVENTS:
+            loop = self._loop
+            runner_id = event.get("runner_id")
+            if loop is None or loop.is_closed() or not isinstance(runner_id, int):
+                return
+            with contextlib.suppress(RuntimeError):
+                loop.call_soon_threadsafe(self._runner_event, str(name), runner_id)
+            return
+        if name != correspondence_service.EVENT_SEARCH:
             return
         if event.get("kind") not in (None, SearchKind.SEARCH.value):
             # A `task`: an `AnalysisRun` in the ordinary queue, which the analysis workers
@@ -338,18 +423,24 @@ class CorrespondenceSearches:
                 run.pausing = True
                 if run.stop is not None:
                     run.stop.set()
+                if run.session is not None:
+                    self._spawn(self._remote_pause(run))
         elif status in _TERMINAL:
             if run is not None:
                 run.closing = True
                 run.relaunch = False
                 if run.stop is not None:
                     run.stop.set()
+                if run.session is not None:
+                    self._spawn(self._remote_close(run))
             # Not an `elif`: a run that has already parked its process is still in `_runs`
             # until its task's `finally`, and in that window the process it left behind is
             # nobody's to quit but this — a stop would otherwise leave it holding its hash
             # for the life of the server, with the capacity strip saying nothing is parked.
             if search_id in self._parked:
                 self._spawn(self._quit_parked(search_id))
+            if search_id in self._remote_parked:
+                self._spawn(self._quit_remote_parked(search_id))
 
     def _launch(self, search_id: int) -> None:
         if self._closing or search_id in self._runs:
@@ -386,6 +477,10 @@ class CorrespondenceSearches:
                     run.held = None
                 return
             run.context = context
+            if context.get("runner_id") is not None:
+                # On somebody else's machine: no local slot, no process of ours.
+                await self._serve_remote(run)
+                return
 
             permits = self._permits
             if permits is None:  # pragma: no cover - start() always makes one
@@ -529,6 +624,303 @@ class CorrespondenceSearches:
                 stderr=stderr,
             )
 
+    # --- on a runner ------------------------------------------------------
+
+    async def _serve_remote(self, run: _Run) -> None:
+        """One search on a runner's engine: open it over the link, follow what the link
+        says, and wait the link out when it goes.
+
+        Each pass of the loop is one stretch on the runner. It ends `paused` (the owner's
+        pause, answered by the runner), `closed` (the owner's stop, the search's own limit,
+        or the engine failing over there), or `lost` (the link went) — and only the last
+        comes back round, to wait for the runner and open the search again from its last
+        checkpoint.
+        """
+        context = run.context or {}
+        search_id = run.search_id
+        runner_id = int(context["runner_id"])
+        session = f"{SESSION_PREFIX}{search_id}"
+        run.runner_id = runner_id
+        run.session = session
+        run.signal = asyncio.Event()
+        self._remote[session] = run
+        gateway = self.gateway
+        try:
+            if gateway is None:
+                await self._fail(run, "this process has no runner gateway to reach the engine with")
+                return
+            while not self._closing:
+                if run.closing:
+                    await self._service(
+                        correspondence_service.mark_finished,
+                        search_id,
+                        status=SearchStatus.STOPPED,
+                    )
+                    return
+                if run.pausing:
+                    # Paused before anything was sent: nothing to park over there.
+                    await self._park_remote(run, warm=False)
+                    return
+                state = await self._await_runner(run, runner_id)
+                if state is None:
+                    continue
+                root_moves = context.get("root_moves")
+                if root_moves and protocol.FEATURE_ROOT_MOVES not in state.features:
+                    gateway.release_slot(runner_id, session)
+                    await self._fail(
+                        run,
+                        f"runner {state.name!r} is too old to search a shortlist of moves; "
+                        f"update the runner, or search the whole position",
+                    )
+                    return
+                hold = self._remote_parked.pop(search_id, None)
+                warm = hold is not None and hold.runner_id == runner_id
+                frame = (
+                    protocol.stream_resume(
+                        session_id=session,
+                        fen=context["fen"],
+                        multipv=context["multipv"],
+                        root_moves=root_moves,
+                    )
+                    if warm
+                    else protocol.stream_open(
+                        session_id=session,
+                        engine=str(context.get("engine_name") or ""),
+                        fen=context["fen"],
+                        multipv=context["multipv"],
+                        interval_ms=max(1, int(self.settings.stream_snapshot_interval * 1000)),
+                        root_moves=root_moves,
+                    )
+                )
+                run.outcome = None
+                run.paused_warm = False
+                run.ended_error = None
+                run.signal.clear()
+                run.started = time.monotonic()
+                run.last_checkpoint = run.started
+                run.credited_ms = 0
+                run.open = True
+                if not await gateway.send(runner_id, frame):
+                    run.open = False
+                    gateway.release_slot(runner_id, session)
+                    continue
+                outcome = await self._remote_wait(run)
+                run.open = False
+                gateway.release_slot(runner_id, session)
+                if self._closing:
+                    # The process is going down, not the search: the row is left as the
+                    # owner left it, for `recover_at_boot` — the same rule as a local one.
+                    await self._flush(run)
+                    return
+                if outcome == "paused":
+                    await self._flush(run)
+                    if run.paused_warm and not run.closing:
+                        self._remote_parked[search_id] = _RemoteHold(runner_id, session)
+                    await self._park_remote(run, warm=run.paused_warm and not run.closing)
+                    return
+                if outcome == "closed":
+                    await self._flush(run)
+                    if run.ended_error and not run.closing and not run.limit_hit:
+                        await self._fail(run, run.ended_error)
+                        return
+                    await self._service(
+                        correspondence_service.mark_finished,
+                        search_id,
+                        status=SearchStatus.STOPPED if run.closing else SearchStatus.DONE,
+                    )
+                    return
+                # `lost`: the link went. The row stays `running` and the page says "waiting
+                # for host"; the loop waits for the runner and opens the search again cold —
+                # the process over there died with the link, so there is nothing to resume.
+                await self._flush(run)
+                self._remote_parked.pop(search_id, None)
+        finally:
+            self._remote.pop(session, None)
+
+    async def _await_runner(self, run: _Run, runner_id: int) -> RunnerState | None:
+        """Sleep until the runner is attached and has a slot to give, and take it.
+
+        Wakes on every runner event and on the owner's verbs; None means the owner spoke
+        (pause, stop) rather than the runner, and the caller looks at the flags. A free
+        slot is taken without preempting: nobody is waiting at this search, and a deep
+        pass on that machine is not this search's to take away.
+        """
+        gateway = self.gateway
+        signal = run.signal
+        if gateway is None or signal is None:  # pragma: no cover - set by the caller
+            return None
+        while not self._closing and not run.closing and not run.pausing:
+            state = gateway.state(runner_id)
+            if (
+                state is not None
+                and state.ready
+                and gateway.reserve_slot(runner_id, run.session or "", preempt=False)
+            ):
+                return state
+            signal.clear()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(signal.wait(), RUNNER_WAIT_SECONDS)
+        return None
+
+    async def _remote_wait(self, run: _Run) -> str:
+        """Until the link says how this stretch ended, or stops answering a verb.
+
+        An owner's pause or stop has been sent down the link and is answered by a frame;
+        one that is not answered within the stop grace is taken as `closed` — the same
+        budget a local engine gets to answer `stop`, and a runner that has gone quiet in
+        that long is one whose link is about to be dropped anyway.
+        """
+        signal = run.signal
+        if signal is None:  # pragma: no cover - set by the caller
+            return "lost"
+        while True:
+            budget = self.stop_grace if (run.closing or run.pausing or self._closing) else None
+            try:
+                await asyncio.wait_for(signal.wait(), budget)
+            except TimeoutError:
+                return "lost" if self._closing else "closed"
+            signal.clear()
+            if run.outcome is not None:
+                return run.outcome
+            if self._closing:
+                return "lost"
+
+    async def _park_remote(self, run: _Run, *, warm: bool) -> None:
+        answer = await self._service(
+            correspondence_service.mark_parked, run.search_id, warm=warm
+        )
+        if bool(answer) and answer.get("status") == SearchStatus.QUEUED.value:
+            run.relaunch = True
+
+    async def _remote_pause(self, run: _Run) -> None:
+        """The owner pressed Pause on a search that is out on a runner."""
+        gateway = self.gateway
+        if gateway is None or run.session is None or run.runner_id is None:
+            return
+        if not run.open:
+            # Waiting for the runner or its slot: the wait sees the flag and parks it.
+            if run.signal is not None:
+                run.signal.set()
+            return
+        state = gateway.state(run.runner_id)
+        if state is not None and protocol.FEATURE_STREAM_PAUSE in state.features:
+            frame: Mapping[str, Any] = protocol.stream_pause(session_id=run.session)
+        else:
+            # A runner from before there was a pause: closed, and opened again on resume
+            # from the last checkpoint. Cold, but nothing about the tree is lost.
+            frame = protocol.stream_close(session_id=run.session, reason="closed")
+        if not await gateway.send(run.runner_id, frame):
+            run.outcome = "lost"
+            if run.signal is not None:
+                run.signal.set()
+
+    async def _remote_close(self, run: _Run) -> None:
+        """The owner pressed Stop, or the search reached its limit, out on a runner."""
+        gateway = self.gateway
+        if gateway is None or run.session is None or run.runner_id is None:
+            return
+        if not run.open:
+            if run.signal is not None:
+                run.signal.set()
+            return
+        sent = await gateway.send(
+            run.runner_id, protocol.stream_close(session_id=run.session, reason="closed")
+        )
+        if not sent:
+            run.outcome = "lost"
+            if run.signal is not None:
+                run.signal.set()
+
+    async def _quit_remote_parked(self, search_id: int) -> None:
+        """A stop on a search parked warm over there: the runner quits what it kept."""
+        hold = self._remote_parked.pop(search_id, None)
+        if hold is None or self.gateway is None:
+            return
+        await self.gateway.send(
+            hold.runner_id, protocol.stream_close(session_id=hold.session, reason="closed")
+        )
+
+    def _runner_event(self, name: str, runner_id: int) -> None:
+        """A runner came, went or changed: wake the searches that are waiting on it.
+
+        A runner that went takes its processes with it: every search open on it is `lost`
+        (its row stays `running`, and the reconnect reopens it), and one parked warm there
+        is parked cold now — the row says so, or the strip would count memory that is gone.
+        """
+        if self._closing:
+            return
+        gone = name == runners_service.EVENT_RUNNER_DISCONNECTED
+        for run in list(self._remote.values()):
+            if run.runner_id != runner_id:
+                continue
+            if gone and run.open and run.outcome is None:
+                run.outcome = "lost"
+            if run.signal is not None:
+                run.signal.set()
+        if gone:
+            for search_id, hold in list(self._remote_parked.items()):
+                if hold.runner_id == runner_id:
+                    self._remote_parked.pop(search_id, None)
+                    self._spawn(
+                        self._service(correspondence_service.mark_parked, search_id, warm=False)
+                    )
+
+    # --- what the runner says ---------------------------------------------
+
+    def _owned(self, runner_id: int, frame: Mapping[str, Any]) -> _Run | None:
+        """The search this frame is about, if it is one of ours and on that runner."""
+        session_id = frame.get("session_id")
+        if not isinstance(session_id, str) or not session_id.startswith(SESSION_PREFIX):
+            return None
+        run = self._remote.get(session_id)
+        if run is None or run.runner_id != runner_id:
+            return None
+        return run
+
+    async def _on_started(self, runner_id: int, frame: Mapping[str, Any]) -> None:
+        run = self._owned(runner_id, frame)
+        if run is None or not run.open:
+            return
+        await self._service(correspondence_service.mark_running, run.search_id)
+
+    async def _on_remote_snapshot(self, runner_id: int, frame: Mapping[str, Any]) -> None:
+        run = self._owned(runner_id, frame)
+        if run is None or not run.open:
+            return
+        # The runner numbered it and named the session; the picture is the rest, in the
+        # shape the local driver hands over.
+        picture = {
+            key: value
+            for key, value in frame.items()
+            if key not in ("type", "session_id", "seq")
+        }
+        self._on_snapshot(run, picture)
+
+    async def _on_paused(self, runner_id: int, frame: Mapping[str, Any]) -> None:
+        run = self._owned(runner_id, frame)
+        if run is None or not run.open or run.outcome is not None:
+            return
+        run.paused_warm = bool(frame.get("warm", True))
+        run.outcome = "paused"
+        if run.signal is not None:
+            run.signal.set()
+
+    async def _on_closed(self, runner_id: int, frame: Mapping[str, Any]) -> None:
+        run = self._owned(runner_id, frame)
+        if run is None or not run.open or run.outcome is not None:
+            return
+        reason = str(frame.get("reason") or "closed")
+        error = frame.get("error")
+        if reason == REASON_RUNNER_GONE:
+            run.outcome = "lost"
+        else:
+            run.ended_error = None if error is None else str(error)
+            # A close the runner answered because it was told to pause (a runner without
+            # warm pause) is a pause: the row goes `paused`, cold.
+            run.outcome = "paused" if run.pausing and not run.closing else "closed"
+        if run.signal is not None:
+            run.signal.set()
+
     # --- snapshots and checkpoints ---------------------------------------
 
     def _on_snapshot(self, run: _Run, frame: dict[str, Any]) -> None:
@@ -553,9 +945,12 @@ class CorrespondenceSearches:
 
         depth = frame.get("depth")
         depth = depth if isinstance(depth, int) else 0
-        if self._limit_reached(run, frame) and run.stop is not None:
+        if self._limit_reached(run, frame) and not run.limit_hit:
             run.limit_hit = True
-            run.stop.set()
+            if run.stop is not None:
+                run.stop.set()
+            elif run.session is not None:
+                self._spawn(self._remote_close(run))
         now = time.monotonic()
         if depth > run.last_depth or now - run.last_checkpoint >= self.checkpoint_seconds:
             run.last_depth = max(run.last_depth, depth)

@@ -1880,6 +1880,12 @@ export interface CorrespondenceSearch extends Extra {
   multipv?: number
   run_id?: number | null
   runner_id?: number | null
+  /**
+   * For a search on a runner: whether that runner is connected right now. A row that says
+   * `running` while this is false is a search waiting for its host to come back — the
+   * pane says so rather than "searching". Null on this host's searches.
+   */
+  host_connected?: boolean | null
   limit_depth?: number | null
   limit_nodes?: number | null
   limit_seconds?: number | null
@@ -1975,6 +1981,8 @@ export interface CorrespondenceHost extends Extra {
   slots: number
   in_use?: number
   parked?: number
+  /** Always true for this host; a runner's link state. */
+  connected?: boolean
 }
 
 /** One engine a search can run on; `default` marks the picker's first. */

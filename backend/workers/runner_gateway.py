@@ -263,6 +263,10 @@ class RunnerState:
     reported_slots: int | None = None
     runs: dict[int, RemoteRun] = field(default_factory=dict)
     streams: set[str] = field(default_factory=set)
+    # What the runner said it can do beyond the baseline (`protocol.FEATURES`): whether a
+    # stream may carry root moves, whether a pause is warm. Read per runner by whoever
+    # opens a stream, so an older runner keeps connecting and is simply given less.
+    features: frozenset[str] = frozenset()
     # A link is given work only once its welcome has actually gone out.
     ready: bool = False
     missed_pings: int = 0
@@ -488,6 +492,7 @@ class RunnerGateway:
                 engines=registration.engines,
                 reported_slots=None if hello.get("slots") is None else int(hello["slots"]),
                 runs=resumed,
+                features=_features(hello.get("features")),
             )
             self._states[runner.id] = state
         logger.info(
@@ -888,12 +893,16 @@ class RunnerGateway:
 
     # --- slots (the seam the stream backends plug into) --------------------
 
-    def reserve_slot(self, runner_id: int, key: str) -> bool:
+    def reserve_slot(self, runner_id: int, key: str, *, preempt: bool = True) -> bool:
         """Hold one slot for something that is not a queue run. Was there one to hold?
 
         D6: a stream is a person waiting at a board, so it takes the slot of the most
         recently started run rather than queueing behind a deep pass. That run goes back
         with its attempt refunded — it was taken away, it did not fail.
+
+        `preempt=False` is a correspondence search: nobody is sitting at it, and a search
+        that will run for days has no business taking a deep pass off the machine. It waits
+        for a free slot instead, and the answer is simply False until there is one.
         """
         state = self._states.get(runner_id)
         if state is None or not state.ready:
@@ -901,6 +910,8 @@ class RunnerGateway:
         if key in state.streams:
             return True
         if state.free_slots <= 0:
+            if not preempt:
+                return False
             victim = max(state.runs.values(), key=lambda run: run.started, default=None)
             if victim is None:
                 return False
@@ -1410,6 +1421,13 @@ _BUILTIN: dict[str, Callable[[RunnerGateway, int, Mapping[str, Any]], Awaitable[
     protocol.RUN_FAILED: RunnerGateway._on_run_failed,
     protocol.RUN_CANCELLED: RunnerGateway._on_run_cancelled,
 }
+
+
+def _features(value: Any) -> frozenset[str]:
+    """The feature names a hello carries, or none for a runner from before there were any."""
+    if not isinstance(value, (list, tuple)):
+        return frozenset()
+    return frozenset(str(item) for item in value if isinstance(item, str) and item)
 
 
 def _active_runs(entries: Sequence[Mapping[str, Any]]) -> dict[int, str]:

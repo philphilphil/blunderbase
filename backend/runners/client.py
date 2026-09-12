@@ -105,7 +105,13 @@ CLOSE_CAUSES = {
     ),
 }
 
-STREAM_FRAMES = (protocol.STREAM_OPEN, protocol.STREAM_RESTART, protocol.STREAM_CLOSE)
+STREAM_FRAMES = (
+    protocol.STREAM_OPEN,
+    protocol.STREAM_RESTART,
+    protocol.STREAM_CLOSE,
+    protocol.STREAM_PAUSE,
+    protocol.STREAM_RESUME,
+)
 
 
 class RunnerRefused(RuntimeError):
@@ -245,11 +251,20 @@ class Stream:
     fen: str
     multipv: int = 1
     interval: float = 0.5
+    # UCI `searchmoves`: a correspondence search over a shortlist. None is the whole position.
+    root_moves: list[str] | None = None
     seq: int = 0
     task: asyncio.Task[None] | None = None
     stop: threading.Event | None = None
     restart: bool = False
     closing: bool = False
+    # A pause is a stop that keeps the process: the server asked for the slot back and
+    # will ask for the search again. `held` is that process while it is parked — out of
+    # the pool, so the pool's idle reaper cannot quit it — and `resumed` is what the task
+    # sleeps on until the server says go, or says close.
+    pausing: bool = False
+    held: Any | None = None
+    resumed: asyncio.Event = field(default_factory=asyncio.Event)
     # Set once the pool has actually handed the task an engine. Until it is, the task is
     # parked on the pool's semaphore where neither `closing` nor `stop` reaches it, and
     # the only way to get it back is to cancel it.
@@ -661,6 +676,7 @@ class RunnerClient:
                 slots=self.config.slots,
                 engines=[ad.as_dict() for ad in self._ads],
                 active_runs=[job.active for job in self._runs.values()],
+                features=protocol.FEATURES,
             )
         )
 
@@ -786,6 +802,10 @@ class RunnerClient:
             await self._open_stream(session_id, frame)
         elif kind == protocol.STREAM_RESTART:
             await self._restart_stream(session_id, frame)
+        elif kind == protocol.STREAM_PAUSE:
+            await self._pause_stream(session_id)
+        elif kind == protocol.STREAM_RESUME:
+            await self._resume_stream(session_id, frame)
         else:
             await self._close_stream(session_id, str(frame.get("reason") or "closed"))
 
@@ -817,12 +837,48 @@ class RunnerClient:
             fen=board.fen(),
             multipv=max(1, int(frame.get("multipv") or 1)),
             interval=max(0.0, float(frame.get("interval_ms") or 500) / 1000.0),
+            root_moves=_root_moves(frame.get("root_moves")),
         )
         self._streams[session_id] = stream
         stream.task = asyncio.ensure_future(self._serve_stream(stream))
         logger.info(
             "stream %s: %r at multipv %s", session_id, engine.name, stream.multipv
         )
+
+    async def _pause_stream(self, session_id: str) -> None:
+        """Stop searching and keep the process; the slot is the server's again once the
+        `stream_paused` goes out. A session this runner is not serving is answered as such,
+        so the server does not wait on a pause that will never be confirmed."""
+        stream = self._streams.get(session_id)
+        if stream is None:
+            await self._stream_ended(session_id, "engine_failed", "no such session here")
+            return
+        if stream.pausing or stream.held is not None:
+            return
+        stream.pausing = True
+        if stream.stop is not None:
+            stream.stop.set()
+
+    async def _resume_stream(self, session_id: str, frame: Mapping[str, Any]) -> None:
+        """Set a parked search going again on its kept process, with whatever changed."""
+        stream = self._streams.get(session_id)
+        if stream is None:
+            await self._stream_ended(session_id, "engine_failed", "no such session here")
+            return
+        fen = frame.get("fen")
+        if fen is not None:
+            try:
+                stream.fen = _board(str(fen)).fen()
+            except ValueError as exc:
+                await self._stream_ended(session_id, "engine_failed", str(exc))
+                await self._close_stream(session_id, "engine_failed", answer=False)
+                return
+        if frame.get("multipv") is not None:
+            stream.multipv = max(1, int(frame["multipv"]))
+        if "root_moves" in frame:
+            stream.root_moves = _root_moves(frame.get("root_moves"))
+        stream.pausing = False
+        stream.resumed.set()
 
     async def _restart_stream(self, session_id: str, frame: Mapping[str, Any]) -> None:
         stream = self._streams.get(session_id)
@@ -857,6 +913,8 @@ class RunnerClient:
         stream.closing = True
         if stream.stop is not None:
             stream.stop.set()
+        # A parked search is asleep on its resume; closing is the other thing that wakes it.
+        stream.resumed.set()
         task = stream.task
         if task is not None and task is not asyncio.current_task():
             if not stream.started.is_set():
@@ -877,49 +935,99 @@ class RunnerClient:
             await self._stream_ended(session_id, reason)
 
     async def _serve_stream(self, stream: Stream) -> None:
-        """Hold one engine and search whatever the session is showing, until it is closed."""
-        from backend.adapters.infinite import InfiniteSearch, Snapshot
+        """Hold one engine and search whatever the session is showing, until it is closed.
 
+        A pause hands the process out of the pool and into `stream.held`, answers the server
+        with `stream_paused`, and sleeps until a resume or a close. Out of the pool because
+        a parked process must neither count against the slots this runner advertised —
+        the server has already given the slot away — nor be reaped for sitting idle, which
+        is exactly what it is doing. A resume drives the held process directly; a close
+        quits it.
+        """
         loop = asyncio.get_running_loop()
         error: str | None = None
+        outcome = "ended"
         try:
-            async with self.pool.acquire(_spec(stream.engine)) as adapter:
-                # Past the semaphore: from here a close reaches the loop through the flags
-                # and does not have to cancel the task out of the queue it was sitting in.
-                stream.started.set()
+            while not stream.closing:
+                if stream.held is None:
+                    async with self.pool.acquire(_spec(stream.engine)) as adapter:
+                        # Past the semaphore: from here a close reaches the loop through
+                        # the flags and does not have to cancel the task out of the queue
+                        # it was sitting in.
+                        stream.started.set()
+                        outcome, error = await self._search(stream, adapter, loop)
+                        if outcome == "paused":
+                            self.pool.detach(adapter)
+                            stream.held = adapter
+                else:
+                    outcome, error = await self._search(stream, stream.held, loop)
+                    if outcome != "paused":
+                        held, stream.held = stream.held, None
+                        await self._quit(held)
+                if outcome != "paused":
+                    break
                 await self._send_quietly(
-                    protocol.stream_started(session_id=stream.session_id, engine=stream.engine.name)
+                    protocol.stream_paused(session_id=stream.session_id, warm=True)
                 )
-                driver = InfiniteSearch(adapter, interval=stream.interval)  # type: ignore[arg-type]
-
-                def emit(snapshot: Snapshot) -> None:
-                    # On the engine thread: the socket belongs to the loop.
-                    loop.call_soon_threadsafe(self._spawn, self._send_snapshot(stream, snapshot))
-
-                while not stream.closing:
-                    board = _board(stream.fen)
-                    stream.restart = False
-                    stream.stop = threading.Event()
-                    finished = await asyncio.to_thread(
-                        driver.run,
-                        board,
-                        multipv=stream.multipv,
-                        on_snapshot=emit,
-                        stop=stream.stop,
-                    )
-                    if stream.closing or not stream.restart:
-                        if finished and not stream.closing:
-                            error = "the engine stopped searching this position"
-                        break
+                stream.resumed.clear()
+                await stream.resumed.wait()
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             error = _message(exc)
+        finally:
+            held, stream.held = stream.held, None
+            if held is not None:
+                # Closed while parked, or the task is going down: the process is nobody's.
+                self._spawn(self._quit(held))
         if stream.closing:
             return
         self._streams.pop(stream.session_id, None)
         logger.info("stream %s ended: %s", stream.session_id, error or "the engine stopped")
         self._spawn(self._stream_ended(stream.session_id, "engine_failed", error))
+
+    async def _search(
+        self, stream: Stream, adapter: Any, loop: asyncio.AbstractEventLoop
+    ) -> tuple[str, str | None]:
+        """One process searching the session's position until it is closed, paused, or
+        the engine gives up: `closed`, `paused`, or `ended` with the reason."""
+        from backend.adapters.infinite import InfiniteSearch, Snapshot
+
+        await self._send_quietly(
+            protocol.stream_started(session_id=stream.session_id, engine=stream.engine.name)
+        )
+        driver = InfiniteSearch(adapter, interval=stream.interval)  # type: ignore[arg-type]
+
+        def emit(snapshot: Snapshot) -> None:
+            # On the engine thread: the socket belongs to the loop.
+            loop.call_soon_threadsafe(self._spawn, self._send_snapshot(stream, snapshot))
+
+        while True:
+            board = _board(stream.fen)
+            stream.restart = False
+            stream.stop = threading.Event()
+            if stream.closing or stream.pausing:
+                # Arrived between the last check and this event existing.
+                stream.stop.set()
+            finished = await asyncio.to_thread(
+                driver.run,
+                board,
+                multipv=stream.multipv,
+                root_moves=stream.root_moves,
+                on_snapshot=emit,
+                stop=stream.stop,
+            )
+            if stream.closing:
+                return "closed", None
+            if stream.pausing:
+                return "paused", None
+            if stream.restart:
+                continue
+            return "ended", "the engine stopped searching this position" if finished else None
+
+    async def _quit(self, adapter: Any) -> None:
+        with contextlib.suppress(Exception, TimeoutError):
+            await asyncio.wait_for(asyncio.to_thread(adapter.close), CLOSE_TIMEOUT)
 
     async def _send_snapshot(self, stream: Stream, snapshot: Any) -> None:
         stream.seq += 1
@@ -1267,6 +1375,14 @@ def _spec(engine: EngineConfig) -> EngineSpec:
         name=engine.name,
         instances=engine.instances,
     )
+
+
+def _root_moves(value: Any) -> list[str] | None:
+    """The `root_moves` of a stream frame as a list of UCI moves, or None for all of them."""
+    if not isinstance(value, (list, tuple)):
+        return None
+    moves = [str(move) for move in value if isinstance(move, str) and move]
+    return moves or None
 
 
 def _board(fen: str) -> Any:

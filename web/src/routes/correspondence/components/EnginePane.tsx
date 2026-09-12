@@ -78,6 +78,14 @@ export interface EnginePaneProps {
 /** The status dot and the word beside it: green live, amber parked, quiet otherwise. */
 function statusOf(search: CorrespondenceSearch | null) {
   if (!search) return { tone: 'idle' as const }
+  // A search on a runner whose link is down: the row says running or queued, and nothing
+  // is happening until the machine comes back. Said before "searching", which would be a lie.
+  if (
+    search.host_connected === false &&
+    (search.status === 'running' || search.status === 'queued')
+  ) {
+    return { tone: 'away' as const }
+  }
   if (isLive(search)) return { tone: 'live' as const }
   if (isWarm(search)) return { tone: 'warm' as const }
   if (search.status === 'paused') return { tone: 'cold' as const }
@@ -144,7 +152,7 @@ export function EnginePane({
             'size-[0.4375rem] flex-none rounded-full',
             tone === 'live'
               ? 'animate-pulse bg-good'
-              : tone === 'warm'
+              : tone === 'warm' || tone === 'away'
                 ? 'bg-mistake'
                 : tone === 'queued'
                   ? 'bg-accent-teal'
@@ -160,6 +168,13 @@ export function EnginePane({
             title={t`A bounded look through the analysis queue, which may be running on another machine`}
           >
             {live ? <Trans>task running</Trans> : <Trans>task waiting in the queue</Trans>}
+          </span>
+        ) : tone === 'away' ? (
+          <span
+            className="whitespace-nowrap text-mistake"
+            title={t`The runner this search is on is not connected. It starts again from its last checkpoint when the runner comes back.`}
+          >
+            <Trans>waiting for host</Trans>
           </span>
         ) : tone === 'live' ? (
           <span className="whitespace-nowrap text-good">

@@ -130,6 +130,20 @@ describe('EnginesPane', () => {
     expect(within(pane).queryByText('+0.18')).not.toBeInTheDocument()
   })
 
+  it('says a search on a runner that is away is waiting for its host, not searching', () => {
+    // The row says running — the search is not over — but nothing is happening until the
+    // runner comes back, and "searching" with a clock counting up would claim otherwise.
+    draw(
+      node({
+        searches: [search({ status: 'running', runner_id: 3, host_connected: false })],
+      }),
+    )
+
+    const pane = screen.getByTestId('engine-pane-1')
+    expect(within(pane).getByText('waiting for host')).toBeInTheDocument()
+    expect(within(pane).queryByText(/^searching/)).not.toBeInTheDocument()
+  })
+
   it('falls back to the stored lines for a search that is parked', () => {
     draw(
       node({

@@ -108,12 +108,15 @@ class FakeRunner:
         slots: int = 2,
         version: str = "0.1.0",
         engines: Sequence[Mapping[str, Any]] = (STOCKFISH_AD,),
+        features: Sequence[str] = protocol.FEATURES,
     ) -> None:
         self.socket = socket
         self.name = name
         self.slots = slots
         self.version = version
         self.engines = [dict(engine) for engine in engines]
+        # What this runner claims it can do; `()` is a runner from before there were any.
+        self.features = tuple(features)
         self.welcome: dict[str, Any] | None = None
         self.pings = 0
 
@@ -136,6 +139,7 @@ class FakeRunner:
             engines=self.engines if engines is None else engines,
             active_runs=active_runs,
             browser=browser,
+            features=self.features,
         )
         if proto is not None:
             frame["proto"] = proto

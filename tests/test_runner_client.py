@@ -41,7 +41,7 @@ from backend.runners.client import (
 from backend.runners.config import Reconnect, RunnerConfig
 from backend.services import analysis
 from backend.services import runners as runners_service
-from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
+from tests.fake_uci import STOCKFISH_OPTIONS, commands, fake_engine_command, read_log
 
 # How long a test waits for something that crosses a thread, a socket and a subprocess.
 SETTLE_SECONDS = 30.0
@@ -928,6 +928,128 @@ async def test_closing_a_board_that_is_still_waiting_for_an_engine_does_not_stal
 
     assert pong["t"] == 1756209600.5
     assert "str_two" not in client.streams
+
+
+async def test_the_hello_says_what_this_runner_can_do_beyond_the_baseline(
+    tmp_path: Path,
+) -> None:
+    """A server tells an older runner from a newer one by this list, not by the version."""
+    sockets = Sockets()
+    client = scripted_client(tmp_path, sockets)
+
+    async with running(client):
+        socket = await sockets.latest(0)
+        hello = await socket.wait_for(protocol.HELLO)
+
+    assert set(hello["features"]) == set(protocol.FEATURES)
+
+
+async def test_a_stream_over_a_shortlist_searches_those_moves_only(tmp_path: Path) -> None:
+    """`root_moves` on the frame is UCI `searchmoves` on the engine — a correspondence
+    search over the candidates the owner shortlisted."""
+    sockets = Sockets()
+    log = tmp_path / "engine.log"
+    client = scripted_client(tmp_path, sockets, go=HOLDING, log=str(log))
+
+    async with running(client):
+        socket = await sockets.latest(0)
+        await socket.wait_for(protocol.HELLO)
+        socket.push(welcome())
+        socket.push(
+            protocol.stream_open(
+                session_id="corr:7",
+                engine="sf-remote",
+                fen=STARTING_FEN,
+                multipv=1,
+                interval_ms=1,
+                root_moves=["e2e4", "d2d4"],
+            )
+        )
+        await socket.wait_for(protocol.STREAM_STARTED)
+        await snapshot_where(socket, lambda frame: bool(frame["lines"]))
+        socket.push(protocol.stream_close(session_id="corr:7", reason="closed"))
+        await socket.wait_for(protocol.STREAM_CLOSED)
+
+    go = [line for line in commands(log, "go") if "searchmoves" in line]
+    assert go, commands(log, "go")
+    assert go[0].endswith("searchmoves e2e4 d2d4")
+
+
+async def test_a_paused_stream_keeps_its_engine_and_resumes_on_the_same_process(
+    tmp_path: Path,
+) -> None:
+    """Warm pause on a runner: the process is parked out of the pool, hash and all, and
+    the resume drives that same process rather than starting another."""
+    sockets = Sockets()
+    log = tmp_path / "engine.log"
+    client = scripted_client(tmp_path, sockets, go=HOLDING, log=str(log))
+
+    async with running(client):
+        socket = await sockets.latest(0)
+        await socket.wait_for(protocol.HELLO)
+        socket.push(welcome())
+        socket.push(
+            protocol.stream_open(
+                session_id="corr:9", engine="sf-remote", fen=STARTING_FEN, interval_ms=1
+            )
+        )
+        await socket.wait_for(protocol.STREAM_STARTED)
+        await snapshot_where(socket, lambda frame: bool(frame["lines"]))
+
+        socket.push(protocol.stream_pause(session_id="corr:9"))
+        paused = await socket.wait_for(protocol.STREAM_PAUSED)
+        # Parked: still a session here, no longer a process in the pool's count.
+        assert "corr:9" in client.streams
+        assert client.streams["corr:9"].held is not None
+        assert client.pool.warm() == []
+
+        before = len(socket.of_type(protocol.STREAM_STARTED))
+        socket.push(protocol.stream_resume(session_id="corr:9", fen=AFTER_E4))
+        await eventually(
+            lambda: len(socket.of_type(protocol.STREAM_STARTED)) > before, "the resume started"
+        )
+        moved = await snapshot_where(
+            socket, lambda frame: bool(frame["lines"]) and frame["lines"][0]["cp"] == -18
+        )
+
+        socket.push(protocol.stream_close(session_id="corr:9", reason="closed"))
+        closed = await socket.wait_for(protocol.STREAM_CLOSED)
+
+    assert paused["warm"] is True
+    assert moved["lines"][0]["pv"] == ["e7e5", "g1f3"]
+    assert closed["reason"] == "closed"
+    assert client.streams == {}
+    # One process searched the whole of it: the pause kept it, the resume reused it. (The
+    # other pid in the log is the probe the runner ran at start-up.)
+    assert len({entry["pid"] for entry in read_log(log) if entry["cmd"].startswith("go")}) == 1
+
+
+async def test_closing_a_parked_stream_quits_the_process_it_kept(tmp_path: Path) -> None:
+    sockets = Sockets()
+    log = tmp_path / "engine.log"
+    client = scripted_client(tmp_path, sockets, go=HOLDING, log=str(log))
+
+    async with running(client):
+        socket = await sockets.latest(0)
+        await socket.wait_for(protocol.HELLO)
+        socket.push(welcome())
+        socket.push(
+            protocol.stream_open(
+                session_id="corr:11", engine="sf-remote", fen=STARTING_FEN, interval_ms=1
+            )
+        )
+        await socket.wait_for(protocol.STREAM_STARTED)
+        socket.push(protocol.stream_pause(session_id="corr:11"))
+        await socket.wait_for(protocol.STREAM_PAUSED)
+
+        socket.push(protocol.stream_close(session_id="corr:11", reason="closed"))
+        closed = await socket.wait_for(protocol.STREAM_CLOSED)
+        await eventually(
+            lambda: any(entry["cmd"] == "quit" for entry in read_log(log)), "the process quit"
+        )
+
+    assert closed["session_id"] == "corr:11"
+    assert client.streams == {}
 
 
 async def test_a_board_does_not_outlive_the_link_it_was_opened_on(tmp_path: Path) -> None:
