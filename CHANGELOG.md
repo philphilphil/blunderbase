@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.3.0 — 2026-09-12
+
+- Added correspondence searches on remote runners, with warm pause (update the runner for warm pause and shortlists)
+- Added "waiting for host" on a search whose runner has dropped off; it resumes when the runner returns
+- Added each runner to the correspondence capacity strip
+
 ## v1.2.2 — 2026-09-12
 
 - Added a Machines page: queue processes and search slots per machine
