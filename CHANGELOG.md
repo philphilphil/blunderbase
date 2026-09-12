@@ -4,6 +4,14 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.2.2 — 2026-09-12
+
+- Added a Machines page: queue processes and search slots per machine
+- Changed the Engines page to what is installed, with threads and hash on each row
+- Changed the queue's process cap into a setting (the environment variable still overrides it)
+- Changed search slots to live on Machines, shown only while correspondence mode is on
+- Added hovering a move in the correspondence tree shows it on the board
+
 ## v1.2.1 — 2026-09-11
 
 - Changed correspondence to offer every engine in every picker, with the deep engine suggested
