@@ -142,7 +142,8 @@ def test_a_search_on_a_runner_is_a_stream_that_checkpoints_pauses_warm_and_stops
             picture = until(events, correspondence_service.EVENT_SNAPSHOT)
             assert (picture["search_id"], picture["depth"]) == (search["id"], 20)
             # Checkpointed into the tree exactly as a local search's picture is.
-            settle(lambda: node_depth(api, game["game"]["game_id"], node_id) == 20, "the checkpoint")
+            game_id = game["game"]["game_id"]
+            settle(lambda: node_depth(api, game_id, node_id) == 20, "the checkpoint")
             # Counted against that host, now that it is running there.
             live = {row["host"]: row for row in api.get("/correspondence/status").json()["hosts"]}
             assert (live["gpu-box"]["in_use"], live["this host"]["in_use"]) == (1, 0)
