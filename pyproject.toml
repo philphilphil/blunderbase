@@ -1,6 +1,6 @@
 [project]
 name = "blunderbase"
-version = "1.2.1"
+version = "1.2.2"
 description = "A personal chess database with an AI coach as its centerpiece"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
