@@ -131,6 +131,8 @@ export function CorrespondenceGamePage() {
   const [bookSource, setBookSource] = useState<BookSource>('masters')
   const [pane, setPane] = useState<MobilePane>('board')
   const [hover, setHover] = useState<HoveredLine | null>(null)
+  /** The tree row the pointer is on: the board shows its position while it lasts. */
+  const [hoveredId, setHoveredId] = useState<number | null>(null)
 
   const updateGame = useUpdateCorrespondenceGame()
   const playMove = usePlayCorrespondenceMove({ onSuccess: () => setDialog(null) })
@@ -212,6 +214,11 @@ export function CorrespondenceGamePage() {
   // one from the column's button and the right-clicked one from the tree's menu.
   const searchNode = searchNodeId !== null ? (index.get(searchNodeId)?.node ?? null) : null
   const node = selected ?? tree
+  // What the board column draws: the hovered row's node while the pointer is on one, else
+  // the selected. Kept off `node` itself, because everything else on the page — the
+  // engines, the notes, the book, the verbs — stays on the selection; only the board
+  // follows the pointer.
+  const hovered = hoveredId !== null ? (index.get(hoveredId)?.node ?? null) : null
   const played = useMemo(() => playedPath(tree), [tree])
   const tip = played.at(-1) ?? tree
 
@@ -275,17 +282,17 @@ export function CorrespondenceGamePage() {
     [node, game?.finished],
   )
 
-  // The selected node's children as arrows: the first one in the strong brush, the rest
+  // The shown node's children as arrows: the first one in the strong brush, the rest
   // pale. It is the tree's next level drawn on the board, and what the board shows until a
   // hovered engine line takes over.
   const arrows = useMemo<BoardArrow[]>(
     () =>
-      sortSiblings(node?.children ?? []).map((child, position) => ({
+      sortSiblings((hovered ?? node)?.children ?? []).map((child, position) => ({
         from: (child.uci ?? '').slice(0, 2),
         to: (child.uci ?? '').slice(2, 4),
         color: position === 0 ? 'accent' : 'paleAccent',
       })),
-    [node],
+    [hovered, node],
   )
 
   const preview = useLinePreview(node?.fen ?? null, hover, prefs, node?.ply ?? 0)
@@ -327,13 +334,20 @@ export function CorrespondenceGamePage() {
   const playable =
     selected && tip && selected.parent_id === tip.id && !selected.played ? selected : null
 
-  const boardFen = preview.fen ?? node.fen
-  const boardLastMove = preview.fen ? preview.lastMove : (node.uci ?? null)
+  // A hovered tree row and a hovered engine line cannot both be under the pointer, so the
+  // two never compete; the tree's node wins on the off chance a stale one lingers.
+  const shown = hovered ?? node
+  const boardFen = hovered ? hovered.fen : (preview.fen ?? node.fen)
+  const boardLastMove = hovered
+    ? (hovered.uci ?? null)
+    : preview.fen
+      ? preview.lastMove
+      : (node.uci ?? null)
   // The bar is White's point of view — its fills, its percentage and the number in its
   // tooltip alike — so the node's own number is turned out of the mover's frame first.
   // Handing it the tree's number unturned would print "−0.40 · White 56%" on every node a
   // Black move reached.
-  const boardScore = inWhiteFrame(node.own, node.frame)
+  const boardScore = inWhiteFrame(shown.own, shown.frame)
   const win = boardScore ? whiteWinPercent(boardScore) : null
   const orientation = flipped
     ? game.owner_color === 'black'
@@ -353,9 +367,9 @@ export function CorrespondenceGamePage() {
             fen={boardFen}
             orientation={orientation}
             lastMove={boardLastMove}
-            arrows={preview.shapes.length > 0 ? [] : arrows}
-            shapes={preview.shapes}
-            turnColor={node.turn}
+            arrows={!hovered && preview.shapes.length > 0 ? [] : arrows}
+            shapes={hovered ? [] : preview.shapes}
+            turnColor={shown.turn}
             viewOnly={Boolean(game.finished)}
             dests={dests}
             onMove={game.finished ? undefined : onBoardMove}
@@ -464,6 +478,7 @@ export function CorrespondenceGamePage() {
         selectedId={selectedId}
         readOnly={Boolean(game.finished)}
         onSelect={select}
+        onHover={setHoveredId}
         onMark={(id, mark) => updateNode.mutate({ id, body: { mark } })}
         onComment={(commented) => {
           select(commented.id)

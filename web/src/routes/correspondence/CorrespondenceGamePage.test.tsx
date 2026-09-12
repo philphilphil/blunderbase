@@ -245,6 +245,21 @@ describe('the correspondence game view', () => {
     expect(posted[0].body).toEqual({ uci: 'd2d4' })
   })
 
+  it('shows a hovered tree row on the board without moving the selection', async () => {
+    draw()
+    const row = await screen.findByTestId('tree-node-4')
+    // The bar beside the board is the board column's, so it says which node the column
+    // is drawing: the root has no number, Nf3 has one. (chessground's own highlight is not
+    // read here: its animations never finish under jsdom, so its DOM lags a hover behind.)
+    const bar = () => screen.getByLabelText(/^Evaluation: /).getAttribute('aria-label')
+    expect(bar()).toContain('not analysed')
+    await userEvent.hover(row)
+    await waitFor(() => expect(bar()).toContain('+0.05'))
+    expect(row).not.toHaveAttribute('data-selected')
+    await userEvent.unhover(row)
+    await waitFor(() => expect(bar()).toContain('not analysed'))
+  })
+
   it('takes the move that arrived by mail in the notation it arrived in', async () => {
     draw()
     await userEvent.click(await screen.findByRole('button', { name: /Opponent played/ }))

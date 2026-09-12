@@ -233,6 +233,15 @@ describe('the tree pane', () => {
     expect(props.onSelect).toHaveBeenCalledWith(4)
   })
 
+  it('reports the row under the pointer, and nothing once the pointer has left', async () => {
+    const onHover = vi.fn()
+    draw({ onHover })
+    await userEvent.hover(screen.getByTestId('tree-node-4'))
+    expect(onHover).toHaveBeenLastCalledWith(4)
+    await userEvent.unhover(screen.getByTestId('tree-node-4'))
+    expect(onHover).toHaveBeenLastCalledWith(null)
+  })
+
   it('opens the verb set on a right click, and marks from it', async () => {
     const props = draw()
     await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTestId('tree-node-4') })

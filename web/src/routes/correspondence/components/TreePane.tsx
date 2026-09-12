@@ -36,6 +36,10 @@
  * computes: it is a comparison against a setting and against what is installed now, and a
  * client working it out for itself would be a second opinion about it.
  *
+ * Hovering a row puts that node's position on the board without selecting it — the same
+ * thing hovering an engine line does, so a variation can be read by running the pointer
+ * down it and the selection, with its engines and notes, stays where it was.
+ *
  * The context menu carries the whole verb set the design names. A verb is disabled with the
  * reason in its title rather than left out — an excluded move is never given engine time,
  * and a menu that hid the item would leave the reader wondering where it went.
@@ -67,6 +71,12 @@ export interface TreePaneProps {
   tree: CorrespondenceTreeNode | null
   selectedId: number | null
   onSelect: (id: number) => void
+  /**
+   * The row the pointer is on, or null when it has left the tree. The board shows that
+   * node's position while it lasts, so a line can be read by running the pointer down it
+   * without moving the selection — the same gesture an engine line already has.
+   */
+  onHover?: (id: number | null) => void
   onMark: (id: number, mark: CorrespondenceMark | null) => void
   onComment: (node: CorrespondenceTreeNode) => void
   onPromote: (id: number) => void
@@ -117,6 +127,7 @@ function Row({
   progress,
   fold,
   onSelect,
+  onHover,
   onMenu,
 }: {
   node: CorrespondenceTreeNode
@@ -132,6 +143,7 @@ function Row({
   /** The `−`/`+` at the row's end: present only where there are lines to fold. */
   fold?: { collapsed: boolean; hidden: number; onToggle: () => void }
   onSelect: () => void
+  onHover?: (id: number | null) => void
   onMenu: (event: MouseEvent) => void
 }) {
   const { t } = useLingui()
@@ -161,6 +173,8 @@ function Row({
       data-selected={selected ? 'true' : undefined}
       onClick={onSelect}
       onContextMenu={onMenu}
+      onMouseEnter={() => onHover?.(node.id)}
+      onMouseLeave={() => onHover?.(null)}
       className={cn(
         COLUMNS,
         'grid cursor-pointer items-baseline gap-x-2 rounded-sm py-px pr-1 whitespace-nowrap hover:bg-raised',
@@ -371,6 +385,7 @@ function Line({
   weak,
   progress,
   onSelect,
+  onHover,
   onMenu,
   onFold,
   leftBehind,
@@ -382,6 +397,7 @@ function Line({
   weak: Set<number>
   progress: Map<number, TaskProgress>
   onSelect: (id: number) => void
+  onHover?: (id: number | null) => void
   onMenu: (node: CorrespondenceTreeNode, event: MouseEvent) => void
   onFold?: (id: number, collapsed: boolean) => void
   leftBehind: boolean
@@ -430,6 +446,7 @@ function Line({
           progress={progress.get(current.id)}
           fold={fold}
           onSelect={() => onSelect(current.id)}
+          onHover={onHover}
           onMenu={(event) => onMenu(current, event)}
         />,
       )
@@ -450,6 +467,7 @@ function Line({
             weak={weak}
             progress={progress}
             onSelect={onSelect}
+            onHover={onHover}
             onMenu={onMenu}
             onFold={onFold}
             leftBehind={behind}
@@ -506,6 +524,7 @@ export function TreePane({
   tree,
   selectedId,
   onSelect,
+  onHover,
   onMark,
   onComment,
   onPromote,
@@ -550,7 +569,12 @@ export function TreePane({
   const menuNode = menu ? findNode(tree, menu.nodeId) : null
 
   return (
-    <div ref={host} className="relative min-h-0 flex-1 overflow-auto px-3 pb-2">
+    <div
+      ref={host}
+      // A row that unmounts under the pointer (a fold, a delete) never fires its own leave.
+      onMouseLeave={() => onHover?.(null)}
+      className="relative min-h-0 flex-1 overflow-auto px-3 pb-2"
+    >
       <div className="font-mono text-[0.75rem] leading-[1.5]">
         <Heading />
         <Line
@@ -561,6 +585,7 @@ export function TreePane({
           progress={progress}
           onFold={onFold}
           onSelect={onSelect}
+          onHover={onHover}
           onMenu={(node, event) => {
             if (readOnly) return
             event.preventDefault()
