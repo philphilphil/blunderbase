@@ -38,8 +38,8 @@ One chapter per entry in the app's sidebar, in the sidebar's order.
   a clock, exporting, backing up, resetting.
 - [Analysis](guide/analysis.md) — coverage, quick and deep passes, Maia levels, what counts
   as a blunder.
-- Engines is the next entry in the sidebar; it is written up under Operate, in
-  [Engines](operate/engines.md).
+- Compute is the next entry in the sidebar, Engines and Machines; both are written up
+  under Operate, in [Engines](operate/engines.md) and [Machines](operate/runners.md).
 - [Your AI assistant](guide/coach.md) — connecting an MCP client and what it can ask.
 - [Settings](guide/settings.md) — language, theme, board preferences, shortcuts, the tour.
 
@@ -49,8 +49,8 @@ For whoever runs the installation.
 
 - [Install](operate/install.md) — Docker, the desktop applications, first run, signing in.
 - [Deploy](operate/deploy.md) — reverse proxy and TLS, the public URL, read-only mode.
-- [Engines](operate/engines.md) — Stockfish and Maia, the three roles, capacity.
-- [Remote runners](operate/runners.md) — running engines on another machine.
+- [Engines](operate/engines.md) — Stockfish and Maia, the three roles, what a process costs.
+- [Machines](operate/runners.md) — how much runs at once, and engines on another machine.
 - [Configuration](operate/configuration.md) — every environment variable.
 - [Command line](operate/cli.md) — every command and flag.
 - [Backup and restore](operate/backup.md) — PGN export, database backups, restoring.

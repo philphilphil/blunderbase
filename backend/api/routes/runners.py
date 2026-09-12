@@ -17,6 +17,7 @@ stores it, so nothing can show it again; a lost token is a revoke and a new runn
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
 
 from fastapi import APIRouter, Request, Response, status
@@ -64,8 +65,14 @@ def local_picture(request: Request, settings: Settings) -> dict[str, Any]:
     workers = getattr(request.app.state, "workers", None)
     broker = getattr(request.app.state, "streams", None)
     boards = 0 if broker is None else len(_local_boards(broker))
+    # The cap in force is the running workers' own — resolved once when they started, so a
+    # setting changed since is not yet it. A process whose workers are not running has no
+    # cap in force to report, and the service fills in what the setting says instead.
     return {
-        "slots": settings.analysis_concurrency,
+        "slots": workers.concurrency if workers is not None and workers.running else None,
+        # What the two caps are reasoned against: an engine's `Threads` times the processes
+        # that may run at once has to fit in here, and only this process can say how many.
+        "cores": os.cpu_count(),
         "busy": int(workers.busy) if workers is not None else 0,
         "streams": boards,
         "workers": bool(workers is not None and workers.running),

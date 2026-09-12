@@ -128,7 +128,7 @@ plugins:
             Installing: Installieren
             Behind a proxy: Hinter einem Proxy
             Engines: Engines
-            Remote runners: Remote Runner
+            Machines: Maschinen
             Configuration: Konfiguration
             Command line: Kommandozeile
             Backup and restore: Sichern und wiederherstellen
@@ -157,7 +157,7 @@ nav:
       - Installing: operate/install.md
       - Behind a proxy: operate/deploy.md
       - Engines: operate/engines.md
-      - Remote runners: operate/runners.md
+      - Machines: operate/runners.md
       - Configuration: operate/configuration.md
       - Command line: operate/cli.md
       - Backup and restore: operate/backup.md

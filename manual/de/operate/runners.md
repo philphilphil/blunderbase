@@ -1,4 +1,54 @@
-# Remote Runner
+# Maschinen
+
+**Rechenleistung → Maschinen** ist, wo Engines laufen, wie viel gleichzeitig läuft und was
+gerade läuft: eine Karte je Host. [Engines](engines.md) ist, was installiert ist; diese
+Seite ist, worauf es läuft.
+
+## Die Maschinen-Seite { #the-machines-page }
+
+**Dieser Server** kommt zuerst und ist immer aufgeklappt: seine Kerne, die zwei Zahlen, die
+sagen, wie viel er gleichzeitig rechnet, die Bilanz, die sich daraus ergibt, und die
+Engines, deren Datei hier liegt, mit dem, was jede gerade tut. Dann **dieser Browser**, der
+in dem Moment eine Maschine wird, in dem du die mitgelieferte Engine installierst, und jeder
+**Remote Runner** mit seinen Slots und den Engines, die er anbietet. Ein Slot ist ein
+Engine-Auftrag oder ein Analysebrett.
+
+**Externer Runner** und **Wie externe Runner funktionieren** stehen oben auf der Seite.
+
+## Wie viel gleichzeitig { #how-much-at-once }
+
+Zwei Obergrenzen, auf der Karte dieses Servers, und sie **addieren sich, statt sich zu
+teilen**.
+
+| Einstellung | |
+|---|---|
+| **Warteschlangenprozesse** | Engine-Prozesse, die die Analyse-Warteschlange hier gleichzeitig laufen lassen darf – Schnell- und Tiefenanalysen und Fernschach-Aufgaben. 1 bis 64; leer heißt die Kerne der Maschine minus zwei |
+| **Suchplätze** | Fernschachsuchen, die hier gleichzeitig laufen dürfen, neben der Warteschlange. 1 bis 16, voreingestellt zwei – eine CPU-Engine und eine GPU-Engine ist das übliche Paar. Jede Suche hält ihren Prozess vom Start bis zur Pause; eine Suche, die tagelang läuft, nimmt also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet. Das Feld gibt es nur, solange der [Fernschachmodus](../guide/analysis.md#correspondence) an ist; für etwas anderes gibt es die Plätze nicht |
+
+Beide werden beim Start des Servers gelesen, weil jede einen Pool von Engine-Prozessen
+bemisst: **ändern und neu starten**. Bis dahin sagt die Karte, welche Zahl gilt und welche
+gespeichert ist. Ist `BLUNDERBASE_ANALYSIS_CONCURRENCY` in der Umgebung gesetzt, legt sie
+die Obergrenze der Warteschlange von außen fest; das Feld ist dann nur lesbar und sagt es.
+`BLUNDERBASE_ANALYSIS_WORKERS` schaltet die Worker im Prozess ganz ab, für eine
+Installation, die die Warteschlange mit `blunderbase analyze` nach eigenem Zeitplan
+abarbeitet – die Fernschachsuchen gehen mit ab. Siehe [Konfiguration](configuration.md).
+
+Unter den beiden Feldern rechnet die **Bilanzzeile** vor. Ein Prozess kostet die `Threads`
+seiner Engine; in die Kerne passen muss also `Warteschlangenprozesse × Threads + Suchplätze
+× Threads`. Die Karte nimmt die Threads von den Zeilen unter Engines – die Engines mit den
+Rollen Schnell und Tief bemessen die Warteschlange, die schwerste Suchengine hier die Suchen
+– und sagt in Worten, wann beide Obergrenzen bei Volllast die Maschine übersteigen. Sechs
+Warteschlangenprozesse eines Stockfish mit zwei Threads und zwei Suchplätze eines mit vier
+sind zwanzig Threads; auf acht Kernen kommt das ins Schwimmen, und die Zeile sagt es. Senk
+eine Obergrenze, oder gib einer Zeile unter Engines weniger Threads. Threads gelten je
+Engine; wie viele Prozesse, gilt je Maschine. Suchen zählen nur, solange der
+[Fernschachmodus](../guide/analysis.md#correspondence) an ist.
+
+Die Slots eines Remote Runners werden beim Registrieren festgelegt und lassen sich auf
+seiner Karte ändern (**Umbenennen oder Größe ändern**); die Threads jener Maschine stehen in
+ihrer eigenen `runner.yaml`, die Bilanzzeile gilt also nur diesem Server.
+
+## Remote Runner { #remote-runners }
 
 Ein **Runner** ist ein zweiter Blunderbase-Prozess auf einer Maschine mit freien Kernen. Er
 hat keine Datenbank und liefert keine Seite aus. Er meldet sich *von sich aus* bei deinem
@@ -31,8 +81,8 @@ engines:
       Threads: 8
 ```
 
-**Externen Runner hinzufügen** unter **Rechenkapazität** auf der Engines-Seite tut dasselbe
-und antwortet mit demselben yaml. So
+**Externer Runner** oben auf der Maschinen-Seite tut dasselbe und antwortet mit demselben
+yaml. So
 oder so wird das Token einmal herausgegeben und nie wieder: Gespeichert wird nur sein
 SHA-256. Ein verlorenes Token heißt widerrufen und einen neuen Runner anlegen, und das kostet
 nichts.
@@ -199,9 +249,8 @@ Logzeilen.
 
 - `blunderbase runners list` – eine Zeile je Runner: verbunden oder nicht, seine Slots, die
   Engines, die er anbietet, und wie viel vom Rückstand nur er abarbeiten kann.
-- **Rechenkapazität** auf der Engines-Seite – dieser Host und jeder Runner, jeweils mit den
-  Engines, die er anbietet. Dort steht, auf welcher Maschine eine an einen Runner gebundene
-  Engine liegt.
+- Die Maschinen-Seite – dieser Host und jeder Runner, jeweils mit den Engines, die er
+  anbietet. Engines nennt die Maschine auch auf jeder Zeile.
 - Die Analyse-Warteschlange, nach Ziel aufgeteilt. Eine Warteschlange, die stillsteht, weil
   die Maschine mit dieser Engine offline ist, sieht genau wie eine lange Warteschlange aus,
   bis du hier nachschaust.
@@ -228,7 +277,7 @@ Logzeilen.
 $ blunderbase runners revoke gpu-box
 ```
 
-**Widerrufen** auf der Karte des Runners unter **Rechenkapazität** tut dasselbe. So oder so
+**Widerrufen** auf der Karte des Runners auf der Maschinen-Seite tut dasselbe. So oder so
 hört das Token auf zu funktionieren, und die
 Engines, die es angeboten hat, werden gelöscht.
 

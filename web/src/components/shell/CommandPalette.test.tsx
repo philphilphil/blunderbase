@@ -162,7 +162,7 @@ describe('the ⌘K palette', () => {
     await user.keyboard('engines')
     await user.keyboard('{Enter}')
 
-    expect(screen.getByTestId('where')).toHaveTextContent('/engines')
+    expect(screen.getByTestId('where')).toHaveTextContent('/compute/engines')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

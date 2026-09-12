@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session
 from backend.db.enums import RunStatus
 from backend.db.models import AnalysisRun, Engine, Runner
 from backend.db.types import utcnow
+from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
 from backend.services import events as events_service
 
@@ -482,15 +483,26 @@ def local_row(
 
     `live` is what only the process serving the queue knows: whether its workers are
     running, how many slots they have and how many are in use. Everything else is a row.
+
+    The slots come with where they came from and what the row says, so the page can tell
+    an owner three things apart: the cap is pinned by the environment (the field is
+    read-only), the cap is the setting (editable), and the setting was changed since the
+    workers started (a restart is what applies it). Without a live cap — a process that
+    runs no workers — the slots are what the setting would give one.
     """
     live = dict(live or {})
     local = next(
         (row for row in _breakdown(session, breakdown) if row["runner_id"] is None),
         {"queued": 0, "running": 0},
     )
+    configured = app_settings_service.get_analysis_concurrency(session)
+    slots = live.get("slots")
     return {
         "name": LOCAL_NAME,
-        "slots": live.get("slots"),
+        "slots": configured if slots is None else slots,
+        "slots_source": app_settings_service.analysis_concurrency_source(session),
+        "slots_configured": configured,
+        "cores": live.get("cores"),
         "busy": int(live.get("busy", 0)),
         "streams": int(live.get("streams", 0)),
         "workers": bool(live.get("workers", False)),
@@ -545,7 +557,12 @@ def queue_destinations(
     for row in queue_breakdown(session):
         merged = dict(row)
         if row["runner_id"] is None:
-            merged["slots"] = local.get("slots")
+            # The running workers' cap, else the setting's — the same rule `local_row`
+            # applies, so the two reads of this host never show two numbers.
+            slots = local.get("slots")
+            merged["slots"] = (
+                app_settings_service.get_analysis_concurrency(session) if slots is None else slots
+            )
             merged["streams"] = int(local.get("streams", 0))
         else:
             seen = live.get(int(row["runner_id"])) or {}

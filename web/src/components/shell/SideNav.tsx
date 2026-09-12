@@ -111,7 +111,7 @@ const CORRESPONDENCE: NavItem = { to: '/correspondence', label: msg`Corresponden
 const DATA: NavItem[] = [
   { to: '/library', label: msg`Library`, icon: Database },
   { to: '/analysis', label: msg`Analysis`, icon: Gauge },
-  { to: '/engines', label: msg`Engines`, icon: Cpu },
+  { to: '/compute', label: msg`Compute`, icon: Cpu },
 ]
 
 /**
@@ -137,6 +137,10 @@ const SUBPAGES: Record<string, { to: string; label: MessageDescriptor }[]> = {
     { to: '/analysis/engine', label: msg`Engine passes` },
     { to: '/analysis/maia', label: msg`Maia` },
     { to: '/analysis/correspondence', label: msg`Correspondence` },
+  ],
+  '/compute': [
+    { to: '/compute/engines', label: msg`Engines` },
+    { to: '/compute/machines', label: msg`Machines` },
   ],
 }
 

@@ -7,9 +7,10 @@
  * switch that brings it into existence, and everything under it is what that mode will do
  * once it is on.
  *
- * **Search slots is the one setting here that needs a restart.** The server reads it when
- * it starts, because it sizes an engine pool, and a pool cannot be resized under three
- * searches that are already in it. The field says so rather than pretending otherwise.
+ * **Search slots is not here.** How many searches run at once is a fact about a machine —
+ * the twin of the queue's own cap, added to it, both against the same cores — so it is set
+ * on Compute → Machines beside that cap, and this page only says so. Nothing here needs a
+ * restart.
  *
  * **There is no engine setting here.** Every enabled UCI engine is offered wherever an
  * engine is chosen — the search dialog, Queue task, Expand, Refresh — with the deep role's
@@ -41,7 +42,6 @@ import { useAppSettings, useSaveAppSettings } from '@/lib/api/queries'
 
 type NumberKey =
   | 'correspondence_multipv'
-  | 'correspondence_slots'
   | 'correspondence_task_nodes'
   | 'correspondence_task_multipv'
   | 'correspondence_stale_depth'
@@ -110,14 +110,6 @@ export function CorrespondenceSettingsPage() {
       unset: t`Default 3`,
     },
   ]
-  const slots: SettingSpec<NumberKey> = {
-    key: 'correspondence_slots',
-    label: t`Search slots`,
-    min: 1,
-    max: 16,
-    step: 1,
-    unset: t`Default 2`,
-  }
   const taskFields: SettingSpec<NumberKey>[] = [
     {
       key: 'correspondence_task_nodes',
@@ -146,7 +138,6 @@ export function CorrespondenceSettingsPage() {
   const keys = [
     'correspondence_enabled',
     ...fields.map((field) => field.key),
-    slots.key,
     ...taskFields.map((field) => field.key),
   ] as const
 
@@ -159,7 +150,6 @@ export function CorrespondenceSettingsPage() {
       ...completeUpdate(stored),
       correspondence_enabled: enabled ? 1 : 0,
       correspondence_multipv: parse(text('correspondence_multipv')),
-      correspondence_slots: parse(text('correspondence_slots')),
       correspondence_task_nodes: parse(text('correspondence_task_nodes')),
       correspondence_task_multipv: parse(text('correspondence_task_multipv')),
       correspondence_stale_depth: parse(text('correspondence_stale_depth')),
@@ -254,20 +244,17 @@ export function CorrespondenceSettingsPage() {
               </Trans>
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-start gap-4">
-              <SettingField
-                field={slots}
-                value={text(slots.key)}
-                onChange={(next) => setDraft({ ...draft, [slots.key]: next })}
-              />
-              <p className="max-w-sm pt-6 text-[0.625rem] leading-[1.6] text-dim-2">
-                <Trans>
-                  Two is one CPU engine and one GPU engine at once. The server reads this
-                  when it starts, so a change here takes effect after a restart.
-                </Trans>
-              </p>
-            </div>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-[0.625rem] leading-[1.6] text-dim-2">
+              <Trans>
+                How many searches this machine runs at once is set on{' '}
+                <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                  Machines
+                </Link>
+                , beside the queue&rsquo;s own cap — the two are added, and both are read when
+                the server starts.
+              </Trans>
+            </p>
             <p className="border-t border-hairline pt-3 text-[0.625rem] leading-[1.6] text-dim-2">
               <Trans>
                 Which engine searches is chosen on the position: Search with… offers every

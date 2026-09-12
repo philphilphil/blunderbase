@@ -178,6 +178,13 @@ export interface AppSettings {
    */
   correspondence_slots?: number | null
   /**
+   * Engine processes the analysis queue runs on this host at once, 1 to 64: the search
+   * slots' twin, read by the server when it starts, so a change takes a restart. Null is
+   * the machine's cores minus two — and while `BLUNDERBASE_ANALYSIS_CONCURRENCY` is set the
+   * row is ignored, which `/runners/status` reports as `local.slots_source === 'env'`.
+   */
+  analysis_concurrency?: number | null
+  /**
    * The bounded half of the mode. A *task* is one `AnalysisRun` over one node's position,
    * so these two are its budget in the sense `quick_nodes` is a pass's: read when the task
    * is queued and copied onto its run. The line count doubles as how wide an expansion can
@@ -1626,8 +1633,17 @@ export interface RunnerCreated {
 /** This host, described as one more destination. */
 export interface LocalHost extends Extra {
   name: string
-  /** `analysis_concurrency`, when this process knows it. */
+  /**
+   * Engine processes the queue runs here at once: the cap the running workers started
+   * with, or what the setting would give a process whose workers are not running.
+   */
   slots?: number | null
+  /** What decides that cap: the environment variable, the stored setting, or neither. */
+  slots_source?: 'env' | 'setting' | 'default' | null
+  /** The cap after a restart — the setting as it stands, which `slots` lags once changed. */
+  slots_configured?: number | null
+  /** This machine's CPU count, which `Threads` × processes has to fit. */
+  cores?: number | null
   busy: number
   streams: number
   /** Whether this process drains the queue. */

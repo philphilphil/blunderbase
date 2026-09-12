@@ -77,7 +77,9 @@ The middle column, and the point of the screen. The played moves are the spine; 
 move you have entered hangs off the move it answers, indented under it. Play a move on the
 board and it goes into the tree — if the branch is already there you walk into it, if it is
 not it is added. Arrow keys walk the tree: left and right along a line, up and down across
-the alternatives.
+the alternatives. Hovering a move shows its position on the board, with the tree's next
+moves from there as arrows, and the selection stays where it was — so a line can be read
+by running the pointer down it; click to make the position yours.
 
 Each node shows its move, its evaluation and the evaluation its own branches back up:
 
@@ -186,8 +188,8 @@ One engine on one node has one search: asking the same engine again while it is 
 running or paused there is refused, and a finished game takes no searches at all — its tree
 is frozen.
 
-Each search holds one of this machine's **search slots** — two by default, under **Analysis
-→ Correspondence → Search slots**. With all of them busy a new search is **queued** and
+Each search holds one of this machine's **search slots** — two by default, under **Compute
+→ Machines** on this server's card. With all of them busy a new search is **queued** and
 starts by itself the moment one comes free. Searches have their own slots, so one that runs
 for three days never takes the slot an imported game's quick pass is waiting for.
 

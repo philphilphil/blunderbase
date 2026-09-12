@@ -63,7 +63,11 @@ function MachineEngineRow({
   return (
     <div className="flex items-center gap-2 rounded-[0.3125rem] px-1 py-1.5 hover:bg-raised">
       <StatusDot tone={engine.enabled ? 'healthy' : 'away'} />
-      <span className="truncate text-[0.71875rem] text-body">{engine.name}</span>
+      {/* The name is what the row is read for, so the path gives way first: a `m…` beside
+          forty characters of path was the row saying the least important thing. */}
+      <span className="max-w-[60%] flex-none truncate text-[0.71875rem] text-body">
+        {engine.name}
+      </span>
       <KindBadge kind={engine.kind} />
       {queueOnly ? (
         <span
@@ -77,8 +81,9 @@ function MachineEngineRow({
           <Trans>queue only</Trans>
         </span>
       ) : null}
-      <div className="flex-1" />
-      <span className="min-w-0 truncate font-mono text-[0.65625rem] text-faint">{engine.path}</span>
+      <span className="min-w-0 flex-1 truncate text-right font-mono text-[0.65625rem] text-faint">
+        {engine.path}
+      </span>
     </div>
   )
 }

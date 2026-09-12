@@ -43,9 +43,9 @@ from backend.db.models import (
 )
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
+from backend.services import app_settings, import_service
 from backend.services import backups as backups_service
 from backend.services import engines as engines_service
-from backend.services import import_service
 from backend.services import live as live_service
 from tests.conftest import OWNER_PASSWORD, running_app, socket_headers
 from tests.fake_uci import STOCKFISH_OPTIONS, fake_engine_command
@@ -1072,7 +1072,7 @@ def test_the_coverage_answer_adds_up_to_the_library(
         "quick_seconds": None,
         "deep_seconds": None,
         "maia_seconds": None,
-        "concurrency": settings.analysis_concurrency,
+        "concurrency": app_settings.ANALYSIS_CONCURRENCY_DEFAULT,
     }
 
 

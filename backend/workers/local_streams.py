@@ -26,7 +26,7 @@ import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from backend.config import Settings, get_settings
+from backend.config import Settings, default_analysis_concurrency, get_settings
 from backend.services import streams as streams_service
 from backend.services.streams import StreamSession, StreamUnavailableError
 
@@ -82,7 +82,11 @@ class LocalStreamBackend:
         if self._pool is None:
             from backend.adapters.pool import EnginePool
 
-            self._pool = EnginePool(concurrency=self.settings.analysis_concurrency)
+            # Only a backend built without the workers' pool gets here (tests); the app
+            # hands the shared one in. The environment's cap, else the machine's.
+            self._pool = EnginePool(
+                concurrency=self.settings.analysis_concurrency or default_analysis_concurrency()
+            )
         return self._pool
 
     async def open(self, session: StreamSession) -> None:

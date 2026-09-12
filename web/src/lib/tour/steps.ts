@@ -77,7 +77,7 @@ export const TOUR_STEPS: TourStep[] = [
     title: msg`Set up your engines`,
     body: msg`Register Stockfish and Maia here and give each job one. Nothing is analysed until you do.`,
     anchor: 'engines',
-    route: ({ demo }) => (demo ? null : '/engines'),
+    route: ({ demo }) => (demo ? null : '/compute/engines'),
     side: 'right',
   },
   {

@@ -50,6 +50,7 @@ from backend.db.enums import RunStatus
 from backend.db.models import Engine
 from backend.db.session import database_backpressure, get_sessionmaker
 from backend.services import analysis
+from backend.services import app_settings as app_settings_service
 from backend.services import engines as engines_service
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -111,7 +112,10 @@ class AnalysisWorkers:
         stop_grace: float = STOP_GRACE_SECONDS,
     ) -> None:
         self.settings = settings or get_settings()
-        self.concurrency = max(1, int(concurrency or self.settings.analysis_concurrency))
+        # Resolved on first use rather than here: with nothing passed in, the cap is the
+        # `analysis_concurrency` setting, and reading it is a database read that belongs
+        # to `start()`, not to constructing the object.
+        self._concurrency = int(concurrency) if concurrency else None
         self.poll_seconds = float(
             poll_seconds if poll_seconds is not None else self.settings.analysis_poll_seconds
         )
@@ -130,6 +134,16 @@ class AnalysisWorkers:
         self._inflight: set[int] = set()
 
     # --- lifecycle --------------------------------------------------------
+
+    @property
+    def concurrency(self) -> int:
+        """Engine processes this set runs at once — what was asked for, else the setting."""
+        if self._concurrency is None:
+            with self.sessions() as session:
+                self._concurrency = app_settings_service.get_analysis_concurrency(
+                    session, self.settings
+                )
+        return max(1, self._concurrency)
 
     @property
     def running(self) -> bool:

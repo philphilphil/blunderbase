@@ -6,6 +6,15 @@ directory are local snapshots pulled 2026-08-25.
 
 ## Decisions
 
+- **Compute: Engines and Machines as two pages**
+  (`prototypes/compute-pages.html`, built 2026-09-12; plan and what differs from the
+  prototype in `docs/compute.md`). The Engines page's inventory and its capacity grid become two rail
+  rows under a `Compute` heading: *Engines* is what is installed (roles, the list with
+  `Threads` and `Hash` on the row, the editor, adding), *Machines* is where it runs (one
+  card per host with the two "how much at once" numbers editable for this server, a
+  budget line that adds threads × processes up against the cores, and the runner
+  lifecycle). Search slots leaves the correspondence settings for the server's card, and
+  the queue's concurrency joins it as a setting with the env var as an override.
 - **Notes screen: a flat list, in one of two views**
   (`prototypes/notes-screen.html`, chosen 2026-09-02). The grouping by game is gone —
   a game is where a note was *written*, not what it is about, `/games` is already the

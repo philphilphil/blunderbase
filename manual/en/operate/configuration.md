@@ -44,7 +44,7 @@ They take effect on the next thing you click, not on the next restart. See
 
 | Variable | Default | What it does |
 |---|---|---|
-| `BLUNDERBASE_ANALYSIS_CONCURRENCY` | The machine's cores minus two, never below 1 | Engine processes running at once, shared across tiers. This caps CPU, not connections |
+| `BLUNDERBASE_ANALYSIS_CONCURRENCY` | unset | Pins **Queue processes** — engine processes running at once, shared across tiers — from outside. Unset, the number is the setting on [Machines](runners.md#how-much-at-once), which defaults to the machine's cores minus two. Set, that field is read-only. This caps CPU, not connections |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | Whether this process runs the analysis workers itself. Turn it off for an installation that drives the queue from `blunderbase analyze` on another schedule, and for the read-only demo |
 | `BLUNDERBASE_ANALYSIS_POLL_SECONDS` | `1.0` | How long an idle worker waits before looking at the queue again |
 | `BLUNDERBASE_AUTO_SYNC_POLL_SECONDS` | `60.0` | How often the scheduled import looks at the clock. The interval itself is an application setting, off by default, so this only decides how late a sync can be |

@@ -251,8 +251,8 @@ msgid "Set up browser Stockfish to start this analysis without leaving the page.
 msgstr "Set up browser Stockfish to start this analysis without leaving the page."
 
 #: src/components/analysis/useEngineSetup.tsx
-msgid "Go to engine page"
-msgstr "Go to engine page"
+msgid "Go to Machines"
+msgstr "Go to Machines"
 
 #: src/components/analysis/useEngineSetup.tsx
 #: src/routes/engines/DemoEngines.tsx
@@ -727,8 +727,18 @@ msgid "Engines"
 msgstr "Engines"
 
 #: src/components/shell/CommandPalette.tsx
-msgid "the roster and what runs what"
-msgstr "the roster and what runs what"
+msgid "what is installed, and what runs what"
+msgstr "what is installed, and what runs what"
+
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
+#: src/routes/engines/MachinesPage.tsx
+msgid "Machines"
+msgstr "Machines"
+
+#: src/components/shell/CommandPalette.tsx
+msgid "where engines run, and how much at once"
+msgstr "where engines run, and how much at once"
 
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
@@ -956,6 +966,12 @@ msgstr "Keyboard shortcuts (?)"
 #: src/routes/game/gameModel.ts
 msgid "Correspondence"
 msgstr "Correspondence"
+
+#: src/components/shell/SideNav.tsx
+#: src/routes/engines/EnginesPage.tsx
+#: src/routes/engines/MachinesPage.tsx
+msgid "Compute"
+msgstr "Compute"
 
 #: src/components/shell/SideNav.tsx
 #: src/routes/import/LibraryManagePage.tsx
@@ -1600,8 +1616,8 @@ msgstr "The coverage could not be read."
 #: src/routes/analysis/CorrespondenceSettings.tsx
 #: src/routes/auth/AuthLoading.tsx
 #: src/routes/correspondence/CorrespondencePage.tsx
-#: src/routes/engines/CapacityGrid.tsx
 #: src/routes/engines/EnginesPage.tsx
+#: src/routes/engines/MachinesPage.tsx
 #: src/routes/explorer/ExplorerPage.tsx
 #: src/routes/games/components/GamesTable.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
@@ -1756,14 +1772,6 @@ msgid "Default 3"
 msgstr "Default 3"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Search slots"
-msgstr "Search slots"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Default 2"
-msgstr "Default 2"
-
-#: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Nodes per task"
 msgstr "Nodes per task"
 
@@ -1820,8 +1828,8 @@ msgid "A search is one engine on one position for as long as you let it. They ha
 msgstr "A search is one engine on one position for as long as you let it. They have slots of their own, so a search that runs for days never takes one an imported game’s quick pass is waiting for."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Two is one CPU engine and one GPU engine at once. The server reads this when it starts, so a change here takes effect after a restart."
-msgstr "Two is one CPU engine and one GPU engine at once. The server reads this when it starts, so a change here takes effect after a restart."
+msgid "How many searches this machine runs at once is set on <0>Machines</0>, beside the queue’s own cap — the two are added, and both are read when the server starts."
+msgstr "How many searches this machine runs at once is set on <0>Machines</0>, beside the queue’s own cap — the two are added, and both are read when the server starts."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
@@ -3644,6 +3652,7 @@ msgid "an engine needs a name and a path"
 msgstr "an engine needs a name and a path"
 
 #: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/EnginesPage.tsx
 msgid "Add an engine"
 msgstr "Add an engine"
 
@@ -3750,100 +3759,6 @@ msgstr "This page is not cross-origin isolated, so the engine gets one thread in
 #: src/routes/engines/BrowserRunnerSection.tsx
 msgid "The server refused {refusedName}: {refusedReason}"
 msgstr "The server refused {refusedName}: {refusedReason}"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Compute capacity"
-msgstr "Compute capacity"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "This server, this browser, and remote machines that can take engine work."
-msgstr "This server, this browser, and remote machines that can take engine work."
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "The engines and analysis capacity on this computer."
-msgstr "The engines and analysis capacity on this computer."
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "How remote runners work"
-msgstr "How remote runners work"
-
-#: src/routes/engines/CapacityGrid.tsx
-#: src/routes/engines/EngineInventory.tsx
-#: src/routes/engines/RunnerCard.tsx
-msgid "Remote runner"
-msgstr "Remote runner"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Compute capacity could not be read."
-msgstr "Compute capacity could not be read."
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "No remote runners are registered. This server and browser still work independently."
-msgstr "No remote runners are registered. This server and browser still work independently."
-
-#: src/routes/engines/CapacityGrid.tsx
-#: src/routes/engines/EnginesPage.tsx
-msgid "This computer"
-msgstr "This computer"
-
-#: src/routes/engines/CapacityGrid.tsx
-#: src/routes/engines/EngineInventory.tsx
-#: src/routes/engines/EnginesPage.tsx
-msgid "This server"
-msgstr "This server"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "ready for queued work"
-msgstr "ready for queued work"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "not draining the queue"
-msgstr "not draining the queue"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Computer"
-msgstr "Computer"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Server"
-msgstr "Server"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Collapse this computer"
-msgstr "Collapse this computer"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Expand this computer"
-msgstr "Expand this computer"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Collapse this server"
-msgstr "Collapse this server"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "Expand this server"
-msgstr "Expand this server"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgctxt "button"
-msgid "Engine"
-msgstr "Engine"
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "{queued} queued and {running} running here. Paths and options for these engines are editable in the inventory above."
-msgstr "{queued} queued and {running} running here. Paths and options for these engines are editable in the inventory above."
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "This process is not draining the queue. Runs wait until a worker picks them up."
-msgstr "This process is not draining the queue. Runs wait until a worker picks them up."
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "A runner is a small process on another machine that connects outward to this Blunderbase deployment. Registering one mints a token shown once and a paste-ready <0>runner.yaml</0>. Copy both to that machine, set its engine paths in the yaml, and start the runner. Its advertised engines then appear in the inventory above; their paths and options remain read-only here because the yaml on that machine is the source of truth."
-msgstr "A runner is a small process on another machine that connects outward to this Blunderbase deployment. Registering one mints a token shown once and a paste-ready <0>runner.yaml</0>. Copy both to that machine, set its engine paths in the yaml, and start the runner. Its advertised engines then appear in the inventory above; their paths and options remain read-only here because the yaml on that machine is the source of truth."
-
-#: src/routes/engines/CapacityGrid.tsx
-msgid "A longer setup and troubleshooting guide will be linked here when the documentation is ready."
-msgstr "A longer setup and troubleshooting guide will be linked here when the documentation is ready."
 
 #: src/routes/engines/CreateRunnerForm.tsx
 msgid "a runner needs a name"
@@ -3963,6 +3878,18 @@ msgid "In {runnerName}"
 msgstr "In {runnerName}"
 
 #: src/routes/engines/EngineDetail.tsx
+msgid "the default, one"
+msgstr "the default, one"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "the default"
+msgstr "the default"
+
+#: src/routes/engines/EngineDetail.tsx
+msgid "{hashMb} MB"
+msgstr "{hashMb} MB"
+
+#: src/routes/engines/EngineDetail.tsx
 msgid "Runner-owned settings are read-only here"
 msgstr "Runner-owned settings are read-only here"
 
@@ -4031,6 +3958,10 @@ msgid "A file, a command line with arguments, or a name on PATH. Saving a new pa
 msgstr "A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary."
 
 #: src/routes/engines/EngineDetail.tsx
+msgid "One process of this engine costs <0>{threads}</0> {threadCount, plural, one {thread} other {threads}} and <1>{hash}</1> of hash. Both are UCI options under More settings; how many processes run at once is set on <2>Machines</2>."
+msgstr "One process of this engine costs <0>{threads}</0> {threadCount, plural, one {thread} other {threads}} and <1>{hash}</1> of hash. Both are UCI options under More settings; how many processes run at once is set on <2>Machines</2>."
+
+#: src/routes/engines/EngineDetail.tsx
 msgid "More settings"
 msgstr "More settings"
 
@@ -4095,12 +4026,12 @@ msgid "The engine did not answer."
 msgstr "The engine did not answer."
 
 #: src/routes/engines/EngineDetail.tsx
-msgid "Nothing here is editable. This row belongs to a browser tab — uninstall it under <0>This browser</0> in Compute capacity below, or revoke the runner there."
-msgstr "Nothing here is editable. This row belongs to a browser tab — uninstall it under <0>This browser</0> in Compute capacity below, or revoke the runner there."
+msgid "Nothing here is editable. This row belongs to a browser tab — uninstall it under <0>This browser</0> on <1>Machines</1>, or revoke the runner there."
+msgstr "Nothing here is editable. This row belongs to a browser tab — uninstall it under <0>This browser</0> on <1>Machines</1>, or revoke the runner there."
 
 #: src/routes/engines/EngineDetail.tsx
-msgid "Nothing here is editable. Change this engine in <0>runner.yaml</0> on {runnerName}, or open {runnerName} under Compute capacity below to revoke it."
-msgstr "Nothing here is editable. Change this engine in <0>runner.yaml</0> on {runnerName}, or open {runnerName} under Compute capacity below to revoke it."
+msgid "Nothing here is editable. Change this engine in <0>runner.yaml</0> on {runnerName}, or open {runnerName} on <1>Machines</1> to revoke it."
+msgstr "Nothing here is editable. Change this engine in <0>runner.yaml</0> on {runnerName}, or open {runnerName} on <1>Machines</1> to revoke it."
 
 #: src/routes/engines/EngineDetail.tsx
 msgid "Remove {engineName}? Analysis already stored keeps its runs."
@@ -4118,6 +4049,12 @@ msgstr "Fix the options above first"
 #: src/routes/engines/EngineDetail.tsx
 msgid "Save changes"
 msgstr "Save changes"
+
+#: src/routes/engines/EngineInventory.tsx
+#: src/routes/engines/EnginesPage.tsx
+#: src/routes/engines/ServerCard.tsx
+msgid "This server"
+msgstr "This server"
 
 #: src/routes/engines/EngineInventory.tsx
 msgctxt "inventory column"
@@ -4141,6 +4078,16 @@ msgstr "Where"
 
 #: src/routes/engines/EngineInventory.tsx
 msgctxt "inventory column"
+msgid "Threads"
+msgstr "Threads"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "inventory column"
+msgid "Hash"
+msgstr "Hash"
+
+#: src/routes/engines/EngineInventory.tsx
+msgctxt "inventory column"
 msgid "State"
 msgstr "State"
 
@@ -4151,6 +4098,23 @@ msgstr "Collapse {engineName}"
 #: src/routes/engines/EngineInventory.tsx
 msgid "Edit {engineName}"
 msgstr "Edit {engineName}"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "Not set: the engine's own default, one thread"
+msgstr "Not set: the engine's own default, one thread"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "Not set: the engine's own default"
+msgstr "Not set: the engine's own default"
+
+#: src/routes/engines/EngineInventory.tsx
+msgid "{value} MB"
+msgstr "{value} MB"
+
+#: src/routes/engines/EngineInventory.tsx
+#: src/routes/engines/OptionsEditor.tsx
+msgid "default"
+msgstr "default"
 
 #: src/routes/engines/EngineInventory.tsx
 msgid "Checking…"
@@ -4174,17 +4138,19 @@ msgctxt "engine state"
 msgid "On"
 msgstr "On"
 
-#: src/routes/engines/EnginesPage.tsx
-msgid "Assign each job, compare every configured engine, and see all compute capacity in one place."
-msgstr "Assign each job, compare every configured engine, and see all compute capacity in one place."
+#: src/routes/engines/EngineInventory.tsx
+#: src/routes/engines/MachinesPage.tsx
+#: src/routes/engines/RunnerCard.tsx
+msgid "Remote runner"
+msgstr "Remote runner"
 
 #: src/routes/engines/EnginesPage.tsx
-msgid "Engine inventory"
-msgstr "Engine inventory"
+msgid "What is installed, how each engine is set up, and which job it does."
+msgstr "What is installed, how each engine is set up, and which job it does."
 
 #: src/routes/engines/EnginesPage.tsx
-msgid "Every configured engine, what it does and where it runs."
-msgstr "Every configured engine, what it does and where it runs."
+msgid "Every configured engine, where it runs, and what it costs per process."
+msgstr "Every configured engine, where it runs, and what it costs per process."
 
 #: src/routes/engines/EnginesPage.tsx
 msgid "The engine list could not be read."
@@ -4195,12 +4161,21 @@ msgid "No engines are registered."
 msgstr "No engines are registered."
 
 #: src/routes/engines/EnginesPage.tsx
-msgid "Add a path-based engine below, install browser Stockfish, or connect a remote runner."
-msgstr "Add a path-based engine below, install browser Stockfish, or connect a remote runner."
+msgid "Add a path-based engine above, or install browser Stockfish and connect remote runners on <0>Machines</0>."
+msgstr "Add a path-based engine above, or install browser Stockfish and connect remote runners on <0>Machines</0>."
 
 #: src/routes/engines/EnginesPage.tsx
-msgid "Add a path-based engine on this computer below."
-msgstr "Add a path-based engine on this computer below."
+msgid "Add a path-based engine on this computer above."
+msgstr "Add a path-based engine on this computer above."
+
+#: src/routes/engines/EnginesPage.tsx
+#: src/routes/engines/ServerCard.tsx
+msgid "This computer"
+msgstr "This computer"
+
+#: src/routes/engines/EnginesPage.tsx
+msgid "Threads and hash belong to one process of one engine. How many processes a machine runs at once — queue processes, correspondence search slots — is set per machine on <0>Machines</0>."
+msgstr "Threads and hash belong to one process of one engine. How many processes a machine runs at once — queue processes, correspondence search slots — is set per machine on <0>Machines</0>."
 
 #: src/routes/engines/HostBadge.tsx
 #: src/routes/engines/RolesForm.tsx
@@ -4229,6 +4204,34 @@ msgstr "this link takes queue work but cannot open an analysis board"
 msgid "{0, plural, one {# engine} other {# engines}}"
 msgstr "{0, plural, one {# engine} other {# engines}}"
 
+#: src/routes/engines/MachinesPage.tsx
+msgid "Where engines run, how much runs at once, and what is running now."
+msgstr "Where engines run, how much runs at once, and what is running now."
+
+#: src/routes/engines/MachinesPage.tsx
+msgid "How much this computer runs at once, and what is running now."
+msgstr "How much this computer runs at once, and what is running now."
+
+#: src/routes/engines/MachinesPage.tsx
+msgid "How remote runners work"
+msgstr "How remote runners work"
+
+#: src/routes/engines/MachinesPage.tsx
+msgid "Compute capacity could not be read."
+msgstr "Compute capacity could not be read."
+
+#: src/routes/engines/MachinesPage.tsx
+msgid "No remote runners are registered. This server and browser still work independently."
+msgstr "No remote runners are registered. This server and browser still work independently."
+
+#: src/routes/engines/MachinesPage.tsx
+msgid "A runner is a small process on another machine that connects outward to this Blunderbase deployment. Registering one mints a token shown once and a paste-ready <0>runner.yaml</0>. Copy both to that machine, set its engine paths in the yaml, and start the runner. Its advertised engines then appear on Engines; their paths and options remain read-only here because the yaml on that machine is the source of truth."
+msgstr "A runner is a small process on another machine that connects outward to this Blunderbase deployment. Registering one mints a token shown once and a paste-ready <0>runner.yaml</0>. Copy both to that machine, set its engine paths in the yaml, and start the runner. Its advertised engines then appear on Engines; their paths and options remain read-only here because the yaml on that machine is the source of truth."
+
+#: src/routes/engines/MachinesPage.tsx
+msgid "The manual chapter behind the (?) in the titlebar has the setup and the troubleshooting."
+msgstr "The manual chapter behind the (?) in the titlebar has the setup and the troubleshooting."
+
 #: src/routes/engines/OptionsEditor.tsx
 msgid "set per analysis"
 msgstr "set per analysis"
@@ -4240,10 +4243,6 @@ msgstr "action"
 #: src/routes/engines/OptionsEditor.tsx
 msgid "default ({fallback})"
 msgstr "default ({fallback})"
-
-#: src/routes/engines/OptionsEditor.tsx
-msgid "default"
-msgstr "default"
 
 #: src/routes/engines/OptionsEditor.tsx
 msgid "Filter options"
@@ -4383,6 +4382,106 @@ msgstr "rating {level}"
 #: src/routes/engines/SampleResult.tsx
 msgid "{depth} · {nodes} nodes"
 msgstr "{depth} · {nodes} nodes"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Passes and tasks · default {configured}"
+msgstr "Passes and tasks · default {configured}"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Passes and tasks · default cores − 2"
+msgstr "Passes and tasks · default cores − 2"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Queue processes"
+msgstr "Queue processes"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Search slots"
+msgstr "Search slots"
+
+#. placeholder {0}: DEFAULTS.correspondence_slots
+#: src/routes/engines/ServerCard.tsx
+msgid "Correspondence · default {0}"
+msgstr "Correspondence · default {0}"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "{cores} cores"
+msgstr "{cores} cores"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "cores unknown"
+msgstr "cores unknown"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "{cores, plural, one {# core} other {# cores}}"
+msgstr "{cores, plural, one {# core} other {# cores}}"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Runs wait until a worker picks them up."
+msgstr "Runs wait until a worker picks them up."
+
+#. placeholder {0}: inForce ?? '?'
+#: src/routes/engines/ServerCard.tsx
+msgid "queue {used} of {0} in use"
+msgstr "queue {used} of {0} in use"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "not draining the queue"
+msgstr "not draining the queue"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "How much at once"
+msgstr "How much at once"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Set by BLUNDERBASE_ANALYSIS_CONCURRENCY"
+msgstr "Set by BLUNDERBASE_ANALYSIS_CONCURRENCY"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Queue processes run the passes and tasks; search slots exist only for correspondence searches and are added on top. Read when the server starts: change, then restart."
+msgstr "Queue processes run the passes and tasks; search slots exist only for correspondence searches and are added on top. Read when the server starts: change, then restart."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Queue processes run the analysis passes. Read when the server starts: change, then restart."
+msgstr "Queue processes run the analysis passes. Read when the server starts: change, then restart."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Saved {configured}; the queue is running on {inForce} until the server restarts."
+msgstr "Saved {configured}; the queue is running on {inForce} until the server restarts."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "queue {queueProcesses} × {queueThreads} threads + searches {searchProcesses} × {searchThreads} = <0>{total} threads</0> · {coresLabel}"
+msgstr "queue {queueProcesses} × {queueThreads} threads + searches {searchProcesses} × {searchThreads} = <0>{total} threads</0> · {coresLabel}"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "queue {queueProcesses} × {queueThreads} threads = <0>{total} threads</0> · {coresLabel}"
+msgstr "queue {queueProcesses} × {queueThreads} threads = <0>{total} threads</0> · {coresLabel}"
+
+#: src/routes/engines/ServerCard.tsx
+msgid "At full load, more threads than cores. Lower a cap, or an engine’s threads on Engines."
+msgstr "At full load, more threads than cores. Lower a cap, or an engine’s threads on Engines."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "At full load, everything fits the cores."
+msgstr "At full load, everything fits the cores."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Threads × processes is what has to fit the cores."
+msgstr "Threads × processes is what has to fit the cores."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Engines on this machine"
+msgstr "Engines on this machine"
+
+#. placeholder {0}: local.queued
+#. placeholder {1}: local.running
+#: src/routes/engines/ServerCard.tsx
+msgid "{0} queued, {1} running here. Add or edit engines on <0>Engines</0>."
+msgstr "{0} queued, {1} running here. Add or edit engines on <0>Engines</0>."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Add or edit engines on <0>Engines</0>."
+msgstr "Add or edit engines on <0>Engines</0>."
 
 #: src/routes/engines/browserRunner.ts
 msgid "not running"

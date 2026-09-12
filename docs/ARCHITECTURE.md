@@ -375,13 +375,14 @@ Engines are rows, and three modules divide the work:
   repeating it.
 - `adapters/pool.py` keeps **warm processes per `EngineSpec`** — the spec's key covers
   path, kind and options, so editing an engine's options in the UI starts a fresh process
-  instead of leaving the old settings warm. One process per caller up to
-  `settings.analysis_concurrency`, not one per spec: every analysis worker resolves the
+  instead of leaving the old settings warm. One process per caller up to the
+  `analysis_concurrency` app setting (`BLUNDERBASE_ANALYSIS_CONCURRENCY` overrides it), not
+  one per spec: every analysis worker resolves the
   quick tier to the same engine row, and a single process would queue the whole pool behind
   one search. The pool is asyncio-facing because the analysis
   workers are asyncio tasks: every blocking engine call goes out through
-  `pool.run(spec, work)` / `asyncio.to_thread`, and one semaphore of
-  `settings.analysis_concurrency` caps concurrent engine work across all engines. A call
+  `pool.run(spec, work)` / `asyncio.to_thread`, and one semaphore of that cap governs
+  concurrent engine work across all engines. A call
   that raises drops its process (a corpse in the slot would be handed to the next caller)
   and always releases its slot.
 - `services/engines.py` owns the policy: probe on add, options validated against what the

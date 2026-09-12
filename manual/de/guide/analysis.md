@@ -62,7 +62,6 @@ nicht in der Seitenleiste, und seine Seiten schicken dich zur Übersicht zurück
 |---|---|
 | **Fernschachmodus** | An ergänzt den Eintrag in der Seitenleiste unter **Live** |
 | **Linien pro Suche** | Wie viele Kandidatenvarianten eine Engine behält, wenn sie auf eine Stellung eines Fernschachbaums angesetzt wird, 1 bis 5, voreingestellt drei |
-| **Suchplätze** | Wie viele Suchen dieser Rechner gleichzeitig laufen lässt, 1 bis 16, voreingestellt zwei – eine CPU-Engine und eine GPU-Engine ist das übliche Paar. Suchen haben eigene Plätze: eine Suche, die tagelang läuft, nimmt also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet. Der Wert wird beim Start des Servers gelesen: **ändern und neu starten** |
 | **Knoten pro Aufgabe** | Was eine Aufgabe kostet, voreingestellt vierzig Millionen: ein bis zwei Minuten einer modernen Engine – gerade so, dass eine Erweiterung über ein Dutzend Stellungen fertig wird, während du noch aufs Brett schaust. Der Wert wird beim Einreihen auf die Aufgabe kopiert; änderst du ihn, gilt er für die nächste |
 | **Linien pro Aufgabe** | Wie viele Kandidatenvarianten eine Aufgabe behält, 1 bis 5, voreingestellt drei – und damit, wie breit eine Erweiterung sein kann, denn die Kinder entstehen aus diesen Varianten |
 | **Veraltet unter Tiefe** | Unter dieser Tiefe wird ein gespeichertes Urteil im Baum als veraltet markiert, 1 bis 100, voreingestellt dreißig. Die andere Hälfte braucht keine Zahl: Ein Urteil von einer Version der Engine, die nicht mehr installiert ist, ist veraltet, wie tief es auch ging |
@@ -70,7 +69,10 @@ nicht in der Seitenleiste, und seine Seiten schicken dich zur Übersicht zurück
 Eine Engine-Einstellung gibt es nicht: Welche Engine sucht oder eine Aufgabe abarbeitet,
 wählst du an der Stellung, im Dialog, aus allen eingeschalteten Engines – siehe
 [Eine Stellung rechnen lassen](correspondence.md#search-a-position). Vorgeschlagen wird die
-Engine mit der Rolle **Tiefenanalyse**.
+Engine mit der Rolle **Tiefenanalyse**. Und es gibt hier keine Platzzahl: Wie viele Suchen
+dieser Rechner gleichzeitig laufen lässt, ist eine Eigenschaft der Maschine, eingestellt
+neben der Obergrenze der Warteschlange unter
+[Maschinen](../operate/runners.md#how-much-at-once).
 
 Ein leeres Feld heißt: die Voreinstellung gilt. Was der Modus selbst tut, steht unter
 [Fernschach](correspondence.md); wie du ihm eine eigene Engine gibst, unter

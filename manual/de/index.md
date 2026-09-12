@@ -38,8 +38,9 @@ Reihenfolge.
   Synchronisierung, Export, Sicherung, Zurücksetzen.
 - [Analyse](guide/analysis.md) – Schnell- und Tiefenanalyse, Maia, Abdeckung, Budgets, was
   als grober Patzer gilt.
-- Engines ist der nächste Eintrag in der Seitenleiste; beschrieben ist er unter Betrieb in
-  [Engines](operate/engines.md).
+- Rechenleistung ist der nächste Eintrag in der Seitenleiste, Engines und Maschinen; beide
+  sind unter Betrieb beschrieben, in [Engines](operate/engines.md) und
+  [Maschinen](operate/runners.md).
 - [Dein KI-Assistent](guide/coach.md) – einen MCP-Client verbinden und was er kann.
 - [Einstellungen](guide/settings.md) – Sprache, Erscheinungsbild, Bretteinstellungen,
   Tastenkürzel, die Tour.
@@ -52,8 +53,8 @@ Für alle, die die Installation betreiben.
   Anmeldung.
 - [Hinter einem Proxy](operate/deploy.md) – Reverse Proxy und TLS, die öffentliche URL, der
   schreibgeschützte Modus.
-- [Engines](operate/engines.md) – Stockfish und Maia, die drei Rollen, Kapazität.
-- [Remote Runner](operate/runners.md) – Engines auf einem anderen Rechner.
+- [Engines](operate/engines.md) – Stockfish und Maia, die drei Rollen, was ein Prozess kostet.
+- [Maschinen](operate/runners.md) – wie viel gleichzeitig läuft, und Engines auf einem anderen Rechner.
 - [Konfiguration](operate/configuration.md) – alle Umgebungsvariablen.
 - [Kommandozeile](operate/cli.md) – alle Befehle und Optionen.
 - [Sichern und wiederherstellen](operate/backup.md) – PGN-Export, Datenbanksicherung,

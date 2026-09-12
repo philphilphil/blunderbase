@@ -11,22 +11,24 @@ ist in jedem Fall ein eigener Download.
 
 ## Die Engines-Seite { #the-engines-page }
 
-Eine Seite in drei Teilen, von oben nach unten.
+**Rechenleistung → Engines** ist, was installiert ist, in zwei Teilen von oben nach unten.
 
 *Was läuft womit*: je eine Zeile für Schnell, Tief und Menschliche Züge, mit der Engine,
 die die Rolle hält, und, wenn sie nicht laufen kann, dem Grund in Worten.
 
-**Engine-Inventar**: jede eingerichtete Engine, was sie tut und wo sie läuft. Ein Klick auf
-eine Zeile öffnet die Karte der Engine.
-
-**Rechenkapazität**: dieser Server, dieser Browser und jeder [Remote Runner](runners.md),
-jeweils mit den Engines, die er anbietet, und seinen Slots. Engines hinzufügen,
-Browser-Stockfish installieren und Runner registrieren passiert alles hier.
+**Engines**: jede eingerichtete Engine – ihre Art, die Maschine, auf der sie läuft, ihre
+`Threads` und ihr `Hash`, welche Aufgaben sie hält und ob sie eingeschaltet ist. Ein Klick
+auf eine Zeile öffnet die Karte der Engine. `Threads` und `Hash` stehen auf der Zeile, weil
+sie sind, was ein *Prozess* der Engine kostet; wie viele Prozesse eine Maschine gleichzeitig
+laufen lässt, wird nicht hier entschieden, sondern unter [Maschinen](runners.md), der Seite
+daneben.
 
 ## Eine Engine hinzufügen { #adding-an-engine }
 
-Öffne unter **Rechenkapazität** auf der Karte dieses Servers **Engine hinzufügen** und trag
-drei Dinge ein.
+**Engine hinzufügen**, rechts oben auf der Engines-Seite, fragt drei Dinge. Eine Engine
+über ihren Pfad ist immer die dieses Servers: Die Engines eines [Remote
+Runners](runners.md) kommen aus dessen eigenem yaml, und die Engine in deinem Browser ist
+eine Installation mit einem Klick unter Maschinen.
 
 | Feld | Was hineingehört |
 |---|---|
@@ -77,37 +79,31 @@ Konfigurationsdatei des Runners.
 
 ## Kapazität { #capacity }
 
-**Rechenkapazität** unten auf der Engines-Seite zeigt jeden Host, der Engine-Arbeit
-übernehmen kann: diesen Server, diesen Browser, wenn du ihn als Runner eingerichtet hast,
-und jeden Remote Runner mit der Anzahl Slots, die er anbietet. Ein Slot ist ein
-Engine-Auftrag oder ein Analysebrett.
-
-Auf dem Server selbst begrenzt `BLUNDERBASE_ANALYSIS_CONCURRENCY`, wie viele
-Engine-Prozesse über alle Stufen hinweg gleichzeitig laufen. Voreingestellt sind die Kerne
-der Maschine minus zwei. `BLUNDERBASE_ANALYSIS_WORKERS` schaltet die Worker im Prozess ganz
-ab, für eine Installation, die die Warteschlange mit `blunderbase analyze` nach eigenem
-Zeitplan abarbeitet – die Fernschachsuchen gehen mit ab. Siehe
-[Konfiguration](configuration.md).
+Wie viele Engine-Prozesse eine Maschine gleichzeitig laufen lässt, ist eine Eigenschaft der
+Maschine, und sie steht unter [Maschinen](runners.md#how-much-at-once): die
+**Warteschlangenprozesse** und **Suchplätze** dieses Servers, die Slots jedes Remote
+Runners, und eine Bilanzzeile, die das gegen die Kerne aufrechnet, mit den `Threads`, die
+jede Zeile hier verlangt. Diese Seite legt nur fest, was ein Prozess kostet.
 
 ## Eine Engine fürs Fernschach { #an-engine-for-correspondence }
 
 Eine Fernschachsuche ist kein Auftrag aus der Warteschlange: Sie ist eine Engine, die
-stunden- oder tagelang auf einer Stellung sitzt, und sie wird getrennt gezählt. **Analyse →
-Fernschach → Suchplätze** legt fest, wie viele davon hier gleichzeitig laufen dürfen –
-voreingestellt zwei –, und es sind eigene Plätze: Eine Suche nimmt nie den weg, auf den die
-Schnellanalyse einer importierten Partie wartet. Gib dem Fernschach **eine eigene
-Engine-Zeile** statt der, die deine Durchläufe benutzen: eine Zeile mit hohem `Threads` und
-so viel `Hash`, wie du entbehren kannst, und wähl sie unter **Suchen mit …** an der
-Stellung. Ändern der Optionen startet ohnehin einen frischen Prozess, die beiden Zeilen
-kommen sich also nie in die Quere.
+stunden- oder tagelang auf einer Stellung sitzt, und sie wird getrennt gezählt.
+**Suchplätze** auf der Karte dieses Servers unter [Maschinen](runners.md#how-much-at-once)
+legt fest, wie viele davon hier gleichzeitig laufen dürfen – voreingestellt zwei –, und es
+sind eigene Plätze: Eine Suche nimmt nie den weg, auf den die Schnellanalyse einer
+importierten Partie wartet. Gib dem Fernschach **eine eigene Engine-Zeile** statt der, die
+deine Durchläufe benutzen: eine Zeile mit hohem `Threads` und so viel `Hash`, wie du
+entbehren kannst, und wähl sie unter **Suchen mit …** an der Stellung. Ändern der Optionen
+startet ohnehin einen frischen Prozess, die beiden Zeilen kommen sich also nie in die Quere.
 
-Ein Suchplatz ist nicht dieselbe Einheit wie `BLUNDERBASE_ANALYSIS_CONCURRENCY` weiter oben,
-und die beiden addieren sich, statt sich zu teilen: Die Variable begrenzt die
-Engine-Prozesse der *Warteschlange* über alle Stufen, **Suchplätze** begrenzt die Suchen
-daneben. Zwei Plätze und eine Nebenläufigkeit von sechs sind bis zu acht Engine-Prozesse
-gleichzeitig auf diesem Rechner; setz `Threads` in der Fernschach-Zeile also gegen das, was
-die Warteschlange ohnehin schon belegt – eine Zeile, die alle Kerne nimmt, nimmt sie zum
-zweiten Mal, und die Maschine kommt nur noch ins Schwimmen.
+Ein Suchplatz ist nicht dieselbe Einheit wie die **Warteschlangenprozesse** daneben, und
+die beiden addieren sich, statt sich zu teilen: Diese Obergrenze sind die Engine-Prozesse
+der *Warteschlange* über alle Stufen, **Suchplätze** begrenzt die Suchen daneben. Zwei
+Plätze und sechs Warteschlangenprozesse sind bis zu acht Engine-Prozesse gleichzeitig auf
+diesem Rechner; setz `Threads` in der Fernschach-Zeile also gegen das, was die Warteschlange
+ohnehin schon belegt – die Bilanzzeile auf der Karte des Servers rechnet das vor und sagt,
+wann die Maschine ins Schwimmen käme.
 
 Zwei Dinge zum Speicher, bevor du `Hash` groß setzt. Eine **pausierte** Suche behält ihren
 Prozess samt Hash, damit das Fortsetzen Sekunden statt Stunden kostet – die Kapazitätsleiste
@@ -128,7 +124,7 @@ eine GPU-Engine, jede auf ihrer eigenen Hardware.
 Warteschlangenarbeit.** Eine Aufgabe – ein begrenzter Blick auf eine Stellung, und das,
 woraus eine [Erweiterung](../guide/correspondence.md#tasks-and-expansion) besteht – ist ein
 `AnalysisRun` wie jeder andere: Sie belegt keinen Suchplatz, sie zählt zusammen mit der
-Schnell- und der Tiefenanalyse gegen `BLUNDERBASE_ANALYSIS_CONCURRENCY`, und sie läuft auf
+Schnell- und der Tiefenanalyse gegen die **Warteschlangenprozesse**, und sie läuft auf
 dem Host, dem die Warteschlange sie gibt – [Remote Runner](runners.md) eingeschlossen. Die
 Engine, die du für eine Aufgabe wählst – in **Aufgabe einreihen …**, **Erweitern …** oder
 **Teilbaum auffrischen …** –, darf also auf einem Runner liegen, anders als eine
@@ -208,4 +204,4 @@ Alle Optionen stehen unter [Kommandozeile](cli.md#engines).
 ## Engines auf einer anderen Maschine { #engines-on-another-machine }
 
 Eine Maschine mit freien Kernen kann Engines für diese Installation ausführen, ohne eine
-zweite Installation zu sein. Siehe [Remote Runner](runners.md).
+zweite Installation zu sein. Siehe [Maschinen](runners.md).

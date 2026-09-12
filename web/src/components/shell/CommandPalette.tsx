@@ -135,7 +135,18 @@ const PAGES: PageRoute[] = [
     icon: Gauge,
     to: '/analysis/coverage',
   },
-  { label: msg`Engines`, hint: msg`the roster and what runs what`, icon: Cpu, to: '/engines' },
+  {
+    label: msg`Engines`,
+    hint: msg`what is installed, and what runs what`,
+    icon: Cpu,
+    to: '/compute/engines',
+  },
+  {
+    label: msg`Machines`,
+    hint: msg`where engines run, and how much at once`,
+    icon: Cpu,
+    to: '/compute/machines',
+  },
   {
     label: msg`Engine passes`,
     hint: msg`budgets and move labels`,

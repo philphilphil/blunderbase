@@ -86,17 +86,19 @@ afterEach(() => {
 describe('Analysis → Correspondence', () => {
   it('sends every key the deployment holds, not only the one that changed', async () => {
     draw()
-    const slots = await screen.findByLabelText('Search slots')
-    await userEvent.clear(slots)
-    await userEvent.type(slots, '4')
+    const lines = await screen.findByLabelText('Lines per search')
+    await userEvent.clear(lines)
+    await userEvent.type(lines, '4')
     await userEvent.click(screen.getByRole('button', { name: /Save/ }))
 
     await waitFor(() => expect(sent).not.toBeNull())
-    // The whole record: a PUT is a replace, and an absent key is a cleared one.
+    // The whole record: a PUT is a replace, and an absent key is a cleared one. The search
+    // slots are not this page's any more — they are set on Machines — and still ride along.
+    expect(screen.queryByLabelText('Search slots')).not.toBeInTheDocument()
     expect(sent).toMatchObject({
       correspondence_enabled: 1,
-      correspondence_multipv: 3,
-      correspondence_slots: 4,
+      correspondence_multipv: 4,
+      correspondence_slots: 2,
       correspondence_task_nodes: 40_000_000,
       correspondence_task_multipv: 3,
       correspondence_stale_depth: 30,
@@ -124,10 +126,13 @@ describe('Analysis → Correspondence', () => {
     expect(sent?.correspondence_task_multipv).toBe(3)
   })
 
-  it('says that the slot count needs a restart, because the pool is sized at boot', async () => {
+  it('sends the owner to Machines for the search slots rather than holding a box', async () => {
     draw()
-    expect(
-      await screen.findByText(/reads this when it starts, so a change here takes effect/),
-    ).toBeInTheDocument()
+    await screen.findByLabelText('Lines per search')
+    expect(screen.queryByLabelText('Search slots')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Machines' })).toHaveAttribute(
+      'href',
+      '/compute/machines',
+    )
   })
 })

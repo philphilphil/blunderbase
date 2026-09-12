@@ -515,6 +515,66 @@ def test_a_plan_built_after_a_put_carries_the_new_level(
         assert cleared.maia_plies() == [0, 1]
 
 
+# --- the queue's cap --------------------------------------------------------
+
+
+def test_an_install_that_set_nothing_runs_the_queue_on_cores_minus_two(
+    session: Session,
+) -> None:
+    settings = Settings(analysis_concurrency=None)
+
+    assert (
+        app_settings.get_analysis_concurrency(session, settings)
+        == app_settings.ANALYSIS_CONCURRENCY_DEFAULT
+    )
+    assert app_settings.analysis_concurrency_source(session, settings) == "default"
+
+
+def test_the_stored_cap_is_what_the_queue_runs_on(session: Session) -> None:
+    settings = Settings(analysis_concurrency=None)
+    app_settings.set_value(session, app_settings.ANALYSIS_CONCURRENCY, 3)
+
+    assert app_settings.get_analysis_concurrency(session, settings) == 3
+    assert app_settings.analysis_concurrency_source(session, settings) == "setting"
+
+
+def test_the_environment_pins_the_cap_over_the_row(session: Session) -> None:
+    """A Docker deployment that exports the variable is not second-guessed by a setting."""
+    settings = Settings(analysis_concurrency=5)
+    app_settings.set_value(session, app_settings.ANALYSIS_CONCURRENCY, 3)
+
+    assert app_settings.get_analysis_concurrency(session, settings) == 5
+    assert app_settings.analysis_concurrency_source(session, settings) == "env"
+
+
+def test_a_cap_bigger_than_any_machine_is_clamped(session: Session) -> None:
+    assert (
+        app_settings.set_value(session, app_settings.ANALYSIS_CONCURRENCY, 999)
+        == app_settings.MAX_ANALYSIS_CONCURRENCY
+    )
+    assert app_settings.set_value(session, app_settings.ANALYSIS_CONCURRENCY, 0) == 1
+
+
+def test_a_put_stores_the_queue_cap_and_the_status_says_a_restart_will_apply_it(
+    api: TestClient,
+) -> None:
+    """The workers keep the cap they started with; the status shows both numbers."""
+    before = api.get("/api/runners/status").json()["local"]
+    assert before["slots_source"] == "default"
+    assert before["slots_configured"] == before["slots"]
+
+    assert api.put("/api/settings", json={"analysis_concurrency": 3}).json()[
+        "analysis_concurrency"
+    ] == 3
+
+    after = api.get("/api/runners/status").json()["local"]
+    assert after["slots_source"] == "setting"
+    assert after["slots_configured"] == 3
+    # This app's workers are not running, so the slots are what the setting would give a
+    # process whose were; running ones keep the cap they started with until restarted.
+    assert after["slots"] == 3
+
+
 def test_a_run_queued_after_a_put_carries_the_new_budget(
     api: TestClient, settings: Settings
 ) -> None:

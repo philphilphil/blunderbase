@@ -67,7 +67,7 @@ describe('engine setup', () => {
     const user = userEvent.setup()
     const { resume } = mount()
     await user.click(screen.getByText('Quick'))
-    expect(screen.getByRole('link', { name: 'Go to engine page' })).toHaveAttribute('href', '/engines')
+    expect(screen.getByRole('link', { name: 'Go to Machines' })).toHaveAttribute('href', '/compute/machines')
     await user.click(screen.getByRole('button', { name: 'Set up browser engine' }))
     expect(resume).not.toHaveBeenCalled()
     await act(async () => ready())

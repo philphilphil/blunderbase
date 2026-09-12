@@ -63,11 +63,14 @@ export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
     inaccuracy_threshold: settings.inaccuracy_threshold,
     mistake_threshold: settings.mistake_threshold,
     blunder_threshold: settings.blunder_threshold,
-    // Correspondence mode's six. A settings form that left them out would switch the
+    // Correspondence mode's six, and the queue's cap. A settings form that left them out would switch the
     // mode off on its next save — the PUT is a replace, and an absent key is a cleared one.
     correspondence_enabled: settings.correspondence_enabled ?? null,
     correspondence_multipv: settings.correspondence_multipv ?? null,
     correspondence_slots: settings.correspondence_slots ?? null,
+    // The queue's cap lives on the Machines page beside the search slots, and is a full
+    // member of the registry like them.
+    analysis_concurrency: settings.analysis_concurrency ?? null,
     correspondence_task_nodes: settings.correspondence_task_nodes ?? null,
     correspondence_task_multipv: settings.correspondence_task_multipv ?? null,
     correspondence_stale_depth: settings.correspondence_stale_depth ?? null,

@@ -1160,7 +1160,7 @@ def coverage(session: Session, *, settings: Settings | None = None) -> dict[str,
             "quick_seconds": _tier_estimate(session, Tier.QUICK, quick_plies),
             "deep_seconds": _tier_estimate(session, Tier.DEEP, deep_plies),
             "maia_seconds": _maia_estimate(session, fill_targets),
-            "concurrency": int(resolved.analysis_concurrency),
+            "concurrency": app_settings_service.get_analysis_concurrency(session, resolved),
         },
     }
 

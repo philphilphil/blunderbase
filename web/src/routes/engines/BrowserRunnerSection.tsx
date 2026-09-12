@@ -27,7 +27,7 @@ import { MachineRow } from './MachineRow'
  * of it: the engine ships with the app, the token is minted and stored by this component,
  * and the socket is dialled from the page. Once installed it registers exactly like any
  * other runner and would otherwise show up a second time in the plain list below, which is
- * why `CapacityGrid` filters this browser's own id back out of it.
+ * why `MachinesPage` filters this browser's own id back out of it.
  *
  * Two things this component is careful about.
  *

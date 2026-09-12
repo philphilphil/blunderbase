@@ -313,7 +313,7 @@ describe('the phone drawer', () => {
 
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Games' })).toHaveAttribute('href', '/games')
-    expect(screen.getByRole('link', { name: 'Engines' })).toHaveAttribute('href', '/engines')
+    expect(screen.getByRole('link', { name: 'Compute' })).toHaveAttribute('href', '/compute')
     expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '/library')
   })
 

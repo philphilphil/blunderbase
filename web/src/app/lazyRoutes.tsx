@@ -24,6 +24,9 @@ export const DashboardPage = lazy(() =>
 export const EnginesPage = lazy(() =>
   import('@/routes/engines').then((route) => ({ default: route.EnginesPage })),
 )
+export const MachinesPage = lazy(() =>
+  import('@/routes/engines').then((route) => ({ default: route.MachinesPage })),
+)
 export const ExplorerPage = lazy(() =>
   import('@/routes/explorer').then((route) => ({ default: route.ExplorerPage })),
 )

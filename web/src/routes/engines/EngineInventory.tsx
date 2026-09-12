@@ -9,19 +9,24 @@ import type { EngineHost } from '@/lib/engines/hosts'
 import { cn } from '@/lib/utils'
 
 import { EngineDetail } from './EngineDetail'
+import { engineHashMb, engineThreads } from './capacity'
 import { KindBadge, RoleBadge } from './EngineBadges'
 import { NO_ROLES, type EngineRoles } from './roles'
 
 /**
  * The header and every row share one track list, so the columns can never be drawn two
- * widths. The five tracks are 25rem of fixed width before the name gets any, so below `md`
- * the two describing *policy and place* are dropped and the row keeps name, kind and state
- * — what it is scanned for. Neither dropped fact is only here: the assignment is the role
- * strip at the top of the same page, and the host is named again inside the detail the row
- * expands into.
+ * widths. The seven tracks are 33rem of fixed width before the name gets any, so below `md`
+ * the four describing *policy, place and cost* are dropped and the row keeps name, kind and
+ * state — what it is scanned for. None of the dropped facts is only here: the assignment
+ * is the role strip at the top of the same page, the host is named again inside the detail
+ * the row expands into, and threads and hash are in its options.
+ *
+ * Threads and hash are on the row because they are the two options every capacity question
+ * is about: what one process of this engine costs, which the Machines page multiplies by
+ * how many may run at once.
  */
 const COLUMNS =
-  'grid-cols-[minmax(0,1fr)_5rem_7rem_8rem_5rem] max-md:grid-cols-[minmax(0,1fr)_5rem_4rem]'
+  'grid-cols-[minmax(0,1fr)_5rem_7rem_8rem_4rem_5rem_5rem] max-md:grid-cols-[minmax(0,1fr)_5rem_4rem]'
 
 /**
  * Every configured engine as one operational table, with its editor expanding directly
@@ -74,6 +79,12 @@ export function EngineInventory({
         <span className="max-md:hidden">
           <Trans context="inventory column">Where</Trans>
         </span>
+        <span className="text-right max-md:hidden">
+          <Trans context="inventory column">Threads</Trans>
+        </span>
+        <span className="text-right max-md:hidden">
+          <Trans context="inventory column">Hash</Trans>
+        </span>
         <span className="text-right">
           <Trans context="inventory column">State</Trans>
         </span>
@@ -124,6 +135,8 @@ export function EngineInventory({
               <span className="truncate text-[0.6875rem] text-dim max-md:hidden">
                 {hostLabel(host, hostKnown, local, i18n)}
               </span>
+              <CostCell engine={engine} which="threads" />
+              <CostCell engine={engine} which="hash" />
               <span
                 className={cn(
                   'text-right text-[0.6875rem]',
@@ -151,6 +164,37 @@ export function EngineInventory({
         )
       })}
     </div>
+  )
+}
+
+/**
+ * What one process costs, as the row stores it. A Maia has no threads or hash to speak of,
+ * and a UCI row that sets neither runs on the engine's own defaults — one thread and a
+ * small hash — which is said as "default" rather than as a number this page made up.
+ */
+function CostCell({ engine, which }: { engine: EngineResponse; which: 'threads' | 'hash' }) {
+  const { t } = useLingui()
+  if (engine.kind !== 'uci') {
+    return <span className="text-right text-[0.6875rem] text-faint max-md:hidden">—</span>
+  }
+  const value = which === 'threads' ? engineThreads(engine) : engineHashMb(engine)
+  const set = which === 'threads' ? engine.options?.Threads !== undefined : value !== null
+  return (
+    <span
+      className={cn(
+        'text-right font-mono text-[0.6875rem] tabular max-md:hidden',
+        set ? 'text-body' : 'text-faint',
+      )}
+      title={
+        set
+          ? undefined
+          : which === 'threads'
+            ? t`Not set: the engine's own default, one thread`
+            : t`Not set: the engine's own default`
+      }
+    >
+      {set ? (which === 'hash' ? t`${value} MB` : String(value)) : t`default`}
+    </span>
   )
 }
 

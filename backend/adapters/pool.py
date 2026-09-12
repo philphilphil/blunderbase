@@ -34,7 +34,7 @@ from typing import Any, TypeVar
 
 from backend.adapters.maia import MaiaAdapter
 from backend.adapters.stockfish import StockfishAdapter
-from backend.config import Settings, get_settings
+from backend.config import Settings, default_analysis_concurrency, get_settings
 
 IDLE_SECONDS = 600.0
 REAP_INTERVAL_SECONDS = 30.0
@@ -444,13 +444,22 @@ _POOL: EnginePool | None = None
 _POOL_LOCK = threading.Lock()
 
 
-def get_pool(settings: Settings | None = None) -> EnginePool:
-    """The process-wide pool. The API lifespan owns it; workers borrow it."""
+def get_pool(settings: Settings | None = None, *, concurrency: int | None = None) -> EnginePool:
+    """The process-wide pool. The API lifespan owns it; workers borrow it.
+
+    `concurrency` is the resolved cap — the `analysis_concurrency` setting, which an adapter
+    cannot read for itself. Without it the pool takes the environment's number, else the
+    machine's cores minus two: the same answer the setting gives an install that never set it.
+    """
     global _POOL
     with _POOL_LOCK:
         if _POOL is None:
             resolved = settings or get_settings()
-            _POOL = EnginePool(concurrency=resolved.analysis_concurrency)
+            _POOL = EnginePool(
+                concurrency=concurrency
+                or resolved.analysis_concurrency
+                or default_analysis_concurrency()
+            )
         return _POOL
 
 

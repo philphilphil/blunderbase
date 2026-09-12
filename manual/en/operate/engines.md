@@ -10,22 +10,22 @@ download in every case.
 
 ## The Engines page
 
-One page, in three parts from top to bottom.
+**Compute → Engines** is what is installed, in two parts from top to bottom.
 
 *What runs what*: one row each for Quick, Deep and Human moves, naming the engine assigned
 to it and, when it cannot run, saying why in words.
 
-**Engine inventory**: every configured engine, what it does and where it runs. A row opens
-the engine's card.
-
-**Compute capacity**: this server, this browser, and every [remote runner](runners.md),
-each with the engines it advertises and its slots. Adding an engine, installing browser
-Stockfish and registering a runner all happen here.
+**Engines**: every configured engine — its kind, the machine it runs on, its `Threads`
+and `Hash`, which jobs it holds, and whether it is on. A row opens the engine's card.
+`Threads` and `Hash` are on the row because they are what one *process* of the engine
+costs; how many processes a machine runs at once is not decided here but on
+[Machines](runners.md), the page beside this one.
 
 ## Adding an engine
 
-Under **Compute capacity**, open **Add an engine** on this server's card and fill in three
-things.
+**Add an engine**, top right on the Engines page, asks for three things. A path-based
+engine is always this server's: a [remote runner](runners.md)'s engines come from its own
+yaml, and the engine in your browser is a one-press install on Machines.
 
 | Field | What goes in it |
 |---|---|
@@ -73,34 +73,28 @@ file.
 
 ## Capacity
 
-**Compute capacity**, at the bottom of the Engines page, shows every host that can take
-engine work: this server, this browser if you have installed it as a runner, and each remote
-runner with the number of slots it advertises. A slot is one engine job or one analysis
-board.
-
-On the server itself, `BLUNDERBASE_ANALYSIS_CONCURRENCY` caps how many engine processes run
-at once across all tiers. It defaults to the machine's cores minus two.
-`BLUNDERBASE_ANALYSIS_WORKERS` turns the in-process workers off entirely, for an
-installation that drains the queue from `blunderbase analyze` on its own schedule — the
-correspondence searches go with them. See [Configuration](configuration.md).
+How many engine processes a machine runs at once is a fact about the machine, and it lives
+on [Machines](runners.md#how-much-at-once): this server's **Queue processes** and **Search
+slots**, each remote runner's slots, and a budget line that adds them up against the cores
+at the `Threads` every row here asks for. This page only sets what one process costs.
 
 ## An engine for correspondence
 
 A correspondence search is not a queue job: it is one engine sitting on one position for
-hours or days, and it is counted separately. **Analysis → Correspondence → Search slots**
-says how many of those may run at once here — two by default — and they are slots of their
-own, so a search never takes the one an imported game's quick pass is waiting for. Give
-correspondence **its own engine row** rather than the one your passes use: a row with
-`Threads` set high and `Hash` set to as much memory as you can spare, and pick it in **Search
-with…** on the position. Editing the options of an engine starts a fresh process, so the
-two rows never fight over one.
+hours or days, and it is counted separately. **Search slots** on this server's card under
+[Machines](runners.md#how-much-at-once) says how many of those may run at once here — two
+by default — and they are slots of their own, so a search never takes the one an imported
+game's quick pass is waiting for. Give correspondence **its own engine row** rather than
+the one your passes use: a row with `Threads` set high and `Hash` set to as much memory as
+you can spare, and pick it in **Search with…** on the position. Editing the options of an
+engine starts a fresh process, so the two rows never fight over one.
 
-A search slot is not the same unit as `BLUNDERBASE_ANALYSIS_CONCURRENCY` above, and the two
-are added rather than shared: that variable caps the engine processes the *queue* runs
-across all tiers, **Search slots** caps the searches beside them. Two slots and a
-concurrency of six are up to eight engine processes on this machine at once, so set
-`Threads` on the correspondence row against what the queue is already using — a row that
-takes every core, twice over, is how a machine ends up thrashing.
+A search slot is not the same unit as **Queue processes** beside it, and the two are added
+rather than shared: that cap is the engine processes the *queue* runs across all tiers,
+**Search slots** caps the searches beside them. Two slots and six queue processes are up to
+eight engine processes on this machine at once, so set `Threads` on the correspondence row
+against what the queue is already using — the budget line on the server's card does the
+sum and says when the machine would thrash.
 
 Two things about memory are worth knowing before you set `Hash` to something large. A
 **paused** search keeps its process, hash and all, so that resuming it costs seconds
@@ -120,9 +114,9 @@ meant for is one CPU engine and one GPU engine, each on its own hardware.
 **Tasks are the other half of the mode, and they are ordinary queue work.** A task — a
 bounded look at one position, and what an
 [expansion](../guide/correspondence.md#tasks-and-expansion) is made of — is an
-`AnalysisRun` like any other: it takes no search slot, it counts against
-`BLUNDERBASE_ANALYSIS_CONCURRENCY` along with the quick and deep passes, and it runs on
-whichever host the queue hands it to, [remote runners](runners.md) included. So the engine
+`AnalysisRun` like any other: it takes no search slot, it counts against **Queue
+processes** along with the quick and deep passes, and it runs on whichever host the queue
+hands it to, [remote runners](runners.md) included. So the engine
 picked for a task — in **Queue task…**, **Expand…** or **Refresh subtree…** — may live on a
 runner, unlike a search engine, which has to be here, and where you have a runner that is
 where it belongs:
@@ -193,4 +187,4 @@ Every flag is in [Command line](cli.md#engines).
 ## Engines on another machine
 
 A machine with cores to spare can run engines for this installation without being a second
-installation. See [Remote runners](runners.md).
+installation. See [Machines](runners.md).

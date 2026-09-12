@@ -1,7 +1,8 @@
-import { Trans, useLingui } from '@lingui/react/macro'
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, Loader2, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +23,7 @@ import { KindBadge, RoleBadge } from './EngineBadges'
 import { HostBadge } from './HostBadge'
 import { OptionsEditor } from './OptionsEditor'
 import { SampleResult } from './SampleResult'
+import { engineHashMb, engineThreads } from './capacity'
 import { Toggle } from './Toggle'
 import { declaredOptions, draftFrom, resolveDraft, type OptionDraft } from './options'
 import { NO_ROLES, roleLabel, type EngineRoles } from './roles'
@@ -166,6 +168,10 @@ export function EngineDetail({
   const testRun = useTestRunEngine()
 
   const assignment = roleLabel(roles)
+  const threadCount = engineThreads(engine)
+  const threads = engine.options?.Threads === undefined ? t`the default, one` : String(threadCount)
+  const hashMb = engineHashMb(engine)
+  const hash = hashMb === null ? t`the default` : t`${hashMb} MB`
   const renamed = name.trim() !== engine.name
   const repathed = path.trim() !== engine.path
   // An options change can only be trusted once the probe has said what this binary
@@ -332,6 +338,23 @@ export function EngineDetail({
                 : t`A file, a command line with arguments, or a name on PATH. Saving a new path re-probes the binary.`}
           </p>
         </div>
+        {engine.kind === 'uci' && !remote ? (
+          // The two options the Machines page multiplies: said here, where the whole engine
+          // is, and edited under More settings with the rest of what the binary declares.
+          <p className="text-[0.65625rem] leading-[1.5] text-dim">
+            <Trans>
+              One process of this engine costs{' '}
+              <span className="font-medium text-soft">{threads}</span>{' '}
+              <Plural value={threadCount} one="thread" other="threads" /> and{' '}
+              <span className="font-medium text-soft">{hash}</span> of hash. Both are UCI options
+              under More settings; how many processes run at once is set on{' '}
+              <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                Machines
+              </Link>
+              .
+            </Trans>
+          </p>
+        ) : null}
       </Section>
 
       <button
@@ -543,14 +566,21 @@ export function EngineDetail({
             {inBrowser ? (
               <Trans>
                 Nothing here is editable. This row belongs to a browser tab — uninstall it under{' '}
-                <span className="font-medium text-soft">This browser</span> in Compute capacity
-                below, or revoke the runner there.
+                <span className="font-medium text-soft">This browser</span> on{' '}
+                <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                  Machines
+                </Link>
+                , or revoke the runner there.
               </Trans>
             ) : (
               <Trans>
                 Nothing here is editable. Change this engine in{' '}
                 <span className="font-mono text-soft">runner.yaml</span> on {runnerName}, or open{' '}
-                {runnerName} under Compute capacity below to revoke it.
+                {runnerName} on{' '}
+                <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                  Machines
+                </Link>{' '}
+                to revoke it.
               </Trans>
             )}
           </p>

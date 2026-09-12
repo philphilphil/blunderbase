@@ -209,6 +209,9 @@ export function useSaveAppSettings(
       void client.invalidateQueries({ queryKey: queryKeys.maia() })
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
       void client.invalidateQueries({ queryKey: queryKeys.correspondence() })
+      // `/runners/status` reports the queue's cap and whether the row has moved past it,
+      // so the Machines page says "saved N, running on M" the moment the save lands.
+      void client.invalidateQueries({ queryKey: queryKeys.runnersStatus() })
       options?.onSuccess?.(...args)
     },
   })

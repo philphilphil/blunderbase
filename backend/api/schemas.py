@@ -160,6 +160,12 @@ class AppSettings(BaseModel):
         description="how many correspondence searches this host runs at once, 1 to 16; "
         "read when the server starts, so a change takes a restart",
     )
+    analysis_concurrency: int | None = Field(
+        default=None,
+        description="engine processes the analysis queue runs on this host at once, 1 to "
+        "64; null is the machine's cores minus two. Read when the server starts, so a "
+        "change takes a restart, and ignored while BLUNDERBASE_ANALYSIS_CONCURRENCY is set",
+    )
     correspondence_task_nodes: int | None = Field(
         default=None, description="the node budget one correspondence task is queued with"
     )
@@ -216,6 +222,9 @@ class AppSettingsUpdate(Input):
     )
     correspondence_slots: int | None = Field(
         default=None, description="1 to 16 searches at once on this host"
+    )
+    analysis_concurrency: int | None = Field(
+        default=None, description="1 to 64 queue engine processes at once on this host"
     )
     correspondence_task_nodes: int | None = Field(
         default=None, description="the node budget of one task; at least 1"
@@ -2232,7 +2241,24 @@ class LocalHost(Payload):
     """`services.runners.local_row`: this machine, described as one more destination."""
 
     name: str = "local"
-    slots: int | None = Field(default=None, description="analysis_concurrency, when known")
+    slots: int | None = Field(
+        default=None,
+        description="engine processes the queue runs here at once — the cap the workers "
+        "started with, or what the setting would give a process that runs none",
+    )
+    slots_source: Literal["env", "setting", "default"] | None = Field(
+        default=None,
+        description="what decides the cap: BLUNDERBASE_ANALYSIS_CONCURRENCY, the "
+        "`analysis_concurrency` setting, or the machine's cores minus two",
+    )
+    slots_configured: int | None = Field(
+        default=None,
+        description="what the cap will be after a restart: the setting as it stands now, "
+        "which differs from `slots` once it has been changed since the workers started",
+    )
+    cores: int | None = Field(
+        default=None, description="this machine's CPU count, which threads × processes has to fit"
+    )
     busy: int = 0
     streams: int = 0
     workers: bool = Field(default=False, description="whether this process drains the queue")

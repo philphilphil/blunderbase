@@ -22,6 +22,7 @@ import {
   ImportPage,
   LibraryManagePage,
   LivePage,
+  MachinesPage,
   MaiaSettingsPage,
   McpPage,
   NotesPage,
@@ -95,7 +96,12 @@ export const router = createBrowserRouter([
       { path: 'analysis/engine', element: <EnginePassesPage /> },
       { path: 'analysis/maia', element: <MaiaSettingsPage /> },
       { path: 'analysis/correspondence', element: <CorrespondenceSettingsPage /> },
-      { path: 'engines', element: <EnginesPage /> },
+      // Compute is a heading like the two above: Engines is what is installed, Machines
+      // is where it runs and how much at once. The old `/engines` keeps working.
+      { path: 'compute', element: <Navigate to="/compute/engines" replace /> },
+      { path: 'compute/engines', element: <EnginesPage /> },
+      { path: 'compute/machines', element: <MachinesPage /> },
+      { path: 'engines', element: <Navigate to="/compute/engines" replace /> },
       // `/mcp` is the server itself, so the human-facing setup page uses `/assistant`.
       {
         path: 'assistant',

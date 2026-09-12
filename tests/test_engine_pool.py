@@ -641,10 +641,10 @@ def test_the_default_factory_picks_the_adapter_for_the_kind(tmp_path: Path) -> N
 
 
 async def test_the_process_wide_pool_is_one_pool_sized_by_the_settings(settings: Any) -> None:
-    pool = get_pool(settings)
+    pool = get_pool(settings, concurrency=3)
 
     assert get_pool(settings) is pool
-    assert pool.concurrency == settings.analysis_concurrency
+    assert pool.concurrency == 3
     await shutdown_pool()
     assert get_pool(settings) is not pool
     await shutdown_pool()

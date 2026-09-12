@@ -82,7 +82,10 @@ Die mittlere Spalte, und der Sinn des Bildschirms. Die gespielten Züge sind das
 jeder andere eingetragene Zug hängt eingerückt unter dem Zug, den er beantwortet. Spiel
 einen Zug auf dem Brett, und er kommt in den Baum: gibt es den Ast schon, gehst du hinein,
 gibt es ihn nicht, wird er angelegt. Die Pfeiltasten laufen durch den Baum – links und
-rechts an einer Linie entlang, hoch und runter durch die Alternativen.
+rechts an einer Linie entlang, hoch und runter durch die Alternativen. Fährst du mit der
+Maus über einen Zug, zeigt das Brett seine Stellung, mit den nächsten Zügen des Baums als
+Pfeile, und die Auswahl bleibt, wo sie war – so lässt sich eine Linie lesen, indem du den
+Zeiger an ihr entlangführst; ein Klick macht die Stellung zu deiner.
 
 Jeder Knoten zeigt seinen Zug, seine Bewertung und die Bewertung, die seine eigenen Äste
 zurückgeben:
@@ -201,8 +204,8 @@ Eine Engine auf einem Knoten hat eine Suche: dieselbe Engine dort noch einmal an
 solange sie eingereiht, laufend oder pausiert ist, wird abgewiesen – und eine beendete
 Partie nimmt gar keine Suche mehr an, ihr Baum ist eingefroren.
 
-Jede Suche belegt einen **Suchplatz** dieses Rechners – voreingestellt zwei, unter **Analyse
-→ Fernschach → Suchplätze**. Sind alle belegt, wird die Suche **eingereiht** und startet von
+Jede Suche belegt einen **Suchplatz** dieses Rechners – voreingestellt zwei, unter
+**Rechenleistung → Maschinen** auf der Karte dieses Servers. Sind alle belegt, wird die Suche **eingereiht** und startet von
 selbst, sobald einer frei wird. Suchen haben eigene Plätze: eine, die drei Tage läuft, nimmt
 also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet.
 

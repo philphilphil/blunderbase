@@ -5,7 +5,7 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are twenty-three of them, in six groups, plus two rows that are not settings at all
+There are twenty-four of them, in seven groups, plus two rows that are not settings at all
 (`queue_paused` and `tour_seen`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
@@ -56,6 +56,18 @@ something written into it.
 There is deliberately no engine setting for the mode: every enabled UCI engine is offered
 wherever an engine is chosen, and the deep role's engine is the one preselected.
 
+**How many engine processes the queue runs at once** — `analysis_concurrency`, the cap the
+analysis workers and the analysis boards on this host share, and the twin of
+`correspondence_slots`: the two are added, not shared, and together they are the engine
+processes this machine may have going. It used to be an environment variable only; it is a
+setting now because it is the number an owner reasons about against the cores, on the same
+page as the search slots and beside every engine row's `Threads`. The variable
+`BLUNDERBASE_ANALYSIS_CONCURRENCY` survives as an override for a deployment that pins the
+cap from outside — when it is set the row is ignored and the page says so — and
+`get_analysis_concurrency` is the one place the override, the row and the cores-minus-two
+default are put in order. Like the search slots it sizes a pool, so it is read once when
+the workers start and a change takes a restart.
+
 **The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
 engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
 They are identities, not numbers with a range, so they are outside `SETTINGS` and outside
@@ -99,11 +111,19 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Literal
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING
+from backend.config import (
+    MAIA_MAX_RATING,
+    MAIA_MIN_RATING,
+    MIN_ANALYSIS_CONCURRENCY,
+    Settings,
+    default_analysis_concurrency,
+    get_settings,
+)
 from backend.db.enums import EngineRole, Tier
 from backend.db.models import AppSetting
 
@@ -136,6 +156,10 @@ CORRESPONDENCE_MULTIPV = "correspondence_multipv"
 # search, because it sizes an engine pool — changing it takes a restart, and the manual
 # says so.
 CORRESPONDENCE_SLOTS = "correspondence_slots"
+# Engine processes the analysis queue may run on this host at once. The twin of the slot
+# count above, read the same way — once, when the workers start — and overridden by the
+# environment variable of the same name; see the module docstring.
+ANALYSIS_CONCURRENCY = "analysis_concurrency"
 # What one correspondence *task* costs and how many lines it keeps. A task is the bounded
 # half of the mode — an `AnalysisRun` over one node's position, queued into the ordinary
 # analysis queue — so these two are the task's budget in exactly the sense `quick_nodes`
@@ -209,6 +233,10 @@ CORRESPONDENCE_MULTIPV_DEFAULT = 3
 # correspondence setup. A one-slot install can still run one, and a machine with cores to
 # spare can say so.
 CORRESPONDENCE_SLOTS_DEFAULT = 2
+# The machine's cores minus two, which is what the environment variable defaulted to for as
+# long as it was the only way to set this. Worked out once at import: it is a fact about
+# the machine the process runs on, not about a request.
+ANALYSIS_CONCURRENCY_DEFAULT = default_analysis_concurrency()
 # Forty million nodes is a minute or two of a modern Stockfish on a few cores: long enough
 # that the verdict is worth keeping in the tree, short enough that an expansion of a dozen
 # positions finishes while the owner is still looking at the board. Two orders of magnitude
@@ -241,6 +269,9 @@ MAX_CORRESPONDENCE_MULTIPV = 5
 # searches on one machine is already more processes than any owner's cores.
 MIN_CORRESPONDENCE_SLOTS = 1
 MAX_CORRESPONDENCE_SLOTS = 16
+# One process is the least a queue can drain with; sixty-four is more engine processes
+# than any single machine this runs on has cores for, so a bigger number is a typo.
+MAX_ANALYSIS_CONCURRENCY = 64
 # A verdict is stale below this depth. One is "nothing is ever stale by depth"; a hundred
 # is deeper than any engine reaches on a position somebody is waiting for, which is
 # "everything is always stale" — both are states an owner may want, and neither is a number
@@ -353,6 +384,13 @@ SETTINGS: tuple[Setting, ...] = (
         default=CORRESPONDENCE_SLOTS_DEFAULT,
         low=MIN_CORRESPONDENCE_SLOTS,
         high=MAX_CORRESPONDENCE_SLOTS,
+        whole=True,
+    ),
+    Setting(
+        key=ANALYSIS_CONCURRENCY,
+        default=ANALYSIS_CONCURRENCY_DEFAULT,
+        low=MIN_ANALYSIS_CONCURRENCY,
+        high=MAX_ANALYSIS_CONCURRENCY,
         whole=True,
     ),
     Setting(
@@ -676,6 +714,35 @@ def get_correspondence_slots(session: Session) -> int:
     """
     value = stored(session, CORRESPONDENCE_SLOTS)
     return CORRESPONDENCE_SLOTS_DEFAULT if value is None else int(value)
+
+
+ConcurrencySource = Literal["env", "setting", "default"]
+
+
+def analysis_concurrency_source(
+    session: Session, settings: Settings | None = None
+) -> ConcurrencySource:
+    """Which of the three decides the cap: the environment variable, the stored row, or
+    neither. The page shows the field read-only under `env`, because a save there would
+    change nothing."""
+    resolved = settings or get_settings()
+    if resolved.analysis_concurrency is not None:
+        return "env"
+    return "default" if stored(session, ANALYSIS_CONCURRENCY) is None else "setting"
+
+
+def get_analysis_concurrency(session: Session, settings: Settings | None = None) -> int:
+    """How many engine processes the analysis queue runs on this host at once.
+
+    The environment variable wins when it is set, then the stored row, then the machine's
+    cores minus two. Read once, when the workers start, for the reason the search slots
+    are: it sizes a pool and a semaphore, and a change takes effect on the next restart.
+    """
+    resolved = settings or get_settings()
+    if resolved.analysis_concurrency is not None:
+        return max(MIN_ANALYSIS_CONCURRENCY, int(resolved.analysis_concurrency))
+    value = stored(session, ANALYSIS_CONCURRENCY)
+    return ANALYSIS_CONCURRENCY_DEFAULT if value is None else int(value)
 
 
 def get_correspondence_task_nodes(session: Session) -> int:

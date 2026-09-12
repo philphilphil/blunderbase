@@ -1,4 +1,51 @@
-# Remote runners
+# Machines
+
+**Compute → Machines** is where engines run, how much runs at once, and what is running
+now: one card per host. [Engines](engines.md) is what is installed; this page is what it
+runs on.
+
+## The Machines page
+
+**This server** comes first and is always open: its cores, the two numbers that say how
+much it runs at once, the budget those add up to, and the engines whose binary is here
+with what each is doing. Then **this browser**, which becomes a machine the moment you
+install the engine that ships with the app, and each **remote runner** with its slots and
+the engines it advertised. A slot is one engine job or one analysis board.
+
+**Add a remote runner** and **How remote runners work** are at the top of the page.
+
+## How much at once
+
+Two caps, on this server's card, and they are **added, not shared**.
+
+| Setting | |
+|---|---|
+| **Queue processes** | Engine processes the analysis queue may run here at once — quick and deep passes, and correspondence tasks. 1 to 64; empty is the machine's cores minus two |
+| **Search slots** | Correspondence searches that may run here at once, beside the queue. 1 to 16, two by default — one CPU engine and one GPU engine is the ordinary pair. Each search holds its process from start to pause, so a search that runs for days never takes a slot an imported game's quick pass is waiting for. The box is there only while [correspondence mode](../guide/analysis.md#correspondence) is on; the slots exist for nothing else |
+
+Both are read when the server starts, because each sizes a pool of engine processes:
+**change them and restart**. Until then the card says which number is in force and which
+is saved. If `BLUNDERBASE_ANALYSIS_CONCURRENCY` is set in the environment it pins the queue
+cap from outside; the field is then read-only and says so. `BLUNDERBASE_ANALYSIS_WORKERS`
+turns the in-process workers off entirely, for an installation that drains the queue from
+`blunderbase analyze` on its own schedule — the correspondence searches go with them. See
+[Configuration](configuration.md).
+
+Under the two boxes, the **budget line** does the arithmetic. A process costs its engine's
+`Threads`, so what has to fit the cores is `queue processes × threads + search slots ×
+threads`; the card takes the threads from the rows on Engines — the engines holding Quick
+and Deep price the queue, the heaviest search engine here prices the searches — and says
+in words when both caps at full load would exceed the machine. Six queue processes of a
+two-thread Stockfish and two search slots of a four-thread one are twenty threads; on eight
+cores that thrashes, and the line says so. Lower a cap, or give a row fewer threads on
+Engines. Threads are per engine; how many processes is per machine. Searches count only
+while [correspondence mode](../guide/analysis.md#correspondence) is on.
+
+A remote runner's slots are set when it is registered and can be changed on its card
+(**Rename or resize**); the machine's threads are in its own `runner.yaml`, so the budget
+line is this server's only.
+
+## Remote runners
 
 A **runner** is a second Blunderbase process on a machine with cores to spare. It has no
 database and serves no page. It dials *out* to your server, says which engines it has, and
@@ -31,8 +78,8 @@ engines:
       Threads: 8
 ```
 
-**Add a remote runner** under **Compute capacity** on the Engines page does the same thing
-and answers with the same yaml. Either way the token is handed over once and never again: only its SHA-256 is stored.
+**Remote runner** at the top of the Machines page does the same thing and answers with the
+same yaml. Either way the token is handed over once and never again: only its SHA-256 is stored.
 A lost token is a revoke and a new runner, which costs nothing.
 
 `--server` overrides the URL written into the yaml. Without it the command uses
@@ -189,8 +236,8 @@ working perfectly. Watch the log lines instead.
 
 - `blunderbase runners list` — one line per runner: connected or not, its slots, its
   advertised engines, and how much of the backlog only it can do.
-- **Compute capacity** on the Engines page — this host and every runner, each with the
-  engines it advertises. That is where a runner-bound engine's machine is named.
+- The Machines page — this host and every runner, each with the engines it advertises.
+  Engines names the machine on every row too.
 - The analysis queue, split by destination. A queue that is not moving because the machine
   with that engine is offline looks exactly like a long queue until you look here.
 - An MCP client has a read-only `runners_status` tool, which is the same picture. Minting and
@@ -216,7 +263,7 @@ working perfectly. Watch the log lines instead.
 $ blunderbase runners revoke gpu-box
 ```
 
-**Revoke** on the runner's card under **Compute capacity** does the same. Either way the
+**Revoke** on the runner's card on the Machines page does the same. Either way the
 token stops working and the engines it
 advertised are deleted.
 

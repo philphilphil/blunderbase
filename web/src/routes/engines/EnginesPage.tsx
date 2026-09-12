@@ -1,6 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Cpu } from 'lucide-react'
+import { Cpu, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
@@ -12,20 +13,27 @@ import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
 import { DemoEngines } from './DemoEngines'
 
-import { CapacityGrid } from './CapacityGrid'
+import { AddEngineForm } from './AddEngineForm'
 import { EngineInventory } from './EngineInventory'
 import { RolesForm } from './RolesForm'
 import { engineRoles } from './roles'
 
 /**
- * Engines as one ranked screen: assignments, engine inventory, then capacity.
- * Policy comes first because a role that cannot run is the actionable failure; the flat
- * inventory makes kind, role and host comparable; host setup is last because it changes
- * where work can run rather than what the deployment has chosen to run.
+ * **Compute → Engines**: what is installed, how each engine is set up, and which job it does.
  *
- * One detail key spans engine editors, host details and creation forms. The old one-page
- * version was a mess because four equally loud sections and a permanent editor could all
- * remain expanded; here the summaries stay visible and every new detail replaces the old.
+ * Two sections, ranked. Policy comes first because a role that cannot run is the actionable
+ * failure; the flat inventory under it makes kind, machine, threads, hash and state
+ * comparable in one table, with the editor under the row it belongs to. Nothing about
+ * capacity: how many processes a machine runs at once is a fact about the machine, and it
+ * lives on the Machines page beside every other host — the split that stopped this screen
+ * from being three equally loud sections and a wall of cards.
+ *
+ * Adding an engine happens here rather than on a machine's card. A path-based engine is
+ * always this server's — a runner's engines come from its own yaml and a browser's from
+ * the one-press install on Machines — so the form has nothing to ask about *where*.
+ *
+ * One detail key spans the engine editors and the add form: the summaries stay visible and
+ * every new detail replaces the old.
  */
 export function EnginesPage() {
   const { t } = useLingui()
@@ -42,16 +50,39 @@ export function EnginesPage() {
 
   if (capabilities.read_only) return <DemoEngines />
 
+  const adding = openDetail === 'add-engine'
+
   return (
     <PageBody>
-      <SetPageChrome breadcrumb={[{ label: t`Engines` }]} manual="operate/engines" />
+      <SetPageChrome
+        breadcrumb={[{ label: t`Compute`, to: '/compute' }, { label: t`Engines` }]}
+        manual="operate/engines"
+      />
       <PageHeader
         className="max-w-5xl"
         title={t`Engines`}
-        description={t`Assign each job, compare every configured engine, and see all compute capacity in one place.`}
+        description={t`What is installed, how each engine is set up, and which job it does.`}
+        actions={
+          <Button
+            type="button"
+            size="sm"
+            aria-expanded={adding}
+            onClick={() => setOpenDetail(adding ? null : 'add-engine')}
+          >
+            <Plus aria-hidden />
+            <Trans>Add an engine</Trans>
+          </Button>
+        }
       />
 
       <div className="flex max-w-5xl flex-col gap-5">
+        {adding ? (
+          <AddEngineForm
+            onCancel={() => setOpenDetail(null)}
+            onAdded={(engine) => setOpenDetail(`engine:${engine.id}`)}
+          />
+        ) : null}
+
         <RolesForm
           roles={roles.data}
           engines={list}
@@ -64,10 +95,10 @@ export function EnginesPage() {
           <div className="flex items-center gap-2">
             <div>
               <h2 className="text-xs font-semibold text-ink">
-                <Trans>Engine inventory</Trans>
+                <Trans>Engines</Trans>
               </h2>
               <p className="mt-1 text-[0.6875rem] text-dim">
-                <Trans>Every configured engine, what it does and where it runs.</Trans>
+                <Trans>Every configured engine, where it runs, and what it costs per process.</Trans>
               </p>
             </div>
           </div>
@@ -104,11 +135,15 @@ export function EnginesPage() {
               <p className="max-w-md text-[0.71875rem] leading-[1.5] text-dim">
                 {capabilities.remote_runners ? (
                   <Trans>
-                    Add a path-based engine below, install browser Stockfish, or connect a remote
-                    runner.
+                    Add a path-based engine above, or install browser Stockfish and connect
+                    remote runners on{' '}
+                    <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                      Machines
+                    </Link>
+                    .
                   </Trans>
                 ) : (
-                  <Trans>Add a path-based engine on this computer below.</Trans>
+                  <Trans>Add a path-based engine on this computer above.</Trans>
                 )}
               </p>
             </div>
@@ -123,18 +158,18 @@ export function EnginesPage() {
               localLabel={capabilities.remote_runners ? t`This server` : t`This computer`}
             />
           )}
-        </section>
 
-        <CapacityGrid
-          remoteRunnersEnabled={capabilities.remote_runners}
-          status={status.data}
-          isLoading={status.isPending}
-          error={status.error}
-          onRetry={() => void status.refetch()}
-          openDetail={openDetail}
-          onOpenDetail={setOpenDetail}
-          onEngineAdded={(engine) => setOpenDetail(`engine:${engine.id}`)}
-        />
+          <p className="text-[0.6875rem] leading-[1.6] text-dim">
+            <Trans>
+              Threads and hash belong to one process of one engine. How many processes a machine
+              runs at once — queue processes, correspondence search slots — is set per machine on{' '}
+              <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
+                Machines
+              </Link>
+              .
+            </Trans>
+          </p>
+        </section>
       </div>
     </PageBody>
   )

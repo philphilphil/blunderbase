@@ -866,7 +866,7 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
     await user.keyboard(key)
     expect(await screen.findByRole('dialog')).toHaveTextContent('No engine is set up')
-    expect(screen.getByRole('link', { name: 'Go to engine page' })).toHaveAttribute('href', '/engines')
+    expect(screen.getByRole('link', { name: 'Go to Machines' })).toHaveAttribute('href', '/compute/machines')
     expect(screen.getByRole('button', { name: 'Set up browser engine' })).toBeInTheDocument()
     expect(toast.error).not.toHaveBeenCalled()
   })

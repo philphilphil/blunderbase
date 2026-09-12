@@ -24,6 +24,7 @@ from backend.db.enums import RunStatus
 from backend.db.session import get_sessionmaker
 from backend.runners import protocol
 from backend.runners.config import WS_PATH, WS_SUBPROTOCOL, RunnerConfig
+from backend.services import app_settings
 from backend.services import runners as runners_service
 from tests.conftest import running_app, socket_headers
 from tests.fake_runner import WASM_AD, FakeRunner, connect
@@ -185,7 +186,8 @@ def test_status_puts_this_host_beside_the_runners(api: TestClient, settings: Set
     assert [row["name"] for row in payload["runners"]] == ["gpu-box"]
     assert payload["runners"][0]["busy"] == 1
     assert payload["local"]["name"] == "local"
-    assert payload["local"]["slots"] == settings.analysis_concurrency
+    assert payload["local"]["slots"] == app_settings.ANALYSIS_CONCURRENCY_DEFAULT
+    assert payload["local"]["slots_source"] == "default"
     assert payload["local"]["workers"] is False, "this app was started without them"
     assert payload["local"]["queued"] == 0
     assert payload["queue"] == {"queued": 0, "running": 1}
@@ -433,7 +435,7 @@ def test_the_queue_says_where_the_backlog_will_be_worked(
         "runner_id": None,
         "name": "local",
         "connected": True,
-        "slots": settings.analysis_concurrency,
+        "slots": app_settings.ANALYSIS_CONCURRENCY_DEFAULT,
         "queued": 1,
         "running": 0,
         "streams": 0,

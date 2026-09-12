@@ -6,98 +6,32 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import type {
-  EngineResponse,
-  EngineRoleName,
-  EngineRolesResponse,
-  EngineRoleStatus,
-  RunnerEngine,
-  RunnerResponse,
-  RunnersStatus,
-} from '@/lib/api/types'
-
+import type { EngineResponse } from '@/lib/api/types'
 import { hostByEngineId } from '@/lib/engines/hosts'
 import { RuntimeCapabilitiesProvider } from '@/lib/runtime/RuntimeCapabilitiesProvider'
 
 import { EngineDetail } from './EngineDetail'
 import { EnginesPage } from './EnginesPage'
+import {
+  FakeSocket,
+  MAIA,
+  PROBE,
+  ROLES,
+  SF_REMOTE,
+  STOCKFISH,
+  memoryStorage,
+  release,
+  remoteEngine,
+  requestedPaths,
+  resetRelease,
+  role,
+  roles,
+  runner,
+  runnersStatus,
+  stubFetch,
+} from './engines.fixtures'
 
-/** jsdom in this setup exposes no `localStorage`, so the tests bring their own (see
- *  `games/savedFilters.test.ts`). */
-function memoryStorage(): Storage {
-  const map = new Map<string, string>()
-  return {
-    get length() {
-      return map.size
-    },
-    key: (index: number) => [...map.keys()][index] ?? null,
-    getItem: (key: string) => map.get(key) ?? null,
-    setItem: (key: string, value: string) => void map.set(key, String(value)),
-    removeItem: (key: string) => void map.delete(key),
-    clear: () => map.clear(),
-  }
-}
-
-class FakeSocket {
-  onopen: (() => void) | null = null
-  onmessage: ((event: MessageEvent<string>) => void) | null = null
-  onerror: (() => void) | null = null
-  onclose: (() => void) | null = null
-  readonly url: string
-  constructor(url: string) {
-    this.url = url
-  }
-  close() {}
-}
-
-type Route = unknown | { status: number; body: unknown }
-
-/**
- * Releases the routes a case asked to defer. Two reads answering in the same tick is what
- * hides a race between them, so a case that is about one can hold the other open.
- */
-let release: () => void = () => {}
-
-/**
- * Returns the mock so a case can assert on what was *not* asked for.
- *
- * A route may be keyed by path, or by `"<METHOD> <path>"` when a case needs the write to
- * answer differently from the read — `/engines/roles` is both a read and a write, and a
- * refused assignment is only a refusal of the PUT.
- */
-function stubFetch(routes: Record<string, Route>, defer: string[] = []) {
-  const held = new Promise<void>((resolve) => {
-    release = () => resolve()
-  })
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const path = String(input).split('?')[0]!
-    if (defer.includes(path)) await held
-    const route = routes[`${(init?.method ?? 'GET').toUpperCase()} ${path}`] ?? routes[path]
-    if (route === undefined) {
-      return new Response(JSON.stringify({ error: 'not_found', detail: path }), {
-        status: 404,
-        headers: { 'content-type': 'application/json' },
-      })
-    }
-    const shaped =
-      route !== null && typeof route === 'object' && 'status' in route
-        ? (route as { status: number; body: unknown })
-        : { status: 200, body: route }
-    return new Response(JSON.stringify(shaped.body), {
-      status: shaped.status,
-      headers: { 'content-type': 'application/json' },
-    })
-  })
-  vi.stubGlobal('fetch', fetchMock)
-  return fetchMock
-}
-
-function requestedPaths(fetchMock: ReturnType<typeof stubFetch>): string[] {
-  return fetchMock.mock.calls.map(([input]) => String(input).split('?')[0]!)
-}
-
-/** `at` is the URL the page starts on — the tab lives in a search param. */
-function renderPage(ui: ReactNode, at = '/engines') {
+function renderPage(ui: ReactNode, at = '/compute/engines') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
@@ -116,145 +50,8 @@ async function openMoreSettings(name: string) {
   await userEvent.click(screen.getByRole('button', { name: /More settings/ }))
 }
 
-/** The Machines half: runners, this browser, tokens. */
-const MACHINES = '/engines?tab=machines'
-
-const STOCKFISH: EngineResponse = {
-  id: 1,
-  name: 'stockfish',
-  kind: 'uci',
-  path: '/opt/homebrew/bin/stockfish',
-  version: 'Stockfish 18',
-  options: {},
-  enabled: true,
-  created_at: '2026-08-26T00:50:11Z',
-}
-
-const MAIA: EngineResponse = {
-  id: 2,
-  name: 'maia3',
-  kind: 'maia',
-  path: '/models/maia-1500.pb.gz',
-  version: 'lc0 maia-1500',
-  options: {},
-  enabled: true,
-  created_at: '2026-08-26T00:51:00Z',
-}
-
-/** One role status, defaulted to the shape of a role nobody has assigned anything to. */
-function role(
-  over: Partial<EngineRoleStatus> & { role: EngineRoleName },
-): EngineRoleStatus {
-  return {
-    engine_id: null,
-    engine_name: null,
-    available: false,
-    configured: false,
-    reason: `no engine is assigned to ${over.role === 'human' ? 'human moves' : `the ${over.role} tier`}`,
-    ...over,
-  }
-}
-
-/** Quick on `stockfish`, Deep on an engine that is away, and no human-move model at all. */
-function roles(...over: EngineRoleStatus[]): EngineRolesResponse {
-  const base = new Map<EngineRoleName, EngineRoleStatus>([
-    [
-      'quick',
-      role({
-        role: 'quick',
-        engine_id: 1,
-        engine_name: 'stockfish',
-        available: true,
-        configured: true,
-        reason: null,
-      }),
-    ],
-    [
-      'deep',
-      role({
-        role: 'deep',
-        engine_id: 7,
-        engine_name: 'sf-remote',
-        configured: true,
-        reason: "'sf-remote' runs on 'gpu-box', which is not connected",
-      }),
-    ],
-    ['human', role({ role: 'human' })],
-  ])
-  for (const status of over) base.set(status.role, status)
-  return { roles: [...base.values()] }
-}
-
-const ROLES = roles()
-
-function remoteEngine(over: Partial<RunnerEngine> & { id: number; name: string }): RunnerEngine {
-  return {
-    kind: 'uci',
-    version: 'Stockfish 17',
-    path: '/usr/games/stockfish',
-    enabled: true,
-    streams: true,
-    ...over,
-  }
-}
-
-function runner(over: Partial<RunnerResponse> & { id: number; name: string }): RunnerResponse {
-  return {
-    slots: 4,
-    version: '0.1.0',
-    connected: true,
-    transport: 'websocket',
-    last_seen_at: '2026-08-26T10:00:00Z',
-    created_at: '2026-08-26T09:00:00Z',
-    busy: 2,
-    streams: 0,
-    free_slots: 2,
-    queued_eligible: 78,
-    engines: [],
-    ...over,
-  }
-}
-
-function runnersStatus(runners: RunnerResponse[] = []): RunnersStatus {
-  return {
-    runners,
-    local: {
-      name: 'local',
-      slots: 6,
-      busy: 0,
-      streams: 0,
-      workers: true,
-      queued: 0,
-      running: 0,
-      engines: [remoteEngine({ id: 1, name: 'stockfish', path: STOCKFISH.path })],
-    },
-    queue: { queued: 0, running: 0 },
-  }
-}
-
-/** The one advertised by `gpu-box`; its id is what joins it to `/engines`. */
-const SF_REMOTE: EngineResponse = {
-  id: 7,
-  name: 'sf-remote',
-  kind: 'uci',
-  path: '/usr/games/stockfish',
-  version: 'Stockfish 17',
-  options: {},
-  enabled: true,
-  created_at: '2026-08-26T09:30:00Z',
-}
-
-const PROBE = {
-  name: 'Stockfish 18',
-  author: 'the Stockfish developers (see AUTHORS file)',
-  options: [
-    { name: 'Threads', type: 'spin', default: 1, min: 1, max: 1024, var: [], managed: false },
-    { name: 'MultiPV', type: 'spin', default: 1, min: 1, max: 256, var: [], managed: true },
-  ],
-}
-
 beforeEach(() => {
-  release = () => {}
+  resetRelease()
   vi.stubGlobal('localStorage', memoryStorage())
   vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket)
 })
@@ -570,23 +367,8 @@ describe('EnginesPage', () => {
   })
 })
 
-describe('EnginesPage — runners', () => {
-  it('shows server and browser capacity when no remote runner is registered', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus(),
-    })
-    renderPage(<EnginesPage />, MACHINES)
-
-    expect(await screen.findByText(/No remote runners are registered/)).toBeInTheDocument()
-    expect(screen.getAllByText('This server').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('This browser').length).toBeGreaterThan(0)
-    expect(screen.queryByText('queue only')).not.toBeInTheDocument()
-  })
-
-  it('labels every engine with where it runs on the same page as capacity', async () => {
+describe('EnginesPage — engines on other machines', () => {
+  it('labels every engine with the machine it runs on', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH, SF_REMOTE],
       '/api/engines/roles': ROLES,
@@ -597,67 +379,13 @@ describe('EnginesPage — runners', () => {
     })
     renderPage(<EnginesPage />)
 
-    expect((await screen.findAllByText('gpu-box')).length).toBeGreaterThan(1)
+    expect((await screen.findAllByText('gpu-box')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('This server').length).toBeGreaterThan(0)
-    expect(screen.getByText('Compute capacity')).toBeInTheDocument()
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    // Capacity is the other page's; this one only points there.
+    expect(screen.queryByText('Compute capacity')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Machines' }).length).toBeGreaterThan(0)
   })
 
-  it('names the machine an engine is advertised by, and what its slots are doing', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH, SF_REMOTE],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus([
-        runner({
-          id: 3,
-          name: 'gpu-box',
-          engines: [
-            remoteEngine({ id: 7, name: 'sf-remote' }),
-            remoteEngine({ id: 8, name: 'maia-remote', kind: 'maia', streams: false }),
-          ],
-        }),
-      ]),
-    })
-    renderPage(<EnginesPage />, MACHINES)
-
-    expect((await screen.findAllByText('gpu-box')).length).toBeGreaterThan(1)
-    // The status caption and the slot count are on the row itself, unopened.
-    expect(screen.getByText('connected · websocket')).toBeInTheDocument()
-    expect(screen.getByText('2/4')).toBeInTheDocument()
-    // Its advertised engines are the detail — opening the row is what reveals them.
-    await userEvent.click(screen.getByRole('button', { name: /expand gpu-box/i }))
-    expect(screen.getAllByText('sf-remote').length).toBeGreaterThan(1)
-    expect(screen.getByText('maia-remote')).toBeInTheDocument()
-    // A Maia never drives a board, whatever its host's transport is.
-    expect(screen.getAllByText('queue only')).toHaveLength(1)
-  })
-
-  it('marks a polling runner queue only in both inventories', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH, SF_REMOTE],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus([
-        runner({
-          id: 3,
-          name: 'gpu-box',
-          transport: 'poll',
-          engines: [remoteEngine({ id: 7, name: 'sf-remote' })],
-        }),
-      ]),
-    })
-    renderPage(<EnginesPage />, MACHINES)
-
-    expect(
-      await screen.findByText('connected · polling — queue only'),
-    ).toBeInTheDocument()
-    // The flat engine inventory says it before any detail is opened.
-    expect(screen.getAllByText(/queue only/i).length).toBeGreaterThanOrEqual(2)
-    // The advertised-engine detail repeats the transport limitation in its own context.
-    await userEvent.click(screen.getByRole('button', { name: /expand gpu-box/i }))
-    expect(screen.getAllByText(/queue only/i).length).toBeGreaterThanOrEqual(3)
-  })
 
   it('shows a runner-bound engine as read-only, and never probes its remote path', async () => {
     const fetchMock = stubFetch({
@@ -681,6 +409,7 @@ describe('EnginesPage — runners', () => {
     await waitFor(() => expect(requestedPaths(fetchMock)).toContain('/api/runners/status'))
     expect(requestedPaths(fetchMock)).not.toContain('/api/engines/probe')
   })
+
 
   it('probes nothing while it is still unknown which machine an engine is on', async () => {
     // `/engines` is the lighter read and answers first; until `/runners/status` joins the
@@ -712,106 +441,6 @@ describe('EnginesPage — runners', () => {
     expect(requestedPaths(fetchMock)).not.toContain('/api/engines/probe')
   })
 
-  it('does not claim a runner that is away is taking queue work', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH, SF_REMOTE],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus([
-        runner({
-          id: 3,
-          name: 'gpu-box',
-          connected: false,
-          transport: null,
-          engines: [remoteEngine({ id: 7, name: 'sf-remote' })],
-        }),
-      ]),
-    })
-    renderPage(<EnginesPage />, MACHINES)
-
-    expect(await screen.findByText('not connected')).toBeInTheDocument()
-    // A machine that is away drains nothing; the grey dot beside its name is the whole
-    // story, and "queue only" would be a claim about a link that is not there.
-    expect(screen.queryByText('queue only')).not.toBeInTheDocument()
-  })
-
-  it('says why a revoke was refused instead of leaving the click unanswered', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus([runner({ id: 3, name: 'gpu-box' })]),
-      '/api/runners/3': {
-        status: 409,
-        body: { error: 'runner_busy', detail: 'gpu-box is running two analysis boards' },
-      },
-    })
-    renderPage(<EnginesPage />, MACHINES)
-
-    await userEvent.click(await screen.findByRole('button', { name: /expand gpu-box/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
-    // The confirmation row is where the second click lands, so it is where the refusal has
-    // to be readable — the row otherwise looks exactly as it did before the click.
-    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
-    expect(
-      await screen.findByText('gpu-box is running two analysis boards'),
-    ).toBeInTheDocument()
-  })
-
-  it('sends only what a rename actually changed', async () => {
-    const fetchMock = stubFetch({
-      '/api/engines': [STOCKFISH],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus([runner({ id: 3, name: 'gpu-box' })]),
-      '/api/runners/3': runner({ id: 3, name: 'gpu-two' }),
-    })
-    renderPage(<EnginesPage />, MACHINES)
-
-    await userEvent.click(await screen.findByRole('button', { name: /expand gpu-box/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Edit gpu-box' }))
-    const field = screen.getByLabelText<HTMLInputElement>('Name of gpu-box')
-    await userEvent.clear(field)
-    await userEvent.type(field, 'gpu-two')
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(requestedPaths(fetchMock)).toContain('/api/runners/3'))
-    const patch = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/api/runners/3'))!
-    expect(patch[1]?.method).toBe('PATCH')
-    // The slot count was left alone, so it is not in the body at all.
-    expect(JSON.parse(String(patch[1]?.body))).toEqual({ name: 'gpu-two' })
-  })
-
-  it('shows the token and the yaml once, then lets them go', async () => {
-    stubFetch({
-      '/api/engines': [STOCKFISH],
-      '/api/engines/roles': ROLES,
-      '/api/engines/probe': PROBE,
-      '/api/runners/status': runnersStatus(),
-      '/api/runners': {
-        status: 201,
-        body: {
-          runner: runner({ id: 3, name: 'gpu-box', connected: false, transport: null }),
-          token: 'bb_rnr_kY3secret',
-          config_yaml: 'server: "https://blunderbase.example.com"\ntoken: "bb_rnr_kY3secret"\n',
-        },
-      },
-    })
-    renderPage(<EnginesPage />, MACHINES)
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Remote runner' }))
-    await userEvent.type(screen.getByPlaceholderText('gpu-box'), 'gpu-box')
-    await userEvent.click(screen.getByRole('button', { name: 'Register remote runner' }))
-
-    expect(await screen.findByText('gpu-box is registered')).toBeInTheDocument()
-    expect(screen.getByText('bb_rnr_kY3secret')).toBeInTheDocument()
-    expect(
-      screen.getByText(/Shown once. Nothing stores it, so nothing can show it again/),
-    ).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(screen.queryByText('bb_rnr_kY3secret')).not.toBeInTheDocument())
-  })
 })
 
 describe('EnginesPage — delete engine', () => {
@@ -868,7 +497,7 @@ describe('EnginesPage — delete engine', () => {
     renderPage(<EnginesPage />)
 
     await openEngine('sf-remote')
-    expect(await screen.findByText(/open gpu-box under Compute capacity below/)).toBeInTheDocument()
+    expect(await screen.findByText(/open gpu-box on/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
   })
 
@@ -973,18 +602,19 @@ describe('EnginesPage — one page', () => {
     '/api/runners/status': runnersStatus(),
   }
 
-  it('shows assignments, inventory and capacity together without tabs', async () => {
+  it('shows assignments and the inventory, and sends capacity to Machines', async () => {
     stubFetch(routes)
     renderPage(<EnginesPage />)
-
     expect(await screen.findByText('What runs what')).toBeInTheDocument()
-    expect(screen.getByText('Engine inventory')).toBeInTheDocument()
-    expect(screen.getByText('Compute capacity')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Remote runner' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add an engine' })).toBeInTheDocument()
+    // Nothing about machines lives here any more: no capacity section, no runner button.
+    expect(screen.queryByText('Compute capacity')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remote runner' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Machines' }).length).toBeGreaterThan(0)
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
-  it('keeps only this computer when remote runners are unavailable', async () => {
+  it('calls this machine a computer when remote runners are unavailable', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH],
       '/api/engines/roles': ROLES,
@@ -997,35 +627,33 @@ describe('EnginesPage — one page', () => {
         <EnginesPage />
       </RuntimeCapabilitiesProvider>,
     )
-
-    expect(
-      await screen.findByText('The engines and analysis capacity on this computer.'),
-    ).toBeInTheDocument()
     expect((await screen.findAllByText('This computer')).length).toBeGreaterThan(0)
-    expect(screen.queryByRole('button', { name: /remote runner/i })).not.toBeInTheDocument()
-    expect(screen.queryByText('This browser')).not.toBeInTheDocument()
+    expect(screen.queryByText('This server')).not.toBeInTheDocument()
   })
 
-  it('explains remote runners before registration', async () => {
+  it('keeps only one of the add form and an engine editor open', async () => {
     stubFetch(routes)
     renderPage(<EnginesPage />)
-
-    await userEvent.click(await screen.findByRole('button', { name: 'How remote runners work' }))
-    expect(screen.getByText(/connects outward to this Blunderbase deployment/)).toBeInTheDocument()
-    expect(screen.getByText(/token shown once and a paste-ready/)).toBeInTheDocument()
-    expect(screen.getByText(/documentation is ready/)).toBeInTheDocument()
-  })
-
-  it('keeps only one engine or capacity detail open', async () => {
-    stubFetch(routes)
-    renderPage(<EnginesPage />)
-
     await openEngine('stockfish')
     expect(await screen.findByLabelText('Path')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Add an engine' }))
+    expect(await screen.findByRole('button', { name: 'Add engine' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Name')).toBeInTheDocument()
+    expect(screen.queryByText('Engine settings')).not.toBeInTheDocument()
+  })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Expand this server' }))
-    expect(await screen.findByText(/queued and .* running here/)).toBeInTheDocument()
-    expect(screen.queryByLabelText('Path')).not.toBeInTheDocument()
+  it('prints what one process costs on the row, and says when it is the engine default', async () => {
+    stubFetch({
+      ...routes,
+      '/api/engines': [{ ...STOCKFISH, options: { Threads: 4, Hash: 8192 } }, MAIA],
+    })
+    renderPage(<EnginesPage />)
+    await screen.findByRole('button', { name: 'Edit stockfish' })
+    const row = screen.getByRole('button', { name: 'Edit stockfish' })
+    expect(row).toHaveTextContent('4')
+    expect(row).toHaveTextContent('8192 MB')
+    // A Maia has neither, and a UCI row that sets nothing runs on the engine's own.
+    expect(screen.getByRole('button', { name: 'Edit maia3' })).toHaveTextContent('—')
   })
 })
 

@@ -66,8 +66,12 @@ class Settings(BaseSettings):
     cross_origin_isolation: bool = True
 
     # Engine processes running at once, shared across tiers. Workers are asyncio tasks in
-    # the API process, so this caps CPU rather than connections.
-    analysis_concurrency: int = Field(default_factory=default_analysis_concurrency, ge=1)
+    # the API process, so this caps CPU rather than connections. None means the variable
+    # is not set, and the number in force is the `analysis_concurrency` app setting (or
+    # `default_analysis_concurrency()` when nobody set that either) — this is the override
+    # a Docker or CI deployment pins the cap with. `services.app_settings.
+    # get_analysis_concurrency` is the one place the three are resolved.
+    analysis_concurrency: int | None = Field(default=None, ge=1)
     # Whether the API process drives engines itself: the analysis workers and, beside them,
     # the correspondence searches. Off is for a deployment that drives the queue from
     # `blunderbase analyze` on another schedule.

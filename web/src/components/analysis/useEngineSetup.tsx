@@ -99,7 +99,7 @@ export function useEngineSetup() {
           {!support.supported ? <p className="mt-3 text-sm text-blunder">{support.reason}</p> : null}
           {failure ? <p role="alert" className="mt-3 text-sm text-blunder">{failure}</p> : null}
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button asChild variant="outline"><Link to="/engines" onClick={close}><Trans>Go to engine page</Trans></Link></Button>
+            <Button asChild variant="outline"><Link to="/compute/machines" onClick={close}><Trans>Go to Machines</Trans></Link></Button>
             <Button disabled={busy || !support.supported} onClick={() => void install()}>
               {busy ? <Trans>Setting up Stockfish…</Trans> : <Trans>Set up browser engine</Trans>}
             </Button>

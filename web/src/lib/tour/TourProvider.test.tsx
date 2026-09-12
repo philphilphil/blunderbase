@@ -84,7 +84,7 @@ function draw({ demo = false, mcp = true, notes = ['notes'] }: Options = {}) {
             <div data-tour="account-menu" />
             <Routes>
               <Route path="/library/import" element={<Screen anchors={['sources']} />} />
-              <Route path="/engines" element={<Screen anchors={['engines']} />} />
+              <Route path="/compute/engines" element={<Screen anchors={['engines']} />} />
               <Route path="/notes" element={<Screen anchors={notes} />} />
               <Route path="/assistant" element={<Screen anchors={['assistant']} />} />
               <Route path="/games/:id" element={<Screen anchors={['board-settings']} />} />

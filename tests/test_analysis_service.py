@@ -2606,7 +2606,7 @@ def test_the_estimate_is_none_until_there_is_history_worth_averaging(session: Se
         "quick_seconds": None,
         "deep_seconds": None,
         "maia_seconds": None,
-        "concurrency": analysis.get_settings().analysis_concurrency,
+        "concurrency": app_settings.get_analysis_concurrency(session),
     }
 
 

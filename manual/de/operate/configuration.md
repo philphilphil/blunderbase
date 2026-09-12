@@ -46,7 +46,7 @@ nicht ab dem nächsten Neustart. Siehe [Analyse](../guide/analysis.md) und
 
 | Variable | Standard | Wirkung |
 |---|---|---|
-| `BLUNDERBASE_ANALYSIS_CONCURRENCY` | Die Kerne der Maschine minus zwei, nie unter 1 | Engine-Prozesse gleichzeitig, über alle Stufen hinweg. Das begrenzt die CPU, nicht die Verbindungen |
+| `BLUNDERBASE_ANALYSIS_CONCURRENCY` | nicht gesetzt | Legt die **Warteschlangenprozesse** – Engine-Prozesse gleichzeitig, über alle Stufen hinweg – von außen fest. Nicht gesetzt, gilt die Einstellung unter [Maschinen](runners.md#how-much-at-once), voreingestellt die Kerne der Maschine minus zwei. Gesetzt, ist das Feld dort nur lesbar. Das begrenzt die CPU, nicht die Verbindungen |
 | `BLUNDERBASE_ANALYSIS_WORKERS` | `true` | Ob dieser Prozess die Analyse-Worker selbst betreibt. Schalt es aus für eine Installation, die die Warteschlange mit `blunderbase analyze` nach einem eigenen Zeitplan abarbeitet, und für die schreibgeschützte Demo |
 | `BLUNDERBASE_ANALYSIS_POLL_SECONDS` | `1.0` | Wie lange ein untätiger Worker wartet, bevor er wieder in die Warteschlange schaut |
 | `BLUNDERBASE_AUTO_SYNC_POLL_SECONDS` | `60.0` | Wie oft der geplante Import auf die Uhr schaut. Das Intervall selbst ist eine Einstellung in der App, voreingestellt aus; hier steht also nur, wie spät eine Synchronisierung höchstens dran sein kann |
