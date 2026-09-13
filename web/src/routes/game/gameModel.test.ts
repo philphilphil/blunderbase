@@ -10,6 +10,8 @@ import {
   engineLines,
   evalAtCursor,
   evalCurve,
+  flaggedSide,
+  formatRemaining,
   formatResult,
   formatSeconds,
   formatVariation,
@@ -31,6 +33,7 @@ import {
   scoreAfter,
   scoreBefore,
   sideOf,
+  thinkHeight,
   whiteWinAfter,
 } from './gameModel'
 
@@ -576,16 +579,20 @@ describe('moveTimes', () => {
     expect(points.map((p) => p.seconds)).toEqual([5, 0])
   })
 
-  it('carries the move, its verdict and what was left', () => {
-    const [, , , blunder] = moveTimes(clocked, game)
+  it('carries the move, its verdict, and the clock as it read when the move was played', () => {
+    const [first, , , blunder] = moveTimes(clocked, game)
     expect(blunder).toMatchObject({
       ply: 3,
       san: 'Nc6',
       classification: 'blunder',
+      // The move table's number for the same move.
       remaining: 150,
+      timed: true,
     })
     // An unflagged class is not a mark.
     expect(moveTimes(clocked, game)[2]?.classification).toBeNull()
+    // The first move of each side is played before the clock starts: not a think.
+    expect(first).toMatchObject({ ply: 0, timed: false })
   })
 
   it('skips a ply without a reading rather than drawing it as zero', () => {
@@ -637,29 +644,83 @@ describe('moveTimeSummary', () => {
     { initial_clock: 180, increment: 2 },
   )
 
-  it('averages one side, names its longest think and what it had left', () => {
+  it('averages one side’s timed moves, names its longest think and what it had left', () => {
+    // The untimed first move is not averaged in: a zero that was never a think would
+    // drag every short game's average down.
     expect(moveTimeSummary(points, 'white')).toEqual({
-      average: (0 + 12 + 31) / 3,
+      average: (12 + 31) / 2,
       longest: { seconds: 31, ply: 4 },
       remaining: 141,
     })
     expect(moveTimeSummary(points, 'black')).toEqual({
-      average: 16,
+      average: 32,
       longest: { seconds: 32, ply: 3 },
       remaining: 150,
     })
   })
 
-  it('is null for a side that made no timed move', () => {
+  it('has no average and no longest for a side whose only move was the untimed first', () => {
+    expect(moveTimeSummary(points.slice(0, 2), 'white')).toMatchObject({
+      average: null,
+      longest: null,
+    })
+  })
+
+  it('is null for a side that made no move', () => {
     expect(moveTimeSummary([], 'white')).toBeNull()
+  })
+
+  it('leaves a flagged side with nothing, not its last reading', () => {
+    expect(moveTimeSummary(points, 'black', 'black')?.remaining).toBe(0)
+    expect(moveTimeSummary(points, 'white', 'black')?.remaining).toBe(141)
   })
 })
 
-describe('formatSeconds', () => {
-  it('reads as a clock: seconds, then minutes, then hours', () => {
+describe('flaggedSide', () => {
+  it('reads the loser off the result, in every source’s spelling', () => {
+    expect(flaggedSide({ termination: 'outoftime', result: '1-0' })).toBe('black')
+    expect(flaggedSide({ termination: 'Time forfeit', result: '0-1' })).toBe('white')
+    expect(flaggedSide({ termination: 'phib won on time', result: '1-0' })).toBe('black')
+    expect(flaggedSide({ termination: 'White forfeits on time', result: '0-1' })).toBe('white')
+  })
+
+  it('is nobody for any other ending, or a draw on the clock', () => {
+    expect(flaggedSide({ termination: 'Normal', result: '1-0' })).toBeNull()
+    expect(flaggedSide({ termination: null, result: '0-1' })).toBeNull()
+    expect(flaggedSide({ termination: 'outoftime', result: '1/2-1/2' })).toBeNull()
+  })
+})
+
+describe('thinkHeight', () => {
+  it('is zero at zero, grows fast for short thinks and slowly for long ones, and caps', () => {
+    expect(thinkHeight(0)).toBe(0)
+    const two = thinkHeight(2)
+    const ten = thinkHeight(10)
+    const sixty = thinkHeight(60)
+    const cap = thinkHeight(120)
+    expect(two).toBeGreaterThan(0)
+    // A second between 2s and 10s buys more height than a second between 60s and 120s.
+    expect((ten - two) / 8).toBeGreaterThan((cap - sixty) / 60)
+    // Past two minutes every think is drawn at the cap.
+    expect(thinkHeight(600)).toBe(cap)
+    // Lichess's curve in centiseconds, at 120 s: ln(0.005·12000 + 3)² − ln(3)².
+    expect(cap).toBeCloseTo(Math.log(63) ** 2 - Math.log(3) ** 2, 10)
+  })
+})
+
+describe('formatSeconds / formatRemaining', () => {
+  it('reads a think as seconds, then minutes, then hours, floored like the clock', () => {
     expect(formatSeconds(0)).toBe('0s')
-    expect(formatSeconds(12.6)).toBe('13s')
+    expect(formatSeconds(12.6)).toBe('12s')
     expect(formatSeconds(84)).toBe('1:24')
     expect(formatSeconds(3723)).toBe('1:02:03')
+  })
+
+  it('reads a clock the way the move table does', () => {
+    expect(formatRemaining(19.6)).toBe('0:19')
+    expect(formatRemaining(139)).toBe('2:19')
+    expect(formatRemaining(3723)).toBe('1:02:03')
+    expect(formatRemaining(-1)).toBe('')
+    expect(formatRemaining(null)).toBe('')
   })
 })

@@ -1630,11 +1630,14 @@ def test_performance_by_hour_buckets_in_the_callers_timezone(library: Library) -
 def test_time_trouble_loss(analysed: Library) -> None:
     payload = stats.get_stats(analysed.session, "time_trouble_loss")
     keyed = {bucket["key"]: bucket for bucket in payload["buckets"]}
-    assert keyed["<10s"]["moves"] == 1
-    assert keyed["<10s"]["blunder"] == 1
-    assert keyed["<10s"]["avg_win_loss"] == 42.0
-    assert keyed[">=60s"]["moves"] == 4
-    assert keyed[">=60s"]["blunder"] == 1
+    # A move is bucketed by what the clock read when it was played — the `%clk` beside it,
+    # the number the game screen's move table prints — so the owner's 4. Ba4 (0:05) and
+    # 5. O-O (0:03) are the two under ten seconds, not only the move after them.
+    assert keyed["<10s"]["moves"] == 2
+    assert keyed["<10s"]["blunder"] == 2
+    assert keyed["<10s"]["avg_win_loss"] == 36.0
+    assert keyed[">=60s"]["moves"] == 3
+    assert keyed[">=60s"]["blunder"] == 0
     # The long game carries no clock times at all, so its moves are honestly unknown.
     assert keyed["unknown"]["moves"] == 5
     assert payload["thresholds"] == [10.0, 30.0, 60.0]
@@ -1643,8 +1646,8 @@ def test_time_trouble_loss(analysed: Library) -> None:
 def test_time_trouble_thresholds_are_the_callers(analysed: Library) -> None:
     payload = stats.get_stats(analysed.session, "time_trouble_loss", thresholds=[150])
     keyed = {bucket["key"]: bucket for bucket in payload["buckets"]}
-    assert keyed["<150s"]["moves"] == 2
-    assert keyed[">=150s"]["moves"] == 3
+    assert keyed["<150s"]["moves"] == 3
+    assert keyed[">=150s"]["moves"] == 2
 
 
 def test_rating_trend(analysed: Library) -> None:

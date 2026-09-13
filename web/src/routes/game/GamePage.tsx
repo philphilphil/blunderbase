@@ -62,6 +62,7 @@ import {
   engineLines,
   evalAtCursor,
   evalCurve,
+  flaggedSide,
   formatGameDate,
   formatVariation,
   gameAnalysisSummary,
@@ -1766,7 +1767,11 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // The clock's reading of the same game, for the pane's second tab. `moves` rather
       // than the curve: a think is a fact about the move whether or not a run has looked
       // at it, and a game with clocks but no analysis still has something to draw here.
-      time={{ points: times, increment: detail?.game.increment ?? 0 }}
+      time={{
+        points: times,
+        increment: detail?.game.increment ?? 0,
+        flagged: detail ? flaggedSide(detail.game) : null,
+      }}
       // The header tallies name both players rather than saying You/Opp.: the curve is
       // about the game, and half of it is the opponent's.
       playerNames={{ white: detail?.game.white, black: detail?.game.black }}

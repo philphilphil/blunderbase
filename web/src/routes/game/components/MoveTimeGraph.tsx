@@ -7,16 +7,16 @@ import { Area, AreaChart, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { SideDot } from '@/components/badges/SideDot'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
 import type { Color } from '@/lib/api/types'
-import { GLYPHS, glyphFor } from '@/lib/chess/classification'
 import type { EvalGraphMarks } from '@/lib/ui/evalGraphPrefs'
 import { scaleMargin } from '@/lib/ui/scale'
-import { cn } from '@/lib/utils'
 
 import {
+  formatRemaining,
   formatSeconds,
   moveTimeSummary,
   plyLabel,
   sideOf,
+  thinkHeight,
   type MoveTimePoint,
   type MoveTimeSummary,
 } from '../gameModel'
@@ -25,10 +25,9 @@ import { PlotBars, PlotMarks, type PlotPoint } from './graphParts'
 const AXIS = 0
 const CONFIG: ChartConfig = { value: { label: <Trans>Move time</Trans>, color: 'var(--bb-text-2)' } }
 
-/** A move's think as the plot draws it: White's seconds up, Black's down. */
+/** A move's think as the plot draws it: White's seconds up, Black's down, on the log scale. */
 interface TimeSeriesPoint extends PlotPoint {
   seconds: number
-  remaining: number
 }
 
 /**
@@ -68,13 +67,15 @@ export function MoveTimePlot({
 }) {
   const series = useMemo<TimeSeriesPoint[]>(
     () =>
-      points.map((point) => ({
-        ply: point.ply,
-        value: sideOf(point.ply) === 'white' ? point.seconds : -point.seconds,
-        seconds: point.seconds,
-        remaining: point.remaining,
-        classification: point.classification,
-      })),
+      points.map((point) => {
+        const height = thinkHeight(point.seconds)
+        return {
+          ply: point.ply,
+          value: sideOf(point.ply) === 'white' ? height : -height,
+          seconds: point.seconds,
+          classification: point.classification,
+        }
+      }),
     [points],
   )
   // The same x scale as the eval curve, starting-position point included, so the cursor
@@ -83,10 +84,14 @@ export function MoveTimePlot({
     () => [-1, Math.max(points[points.length - 1]?.ply ?? 0, plyCount - 1)],
     [points, plyCount],
   )
+  // Symmetric about the axis at the longest think either side took, on the same scale
+  // the columns are drawn on — so a game where one side thought and the other blitzed
+  // shows as one tall half and one flat half, which is the point.
   const reach = useMemo(
-    () => Math.max(1, increment * 2, ...points.map((point) => point.seconds)),
+    () => thinkHeight(Math.max(1, increment * 2, ...points.map((point) => point.seconds))),
     [increment, points],
   )
+  const tick = thinkHeight(increment)
 
   return (
     <>
@@ -125,11 +130,11 @@ export function MoveTimePlot({
           <XAxis dataKey="ply" type="number" domain={domain} hide />
           <YAxis type="number" domain={[-reach, reach]} hide />
 
-          {increment > 0 && increment < reach ? (
-            <ReferenceLine y={increment} stroke="var(--bb-graph-grid)" strokeWidth={1} />
+          {increment > 0 && tick < reach ? (
+            <ReferenceLine y={tick} stroke="var(--bb-graph-grid)" strokeWidth={1} />
           ) : null}
-          {increment > 0 && increment < reach ? (
-            <ReferenceLine y={-increment} stroke="var(--bb-graph-grid)" strokeWidth={1} />
+          {increment > 0 && tick < reach ? (
+            <ReferenceLine y={-tick} stroke="var(--bb-graph-grid)" strokeWidth={1} />
           ) : null}
           <PlotBars points={series} axis={AXIS} domain={domain} testId="move-time-bars" />
           <ReferenceLine y={AXIS} stroke="var(--bb-graph-axis)" strokeWidth={1} />
@@ -162,29 +167,18 @@ export function MoveTimePlot({
 }
 
 /**
- * What the pointer is over: which move, how long it took, and what was left on the clock
- * after it. One line, like the eval readout beside it — but the move number only, not the
- * move: this plot is about the clock, the move itself is in the table beside it, and a
- * verdict glyph on the number is all the readout needs to say a mark is here.
+ * What the pointer is over: which move, and how long it took. Nothing else — not the
+ * move, not its verdict, not the clock: the move and its clock are in the table beside
+ * the plot, the mark is already on the column under the pointer, and a readout that
+ * repeated them would be a second table an inch from the first.
  */
 function TimeReadout({ payload }: { payload?: { payload?: TimeSeriesPoint }[] }) {
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
-  const mark = glyphFor(point.classification)
-  const glyph = mark ? GLYPHS[mark] : null
-  const remaining = formatSeconds(point.remaining)
   return (
     <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-[0.65625rem] whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
-      <span className={cn('font-mono tabular', glyph ? glyph.textClass : 'text-dim')}>
-        {plyLabel(point.ply)}
-        {glyph ? <span className="ml-[0.125rem] font-bold opacity-75">{glyph.glyph}</span> : null}
-      </span>{' '}
-      <span className="font-mono tabular text-body-3">{formatSeconds(point.seconds)}</span>{' '}
-      <span className="font-mono tabular text-dim">
-        <Trans comment="Time left on the clock after a move, in a one-line readout">
-          {remaining} left
-        </Trans>
-      </span>
+      <span className="font-mono tabular text-dim">{plyLabel(point.ply)}</span>{' '}
+      <span className="font-mono tabular text-body-3">{formatSeconds(point.seconds)}</span>
     </div>
   )
 }
@@ -211,10 +205,13 @@ function tallyName(side: Color, ownerSide: Color | null): MessageDescriptor {
  */
 export function TimeTallies({
   points,
+  flagged,
   ownerSide,
   playerNames,
 }: {
   points: MoveTimePoint[]
+  /** The side that lost on the clock, whose "left" is nothing rather than its last reading. */
+  flagged: Color | null
   ownerSide: Color | null
   playerNames?: Partial<Record<Color, string | null>>
 }) {
@@ -229,7 +226,7 @@ export function TimeTallies({
           key={side}
           side={side}
           name={playerNames?.[side] || i18n._(tallyName(side, ownerSide))}
-          summary={moveTimeSummary(points, side)}
+          summary={moveTimeSummary(points, side, flagged)}
         />
       ))}
     </div>
@@ -246,11 +243,11 @@ function TimeTally({
   summary: MoveTimeSummary | null
 }) {
   const { t } = useLingui()
-  const average = summary ? formatSeconds(summary.average) : '—'
+  const average = summary?.average != null ? formatSeconds(summary.average) : '—'
   const longest = summary?.longest ? formatSeconds(summary.longest.seconds) : '—'
-  const remaining = summary?.remaining !== null && summary?.remaining !== undefined
-    ? formatSeconds(summary.remaining)
-    : '—'
+  // A clock reading, in the clock's own format — `2:45`, never `165s` — because the move
+  // table prints the same reading beside the last move.
+  const remaining = summary?.remaining != null ? formatRemaining(summary.remaining) : '—'
   const longestAt = summary?.longest ? plyLabel(summary.longest.ply) : null
   return (
     <div

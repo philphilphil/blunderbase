@@ -504,8 +504,10 @@ describe('GamePage', () => {
     expect(screen.getByTestId('move-time-plot')).toBeInTheDocument()
     expect(screen.queryByTestId('player-summaries')).not.toBeInTheDocument()
     const [white, black] = within(screen.getByTestId('time-summaries')).getAllByRole('group')
-    expect(white).toHaveAccessibleName('phib: 9s per move, longest 12s, 2:45 left')
-    expect(black).toHaveAccessibleName('lichess AI level 2: 16s per move, longest 20s, 2:30 left')
+    // The first move of each side is untimed and left out of the average; the clock
+    // readings are in the move table's format.
+    expect(white).toHaveAccessibleName('phib: 12s per move, longest 12s, 2:45 left')
+    expect(black).toHaveAccessibleName('lichess AI level 2: 12s per move, longest 12s, 2:30 left')
     // "only mine" is the pane's, not the tab's: it stays put across the switch.
     expect(screen.getByRole('checkbox', { name: 'only mine' })).toBeChecked()
 

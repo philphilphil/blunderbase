@@ -25,11 +25,15 @@ its marks are board settings.
 
 Where the game was played with a clock, the graph pane has a second tab, **Move time**:
 one column per move, White's up and Black's down, as tall as the think that went into it,
-with the same blunder and mistake marks as the evaluation. A faint line on each side marks
-the increment, so a column under it is a move that gained time. Beside the plot each
-player's average think, longest think and time left at the end take the place of the
-accuracy tallies; pointing at a column reads the move number, the think and what was left
-on the clock after it. Clicking seeks, as on the evaluation.
+with the same blunder and mistake marks as the evaluation. The scale is compressed, so a
+short move and a long one differ in height while a single very long think does not
+flatten the rest; thinks over two minutes are drawn as two minutes. A faint line on each
+side marks the increment, so a column under it is a move that gained time. Beside the
+plot each player's average think, longest think and time left at the end take the place
+of the accuracy tallies — a player who lost on time is left with `0:00` — and pointing at
+a column reads the move number and the think; the move and its clock are in the move
+table beside it. The first move of each side is played before the clock starts and is
+not counted. Clicking seeks, as on the evaluation.
 
 ## Engine lines and the preview
 

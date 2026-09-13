@@ -2232,7 +2232,7 @@ msgid "End of this line"
 msgstr "End of this line"
 
 #. Breadcrumb crumb for the position the line is replayed from.
-#. Stands in for a move at the starting position
+#. Stands in for a move number at the starting position
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
 #: src/routes/explorer/components/LineBreadcrumb.tsx
 #: src/routes/game/components/EvalGraph.tsx
@@ -5425,11 +5425,6 @@ msgstr "Best was"
 #: src/routes/game/components/MoveList.tsx
 msgid "(<0>{winLoss}</0> win)"
 msgstr "(<0>{winLoss}</0> win)"
-
-#. Time left on the clock after a move, in a one-line readout
-#: src/routes/game/components/MoveTimeGraph.tsx
-msgid "{remaining} left"
-msgstr "{remaining} left"
 
 #: src/routes/game/components/MoveTimeGraph.tsx
 msgid "{name}: {average} per move, longest {longest}, {remaining} left"

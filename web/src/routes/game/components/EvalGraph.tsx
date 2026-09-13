@@ -7,9 +7,8 @@ import { Area, AreaChart, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { SideDot } from '@/components/badges/SideDot'
 import type { Color } from '@/lib/api/types'
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart'
-import { GLYPHS, glyphFor } from '@/lib/chess/classification'
+import { GLYPHS } from '@/lib/chess/classification'
 import { formatScore } from '@/lib/chess/evaluation'
-import { useNotation } from '@/lib/chess/notationPrefs'
 import { useWheelStep } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 import { useEvalGraphPrefs } from '@/lib/ui/evalGraphPrefs'
@@ -125,7 +124,7 @@ export function EvalGraph({
    * The clock's reading of the same game (`moveTimes`), or nothing for a game played
    * without one. Empty points are the same as nothing: the tab is not offered.
    */
-  time?: { points: MoveTimePoint[]; increment: number } | null
+  time?: { points: MoveTimePoint[]; increment: number; flagged: Color | null } | null
   /** The ply last played; `-1` for the starting position. */
   cursor: number
   /** The side the owner played; `null` for a game no account claims a side of. */
@@ -224,7 +223,12 @@ export function EvalGraph({
         )}
       >
       {onTime && time ? (
-        <TimeTallies points={time.points} ownerSide={ownerSide} playerNames={playerNames} />
+        <TimeTallies
+          points={time.points}
+          flagged={time.flagged}
+          ownerSide={ownerSide}
+          playerNames={playerNames}
+        />
       ) : analysisSummary ? (
         <PlayerTallies
           summary={analysisSummary}
@@ -430,28 +434,25 @@ const TALLY_A11Y: readonly TallyField[] = ['blunder', 'mistake', 'inaccuracy']
 const TALLY_LAYOUT: readonly TallyField[] = ['blunder', 'inaccuracy', 'mistake']
 
 /**
- * What the pointer is over: the move, and what the engine made of the position after it.
+ * What the pointer is over: which move, and what the engine made of the position after it.
  *
  * Only ever one line — this is a readout, not a panel. The curve already says roughly where
- * the game stood; the number is the thing a pointer is asking for, and the move label is what
- * makes it findable in the table beside it. Synthesised axis crossings carry no move and are
- * skipped rather than drawn as an empty box.
+ * the game stood; the number is the thing a pointer is asking for, and the move number is
+ * what makes it findable in the table beside it, which is where the move itself and its
+ * verdict are read — the mark is already on the plot under the pointer. Synthesised axis
+ * crossings carry no move and are skipped rather than drawn as an empty box.
  */
 function CurveReadout({ payload }: { payload?: { payload?: SeriesPoint }[] }) {
-  const { t } = useLingui()
-  const notate = useNotation()
   const point = payload?.[0]?.payload
   if (!point || !Number.isInteger(point.ply)) return null
-  const mark = glyphFor(point.classification)
-  const glyph = mark ? GLYPHS[mark] : null
   return (
     <div className="pointer-events-none rounded-md border border-edge-strong bg-elevated px-2 py-1 text-[0.65625rem] whitespace-nowrap shadow-[0_0.25rem_0.75rem_var(--bb-shadow)]">
-      <span className="font-mono tabular text-dim">{plyLabel(point.ply)}</span>{' '}
-      <span className={cn('font-mono', glyph ? glyph.textClass : 'text-ink')}>
-        {point.san
-          ? notate(point.san)
-          : t({ message: 'start', comment: 'Stands in for a move at the starting position' })}
-        {glyph ? <span className="ml-[0.125rem] font-bold opacity-75">{glyph.glyph}</span> : null}
+      <span className="font-mono tabular text-dim">
+        {point.ply < 0 ? (
+          <Trans comment="Stands in for a move number at the starting position">start</Trans>
+        ) : (
+          plyLabel(point.ply)
+        )}
       </span>{' '}
       <span className="font-mono tabular text-body-3">{formatScore(point.score)}</span>
     </div>

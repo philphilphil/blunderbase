@@ -501,9 +501,9 @@ describe('MoveList', () => {
   })
 
   describe('the clock column', () => {
-    // `clock` on a move is the reading *after* it; what the column shows is the mover's own
-    // previous reading, `ply - 2` — the same convention `services/stats.py` counts time
-    // trouble by. White starts on 3:00 and burns it; Black barely moves.
+    // `clock` on a move is the reading when it was played — the `%clk` Lichess prints beside
+    // the move — and the column shows it as it is, the same reading `services/stats.py`
+    // counts time trouble by. White starts on 3:00 and burns it; Black barely moves.
     const clocked = () => [
       move(0, 'e4', { clock: 178 }),
       move(1, 'c5', { clock: 179 }),
@@ -518,20 +518,20 @@ describe('MoveList', () => {
     const clocks = () =>
       screen.getAllByTestId('move-clock').map((cell) => cell.textContent)
 
-    it('shows what the mover had left before playing, not after', () => {
+    it('shows the clock as it read when the move was played', () => {
       renderList(clocked())
-      // Move 1 has no earlier reading of its own (the row does not carry the initial time),
-      // move 2 shows ply 0's 2:58 / ply 1's 2:59, move 3 shows ply 2's 2:19 / ply 3's 2:55.
-      expect(clocks()).toEqual(['', '', '2:58', '2:59', '2:19', '2:55', '0:19', '2:50'])
+      // Every move has its own reading, the first ones included: the number beside 3. d4
+      // is the 0:19 the site showed when it was played.
+      expect(clocks()).toEqual(['2:58', '2:59', '2:19', '2:55', '0:19', '2:50', '0:08', '2:46'])
     })
 
     it('colours a reading under twenty seconds in the mistake token', () => {
       renderList(clocked())
       const cells = screen.getAllByTestId('move-clock')
-      // 0:19 is White's fourth move; the 2:50 beside it is not in trouble.
-      expect(cells[6]).toHaveTextContent('0:19')
-      expect(cells[6]!.className).toContain('text-mistake')
-      expect(cells[7]!.className).toContain('text-faint')
+      // 0:19 is White's third move; the 2:50 beside it is not in trouble.
+      expect(cells[4]).toHaveTextContent('0:19')
+      expect(cells[4]!.className).toContain('text-mistake')
+      expect(cells[5]!.className).toContain('text-faint')
     })
 
     it('draws no column at all for a game played without clocks', () => {
@@ -539,13 +539,13 @@ describe('MoveList', () => {
       expect(screen.queryAllByTestId('move-clock')).toHaveLength(0)
     })
 
-    it('keeps a reading whose own move is folded away behind the opening', () => {
-      // The reading shown against move 11 belongs to move 10, which the fold has taken off
-      // screen — it is read off every pair, not the ones left after filtering.
+    it('reads each row off every pair, folded opening included', () => {
+      // The readings are keyed off every pair, not the ones left after the fold has taken
+      // the opening off screen, so the first visible row still finds its own.
       const moves = longGame().map((row, index) => ({ ...row, clock: 300 - index * 5 }))
       renderList(moves, { collapsedThrough: 10 })
-      // Move 11's white cell: ply 20, so ply 18's reading — 300 - 18 * 5 = 210s = 3:30.
-      expect(clocks()[0]).toBe('3:30')
+      // Move 11's white cell is ply 20: 300 - 20 * 5 = 200s = 3:20.
+      expect(clocks()[0]).toBe('3:20')
     })
   })
 

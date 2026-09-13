@@ -1371,18 +1371,20 @@ def _clock_index(session: Session, scope: GameFilters) -> dict[int, tuple[Any, i
 
 
 def _remaining_clock(entry: tuple[Any, int | None] | None, ply: int) -> float | None:
-    """What the mover had left before playing `ply`: their own previous reading."""
+    """What the clock read when `ply` was played: the source's own reading after the move.
+
+    The reading Lichess and chess.com print beside the move, and the one the game screen's
+    move table prints — a blunder "under 20 seconds" here is a blunder whose row shows under
+    20 seconds there. It used to be the mover's previous reading, the time they had when
+    they sat down to choose the move; that read as a different number from every other
+    clock a player sees, so the whole app now agrees on the one the PGN carries.
+    """
     if entry is None:
         return None
-    clocks, initial = entry
-    if not clocks:
+    clocks, _initial = entry
+    if not clocks or ply < 0 or ply >= len(clocks):
         return None
-    previous = ply - 2
-    if previous < 0:
-        return float(initial) if initial is not None else None
-    if previous >= len(clocks):
-        return None
-    value = clocks[previous]
+    value = clocks[ply]
     return float(value) if value is not None else None
 
 

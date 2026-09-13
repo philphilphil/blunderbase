@@ -9,7 +9,7 @@ import { formatScore, formatWinLoss, type Score } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
-import { plyLabel, type MovePair } from '../gameModel'
+import { formatRemaining, plyLabel, type MovePair } from '../gameModel'
 
 /**
  * The inline note design 1a puts under a flagged move: what it cost and what was better.
@@ -140,10 +140,11 @@ export interface MoveListProps {
  * one order, oldest first: a line keeps its place when the board walks back into it, and
  * only the styling and the lit move move.
  *
- * A clock column follows each move where the game was played with one, quiet and mono, and
- * turns `--bb-mistake` under twenty seconds: in a 3+2 blitz game time trouble is what
- * explains the late blunders, and putting the two in the same row lets that correlation be
- * read straight off the table instead of captioned under it.
+ * A clock column follows each move where the game was played with one — the clock as it
+ * read when the move was played, the way Lichess and chess.com print it — quiet and mono,
+ * and turning `--bb-mistake` under twenty seconds: in a 3+2 blitz game time trouble is
+ * what explains the late blunders, and putting the two in the same row lets that
+ * correlation be read straight off the table instead of captioned under it.
  *
  * The design's tab row is `Moves / Variations / Book`, with `PGN` pinned right. `PGN` is
  * here; the other two are not, and are not a matter of layout. A game carries one line —
@@ -202,7 +203,7 @@ export function MoveList({
   // Built off every pair, not the filtered ones: a reading belongs to the move two plies
   // after the one that produced it, and the fold or the `Flagged` tab may well have taken
   // that earlier move off screen.
-  const clocks = useMemo(() => clocksBeforeMove(pairs), [pairs])
+  const clocks = useMemo(() => clocksAtMove(pairs), [pairs])
 
   // Every line on screen, in the order it was handed over — which is the order they were
   // walked. A line's place is its age and nothing else: walking back into one lights it and
@@ -377,37 +378,30 @@ export function MoveList({
 }
 
 /**
- * What each mover had left on their clock *before* they played, keyed by the ply that
- * shows it — or null where this game was played without one.
+ * What the clock read when each move was played, keyed by ply — or null where this game
+ * was played without one.
  *
- * The payload's `MoveRow.clock` is the reading *after* that ply, but the number worth
- * putting beside a move is what its mover had when they sat down to choose it: their own
- * previous reading, two plies back. `backend/services/stats.py:_remaining_clock` builds
- * the app's whole time-trouble statistic on exactly that `ply - 2`, so matching it here is
- * what keeps a `0:19` in this table and a `<20s` blunder on the Stats page meaning the
- * same thing.
+ * The payload's `MoveRow.clock` is the source's own reading after that ply, the `%clk`
+ * Lichess and chess.com print beside the move, and it is shown as it is. It used to be
+ * shifted two plies — what the mover had when they sat down to choose the move — which
+ * answered a better question and matched nothing anyone had seen: a reader who knew the
+ * game from Lichess read 10:00 here where they remembered 9:48, and the move-time plot's
+ * 26-second bar beside a 10:00 looked like an error. `backend/services/stats.py`'s
+ * `_remaining_clock` reads the same ply, so a `0:19` in this table and a `<20s` blunder
+ * on the Stats page are still the same number.
  *
- * Plies 0 and 1 have no previous reading of their own — `_remaining_clock` falls back to
- * the game's initial time there, which a move row does not carry — so they stay blank.
  * Null for a game with no readings at all: an empty column of dashes down the table would
  * cost the two move cells their width and say nothing.
  */
-function clocksBeforeMove(pairs: MovePair[]): Map<number, number> | null {
-  const before = new Map<number, number>()
+function clocksAtMove(pairs: MovePair[]): Map<number, number> | null {
+  const at = new Map<number, number>()
   for (const pair of pairs) {
     for (const move of [pair.white, pair.black]) {
       if (move?.clock === null || move?.clock === undefined) continue
-      before.set(move.ply + 2, move.clock)
+      at.set(move.ply, move.clock)
     }
   }
-  return before.size > 0 ? before : null
-}
-
-/** `139` -> `2:19`, the way a clock reads on the board. Negative or absent shows nothing. */
-function formatRemaining(seconds: number | undefined): string {
-  if (seconds === undefined || seconds < 0) return ''
-  const whole = Math.floor(seconds)
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
+  return at.size > 0 ? at : null
 }
 
 /** Under twenty seconds is time trouble — the band the late blunders fall in. */

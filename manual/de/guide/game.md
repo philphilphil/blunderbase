@@ -28,12 +28,16 @@ Stelle. Form und Markierungen der Kurve sind Bretteinstellungen.
 Wurde die Partie mit Uhr gespielt, hat das Feld einen zweiten Reiter, **Bedenkzeit**: eine
 Säule je Zug, Weiß nach oben und Schwarz nach unten, so hoch, wie der Zug an Bedenkzeit
 gekostet hat, mit denselben Markierungen für Fehler und grobe Fehler wie beim
-Bewertungsverlauf. Eine feine Linie auf jeder Seite zeigt das Inkrement; eine Säule
-darunter ist ein Zug, der Zeit gewonnen hat. Neben dem Diagramm stehen statt der
-Genauigkeitswerte für jeden Spieler die durchschnittliche Bedenkzeit, die längste
-Bedenkzeit und die Restzeit am Ende; zeigst du auf eine Säule, siehst du die Zugnummer,
-die Bedenkzeit und die Restzeit danach. Ein Klick springt an die Stelle, wie beim
-Bewertungsverlauf.
+Bewertungsverlauf. Die Skala ist gestaucht: Ein kurzer und ein langer Zug unterscheiden
+sich in der Höhe, aber ein einzelnes sehr langes Nachdenken drückt den Rest nicht platt;
+mehr als zwei Minuten werden als zwei Minuten gezeichnet. Eine feine Linie auf jeder Seite
+zeigt das Inkrement; eine Säule darunter ist ein Zug, der Zeit gewonnen hat. Neben dem
+Diagramm stehen statt der Genauigkeitswerte für jeden Spieler die durchschnittliche
+Bedenkzeit, die längste Bedenkzeit und die Restzeit am Ende – wer auf Zeit verloren hat,
+steht bei `0:00` –, und zeigst du auf eine Säule, siehst du die Zugnummer und die
+Bedenkzeit; der Zug selbst und seine Uhr stehen in der Zugliste daneben. Der erste Zug
+jeder Seite fällt vor dem Start der Uhr und zählt nicht. Ein Klick springt an die Stelle,
+wie beim Bewertungsverlauf.
 
 ## Engine-Varianten und die Vorschau
 

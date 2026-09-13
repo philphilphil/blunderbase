@@ -371,8 +371,17 @@ export interface MoveTimePoint {
   ply: number
   /** Seconds the mover spent on this move; never negative. */
   seconds: number
-  /** Seconds the mover had left after playing it, as the source reported them. */
+  /**
+   * What the clock read when the move was played, as the source reported it — the number
+   * the move table prints beside the move and the Stats page buckets by.
+   */
   remaining: number
+  /**
+   * Whether the clock was running: the first move of each side is played before it
+   * starts, everywhere clocks are recorded, so its zero is not a think and must not be
+   * averaged in as one.
+   */
+  timed: boolean
   san: string | null
   classification: Classification | null
 }
@@ -414,6 +423,7 @@ export function moveTimes(moves: MoveRow[], game: ClockedGame): MoveTimePoint[] 
       ply: move.ply,
       seconds: Math.max(0, seconds),
       remaining: move.clock,
+      timed: !first,
       san: move.san ?? null,
       classification: isFlagged(move.classification) ? (move.classification ?? null) : null,
     })
@@ -421,41 +431,104 @@ export function moveTimes(moves: MoveRow[], game: ClockedGame): MoveTimePoint[] 
   return points
 }
 
+/**
+ * The side that lost on the clock, or null where the game ended some other way — for the
+ * summary, whose "left" would otherwise report what a flagged player had after their last
+ * move rather than the nothing they finished with.
+ *
+ * Each source spells it its own way: Lichess's status is `outoftime`, its PGN says `Time
+ * forfeit`, chess.com's header says who `won on time`, FICS says who `forfeits on time`.
+ * The loser is read off the result, which every source agrees on.
+ */
+export function flaggedSide(game: {
+  termination?: string | null
+  result?: string | null
+}): Side | null {
+  const how = (game.termination ?? '').toLowerCase()
+  if (!/outoftime|time forfeit|on time|timeout/.test(how)) return null
+  if (game.result === '1-0') return 'black'
+  if (game.result === '0-1') return 'white'
+  return null
+}
+
 /** One side's clock, summed up for the plot's header: how it was spent and where it ended. */
 export interface MoveTimeSummary {
-  /** Mean seconds per move. */
-  average: number
+  /** Mean seconds per timed move; null where no move was timed. */
+  average: number | null
   /** The longest think, and the ply it went into. */
   longest: { seconds: number; ply: number } | null
-  /** Seconds left after the side's last move. */
+  /** Seconds left at the end: after the side's last move, or none at all if they flagged. */
   remaining: number | null
 }
 
-export function moveTimeSummary(points: MoveTimePoint[], side: Side): MoveTimeSummary | null {
+export function moveTimeSummary(
+  points: MoveTimePoint[],
+  side: Side,
+  flagged: Side | null = null,
+): MoveTimeSummary | null {
   const own = points.filter((point) => sideOf(point.ply) === side)
   if (own.length === 0) return null
   let total = 0
+  let timed = 0
   let longest: MoveTimeSummary['longest'] = null
   for (const point of own) {
+    // Only the timed moves count as thinks, for the longest as for the average: a source
+    // that runs the clock on move one would otherwise name a pre-game pause as the
+    // longest think.
+    if (!point.timed) continue
     total += point.seconds
+    timed += 1
     if (!longest || point.seconds > longest.seconds) {
       longest = { seconds: point.seconds, ply: point.ply }
     }
   }
   return {
-    average: total / own.length,
+    average: timed > 0 ? total / timed : null,
     longest,
-    remaining: own[own.length - 1]?.remaining ?? null,
+    remaining: flagged === side ? 0 : (own[own.length - 1]?.remaining ?? null),
   }
 }
 
 /**
+ * Thinks longer than this are drawn as this. Lichess's cap, and for its reason: past two
+ * minutes a column says "a very long think" whatever its exact height, and letting one
+ * ten-minute think set the scale would flatten every other move in the game into a
+ * hairline. The readout still says the true seconds.
+ */
+const THINK_CAP = 120
+
+/**
+ * How tall a think is drawn on the move-time plot: `ln(s/2 + 3)² − ln(3)²`, Lichess's own
+ * curve for its move time chart, in seconds rather than its centiseconds. Zero at zero,
+ * and each further second buying less height than the one before — a 2-second move and
+ * a 10-second move are plainly different heights, while a minute more on a long think
+ * adds only a little, which is how thinks are read: the difference that matters is
+ * between a premove and a pause, not between two long thinks.
+ */
+export function thinkHeight(seconds: number): number {
+  return Math.log(Math.min(Math.max(0, seconds), THINK_CAP) / 2 + 3) ** 2 - Math.log(3) ** 2
+}
+
+/**
  * Seconds as a think reads: `12s` under a minute, `1:24` from there, `1:02:03` past an
- * hour. Tenths are dropped — a clock is read in whole seconds.
+ * hour. Floored, not rounded, the way the clock beside the move is — the two must not
+ * disagree by a second about the same reading.
  */
 export function formatSeconds(seconds: number): string {
-  const whole = Math.max(0, Math.round(seconds))
+  const whole = Math.max(0, Math.floor(seconds))
   if (whole < 60) return `${whole}s`
+  return formatRemaining(whole)
+}
+
+/**
+ * A clock reading, the way a clock on the board shows it: `139` -> `2:19`, `3723` ->
+ * `1:02:03`. The move table's clock column, the move-time plot's readout and its tallies
+ * all print one through here, so the same seconds are the same string in all three.
+ * Negative or absent shows nothing.
+ */
+export function formatRemaining(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || seconds < 0) return ''
+  const whole = Math.floor(seconds)
   const minutes = Math.floor(whole / 60)
   const rest = String(whole % 60).padStart(2, '0')
   if (minutes < 60) return `${minutes}:${rest}`
