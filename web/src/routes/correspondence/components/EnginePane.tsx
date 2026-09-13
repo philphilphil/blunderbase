@@ -145,147 +145,156 @@ export function EnginePane({
       data-live={live ? 'true' : undefined}
       className="flex min-h-0 flex-col border-b border-edge-strong last:border-b-0"
     >
-      <div className="flex h-[2.1875rem] flex-none items-center gap-2 border-b border-line bg-panel px-2.5 text-[0.6875rem]">
-        <span
-          aria-hidden
-          className={cn(
-            'size-[0.4375rem] flex-none rounded-full',
-            tone === 'live'
-              ? 'animate-pulse bg-good'
-              : tone === 'warm' || tone === 'away'
-                ? 'bg-mistake'
-                : tone === 'queued'
-                  ? 'bg-accent-teal'
-                  : 'bg-edge-strong',
-          )}
-        />
-        <strong className="truncate font-semibold text-ink" title={pane.engineName}>
-          {pane.engineName}
-        </strong>
-        {task ? (
+      {/* Two rows, not one: the name and the figures both matter, and on a pane this
+          narrow a single row squeezed the name — the one thing that tells two panes on
+          the same node apart — to nothing. The controls sit by the name; what the
+          engine is doing and how far it has got sits under it. */}
+      <div className="flex flex-none flex-col gap-0.5 border-b border-line bg-panel px-2.5 py-1.5 text-[0.6875rem]">
+        <div className="flex items-center gap-2">
           <span
-            className={cn('whitespace-nowrap', live ? 'text-good' : 'text-accent-teal')}
-            title={t`A bounded look through the analysis queue, which may be running on another machine`}
-          >
-            {live ? <Trans>task running</Trans> : <Trans>task waiting in the queue</Trans>}
-          </span>
-        ) : tone === 'away' ? (
-          <span
-            className="whitespace-nowrap text-mistake"
-            title={t`The runner this search is on is not connected. It starts again from its last checkpoint when the runner comes back.`}
-          >
-            <Trans>waiting for host</Trans>
-          </span>
-        ) : tone === 'live' ? (
-          <span className="whitespace-nowrap text-good">
-            {elapsed === null ? (
-              <Trans>searching</Trans>
-            ) : (
-              t`searching · ${formatSpan(elapsed)}`
-            )}
-          </span>
-        ) : tone === 'warm' ? (
-          <span className="whitespace-nowrap text-mistake" title={t`The process is parked with its hash intact — resuming costs seconds`}>
-            <Trans>parked, warm</Trans>
-          </span>
-        ) : tone === 'cold' ? (
-          <span className="whitespace-nowrap text-dim">
-            <Trans>paused, cold</Trans>
-          </span>
-        ) : tone === 'queued' ? (
-          <span className="whitespace-nowrap text-accent-teal">
-            <Trans>waiting for a slot</Trans>
-          </span>
-        ) : stopped ? (
-          // Nothing running, nothing stored, and a task that ended badly: the pane exists
-          // only to carry the reason under this header, so it must not say "stored".
-          <span className="whitespace-nowrap text-blunder">
-            <Trans>task stopped</Trans>
-          </span>
-        ) : (
-          <span className="whitespace-nowrap text-dim">
-            <Trans>stored</Trans>
-          </span>
-        )}
-
-        <span className="ml-auto flex flex-none items-center gap-2 font-mono text-[0.625rem] tabular text-dim">
-          {/* Per verdict rather than per node: this engine's number can be old news while
-              the one in the pane below it is current, and the tree's own mark cannot say
-              which of the two it meant. */}
-          {stored?.stale && !live ? (
-            <span
-              data-testid="engine-pane-stale"
-              className="text-inaccuracy"
-              title={t`This verdict is stale: below the stale depth, or from a version of this engine you no longer have`}
-            >
-              ⟳
-            </span>
-          ) : null}
-          {depth !== null ? <span>{t`depth ${depth}`}</span> : null}
-          {nodes ? <span>{t`${formatNodes(nodes)} nodes`}</span> : null}
-          {live && snapshot?.nps ? <span>{formatNps(snapshot.nps)}</span> : null}
-          <span className="font-sans text-[0.6875rem] font-semibold text-body">
-            {formatScore(score)}
-          </span>
-        </span>
-
-        {onPin && pane.engineId !== null ? (
-          <button
-            type="button"
-            aria-pressed={pane.pinned}
-            title={
-              pane.pinned
-                ? t`The tree reads this engine here. Click to go back to the deepest.`
-                : t`Make this engine's verdict the one the tree reads here`
-            }
-            onClick={() => onPin(pane.pinned ? null : pane.engineId)}
+            aria-hidden
             className={cn(
-              'flex-none rounded-sm border px-1.5 py-px text-[0.625rem] transition-colors',
-              pane.pinned
-                ? 'border-accent-teal/40 bg-selected text-accent-teal'
-                : 'border-transparent text-dim hover:bg-raised hover:text-ink',
+              'size-[0.4375rem] flex-none rounded-full',
+              tone === 'live'
+                ? 'animate-pulse bg-good'
+                : tone === 'warm' || tone === 'away'
+                  ? 'bg-mistake'
+                  : tone === 'queued'
+                    ? 'bg-accent-teal'
+                    : 'bg-edge-strong',
             )}
-          >
-            {pane.pinned ? <Trans>Pinned</Trans> : <Trans>Pin</Trans>}
-          </button>
-        ) : null}
+          />
+          <strong className="truncate font-semibold text-ink" title={pane.engineName}>
+            {pane.engineName}
+          </strong>
 
-        {search && task ? (
-          <div className="flex flex-none items-center gap-0.5">
-            <PaneButton
-              label={t`Cancel`}
-              // A task an engine has already claimed finishes: there is no cancelled state
-              // for a run in flight, and the server says so rather than half-doing it.
-              disabled={busy || live || !onCancel}
-              onClick={() => onCancel?.(search.id)}
-              icon={<X aria-hidden />}
-            />
-          </div>
-        ) : search ? (
-          <div className="flex flex-none items-center gap-0.5">
-            {search.status === 'paused' || search.status === 'queued' ? (
+          {onPin && pane.engineId !== null ? (
+            <button
+              type="button"
+              aria-pressed={pane.pinned}
+              title={
+                pane.pinned
+                  ? t`The tree reads this engine here. Click to go back to the deepest.`
+                  : t`Make this engine's verdict the one the tree reads here`
+              }
+              onClick={() => onPin(pane.pinned ? null : pane.engineId)}
+              className={cn(
+                'ml-auto flex-none rounded-sm border px-1.5 py-px text-[0.625rem] transition-colors',
+                pane.pinned
+                  ? 'border-accent-teal/40 bg-selected text-accent-teal'
+                  : 'border-transparent text-dim hover:bg-raised hover:text-ink',
+              )}
+            >
+              {pane.pinned ? <Trans>Pinned</Trans> : <Trans>Pin</Trans>}
+            </button>
+          ) : null}
+
+          {search && task ? (
+            <div className="ml-auto flex flex-none items-center gap-0.5">
               <PaneButton
-                label={t`Resume`}
-                disabled={busy || search.status === 'queued'}
-                onClick={() => onResume(search.id)}
-                icon={<Play aria-hidden />}
+                label={t`Cancel`}
+                // A task an engine has already claimed finishes: there is no cancelled state
+                // for a run in flight, and the server says so rather than half-doing it.
+                disabled={busy || live || !onCancel}
+                onClick={() => onCancel?.(search.id)}
+                icon={<X aria-hidden />}
               />
-            ) : (
+            </div>
+          ) : search ? (
+            <div className="ml-auto flex flex-none items-center gap-0.5">
+              {search.status === 'paused' || search.status === 'queued' ? (
+                <PaneButton
+                  label={t`Resume`}
+                  disabled={busy || search.status === 'queued'}
+                  onClick={() => onResume(search.id)}
+                  icon={<Play aria-hidden />}
+                />
+              ) : (
+                <PaneButton
+                  label={t`Pause`}
+                  disabled={busy}
+                  onClick={() => onPause(search.id)}
+                  icon={<Pause aria-hidden />}
+                />
+              )}
               <PaneButton
-                label={t`Pause`}
+                label={t`Stop`}
                 disabled={busy}
-                onClick={() => onPause(search.id)}
-                icon={<Pause aria-hidden />}
+                onClick={() => onStop(search.id)}
+                icon={<StopIcon aria-hidden />}
               />
-            )}
-            <PaneButton
-              label={t`Stop`}
-              disabled={busy}
-              onClick={() => onStop(search.id)}
-              icon={<StopIcon aria-hidden />}
-            />
-          </div>
-        ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {task ? (
+            <span
+              className={cn('whitespace-nowrap', live ? 'text-good' : 'text-accent-teal')}
+              title={t`A bounded look through the analysis queue, which may be running on another machine`}
+            >
+              {live ? <Trans>task running</Trans> : <Trans>task waiting in the queue</Trans>}
+            </span>
+          ) : tone === 'away' ? (
+            <span
+              className="whitespace-nowrap text-mistake"
+              title={t`The runner this search is on is not connected. It starts again from its last checkpoint when the runner comes back.`}
+            >
+              <Trans>waiting for host</Trans>
+            </span>
+          ) : tone === 'live' ? (
+            <span className="whitespace-nowrap text-good">
+              {elapsed === null ? (
+                <Trans>searching</Trans>
+              ) : (
+                t`searching · ${formatSpan(elapsed)}`
+              )}
+            </span>
+          ) : tone === 'warm' ? (
+            <span className="whitespace-nowrap text-mistake" title={t`The process is parked with its hash intact — resuming costs seconds`}>
+              <Trans>parked, warm</Trans>
+            </span>
+          ) : tone === 'cold' ? (
+            <span className="whitespace-nowrap text-dim">
+              <Trans>paused, cold</Trans>
+            </span>
+          ) : tone === 'queued' ? (
+            <span className="whitespace-nowrap text-accent-teal">
+              <Trans>waiting for a slot</Trans>
+            </span>
+          ) : stopped ? (
+            // Nothing running, nothing stored, and a task that ended badly: the pane exists
+            // only to carry the reason under this header, so it must not say "stored".
+            <span className="whitespace-nowrap text-blunder">
+              <Trans>task stopped</Trans>
+            </span>
+          ) : (
+            <span className="whitespace-nowrap text-dim">
+              <Trans>stored</Trans>
+            </span>
+          )}
+
+          <span className="ml-auto flex flex-none items-center gap-2 font-mono text-[0.625rem] tabular text-dim">
+            {/* Per verdict rather than per node: this engine's number can be old news while
+                the one in the pane below it is current, and the tree's own mark cannot say
+                which of the two it meant. */}
+            {stored?.stale && !live ? (
+              <span
+                data-testid="engine-pane-stale"
+                className="text-inaccuracy"
+                title={t`This verdict is stale: below the stale depth, or from a version of this engine you no longer have`}
+              >
+                ⟳
+              </span>
+            ) : null}
+            {depth !== null ? <span>{t`depth ${depth}`}</span> : null}
+            {nodes ? <span>{t`${formatNodes(nodes)} nodes`}</span> : null}
+            {live && snapshot?.nps ? <span>{formatNps(snapshot.nps)}</span> : null}
+            <span className="font-sans text-[0.6875rem] font-semibold text-body">
+              {formatScore(score)}
+            </span>
+          </span>
+        </div>
       </div>
 
       {/* A task whose queue was cleared under it, or whose run failed for good, left its
