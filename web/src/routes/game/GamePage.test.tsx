@@ -65,6 +65,7 @@ const DETAIL: GameDetail = {
   game: {
     id: 14,
     source: 'lichess',
+    url: 'https://lichess.org/abcd1234',
     played_at: '2016-12-07T12:28:49Z',
     color: 'white',
     result: '0-1',
@@ -289,6 +290,13 @@ function stubFetch(
         }
       }
       return json(url.includes('/lines') ? lineRows : [])
+    }
+    // "Show the engine" on a game imported with it held back: answers with the game as it
+    // now reads, and the page refetches the detail through whatever `fetch` is by then.
+    if (method === 'PUT' && url.includes('/engine')) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { hidden: boolean }) : null
+      posted.push({ url, body })
+      return json({ ...DETAIL.game, engine_hidden: body?.hidden ?? false })
     }
     if (method === 'POST') {
       posted.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null })
@@ -1457,6 +1465,97 @@ describe('GamePage', () => {
     act(() => setEngineHidden(true))
     await user.keyboard('e')
     expect(streamCalls).toEqual([])
+  })
+
+  /*
+   * The per-game twin of ⇧E: a game imported while "Hide the engine on new games" was on
+   * carries `engine_hidden`, and says nothing the engine said until the reader presses the
+   * button — which clears the flag on the server and lets the verdict through.
+   */
+  it('holds the engine back on a game imported that way until Show the engine is pressed', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({ '/games/14': { ...DETAIL, game: { ...DETAIL.game, engine_hidden: true } } }),
+    )
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // Quiet, the way ⇧E is quiet — and the mode itself is off.
+    expect(document.querySelector('[data-classification]')).toBeNull()
+    expect(screen.queryByLabelText(/^Evaluation:/)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+    // The game and the app's bookkeeping stay, and so does the way out.
+    expect(screen.getByText('d5')).toBeInTheDocument()
+    const show = screen.getByRole('button', { name: 'Show the engine' })
+
+    // Once the flag is cleared the detail is fetched again; from then on it is not hidden.
+    vi.stubGlobal('fetch', stubFetch())
+    await user.click(show)
+
+    await waitFor(() =>
+      expect(posted).toContainEqual({
+        url: expect.stringContaining('/games/14/engine'),
+        body: { hidden: false },
+      }),
+    )
+    expect(await screen.findByTestId('maia-panel')).toBeInTheDocument()
+    expect(document.querySelector('[data-classification="blunder"]')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show the engine' })).not.toBeInTheDocument()
+  })
+
+  it('links the header’s source chip to the game on its site', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const link = within(screen.getByTestId('game-header')).getByRole('link', { name: /Lichess/ })
+    expect(link).toHaveAttribute('href', 'https://lichess.org/abcd1234')
+    expect(link).toHaveAttribute('target', '_blank')
+  })
+
+  it('shows no such button on a game whose engine was never held back', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    expect(screen.queryByRole('button', { name: 'Show the engine' })).not.toBeInTheDocument()
+  })
+})
+
+describe('GamePage typed moves', () => {
+  it('opens the box on M, plays a typed move into a line and keeps the box for the next', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    expect(screen.queryByRole('textbox', { name: 'Type a move' })).not.toBeInTheDocument()
+
+    await user.keyboard('{Home}')
+    await user.keyboard('m')
+    const box = screen.getByRole('textbox', { name: 'Type a move' })
+    expect(box).toHaveFocus()
+
+    // Played the moment it can only mean one move — no Enter needed.
+    await user.type(box, 'Nf3')
+    expect(await screen.findByRole('button', { name: /Back to game/ })).toBeInTheDocument()
+    expect(box).toHaveValue('')
+    expect(box).toHaveFocus()
+
+    // Nonsense is answered in the row, not swallowed.
+    await user.type(box, 'zz')
+    expect(screen.getByRole('status')).toHaveTextContent('No such move')
+
+    // Escape closes the box without leaving the line it was typing.
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('textbox', { name: 'Type a move' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Back to game/ })).toBeInTheDocument()
+  })
+
+  it('opens the same box from the keyboard button in the transport row', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.click(screen.getByRole('button', { name: 'Type a move (M)' }))
+    expect(screen.getByRole('textbox', { name: 'Type a move' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Type a move (M)' }))
+    expect(screen.queryByRole('textbox', { name: 'Type a move' })).not.toBeInTheDocument()
   })
 })
 

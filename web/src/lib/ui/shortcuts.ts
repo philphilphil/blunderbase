@@ -83,6 +83,7 @@ export type BoardAction =
   | 'jump-back'
   | 'jump-forward'
   | 'play-best'
+  | 'type-move'
   | 'board-settings'
   | 'queue-quick'
   | 'queue-deep'
@@ -262,6 +263,13 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     press: ['Enter'],
     keys: ['↵'],
     label: msg`Play the engine’s move onto the board`,
+  },
+  {
+    section: BOARD,
+    action: 'type-move',
+    press: ['m', 'M'],
+    keys: ['M'],
+    label: msg`Type a move — Nf3, exd5, O-O — instead of dragging it`,
   },
   {
     section: BOARD,

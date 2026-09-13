@@ -40,6 +40,17 @@ that already has that tier is skipped. **Fill missing levels** does the same for
 **Analysis → Engine passes** sets the node budget of each tier, how many lines a deep pass
 keeps, and the three thresholds above.
 
+## Hide the engine on new games
+
+The same page has **New games → Hide the engine on new games**. On, every game you import
+from then on is analysed as usual but arrives quiet: no evaluation, badge, graph or line
+until you press **Show the engine** in the row under the board of that game. The idea is
+to read your own game first — where did it turn? — and only then ask. Games already in the
+library are left as they are, and so are correspondence games and model games from the
+reference explorer; in the games list and on the dashboard such a game shows an eye
+instead of its worst move. `⇧E` still hides everything everywhere on top of this; the
+difference is that `⇧E` is a switch of the browser, and this is stored on each game.
+
 ## What is Maia asked?
 
 **Analysis → Maia** sets which human levels are asked, up to five ratings between 1100 and

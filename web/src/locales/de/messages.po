@@ -1506,6 +1506,10 @@ msgid "Play the engine’s move onto the board"
 msgstr "Den Zug der Engine aufs Brett spielen"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Type a move — Nf3, exd5, O-O — instead of dragging it"
+msgstr "Einen Zug tippen – Sf3, exd5, O-O – statt ihn zu ziehen"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Board settings — arrows, sound, the eval graph"
 msgstr "Bretteinstellungen – Pfeile, Ton, Bewertungsverlauf"
 
@@ -1723,6 +1727,22 @@ msgid "Win-percentage points lost by the mover. The three thresholds must rise."
 msgstr "Prozentpunkte an Gewinnchance, die der Ziehende verliert. Die drei Schwellen müssen ansteigen."
 
 #: src/routes/analysis/AnalysisSettings.tsx
+msgid "New games"
+msgstr "Neue Partien"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Read a game yourself before the engine tells you where it went wrong."
+msgstr "Lies eine Partie erst selbst, bevor die Engine dir sagt, wo sie gekippt ist."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Hide the engine on new games"
+msgstr "Engine bei neuen Partien ausblenden"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Every game you import from now on is analysed as usual but shows no evaluation, badge or line until you press <0>Show the engine</0> on that game. Games already in the library are left as they are."
+msgstr "Jede Partie, die du von jetzt an importierst, wird wie gewohnt analysiert, zeigt aber keine Bewertung, Markierung oder Variante, bis du bei dieser Partie <0>Engine zeigen</0> drückst. Partien, die schon in der Bibliothek sind, bleiben, wie sie sind."
+
+#: src/routes/analysis/AnalysisSettings.tsx
 msgid "Remove {elo}"
 msgstr "{elo} entfernen"
 
@@ -1824,12 +1844,12 @@ msgid "Searches"
 msgstr "Suchen"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "A search is one engine on one position for as long as you let it. They have slots of their own, so a search that runs for days never takes one an imported game’s quick pass is waiting for."
-msgstr "Eine Suche ist eine Engine auf einer Stellung, so lange du sie lässt. Suchen haben eigene Plätze, damit eine Suche über Tage nie einen Platz belegt, auf den der schnelle Durchgang einer importierten Partie wartet."
+msgid "A search is one engine on one position for as long as you let it. It holds one of the machine’s engine slots the whole time, so while it runs the queue has one fewer to work with."
+msgstr "Eine Suche ist eine Engine auf einer Stellung, solange du sie lässt. Sie belegt die ganze Zeit einen der Engine-Plätze der Maschine; solange sie läuft, hat die Warteschlange also einen weniger."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "How many searches this machine runs at once is set on <0>Machines</0>, beside the queue’s own cap — the two are added, and both are read when the server starts."
-msgstr "Wie viele Suchen dieser Rechner gleichzeitig laufen lässt, stellst du unter <0>Maschinen</0> ein, neben der Obergrenze der Warteschlange – die beiden addieren sich, und beide werden beim Start des Servers gelesen."
+msgid "How many engine processes this machine runs at once — searches, passes and boards together — is <0>Queue processes</0> on <1>Machines</1>, and it takes effect when saved."
+msgstr "Wie viele Engine-Prozesse diese Maschine gleichzeitig laufen lässt – Suchen, Durchläufe und Bretter zusammen –, sind die <0>Warteschlangenprozesse</0> unter <1>Maschinen</1>; die Zahl gilt, sobald sie gespeichert ist."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
@@ -1840,8 +1860,8 @@ msgid "Tasks"
 msgstr "Aufgaben"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
-msgstr "Eine Aufgabe ist ein begrenzter Blick auf eine Stellung, über die gewöhnliche Analysewarteschlange – sie belegt keinen Suchplatz, und eine Erweiterung ist ein Dutzend davon auf einmal. Anders als eine Suche kann sie auf einem entfernten Runner laufen; welche Engine, wird beim Einreihen gewählt, vorgeschlagen wird die mit der Rolle Tiefenanalyse."
+msgid "A task is one bounded look at one position, through the ordinary analysis queue — it holds a slot for a minute or two where a search keeps its own, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
+msgstr "Eine Aufgabe ist ein begrenzter Blick auf eine Stellung durch die gewöhnliche Analysewarteschlange – sie belegt einen Platz für ein, zwei Minuten, wo eine Suche ihren behält, und eine Erweiterung sind ein Dutzend davon auf einmal. Anders als eine Suche kann sie auf einem Remote Runner laufen; die Engine wird beim Einreihen gewählt, vorgeschlagen ist die mit der Rolle Tiefenanalyse."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
@@ -2486,8 +2506,8 @@ msgid "{inUse} of {slots}"
 msgstr "{inUse} von {slots}"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
-msgid "search slots in use on this machine"
-msgstr "Suchplätze auf diesem Rechner belegt"
+msgid "engine slots held by searches on this machine"
+msgstr "Engine-Plätze auf diesem Rechner von Suchen belegt"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
 msgid "{parked, plural, one {# engine parked} other {# engines parked}}"
@@ -2541,6 +2561,36 @@ msgstr "Fernschachbaum"
 #: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
 msgid "what was considered while the game ran"
 msgstr "was während der Partie erwogen wurde"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "The tree reads this engine here. Click to go back to the deepest."
+msgstr "Der Baum liest hier diese Engine. Klicken, um wieder die tiefste zu nehmen."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Make this engine's verdict the one the tree reads here"
+msgstr "Das Urteil dieser Engine zu dem machen, das der Baum hier liest"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pinned"
+msgstr "Angeheftet"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pin"
+msgstr "Anheften"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Resume"
+msgstr "Fortsetzen"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pause"
+msgstr "Pausieren"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/import/JobProgress.tsx
+msgid "Stop"
+msgstr "Stoppen"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "A bounded look through the analysis queue, which may be running on another machine"
@@ -2610,36 +2660,6 @@ msgstr "Tiefe {depth}"
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "{0} nodes"
 msgstr "{0} Knoten"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "The tree reads this engine here. Click to go back to the deepest."
-msgstr "Der Baum liest hier diese Engine. Klicken, um wieder die tiefste zu nehmen."
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Make this engine's verdict the one the tree reads here"
-msgstr "Das Urteil dieser Engine zu dem machen, das der Baum hier liest"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Pinned"
-msgstr "Angeheftet"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Pin"
-msgstr "Anheften"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Resume"
-msgstr "Fortsetzen"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Pause"
-msgstr "Pausieren"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-#: src/routes/engines/BrowserRunnerSection.tsx
-#: src/routes/import/JobProgress.tsx
-msgid "Stop"
-msgstr "Stoppen"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "The engine has not sent a line yet."
@@ -3101,8 +3121,8 @@ msgid "Refresh subtree…"
 msgstr "Teilbaum auffrischen …"
 
 #: src/routes/correspondence/components/TaskDialog.tsx
-msgid "One bounded look at {where}, through the analysis queue. It takes no search slot and runs wherever the queue has room."
-msgstr "Ein begrenzter Blick auf {where}, über die Analysewarteschlange. Er belegt keinen Suchplatz und läuft dort, wo die Warteschlange Platz hat."
+msgid "One bounded look at {where}, through the analysis queue. It holds a slot for a minute or two and runs wherever the queue has room."
+msgstr "Ein begrenzter Blick auf {where} durch die Analysewarteschlange. Er belegt einen Platz für ein, zwei Minuten und läuft dort, wo die Warteschlange Platz hat."
 
 #: src/routes/correspondence/components/TaskDialog.tsx
 msgid "A task on every stale position from {where} down: too shallow, or judged by a version of the engine you no longer have."
@@ -4186,8 +4206,8 @@ msgid "This computer"
 msgstr "Dieser Computer"
 
 #: src/routes/engines/EnginesPage.tsx
-msgid "Threads and hash belong to one process of one engine. How many processes a machine runs at once — queue processes, correspondence search slots — is set per machine on <0>Machines</0>."
-msgstr "Threads und Hash gehören zu einem Prozess einer Engine. Wie viele Prozesse eine Maschine gleichzeitig laufen lässt – Warteschlangenprozesse, Suchplätze fürs Fernschach –, stellst du je Maschine unter <0>Maschinen</0> ein."
+msgid "Threads and hash belong to one process of one engine. How many processes a machine runs at once — passes, boards and correspondence searches together — is set per machine on <0>Machines</0>."
+msgstr "Threads und Hash gehören zu einem Prozess einer Engine. Wie viele Prozesse eine Maschine gleichzeitig laufen lässt – Durchläufe, Bretter und Fernschachsuchen zusammen –, wird je Maschine unter <0>Maschinen</0> festgelegt."
 
 #: src/routes/engines/HostBadge.tsx
 #: src/routes/engines/RolesForm.tsx
@@ -4396,25 +4416,16 @@ msgid "{depth} · {nodes} nodes"
 msgstr "{depth} · {nodes} Knoten"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Passes and tasks · default {configured}"
-msgstr "Durchläufe und Aufgaben · Voreinstellung {configured}"
+msgid "Passes, boards and searches · default {configured}"
+msgstr "Durchläufe, Bretter und Suchen · Vorgabe {configured}"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Passes and tasks · default cores − 2"
-msgstr "Durchläufe und Aufgaben · Voreinstellung Kerne − 2"
+msgid "Passes, boards and searches · default cores − 2"
+msgstr "Durchläufe, Bretter und Suchen · Vorgabe Kerne − 2"
 
 #: src/routes/engines/ServerCard.tsx
 msgid "Queue processes"
 msgstr "Warteschlangenprozesse"
-
-#: src/routes/engines/ServerCard.tsx
-msgid "Search slots"
-msgstr "Suchplätze"
-
-#. placeholder {0}: DEFAULTS.correspondence_slots
-#: src/routes/engines/ServerCard.tsx
-msgid "Correspondence · default {0}"
-msgstr "Fernschach · Voreinstellung {0}"
 
 #: src/routes/engines/ServerCard.tsx
 msgid "{cores} cores"
@@ -4431,6 +4442,15 @@ msgstr "{cores, plural, one {# Kern} other {# Kerne}}"
 #: src/routes/engines/ServerCard.tsx
 msgid "Runs wait until a worker picks them up."
 msgstr "Durchläufe warten, bis ein Worker sie übernimmt."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "{searching} held by correspondence searches; the queue works with the rest."
+msgstr "{searching} von Fernschachsuchen belegt; die Warteschlange arbeitet mit dem Rest."
+
+#. placeholder {0}: inForce ?? '?'
+#: src/routes/engines/ServerCard.tsx
+msgid "{used} of {0} in use · {searching} searching"
+msgstr "{used} von {0} belegt · {searching} suchen"
 
 #. placeholder {0}: inForce ?? '?'
 #: src/routes/engines/ServerCard.tsx
@@ -4450,28 +4470,20 @@ msgid "Set by BLUNDERBASE_ANALYSIS_CONCURRENCY"
 msgstr "Gesetzt durch BLUNDERBASE_ANALYSIS_CONCURRENCY"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Queue processes run the passes and tasks; search slots exist only for correspondence searches and are added on top. Read when the server starts: change, then restart."
-msgstr "Warteschlangenprozesse rechnen die Durchläufe und Aufgaben; Suchplätze gibt es nur für Fernschachsuchen, und sie kommen obendrauf. Wird beim Start des Servers gelesen: ändern, dann neu starten."
+msgid "Queue processes run the passes, the tasks, the analysis boards and the correspondence searches — a search holds one for as long as it runs, and the queue waits behind it. Saving applies the number at once; a lower one lets the runs in flight finish first."
+msgstr "Warteschlangenprozesse führen die Durchläufe, die Aufgaben, die Analysebretter und die Fernschachsuchen aus – eine Suche belegt einen, solange sie läuft, und die Warteschlange wartet hinter ihr. Speichern übernimmt die Zahl sofort; eine kleinere lässt die laufenden Durchläufe erst zu Ende kommen."
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Queue processes run the analysis passes. Read when the server starts: change, then restart."
-msgstr "Warteschlangenprozesse rechnen die Analyse-Durchläufe. Wird beim Start des Servers gelesen: ändern, dann neu starten."
+msgid "Queue processes run the analysis passes and the analysis boards. Saving applies the number at once; a lower one lets the runs in flight finish first."
+msgstr "Warteschlangenprozesse führen die Analysedurchläufe und die Analysebretter aus. Speichern übernimmt die Zahl sofort; eine kleinere lässt die laufenden Durchläufe erst zu Ende kommen."
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Saved {configured}; the queue is running on {inForce} until the server restarts."
-msgstr "Gespeichert: {configured}; die Warteschlange läuft mit {inForce}, bis der Server neu startet."
+msgid "{processes} processes × {threads} threads = <0>{total} threads</0> · {coresLabel}"
+msgstr "{processes} Prozesse × {threads} Threads = <0>{total} Threads</0> · {coresLabel}"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "queue {queueProcesses} × {queueThreads} threads + searches {searchProcesses} × {searchThreads} = <0>{total} threads</0> · {coresLabel}"
-msgstr "Warteschlange {queueProcesses} × {queueThreads} Threads + Suchen {searchProcesses} × {searchThreads} = <0>{total} Threads</0> · {coresLabel}"
-
-#: src/routes/engines/ServerCard.tsx
-msgid "queue {queueProcesses} × {queueThreads} threads = <0>{total} threads</0> · {coresLabel}"
-msgstr "Warteschlange {queueProcesses} × {queueThreads} Threads = <0>{total} Threads</0> · {coresLabel}"
-
-#: src/routes/engines/ServerCard.tsx
-msgid "At full load, more threads than cores. Lower a cap, or an engine’s threads on Engines."
-msgstr "Bei Volllast mehr Threads als Kerne. Senk eine Obergrenze, oder die Threads einer Engine unter Engines."
+msgid "At full load, more threads than cores. Lower the cap, or an engine’s threads on Engines."
+msgstr "Bei Volllast mehr Threads als Kerne. Senk die Obergrenze oder die Threads einer Engine unter Engines."
 
 #: src/routes/engines/ServerCard.tsx
 msgid "At full load, everything fits the cores."
@@ -4480,6 +4492,10 @@ msgstr "Bei Volllast passt alles in die Kerne."
 #: src/routes/engines/ServerCard.tsx
 msgid "Threads × processes is what has to fit the cores."
 msgstr "Threads × Prozesse ist, was in die Kerne passen muss."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Every slot is priced at the heaviest engine a search could hold."
+msgstr "Jeder Platz ist mit der schwersten Engine bemessen, die eine Suche halten könnte."
 
 #: src/routes/engines/ServerCard.tsx
 msgid "Engines on this machine"
@@ -4997,6 +5013,14 @@ msgid "Hints"
 msgstr "Hinweise"
 
 #: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M)"
+msgstr "Einen Zug tippen (M)"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
+msgstr "Einen Zug tippen (M) – Sf3, exd5, O-O – statt ihn zu ziehen"
+
+#: src/routes/game/components/BoardPanel.tsx
 msgid "Write a note about this position (N)"
 msgstr "Eine Notiz zu dieser Stellung schreiben (N)"
 
@@ -5076,6 +5100,19 @@ msgstr "Keine deiner Partien hat diese Stellung erreicht."
 msgid "Your games from this position"
 msgstr "Deine Partien ab dieser Stellung"
 
+#: src/routes/game/components/EngineRevealButton.tsx
+msgid "The engine was held back on this game when it was imported. Show it — the screen stays quiet until ⇧E is off as well."
+msgstr "Die Engine wurde bei dieser Partie beim Import zurückgehalten. Zeig sie – der Bildschirm bleibt stumm, bis auch ⇧E aus ist."
+
+#: src/routes/game/components/EngineRevealButton.tsx
+msgid "The engine was held back on this game when it was imported, so you could read it first. Show its evaluations, badges and lines now."
+msgstr "Die Engine wurde bei dieser Partie beim Import zurückgehalten, damit du sie erst selbst liest. Zeig jetzt ihre Bewertungen, Markierungen und Varianten."
+
+#. Button in the transport row that reveals the engine on a game imported with it hidden
+#: src/routes/game/components/EngineRevealButton.tsx
+msgid "Show the engine"
+msgstr "Engine zeigen"
+
 #: src/routes/game/components/EvalGraph.tsx
 msgid "Evaluation"
 msgstr "Bewertung"
@@ -5141,6 +5178,12 @@ msgstr "Vorherige Partie"
 #: src/routes/game/components/GameHeaderBar.tsx
 msgid "Next game"
 msgstr "Nächste Partie"
+
+#: src/routes/game/components/GameHeaderBar.tsx
+#: src/routes/game/components/MobileGameView.tsx
+#: src/routes/games/components/GameRow.tsx
+msgid "Open this game on the site it came from"
+msgstr "Diese Partie auf der Seite öffnen, von der sie stammt"
 
 #: src/routes/game/components/GameHeaderBar.tsx
 msgid "casual"
@@ -5264,6 +5307,26 @@ msgstr "Halbzug {plyNumber}/{plyCount}"
 #: src/routes/game/components/MobileGameView.tsx
 msgid "Game panels"
 msgstr "Bereiche der Partie"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "No such move"
+msgstr "Kein solcher Zug"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Not a whole move yet"
+msgstr "Noch kein ganzer Zug"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Type a move"
+msgstr "Einen Zug tippen"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Nf3, exd5, O-O…"
+msgstr "Sf3, exd5, O-O…"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Type a move in notation; it is played as soon as it is unambiguous."
+msgstr "Tipp einen Zug in Notation; er wird gespielt, sobald er eindeutig ist."
 
 #: src/routes/game/components/MoveList.tsx
 msgid "{plyCount} plies"
@@ -5705,6 +5768,10 @@ msgstr "Partie {id} auswählen"
 #: src/routes/games/components/GameRow.tsx
 msgid "Unknown opening"
 msgstr "Unbekannte Eröffnung"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "Engine hidden on this game until you show it"
+msgstr "Engine bei dieser Partie ausgeblendet, bis du sie zeigst"
 
 #: src/routes/games/components/GameRow.tsx
 msgid "queueing…"

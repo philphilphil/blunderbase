@@ -19,7 +19,7 @@ import { Chess, normalizeMove } from 'chessops/chess'
 import { chessgroundDests } from 'chessops/compat'
 import { makeFen } from 'chessops/fen'
 import { makeSanAndPlay } from 'chessops/san'
-import type { NormalMove, SquareName } from 'chessops/types'
+import type { NormalMove, Role, SquareName } from 'chessops/types'
 import { makeUci, parseUci } from 'chessops/util'
 
 import { sameMove, type GameLine, type PlyPosition } from './gameModel'
@@ -107,19 +107,21 @@ export function buildAnalysisLine(
  * behind a move that no longer leads to it.
  *
  * A pawn reaching the last rank promotes to a queen, as it does on the explorer's board — an
- * underpromotion is not what a Maia rollout is ever about.
+ * underpromotion is not what a Maia rollout is ever about. A *typed* move can say
+ * otherwise (`e8=N`), which is what `promotion` is for; a drag never passes one.
  */
 export function withBoardMove(
   analysis: AnalysisLine,
   orig: string,
   dest: string,
+  promotion?: Role,
 ): string[] | null {
   const plain = parseUci(`${orig}${dest}`)
   if (!plain || !('from' in plain)) return null
   const promotes =
     analysis.board.board.getRole(plain.from) === 'pawn' &&
     (dest.endsWith('8') || dest.endsWith('1'))
-  const move: NormalMove = promotes ? { ...plain, promotion: 'queen' } : plain
+  const move: NormalMove = promotes ? { ...plain, promotion: promotion ?? 'queen' } : plain
   if (!analysis.board.isLegal(move)) return null
   return [...analysis.moves.slice(0, analysis.cursor), makeUci(move)]
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -637,6 +638,23 @@ def owner_move_condition() -> ColumnElement[bool]:
 def get_game(session: Session, game_id: int) -> Game | None:
     """One game with its move lists; evals are fetched through `get_game_detail`."""
     return session.get(Game, game_id)
+
+
+def set_engine_hidden(session: Session, game_id: int, hidden: bool) -> Game | None:
+    """Show the engine on one game, or hold it back again. None for a game that is not there.
+
+    The one thing about a stored game the owner changes by hand: the flag the import set
+    from `hide_engine_new_games` (`Game.engine_hidden`), which is about what the screen
+    shows and not about the game — so unlike the move-list mutations below it is safe on any
+    game, imported or played, and touches nothing that describes the game itself. Committed
+    here, because it is a whole action of its own.
+    """
+    game = session.get(Game, game_id)
+    if game is None:
+        return None
+    game.engine_hidden = hidden
+    session.commit()
+    return game
 
 
 # --- the one mutation of a stored game ------------------------------------
@@ -1283,6 +1301,29 @@ def _stored_card(game: Game, worst: int) -> dict[str, Any] | None:
     return card
 
 
+# A `Link` or `Site` header holding a web address — chess.com writes the game's page into
+# `Link`, Lichess into `Site`, and a PGN exported from either keeps it. Matched on the raw
+# PGN text rather than through a parse: this runs once per row of a games page.
+_LINKED_HEADER = re.compile(r'\[(?:Link|Site)\s+"(https?://[^"\s]+)"\]')
+LICHESS_GAME_URL = "https://lichess.org/{id}"
+
+
+def game_url(game: Game) -> str | None:
+    """Where this game lives on the site it came from, or None for a game that lives nowhere.
+
+    A Lichess game is `lichess.org/<id>` by construction — the id is its `source_id` — and
+    every other game is whatever web address its PGN carries in `Link` or `Site`: chess.com
+    puts the game page there, and a file exported from either site keeps the header, so an
+    uploaded PGN links back too. A FICS game, an OTB game and a hand-typed correspondence
+    game have no page anywhere and answer None; a `Site` of "Chess.com" or "?" is not an
+    address and is skipped.
+    """
+    if game.source == Source.LICHESS and game.source_id:
+        return LICHESS_GAME_URL.format(id=game.source_id)
+    match = _LINKED_HEADER.search(game.pgn or "")
+    return match.group(1) if match else None
+
+
 def game_summary(game: Game) -> dict[str, Any]:
     """The compact form of a game every payload in the service layer embeds."""
     return _compact(
@@ -1290,9 +1331,11 @@ def game_summary(game: Game) -> dict[str, Any]:
             "id": game.id,
             "source": str(game.source),
             "source_id": game.source_id,
+            "url": game_url(game),
             "played_at": _stamp(game.played_at),
             "color": str(game.owner_color) if game.owner_color else None,
             "is_owner_game": game.is_owner_game,
+            "engine_hidden": game.engine_hidden,
             "result": str(game.result),
             "outcome": outcome_of(game),
             "white": game.white_name,

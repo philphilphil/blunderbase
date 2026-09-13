@@ -1506,6 +1506,10 @@ msgid "Play the engine’s move onto the board"
 msgstr "Play the engine’s move onto the board"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Type a move — Nf3, exd5, O-O — instead of dragging it"
+msgstr "Type a move — Nf3, exd5, O-O — instead of dragging it"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Board settings — arrows, sound, the eval graph"
 msgstr "Board settings — arrows, sound, the eval graph"
 
@@ -1723,6 +1727,22 @@ msgid "Win-percentage points lost by the mover. The three thresholds must rise."
 msgstr "Win-percentage points lost by the mover. The three thresholds must rise."
 
 #: src/routes/analysis/AnalysisSettings.tsx
+msgid "New games"
+msgstr "New games"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Read a game yourself before the engine tells you where it went wrong."
+msgstr "Read a game yourself before the engine tells you where it went wrong."
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Hide the engine on new games"
+msgstr "Hide the engine on new games"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Every game you import from now on is analysed as usual but shows no evaluation, badge or line until you press <0>Show the engine</0> on that game. Games already in the library are left as they are."
+msgstr "Every game you import from now on is analysed as usual but shows no evaluation, badge or line until you press <0>Show the engine</0> on that game. Games already in the library are left as they are."
+
+#: src/routes/analysis/AnalysisSettings.tsx
 msgid "Remove {elo}"
 msgstr "Remove {elo}"
 
@@ -1824,12 +1844,12 @@ msgid "Searches"
 msgstr "Searches"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "A search is one engine on one position for as long as you let it. They have slots of their own, so a search that runs for days never takes one an imported game’s quick pass is waiting for."
-msgstr "A search is one engine on one position for as long as you let it. They have slots of their own, so a search that runs for days never takes one an imported game’s quick pass is waiting for."
+msgid "A search is one engine on one position for as long as you let it. It holds one of the machine’s engine slots the whole time, so while it runs the queue has one fewer to work with."
+msgstr "A search is one engine on one position for as long as you let it. It holds one of the machine’s engine slots the whole time, so while it runs the queue has one fewer to work with."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "How many searches this machine runs at once is set on <0>Machines</0>, beside the queue’s own cap — the two are added, and both are read when the server starts."
-msgstr "How many searches this machine runs at once is set on <0>Machines</0>, beside the queue’s own cap — the two are added, and both are read when the server starts."
+msgid "How many engine processes this machine runs at once — searches, passes and boards together — is <0>Queue processes</0> on <1>Machines</1>, and it takes effect when saved."
+msgstr "How many engine processes this machine runs at once — searches, passes and boards together — is <0>Queue processes</0> on <1>Machines</1>, and it takes effect when saved."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
@@ -1840,8 +1860,8 @@ msgid "Tasks"
 msgstr "Tasks"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
-msgstr "A task is one bounded look at one position, through the ordinary analysis queue — it takes no search slot, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
+msgid "A task is one bounded look at one position, through the ordinary analysis queue — it holds a slot for a minute or two where a search keeps its own, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
+msgstr "A task is one bounded look at one position, through the ordinary analysis queue — it holds a slot for a minute or two where a search keeps its own, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
@@ -2486,8 +2506,8 @@ msgid "{inUse} of {slots}"
 msgstr "{inUse} of {slots}"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
-msgid "search slots in use on this machine"
-msgstr "search slots in use on this machine"
+msgid "engine slots held by searches on this machine"
+msgstr "engine slots held by searches on this machine"
 
 #: src/routes/correspondence/components/CapacityStrip.tsx
 msgid "{parked, plural, one {# engine parked} other {# engines parked}}"
@@ -2541,6 +2561,36 @@ msgstr "Correspondence tree"
 #: src/routes/correspondence/components/CorrespondenceTreeDialog.tsx
 msgid "what was considered while the game ran"
 msgstr "what was considered while the game ran"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "The tree reads this engine here. Click to go back to the deepest."
+msgstr "The tree reads this engine here. Click to go back to the deepest."
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Make this engine's verdict the one the tree reads here"
+msgstr "Make this engine's verdict the one the tree reads here"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pinned"
+msgstr "Pinned"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pin"
+msgstr "Pin"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Resume"
+msgstr "Resume"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+msgid "Pause"
+msgstr "Pause"
+
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/import/JobProgress.tsx
+msgid "Stop"
+msgstr "Stop"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "A bounded look through the analysis queue, which may be running on another machine"
@@ -2610,36 +2660,6 @@ msgstr "depth {depth}"
 #: src/routes/correspondence/components/RunningNow.tsx
 msgid "{0} nodes"
 msgstr "{0} nodes"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "The tree reads this engine here. Click to go back to the deepest."
-msgstr "The tree reads this engine here. Click to go back to the deepest."
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Make this engine's verdict the one the tree reads here"
-msgstr "Make this engine's verdict the one the tree reads here"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Pinned"
-msgstr "Pinned"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Pin"
-msgstr "Pin"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Resume"
-msgstr "Resume"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-msgid "Pause"
-msgstr "Pause"
-
-#: src/routes/correspondence/components/EnginePane.tsx
-#: src/routes/engines/BrowserRunnerSection.tsx
-#: src/routes/import/JobProgress.tsx
-msgid "Stop"
-msgstr "Stop"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 msgid "The engine has not sent a line yet."
@@ -3101,8 +3121,8 @@ msgid "Refresh subtree…"
 msgstr "Refresh subtree…"
 
 #: src/routes/correspondence/components/TaskDialog.tsx
-msgid "One bounded look at {where}, through the analysis queue. It takes no search slot and runs wherever the queue has room."
-msgstr "One bounded look at {where}, through the analysis queue. It takes no search slot and runs wherever the queue has room."
+msgid "One bounded look at {where}, through the analysis queue. It holds a slot for a minute or two and runs wherever the queue has room."
+msgstr "One bounded look at {where}, through the analysis queue. It holds a slot for a minute or two and runs wherever the queue has room."
 
 #: src/routes/correspondence/components/TaskDialog.tsx
 msgid "A task on every stale position from {where} down: too shallow, or judged by a version of the engine you no longer have."
@@ -4186,8 +4206,8 @@ msgid "This computer"
 msgstr "This computer"
 
 #: src/routes/engines/EnginesPage.tsx
-msgid "Threads and hash belong to one process of one engine. How many processes a machine runs at once — queue processes, correspondence search slots — is set per machine on <0>Machines</0>."
-msgstr "Threads and hash belong to one process of one engine. How many processes a machine runs at once — queue processes, correspondence search slots — is set per machine on <0>Machines</0>."
+msgid "Threads and hash belong to one process of one engine. How many processes a machine runs at once — passes, boards and correspondence searches together — is set per machine on <0>Machines</0>."
+msgstr "Threads and hash belong to one process of one engine. How many processes a machine runs at once — passes, boards and correspondence searches together — is set per machine on <0>Machines</0>."
 
 #: src/routes/engines/HostBadge.tsx
 #: src/routes/engines/RolesForm.tsx
@@ -4396,25 +4416,16 @@ msgid "{depth} · {nodes} nodes"
 msgstr "{depth} · {nodes} nodes"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Passes and tasks · default {configured}"
-msgstr "Passes and tasks · default {configured}"
+msgid "Passes, boards and searches · default {configured}"
+msgstr "Passes, boards and searches · default {configured}"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Passes and tasks · default cores − 2"
-msgstr "Passes and tasks · default cores − 2"
+msgid "Passes, boards and searches · default cores − 2"
+msgstr "Passes, boards and searches · default cores − 2"
 
 #: src/routes/engines/ServerCard.tsx
 msgid "Queue processes"
 msgstr "Queue processes"
-
-#: src/routes/engines/ServerCard.tsx
-msgid "Search slots"
-msgstr "Search slots"
-
-#. placeholder {0}: DEFAULTS.correspondence_slots
-#: src/routes/engines/ServerCard.tsx
-msgid "Correspondence · default {0}"
-msgstr "Correspondence · default {0}"
 
 #: src/routes/engines/ServerCard.tsx
 msgid "{cores} cores"
@@ -4431,6 +4442,15 @@ msgstr "{cores, plural, one {# core} other {# cores}}"
 #: src/routes/engines/ServerCard.tsx
 msgid "Runs wait until a worker picks them up."
 msgstr "Runs wait until a worker picks them up."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "{searching} held by correspondence searches; the queue works with the rest."
+msgstr "{searching} held by correspondence searches; the queue works with the rest."
+
+#. placeholder {0}: inForce ?? '?'
+#: src/routes/engines/ServerCard.tsx
+msgid "{used} of {0} in use · {searching} searching"
+msgstr "{used} of {0} in use · {searching} searching"
 
 #. placeholder {0}: inForce ?? '?'
 #: src/routes/engines/ServerCard.tsx
@@ -4450,28 +4470,20 @@ msgid "Set by BLUNDERBASE_ANALYSIS_CONCURRENCY"
 msgstr "Set by BLUNDERBASE_ANALYSIS_CONCURRENCY"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Queue processes run the passes and tasks; search slots exist only for correspondence searches and are added on top. Read when the server starts: change, then restart."
-msgstr "Queue processes run the passes and tasks; search slots exist only for correspondence searches and are added on top. Read when the server starts: change, then restart."
+msgid "Queue processes run the passes, the tasks, the analysis boards and the correspondence searches — a search holds one for as long as it runs, and the queue waits behind it. Saving applies the number at once; a lower one lets the runs in flight finish first."
+msgstr "Queue processes run the passes, the tasks, the analysis boards and the correspondence searches — a search holds one for as long as it runs, and the queue waits behind it. Saving applies the number at once; a lower one lets the runs in flight finish first."
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Queue processes run the analysis passes. Read when the server starts: change, then restart."
-msgstr "Queue processes run the analysis passes. Read when the server starts: change, then restart."
+msgid "Queue processes run the analysis passes and the analysis boards. Saving applies the number at once; a lower one lets the runs in flight finish first."
+msgstr "Queue processes run the analysis passes and the analysis boards. Saving applies the number at once; a lower one lets the runs in flight finish first."
 
 #: src/routes/engines/ServerCard.tsx
-msgid "Saved {configured}; the queue is running on {inForce} until the server restarts."
-msgstr "Saved {configured}; the queue is running on {inForce} until the server restarts."
+msgid "{processes} processes × {threads} threads = <0>{total} threads</0> · {coresLabel}"
+msgstr "{processes} processes × {threads} threads = <0>{total} threads</0> · {coresLabel}"
 
 #: src/routes/engines/ServerCard.tsx
-msgid "queue {queueProcesses} × {queueThreads} threads + searches {searchProcesses} × {searchThreads} = <0>{total} threads</0> · {coresLabel}"
-msgstr "queue {queueProcesses} × {queueThreads} threads + searches {searchProcesses} × {searchThreads} = <0>{total} threads</0> · {coresLabel}"
-
-#: src/routes/engines/ServerCard.tsx
-msgid "queue {queueProcesses} × {queueThreads} threads = <0>{total} threads</0> · {coresLabel}"
-msgstr "queue {queueProcesses} × {queueThreads} threads = <0>{total} threads</0> · {coresLabel}"
-
-#: src/routes/engines/ServerCard.tsx
-msgid "At full load, more threads than cores. Lower a cap, or an engine’s threads on Engines."
-msgstr "At full load, more threads than cores. Lower a cap, or an engine’s threads on Engines."
+msgid "At full load, more threads than cores. Lower the cap, or an engine’s threads on Engines."
+msgstr "At full load, more threads than cores. Lower the cap, or an engine’s threads on Engines."
 
 #: src/routes/engines/ServerCard.tsx
 msgid "At full load, everything fits the cores."
@@ -4480,6 +4492,10 @@ msgstr "At full load, everything fits the cores."
 #: src/routes/engines/ServerCard.tsx
 msgid "Threads × processes is what has to fit the cores."
 msgstr "Threads × processes is what has to fit the cores."
+
+#: src/routes/engines/ServerCard.tsx
+msgid "Every slot is priced at the heaviest engine a search could hold."
+msgstr "Every slot is priced at the heaviest engine a search could hold."
 
 #: src/routes/engines/ServerCard.tsx
 msgid "Engines on this machine"
@@ -4997,6 +5013,14 @@ msgid "Hints"
 msgstr "Hints"
 
 #: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M)"
+msgstr "Type a move (M)"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
+msgstr "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
+
+#: src/routes/game/components/BoardPanel.tsx
 msgid "Write a note about this position (N)"
 msgstr "Write a note about this position (N)"
 
@@ -5076,6 +5100,19 @@ msgstr "None of your games reached this position."
 msgid "Your games from this position"
 msgstr "Your games from this position"
 
+#: src/routes/game/components/EngineRevealButton.tsx
+msgid "The engine was held back on this game when it was imported. Show it — the screen stays quiet until ⇧E is off as well."
+msgstr "The engine was held back on this game when it was imported. Show it — the screen stays quiet until ⇧E is off as well."
+
+#: src/routes/game/components/EngineRevealButton.tsx
+msgid "The engine was held back on this game when it was imported, so you could read it first. Show its evaluations, badges and lines now."
+msgstr "The engine was held back on this game when it was imported, so you could read it first. Show its evaluations, badges and lines now."
+
+#. Button in the transport row that reveals the engine on a game imported with it hidden
+#: src/routes/game/components/EngineRevealButton.tsx
+msgid "Show the engine"
+msgstr "Show the engine"
+
 #: src/routes/game/components/EvalGraph.tsx
 msgid "Evaluation"
 msgstr "Evaluation"
@@ -5141,6 +5178,12 @@ msgstr "Previous game"
 #: src/routes/game/components/GameHeaderBar.tsx
 msgid "Next game"
 msgstr "Next game"
+
+#: src/routes/game/components/GameHeaderBar.tsx
+#: src/routes/game/components/MobileGameView.tsx
+#: src/routes/games/components/GameRow.tsx
+msgid "Open this game on the site it came from"
+msgstr "Open this game on the site it came from"
 
 #: src/routes/game/components/GameHeaderBar.tsx
 msgid "casual"
@@ -5264,6 +5307,26 @@ msgstr "ply {plyNumber}/{plyCount}"
 #: src/routes/game/components/MobileGameView.tsx
 msgid "Game panels"
 msgstr "Game panels"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "No such move"
+msgstr "No such move"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Not a whole move yet"
+msgstr "Not a whole move yet"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Type a move"
+msgstr "Type a move"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Nf3, exd5, O-O…"
+msgstr "Nf3, exd5, O-O…"
+
+#: src/routes/game/components/MoveInput.tsx
+msgid "Type a move in notation; it is played as soon as it is unambiguous."
+msgstr "Type a move in notation; it is played as soon as it is unambiguous."
 
 #: src/routes/game/components/MoveList.tsx
 msgid "{plyCount} plies"
@@ -5705,6 +5768,10 @@ msgstr "Select game {id}"
 #: src/routes/games/components/GameRow.tsx
 msgid "Unknown opening"
 msgstr "Unknown opening"
+
+#: src/routes/games/components/GameRow.tsx
+msgid "Engine hidden on this game until you show it"
+msgstr "Engine hidden on this game until you show it"
 
 #: src/routes/games/components/GameRow.tsx
 msgid "queueing…"

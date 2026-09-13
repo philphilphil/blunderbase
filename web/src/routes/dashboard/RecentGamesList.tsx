@@ -82,7 +82,10 @@ function titleOf(game: GameCardRow, i18n: I18n): string {
 function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: boolean }) {
   const { t, i18n } = useLingui()
   const outcome = outcomeOf(game)
-  const worst = engineHidden ? null : worstOf(game)
+  // Quiet under ⇧E, and quiet for a game imported with its engine held back
+  // (`engine_hidden`): the swing reads `—` and the badge is left out, as for a game nothing
+  // has analysed — the row says what was played and not how well.
+  const worst = engineHidden || game.engine_hidden ? null : worstOf(game)
   return (
     <Link
       to={`/games/${game.id}`}

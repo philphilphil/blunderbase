@@ -20,6 +20,12 @@ stehen je für eine Filtergruppe:
 Die Zeile über der Tabelle zeigt, wie viele Partien passen. **Leeren** daneben setzt alle
 Chips auf einmal zurück; jeder Chip hat zusätzlich sein eigenes Kreuz.
 
+In der Tabelle ist der Chip **Quelle** einer Lichess- oder Chess.com-Zeile ein Link: Er
+öffnet die Partie auf der Seite in einem neuen Tab, ohne hier die Zeile zu öffnen. Ein
+hochgeladenes PGN behält den Link, wenn die Datei von einer der beiden Seiten stammt.
+FICS-, OTB- und von Hand angelegte Fernschachpartien haben nirgends eine Seite; ihr Chip
+ist nur ein Chip.
+
 ## In der Tabelle suchen
 
 `/` setzt den Cursor ins Suchfeld. Gesucht wird in Gegnername, ECO-Code und im Text des PGN.
@@ -47,6 +53,11 @@ nach **Verlust** sortiert war, fällt solange auf „neueste zuerst“ zurück. 
 jemand gegeben hat – und **analysieren** steht bei einer Partie, die noch niemand
 angesehen hat, weiterhin da. Alles zum Modus steht unter
 [Einstellungen](settings.md#hide-the-engine).
+
+Eine Zeile, die in der Spalte **Verlust** ein Auge zeigt, während der Rest der Tabelle
+aussieht wie immer, ist eine Partie, die mit ausgeblendeter Engine importiert wurde
+([Analyse](analysis.md#hide-the-engine-on-new-games)); öffne sie und drück **Engine
+zeigen**, wenn du sie gelesen hast.
 
 ## Mehrere Partien auf einmal bearbeiten
 

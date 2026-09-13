@@ -351,6 +351,15 @@ class Game(Base):
     is_owner_game: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
     )
+    # Whether the engine's verdict on this game is kept off the screen until the owner asks
+    # for it. Set when the game is stored, from `app_settings.hide_engine_new_games`, and
+    # cleared by the owner on the game itself ("Show the engine"); never by an analysis run,
+    # whose results it is there to hold back. Nothing about the analysis changes with it —
+    # the runs happen and the evals are stored — only what the game screen and the lists
+    # show. Off for every game that predates the column, which is what those games did.
+    engine_hidden: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
 
     result: Mapped[Result] = mapped_column(EnumString(Result), nullable=False)
     termination: Mapped[str | None] = mapped_column(String(64))

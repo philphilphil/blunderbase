@@ -326,6 +326,29 @@ def test_half_a_ply_window_is_a_typed_refusal(api: TestClient, seeded: dict[str,
     assert error_of(response) == "invalid_request"
 
 
+def test_the_engine_can_be_shown_or_held_back_on_one_game(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    game_id = seeded["game_id"]
+    assert api.get(f"/games/{game_id}").json()["game"]["engine_hidden"] is False
+
+    response = api.put(f"/games/{game_id}/engine", json={"hidden": True})
+
+    assert response.status_code == 200
+    assert response.json()["id"] == game_id
+    assert response.json()["engine_hidden"] is True
+    # Only the flag moved: the evals are still there for the moment the owner asks.
+    detail = api.get(f"/games/{game_id}").json()
+    assert detail["game"]["engine_hidden"] is True
+    assert any(move.get("classification") for move in detail["moves"])
+    rows = api.get("/games", params={"limit": 50}).json()["games"]
+    assert next(row for row in rows if row["id"] == game_id)["engine_hidden"] is True
+
+    shown = api.put(f"/games/{game_id}/engine", json={"hidden": False}).json()
+    assert shown["engine_hidden"] is False
+    assert api.put("/games/999999/engine", json={"hidden": False}).status_code == 404
+
+
 def test_a_game_that_is_not_there_is_a_typed_404(api: TestClient) -> None:
     response = api.get("/games/9999")
 

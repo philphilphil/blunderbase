@@ -7,6 +7,11 @@ markierten Zug, Pos1 und Ende an Anfang und Ende, die Leertaste spielt die Parti
 dreht das Brett, `[` und `]` öffnen die vorige und die nächste Partie deiner Liste. Die
 vollständige Tastenliste steht unter [Einstellungen](settings.md).
 
+Die Leiste oben nennt die Eröffnung, die Herkunft der Partie, ihre Bedenkzeit und den
+Ausgang. Bei einer Lichess- oder Chess.com-Partie ist der Quellen-Chip dort ein Link, der
+die Partie auf der Seite in einem neuen Tab öffnet; auf dem Telefon ist derselbe Link der
+Pfeil neben der PGN-Schaltfläche.
+
 ## Was die Markierungen bedeuten
 
 Die Zugspalte kennzeichnet Züge mit `??`, `?`, `?!` oder `!` und färbt die betroffenen
@@ -30,6 +35,16 @@ Spiel einen Zug auf dem Brett, und du bist in einer Variante; `Esc` bringt dich 
 zurück. **Diese Variante anheften** speichert sie mit der Partie, sodass sie beim nächsten
 Mal wieder da ist und im PGN-Export steht.
 
+Du kannst die Züge auch tippen. `M`, oder die Tastatur-Schaltfläche neben **Hinweise**,
+öffnet ein kleines Feld unter dem Brett: Tipp `Sf3`, `exd5`, `O-O` oder `e8=D` – oder
+schlicht `g1f3` –, und der Zug wird gespielt, sobald er nur noch eines bedeuten kann; eine
+ganze Variante geht so als eine Folge von Zügen hinein. Schlagzeichen, Schach und `=` sind
+freiwillig, die englischen Figurenbuchstaben gehen genauso (`Nf3`), und ein Zug, den zwei
+Figuren machen könnten (`Sd2` mit zwei Springern), wird als mehrdeutig gemeldet, bis du die
+Linie dazuschreibst. `↵` spielt das Getippte, wenn das Feld noch auf mehr wartet, `Esc`
+schließt es. Solange das Feld den Cursor hat, bewegen die Pfeiltasten den Cursor und nicht
+die Partie.
+
 ## Die Engine live rechnen lassen
 
 `E` startet die Engine auf der aktuellen Stellung. Stell ein, wie viele Varianten sie
@@ -49,6 +64,12 @@ Verlauf, die Bereiche von Engine und Maia. Die Züge, die Uhren und deine Notize
 und ebenso die Schaltflächen **Schnell** und **Tief**: Schreib erst auf, was deiner Meinung
 nach schiefging, dann drück eine davon und sieh nach. Der Modus bleibt an, bis du ihn wieder
 ausschaltest; alles dazu steht unter [Einstellungen](settings.md#hide-the-engine).
+
+Eine Partie kann auch von selbst stumm ankommen: Ist unter
+[Analyse](analysis.md#hide-the-engine-on-new-games) **Engine bei neuen Partien ausblenden**
+an, wird jede neu importierte Partie analysiert, zeigt aber nichts davon, und in der Zeile
+unter dem Brett steht eine Schaltfläche **Engine zeigen**. Lies die Partie, dann drück sie –
+von da an spricht diese Partie, und die anderen bleiben unberührt.
 
 ## Eine Notiz schreiben
 

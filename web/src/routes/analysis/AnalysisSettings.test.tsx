@@ -87,6 +87,23 @@ describe('focused analysis configuration', () => {
     })
   })
 
+  it('offers to hide the engine on new games, and saves the switch as a flag', async () => {
+    draw(<EnginePassesPage />)
+
+    const hide = await screen.findByRole('switch', { name: 'Hide the engine on new games' })
+    // Nothing stored means off, which is what every game before the switch existed did.
+    expect(hide).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled()
+
+    await userEvent.click(hide)
+    expect(hide).toHaveAttribute('aria-checked', 'true')
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(sent).not.toBeNull())
+    // The flag rides with the whole of the settings, the budgets untouched.
+    expect(sent).toMatchObject({ hide_engine_new_games: 1, quick_nodes: 111000, maia_elos: [1500, 1800] })
+  })
+
   it('keeps Maia controls together and carries engine-pass values through its save', async () => {
     draw(<MaiaSettingsPage />)
 

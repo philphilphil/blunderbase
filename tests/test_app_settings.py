@@ -52,6 +52,20 @@ def test_nothing_is_configured_until_somebody_configures_it(session: Session) ->
     assert app_settings.get_maia_on_quick(session) is True
     assert app_settings.get_maia_on_deep(session) is False
     assert app_settings.get_maia_both_sides(session) is True
+    # A new game shows what the pass found, as every game before the switch existed did.
+    assert app_settings.get_hide_engine_new_games(session) is False
+
+
+def test_hiding_the_engine_on_new_games_is_a_flag_like_the_maia_switches(
+    session: Session,
+) -> None:
+    app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, 1)
+    assert app_settings.get_hide_engine_new_games(session) is True
+    # Clamped like every other row: there is nothing between off and on to land on.
+    app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, 7)
+    assert app_settings.get_hide_engine_new_games(session) is True
+    app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, None)
+    assert app_settings.get_hide_engine_new_games(session) is False
 
 
 def test_which_tier_a_maia_pass_belongs_to_is_the_tiers_own_setting(session: Session) -> None:

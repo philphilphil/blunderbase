@@ -1,11 +1,13 @@
 import type { Api } from '@lichess-org/chessground/api'
 import type { DrawShape } from '@lichess-org/chessground/draw'
 import { Trans, useLingui } from '@lingui/react/macro'
+import type { Chess } from 'chessops/chess'
 import {
   Check,
   ChevronLeft,
   ChevronRight,
   Flag,
+  Keyboard,
   Loader2,
   Pause,
   Play,
@@ -28,8 +30,10 @@ import { cn } from '@/lib/utils'
 
 import type { AnalysisLine } from '../analysisLine'
 import { sameMove, type MaiaLevel, type PlyPosition, type Side } from '../gameModel'
+import type { TypedMove } from '../moveInput'
 import type { RunProgress } from '../useAnalysisRequest'
 import { EvalBar } from './EvalBar'
+import { MoveInput } from './MoveInput'
 
 export interface BoardPanelProps {
   /** The game position the cursor is on. */
@@ -42,6 +46,22 @@ export interface BoardPanelProps {
   analysis?: AnalysisLine | null
   /** A move dragged on the board — how a line is started or extended. */
   onPlayMove?: (orig: string, dest: string) => void
+  /**
+   * The box a move is typed into (`MoveInput`), and whether it is open. The page owns the
+   * state rather than this panel because `M` opens the box from anywhere on the screen and
+   * the page's keyboard hook is where `M` lands; the panel only draws the button and the
+   * box. `board` is the position the typed move is resolved against — the analysis line's,
+   * which is the game position when no line is being walked. Null on a board nothing can be
+   * played on, and the button is left out with it.
+   */
+  moveEntry?: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    board: Chess
+    onPlay: (move: TypedMove) => void
+    /** Bumped when `M` is pressed on an open box, so the caret comes back to it. */
+    focusNonce: number
+  } | null
   /** Back to the game line. Only offered while there is a line to leave. */
   onExitAnalysis?: () => void
   orientation: Side
@@ -192,6 +212,7 @@ export function BoardPanel({
   position,
   analysis,
   onPlayMove,
+  moveEntry = null,
   onExitAnalysis,
   orientation,
   game,
@@ -600,6 +621,39 @@ export function BoardPanel({
           >
             <Trans>Hints</Trans>
           </button>
+
+          {/* The typed-move box, and the button that opens it. In the "what the board is
+              showing" group rather than with the actions: typing a move is another way of
+              playing on the board, not something done to the game. Lit while open, like
+              Hints, and the box itself follows the button so the row grows to the right of
+              what the reader just pressed. */}
+          {moveEntry ? (
+            <>
+              <button
+                type="button"
+                onClick={() => moveEntry.onOpenChange(!moveEntry.open)}
+                aria-pressed={moveEntry.open}
+                aria-label={t`Type a move (M)`}
+                title={t`Type a move (M) — Nf3, exd5, O-O — instead of dragging it`}
+                className={cn(
+                  'flex flex-none items-center rounded-md border px-2 py-[0.3125rem] text-xs max-md:py-1.5',
+                  moveEntry.open
+                    ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
+                    : 'border-edge bg-elevated text-dim hover:text-ink',
+                )}
+              >
+                <Keyboard className="size-3.5" aria-hidden />
+              </button>
+              {moveEntry.open ? (
+                <MoveInput
+                  board={moveEntry.board}
+                  onPlay={moveEntry.onPlay}
+                  onClose={() => moveEntry.onOpenChange(false)}
+                  focusNonce={moveEntry.focusNonce}
+                />
+              ) : null}
+            </>
+          ) : null}
         </div>
 
         {/* A rule with nothing behind it divides the row from the air. The actions group can

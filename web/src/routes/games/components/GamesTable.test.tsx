@@ -189,6 +189,42 @@ describe('GamesTable rows', () => {
   })
 })
 
+describe('GamesTable source chip', () => {
+  it('links to the game on its site without opening the row', async () => {
+    const props = setup({
+      games: [{ ...GAME, url: 'https://lichess.org/abcd1234' } as GameCard],
+    })
+    const link = screen.getByRole('link', { name: /Lichess/ })
+    expect(link).toHaveAttribute('href', 'https://lichess.org/abcd1234')
+    expect(link).toHaveAttribute('target', '_blank')
+    await userEvent.click(link)
+    expect(props.onOpen).not.toHaveBeenCalled()
+  })
+
+  it('is a plain chip on a game that has no page anywhere', () => {
+    setup()
+    expect(screen.queryByRole('link', { name: /Lichess/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Lichess')).toBeInTheDocument()
+  })
+})
+
+describe('GamesTable with one game imported with its engine held back', () => {
+  it('keeps the Worst column and quietens only that row', () => {
+    const quiet = { ...GAME, id: 13, white: 'quietone', engine_hidden: true } as GameCard
+    setup({ games: [GAME, quiet] })
+
+    // The column is still there — ⇧E is off — and the ordinary row reads as ever.
+    expect(screen.getByRole('button', { name: /Worst/ })).toBeInTheDocument()
+    expect(screen.getAllByText('−80%')).toHaveLength(1)
+    expect(screen.getAllByLabelText('1 blunder')).toHaveLength(1)
+    // The held-back row says why it is quiet, in the cell the number would be in.
+    expect(
+      screen.getByRole('img', { name: 'Engine hidden on this game until you show it' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('quietone')).toBeInTheDocument()
+  })
+})
+
 describe('GamesTable with the engine hidden', () => {
   it('drops the Worst column and the flag badges, and keeps the game', () => {
     setEngineHidden(true)

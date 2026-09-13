@@ -29,9 +29,9 @@ from backend.db.models import (
     ImportJob,
     Position,
 )
+from backend.services import app_settings, import_service
 from backend.services import engines as engines_service
 from backend.services import games as games_service
-from backend.services import import_service
 from backend.services.import_service import ImportFailure, ParsedGame
 
 START_EPD = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
@@ -111,6 +111,29 @@ def test_a_pgn_file_imports_every_readable_game(session: Session, fixtures_dir: 
     assert _count(session, Game) == 3
     assert {game.source for game in session.scalars(select(Game))} == {Source.PGN}
     assert all(game.import_job_id == job.id for game in session.scalars(select(Game)))
+
+
+def test_a_game_links_back_to_the_site_it_came_from(session: Session, fixtures_dir: Path) -> None:
+    """Lichess writes the game's page into `Site`, chess.com into `Link`, and a file exported
+    from either keeps the header — so an uploaded PGN links back too. A game with no page
+    anywhere links nowhere, and a `Site` that is a name rather than an address is not one."""
+    import_service.run_import(session, "pgn", path=_multi_game(fixtures_dir))
+    stored = list(session.scalars(select(Game)))
+
+    assert {games_service.game_url(game) for game in stored} == {
+        "https://lichess.org/abcd1234",
+        "https://www.chess.com/game/live/98765432",
+        "https://lichess.org/zzzz9999",
+    }
+    assert all(games_service.game_summary(game)["url"] for game in stored)
+
+    # A Lichess game is its id, whatever its PGN says; a game from nowhere is None.
+    lichess = stored[0]
+    lichess.source, lichess.source_id, lichess.pgn = Source.LICHESS, "q1w2e3r4", '[Site "?"]\n\n*'
+    assert games_service.game_url(lichess) == "https://lichess.org/q1w2e3r4"
+    lichess.source, lichess.source_id = Source.FICS, "12345"
+    assert games_service.game_url(lichess) is None
+    assert "url" not in games_service.game_summary(lichess)
 
 
 def test_a_bad_game_is_recorded_on_the_job_and_never_aborts_the_sync(
@@ -259,6 +282,50 @@ def test_a_rematch_with_the_same_moves_is_still_two_games(session: Session) -> N
     assert (first.created, second.created) == (True, True)
     assert first.game.dedup_hash == second.game.dedup_hash
     assert _count(session, Game) == 2
+
+
+def test_a_new_game_arrives_with_its_engine_hidden_only_while_the_setting_says_so(
+    session: Session,
+) -> None:
+    """The flag is the setting at the moment the game is stored, copied onto the row: a
+    game stored before it was switched on stays as it was, and a game that is not the
+    owner's is never held back — there is nothing of theirs to read first."""
+    job = ImportJob(source=Source.PGN, status=JobStatus.RUNNING)
+    session.add(job)
+    session.commit()
+
+    def game(source_id: str) -> ParsedGame:
+        return ParsedGame(
+            source=Source.LICHESS,
+            source_id=source_id,
+            white_name="blunderbase",
+            black_name="opponent1",
+            result=Result.WHITE_WIN,
+            pgn="from the API",
+            moves_uci=["e2e4", "e7e5"],
+            moves_san=["e4", "e5"],
+            played_at=datetime(2026, 3, 1, 12, 0, tzinfo=UTC),
+        )
+
+    before = import_service.ingest_game(session, job, game("zzBefore"))
+    session.commit()
+    app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, 1)
+    hidden = import_service.ingest_game(session, job, game("zzHidden"))
+    not_mine = import_service.ingest_game(session, job, game("zzModel"), presume_owner=False)
+    explicit = import_service.ingest_game(session, job, game("zzShown"), hide_engine=False)
+    session.commit()
+
+    assert before.game is not None and before.game.engine_hidden is False
+    assert hidden.game is not None and hidden.game.engine_hidden is True
+    assert not_mine.game is not None and not_mine.game.engine_hidden is False
+    assert explicit.game is not None and explicit.game.engine_hidden is False
+    # The summary every payload embeds carries it, so a list row knows to hold back too.
+    assert games_service.game_summary(hidden.game)["engine_hidden"] is True
+
+    # And the owner's own word on the game outranks the import's.
+    assert games_service.set_engine_hidden(session, hidden.game.id, False) is hidden.game
+    assert hidden.game.engine_hidden is False
+    assert games_service.set_engine_hidden(session, 10**9, False) is None
 
 
 def test_deleting_one_rematch_does_not_block_the_other(session: Session) -> None:

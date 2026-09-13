@@ -20,6 +20,11 @@ own one group:
 The line above the table says how many games match. **Clear** next to it drops every chip
 at once, and a chip's own clear drops just that group.
 
+In the table, the **Source** chip on a Lichess or Chess.com row is a link: it opens the
+game on that site in a new tab, without opening the row here. A PGN you uploaded keeps the
+link too when the file came from one of those sites. FICS, OTB and typed correspondence
+games have no page anywhere, and their chip is just a chip.
+
 ## Search the table
 
 `/` puts the cursor in the search box, which matches an opponent, an ECO code and the text
@@ -46,6 +51,11 @@ every row, so the table says what you played and not how well. A list left sorte
 work — a question you asked is not an answer you were handed — and **analyse** is still
 there on a game nothing has looked at. The whole of the mode is under
 [Settings](settings.md#hide-the-engine).
+
+A row that shows an eye in the **Worst** column, with the rest of the table as ever, is a
+game that was imported with its engine held back
+([Analysis](analysis.md#hide-the-engine-on-new-games)); open it and press **Show the
+engine** when you have read it.
 
 ## Act on several games at once
 

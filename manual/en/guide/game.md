@@ -6,6 +6,10 @@
 to the ends, and Space plays the game through. `F` flips the board, `[` and `]` open the
 previous and next game in your list. The full list is under [Settings](settings.md).
 
+The bar across the top names the opening, where the game came from, its time control and
+how it ended. On a Lichess or Chess.com game the source chip there is a link that opens the
+game on that site in a new tab; on a phone the same link is the arrow beside the PGN button.
+
 ## What the badges mean
 
 The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged rows. The
@@ -28,6 +32,15 @@ deep one. Point at one and it is drawn on the board, in whatever form you chose 
 Play a move on the board and you are in a variation; `Esc` returns to the game. **Pin this
 line** keeps one with the game, so it is there next time and in the PGN export.
 
+You can type the moves instead. `M`, or the keyboard button beside **Hints**, opens a small
+box under the board: type `Nf3`, `exd5`, `O-O` or `e8=Q` — or plain `g1f3` — and the move
+is played the moment it can only mean one thing, so a whole line goes in as one run of
+moves. Captures, checks and `=` are optional, the piece letters of your language work
+(`Sf3` in German), and a move two pieces could make (`Nd2` with both knights able) is
+reported as ambiguous until you add the file. `↵` plays what is typed when the box is
+waiting for more, `Esc` closes it. While the box has the cursor, the arrow keys move the
+caret rather than the game.
+
 ## Run the live engine
 
 `E` opens the live engine on the position in front of you. Set how many lines it shows;
@@ -46,6 +59,11 @@ and Maia panels. The moves, the clocks and your notes stay, and so do the **Quic
 **Deep** buttons — write down what you think went wrong, then press one and see. The mode
 holds until you press it again; the whole of it is under
 [Settings](settings.md#hide-the-engine).
+
+A game can also arrive quiet on its own: with **Hide the engine on new games** on under
+[Analysis](analysis.md#hide-the-engine-on-new-games), every newly imported game is analysed
+but shows nothing of it, and a **Show the engine** button sits in the row under the board.
+Read the game, then press it — that game speaks from then on, and the others are untouched.
 
 ## Write a note
 

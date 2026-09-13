@@ -8,7 +8,7 @@
  * decides where it sits, so the row stays one thing to reason about — and to test.
  */
 import { useLingui } from '@lingui/react/macro'
-import { X } from 'lucide-react'
+import { EyeOff, X } from 'lucide-react'
 import type * as React from 'react'
 import { memo } from 'react'
 
@@ -72,6 +72,11 @@ export const GameRow = memo(function GameRow({
   const tier = tierOf(game)
   const drop = worstDrop(game)
   const flags = flagCounts(game)
+  // This row's verdict is held back either because the engine is hidden everywhere (⇧E,
+  // which also takes the Worst column out of the table) or because this one game was
+  // imported with it held back (`engine_hidden`, cleared on the game itself). The second
+  // keeps the column and marks the cell instead, so the row says *why* it is quiet.
+  const quiet = engineHidden || game.engine_hidden === true
   // The owner's side, or null: a game added from the reference books has none, and a
   // game of theirs whose side is not yet known has none either. Their name is set bold
   // under its column, which is how the row says which side was theirs — the same fact
@@ -158,12 +163,27 @@ export const GameRow = memo(function GameRow({
 
       <span {...cell('moves', 'text-right text-soft')}>{moveCount(game.ply_count)}</span>
 
-      {engineHidden ? null : (
+      {engineHidden ? null : quiet ? (
+        <span {...cell('worst', 'flex items-center justify-end text-dim')}>
+          <EyeOff
+            className="size-3"
+            role="img"
+            aria-label={t`Engine hidden on this game until you show it`}
+          />
+        </span>
+      ) : (
         <span {...cell('worst', cn('text-right', dropTone(drop)))}>{formatDrop(drop)}</span>
       )}
 
       <span {...cell('source')}>
-        <SourceBadge source={game.source} size="sm" />
+        {/* A link to the game on its site where it has one; the click stops in the chip
+            rather than also opening the row (`SourceBadge`). */}
+        <SourceBadge
+          source={game.source}
+          size="sm"
+          href={game.url}
+          title={game.url ? t`Open this game on the site it came from` : undefined}
+        />
       </span>
 
       <span {...cell('tier')}>
@@ -175,7 +195,7 @@ export const GameRow = memo(function GameRow({
       </span>
 
       <span {...cell('flags', 'flex items-center gap-1 overflow-hidden')}>
-        {tier && engineHidden ? null : tier ? (
+        {tier && quiet ? null : tier ? (
           flags.map((flag) => (
             <ClassificationBadge
               key={flag.glyph}

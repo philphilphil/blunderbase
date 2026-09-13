@@ -27,6 +27,11 @@ was Blunderbase *getan* hat: welcher Durchlauf gelaufen ist und wie tief, samt d
 Schaltflächen, die den nächsten einreihen. Genau die drückst du, wenn dein eigenes Urteil
 geschrieben ist.
 
+Wenn du die Ruhe nur bei *neuen* Partien willst – jede erst durchgehen, wie sie
+hereinkommt, dann die Engine für sie einschalten –, ist das eine Einstellung der
+Bibliothek und nicht des Browsers: **Analyse → Engine-Durchläufe → Neue Partien**,
+beschrieben unter [Analyse](analysis.md#hide-the-engine-on-new-games).
+
 ## Das Brett einstellen
 
 Das Zahnrad unter dem Brett oder `S` öffnet die **Bretteinstellungen**. Sie gelten nur in
@@ -88,6 +93,7 @@ aktuellen Bildschirm gelten.
 | `H` | Hinweise: die Pfeile auf dem Brett und die Engine-Spalten |
 | `E` | Die Engine auf dieser Stellung rechnen lassen |
 | `↵` | Den Zug der Engine aufs Brett spielen |
+| `M` | Einen Zug tippen – `Sf3`, `exd5`, `O-O` – statt ihn zu ziehen |
 | `S` | Bretteinstellungen |
 | `Esc` | Zurück zur Partie |
 

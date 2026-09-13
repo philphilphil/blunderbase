@@ -34,7 +34,7 @@ from backend.db.models import (
 from backend.db.session import database_backpressure
 from backend.db.types import utcnow
 from backend.services import accounts as accounts_service
-from backend.services import analysis, engines
+from backend.services import analysis, app_settings, engines
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services.accounts import AccountIndex, fold
@@ -393,6 +393,10 @@ def ingest_games(
         session.commit()
     if accounts is None:
         accounts = AccountIndex.load(session)
+    # Read once for the stream rather than per game: a sync of a few thousand games is a
+    # few thousand games stored under one answer, and the setting is the answer at the
+    # moment the stream started, the way a run's budget is the budget when it was queued.
+    hide_engine = app_settings.get_hide_engine_new_games(session)
 
     result = ImportResult()
     # Whether the stream is still settling: it stops at the first game the database could
@@ -419,6 +423,7 @@ def ingest_games(
                     accounts,
                     analyze=analyze,
                     presume_owner=presume_owner,
+                    hide_engine=hide_engine,
                     sleep=sleep,
                 )
             except Exception as exc:
@@ -460,6 +465,7 @@ def _ingest_with_retries(
     *,
     analyze: bool,
     presume_owner: bool,
+    hide_engine: bool,
     sleep: Callable[[float], None],
 ) -> IngestOutcome:
     """`ingest_game`, tried again while it is the database that is failing, not the game.
@@ -472,7 +478,13 @@ def _ingest_with_retries(
     while True:
         try:
             return ingest_game(
-                session, job, parsed, accounts, analyze=analyze, presume_owner=presume_owner
+                session,
+                job,
+                parsed,
+                accounts,
+                analyze=analyze,
+                presume_owner=presume_owner,
+                hide_engine=hide_engine,
             )
         except Exception as exc:
             session.rollback()
@@ -498,6 +510,7 @@ def ingest_game(
     *,
     analyze: bool = True,
     presume_owner: bool = True,
+    hide_engine: bool | None = None,
 ) -> IngestOutcome:
     """Store one parsed game, or report the one that is already there.
 
@@ -510,9 +523,16 @@ def ingest_game(
     fetched from the reference books is the opposite case — somebody else's unless an owner
     account is recognised in it — and passes False. A PGN upload is the one route that can
     be either, so the person uploading it says which.
+
+    `hide_engine` is whether the game arrives with its engine held back
+    (`Game.engine_hidden`). None asks the `hide_engine_new_games` setting, which is what
+    every import route means; a stream reads it once and passes the answer down. A game
+    that is not the owner's is never hidden — there is nothing of theirs to review first.
     """
     if accounts is None:
         accounts = AccountIndex.load(session)
+    if hide_engine is None:
+        hide_engine = app_settings.get_hide_engine_new_games(session)
 
     digest = dedup_hash(parsed)
     # One question — "does the library know this game?" — asked once, over the games and
@@ -541,6 +561,7 @@ def ingest_game(
         owner_color = Color.WHITE
     elif black_is_owner:
         owner_color = Color.BLACK
+    is_owner_game = presume_owner or owner_color is not None
 
     game = Game(
         source=parsed.source,
@@ -553,7 +574,8 @@ def ingest_game(
         white_account_id=white_account,
         black_account_id=black_account,
         owner_color=owner_color,
-        is_owner_game=presume_owner or owner_color is not None,
+        is_owner_game=is_owner_game,
+        engine_hidden=hide_engine and is_owner_game,
         result=parsed.result,
         termination=parsed.termination,
         variant=parsed.variant,
@@ -706,6 +728,7 @@ def import_one(
     progress: ProgressHook | None = None,
     presume_owner: bool = True,
     analyze: bool = True,
+    hide_engine: bool | None = None,
 ) -> IngestOutcome:
     """Store one game the owner asked for by name, under a job of its own.
 
@@ -722,7 +745,9 @@ def import_one(
 
     `analyze=False` stores the game without the automatic quick pass, which is what a
     correspondence game being created is: it has no moves yet, its analysis is the tree
-    while it is played, and a pass over it would be redone after every move.
+    while it is played, and a pass over it would be redone after every move. `hide_engine`
+    is `ingest_game`'s: None asks the setting, and a correspondence game passes False,
+    because a game played *with* the engine is not one to be read before it speaks.
     """
     known = games_service.identify(session, parsed.source, parsed.source_id, dedup_hash(parsed))
     if known.deleted is not None:
@@ -735,7 +760,14 @@ def import_one(
 
     result = ImportResult(seen=1)
     try:
-        outcome = ingest_game(session, job, parsed, presume_owner=presume_owner, analyze=analyze)
+        outcome = ingest_game(
+            session,
+            job,
+            parsed,
+            presume_owner=presume_owner,
+            analyze=analyze,
+            hide_engine=hide_engine,
+        )
     except Exception as exc:
         session.rollback()
         error = f"{type(exc).__name__}: {exc}"

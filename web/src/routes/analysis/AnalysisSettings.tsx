@@ -139,11 +139,24 @@ function LoadingOrError({
 export function EnginePassesPage() {
   const { i18n, t } = useLingui()
   const settings = useAppSettings()
-  const save = useSaveAppSettings({ onSuccess: () => setDraft({}) })
+  const save = useSaveAppSettings({
+    onSuccess: () => {
+      setDraft({})
+      setHideNew(null)
+    },
+  })
   const [draft, setDraft] = useState<Partial<Record<EngineKey, string>>>({})
+  // The one switch on this page: null while the reader has not touched it, so the stored
+  // value shows through and "dirty" means what it says.
+  const [hideNew, setHideNew] = useState<boolean | null>(null)
   const value = (key: EngineKey) => draft[key] ?? storedText(settings.data, key)
   const fields = [...PASS_FIELDS, ...CLASSIFICATION_FIELDS]
-  const dirty = fields.some((field) => value(field.key) !== storedText(settings.data, field.key))
+  const storedHideNew =
+    (settings.data?.hide_engine_new_games ?? DEFAULTS.hide_engine_new_games) === 1
+  const hideNewShown = hideNew ?? storedHideNew
+  const dirty =
+    fields.some((field) => value(field.key) !== storedText(settings.data, field.key)) ||
+    hideNewShown !== storedHideNew
   /** The two strings the box shows, in the reader's language. */
   const spec = (field: EngineSpec): SettingSpec<EngineKey> => ({
     ...field,
@@ -156,6 +169,7 @@ export function EnginePassesPage() {
     if (!dirty || !settings.data) return
     const body = completeUpdate(settings.data)
     for (const field of fields) body[field.key] = parse(value(field.key))
+    body.hide_engine_new_games = hideNewShown ? 1 : 0
     save.mutate(body)
   }
 
@@ -207,8 +221,55 @@ export function EnginePassesPage() {
               ))}
             </CardContent>
           </Card>
+          {/*
+            Not a budget, but it belongs beside them: it decides what the quick pass every
+            new game receives is allowed to *show* before the owner has read the game. The
+            browser-wide ⇧E mode hides everything everywhere; this is the per-game version,
+            stored on the game, so it survives a second browser and comes off one game at
+            a time.
+          */}
+          <Card>
+            <CardHeader className="flex-col items-stretch gap-1">
+              <CardTitle>
+                <Trans>New games</Trans>
+              </CardTitle>
+              <CardDescription>
+                <Trans>
+                  Read a game yourself before the engine tells you where it went wrong.
+                </Trans>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex items-start gap-2">
+                <Toggle
+                  checked={hideNewShown}
+                  onChange={setHideNew}
+                  label={t`Hide the engine on new games`}
+                />
+                <div className="flex flex-col gap-0.5 pt-1.5">
+                  <span className="text-[0.71875rem] text-body">
+                    <Trans>Hide the engine on new games</Trans>
+                  </span>
+                  <span className="text-[0.625rem] leading-[1.5] text-dim-2">
+                    <Trans>
+                      Every game you import from now on is analysed as usual but shows no
+                      evaluation, badge or line until you press <strong>Show the engine</strong> on
+                      that game. Games already in the library are left as they are.
+                    </Trans>
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           {save.isError ? <p role="alert" className="text-[0.6875rem] text-blunder">{save.error.message}</p> : null}
-          <SaveRow dirty={dirty} pending={save.isPending} onRevert={() => setDraft({})} />
+          <SaveRow
+            dirty={dirty}
+            pending={save.isPending}
+            onRevert={() => {
+              setDraft({})
+              setHideNew(null)
+            }}
+          />
         </form>
       ) : null}
     </PageBody>

@@ -42,6 +42,19 @@ nachtragen** tut dasselbe für Maia. **Warteschlange leeren** leert sie, und
 **Analyse → Engine-Durchläufe** legt das Knotenbudget jeder Stufe fest, wie viele Varianten
 eine Tiefenanalyse behält und die drei Schwellen von oben.
 
+## Die Engine bei neuen Partien ausblenden { #hide-the-engine-on-new-games }
+
+Auf derselben Seite steht **Neue Partien → Engine bei neuen Partien ausblenden**. Ist es
+an, wird jede Partie, die du von da an importierst, wie gewohnt analysiert, kommt aber
+stumm an: keine Bewertung, keine Markierung, kein Verlauf und keine Variante, bis du in der
+Zeile unter dem Brett dieser Partie **Engine zeigen** drückst. Der Gedanke: erst die eigene
+Partie lesen – wo ist sie gekippt? –, dann fragen. Partien, die schon in der Bibliothek
+sind, bleiben, wie sie sind; ebenso Fernschachpartien und Musterpartien aus dem
+Referenz-Explorer. In der Partienliste und auf der Startseite zeigt so eine Partie ein Auge
+statt ihres schlechtesten Zugs. `⇧E` blendet weiterhin alles überall aus, zusätzlich dazu;
+der Unterschied ist, dass `⇧E` ein Schalter des Browsers ist und dies an jeder Partie
+gespeichert wird.
+
 ## Was wird Maia gefragt? { #what-is-maia-asked }
 
 **Analyse → Maia** legt fest, welche Spielstärken gefragt werden – bis zu fünf Wertungen

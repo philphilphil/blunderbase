@@ -13,9 +13,11 @@ from backend.api.errors import ApiError
 from backend.api.schemas import (
     GameDeleteRequest,
     GameDetail,
+    GameEngineUpdate,
     GameList,
     GamesDeleted,
     GamesRemoved,
+    GameSummary,
     GamesWipe,
 )
 from backend.runtime import capabilities_for
@@ -144,3 +146,21 @@ def get_game(
     if detail is None:
         raise not_found("unknown_game", f"no game with id {game_id}")
     return GameDetail.model_validate(detail)
+
+
+@router.put(
+    "/{game_id}/engine",
+    response_model=GameSummary,
+    summary="Show the engine on one game, or hold it back again",
+)
+def put_game_engine(session: SessionDep, game_id: int, body: GameEngineUpdate) -> GameSummary:
+    """Flip `engine_hidden` on one game and answer with the game as it now reads.
+
+    This is the "Show the engine" button on a game that an import stored under
+    `hide_engine_new_games`. Nothing about the analysis moves — the runs and their evals are
+    where they were — only whether the screens show them for this game.
+    """
+    game = games_service.set_engine_hidden(session, game_id, body.hidden)
+    if game is None:
+        raise not_found("unknown_game", f"no game with id {game_id}")
+    return GameSummary.model_validate(games_service.game_summary(game))

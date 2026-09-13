@@ -36,9 +36,11 @@ import { advanceTrail, useGameTrail } from '@/routes/games/gameTrail'
 import { tokenTrouble } from '@/routes/explorer/reference'
 
 import { buildAnalysisLine, lineStartingWith, withBoardMove } from './analysisLine'
+import type { TypedMove } from './moveInput'
 import { BoardPanel } from './components/BoardPanel'
 import type { BookMove } from './components/BookPanel'
 import { ColumnSplitter } from './components/ColumnSplitter'
+import { EngineRevealButton } from './components/EngineRevealButton'
 import { EvalGraph } from './components/EvalGraph'
 import { FlaggedMoments } from './components/FlaggedMoments'
 import { GameHeaderBar } from './components/GameHeaderBar'
@@ -325,6 +327,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const [playing, setPlaying] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [hints, setHints] = useState(true)
+  // The typed-move box under the board: open or not, and a counter `M` bumps so that
+  // pressing it on an already-open box brings the caret back rather than doing nothing.
+  const [typingMove, setTypingMove] = useState(false)
+  const [moveFocus, setMoveFocus] = useState(0)
   /** The first move of the engine line being pointed at, previewed on the board. */
   const [hoverMove, setHoverMove] = useState<string | null>(null)
   /**
@@ -489,7 +495,11 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * is not "read this game unaided" — it is a screen with holes in it. Those are left out of
    * the layout entirely further down.
    */
-  const engineHidden = useEngineHidden()
+  const modeHidden = useEngineHidden()
+  // Two reasons for the same silence: the browser's ⇧E mode, and this one game having been
+  // imported with its verdict held back (`engine_hidden`, cleared by the button in the
+  // transport row). Everything below asks one question and gets one answer.
+  const engineHidden = modeHidden || detail?.game.engine_hidden === true
   const moves = useMemo<MoveRow[]>(
     () => (engineHidden ? withoutEngine(detail?.moves ?? []) : (detail?.moves ?? [])),
     [detail, engineHidden],
@@ -1387,9 +1397,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * live search: which lines are on offer is `boardPvs`, and the session is opened above.
    */
   const playMove = useCallback(
-    (orig: string, dest: string) => {
+    (orig: string, dest: string, promotion?: TypedMove['move']['promotion']) => {
       if (!analysis) return
-      const next = withBoardMove(analysis, orig, dest)
+      const next = withBoardMove(analysis, orig, dest, promotion)
       if (!next) return
       const offered = lineStartingWith(boardPvs, next[next.length - 1]!)
       if (offered) {
@@ -1485,6 +1495,12 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // more to the point, whatever is open on top of the page keeps it.
       exitLine: exploring ? exitLine : undefined,
       playBest: playEngineBest,
+      // Open the typed-move box, or put the caret back in it: the same key either way, so
+      // a reader whose hand left the box for the mouse has one thing to press.
+      typeMove: () => {
+        setTypingMove(true)
+        setMoveFocus((nonce) => nonce + 1)
+      },
       // The key presses the button that owns the panel — see `BOARD_SETTINGS_ID`.
       boardSettings: () => document.getElementById(BOARD_SETTINGS_ID)?.click(),
       // Both tiers are the buttons' own calls. Quick is bound even where its button is
@@ -1610,6 +1626,20 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       position={position}
       analysis={analysis}
       onPlayMove={playMove}
+      // A typed move is a board move with its promotion spelled out (`e8=N`), resolved
+      // against the line's own position — the game position when no line is being walked.
+      moveEntry={
+        analysis
+          ? {
+              open: typingMove,
+              onOpenChange: setTypingMove,
+              board: analysis.board,
+              onPlay: (typed) =>
+                playMove(typed.uci.slice(0, 2), typed.uci.slice(2, 4), typed.move.promotion),
+              focusNonce: moveFocus,
+            }
+          : null
+      }
       onExitAnalysis={exitLine}
       orientation={orientation}
       // The two player rows flanking the board — name, rating and the material each side is
@@ -1663,7 +1693,21 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // "Add to library" and "Back to explorer" ride in the control row under the board
       // rather than in the titlebar: they are decisions about the game being read, and the
       // titlebar is the one strip on this screen nobody's eye goes to.
-      actions={<StudioActions game={from} backTo={backToExplorer} />}
+      actions={
+        <>
+          {/* The way to hear the engine on a game that was imported with it held back.
+              Nothing while the game is not, and never for a reference game, which has no
+              row of its own to carry the flag. */}
+          {gameId !== null ? (
+            <EngineRevealButton
+              gameId={gameId}
+              hidden={detail.game.engine_hidden}
+              modeHidden={modeHidden}
+            />
+          ) : null}
+          <StudioActions game={from} backTo={backToExplorer} />
+        </>
+      }
     />
   )
 

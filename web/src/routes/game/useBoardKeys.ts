@@ -25,6 +25,8 @@ export interface BoardKeyHandlers {
   exitLine?: () => void
   /** Walk the engine's own move here onto the board. */
   playBest?: () => void
+  /** Open the box a move is typed into, or bring the caret back to it. */
+  typeMove?: () => void
   boardSettings?: () => void
   queueQuick?: () => void
   queueDeep?: () => void
@@ -176,6 +178,8 @@ function run(action: BoardAction, keys: BoardKeyHandlers): boolean {
       return call(keys.exitLine)
     case 'play-best':
       return call(keys.playBest)
+    case 'type-move':
+      return call(keys.typeMove)
     case 'board-settings':
       return call(keys.boardSettings)
     case 'queue-quick':

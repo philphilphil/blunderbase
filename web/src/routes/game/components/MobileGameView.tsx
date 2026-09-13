@@ -1,6 +1,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { ExternalLink } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
@@ -258,6 +259,7 @@ function CompactHeader({
   score: Score | null
   engineHidden: boolean
 }) {
+  const { t } = useLingui()
   const winner = game.result === '1-0' ? 'white' : game.result === '0-1' ? 'black' : null
   const plyNumber = cursor + 1
 
@@ -313,6 +315,20 @@ function CompactHeader({
         ) : (
           <UnanalysedBadge />
         )}
+        {/* The desktop header's source chip is the link to the game on its site; this line
+            has no room for the chip, so the arrow alone stands for it. */}
+        {game.url ? (
+          <a
+            href={game.url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t`Open this game on the site it came from`}
+            title={t`Open this game on the site it came from`}
+            className="flex size-7 items-center justify-center rounded-md border border-edge bg-elevated text-dim hover:text-ink"
+          >
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        ) : null}
         <PgnButton pgn={pgn} />
       </div>
     </div>

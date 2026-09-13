@@ -25,6 +25,11 @@ the moves, the clocks, your notes — and what Blunderbase has *done*: which pas
 how deep it went, and the buttons that queue another one, which is what you press once you
 have written your own verdict down.
 
+If what you want is quiet on *new* games only — review each one as it comes in, then turn
+the engine on for it — that is a setting of the library rather than of the browser:
+**Analysis → Engine passes → New games**, described under
+[Analysis](analysis.md#hide-the-engine-on-new-games).
+
 ## Set up the board
 
 The gear under the board, or `S`, opens **Board settings**. They apply in this browser
@@ -86,6 +91,7 @@ are on.
 | `H` | Hints — the board's arrows and the engine columns |
 | `E` | The live engine on this position |
 | `↵` | Play the engine's move onto the board |
+| `M` | Type a move — `Nf3`, `exd5`, `O-O` — instead of dragging it |
 | `S` | Board settings |
 | `Esc` | Back to the game |
 

@@ -100,7 +100,15 @@ export function GameHeaderBar({
           {game.eco}
         </span>
       ) : null}
-      <SourceBadge source={game.source} size="sm" className="flex-none" />
+      {/* The chip is the way to the game on its own site, where it has one: the same fact,
+          made clickable, rather than a sixth thing on the line. */}
+      <SourceBadge
+        source={game.source}
+        size="sm"
+        className="flex-none"
+        href={game.url}
+        title={game.url ? t`Open this game on the site it came from` : undefined}
+      />
       {timeControl ? (
         <span className="flex-none font-mono text-[0.6875rem] text-dim">{timeControl}</span>
       ) : null}
