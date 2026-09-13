@@ -11,11 +11,14 @@ import {
   evalAtCursor,
   evalCurve,
   formatResult,
+  formatSeconds,
   formatVariation,
   gameAnalysisSummary,
   humanMoves,
   maiaLevels,
   maiaLive,
+  moveTimeSummary,
+  moveTimes,
   nextFlaggedPly,
   pairMoves,
   plyLabel,
@@ -533,5 +536,130 @@ describe('barLayout', () => {
   it('never draws a column narrower than a hairline', () => {
     expect(barLayout(0, 200).width).toBe(0.75)
     expect(barLayout(240, 0).width).toBeGreaterThan(0)
+  })
+})
+
+describe('moveTimes', () => {
+  // A 3+2 game: the reading after each ply is what the source stored. A think is the
+  // mover's previous reading, plus the increment they were given, less this one.
+  const clocked: MoveRow[] = [
+    { ply: 0, san: 'e4', clock: 180 },
+    { ply: 1, san: 'e5', clock: 180 },
+    { ply: 2, san: 'Nf3', clock: 170, classification: 'best' },
+    { ply: 3, san: 'Nc6', clock: 150, classification: 'blunder' },
+    { ply: 4, san: 'Bb5', clock: 171 },
+  ]
+  const game = { initial_clock: 180, increment: 2 }
+
+  it('reads a think as the previous reading plus the increment, less this one', () => {
+    const points = moveTimes(clocked, game)
+    expect(points.map((p) => [p.ply, p.seconds])).toEqual([
+      [0, 0],
+      [1, 0],
+      [2, 12],
+      [3, 32],
+      [4, 1],
+    ])
+  })
+
+  it('starts each side from the initial clock without the increment', () => {
+    // The clock does not run on the first move, and every site reports it at the initial
+    // time; with the increment added a think of two seconds would appear on a move nobody
+    // timed.
+    const points = moveTimes(
+      [
+        { ply: 0, san: 'e4', clock: 175 },
+        { ply: 1, san: 'e5', clock: 180 },
+      ],
+      game,
+    )
+    expect(points.map((p) => p.seconds)).toEqual([5, 0])
+  })
+
+  it('carries the move, its verdict and what was left', () => {
+    const [, , , blunder] = moveTimes(clocked, game)
+    expect(blunder).toMatchObject({
+      ply: 3,
+      san: 'Nc6',
+      classification: 'blunder',
+      remaining: 150,
+    })
+    // An unflagged class is not a mark.
+    expect(moveTimes(clocked, game)[2]?.classification).toBeNull()
+  })
+
+  it('skips a ply without a reading rather than drawing it as zero', () => {
+    const points = moveTimes(
+      [
+        { ply: 0, san: 'e4', clock: 180 },
+        { ply: 1, san: 'e5', clock: 180 },
+        { ply: 2, san: 'Nf3' },
+        { ply: 3, san: 'Nc6', clock: 160 },
+        // No reading two plies back to count from, so nothing to draw here either.
+        { ply: 4, san: 'Bb5', clock: 170 },
+      ],
+      game,
+    )
+    expect(points.map((p) => p.ply)).toEqual([0, 1, 3])
+  })
+
+  it('never draws a negative think', () => {
+    // A reconnect that handed the clock back: the source's readings go up.
+    const points = moveTimes(
+      [
+        { ply: 0, san: 'e4', clock: 180 },
+        { ply: 1, san: 'e5', clock: 180 },
+        { ply: 2, san: 'Nf3', clock: 200 },
+      ],
+      game,
+    )
+    expect(points[2]?.seconds).toBe(0)
+  })
+
+  it('is empty for a game with no clocks, or no initial time to count the first move from', () => {
+    expect(moveTimes([{ ply: 0, san: 'e4' }, { ply: 1, san: 'e5' }], game)).toEqual([])
+    // Without the initial time the first two plies have nothing to count from; the third
+    // does, from the reading two plies back.
+    const points = moveTimes(clocked, { increment: 2 })
+    expect(points.map((p) => p.ply)).toEqual([2, 3, 4])
+  })
+})
+
+describe('moveTimeSummary', () => {
+  const points = moveTimes(
+    [
+      { ply: 0, san: 'e4', clock: 180 },
+      { ply: 1, san: 'e5', clock: 180 },
+      { ply: 2, san: 'Nf3', clock: 170 },
+      { ply: 3, san: 'Nc6', clock: 150 },
+      { ply: 4, san: 'Bb5', clock: 141 },
+    ],
+    { initial_clock: 180, increment: 2 },
+  )
+
+  it('averages one side, names its longest think and what it had left', () => {
+    expect(moveTimeSummary(points, 'white')).toEqual({
+      average: (0 + 12 + 31) / 3,
+      longest: { seconds: 31, ply: 4 },
+      remaining: 141,
+    })
+    expect(moveTimeSummary(points, 'black')).toEqual({
+      average: 16,
+      longest: { seconds: 32, ply: 3 },
+      remaining: 150,
+    })
+  })
+
+  it('is null for a side that made no timed move', () => {
+    expect(moveTimeSummary([], 'white')).toBeNull()
+  })
+})
+
+describe('formatSeconds', () => {
+  it('reads as a clock: seconds, then minutes, then hours', () => {
+    expect(formatSeconds(0)).toBe('0s')
+    expect(formatSeconds(12.6)).toBe('13s')
+    expect(formatSeconds(84)).toBe('1:24')
+    expect(formatSeconds(3723)).toBe('1:02:03')
   })
 })

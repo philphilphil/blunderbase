@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils'
 
 import type { NoteRow } from '../notesModel'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
+import { TAB, TAB_ON, TAB_ROW } from './paneTabs'
 
 export interface NotesTrackProps {
   /**
@@ -82,18 +83,6 @@ export interface NotesTrackProps {
  */
 const COMPOSER_SLOT = 'h-[9rem]'
 
-/**
- * The pane's title strip, in the same 35-design-pixel chrome band every other pane on the
- * game screen wears — so the Maia band's headers, the move table's tabs and this row all sit
- * on one line across the workspace.
- */
-const TAB_ROW = 'flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5'
-
-const TAB =
-  'relative flex h-full items-center gap-1.5 px-3 text-xs text-dim transition-colors hover:text-body-3'
-/** The selected tab is the pane's surface pushed into the strip — see `MoveList`'s `Tab`. */
-const TAB_ON =
-  'bg-surface font-medium text-ink after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-surface'
 
 export function NotesTrack({
   book,

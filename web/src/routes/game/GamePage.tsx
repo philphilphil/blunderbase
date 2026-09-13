@@ -70,6 +70,7 @@ import {
   maiaLevelFor,
   maiaLevelOptions,
   maiaLevels,
+  moveTimes,
   nextFlaggedPly,
   pairMoves,
   previousFlaggedPly,
@@ -508,6 +509,11 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const line = useMemo(() => buildGameLine(moves), [moves])
   const pairs = useMemo(() => pairMoves(moves), [moves])
   const curve = useMemo(() => evalCurve(moves), [moves])
+  // Empty for a game played without a clock, which is what keeps the graph pane to one tab.
+  const times = useMemo(
+    () => (detail ? moveTimes(moves, detail.game) : []),
+    [detail, moves],
+  )
   const notes = useMemo<GameNote[]>(
     () => sortNotes((detail?.notes ?? []) as GameNote[]),
     [detail],
@@ -1757,24 +1763,30 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       cursor={cursor}
       ownerSide={detail?.game.color ?? null}
       analysisSummary={best ? analysisSummary : null}
+      // The clock's reading of the same game, for the pane's second tab. `moves` rather
+      // than the curve: a think is a fact about the move whether or not a run has looked
+      // at it, and a game with clocks but no analysis still has something to draw here.
+      time={{ points: times, increment: detail?.game.increment ?? 0 }}
       // The header tallies name both players rather than saying You/Opp.: the curve is
       // about the game, and half of it is the opponent's.
       playerNames={{ white: detail?.game.white, black: detail?.game.black }}
       onSelectPly={selectPly}
       // Desktop: the workspace's third row, spanning both tracks, ruled off from the panes
       // above rather than floating between them, at the mockup's own height for the plot
-      // (170 design pixels, 150 in the narrow band) plus the padding it now carries itself.
-      // A definite height rather than a share of the row: the row above it is the one that
-      // should take the slack, because a move table is a list and a curve is a shape — a
-      // taller curve is the same handful of turning points drawn bigger.
+      // (170 design pixels, 150 in the narrow band) plus the padding it carries itself and
+      // the 35-pixel tab strip it now wears like every other pane. A definite height rather
+      // than a share of the row: the row above it is the one that should take the slack,
+      // because a move table is a list and a curve is a shape — a taller curve is the same
+      // handful of turning points drawn bigger.
       //
       // Phone: a compact box, since the rest of the Eval tab goes to `FlaggedMoments`,
-      // which is the part of "the story of the game" a finger can actually hit. 8.5rem so
-      // that at 812 a row or two of that list is on screen before anybody scrolls.
+      // which is the part of "the story of the game" a finger can actually hit. 10rem so
+      // that at 812 a row or two of that list is on screen before anybody scrolls, the
+      // strip included.
       className={
         mobile
-          ? 'h-[8.5rem]'
-          : 'col-span-2 h-[9.875rem] border-t border-edge-strong xl:h-[11.125rem]'
+          ? 'h-[10rem]'
+          : 'col-span-2 h-[11.5rem] border-t border-edge-strong xl:h-[12.75rem]'
       }
       // A drag along the curve walks the game. Only here: see `EvalGraph`'s own note.
       scrub={mobile}

@@ -1,18 +1,8 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Fragment, useMemo, useRef, useState } from 'react'
-import {
-  Area,
-  AreaChart,
-  ReferenceLine,
-  Tooltip,
-  XAxis,
-  YAxis,
-  usePlotArea,
-  useXAxisScale,
-  useYAxisScale,
-} from 'recharts'
+import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Area, AreaChart, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 
 import { SideDot } from '@/components/badges/SideDot'
 import type { Color } from '@/lib/api/types'
@@ -22,45 +12,28 @@ import { formatScore } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { useWheelStep } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
-import { useEvalGraphPrefs, type EvalGraphMarks } from '@/lib/ui/evalGraphPrefs'
+import { useEvalGraphPrefs } from '@/lib/ui/evalGraphPrefs'
 import { scaleMargin, scalePx } from '@/lib/ui/scale'
 
 import {
-  barLayout,
   plyLabel,
   type CurvePoint,
   type GameAnalysisSummary,
+  type MoveTimePoint,
   type PlayerAnalysisSummary,
 } from '../gameModel'
+import { PlotBars, PlotMarks, type PlotPoint } from './graphParts'
+import { FILL_BLACK, FILL_WHITE } from './graphTokens'
+import { MoveTimePlot, TimeTallies } from './MoveTimeGraph'
+import { TAB, TAB_ON, TAB_ROW } from './paneTabs'
 
 const AXIS = 50
 const CURVE = 'var(--bb-text-2)'
-/**
- * Flat, opaque fills, one per side: white above the axis and black below it, read against
- * the mid-grey plot ground (`--bb-graph-bg`) — lichess's treatment, and the reason that
- * ground is its own token rather than the pane's surface.
- *
- * They used to be mixed down to 55 % / 85 % against a background that was nearly the same
- * value as the fill in each theme, which left both halves as tints of the ground and the
- * curve doing all the work. Solid, the side that is winning is legible at a glance from
- * across the desk, which is the whole job of this chart.
- */
-const FILL_WHITE = 'var(--bb-side-white)'
-const FILL_BLACK = 'var(--bb-side-black)'
-/** Only the bars wear these: a rim is what keeps a black column from reading as a hole. */
-const EDGE_WHITE = 'var(--bb-side-white-edge)'
-const EDGE_BLACK = 'var(--bb-side-black-edge)'
-const GRAPH_BG = 'var(--bb-graph-bg)'
-/** The design marks — and its legend explains — only these two. */
-type MarkedGlyph = 'blunder' | 'mistake'
-
-/** The classification as a mark on the plot, or nothing for the plies that carry none. */
-function markFor(classification: CurvePoint['classification']): MarkedGlyph | null {
-  const glyph = glyphFor(classification)
-  return glyph === 'blunder' || glyph === 'mistake' ? glyph : null
-}
 
 const CONFIG: ChartConfig = { win: { label: <Trans>White</Trans>, color: CURVE } }
+
+/** The pane's two readings of the game against ply: who was ahead, and who was thinking. */
+export type GraphTab = 'eval' | 'time'
 
 /**
  * A curve point split into the half above and the half below the axis, so each half can
@@ -100,66 +73,6 @@ function splitSeries(points: CurvePoint[]): SeriesPoint[] {
   return out
 }
 
-/** Even plies are White's moves — `plyLabel` prints them as `N.`, odd ones as `N…`. */
-function mover(ply: number): 'white' | 'black' {
-  return ply % 2 === 0 ? 'white' : 'black'
-}
-
-/**
- * The default shape: one column per ply, standing on the 50 % axis and reaching up in
- * White's tone or down in Black's.
- *
- * It exists because the filled curve asks the reader to remember a convention — which of
- * three greys is the ground, and which half of the axis belongs to whom — while a column
- * says it by pointing. Every ply also becomes its own object, which is the honest picture
- * of what the data is: the engine's verdict after each move, not a continuous quantity.
- *
- * Drawn by hand off the chart's own scales rather than through `<Bar>`, because recharts
- * sizes bars from a *category* axis and this one is numeric (ply is a number so that
- * click-to-seek and the cursor line can position against it). `usePlotArea` and the two
- * scale hooks are recharts 3's supported way in — the same coordinates the areas use, so
- * the marks on top land on the bar tips without a second calculation.
- *
- * How wide a column is drawn at all is `barLayout`, in the model beside the curve it is
- * drawn from: it is the one part of this with a rule rather than a shape, and a rule is
- * worth a test.
- */
-function PlyBars({ points, domain }: { points: CurvePoint[]; domain: [number, number] }) {
-  const plot = usePlotArea()
-  const xScale = useXAxisScale()
-  const yScale = useYAxisScale()
-  if (!plot || !xScale || !yScale) return null
-
-  const baseline = yScale(AXIS)
-  if (baseline === undefined) return null
-
-  const { width, rim } = barLayout(plot.width, domain[1] - domain[0] + 1)
-
-  return (
-    <g data-testid="evaluation-bars">
-      {points.map((point) => {
-        const x = xScale(point.ply)
-        const y = yScale(point.win)
-        if (x === undefined || y === undefined) return null
-        const white = point.win >= AXIS
-        return (
-          <rect
-            key={point.ply}
-            x={x - width / 2}
-            y={Math.min(y, baseline)}
-            width={width}
-            height={Math.max(1, Math.abs(y - baseline))}
-            rx={width >= 3 ? 1 : 0}
-            fill={white ? FILL_WHITE : FILL_BLACK}
-            stroke={rim ? (white ? EDGE_WHITE : EDGE_BLACK) : undefined}
-            strokeWidth={rim ? 0.75 : undefined}
-          />
-        )
-      })}
-    </g>
-  )
-}
-
 /**
  * White's win percentage against ply, drawn either as a column per move or as the filled
  * curve from design 1a, with blunders and mistakes marked where they happened and a dashed
@@ -174,7 +87,7 @@ function PlyBars({ points, domain }: { points: CurvePoint[]; domain: [number, nu
  * it, where the filled curve leaves over half the plot as a third grey belonging to nobody
  * and asks the reader to hold the convention in their head.
  *
- * A mark is the move table's `??` or `?` (`CurveMarks`), a plain disc, or nothing, as the
+ * A mark is the move table's `??` or `?` (`PlotMarks`), a plain disc, or nothing, as the
  * same preference says. Whose it was is already told by the direction the curve jumps, so
  * the mark does not repeat it; "only mine" hides the opponent's marks for going over one's
  * own game.
@@ -186,6 +99,13 @@ function PlyBars({ points, domain }: { points: CurvePoint[]; domain: [number, nu
  * It carries no height of its own any more: it fills whatever the row it sits in gives it
  * — a track-spanning row of the right column on the desktop, a fixed box on the phone —
  * with only a small floor under the plot so it can never collapse to a line.
+ *
+ * Given `time`, the pane has a second tab, Move time: the same plies as columns of seconds
+ * (`MoveTimePlot`), with the clock's own tallies in the accuracy tallies' place. Two
+ * readings of one game against one x scale, so the cursor and a click land on the same
+ * ply on either — and the marks stay on both, because whether a blunder came after a long
+ * think or in a hurry is the question the second tab is for. The tab is the pane's own
+ * state: nothing else on the page changes with it. A game with no clocks has no tab row.
  */
 export function EvalGraph({
   points,
@@ -196,10 +116,16 @@ export function EvalGraph({
   playerNames,
   onSelectPly,
   scrub = false,
+  time,
   className,
 }: {
   points: CurvePoint[]
   plyCount: number
+  /**
+   * The clock's reading of the same game (`moveTimes`), or nothing for a game played
+   * without one. Empty points are the same as nothing: the tab is not offered.
+   */
+  time?: { points: MoveTimePoint[]; increment: number } | null
   /** The ply last played; `-1` for the starting position. */
   cursor: number
   /** The side the owner played; `null` for a game no account claims a side of. */
@@ -226,6 +152,12 @@ export function EvalGraph({
     [points, plyCount],
   )
   const series = useMemo(() => splitSeries(points), [points])
+  // The columns and the marks read one shape off the curve: the ply, how far from the
+  // axis, and what the move was filed as.
+  const plotPoints = useMemo<PlotPoint[]>(
+    () => points.map((p) => ({ ply: p.ply, value: p.win, classification: p.classification })),
+    [points],
+  )
   // The shape this browser reads the balance in. Bars unless the reader asked for the
   // curve; the split series is computed either way because it is what the tooltip and the
   // marks index against, and it costs one pass over a list the length of a game.
@@ -235,6 +167,12 @@ export function EvalGraph({
   // markers without changing the two-player tallies on the header line.
   const [onlyMine, setOnlyMine] = useState(true)
   const markedSide = onlyMine && ownerSide ? ownerSide : null
+  // Which reading is up. Only offered where the clock has something to say, and held
+  // here rather than on the page: switching it changes nothing outside this pane.
+  const timed = (time?.points.length ?? 0) > 0
+  const [tab, setTab] = useState<GraphTab>('eval')
+  const onTime = timed && tab === 'time'
+  const { t } = useLingui()
 
   // Wheeling over the curve walks the game, exactly as wheeling over the board does — same
   // hook, so the same flick moves the same distance whichever of the two the pointer is over.
@@ -244,48 +182,50 @@ export function EvalGraph({
   useWheelStep(plot, { cursor, onSeek: onSelectPly })
 
   return (
-    <div
+    <section
       className={cn(
         // A pane, not a card: the workspace bounds it with rules (`GamePage` draws the one
-        // above it) and it carries the padding the card's border used to imply. The plot,
-        // the tallies, the "only mine" control and every scrubbing gesture are untouched —
-        // only the frame around them changed.
-        'grid min-h-0 gap-x-3 gap-y-[0.21875rem] bg-surface px-3 pt-2 pb-1.5',
-        // Wide enough, everything that is not the curve stands to its left in one column —
-        // the title and its checkbox, then a player per row — and the plot takes the whole
-        // height beside them. The title deliberately does NOT span: a full-width header row
-        // pushes the tallies down a line and costs the chart that line twice over, which is
-        // the opposite of what this card is short of.
-        //
-        // Narrow, there is no room for a rail without halving the chart, so the three parts
-        // stack instead. One element either way: it is placed, not duplicated.
-        'grid-cols-1 grid-rows-[auto_auto_minmax(0,1fr)]',
-        '[grid-template-areas:"head"_"tallies"_"plot"]',
-        'md:grid-cols-[auto_minmax(0,1fr)] md:grid-rows-[auto_minmax(0,1fr)]',
-        'md:[grid-template-areas:"head_plot"_"tallies_plot"]',
+        // above it), and like every other pane on the screen it is a chrome strip over a
+        // body. The strip is the tab row the move table and the notes track wear — the
+        // same 35 design pixels, the same pushed-up surface for the tab that is on — so
+        // switching between the two readings of the game is the gesture the reader already
+        // knows from the panes above.
+        'flex min-h-0 flex-col bg-surface',
         className,
       )}
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 [grid-area:head]">
-        <span className="flex items-center gap-2">
-          <span className="text-[0.6875rem] font-medium text-soft">
-            <Trans>Evaluation</Trans>
-          </span>
-          {ownerSide ? (
-            <label className="inline-flex cursor-pointer select-none items-center gap-1 text-[0.625rem] text-dim">
-              <input
-                type="checkbox"
-                checked={onlyMine}
-                onChange={(e) => setOnlyMine(e.target.checked)}
-                className="size-2.5 accent-accent"
-              />
-              <Trans>only mine</Trans>
-            </label>
-          ) : null}
-        </span>
+      <div role="tablist" aria-label={t`Graph`} className={TAB_ROW}>
+        <GraphTabs tab={tab} timed={timed} onTabChange={setTab} />
+        <span className="flex-1" />
+        {ownerSide ? (
+          <label className="inline-flex cursor-pointer select-none items-center gap-1 text-[0.625rem] text-dim">
+            <input
+              type="checkbox"
+              checked={onlyMine}
+              onChange={(e) => setOnlyMine(e.target.checked)}
+              className="size-2.5 accent-accent"
+            />
+            <Trans>only mine</Trans>
+          </label>
+        ) : null}
       </div>
 
-      {analysisSummary ? (
+      <div
+        className={cn(
+          'grid min-h-0 flex-1 gap-x-3 gap-y-[0.21875rem] px-3 pt-1.5 pb-1.5',
+          // Wide enough, the tallies stand to the left in one column — a player per row —
+          // and the plot takes the whole height beside them. Narrow, there is no room for
+          // a rail without halving the chart, so the two stack instead. One element either
+          // way: it is placed, not duplicated.
+          'grid-cols-1 grid-rows-[auto_minmax(0,1fr)]',
+          '[grid-template-areas:"tallies"_"plot"]',
+          'md:grid-cols-[auto_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]',
+          'md:[grid-template-areas:"tallies_plot"]',
+        )}
+      >
+      {onTime && time ? (
+        <TimeTallies points={time.points} ownerSide={ownerSide} playerNames={playerNames} />
+      ) : analysisSummary ? (
         <PlayerTallies
           summary={analysisSummary}
           ownerSide={ownerSide}
@@ -293,7 +233,24 @@ export function EvalGraph({
         />
       ) : null}
 
-      {points.length === 0 ? (
+      {onTime && time ? (
+        <div
+          ref={plot}
+          data-testid="move-time-plot"
+          className="relative min-h-[2.875rem] min-w-0 [grid-area:plot]"
+        >
+          <MoveTimePlot
+            points={time.points}
+            increment={time.increment}
+            plyCount={plyCount}
+            cursor={cursor}
+            side={markedSide}
+            marks={prefs.marks}
+            onSelectPly={onSelectPly}
+            scrub={scrub}
+          />
+        </div>
+      ) : points.length === 0 ? (
         <div className="flex min-h-[2.875rem] min-w-0 items-center justify-center rounded-md border border-dashed border-edge-strong bg-graph-bg text-center text-[0.6875rem] text-dim [grid-area:plot]">
           <Trans>No evaluations yet — run an analysis pass to draw the curve.</Trans>
         </div>
@@ -352,7 +309,9 @@ export function EvalGraph({
               <ReferenceLine y={25} stroke="var(--bb-graph-grid)" strokeWidth={1} />
               {/* Between the quarter lines and the axis on purpose: the columns cover the
                   grid the way the fills do, and the axis they stand on stays on top. */}
-              {bars ? <PlyBars points={points} domain={domain} /> : null}
+              {bars ? (
+                <PlotBars points={plotPoints} axis={AXIS} domain={domain} testId="evaluation-bars" />
+              ) : null}
               <ReferenceLine y={AXIS} stroke="var(--bb-graph-axis)" strokeWidth={1} />
               {cursor >= -1 ? (
                 <ReferenceLine
@@ -387,12 +346,62 @@ export function EvalGraph({
                 dot={false}
               />
               {/* Last, so a mark is never under a fill or a column. */}
-              <CurveMarks points={points} side={markedSide} marks={prefs.marks} />
+              <PlotMarks
+                points={plotPoints}
+                axis={AXIS}
+                side={markedSide}
+                marks={prefs.marks}
+                testId="evaluation-marks"
+              />
             </AreaChart>
           </ChartContainer>
         </div>
       )}
-    </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Evaluation | Move time, as the tabs of the pane's strip — `NotesTrack`'s Notes | Book
+ * exactly, and for the same reason: one way of switching a pane's reading across the
+ * screen. A game with no clocks has the one tab, drawn selected, which is the strip's own
+ * title for the pane; a label in some other type would be the one strip that did not
+ * match the row of them.
+ */
+function GraphTabs({
+  tab,
+  timed,
+  onTabChange,
+}: {
+  tab: GraphTab
+  /** Whether the clock has anything to show; off, Move time is not offered at all. */
+  timed: boolean
+  onTabChange: (tab: GraphTab) => void
+}) {
+  const tabs: { tab: GraphTab; label: ReactNode }[] = [
+    { tab: 'eval', label: <Trans>Evaluation</Trans> },
+    ...(timed ? [{ tab: 'time' as const, label: <Trans>Move time</Trans> }] : []),
+  ]
+  return (
+    <>
+      {tabs.map(({ tab: which, label }) => {
+        const selected = tab === which || !timed
+        return (
+          <button
+            key={which}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            data-testid={`graph-tab-${which}`}
+            onClick={() => onTabChange(which)}
+            className={cn(TAB, selected && TAB_ON)}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </>
   )
 }
 
@@ -572,122 +581,3 @@ function PlayerTally({
   )
 }
 
-/**
- * The ink a filled mark carries its glyph in. Only the two marked severities need one, and
- * both are the token the rest of the app uses for text on that colour — the pair flips with
- * the theme, because in light mode the fill is the dark half of the pair.
- */
-const MARK_INK: Record<MarkedGlyph, string> = {
-  blunder: 'var(--bb-blunder-ink)',
-  mistake: 'var(--bb-mistake-ink)',
-}
-
-/**
- * Blunders and mistakes where they happened — the two the legend names; every other ply
- * draws nothing, and so does the opponent's when `side` narrows the marks to one player.
- *
- * The default mark is the move table's own `??` and `?` on a small filled tab, which is the
- * whole argument for it: a disc says *that* something happened here and leaves the severity
- * to a colour the reader has to have learnt, where the glyph says which it was in the
- * vocabulary they have been clicking on all game. It is louder, so all three settings are
- * offered — the tab, the plain disc, or a bare plot where a blunder is still visible as the
- * jump that produced it.
- *
- * Drawn as a layer off the chart's scales rather than as the curve's `dot`, because a tab
- * has to know where the walls are: it hangs outside the bar, away from the axis, and flips
- * to the inside when the plot's edge is nearer than the tab is tall. A dot renderer is
- * handed one point and no room to ask.
- *
- * No `<title>` on either shape: the plot's own hover readout already names the move, its
- * glyph and its eval, and a native SVG tooltip on top of that would be a second box saying
- * less, on its own delay, in the browser's font.
- */
-function CurveMarks({
-  points,
-  side: only,
-  marks,
-}: {
-  points: CurvePoint[]
-  side: Color | null
-  marks: EvalGraphMarks
-}) {
-  const plot = usePlotArea()
-  const xScale = useXAxisScale()
-  const yScale = useYAxisScale()
-  if (!plot || !xScale || !yScale) return null
-
-  const height = scalePx(11)
-  const stem = scalePx(3)
-  const floor = plot.y + plot.height
-  if (marks === 'none') return null
-
-  return (
-    <g data-testid="evaluation-marks">
-      {points.map((point) => {
-        const glyph = markFor(point.classification)
-        if (!glyph) return null
-        if (only && mover(point.ply) !== only) return null
-        const x = xScale(point.ply)
-        const y = yScale(point.win)
-        if (x === undefined || y === undefined) return null
-        const colour = GLYPHS[glyph].color
-
-        if (marks === 'dots') {
-          return (
-            <circle
-              key={point.ply}
-              cx={x}
-              cy={y}
-              r={scalePx(3)}
-              fill={colour}
-              stroke={GRAPH_BG}
-              strokeWidth={scalePx(1.5)}
-            />
-          )
-        }
-
-        const label = GLYPHS[glyph].glyph
-        const width = scalePx(label.length > 1 ? 15 : 11)
-        // Outside the fill — up when White is ahead, down when Black is — unless that is
-        // where the plot ends, in which case it hangs the other way.
-        let top = point.win >= AXIS ? y - stem - height : y + stem
-        if (top < plot.y) top = y + stem
-        if (top + height > floor) top = y - stem - height
-        top = Math.min(Math.max(top, plot.y), floor - height)
-        // The tab stays whole at the ends of the game; the stem keeps the true ply.
-        const cx = Math.min(Math.max(x, plot.x + width / 2), plot.x + plot.width - width / 2)
-        return (
-          <g key={point.ply}>
-            <line
-              x1={x}
-              y1={y}
-              x2={x}
-              y2={top > y ? top : top + height}
-              stroke={colour}
-              strokeWidth={scalePx(1.2)}
-            />
-            <rect
-              x={cx - width / 2}
-              y={top}
-              width={width}
-              height={height}
-              rx={scalePx(3)}
-              fill={colour}
-            />
-            <text
-              x={cx}
-              y={top + height / 2}
-              textAnchor="middle"
-              dominantBaseline="central"
-              className="font-mono font-bold"
-              fontSize={scalePx(8.5)}
-              fill={MARK_INK[glyph]}
-            >
-              {label}
-            </text>
-          </g>
-        )
-      })}
-    </g>
-  )
-}

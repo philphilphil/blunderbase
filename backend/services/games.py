@@ -1347,6 +1347,8 @@ def game_summary(game: Game) -> dict[str, Any]:
             "rating": owner_rating(game),
             "speed": str(game.speed) if game.speed else None,
             "time_control": game.time_control,
+            "initial_clock": game.initial_clock,
+            "increment": game.increment,
             "rated": game.rated,
             "variant": game.variant if game.variant != "standard" else None,
             "eco": game.eco,

@@ -21,6 +21,16 @@ The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged rows. 
 The curve under the board is the evaluation move by move; clicking it seeks. Its shape and
 its marks are board settings.
 
+## See how long each move took
+
+Where the game was played with a clock, the graph pane has a second tab, **Move time**:
+one column per move, White's up and Black's down, as tall as the think that went into it,
+with the same blunder and mistake marks as the evaluation. A faint line on each side marks
+the increment, so a column under it is a move that gained time. Beside the plot each
+player's average think, longest think and time left at the end take the place of the
+accuracy tallies; pointing at a column reads the move number, the think and what was left
+on the clock after it. Clicking seeks, as on the evaluation.
+
 ## Engine lines and the preview
 
 The lines under the board are what the stored pass found: one for a quick pass, four for a

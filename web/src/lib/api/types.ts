@@ -260,6 +260,9 @@ export interface GameSummary extends Extra {
   rating?: number | null
   speed?: string | null
   time_control?: string | null
+  /** The clock as numbers: seconds at the start and seconds added per move. */
+  initial_clock?: number | null
+  increment?: number | null
   rated?: boolean | null
   variant?: string | null
   eco?: string | null

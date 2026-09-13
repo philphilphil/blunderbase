@@ -294,6 +294,7 @@ msgstr "Abbrechen"
 #: src/components/badges/SideDot.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
+#: src/routes/game/components/MoveTimeGraph.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -303,6 +304,7 @@ msgstr "Weiß"
 #: src/components/badges/SideDot.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
+#: src/routes/game/components/MoveTimeGraph.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -5119,8 +5121,8 @@ msgid "Show the engine"
 msgstr "Engine zeigen"
 
 #: src/routes/game/components/EvalGraph.tsx
-msgid "Evaluation"
-msgstr "Bewertung"
+msgid "Graph"
+msgstr "Diagramm"
 
 #: src/routes/game/components/EvalGraph.tsx
 msgid "only mine"
@@ -5129,6 +5131,15 @@ msgstr "nur meine"
 #: src/routes/game/components/EvalGraph.tsx
 msgid "No evaluations yet — run an analysis pass to draw the curve."
 msgstr "Noch keine Bewertungen – starte eine Analyse, damit die Kurve entsteht."
+
+#: src/routes/game/components/EvalGraph.tsx
+msgid "Evaluation"
+msgstr "Bewertung"
+
+#: src/routes/game/components/EvalGraph.tsx
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "Move time"
+msgstr "Bedenkzeit"
 
 #: src/routes/game/components/EvalGraph.tsx
 msgid "{count} blunders"
@@ -5143,10 +5154,12 @@ msgid "{count} inaccuracies"
 msgstr "{count} Ungenauigkeiten"
 
 #: src/routes/game/components/EvalGraph.tsx
+#: src/routes/game/components/MoveTimeGraph.tsx
 msgid "You"
 msgstr "Du"
 
 #: src/routes/game/components/EvalGraph.tsx
+#: src/routes/game/components/MoveTimeGraph.tsx
 msgid "Opp."
 msgstr "Gegner"
 
@@ -5412,6 +5425,42 @@ msgstr "Am besten war"
 #: src/routes/game/components/MoveList.tsx
 msgid "(<0>{winLoss}</0> win)"
 msgstr "(<0>{winLoss}</0> Gewinnchance)"
+
+#. Time left on the clock after a move, in a one-line readout
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "{remaining} left"
+msgstr "{remaining} übrig"
+
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "{name}: {average} per move, longest {longest}, {remaining} left"
+msgstr "{name}: {average} je Zug, längste {longest}, {remaining} übrig"
+
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "Average time per move"
+msgstr "Durchschnittliche Bedenkzeit je Zug"
+
+#. Label beside a player's average time per move
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "avg"
+msgstr "Ø"
+
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "The longest think, on move {longestAt}"
+msgstr "Die längste Bedenkzeit, bei Zug {longestAt}"
+
+#. Label beside a player's longest think
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "max"
+msgstr "max"
+
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "Time left at the end"
+msgstr "Restzeit am Ende"
+
+#. Label beside the time a player had left at the end
+#: src/routes/game/components/MoveTimeGraph.tsx
+msgid "left"
+msgstr "übrig"
 
 #: src/routes/game/components/NoteComposer.tsx
 msgid "pins the line"

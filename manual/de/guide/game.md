@@ -23,6 +23,18 @@ beiden. Wann ein Zug welche Markierung bekommt, steht unter [Analyse](analysis.m
 Die Kurve unter dem Brett ist die Bewertung Zug für Zug; ein Klick darauf springt an die
 Stelle. Form und Markierungen der Kurve sind Bretteinstellungen.
 
+## Die Bedenkzeit je Zug { #see-how-long-each-move-took }
+
+Wurde die Partie mit Uhr gespielt, hat das Feld einen zweiten Reiter, **Bedenkzeit**: eine
+Säule je Zug, Weiß nach oben und Schwarz nach unten, so hoch, wie der Zug an Bedenkzeit
+gekostet hat, mit denselben Markierungen für Fehler und grobe Fehler wie beim
+Bewertungsverlauf. Eine feine Linie auf jeder Seite zeigt das Inkrement; eine Säule
+darunter ist ein Zug, der Zeit gewonnen hat. Neben dem Diagramm stehen statt der
+Genauigkeitswerte für jeden Spieler die durchschnittliche Bedenkzeit, die längste
+Bedenkzeit und die Restzeit am Ende; zeigst du auf eine Säule, siehst du die Zugnummer,
+die Bedenkzeit und die Restzeit danach. Ein Klick springt an die Stelle, wie beim
+Bewertungsverlauf.
+
 ## Engine-Varianten und die Vorschau
 
 Die Varianten unter dem Brett stammen aus der gespeicherten Analyse: eine nach einer

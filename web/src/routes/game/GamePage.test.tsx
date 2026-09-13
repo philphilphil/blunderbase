@@ -474,6 +474,46 @@ describe('GamePage', () => {
     expect(summary.compareDocumentPosition(plot)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
+  it('offers no move-time tab for a game played without a clock', async () => {
+    renderPage()
+    await screen.findByText('Evaluation')
+    expect(screen.queryByRole('tab', { name: 'Move time' })).not.toBeInTheDocument()
+  })
+
+  it('reads the clock on the graph pane’s second tab', async () => {
+    const user = userEvent.setup()
+    // A 3+2 game: the reading after each ply, from which a think is the mover's previous
+    // reading plus the increment, less this one — the first move from the initial time.
+    const clocked: GameDetail = {
+      ...DETAIL,
+      game: { ...DETAIL.game, initial_clock: 180, increment: 2 },
+      moves: DETAIL.moves.map((row, index) => ({ ...row, clock: [175, 160, 165, 150][index] })),
+    }
+    vi.stubGlobal('fetch', stubFetch({ '/games/14': clocked }))
+
+    renderPage()
+    await screen.findByRole('tab', { name: 'Evaluation' })
+    expect(screen.getByRole('tab', { name: 'Evaluation' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('evaluation-plot')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Move time' }))
+    expect(screen.getByRole('tab', { name: 'Move time' })).toHaveAttribute('aria-selected', 'true')
+    // The plot swaps and so do the tallies: the clock's three figures in the accuracy
+    // tallies' place, one cluster per player, white first.
+    expect(screen.queryByTestId('evaluation-plot')).not.toBeInTheDocument()
+    expect(screen.getByTestId('move-time-plot')).toBeInTheDocument()
+    expect(screen.queryByTestId('player-summaries')).not.toBeInTheDocument()
+    const [white, black] = within(screen.getByTestId('time-summaries')).getAllByRole('group')
+    expect(white).toHaveAccessibleName('phib: 9s per move, longest 12s, 2:45 left')
+    expect(black).toHaveAccessibleName('lichess AI level 2: 16s per move, longest 20s, 2:30 left')
+    // "only mine" is the pane's, not the tab's: it stays put across the switch.
+    expect(screen.getByRole('checkbox', { name: 'only mine' })).toBeChecked()
+
+    await user.click(screen.getByRole('tab', { name: 'Evaluation' }))
+    expect(screen.getByTestId('evaluation-plot')).toBeInTheDocument()
+    expect(screen.getByTestId('player-summaries')).toBeInTheDocument()
+  })
+
   it('walks a book continuation on the board, as a line like any other', async () => {
     const user = userEvent.setup()
     renderPage()

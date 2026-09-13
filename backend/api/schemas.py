@@ -291,6 +291,10 @@ class GameSummary(Payload):
     rating: int | None = None
     speed: str | None = None
     time_control: str | None = None
+    # The clock as numbers, for the move-time chart: seconds at the start and seconds added
+    # per move. `time_control` is the same fact as text, and is what the library filters on.
+    initial_clock: int | None = None
+    increment: int | None = None
     rated: bool | None = None
     variant: str | None = None
     eco: str | None = None

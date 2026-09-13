@@ -366,6 +366,102 @@ export function evalCurve(moves: MoveRow[]): CurvePoint[] {
   return points
 }
 
+/** One move's think, for the move-time plot beside the eval curve. */
+export interface MoveTimePoint {
+  ply: number
+  /** Seconds the mover spent on this move; never negative. */
+  seconds: number
+  /** Seconds the mover had left after playing it, as the source reported them. */
+  remaining: number
+  san: string | null
+  classification: Classification | null
+}
+
+/** The clock as numbers — what `moveTimes` needs of the game. */
+export interface ClockedGame {
+  initial_clock?: number | null
+  increment?: number | null
+}
+
+/**
+ * How long each move took, from the clock readings the source stored.
+ *
+ * A move row carries the reading *after* its ply, so a think is the mover's previous
+ * reading — two plies back, the same rule the move table and the Stats page use — less
+ * this one, plus the increment that was added on the way. The first move of each side has
+ * no previous reading and starts from the game's initial clock, without the increment:
+ * every site that records clocks starts the clock after that move, and reports it at the
+ * initial time, so adding the increment would put a think of `increment` seconds on a move
+ * nobody timed.
+ *
+ * A ply without a reading is skipped rather than drawn as zero, and a source whose clocks
+ * run backwards for a ply (a correction, a reconnect) draws nothing rather than a negative
+ * column. Empty for a game with no clocks at all, which is what hides the tab.
+ */
+export function moveTimes(moves: MoveRow[], game: ClockedGame): MoveTimePoint[] {
+  const increment = game.increment ?? 0
+  const initial = game.initial_clock ?? null
+  const after = new Map<number, number>()
+  const points: MoveTimePoint[] = []
+  for (const move of moves) {
+    if (move.clock === null || move.clock === undefined) continue
+    after.set(move.ply, move.clock)
+    const first = move.ply < 2
+    const before = first ? initial : (after.get(move.ply - 2) ?? null)
+    if (before === null) continue
+    const seconds = before + (first ? 0 : increment) - move.clock
+    points.push({
+      ply: move.ply,
+      seconds: Math.max(0, seconds),
+      remaining: move.clock,
+      san: move.san ?? null,
+      classification: isFlagged(move.classification) ? (move.classification ?? null) : null,
+    })
+  }
+  return points
+}
+
+/** One side's clock, summed up for the plot's header: how it was spent and where it ended. */
+export interface MoveTimeSummary {
+  /** Mean seconds per move. */
+  average: number
+  /** The longest think, and the ply it went into. */
+  longest: { seconds: number; ply: number } | null
+  /** Seconds left after the side's last move. */
+  remaining: number | null
+}
+
+export function moveTimeSummary(points: MoveTimePoint[], side: Side): MoveTimeSummary | null {
+  const own = points.filter((point) => sideOf(point.ply) === side)
+  if (own.length === 0) return null
+  let total = 0
+  let longest: MoveTimeSummary['longest'] = null
+  for (const point of own) {
+    total += point.seconds
+    if (!longest || point.seconds > longest.seconds) {
+      longest = { seconds: point.seconds, ply: point.ply }
+    }
+  }
+  return {
+    average: total / own.length,
+    longest,
+    remaining: own[own.length - 1]?.remaining ?? null,
+  }
+}
+
+/**
+ * Seconds as a think reads: `12s` under a minute, `1:24` from there, `1:02:03` past an
+ * hour. Tenths are dropped — a clock is read in whole seconds.
+ */
+export function formatSeconds(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds))
+  if (whole < 60) return `${whole}s`
+  const minutes = Math.floor(whole / 60)
+  const rest = String(whole % 60).padStart(2, '0')
+  if (minutes < 60) return `${minutes}:${rest}`
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${rest}`
+}
+
 /** How wide one ply's column is drawn, and whether there is room to detail it. */
 export interface BarLayout {
   /** The column itself, never below a hairline. */
