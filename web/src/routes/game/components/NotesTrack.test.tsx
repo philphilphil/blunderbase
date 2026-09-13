@@ -72,8 +72,24 @@ function renderTrack(props: Partial<Parameters<typeof NotesTrack>[0]> = {}) {
 }
 
 describe('NotesTrack', () => {
-  it('opens on Book where the position has one', () => {
+  it('opens on Notes, with Notes first on the strip, even where the position has a book', () => {
     renderTrack()
+
+    // Notes lead: they matter at every ply and the composer writes into them, so the game
+    // opens on what you wrote rather than on a pane that changes from game to game.
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Notes', 'Book'])
+    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.queryByTestId('book-panel')).not.toBeInTheDocument()
+    expect(screen.getByText('2 notes')).toBeInTheDocument()
+  })
+
+  it('shows the book, with its own game count, when the reader asks for it', async () => {
+    const user = userEvent.setup()
+    renderTrack()
+
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
 
     expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('book-panel')).toBeInTheDocument()
@@ -87,23 +103,21 @@ describe('NotesTrack', () => {
     const onOpenInExplorer = vi.fn()
     renderTrack({ onOpenInExplorer })
 
-    await user.click(screen.getByRole('button', { name: 'Open this position in the explorer' }))
-    expect(onOpenInExplorer).toHaveBeenCalledTimes(1)
-
     // The arrow belongs to the book, not to the row: on Notes there is nothing to open.
-    await user.click(screen.getByRole('tab', { name: 'Notes' }))
     expect(
       screen.queryByRole('button', { name: 'Open this position in the explorer' }),
     ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'Open this position in the explorer' }))
+    expect(onOpenInExplorer).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the Book tab where no book reached this position, and opens on Notes', () => {
+  it('keeps the Book tab where no book reached this position', () => {
     renderTrack({ book: NO_BOOK })
 
     // The strip never changes shape — a tab that came and went moved the Notes tab under
-    // the pointer every time the game left book. What it opens on still follows the
-    // position: 452k of the owner's 463k positions are reached by exactly one game, so
-    // opening on Book would mean opening on an empty pane nearly always.
+    // the pointer every time the game left book.
     expect(screen.getAllByRole('tab')).toHaveLength(2)
     expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'false')
     expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
@@ -127,7 +141,7 @@ describe('NotesTrack', () => {
     expect(screen.getByRole('tabpanel')).not.toContainElement(before)
     expect(screen.getByTestId('composer-slot')).toContainElement(before)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Book' }))
 
     // The very same DOM node, still in the same slot: a box being typed into cannot be
     // remounted or reflowed by a tab above it.
@@ -135,8 +149,9 @@ describe('NotesTrack', () => {
     expect(screen.getByRole('tabpanel')).not.toContainElement(before)
   })
 
-  it('falls back to Notes out of book, and returns to Book on the way back in', () => {
+  it('leaves a reader who chose Book on Book as the board steps out of book and back in', () => {
     const { rerender } = renderTrack()
+    fireEvent.click(screen.getByRole('tab', { name: 'Book' }))
     const track = (book: BookEntry | null) => (
       <NotesTrack
         book={book}
@@ -147,36 +162,20 @@ describe('NotesTrack', () => {
       />
     )
 
+    // The open tab is the reader's, not the position's: it does not flip to Notes when the
+    // game leaves book, and the empty book is itself an answer.
     rerender(track(null))
-    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('book-panel-empty')).toBeInTheDocument()
 
-    // The reader never chose Notes there — the position did — so Book comes back.
     rerender(track(BOOK))
     expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
-  })
-
-  it('leaves a reader who chose Notes on Notes, book or no book', () => {
-    const { rerender } = renderTrack()
-    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
-    const track = (book: BookEntry | null) => (
-      <NotesTrack
-        book={book}
-        bookPly={4}
-        notes={NOTES}
-        onSelectNote={vi.fn()}
-        composer={composer}
-      />
-    )
-
-    rerender(track(null))
-    rerender(track(BOOK))
-    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('book-panel')).toBeInTheDocument()
   })
 
   it('lists the notes with their move labels and seeks the one that is clicked', () => {
     const onSelectNote = vi.fn()
     renderTrack({ onSelectNote })
-    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
 
     expect(screen.getByText('2 notes')).toBeInTheDocument()
     // The tabs carry `role="tab"` and the book rows `role="row"`, so the only plain

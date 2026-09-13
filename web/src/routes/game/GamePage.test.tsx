@@ -479,7 +479,9 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // The board is at the start, where the fixture's book has two continuations.
+    // The board is at the start, where the fixture's book has two continuations. The track
+    // opens on Notes, so the book is one tab away.
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
     const row = await screen.findByRole('row', { name: /d4/ })
     await user.click(row)
 
@@ -772,6 +774,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
     await user.click(await screen.findByRole('row', { name: /d4/ }))
     expect(await screen.findByText('Back to game')).toBeInTheDocument()
 
@@ -1240,6 +1243,7 @@ describe('GamePage', () => {
     // worse than none.
     await user.click(screen.getByRole('button', { name: /Back to game/ }))
     await user.click(screen.getByRole('button', { name: 'First' }))
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
     await user.click(await screen.findByRole('row', { name: /d4/ }))
     expect(screen.getByText('analysis +1')).toBeInTheDocument()
     expect(bar()).toHaveAttribute('title', 'not analysed')
