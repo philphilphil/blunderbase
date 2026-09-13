@@ -34,21 +34,25 @@ msgid "nothing is on the board"
 msgstr "auf dem Brett steht nichts"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
 #: src/routes/correspondence/components/EnginePicker.tsx
 #: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/RunningNow.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
 #: src/routes/correspondence/components/TaskDialog.tsx
 #: src/routes/engines/EngineBadges.tsx
+#: src/routes/game/components/MaiaPanel.tsx
 #: src/routes/game/components/MobileGameView.tsx
 msgid "Engine"
 msgstr "Engine"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
 msgid "deep tier — {deepName}"
 msgstr "Tiefenanalyse – {deepName}"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
 msgid "deep tier"
 msgstr "Tiefenanalyse"
 
@@ -79,15 +83,6 @@ msgid "The search ended."
 msgstr "Die Suche ist beendet."
 
 #: src/components/analysis/InfiniteAnalysisPanel.tsx
-msgid "Analyse this position continuously."
-msgstr "Diese Stellung fortlaufend analysieren."
-
-#: src/components/analysis/InfiniteAnalysisPanel.tsx
-#: src/routes/correspondence/components/RunningNow.tsx
-msgid "this machine"
-msgstr "dieser Rechner"
-
-#: src/components/analysis/InfiniteAnalysisPanel.tsx
 msgid "Live analysis"
 msgstr "Live-Analyse"
 
@@ -95,6 +90,15 @@ msgstr "Live-Analyse"
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "{nodes} nodes"
 msgstr "{nodes} Knoten"
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "Analyse this position continuously."
+msgstr "Diese Stellung fortlaufend analysieren."
+
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+#: src/routes/correspondence/components/RunningNow.tsx
+msgid "this machine"
+msgstr "dieser Rechner"
 
 #: src/components/analysis/InfiniteAnalysisPanel.tsx
 msgid "Resume on {engine}"
@@ -684,6 +688,7 @@ msgstr "alles Aufgeschriebene"
 
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
+#: src/routes/game/components/MaiaPanel.tsx
 #: src/routes/live/LivePage.tsx
 msgid "Live"
 msgstr "Live"
@@ -5240,6 +5245,10 @@ msgstr "Der Rest der Variante aus diesem Durchlauf, ab der Stellung, die jetzt a
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "along its line"
 msgstr "entlang seiner Variante"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Run"
+msgstr "Analyse"
 
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "human moves"

@@ -2,7 +2,6 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
-import { InfiniteAnalysisPanel } from '@/components/analysis/InfiniteAnalysisPanel'
 import { BOARD_SETTINGS_ID } from '@/components/board/BoardSettings'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
@@ -45,7 +44,7 @@ import { EvalGraph } from './components/EvalGraph'
 import { FlaggedMoments } from './components/FlaggedMoments'
 import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
-import { MaiaPanel } from './components/MaiaPanel'
+import { MaiaPanel, type EnginePaneTab } from './components/MaiaPanel'
 import { MobileGameView, type MobileTab } from './components/MobileGameView'
 import {
   MoveList,
@@ -1246,6 +1245,45 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   useEffect(() => {
     if (engineHidden) setStreamEnabled(false)
   }, [engineHidden, setStreamEnabled])
+
+  /**
+   * Which claim the engine pane shows: the stored run's or the live search's (`MaiaPanel`).
+   *
+   * The search moves it and the reader moves it. Switching the search on lands on Live,
+   * because that is what was just asked for; switching it off lands back on Run, because a
+   * Live tab with nothing running on it is an empty box. Between those the reader may click
+   * Run to look at the stored lines while the search keeps going. Leaving the game line
+   * lands on Live as well while a search is running: the run never looked at where the
+   * board has gone, and the search is the only thing here with an opinion about it.
+   */
+  const [enginePaneTab, setEnginePaneTab] = useState<EnginePaneTab>('run')
+  // Every way of switching the search on or off goes through here — the strip's switch,
+  // the `e` key — so the tab moves in the same gesture rather than in an effect chasing it.
+  const setLiveSearch = useCallback(
+    (on: boolean) => {
+      setStreamEnabled(on)
+      setEnginePaneTab(on ? 'live' : 'run')
+    },
+    [setStreamEnabled],
+  )
+  // Leaving the game line is not a gesture of the search's, so it is caught here as the
+  // render sees `exploring` change, the way React adjusts one state to another — not in
+  // an effect, which would paint the Run tab once before moving off it.
+  const [wasExploring, setWasExploring] = useState(exploring)
+  if (exploring !== wasExploring) {
+    setWasExploring(exploring)
+    if (exploring && stream.enabled) setEnginePaneTab('live')
+  }
+  const search = useMemo(
+    () => ({
+      stream: { ...stream, setEnabled: setLiveSearch },
+      // Off — by the switch, by ⇧E, by the session ending — the Live tab is an empty box,
+      // so it is not offered: Run, whatever was chosen last.
+      tab: stream.enabled ? enginePaneTab : ('run' as const),
+      onTabChange: setEnginePaneTab,
+    }),
+    [enginePaneTab, setLiveSearch, stream],
+  )
   /**
    * What the last search said, or nothing at all while the engine is hidden. The session is
    * closed above, but a session that has been closed still remembers its final snapshot —
@@ -1483,12 +1521,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // Still bound while ⇧E is on: what is left for it to switch is the arrow for the move
       // the game itself played next, which is the game rather than a verdict about it.
       toggleHints: () => setHints((value) => !value),
-      // The same switch the panel's footer carries, and the same guard it draws disabled
-      // under: with nothing on the board there is nothing to search.
+      // The same switch the engine pane's title strip carries, and the same guard it draws
+      // disabled under: with nothing on the board there is nothing to search.
       toggleEngine:
-        boardPosition?.fen && !engineHidden
-          ? () => stream.setEnabled(!stream.enabled)
-          : undefined,
+        boardPosition?.fen && !engineHidden ? () => setLiveSearch(!stream.enabled) : undefined,
       // A note hangs off a game row, so a model game nobody has added has none to write.
       note: readOnly ? undefined : focusComposer,
       // Only while there is a line to leave: off one, Escape is the browser's again — and,
@@ -1596,6 +1632,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       previewLine={previewView.line}
       previewPly={previewView.ply}
       onPlayLine={playLine}
+      // The live search shares the engine pane behind a Run | Live switch; the tab is this
+      // page's state (`enginePaneTab`), the panel only reports a click on it.
+      search={search}
       // On the desktop the band is the workspace's top row: two panes side by side,
       // separated by a rule and ruled off from the move table below, spanning both tracks
       // and taking no margin of its own — a pane is bounded by the rules around it, not by
@@ -1846,24 +1885,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
-  const infinite = engineHidden ? null : (
-    <InfiniteAnalysisPanel
-      stream={stream}
-      fen={boardPosition.fen}
-      ply={analysisPly}
-      orientation={orientation}
-      onHoverLine={setPreview}
-      onStepPreview={previewView.step}
-      onPlayLine={playLine}
-      previewLine={previewView.line}
-      previewPly={previewView.ply}
-      // The workspace's last row, spanning both tracks — the foot of the window, on the
-      // chrome surface, the way a desktop app parks a status strip. It brings its own top
-      // rule; on the phone it is a card in the Engine tab's stack instead.
-      className={mobile ? 'rounded-md border border-line' : 'col-span-2'}
-    />
-  )
-
   const chrome = (
     <SetPageChrome
       breadcrumb={
@@ -1899,7 +1920,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           score={boardScore}
           flaggedCount={flaggedCount}
           noteCount={noteList.length}
-          // The strip loses Eval and Engine with it; `evalGraph` and `infinite` above are
+          // The strip loses Eval and Engine with it; `evalGraph` and `maiaPanel` above are
           // already null, and a tab onto nothing is worse than no tab.
           engineHidden={engineHidden}
           tab={mobileTab}
@@ -1909,7 +1930,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           evalGraph={evalGraph}
           flaggedMoments={flaggedMoments}
           maiaPanel={maiaPanel}
-          infinite={infinite}
           notesTrack={notesTrack}
         />
       </>
@@ -2002,18 +2022,19 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         />
 
         {/*
-          ONE grid, two tracks, four rows — not a stack of panels each arranging itself.
+          ONE grid, two tracks, three rows — not a stack of panels each arranging itself.
           That is what puts the moves/notes rule and the engine band's own gap on the same
-          geometry, and it is why the column reads as a column rather than as four boxes:
+          geometry, and it is why the column reads as a column rather than as three boxes:
 
-            row 1  the engine band, spanning both tracks (Maia 25 % / Stockfish 75 %,
-                   two cards with a gap and no rule between them)
+            row 1  the engine band, spanning both tracks (Maia 25 % / Stockfish 75 %, two
+                   panes divided by a rule; the live search is a tab of the Stockfish pane)
             row 2  the move table | the notes track, the one boundary that draws a line
             row 3  the eval graph, spanning both tracks
-            row 4  the continuous-analysis footer, spanning both tracks
 
           Row 2 is the only `1fr`: it is the row that should take the slack, because the move
-          table is a list and the three panels around it are fixed things.
+          table is a list and the two panels around it are fixed things. The live search
+          used to be a fourth row, a footer under the graph; it is in the engine band now,
+          behind a Run | Live switch, so one position has one list of lines on this screen.
 
           The track widths are the design's, converted: 340/300/250 *design* pixels over 16
           to `rem`, which the 120 % root renders as 408/360/300 physical pixels. A literal
@@ -2029,7 +2050,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           data-testid="moves-column"
           className={cn(
             'grid min-h-0 min-w-[26.875rem] grow-0',
-            'grid-cols-[15.625rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto_auto]',
+            'grid-cols-[15.625rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]',
             // The middle band starts at 1440 rather than at 1280. At exactly 1280 — a very
             // common laptop — the rail (200), the board column's floor (420) and this
             // column's 508 come to 1271, which fits; the 1280 band asked for 508 more than
@@ -2056,13 +2077,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           */}
           {notesTrack}
           {evalGraph}
-          {/*
-            The whole line, not its first move: `onHoverLine` replaces the single arrow
-            `onHoverMove` drew here, and the preview it feeds is what the board shows. The
-            engine band reports the same three gestures from its own rows, into the same
-            state — the namespaced ids are what keeps the two apart.
-          */}
-          {infinite}
         </div>
       </div>
     </>

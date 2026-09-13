@@ -85,8 +85,8 @@ export interface MobileGameViewProps {
   evalGraph: ReactNode
   /** `FlaggedMoments` — the curve's marks as a tappable list, under the curve. */
   flaggedMoments: ReactNode
+  /** `MaiaPanel` — the human column and the engine pane, the live search a tab of the latter. */
   maiaPanel: ReactNode
-  infinite: ReactNode
   /**
    * `NotesTrack` — Book and Notes behind one tab row, with the note composer pinned under
    * both. It is the whole of the Notes tab: the desktop's second track, unchanged, which is
@@ -131,7 +131,6 @@ export function MobileGameView({
   evalGraph,
   flaggedMoments,
   maiaPanel,
-  infinite,
   notesTrack,
 }: MobileGameViewProps) {
   // The strip is told which tabs exist; which one is *shown* is the page's state, and it can
@@ -205,10 +204,7 @@ export function MobileGameView({
             <div className="border-t border-hairline">{flaggedMoments}</div>
           </div>
         ) : shown === 'engine' ? (
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-            {maiaPanel}
-            {infinite}
-          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">{maiaPanel}</div>
         ) : shown === 'notes' ? (
           /*
             The desktop's notes track, whole: Book when the position has one, the game's

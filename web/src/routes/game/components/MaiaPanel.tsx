@@ -2,8 +2,15 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, Columns3, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { LiveLinesChip, LiveSwitch } from '@/components/analysis/AnalysisControls'
+import {
+  LiveSearchLines,
+  LiveSearchMeta,
+  LiveSearchStatus,
+} from '@/components/analysis/InfiniteAnalysisPanel'
 import { LinePreviewRowChip } from '@/components/analysis/LinePreviewSettings'
 import { MiniBoard } from '@/components/board/MiniBoard'
+import { liveLineId, type StreamSessionApi } from '@/lib/analysis'
 import type { GameRunSummary } from '@/lib/api/types'
 import {
   cachedReplay,
@@ -149,7 +156,22 @@ export interface MaiaPanelProps {
    * the rest of the line to step through, so a click is an entry point rather than a cut.
    */
   onPlayLine?: (ucis: string[], index: number) => void
+  /**
+   * The live search, when it shares the engine pane behind a Run | Live switch. The tab is
+   * the page's state, not the panel's: the page moves it when the search is switched on or
+   * off and when the board leaves the game line, and the panel only reports a click.
+   */
+  search?: EnginePaneSearch
   className?: string
+}
+
+/** Which of the engine pane's two claims is showing: the stored run's, or the live search's. */
+export type EnginePaneTab = 'run' | 'live'
+
+export interface EnginePaneSearch {
+  stream: StreamSessionApi
+  tab: EnginePaneTab
+  onTabChange: (tab: EnginePaneTab) => void
 }
 
 /**
@@ -176,11 +198,20 @@ export interface MaiaPanelProps {
  * engine's verdict is already in every column's colour, and five columns squeezed into a
  * quarter of the width would be five ellipses.
  *
- * The engine column's rows are previewed the way the live panel's are, and for the same
- * reasons (`InfiniteAnalysisPanel`): the **row** asks where the line goes, a **token** asks
+ * The engine column's rows are previewed the way the live search's are, and for the same
+ * reasons (`LiveSearchLines`): the **row** asks where the line goes, a **token** asks
  * what the position looks like after that one move, and the **wheel** walks that ply along
  * without the pointer having to hit each token. The panel only reports them; what any of
  * them draws is the surface's business.
+ *
+ * With `search` given, the engine pane is two claims behind one switch, Run | Live: what
+ * the stored pass concluded, and what a search is finding now. They used to be two boxes,
+ * the run here and the search at the foot of the column, and a reader with the search on
+ * had two lists of lines for one position four rows apart with only the board saying which
+ * won. One pane, and the tab says which claim is on it; the on/off switch sits at the right
+ * end of the title strip so it is reachable from either tab, and the search's two pickers
+ * are the strip's own readings of them — the engine's name and the line-count chip, each
+ * with its select laid over it, where the run's tab shows the run's name and its MPV.
  */
 export function MaiaPanel({
   rating,
@@ -205,9 +236,11 @@ export function MaiaPanel({
   previewPly,
   orientation = 'white',
   onPlayLine,
+  search,
   className,
 }: MaiaPanelProps) {
   const { t } = useLingui()
+  const onLive = search?.tab === 'live'
   const rollout = live?.rollout ?? []
   const nodes = formatNodes(run?.nodes)
   const comparing = showHuman && compare && comparison.length > 1
@@ -262,11 +295,14 @@ export function MaiaPanel({
   // Peek is the panel's own drawing rather than the row's: the engine column scrolls, and a
   // scroll container clips whatever a row inside it positions outside itself. So the board
   // hangs off the panel, *below* it — this box sits at the top of the moves column, where
-  // the room is downwards. The live panel at the foot of the same column draws upwards for
-  // exactly the opposite reason.
+  // the room is downwards. The live rows are in the same scroll container, so their peek is
+  // drawn here too (`LiveSearchLines` is told not to), found by the id they report.
   const peeked =
     onHoverLine && hovered !== null && prefs.row === 'peek' && fen
-      ? (engine.find((line) => runLineId(line.multipv) === hovered) ?? null)
+      ? onLive
+        ? (search?.stream.snapshot?.lines.find((line) => liveLineId(line.multipv) === hovered) ??
+          null)
+        : (engine.find((line) => runLineId(line.multipv) === hovered) ?? null)
       : null
   const peekReplay = peeked && fen ? cachedReplay(fen, peeked.pv) : null
   const peekState = {
@@ -379,19 +415,29 @@ export function MaiaPanel({
           className="flex min-w-0 flex-col overflow-hidden border-l border-edge-strong max-md:border-t max-md:border-l-0"
         >
           <div className="bb-pane-title">
-            <span
-              className={cn(
-                'size-1.5 flex-none rounded-full',
-                run ? 'bg-accent-teal' : 'bg-edge-strong',
-              )}
-            />
-            <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
-              {run?.engine ?? t`No engine run`}
-            </span>
+            {search ? (
+              <EnginePaneTabs search={search} />
+            ) : (
+              <span
+                className={cn(
+                  'size-1.5 flex-none rounded-full',
+                  run ? 'bg-accent-teal' : 'bg-edge-strong',
+                )}
+              />
+            )}
+            {onLive && search ? (
+              // The tab carries the dot, so the status is asked to leave its own off; the
+              // name it draws is the engine picker, the way the Maia label is the level's.
+              <LiveSearchStatus stream={search.stream} dot={false} pick />
+            ) : (
+              <span className="truncate text-[0.6875rem] font-semibold tracking-[0.02em] text-ink">
+                {run?.engine ?? t`No engine run`}
+              </span>
+            )}
             {/* The analysis board's own purple, the colour the score chip under the board
                 takes while it is reading the same line: these rows are the tail of a line
                 the run drew, not a new opinion about the position in front of you. */}
-            {alongLine ? (
+            {alongLine && !onLive ? (
               <span
                 data-testid="maia-engine-along-line"
                 title={t`The rest of the line this run gave, from where the board now stands`}
@@ -405,19 +451,30 @@ export function MaiaPanel({
               never the run's protocol kind, which lives on the engines page.
             */}
             <div className="flex-1" />
-            {run?.depth ? (
-              <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
-            ) : null}
-            {nodes !== '—' ? (
-              <span className="font-mono text-[0.625rem] tabular text-dim">
-                <Trans>{nodes} nodes</Trans>
-              </span>
-            ) : null}
-            {run?.multipv ? (
-              <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
-                MPV {run.multipv}
-              </span>
-            ) : null}
+            {onLive && search ? (
+              <>
+                <LiveSearchMeta stream={search.stream} />
+                {/* The search's line count, where the run's `MPV` chip stands on the
+                    other tab: the same fact about the other claim, in the same shape. */}
+                <LiveLinesChip stream={search.stream} />
+              </>
+            ) : (
+              <>
+                {run?.depth ? (
+                  <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
+                ) : null}
+                {nodes !== '—' ? (
+                  <span className="font-mono text-[0.625rem] tabular text-dim">
+                    <Trans>{nodes} nodes</Trans>
+                  </span>
+                ) : null}
+                {run?.multipv ? (
+                  <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
+                    MPV {run.multipv}
+                  </span>
+                ) : null}
+              </>
+            )}
             {/*
               The one-click cycler for what hovering a line does. The gear that held the
               rest of those settings used to sit beside it and is now under the board
@@ -425,12 +482,43 @@ export function MaiaPanel({
               chip stays because it belongs to the rows right below it.
             */}
             {onHoverLine ? <LinePreviewRowChip /> : null}
+            {/*
+              The search's on/off switch, last on the strip and on both tabs: it is the one
+              control that decides whether the Live tab has anything on it, and a switch
+              that could only be reached from the tab it fills would make the tab a step
+              rather than a view. `h-7`, because the strip is 35 design pixels and the
+              switch was sized for a 2rem footer row it no longer sits in.
+            */}
+            {search ? (
+              <LiveSwitch stream={search.stream} fen={fen ?? null} className="-mr-1.5 h-7" />
+            ) : null}
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[0.4375rem] py-1.5">
-          {/* Switched off, the column holds its place and says nothing at all — the same
-              rule the human column beside it follows. */}
-          {!showEngine ? null : engine.length === 0 ? (
+          {onLive && search ? (
+            <>
+              <LiveSearchLines
+                stream={search.stream}
+                fen={fen ?? null}
+                ply={ply}
+                orientation={orientation}
+                onHoverMove={onHoverMove}
+                onHoverLine={onHoverLine}
+                // The wheel is this section's: its listener above covers the live rows as
+                // well as the run's, and a second one on the rows would step twice.
+                onStepPreview={undefined}
+                onPlayLine={onPlayLine}
+                previewLine={previewLine}
+                previewPly={previewPly}
+                peek={false}
+                onHovered={(row, over) =>
+                  setHovered((current) => (over ? row : current === row ? null : current))
+                }
+              />
+            </>
+          ) : /* Switched off, the column holds its place and says nothing at all — the same
+              rule the human column beside it follows. */
+          !showEngine ? null : engine.length === 0 ? (
             <p className="px-1 py-1 text-[0.6875rem] text-dim">–</p>
           ) : (
             <div className="flex flex-col gap-0.5">
@@ -477,6 +565,61 @@ export function MaiaPanel({
           ) : null}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Run | Live, at the head of the engine pane.
+ *
+ * Each tab carries the dot its claim would have carried alone — the run's steady teal, the
+ * search's pulse while it is running — so a reader on the Run tab can see the search is
+ * still going without switching to it, and a reader on Live can see there is a run to go
+ * back to. The switch that starts the search is not here: it is the strip's last control
+ * (`LiveSwitch`), because a tab that started a search when clicked could not be looked at
+ * without starting one.
+ */
+function EnginePaneTabs({ search }: { search: EnginePaneSearch }) {
+  const { t } = useLingui()
+  const { phase } = search.stream
+  const tabs: { tab: EnginePaneTab; label: string; dot: string }[] = [
+    { tab: 'run', label: t`Run`, dot: 'bg-accent-teal' },
+    {
+      tab: 'live',
+      label: t`Live`,
+      dot:
+        phase === 'running'
+          ? 'animate-pulse bg-accent-teal'
+          : phase === 'opening'
+            ? 'bg-mistake'
+            : phase === 'error'
+              ? 'bg-blunder'
+              : 'bg-edge-strong',
+    },
+  ]
+  return (
+    <div role="tablist" aria-label={t`Engine`} className="-ml-1 flex flex-none items-center gap-0.5">
+      {tabs.map(({ tab, label, dot }) => {
+        const selected = search.tab === tab
+        return (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            data-testid={`engine-pane-tab-${tab}`}
+            onClick={() => search.onTabChange(tab)}
+            className={cn(
+              'inline-flex h-6 items-center gap-1.5 rounded-sm px-1.5 text-[0.6875rem] transition-colors',
+              'outline-none focus-visible:bg-raised',
+              selected ? 'bg-selected font-semibold text-ink' : 'text-dim hover:bg-raised hover:text-ink',
+            )}
+          >
+            <span className={cn('size-1.5 flex-none rounded-full', dot)} />
+            {label}
+          </button>
+        )
+      })}
     </div>
   )
 }

@@ -133,6 +133,20 @@ export function liveTop(snapshot: StreamSnapshot | null, fen: string | null): St
 }
 
 /**
+ * The id a live line carries in a line preview, and the only place it is built.
+ *
+ * A bare `multipv` is not an identity: the game page shows the search's rows and the stored
+ * run's in the same pane, both number their lines from 1, and one `useLinePreview` serves
+ * both. An unqualified "line 1" would make the two the same row — hovering one would dim
+ * the tokens of the other, and the hook's cache key could not tell the two lines apart.
+ * Here rather than beside the rows that draw it, so the host that draws the peek board
+ * (`MaiaPanel`) can tell a live row from a run row without importing a component file.
+ */
+export function liveLineId(multipv: number): string {
+  return `live:${multipv}`
+}
+
+/**
  * The live search's own move in `fen`, in UCI — what the board points at while a search is
  * running on the position it is showing. See `liveTop` for the staleness rule this rests on.
  */

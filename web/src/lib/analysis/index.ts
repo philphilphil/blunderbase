@@ -3,6 +3,7 @@ export {
   formatNps,
   formatVariation,
   liveBest,
+  liveLineId,
   liveScore,
   liveTop,
   sanLine,

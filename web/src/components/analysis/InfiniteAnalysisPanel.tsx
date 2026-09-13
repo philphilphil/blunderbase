@@ -1,11 +1,12 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { ChevronDown } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 
 import { MiniBoard } from '@/components/board/MiniBoard'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatNps, formatVariation, type StreamSessionApi } from '@/lib/analysis'
+import { formatNps, formatVariation, liveLineId, type StreamSessionApi } from '@/lib/analysis'
 import type { StreamEndReason, StreamLine } from '@/lib/api/types'
 import {
   cachedReplay,
@@ -20,7 +21,7 @@ import { useNotation } from '@/lib/chess/notationPrefs'
 import { WHEEL_STEP } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 
-import { AnalysisControls } from './AnalysisControls'
+import { AnalysisControls, engineOptionLabel } from './AnalysisControls'
 
 // What a hovered line *is* belongs to the preview, not to the panel that reports one, so
 // the type lives beside the hook that consumes it — and is re-exported here because this
@@ -61,18 +62,6 @@ export interface InfiniteAnalysisPanelProps {
  * eval curve step the *game* by, because all three gestures land on the same page and a
  * wheel that moved one at a different speed would read as several different wheels.
  */
-
-/**
- * The id this panel gives one of its rows, and the only place it is built.
- *
- * A bare `multipv` is not an identity: the game page shows this panel and the stored-run box
- * at the same time, both number their lines from 1, and one `useLinePreview` serves both. An
- * unqualified "line 1" would make the two boxes the same row — hovering here would dim the
- * tokens there, and the hook's cache key could not tell the two lines apart.
- */
-function lineId(multipv: number): string {
-  return `live:${multipv}`
-}
 
 /** Whether a wheel over a row has anywhere to step: only the modes that stand on a ply. */
 function canStep(prefs: LinePreviewPrefs): boolean {
@@ -206,7 +195,7 @@ function displayEngine(engine: string, runner: string | null): string {
 /**
  * The controls sit under the lines, not over them: the lines are what the panel is for, and
  * a row that changes height as engines and hosts arrive would otherwise keep shoving them
- * down the page. Shared by the live rail and the game page, so both read the same way.
+ * down the page.
  */
 function ControlsFooter({
   stream,
@@ -223,26 +212,152 @@ function ControlsFooter({
 }
 
 /**
- * What the engine is finding *now* in the position on the board.
+ * Who is searching: the phase as a dot, the engine's name and the host it runs on. The
+ * head of the panel here, and the head of the engine pane's Live tab on the game page,
+ * where the tab already carries the dot and asks for it to be left off.
+ */
+export function LiveSearchStatus({
+  stream,
+  dot = true,
+  pick = false,
+}: {
+  stream: StreamSessionApi
+  dot?: boolean
+  /**
+   * The name is also the engine picker: a select laid over it, the way the Maia pane's
+   * level label is its picker. For the engine pane's title strip, which has no room for a
+   * select beside the name it would duplicate.
+   */
+  pick?: boolean
+}) {
+  const { t } = useLingui()
+  const { phase, session } = stream
+  const name = (
+    <span
+      data-testid="infinite-analysis-engine"
+      title={session?.engine}
+      className={cn(
+        'flex-none truncate text-xs font-semibold text-ink',
+        pick ? 'max-w-[10rem]' : 'max-w-[45%]',
+      )}
+    >
+      {session
+        ? displayEngine(session.engine, session.runner ?? null)
+        : pick
+          ? t`deep tier`
+          : t`Live analysis`}
+    </span>
+  )
+  // The name the server resolved "the deep tier" to. It is only knowable from a session
+  // that is actually open, so before the first one the option says what it does, not who.
+  const deepName = stream.engineId === null ? (session?.engine ?? null) : null
+  return (
+    <>
+      {dot ? (
+        <span
+          className={cn(
+            'size-1.5 flex-none rounded-full',
+            phase === 'running'
+              ? 'animate-pulse bg-accent-teal'
+              : phase === 'opening'
+                ? 'bg-mistake'
+                : phase === 'error'
+                  ? 'bg-blunder'
+                  : 'bg-edge-strong',
+          )}
+        />
+      ) : null}
+      {pick ? (
+        <span className="relative inline-flex min-w-0 flex-none items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised">
+          {name}
+          <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
+          <select
+            aria-label={t`Engine`}
+            value={stream.engineId === null ? '' : String(stream.engineId)}
+            onChange={(event) =>
+              stream.setEngineId(event.target.value === '' ? null : Number(event.target.value))
+            }
+            className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
+          >
+            <option value="">{deepName ? t`deep tier — ${deepName}` : t`deep tier`}</option>
+            {stream.engines
+              .filter((host) => host.streams)
+              .map((host) => (
+                <option key={host.engineId} value={String(host.engineId)}>
+                  {engineOptionLabel(host)}
+                </option>
+              ))}
+          </select>
+        </span>
+      ) : (
+        name
+      )}
+      {session ? <HostChip runner={session.runner ?? null} /> : null}
+    </>
+  )
+}
+
+/**
+ * Depth, nodes and speed, as three short mono readouts against whatever they are placed
+ * beside. `data-testid` stays on the group: it is what a test asks for when it wants to
+ * know the runner's name is reported once and not twice.
+ */
+export function LiveSearchMeta({ stream }: { stream: StreamSessionApi }) {
+  const { snapshot } = stream
+  // Named here rather than in the readout below, because the identifier is the placeholder
+  // a translator sees in "{nodes} nodes".
+  const nodes = snapshot?.nodes ? formatNodes(snapshot.nodes) : null
+  return (
+    <div className="flex min-w-0 flex-none items-center gap-2" data-testid="infinite-analysis-meta">
+      {snapshot?.depth ? (
+        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+          d{snapshot.depth}
+        </span>
+      ) : null}
+      {nodes ? (
+        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+          <Trans>{nodes} nodes</Trans>
+        </span>
+      ) : null}
+      {snapshot?.nps ? (
+        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+          {formatNps(snapshot.nps)}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+export interface LiveSearchLinesProps extends Omit<InfiniteAnalysisPanelProps, 'className'> {
+  /**
+   * Whether these rows draw the peek board themselves, hanging off the hovered row. Off,
+   * the host draws it from `onHovered` — the game page's engine pane is a scroll container,
+   * which clips anything a row inside it positions outside itself, so the board has to hang
+   * off the pane instead (`MaiaPanel`).
+   */
+  peek?: boolean
+  /** A row the pointer entered or left, by its `liveLineId` — for a host that draws the peek. */
+  onHovered?: (id: string, over: boolean) => void
+  className?: string
+}
+
+/**
+ * The search's rows, and the sentences that stand in for them: the offer to resume when a
+ * session ended, the error that left the switch off, the idle line before anything ran.
  *
- * It sits under the stored-run panel on the game page rather than replacing it: a run says
- * what an analysis pass concluded about a move that was played, this says what a search is
- * concluding about a position nobody has left yet. Two different claims, stacked, never
- * merged.
- *
- * The scores are White-relative, like every other evaluation the app draws — the panel above
- * this one included, which is the whole reason `streamModel` flips what the engine reports.
+ * The scores are White-relative, like every other evaluation the app draws — the stored
+ * run's rows included, which is the whole reason `streamModel` flips what the engine reports.
  *
  * Three gestures point at a line, and they stay separate because they ask different
  * questions. The **row** asks where the line goes, and answers for the whole line at once;
  * a **token** asks what the position looks like after that one move, so it names a ply the
  * row cannot; the **wheel** walks that ply along without the pointer having to hit each
  * token in turn. Folding them together would lose the difference: a row-only preview cannot
- * say "here", and a token-only one cannot say "all of it". The panel only reports them —
+ * say "here", and a token-only one cannot say "all of it". The rows only report them —
  * what any of them draws is the surface's business, which is why they leave as callbacks
  * and the preview's position comes back as `previewLine` / `previewPly`.
  */
-export function InfiniteAnalysisPanel({
+export function LiveSearchLines({
   stream,
   fen,
   ply,
@@ -253,8 +368,10 @@ export function InfiniteAnalysisPanel({
   previewLine,
   previewPly,
   orientation = 'white',
+  peek: drawPeek = true,
+  onHovered,
   className,
-}: InfiniteAnalysisPanelProps) {
+}: LiveSearchLinesProps) {
   const { t, i18n } = useLingui()
   const { phase, snapshot, session, offer, error, note } = stream
   const lines: StreamLine[] = [...(snapshot?.lines ?? [])].sort((a, b) => a.multipv - b.multipv)
@@ -313,90 +430,24 @@ export function InfiniteAnalysisPanel({
     return () => node.removeEventListener('wheel', onWheel)
   }, [showLines])
 
-  // The workspace's foot: chrome rather than canvas, and ruled off from the pane above it
-  // in the same weight as every other boundary on the screen — a status strip along the
-  // bottom edge of the window, the way a desktop tool parks one.
-  const shell = cn('flex flex-none flex-col border-t border-edge-strong bg-panel', className)
-
   if (phase === 'off' && !offer) {
     return (
-      <section className={shell} data-testid="infinite-analysis">
+      <div className={className}>
         <div className="flex items-center gap-2 px-3 py-2.5">
           <span className="size-1.5 flex-none rounded-full bg-edge-strong" />
           <span className="text-[0.71875rem] text-dim">
             <Trans>Analyse this position continuously.</Trans>
           </span>
         </div>
-        {note ? (
-          <p className="px-3 pb-2.5 text-[0.6875rem] text-dim">{note}</p>
-        ) : null}
-        <ControlsFooter stream={stream} fen={fen} />
-      </section>
+        {note ? <p className="px-3 pb-2.5 text-[0.6875rem] text-dim">{note}</p> : null}
+      </div>
     )
   }
 
   const where = session?.runner ?? t`this machine`
-  // Named here rather than in the readout below, because the identifier is the placeholder
-  // a translator sees in "{nodes} nodes".
-  const nodes = snapshot?.nodes ? formatNodes(snapshot.nodes) : null
 
   return (
-    <section className={shell} data-testid="infinite-analysis">
-      <div className="px-3 pb-2 pt-2.5" data-testid="infinite-analysis-header">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className={cn(
-              'size-1.5 flex-none rounded-full',
-              phase === 'running'
-                ? 'animate-pulse bg-accent-teal'
-                : phase === 'opening'
-                  ? 'bg-mistake'
-                  : phase === 'error'
-                    ? 'bg-blunder'
-                    : 'bg-edge-strong',
-            )}
-          />
-          <span
-            data-testid="infinite-analysis-engine"
-            title={session?.engine}
-            className="max-w-[45%] flex-none truncate text-xs font-semibold text-ink"
-          >
-            {session ? displayEngine(session.engine, session.runner ?? null) : t`Live analysis`}
-          </span>
-          {session ? <HostChip runner={session.runner ?? null} /> : null}
-          <div className="flex-1" />
-          {/*
-            Depth, nodes and speed ride on the header line rather than on a row of their own.
-            They used to need that row because the header's right end was taken by the
-            row-mode cycler and the settings gear — both of which have moved to the run
-            panel's Stockfish card, which is where the preference is now changed. What is
-            left is three short mono readouts against an engine name, so the second row was
-            spending a line's height on a gap.
-
-            `data-testid` stays on the group: it is what a test asks for when it wants to
-            know the runner's name is reported once and not twice.
-          */}
-          <div
-            className="flex min-w-0 flex-none items-center gap-2"
-            data-testid="infinite-analysis-meta"
-          >
-            {snapshot?.depth ? (
-              <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">d{snapshot.depth}</span>
-            ) : null}
-            {nodes ? (
-              <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
-                <Trans>{nodes} nodes</Trans>
-              </span>
-            ) : null}
-            {snapshot?.nps ? (
-              <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
-                {formatNps(snapshot.nps)}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
+    <div className={className}>
       {offer ? (
         <div className="mx-1.5 mb-1.5 rounded-md border border-mistake/28 bg-mistake/5 px-2.5 py-2">
           <p className="text-[0.71875rem] text-mistake">
@@ -468,13 +519,13 @@ export function InfiniteAnalysisPanel({
             const text = sans.length > 0 ? notate(formatVariation(ply, sans)) : line.pv.join(' ')
             // The preview's ply counts for this row only where the preview is on this row;
             // on any other it stands nowhere, and the tokens say so by staying plain.
-            const id = lineId(line.multipv)
+            const id = liveLineId(line.multipv)
             const at = previewLine === id ? (previewPly ?? null) : null
             const state = { line: id, ply: at }
             // Peek draws beside the row instead of on the board, so it is the panel's own
             // job — and only while this row is the one under the pointer.
             const peeking =
-              replay && prefs.row === 'peek' && onHoverLine && hovered === line.multipv
+              drawPeek && replay && prefs.row === 'peek' && onHoverLine && hovered === line.multipv
                 ? replay
                 : null
             const peek = peeking ? peekFen(peeking, prefs, state) : null
@@ -485,11 +536,13 @@ export function InfiniteAnalysisPanel({
                 data-testid="infinite-analysis-line"
                 onMouseEnter={() => {
                   setHovered(line.multipv)
+                  onHovered?.(id, true)
                   onHoverMove?.(line.pv[0] ?? null)
                   onHoverLine?.({ line: id, ply: null, pv: line.pv })
                 }}
                 onMouseLeave={() => {
                   setHovered((row) => (row === line.multipv ? null : row))
+                  onHovered?.(id, false)
                   onHoverMove?.(null)
                   onHoverLine?.(null)
                 }}
@@ -527,9 +580,9 @@ export function InfiniteAnalysisPanel({
                   )}
                 </span>
                 {peek ? (
-                  // Above the row, not below it: this panel hangs off the bottom of a column
-                  // that clips what overflows it (`GamePage`'s `overflow-hidden`), so a board
-                  // drawn downwards would be cut in half by the edge of the window.
+                  // Above the row, not below it: on the live page this panel hangs off the
+                  // bottom of a column that clips what overflows it, so a board drawn
+                  // downwards would be cut in half by the edge of the window.
                   // `pointer-events-none`, so walking along the tokens never lands on the
                   // popover and takes the hover — the row's own state has to survive it.
                   <div className="pointer-events-none absolute bottom-full right-1.5 z-20 mb-1 flex flex-col items-center gap-1 rounded-md border border-edge bg-elevated p-1.5 shadow-lg">
@@ -549,7 +602,46 @@ export function InfiniteAnalysisPanel({
           })}
         </div>
       ) : null}
+    </div>
+  )
+}
 
+/**
+ * What the engine is finding *now* in the position on the board, as a panel of its own:
+ * the status line, the rows, and the controls under them.
+ *
+ * The live page's shape. The game page does not use it: there the same rows sit behind a
+ * Live tab in the stored run's pane (`MaiaPanel`), because a run says what an analysis
+ * pass concluded about a move that was played and a search says what it is concluding
+ * about the position now — two claims about one position, which read better switched
+ * between than stacked four rows apart.
+ */
+export function InfiniteAnalysisPanel({ className, ...props }: InfiniteAnalysisPanelProps) {
+  const { stream, fen } = props
+  const { phase, offer } = stream
+
+  // The workspace's foot: chrome rather than canvas, and ruled off from the pane above it
+  // in the same weight as every other boundary on the screen — a status strip along the
+  // bottom edge of the window, the way a desktop tool parks one.
+  const shell = cn('flex flex-none flex-col border-t border-edge-strong bg-panel', className)
+
+  return (
+    <section className={shell} data-testid="infinite-analysis">
+      {phase === 'off' && !offer ? null : (
+        <div className="px-3 pb-2 pt-2.5" data-testid="infinite-analysis-header">
+          <div className="flex min-w-0 items-center gap-2">
+            <LiveSearchStatus stream={stream} />
+            <div className="flex-1" />
+            {/*
+              Depth, nodes and speed ride on the header line rather than on a row of their
+              own: three short mono readouts against an engine name, and a second row was
+              spending a line's height on a gap.
+            */}
+            <LiveSearchMeta stream={stream} />
+          </div>
+        </div>
+      )}
+      <LiveSearchLines {...props} />
       <ControlsFooter stream={stream} fen={fen} />
     </section>
   )

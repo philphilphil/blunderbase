@@ -1011,17 +1011,20 @@ describe('GamePage', () => {
     expect(screen.getByRole('button', { name: 'Deep' })).toBeEnabled()
   })
 
-  it('offers a live search under the stored run, and opens one when asked', async () => {
+  it('offers a live search beside the stored run, and opens one when asked', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // Two panels, two claims: what the run concluded, and what an engine could find now.
-    expect(within(screen.getByTestId('maia-panel')).getByText('stockfish')).toBeInTheDocument()
-    // At rest the live panel offers the switch itself — the continuous controls are on the
-    // footer, not behind anything that has to be opened first.
+    // One pane, two claims behind a switch: what the run concluded, and what an engine
+    // could find now. At rest the pane is on Run, and the switch that starts the search is
+    // on the pane's own title strip — not behind the Live tab it fills.
+    const pane = within(screen.getByTestId('maia-panel'))
+    expect(pane.getByText('stockfish')).toBeInTheDocument()
+    expect(pane.getByRole('tab', { name: 'Run' })).toHaveAttribute('aria-selected', 'true')
+    expect(pane.getByRole('tab', { name: 'Live' })).toHaveAttribute('aria-selected', 'false')
     expect(
-      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
+      pane.getByRole('switch', { name: 'Analyse this position continuously' }),
     ).toBeInTheDocument()
     // Nothing is opened until the reader asks.
     expect(streamCalls).toHaveLength(0)
@@ -1040,7 +1043,67 @@ describe('GamePage', () => {
     })
   })
 
-  it('reads the live lines in the same frame as the run stacked above them', async () => {
+  it('moves the engine pane to Live with the search, and keeps Run a click away', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const pane = () => within(screen.getByTestId('maia-panel'))
+    const tab = (name: string) => pane().getByRole('tab', { name })
+    const toggle = () => pane().getByRole('switch', { name: 'Analyse this position continuously' })
+
+    // Switching the search on is asking for its answer, so the pane lands on Live — with
+    // the pickers that steer the search, and without the run's rows.
+    await user.click(toggle())
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
+    expect(pane().getByRole('combobox', { name: 'Lines' })).toBeInTheDocument()
+    // The run's rows — its played row among them — are behind the other tab now.
+    expect(pane().queryByTestId('engine-played-line')).not.toBeInTheDocument()
+
+    // Run is still there to look at while the search keeps going: the stored lines come
+    // back, the pickers go, the switch stays on, and nothing was closed.
+    await user.click(tab('Run'))
+    expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
+    expect(pane().getByTestId('engine-played-line')).toBeInTheDocument()
+    expect(pane().queryByRole('combobox', { name: 'Lines' })).not.toBeInTheDocument()
+    expect(toggle()).toHaveAttribute('aria-checked', 'true')
+    expect(streamCalls.filter((c) => c.method === 'DELETE')).toHaveLength(0)
+
+    // Off again from the Run tab: the Live tab would be an empty box, so it is not offered.
+    await user.click(tab('Live'))
+    expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
+    await user.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-checked', 'false')
+    expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('lands the engine pane on Live when the board leaves the game line mid-search', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    const pane = () => within(screen.getByTestId('maia-panel'))
+    const tab = (name: string) => pane().getByRole('tab', { name })
+
+    await user.click(pane().getByRole('switch', { name: 'Analyse this position continuously' }))
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    await user.click(tab('Run'))
+    expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
+
+    // Into a book line: the run never looked here, the search is the only claim about the
+    // position, so the pane goes to it without being asked.
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
+    await user.click(await screen.findByRole('row', { name: /d4/ }))
+    expect(await screen.findByText('Back to game')).toBeInTheDocument()
+    expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
+
+    // Back on the game line the choice is the reader's again: a Run click holds.
+    await user.click(tab('Run'))
+    await user.keyboard('{Escape}')
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+    expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('reads the live lines in the same frame as the run beside them', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
@@ -1074,14 +1137,16 @@ describe('GamePage', () => {
       at: new Date().toISOString(),
     })
 
-    const live = within(screen.getByTestId('infinite-analysis'))
-    expect(live.getAllByTestId('infinite-analysis-line')).toHaveLength(1)
-    // Not −0.40: the same engine may not disagree with itself between two panels an inch
-    // apart, so the panel says what the run above it would have said.
-    expect(live.getByText('+0.40')).toBeInTheDocument()
-    expect(live.queryByText('−0.40')).not.toBeInTheDocument()
+    const pane = within(screen.getByTestId('maia-engine-lines'))
+    expect(pane.getAllByTestId('infinite-analysis-line')).toHaveLength(1)
+    // Not −0.40: the same engine may not disagree with itself between two tabs of one
+    // pane, so the search says what the run behind the other tab would have said.
+    expect(pane.getByText('+0.40')).toBeInTheDocument()
+    expect(pane.queryByText('−0.40')).not.toBeInTheDocument()
     // The stored run's own row for this position, unchanged, says the same number.
-    expect(screen.getAllByText('+0.40').length).toBeGreaterThan(1)
+    await user.click(pane.getByRole('tab', { name: 'Run' }))
+    expect(pane.queryByTestId('infinite-analysis-line')).not.toBeInTheDocument()
+    expect(pane.getByText('+0.40')).toBeInTheDocument()
   })
 
   it('follows the live search on the board’s eval bar, not the stored eval', async () => {
@@ -1842,7 +1907,11 @@ describe('the game view below md', () => {
     await user.click(tab('Engine'))
     expect(tab('Engine')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
-    expect(screen.getByTestId('infinite-analysis')).toBeInTheDocument()
+    // The live search is a tab of the engine pane here as on the desktop, not a card of
+    // its own under it.
+    expect(
+      within(screen.getByTestId('maia-panel')).getByRole('tab', { name: 'Live' }),
+    ).toBeInTheDocument()
     // Asserted on the table itself rather than on a move: the engine box prints SAN too,
     // so "e4" being on screen says nothing about which panel is open.
     expect(screen.queryByTestId('move-list')).not.toBeInTheDocument()

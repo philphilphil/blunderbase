@@ -43,8 +43,18 @@ caret rather than the game.
 
 ## Run the live engine
 
-`E` opens the live engine on the position in front of you. Set how many lines it shows;
-`↵` plays its move onto the board.
+The engine pane has two tabs, **Run** and **Live**: what the stored pass found, and what
+an engine finds now. `E`, or the switch at the right end of the pane's title, starts the
+live engine on the position in front of you and moves the pane to **Live**; the same key
+or switch stops it and moves it back. While the engine runs you can click **Run** to look
+at the stored lines again — the dot on the **Live** tab keeps pulsing until you stop the
+search.
+
+On the **Live** tab the engine's name and the line count in the title are pickers: click
+the name to choose which engine searches, the count to choose how many lines it shows.
+`↵` plays its move onto the board. Once you leave the game line the pane goes to **Live**
+by itself while a search is running, since the stored pass never looked at the position
+you are in.
 
 ## What a human would play
 

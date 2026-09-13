@@ -4,6 +4,7 @@ import { listEngineRoles } from '@/lib/api/endpoints'
 import { useEngineSetup } from './useEngineSetup'
 
 import { Plural, useLingui } from '@lingui/react/macro'
+import { ChevronDown } from 'lucide-react'
 
 import type { StreamSessionApi } from '@/lib/analysis'
 import type { EngineHost } from '@/lib/engines/hosts'
@@ -23,12 +24,15 @@ export function Toggle({
   label,
   disabled,
   title,
+  className,
 }: {
   checked: boolean
   onChange: (next: boolean) => void
   label: string
   disabled?: boolean
   title?: string
+  /** For a host whose row is shorter than the 2rem footer row this switch was sized for. */
+  className?: string
 }) {
   return (
     <button
@@ -43,6 +47,7 @@ export function Toggle({
         'inline-flex h-8 flex-none items-center rounded-md px-1.5 transition-colors',
         'hover:bg-raised disabled:opacity-50 disabled:hover:bg-transparent',
         'outline-none focus-visible:bg-raised',
+        className,
       )}
     >
       <span
@@ -79,20 +84,23 @@ export function engineOptionLabel(host: EngineHost): string {
 const SELECT_CLASS =
   'h-8 rounded-md border border-input bg-elevated px-2 text-xs text-soft outline-none transition-colors hover:border-edge-hover focus-visible:border-accent-teal/50 disabled:opacity-50'
 
-/**
- * The three things a live search is steered by: whether it runs at all, which engine runs
- * it, and how many lines it reports.
- */
-export function AnalysisControls({
-  stream,
-  fen,
-  className,
-}: {
+interface ControlProps {
   stream: StreamSessionApi
   /** null ⇒ nothing on the board, so there is nothing to analyse. */
   fen: string | null
   className?: string
-}) {
+}
+
+/**
+ * The switch that opens and closes the search, and the setup dialog behind it.
+ *
+ * Its own component rather than a line of `AnalysisControls` because the game page puts the
+ * switch in a pane's title strip and the two pickers in that pane's body, two places one
+ * flex row cannot reach. The dialog rides with the switch, and only with it: the effect
+ * that opens it must run exactly once per stream, and the switch is the one control every
+ * surface has exactly one of.
+ */
+export function LiveSwitch({ stream, fen, className }: ControlProps) {
   const { t } = useLingui()
   const setup = useEngineSetup()
   const { error, resume } = stream
@@ -122,14 +130,9 @@ export function AnalysisControls({
     }
   }, [error, resume, show])
   const idle = fen === null || fen === ''
-  // The name the server resolved "the deep tier" to. It is only knowable from a session
-  // that is actually open, so before the first one the option says what it does, not who.
-  const deepName = stream.engineId === null ? stream.session?.engine ?? null : null
 
   return (
-    // The switch leads: it is the one control that decides whether the other two matter, and
-    // on a narrow rail it is the one that must never be the thing that wraps away.
-    <div className={cn('flex flex-wrap items-center gap-2', className)}>
+    <>
       {setup.dialog}
       <Toggle
         checked={stream.enabled}
@@ -137,8 +140,25 @@ export function AnalysisControls({
         label={t`Analyse this position continuously`}
         disabled={idle}
         title={idle ? t`nothing is on the board` : t`Analyse this position continuously`}
+        className={className}
       />
+    </>
+  )
+}
 
+/**
+ * Which engine runs the search and how many lines it reports. Nothing here opens a search;
+ * a change while one is running is applied to it, and before one the choice waits.
+ */
+export function LivePickers({ stream, fen, className }: ControlProps) {
+  const { t } = useLingui()
+  const idle = fen === null || fen === ''
+  // The name the server resolved "the deep tier" to. It is only knowable from a session
+  // that is actually open, so before the first one the option says what it does, not who.
+  const deepName = stream.engineId === null ? stream.session?.engine ?? null : null
+
+  return (
+    <div className={cn('flex min-w-0 flex-1 flex-wrap items-center gap-2', className)}>
       <select
         aria-label={t`Engine`}
         value={stream.engineId === null ? '' : String(stream.engineId)}
@@ -173,6 +193,57 @@ export function AnalysisControls({
           </option>
         ))}
       </select>
+    </div>
+  )
+}
+
+/**
+ * How many lines the search reports, as a chip with the select laid over it — the shape
+ * of the run's own `MPV 3` chip, in the same strip, because it is the same fact about the
+ * other claim. A 2rem select beside three mono readouts was the one thing on the engine
+ * pane's title that did not belong to it.
+ */
+export function LiveLinesChip({ stream, className }: { stream: StreamSessionApi; className?: string }) {
+  const { t } = useLingui()
+  // Named, so the message is the one the picker's options already carry ("{lines, …}").
+  const lines = stream.multipv
+  return (
+    <span
+      data-testid="live-lines-chip"
+      className={cn(
+        'relative inline-flex flex-none items-center gap-0.5 rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim hover:border-edge-hover hover:text-soft',
+        className,
+      )}
+    >
+      <Plural value={lines} one="# line" other="# lines" />
+      <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
+      <select
+        aria-label={t`Lines`}
+        value={String(stream.multipv)}
+        onChange={(event) => stream.setMultipv(Number(event.target.value))}
+        className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
+      >
+        {[1, 2, 3, 4, 5].map((lines) => (
+          <option key={lines} value={String(lines)}>
+            <Plural value={lines} one="# line" other="# lines" />
+          </option>
+        ))}
+      </select>
+    </span>
+  )
+}
+
+/**
+ * The three things a live search is steered by, on one row: whether it runs at all, which
+ * engine runs it, and how many lines it reports.
+ */
+export function AnalysisControls({ stream, fen, className }: ControlProps) {
+  return (
+    // The switch leads: it is the one control that decides whether the other two matter, and
+    // on a narrow rail it is the one that must never be the thing that wraps away.
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
+      <LiveSwitch stream={stream} fen={fen} />
+      <LivePickers stream={stream} fen={fen} />
     </div>
   )
 }

@@ -47,8 +47,20 @@ die Partie.
 
 ## Die Engine live rechnen lassen
 
-`E` startet die Engine auf der aktuellen Stellung. Stell ein, wie viele Varianten sie
-zeigen soll; `↵` spielt ihren besten Zug aufs Brett.
+Das Engine-Feld hat zwei Reiter, **Analyse** und **Live**: was die gespeicherte Analyse
+gefunden hat, und was eine Engine jetzt gerade findet. `E`, oder der Schalter rechts in
+der Titelzeile des Felds, startet die Engine auf der aktuellen Stellung und wechselt auf
+**Live**; dieselbe Taste oder derselbe Schalter hält sie an und wechselt zurück. Während
+die Engine rechnet, kannst du auf **Analyse** klicken, um dir die gespeicherten Varianten
+noch einmal anzusehen – der Punkt auf dem Reiter **Live** pulsiert weiter, bis du die
+Suche anhältst.
+
+Auf dem Reiter **Live** sind der Name der Engine und die Variantenzahl in der Titelzeile
+Auswahlfelder: Klick auf den Namen, um die Engine zu wählen, auf die Zahl, um
+einzustellen, wie viele Varianten sie zeigt. `↵` spielt ihren besten Zug aufs Brett.
+Sobald du die Partie verlässt, wechselt das Feld von selbst auf **Live**, solange eine
+Suche läuft – die gespeicherte Analyse hat die Stellung, in der du jetzt stehst, nie
+gesehen.
 
 ## Was ein Mensch ziehen würde
 
