@@ -121,14 +121,19 @@ correspondence functions, "ICCF" is the rulebook.
    replaced on the next click, reaped when nobody is watching, a board outranks queue work —
    are exactly wrong for a search that must run for three days with nobody looking. The
    correspondence worker is a second owner of the same machinery with its own rules.
-4. **Two engine modes, two pools.** *Searches* (IDeA's infinite analysis) run in a
-   correspondence pool of their own, capped by `correspondence_slots` (default 2: one CPU
-   engine and one GPU engine at once), so a days-long search never takes a slot the quick
-   tier is counting on and a one-slot install can still run one. *Tasks* (IDeA's bounded
-   tasks) are `AnalysisRun` rows with a `fen`, and go through the analysis queue and its
-   runners like any other run. Threads and Hash are the engine row's options as everywhere
-   else; the manual says to give correspondence its own engine rows (`Threads` high,
-   `Hash` large) and ideally a runner on a machine of its own.
+4. **Two engine modes, one pool.** *Searches* (IDeA's infinite analysis) hold one of the
+   machine's engine slots — the analysis workers' `EnginePool`, capped by
+   `analysis_concurrency` — for as long as they run, the same slots the quick and deep
+   passes and the analysis boards take. They used to have a pool and a cap of their own
+   (`correspondence_slots`), so that a days-long search could never take a slot the quick
+   tier was counting on; that went, because a search is visible wherever slots are counted
+   and one number the owner can see beats two to add up. A search holding a slot means the
+   queue waits, and the worker claims no run while the pool is full (`EnginePool.free`), so
+   a waiting run reads as queued rather than running. *Tasks* (IDeA's bounded tasks) are
+   `AnalysisRun` rows with a `fen`, and go through the analysis queue and its runners like
+   any other run. Threads and Hash are the engine row's options as everywhere else; the
+   manual says to give correspondence its own engine rows (`Threads` high, `Hash` large)
+   and ideally a runner on a machine of its own.
 5. **Several engines at once is the normal case.** A search is one engine on one node in
    one process; Stockfish on the CPU and Leela on the GPU on the same node are two searches
    in two slots, with two live panes. Nothing in the driver is Stockfish-specific — `lc0`
@@ -304,7 +309,8 @@ service never touches a process — the same split as `analysis.py` and
 ## The worker: `workers/correspondence_searches.py`
 
 One asyncio set in the serve process, started in the lifespan next to the analysis workers
-and the stream broker, with an `EnginePool` of its own sized `correspondence_slots`.
+and the stream broker, drawing on the analysis workers' `EnginePool` — one cap,
+`analysis_concurrency`, for every engine process on the host.
 
 **A search is one task.** It takes a pool slot, runs `InfiniteSearch.run` on a thread with
 the search's stop event, and bounces snapshots two ways: to `/events` at the stream
@@ -316,10 +322,11 @@ every checkpoint.
 **Limits are a watchdog on the snapshot**, not a UCI limit: depth, nodes or seconds
 reached means `stop`, a final checkpoint, `done`, slot released. One driver for all cases.
 
-**Pause** sets the stop event, waits the search out, flushes a checkpoint, releases the
-semaphore and keeps the adapter in a parked dictionary keyed by search id — outside the
-pool so its idle reaper never quits it. **Resume** takes a slot, lifts the adapter out and
-goes again; the process's hash makes the first snapshots land where the last ones stopped.
+**Pause** sets the stop event, waits the search out, flushes a checkpoint, gives the slot
+back and keeps the adapter in a parked dictionary keyed by search id — outside the pool so
+its idle reaper never quits it. **Resume** takes a slot without a process
+(`EnginePool.reserve`), lifts the adapter out and goes again; the process's hash makes the
+first snapshots land where the last ones stopped.
 **Stop** quits a parked process or lets a running one drop back into the pool warm — the
 next search of the same engine on a sibling position starts with a table full of relevant
 entries, which is a real win the pool gives for free.
@@ -347,8 +354,9 @@ when the search is started, and `status()` lists each runner as a host with its 
 marks the rest `paused` cold with the reason, and clears `warm` on every paused row. The
 tree lost nothing; the rows say what the engines lost.
 
-**Capacity.** `correspondence_slots` on this host; a runner's slots are shared with queue
-work as now, so a runner meant for correspondence is sized with that in mind. Local engines
+**Capacity.** `analysis_concurrency` on this host, shared with the queue and the analysis
+boards; a runner's slots are shared with queue work the same way, so a machine meant for
+correspondence is sized with the searches counted in. Local engines
 carry no `instances` cap, so two Leela searches would mean two processes on one GPU — the
 owner's call, and the status strip says so. The Engines page's capacity section and
 `GET /correspondence/status` show slots in use, parked processes, queued tasks and which
@@ -406,7 +414,6 @@ has to be in both or the next save of any settings form wipes it:
 | key | |
 |---|---|
 | `correspondence_enabled` | the rail entry and the routes |
-| `correspondence_slots` | how many searches may run at once (1–16, default 2) |
 | `correspondence_multipv` | default lines for a search (default 3) |
 | `correspondence_task_nodes` | one task's node budget (default 40,000,000) |
 | `correspondence_task_multipv` | lines a task keeps, and therefore how wide an expansion can be (default 3) |

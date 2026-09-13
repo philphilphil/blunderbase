@@ -16,30 +16,38 @@ the engines it advertised. A slot is one engine job or one analysis board.
 
 ## How much at once
 
-Two caps, on this server's card, and they are **added, not shared**.
+One cap, on this server's card, and everything that runs an engine here counts against it.
 
 | Setting | |
 |---|---|
-| **Queue processes** | Engine processes the analysis queue may run here at once — quick and deep passes, and correspondence tasks. 1 to 64; empty is the machine's cores minus two |
-| **Search slots** | Correspondence searches that may run here at once, beside the queue. 1 to 16, two by default — one CPU engine and one GPU engine is the ordinary pair. Each search holds its process from start to pause, so a search that runs for days never takes a slot an imported game's quick pass is waiting for. The box is there only while [correspondence mode](../guide/analysis.md#correspondence) is on; the slots exist for nothing else |
+| **Queue processes** | Engine processes this machine may run at once — quick and deep passes, correspondence tasks, the analysis boards, and [correspondence searches](../guide/correspondence.md). 1 to 64; empty is the machine's cores minus two |
 
-Both are read when the server starts, because each sizes a pool of engine processes:
-**change them and restart**. Until then the card says which number is in force and which
-is saved. If `BLUNDERBASE_ANALYSIS_CONCURRENCY` is set in the environment it pins the queue
-cap from outside; the field is then read-only and says so. `BLUNDERBASE_ANALYSIS_WORKERS`
+A correspondence search holds one of these from start to pause, for as long as it runs,
+and while it does the queue has one fewer to work with: with four processes and four
+searches going, an imported game's quick pass waits until you pause or stop one. That is by
+design — a search is visible on the correspondence page, in its capacity strip and on this
+card, so the wait is never a mystery — and it is why the card counts searches among what is
+in use. There is no separate cap for them any more.
+
+**Queue processes** takes effect when you save. Raising it starts more workers at once;
+lowering it lets the runs already in flight finish, and simply admits fewer new ones —
+nothing is interrupted or requeued, so with two runs going and the cap set to one, the
+second finishes before the queue is down to one. If `BLUNDERBASE_ANALYSIS_CONCURRENCY` is
+set in the environment it pins the cap from outside; the field is then read-only and says
+so. `BLUNDERBASE_ANALYSIS_WORKERS`
 turns the in-process workers off entirely, for an installation that drains the queue from
 `blunderbase analyze` on its own schedule — the correspondence searches go with them. See
 [Configuration](configuration.md).
 
-Under the two boxes, the **budget line** does the arithmetic. A process costs its engine's
-`Threads`, so what has to fit the cores is `queue processes × threads + search slots ×
-threads`; the card takes the threads from the rows on Engines — the engines holding Quick
-and Deep price the queue, the heaviest search engine here prices the searches — and says
-in words when both caps at full load would exceed the machine. Six queue processes of a
-two-thread Stockfish and two search slots of a four-thread one are twenty threads; on eight
-cores that thrashes, and the line says so. Lower a cap, or give a row fewer threads on
-Engines. Threads are per engine; how many processes is per machine. Searches count only
-while [correspondence mode](../guide/analysis.md#correspondence) is on.
+Under the box, the **budget line** does the arithmetic. A process costs its engine's
+`Threads`, so what has to fit the cores is `queue processes × threads`; the card takes the
+threads from the rows on Engines — the heaviest engine switched on here, since any slot may
+be holding it — and says in words when the cap at full load would exceed the machine. Six
+processes of a four-thread Stockfish are twenty-four threads; on eight cores that thrashes,
+and the line says so. Lower the cap, or give a row fewer threads on Engines. Threads are
+per engine; how many processes is per machine. While
+[correspondence mode](../guide/analysis.md#correspondence) is off only the engines holding
+Quick and Deep are priced, because nothing else runs here.
 
 A remote runner's slots are set when it is registered and can be changed on its card
 (**Rename or resize**); the machine's threads are in its own `runner.yaml`, so the budget

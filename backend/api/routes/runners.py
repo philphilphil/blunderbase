@@ -64,10 +64,11 @@ def local_picture(request: Request, settings: Settings) -> dict[str, Any]:
     """
     workers = getattr(request.app.state, "workers", None)
     broker = getattr(request.app.state, "streams", None)
+    searches = getattr(request.app.state, "searches", None)
     boards = 0 if broker is None else len(_local_boards(broker))
-    # The cap in force is the running workers' own — resolved once when they started, so a
-    # setting changed since is not yet it. A process whose workers are not running has no
-    # cap in force to report, and the service fills in what the setting says instead.
+    # The cap in force is the running workers' own — the setting as it stood when they
+    # started or were last resized by a save of it. A process whose workers are not running
+    # has no cap in force to report, and the service fills in what the setting says instead.
     return {
         "slots": workers.concurrency if workers is not None and workers.running else None,
         # What the two caps are reasoned against: an engine's `Threads` times the processes
@@ -75,6 +76,8 @@ def local_picture(request: Request, settings: Settings) -> dict[str, Any]:
         "cores": os.cpu_count(),
         "busy": int(workers.busy) if workers is not None else 0,
         "streams": boards,
+        # The searches holding a slot here: the same slots, spent on the mode's long work.
+        "searches": int(searches.busy) if searches is not None else 0,
         "workers": bool(workers is not None and workers.running),
     }
 

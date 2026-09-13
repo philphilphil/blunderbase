@@ -485,10 +485,11 @@ def local_row(
     running, how many slots they have and how many are in use. Everything else is a row.
 
     The slots come with where they came from and what the row says, so the page can tell
-    an owner three things apart: the cap is pinned by the environment (the field is
-    read-only), the cap is the setting (editable), and the setting was changed since the
-    workers started (a restart is what applies it). Without a live cap — a process that
-    runs no workers — the slots are what the setting would give one.
+    an owner two things apart: the cap is pinned by the environment (the field is
+    read-only), or the cap is the setting (editable). A save of the setting resizes the
+    running workers, so the two numbers agree except in the moment between the save and
+    the resize landing on the loop. Without a live cap — a process that runs no workers —
+    the slots are what the setting would give one.
     """
     live = dict(live or {})
     local = next(
@@ -505,6 +506,7 @@ def local_row(
         "cores": live.get("cores"),
         "busy": int(live.get("busy", 0)),
         "streams": int(live.get("streams", 0)),
+        "searches": int(live.get("searches", 0)),
         "workers": bool(live.get("workers", False)),
         "queued": int(local["queued"]),
         "running": int(local["running"]),

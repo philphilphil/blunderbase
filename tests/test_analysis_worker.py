@@ -1161,6 +1161,41 @@ def _a_slot_is_free() -> bool:
         return False
 
 
+async def test_the_cap_moves_while_the_workers_run(
+    db: sessionmaker[Session], settings: Settings
+) -> None:
+    """Saving **Queue processes** resizes the running set: a grow spawns workers and widens
+    the pool at once, a shrink lets the surplus leave between runs. No restart anywhere."""
+    workers = AnalysisWorkers(settings=settings, sessions=db, concurrency=1, poll_seconds=0.02)
+    await workers.start()
+    try:
+        assert workers.concurrency == 1
+        assert len(workers._tasks) == 1
+
+        assert workers.resize(3) == 3
+        await asyncio.sleep(0.05)
+        live = [task for task in workers._tasks.values() if not task.done()]
+        assert len(live) == 3
+        assert workers.pool.concurrency == 3
+        assert {task.get_name() for task in live} == {f"analysis-worker-{i}" for i in range(3)}
+
+        workers.resize(1)
+        await asyncio.sleep(0.1)
+        live = [task for task in workers._tasks.values() if not task.done()]
+        assert [task.get_name() for task in live] == ["analysis-worker-0"]
+        assert workers.pool.concurrency == 1
+        assert workers.running
+
+        # Back up again: the indexes that emptied are filled, not doubled.
+        workers.resize(2)
+        await asyncio.sleep(0.05)
+        live = sorted(task.get_name() for task in workers._tasks.values() if not task.done())
+        assert live == ["analysis-worker-0", "analysis-worker-1"]
+    finally:
+        await workers.stop()
+    assert not workers.running
+
+
 def test_the_test_database_is_real_sqlite(db: sessionmaker[Session]) -> None:
     """Guards the fixture itself: worker threads must not share one connection."""
     with db() as session:

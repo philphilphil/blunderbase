@@ -60,7 +60,7 @@ export function TaskDialog({
       title={verb === 'task' ? <Trans>Queue task…</Trans> : <Trans>Refresh subtree…</Trans>}
       description={
         verb === 'task'
-          ? t`One bounded look at ${where}, through the analysis queue. It takes no search slot and runs wherever the queue has room.`
+          ? t`One bounded look at ${where}, through the analysis queue. It holds a slot for a minute or two and runs wherever the queue has room.`
           : t`A task on every stale position from ${where} down: too shallow, or judged by a version of the engine you no longer have.`
       }
       onClose={onClose}

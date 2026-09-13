@@ -161,6 +161,12 @@ export interface AppSettings {
   mistake_threshold: number | null
   blunder_threshold: number | null
   /**
+   * Whether a game the owner imports from now on arrives with its engine hidden
+   * (`GameSummary.engine_hidden`) until they show it on that game. 0 or 1, off by default;
+   * optional in the type for the reason the correspondence fields are.
+   */
+  hide_engine_new_games?: number | null
+  /**
    * Correspondence mode: whether it exists at all for this owner (0 or 1, off by default),
    * the reply window a new game is given, and how many lines a search over one node keeps.
    *
@@ -172,16 +178,10 @@ export interface AppSettings {
   correspondence_enabled?: number | null
   correspondence_multipv?: number | null
   /**
-   * How many correspondence searches this host runs at once, 1 to 16. Read by the server
-   * when it starts — it sizes an engine pool — so a change here takes a restart, which is
-   * the one setting on the page that does.
-   */
-  correspondence_slots?: number | null
-  /**
-   * Engine processes the analysis queue runs on this host at once, 1 to 64: the search
-   * slots' twin, read by the server when it starts, so a change takes a restart. Null is
-   * the machine's cores minus two — and while `BLUNDERBASE_ANALYSIS_CONCURRENCY` is set the
-   * row is ignored, which `/runners/status` reports as `local.slots_source === 'env'`.
+   * Engine processes this host runs at once, 1 to 64 — passes, analysis boards and
+   * correspondence searches together, applied live: a save resizes the running workers.
+   * Null is the machine's cores minus two — and while `BLUNDERBASE_ANALYSIS_CONCURRENCY` is
+   * set the row is ignored, which `/runners/status` reports as `local.slots_source === 'env'`.
    */
   analysis_concurrency?: number | null
   /**
@@ -228,6 +228,12 @@ export interface GameSummary extends Extra {
   id: number
   source: Source
   source_id?: string | null
+  /**
+   * The game's page on the site it came from — `lichess.org/<id>`, chess.com's game page
+   * — or absent for a game that has none (FICS, OTB, a typed correspondence game). The
+   * source chip in the games list and the header is a link while this is set.
+   */
+  url?: string | null
   played_at?: string | null
   color?: Color | null
   /**
@@ -235,6 +241,14 @@ export interface GameSummary extends Extra {
    * analysed and annotated like any other and counted in nothing. Absent means true.
    */
   is_owner_game?: boolean
+  /**
+   * True while the engine's verdict on this game is held back until the owner asks for it
+   * on the game itself — set by an import under the `hide_engine_new_games` setting,
+   * cleared by `PUT /games/{id}/engine`. Absent means false. The per-game twin of the
+   * browser's ⇧E mode (`lib/ui/engineVisibility`): every screen that shows a verdict hides
+   * it for this game while it is set, whatever the mode says.
+   */
+  engine_hidden?: boolean
   result?: string | null
   outcome?: string | null
   white?: string | null
@@ -1634,18 +1648,26 @@ export interface RunnerCreated {
 export interface LocalHost extends Extra {
   name: string
   /**
-   * Engine processes the queue runs here at once: the cap the running workers started
-   * with, or what the setting would give a process whose workers are not running.
+   * Engine processes this host runs at once: the running workers' cap — the setting as it
+   * stood when they started or were last resized by a save — or what the setting would
+   * give a process whose workers are not running.
    */
   slots?: number | null
   /** What decides that cap: the environment variable, the stored setting, or neither. */
   slots_source?: 'env' | 'setting' | 'default' | null
-  /** The cap after a restart — the setting as it stands, which `slots` lags once changed. */
+  /** The setting as it stands; the same as `slots` except in the moment a save is landing. */
   slots_configured?: number | null
   /** This machine's CPU count, which `Threads` × processes has to fit. */
   cores?: number | null
+  /** Slots held by analysis passes right now. */
   busy: number
+  /** Slots held by analysis boards right now. */
   streams: number
+  /**
+   * Slots held by correspondence searches right now — the same slots, for days at a time.
+   * Optional in the type so a fixture built before it existed need not invent one.
+   */
+  searches?: number
   /** Whether this process drains the queue. */
   workers: boolean
   queued: number
@@ -2002,8 +2024,9 @@ export interface CorrespondenceSearchEngine extends Extra {
 
 /** The capacity strip: slots, what is in them, what is parked, and where. */
 export interface CorrespondenceStatus extends Extra {
-  /** `correspondence_slots` in force on this host. */
+  /** This host's engine slots (`analysis_concurrency`), which searches share with the queue. */
   slots: number
+  /** Searches holding one of them here. */
   in_use: number
   queued: number
   paused: number

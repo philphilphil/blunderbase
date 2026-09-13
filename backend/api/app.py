@@ -87,13 +87,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     streams = _analysis_boards(settings, workers, gateway)
     app.state.streams = streams
     await streams.start()
-    # Correspondence searches run in a pool of their own — a days-long search must never
-    # take a slot the quick tier is counting on — and they start even when the mode is
-    # switched off: a deployment that turns it off with searches in flight has rows that
-    # still have to be recovered, parked and answered for. `analysis_workers` covers both
-    # sets, because it is the answer to "does this process drive engines at all".
+    # Correspondence searches draw on the workers' pool — one number of engine processes on
+    # this host, whatever asked for them — and they start even when the mode is switched
+    # off: a deployment that turns it off with searches in flight has rows that still have
+    # to be recovered, parked and answered for. `analysis_workers` covers both sets,
+    # because it is the answer to "does this process drive engines at all".
     searches = (
-        CorrespondenceSearches(settings=settings, gateway=gateway)
+        CorrespondenceSearches(settings=settings, gateway=gateway, pool=workers.pool)
         if settings.analysis_workers and not capabilities.read_only and not settings.demo
         else None
     )

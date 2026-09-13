@@ -52,6 +52,7 @@ import type {
   GameDetail,
   GameFilters,
   GameList,
+  GameSummary,
   GamesDeleted,
   DeletedGameList,
   DeletionsForgotten,
@@ -216,6 +217,14 @@ export const deleteAllGames = (password?: string) =>
  */
 export const deleteGames = (gameIds: number[]) =>
   http.post<GamesRemoved>('/games/delete', { body: { game_ids: gameIds } })
+
+/**
+ * Show the engine on one game, or hold it back again (`GameSummary.engine_hidden`). The
+ * "Show the engine" button on a game an import stored with the verdict held back; nothing
+ * about the analysis moves, only whether this game's screens show it.
+ */
+export const setGameEngineHidden = (gameId: number, hidden: boolean) =>
+  http.put<GameSummary>(`/games/${gameId}/engine`, { body: { hidden } })
 
 
 /** Every stored game with notes and saved lines layered onto its original PGN. */

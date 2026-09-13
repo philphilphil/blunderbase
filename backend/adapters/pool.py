@@ -25,6 +25,7 @@ kept — but the shape had to change on re-review:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
 import time
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -246,7 +247,9 @@ class _SlotGroup:
     ) -> None:
         self.spec = spec
         self._factory = factory
-        self._limit = max(1, limit)
+        # How many processes this group may hold. Public, because the pool moves it when its
+        # own cap is resized (`EnginePool.resize`).
+        self.limit = max(1, limit)
         self._idle_seconds = idle_seconds
         self._clock = clock
         self.slots: list[_Slot] = []
@@ -299,7 +302,7 @@ class _SlotGroup:
     def _take(self) -> _Slot:
         if self._free:
             return self._free.pop()
-        if len(self.slots) >= self._limit:
+        if len(self.slots) >= self.limit:
             # Either a slot was taken out of circulation while every other one was in use, or
             # this engine caps itself below the pool. Waiting on an existing process is right
             # in both cases, and costs nothing.
@@ -330,6 +333,11 @@ class EnginePool:
         self._clock = clock
         self._groups: dict[str, _SlotGroup] = {}
         self._semaphore = asyncio.Semaphore(self.concurrency)
+        # A shrink in progress: the permits it still means to take out of circulation, and
+        # the ones it has taken and is sitting on. See `resize`.
+        self._withdrawing = 0
+        self._withheld = 0
+        self._withdrawer: asyncio.Task[None] | None = None
         self._active = 0
         self._closing = False
         self._reaper: asyncio.Task[None] | None = None
@@ -356,6 +364,87 @@ class EnginePool:
         """Run one blocking engine call on a warm process, off the event loop."""
         async with self.acquire(spec) as engine:
             return await asyncio.to_thread(work, engine)
+
+    @asynccontextmanager
+    async def reserve(self) -> AsyncIterator[None]:
+        """Hold one of the cap's slots without taking a process from the pool.
+
+        For a caller that already owns a process and only owes the machine the *count*: a
+        correspondence search resumed from a park drives the engine it kept warm, which is
+        outside the pool on purpose, but it is still one more engine working on this host
+        and has to stand in the same line as everything else that is.
+        """
+        self._ensure_reaper()
+        await self._semaphore.acquire()
+        self._active += 1
+        try:
+            yield
+        finally:
+            self._active -= 1
+            self._semaphore.release()
+
+    @property
+    def free(self) -> int:
+        """Slots nobody holds right now — what a worker looks at before claiming a run.
+
+        The cap less what a shrink has withdrawn, less the callers inside it. Advisory: two
+        readers may both see one free slot and one of them will wait in `acquire`, which is
+        harmless. What it prevents is the worse case — a worker claiming a run, marking it
+        `running`, and then sitting on a full pool for as long as a search holds the slot.
+        """
+        return max(0, self.concurrency - self._withheld - self._active)
+
+    def resize(self, concurrency: int) -> int:
+        """Change the cap while callers are inside it. Returns the cap now in force.
+
+        This is what lets **Queue processes** on the Machines page take effect on save
+        rather than on the next restart. Growing is immediate: the extra permits are minted
+        and the next callers walk straight in. Shrinking never interrupts a search: the
+        surplus permits are withdrawn one at a time as callers give them back, so the cap
+        simply stops admitting the next caller until enough have finished. A grow that
+        arrives while a shrink is still waiting calls the rest of it off first.
+
+        Every group's own limit follows, so an engine that was capped at the old number
+        starts more processes under the new one — the cap on an engine's `instances` still
+        holds, since a group can never raise itself above what its spec allows.
+
+        Must be called on the event loop's thread, like everything else here.
+        """
+        target = max(1, int(concurrency))
+        delta = target - self.concurrency
+        self.concurrency = target
+        if delta > 0:
+            called_off = min(delta, self._withdrawing)
+            self._withdrawing -= called_off
+            delta -= called_off
+            returned = min(delta, self._withheld)
+            self._withheld -= returned
+            delta -= returned
+            for _ in range(returned + delta):
+                self._semaphore.release()
+        elif delta < 0:
+            self._withdrawing -= delta
+            if self._withdrawer is None or self._withdrawer.done():
+                self._withdrawer = asyncio.create_task(self._withdraw(), name="engine-pool-shrink")
+        for group in self._groups.values():
+            group.limit = self._group_limit(group.spec)
+        return self.concurrency
+
+    async def _withdraw(self) -> None:
+        """Take permits out of circulation as they come free, until the shrink is met."""
+        while self._withdrawing > 0:
+            await self._semaphore.acquire()
+            if self._withdrawing == 0:
+                # A grow called the shrink off while this waited: the permit is wanted after all.
+                self._semaphore.release()
+                return
+            self._withdrawing -= 1
+            self._withheld += 1
+
+    def _group_limit(self, spec: EngineSpec) -> int:
+        # An engine may pin itself below the pool's cap; it can never raise itself above
+        # it, since a caller holds one of the pool's slots either way.
+        return min(self.concurrency, spec.instances or self.concurrency)
 
     def warm(self) -> list[str]:
         """One entry per running process, so an engine serving two callers appears twice."""
@@ -388,6 +477,12 @@ class EnginePool:
 
     async def close(self) -> None:
         self._closing = True
+        withdrawer, self._withdrawer = self._withdrawer, None
+        if withdrawer is not None and not withdrawer.done():
+            # A shrink still waiting for callers to finish has nothing left to wait for.
+            withdrawer.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await withdrawer
         reaper, self._reaper = self._reaper, None
         if reaper is not None:
             # Cancelling the reaper outright would abandon the `close()` of a process it
@@ -411,9 +506,7 @@ class EnginePool:
             group = self._groups[spec.key] = _SlotGroup(
                 spec,
                 self._factory,
-                # An engine may pin itself below the pool's cap; it can never raise itself
-                # above it, since a caller holds one of the pool's slots either way.
-                limit=min(self.concurrency, spec.instances or self.concurrency),
+                limit=self._group_limit(spec),
                 idle_seconds=self._idle_seconds,
                 clock=self._clock,
             )

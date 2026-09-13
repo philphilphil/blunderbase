@@ -123,7 +123,11 @@ class AnalysisWorkers:
         self._sessions = sessions
         self._pool = pool
         self._owns_pool = pool is None
-        self._tasks: list[asyncio.Task[None]] = []
+        # The workers by index. Indexed rather than listed because the cap can move while
+        # they run (`resize`): a worker whose index is at or past the cap leaves on its own,
+        # and a grow fills the indexes that are empty.
+        self._tasks: dict[int, asyncio.Task[None]] = {}
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._heartbeat: asyncio.Task[None] | None = None
         self._db_executor: ThreadPoolExecutor | None = None
         self._stopping = asyncio.Event()
@@ -172,11 +176,12 @@ class AnalysisWorkers:
             self.concurrency,
             DB_THREADS,
         )
-        self._tasks = [
-            asyncio.create_task(self._worker(), name=f"analysis-worker-{index}")
-            for index in range(self.concurrency)
-        ]
+        self._loop = asyncio.get_running_loop()
+        self._tasks = {index: self._spawn(index) for index in range(self.concurrency)}
         self._heartbeat = asyncio.create_task(self._beat(), name="analysis-heartbeat")
+
+    def _spawn(self, index: int) -> asyncio.Task[None]:
+        return asyncio.create_task(self._worker(index), name=f"analysis-worker-{index}")
 
     async def stop(self) -> None:
         """Ask the workers to finish, then take the queue back from the ones that cannot."""
@@ -187,7 +192,7 @@ class AnalysisWorkers:
             heartbeat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat
-        tasks, self._tasks = self._tasks, []
+        tasks, self._tasks = list(self._tasks.values()), {}
         if tasks:
             _done, pending = await asyncio.wait(tasks, timeout=self.stop_grace)
             for task in pending:
@@ -210,6 +215,40 @@ class AnalysisWorkers:
         """Wake an idle worker: something was just enqueued."""
         self._wake.set()
 
+    def resize(self, concurrency: int) -> int:
+        """Change how many runs this set executes at once, without stopping it.
+
+        The **Queue processes** setting used to be read once, at `start()`, and the manual
+        told the owner to restart; this is what makes a save take effect instead. Safe from
+        any thread — the settings route runs on FastAPI's threadpool — because the work is
+        handed to the event loop the workers live on. Returns the cap now in force.
+
+        Growing spawns the missing workers and mints the pool's permits at once. Shrinking
+        interrupts nothing: a surplus worker leaves between runs (`_worker` checks its index
+        against the cap) and the pool withdraws permits as searches finish
+        (`EnginePool.resize`), so a deep pass that is half done is not requeued for it.
+        """
+        target = max(1, int(concurrency))
+        self._concurrency = target
+        loop = self._loop
+        if loop is not None and self._tasks:
+            loop.call_soon_threadsafe(self._apply_resize)
+        return target
+
+    def _apply_resize(self) -> None:
+        """The loop-thread half of `resize`: the pool's cap, then the worker set."""
+        if not self._tasks or self._stopping.is_set():
+            return
+        target = self.concurrency
+        if self._pool is not None:
+            self._pool.resize(target)
+        self._tasks = {index: task for index, task in self._tasks.items() if not task.done()}
+        for index in range(target):
+            if index not in self._tasks:
+                self._tasks[index] = self._spawn(index)
+        # The surplus are asleep in `_idle` as often as not; woken, they see the cap and go.
+        self._wake.set()
+
     async def wait_idle(self, timeout: float = 30.0) -> bool:
         """Block until nothing is queued, running or in flight. For batch runs and tests."""
         loop = asyncio.get_running_loop()
@@ -223,8 +262,21 @@ class AnalysisWorkers:
 
     # --- the loop ---------------------------------------------------------
 
-    async def _worker(self) -> None:
+    async def _worker(self, index: int) -> None:
         while not self._stopping.is_set():
+            # A cap lowered under this worker (`resize`): the surplus leaves between runs,
+            # never in the middle of one, and the run it was on finished as it would have.
+            if index >= self.concurrency:
+                return
+            # No free engine slot, no claim. The pool is shared with the analysis boards and
+            # the correspondence searches, and a search holds its slot for days: a run
+            # claimed now would sit `running` on a full pool for as long, when what it is
+            # is queued. Advisory (`EnginePool.free`), which is enough — the worst case is
+            # one claim that waits in `acquire`, not a queue that lies.
+            if self.pool.free == 0:
+                self._wake.clear()
+                await self._idle()
+                continue
             # Cleared before the claim rather than after: a `notify` or `stop` that lands
             # while the claim is on its thread has to still be set when `_idle` looks, or
             # the worker sleeps a whole poll interval on a queue that just grew — and a
@@ -266,6 +318,8 @@ class AnalysisWorkers:
             finally:
                 self._inflight.discard(run_id)
                 self._busy -= 1
+                # A slot just came free: a sibling dozing on a full pool can look again.
+                self._wake.set()
 
     async def _idle(self) -> None:
         with contextlib.suppress(TimeoutError):

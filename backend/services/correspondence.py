@@ -1102,10 +1102,11 @@ def list_searches(
 def status(session: Session) -> dict[str, Any]:
     """What the capacity strip shows: slots, what is in them, and what is parked.
 
-    Per host: this one first, with the slots the worker was sized to, then each runner
-    with the slots it was registered with. A search on a runner holds one of that
-    runner's slots — shared with its queue work — and never one of this host's, so the two
-    counts are kept apart the way the machines are.
+    Per host: this one first, with the engine slots the machine has — the same slots the
+    queue and the analysis boards use, which searches draw on like any other engine work —
+    then each runner with the slots it was registered with. A search on a runner holds one
+    of that runner's slots and never one of this host's, so the two counts are kept apart
+    the way the machines are.
     """
     rows = _live_searches(session, LIVE_SEARCH_STATES)
     names = _names_for(session, rows)
@@ -1190,15 +1191,12 @@ def _task_counts(session: Session) -> dict[str, int]:
 
 
 def _running_slots(session: Session) -> int:
-    """How many searches this process can actually run at once.
+    """How many engine slots this machine has — the ones searches share with the queue.
 
-    The worker's number, not the setting's: `correspondence_slots` is read once, when the
-    pool and the semaphore are sized, so raising it and saving changes what the settings
-    page holds and nothing about what the machine will do until a restart — which the page
-    says. The strip is the readout the owner acts on ("is there a slot free?"), and one
-    reading "2 of 6 in use" with four slots that do not exist would be worse than no strip
-    at all. With no worker in this process — a test, the CLI, a read-only deployment — the
-    setting is the best answer there is.
+    The worker's number first: it is the shared pool's cap as it stands, resized live when
+    **Queue processes** is saved, and the strip is the readout the owner acts on ("is there
+    a slot free?"). With no worker in this process — a test, the CLI, a read-only
+    deployment — the setting the pool would be built from is the best answer there is.
     """
     source = _CAPACITY_SOURCE
     if source is not None:
@@ -1208,7 +1206,7 @@ def _running_slots(session: Session) -> int:
             running = None
         if isinstance(running, int) and running > 0:
             return running
-    return app_settings_service.get_correspondence_slots(session)
+    return app_settings_service.get_analysis_concurrency(session)
 
 
 def _engine_entries(session: Session) -> list[dict[str, Any]]:
@@ -2311,9 +2309,13 @@ def disagreement(rows: Sequence[CorrespondenceEval]) -> bool:
 
 
 def _store(session: Session, parsed: import_service.ParsedGame, color: Color) -> Game:
-    """The parsed game through the ordinary import, with no quick pass and a known side."""
+    """The parsed game through the ordinary import, with no quick pass and a known side.
+
+    Never with its engine hidden, whatever `hide_engine_new_games` says: a correspondence
+    game is played *with* the engine, and the tree is its analysis from the first move.
+    """
     try:
-        outcome = import_service.import_one(session, parsed, analyze=False)
+        outcome = import_service.import_one(session, parsed, analyze=False, hide_engine=False)
     except Exception as exc:
         raise CorrespondenceError(f"that game could not be stored: {exc}") from None
     if outcome.game is None or not outcome.created:

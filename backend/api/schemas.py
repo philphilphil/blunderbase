@@ -147,6 +147,11 @@ class AppSettings(BaseModel):
     blunder_threshold: float | None = Field(
         default=None, description="win-percentage points lost that make a move a blunder"
     )
+    hide_engine_new_games: int | None = Field(
+        default=None,
+        description="1 if a game the owner imports arrives with its engine hidden "
+        "(`engine_hidden` on the game) until they show it on that game; off by default",
+    )
     correspondence_enabled: int | None = Field(
         default=None,
         description="1 if correspondence mode is on; the rail entry and the "
@@ -155,16 +160,12 @@ class AppSettings(BaseModel):
     correspondence_multipv: int | None = Field(
         default=None, description="how many lines a correspondence search keeps, 1 to 5"
     )
-    correspondence_slots: int | None = Field(
-        default=None,
-        description="how many correspondence searches this host runs at once, 1 to 16; "
-        "read when the server starts, so a change takes a restart",
-    )
     analysis_concurrency: int | None = Field(
         default=None,
-        description="engine processes the analysis queue runs on this host at once, 1 to "
-        "64; null is the machine's cores minus two. Read when the server starts, so a "
-        "change takes a restart, and ignored while BLUNDERBASE_ANALYSIS_CONCURRENCY is set",
+        description="engine processes this host runs at once — passes, analysis boards and "
+        "correspondence searches together — 1 to 64; null is the machine's cores minus "
+        "two. A save resizes the running workers, and the row is ignored while "
+        "BLUNDERBASE_ANALYSIS_CONCURRENCY is set",
     )
     correspondence_task_nodes: int | None = Field(
         default=None, description="the node budget one correspondence task is queued with"
@@ -214,17 +215,17 @@ class AppSettingsUpdate(Input):
     inaccuracy_threshold: float | None = None
     mistake_threshold: float | None = None
     blunder_threshold: float | None = None
+    hide_engine_new_games: int | None = Field(
+        default=None, description="1 to hide the engine on games imported from now on"
+    )
     correspondence_enabled: int | None = Field(
         default=None, description="1 to show correspondence mode, 0 or null to hide it"
     )
     correspondence_multipv: int | None = Field(
         default=None, description="1 to 5 lines per correspondence search"
     )
-    correspondence_slots: int | None = Field(
-        default=None, description="1 to 16 searches at once on this host"
-    )
     analysis_concurrency: int | None = Field(
-        default=None, description="1 to 64 queue engine processes at once on this host"
+        default=None, description="1 to 64 engine processes at once on this host"
     )
     correspondence_task_nodes: int | None = Field(
         default=None, description="the node budget of one task; at least 1"
@@ -269,10 +270,16 @@ class GameSummary(Payload):
     id: int
     source: Source
     source_id: str | None = None
+    # The game's page on the site it came from (`services.games.game_url`); absent for a
+    # game that has none.
+    url: str | None = None
     played_at: datetime | None = None
     color: Color | None = None
     # False for a game added from the reference books: kept for study, counted nowhere.
     is_owner_game: bool = True
+    # True while the engine's verdict on this game is held back from the screen — set by an
+    # import under `hide_engine_new_games`, cleared by `PUT /games/{id}/engine`.
+    engine_hidden: bool = False
     result: str | None = None
     outcome: str | None = None
     white: str | None = None
@@ -290,6 +297,17 @@ class GameSummary(Payload):
     opening: str | None = None
     termination: str | None = None
     ply_count: int | None = None
+
+
+class GameEngineUpdate(Input):
+    """`PUT /games/{id}/engine`: show the engine on this game, or hold it back again.
+
+    `hidden: false` is the button on the game — the owner has read it and wants the verdict
+    now. `hidden: true` puts a game back the way an import under `hide_engine_new_games`
+    stored it, for a game they would rather read again unaided.
+    """
+
+    hidden: bool
 
 
 class GameCard(GameSummary):
@@ -2261,6 +2279,9 @@ class LocalHost(Payload):
     )
     busy: int = 0
     streams: int = 0
+    # Correspondence searches holding one of the same slots right now: the third thing, with
+    # the passes and the boards, that the cap is spent on.
+    searches: int = 0
     workers: bool = Field(default=False, description="whether this process drains the queue")
     queued: int = 0
     running: int = 0

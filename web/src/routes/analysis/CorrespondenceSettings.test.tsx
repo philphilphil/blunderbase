@@ -36,7 +36,6 @@ const STORED: AppSettings = {
   blunder_threshold: 14,
   correspondence_enabled: 1,
   correspondence_multipv: 3,
-  correspondence_slots: 2,
   correspondence_task_nodes: 40_000_000,
   correspondence_task_multipv: 3,
   correspondence_stale_depth: 30,
@@ -92,13 +91,12 @@ describe('Analysis → Correspondence', () => {
     await userEvent.click(screen.getByRole('button', { name: /Save/ }))
 
     await waitFor(() => expect(sent).not.toBeNull())
-    // The whole record: a PUT is a replace, and an absent key is a cleared one. The search
-    // slots are not this page's any more — they are set on Machines — and still ride along.
+    // The whole record: a PUT is a replace, and an absent key is a cleared one. The
+    // machine's cap is not this page's — it is set on Machines — and still rides along.
     expect(screen.queryByLabelText('Search slots')).not.toBeInTheDocument()
     expect(sent).toMatchObject({
       correspondence_enabled: 1,
       correspondence_multipv: 4,
-      correspondence_slots: 2,
       correspondence_task_nodes: 40_000_000,
       correspondence_task_multipv: 3,
       correspondence_stale_depth: 30,
@@ -126,7 +124,7 @@ describe('Analysis → Correspondence', () => {
     expect(sent?.correspondence_task_multipv).toBe(3)
   })
 
-  it('sends the owner to Machines for the search slots rather than holding a box', async () => {
+  it('sends the owner to Machines for the engine cap rather than holding a box', async () => {
     draw()
     await screen.findByLabelText('Lines per search')
     expect(screen.queryByLabelText('Search slots')).not.toBeInTheDocument()

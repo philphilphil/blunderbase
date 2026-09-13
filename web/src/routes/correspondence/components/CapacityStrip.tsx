@@ -3,11 +3,14 @@
  *
  * Three numbers and a host list, because those are the three questions an owner asks
  * before starting a fourth search: is there a slot free, how much memory are the parked
- * processes holding, and is the other machine still connected. A fourth, apart from them:
- * how many **tasks** are out. They hold no slot — each is a run in the ordinary analysis
- * queue and may be working on another machine — so they are counted beside the slots
- * rather than against them, and a deployment with no free slot and forty tasks running is
- * not the same picture as one with neither. Parked processes are not
+ * processes holding, and is the other machine still connected. The slots are the machine's
+ * engine slots — **Queue processes** on Machines, shared with the passes and the boards —
+ * and the count here is the searches holding one, because that is what this page is about
+ * and what the queue behind them is waiting for. A fourth number, apart from them: how many
+ * **tasks** are out. Each is a run in the ordinary analysis queue that holds a slot for a
+ * minute or two and may be working on another machine, so they are counted beside the
+ * searches rather than with them, and a deployment with no free slot and forty tasks
+ * running is not the same picture as one with neither. Parked processes are not
  * capped (`docs/correspondence.md`, Settled) — the strip is what makes that safe, by
  * saying what they cost so the owner can decide when it is too much.
  *
@@ -105,7 +108,7 @@ export function CapacityStrip({ status }: { status: CorrespondenceStatus | undef
       <span>
         <Dot tone={inUse > 0 ? 'live' : 'idle'} />{' '}
         <b className="font-medium text-body">{t`${inUse} of ${slots}`}</b>{' '}
-        <Trans>search slots in use on this machine</Trans>
+        <Trans>engine slots held by searches on this machine</Trans>
       </span>
       {parked > 0 ? (
         <span>

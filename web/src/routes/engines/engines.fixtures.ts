@@ -263,7 +263,6 @@ export const SETTINGS: AppSettings = {
   blunder_threshold: null,
   correspondence_enabled: 1,
   correspondence_multipv: null,
-  correspondence_slots: null,
   analysis_concurrency: null,
   correspondence_task_nodes: null,
   correspondence_task_multipv: null,

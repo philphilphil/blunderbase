@@ -164,7 +164,7 @@ rechnet oder schon ein Urteil zu ihm hinterlassen hat, gestapelt untereinander.
 Zur Auswahl steht jede Engine, die eingeschaltet ist und UCI spricht, auf diesem Rechner
 und auf deinen Runnern; vorgeschlagen wird die mit der Rolle Tiefenanalyse. Eine Suche auf
 der Engine eines [Remote Runners](../operate/runners.md) läuft dort drüben, belegt einen
-Slot dieses Runners statt einen Suchplatz dieses Rechners und wird hier genau wie eine
+Slot dieses Runners statt einen dieses Rechners und wird hier genau wie eine
 lokale gelesen. Die, auf denen keine Suche laufen kann, sind ausgegraut statt versteckt und
 sagen unter dem Zeiger, warum: ein Runner, der nicht verbunden ist, einer, dessen
 Verbindung Warteschlangenarbeit trägt, aber keine Suche (ein Browser-Tab, oder ein Runner,
@@ -216,12 +216,17 @@ Eine Engine auf einem Knoten hat eine Suche: dieselbe Engine dort noch einmal an
 solange sie eingereiht, laufend oder pausiert ist, wird abgewiesen – und eine beendete
 Partie nimmt gar keine Suche mehr an, ihr Baum ist eingefroren.
 
-Jede Suche auf diesem Rechner belegt einen seiner **Suchplätze** – voreingestellt zwei,
-unter **Rechenleistung → Maschinen** auf der Karte dieses Servers –, und jede Suche auf
-einem Runner belegt einen Slot dieses Runners, geteilt mit seiner Warteschlangenarbeit und
-nie einem laufenden Durchlauf weggenommen. Sind alle belegt, wird die Suche **eingereiht** und startet von
-selbst, sobald einer frei wird. Suchen haben eigene Plätze: eine, die drei Tage läuft, nimmt
-also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet.
+Jede Suche auf diesem Rechner belegt einen seiner Engine-Plätze – die
+**Warteschlangenprozesse** unter **Rechenleistung → Maschinen** auf der Karte dieses
+Servers, dieselben Plätze, die Schnell- und Tiefenanalysen und die Analysebretter nutzen –,
+und jede Suche auf einem Runner belegt einen Slot dieses Runners, geteilt mit seiner
+Warteschlangenarbeit und nie einem laufenden Durchlauf weggenommen. Sind alle belegt, wird
+die Suche **eingereiht** und startet von selbst, sobald einer frei wird. Eine Suche, die
+drei Tage läuft, hält ihren Platz drei Tage, und solange hat die Warteschlange einen
+weniger: Die Schnellanalyse einer importierten Partie wartet hinter ihr, bis du sie
+pausierst oder stoppst. Die Kapazitätsleiste dieser Seite und die Karte unter Maschinen
+zählen die Suchen beide zu dem, was belegt ist, du weißt also immer, worauf die
+Warteschlange wartet.
 
 **Stockfish und Leela gleichzeitig** ist der Sinn des Stapels: zwei Engines auf derselben
 Stellung, zwei Plätze, zwei laufende Felder, zwei Urteile zum Vergleichen. Stockfish liest
@@ -258,8 +263,8 @@ Knoten ist der Hinweis, beide Felder zu lesen, bevor du einer der Zahlen traust.
 Eine Suche ist eine Engine, die über eine Stellung nachdenkt, solange du sie lässt. Eine
 **Aufgabe** ist die andere Hälfte: ein begrenzter Blick – voreingestellt vierzig Millionen
 Knoten, ein bis zwei Minuten – auf eine Stellung, eingereiht in die gewöhnliche
-Analysewarteschlange. Sie belegt keinen Suchplatz, steht einer Suche also nie im Weg, und
-sie läuft dort, wo die Warteschlange Platz hat – auch auf einem
+Analysewarteschlange. Sie belegt einen Platz für ein, zwei Minuten und gibt ihn zurück, wo
+eine Suche ihren behält, und sie läuft dort, wo die Warteschlange Platz hat – auch auf einem
 [entfernten Runner](../operate/runners.md). Welche Engine sie abarbeitet, wählst du beim
 Einreihen, aus derselben Liste, die auch die Suche zeigt – nur ist hier die Engine eines
 Runners nicht ausgegraut, denn eine Aufgabe ist gewöhnliche Warteschlangenarbeit, und die
@@ -362,10 +367,12 @@ wartet, trägt also keine Tiefe – was sie über ihre Größe sagen kann, ist d
 ausgeben wird.
 
 Die **Kapazitätsleiste** unter der Seitenüberschrift zählt dieselbe Arbeit über die ganze
-Installation: belegte Suchplätze von denen, die dieser Rechner hat, Suchen, die auf einen
-warten, warm geparkte Engines und der Speicher, den sie halten, wie viele Aufgaben unterwegs
-sind und an wie vielen davon schon gerechnet wird, und eine Zeile je entferntem
-Rechner. Aufgaben werden neben den Plätzen gezählt und nicht gegen sie: Sie belegen keinen. Dieselben Zahlen stehen am Fuß der Seitenleiste, damit sie von jedem Bildschirm aus
+Installation: wie viele der Engine-Plätze dieses Rechners Suchen gerade halten, Suchen, die
+auf einen warten, warm geparkte Engines und der Speicher, den sie halten, wie viele Aufgaben
+unterwegs sind und an wie vielen davon schon gerechnet wird, und eine Zeile je entferntem
+Rechner. Aufgaben werden neben den Suchen gezählt und nicht mit ihnen: Sie halten einen
+Platz nur ein, zwei Minuten, und vielleicht auf einer anderen Maschine. Dieselben Zahlen
+stehen am Fuß der Seitenleiste, damit sie von jedem Bildschirm aus
 beantwortet sind. Leiste und Liste folgen den Suchen, wie sie melden – hier gibt es nichts
 nachzuladen.
 

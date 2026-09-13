@@ -17,32 +17,40 @@ Engine-Auftrag oder ein Analysebrett.
 
 ## Wie viel gleichzeitig { #how-much-at-once }
 
-Zwei Obergrenzen, auf der Karte dieses Servers, und sie **addieren sich, statt sich zu
-teilen**.
+Eine Obergrenze, auf der Karte dieses Servers, und alles, was hier eine Engine laufen
+lässt, zählt gegen sie.
 
 | Einstellung | |
 |---|---|
-| **Warteschlangenprozesse** | Engine-Prozesse, die die Analyse-Warteschlange hier gleichzeitig laufen lassen darf – Schnell- und Tiefenanalysen und Fernschach-Aufgaben. 1 bis 64; leer heißt die Kerne der Maschine minus zwei |
-| **Suchplätze** | Fernschachsuchen, die hier gleichzeitig laufen dürfen, neben der Warteschlange. 1 bis 16, voreingestellt zwei – eine CPU-Engine und eine GPU-Engine ist das übliche Paar. Jede Suche hält ihren Prozess vom Start bis zur Pause; eine Suche, die tagelang läuft, nimmt also nie den Platz weg, auf den die Schnellanalyse einer importierten Partie wartet. Das Feld gibt es nur, solange der [Fernschachmodus](../guide/analysis.md#correspondence) an ist; für etwas anderes gibt es die Plätze nicht |
+| **Warteschlangenprozesse** | Engine-Prozesse, die diese Maschine gleichzeitig laufen lassen darf – Schnell- und Tiefenanalysen, Fernschach-Aufgaben, die Analysebretter und [Fernschachsuchen](../guide/correspondence.md). 1 bis 64; leer heißt die Kerne der Maschine minus zwei |
 
-Beide werden beim Start des Servers gelesen, weil jede einen Pool von Engine-Prozessen
-bemisst: **ändern und neu starten**. Bis dahin sagt die Karte, welche Zahl gilt und welche
-gespeichert ist. Ist `BLUNDERBASE_ANALYSIS_CONCURRENCY` in der Umgebung gesetzt, legt sie
-die Obergrenze der Warteschlange von außen fest; das Feld ist dann nur lesbar und sagt es.
+Eine Fernschachsuche belegt einen davon vom Start bis zur Pause, solange sie läuft, und
+solange hat die Warteschlange einen weniger: Bei vier Prozessen und vier laufenden Suchen
+wartet die Schnellanalyse einer importierten Partie, bis du eine pausierst oder stoppst.
+Das ist so gewollt – eine Suche ist auf der Fernschachseite, in ihrer Kapazitätsleiste und
+auf dieser Karte zu sehen, das Warten also nie ein Rätsel –, und deshalb zählt die Karte
+die Suchen zu dem, was belegt ist. Eine eigene Obergrenze für sie gibt es nicht mehr.
+
+**Warteschlangenprozesse** gilt, sobald du speicherst. Mehr davon starten sofort mehr
+Worker; weniger lässt die laufenden Durchläufe zu Ende kommen und nimmt schlicht weniger
+neue an – nichts wird unterbrochen oder neu eingereiht. Laufen also zwei Durchläufe und du
+setzt die Grenze auf eins, ist der zweite fertig, bevor die Warteschlange bei eins ist. Ist
+`BLUNDERBASE_ANALYSIS_CONCURRENCY` in der Umgebung gesetzt, legt sie die Obergrenze von
+außen fest; das Feld ist dann nur lesbar und sagt es.
 `BLUNDERBASE_ANALYSIS_WORKERS` schaltet die Worker im Prozess ganz ab, für eine
 Installation, die die Warteschlange mit `blunderbase analyze` nach eigenem Zeitplan
 abarbeitet – die Fernschachsuchen gehen mit ab. Siehe [Konfiguration](configuration.md).
 
-Unter den beiden Feldern rechnet die **Bilanzzeile** vor. Ein Prozess kostet die `Threads`
-seiner Engine; in die Kerne passen muss also `Warteschlangenprozesse × Threads + Suchplätze
-× Threads`. Die Karte nimmt die Threads von den Zeilen unter Engines – die Engines mit den
-Rollen Schnell und Tief bemessen die Warteschlange, die schwerste Suchengine hier die Suchen
-– und sagt in Worten, wann beide Obergrenzen bei Volllast die Maschine übersteigen. Sechs
-Warteschlangenprozesse eines Stockfish mit zwei Threads und zwei Suchplätze eines mit vier
-sind zwanzig Threads; auf acht Kernen kommt das ins Schwimmen, und die Zeile sagt es. Senk
-eine Obergrenze, oder gib einer Zeile unter Engines weniger Threads. Threads gelten je
-Engine; wie viele Prozesse, gilt je Maschine. Suchen zählen nur, solange der
-[Fernschachmodus](../guide/analysis.md#correspondence) an ist.
+Unter dem Feld rechnet die **Bilanzzeile** vor. Ein Prozess kostet die `Threads` seiner
+Engine; in die Kerne passen muss also `Warteschlangenprozesse × Threads`. Die Karte nimmt
+die Threads von den Zeilen unter Engines – die schwerste hier eingeschaltete Engine, denn
+jeder Platz kann gerade sie halten – und sagt in Worten, wann die Obergrenze bei Volllast
+die Maschine übersteigt. Sechs Prozesse eines Stockfish mit vier Threads sind
+vierundzwanzig Threads; auf acht Kernen kommt das ins Schwimmen, und die Zeile sagt es. Senk
+die Obergrenze, oder gib einer Zeile unter Engines weniger Threads. Threads gelten je
+Engine; wie viele Prozesse, gilt je Maschine. Solange der
+[Fernschachmodus](../guide/analysis.md#correspondence) aus ist, werden nur die Engines mit
+den Rollen Schnell und Tief bemessen, weil sonst nichts hier läuft.
 
 Die Slots eines Remote Runners werden beim Registrieren festgelegt und lassen sich auf
 seiner Karte ändern (**Umbenennen oder Größe ändern**); die Threads jener Maschine stehen in

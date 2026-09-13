@@ -162,7 +162,7 @@ export function EnginesPage() {
           <p className="text-[0.6875rem] leading-[1.6] text-dim">
             <Trans>
               Threads and hash belong to one process of one engine. How many processes a machine
-              runs at once — queue processes, correspondence search slots — is set per machine on{' '}
+              runs at once — passes, boards and correspondence searches together — is set per machine on{' '}
               <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
                 Machines
               </Link>

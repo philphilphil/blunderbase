@@ -81,29 +81,29 @@ Konfigurationsdatei des Runners.
 
 Wie viele Engine-Prozesse eine Maschine gleichzeitig laufen lässt, ist eine Eigenschaft der
 Maschine, und sie steht unter [Maschinen](runners.md#how-much-at-once): die
-**Warteschlangenprozesse** und **Suchplätze** dieses Servers, die Slots jedes Remote
-Runners, und eine Bilanzzeile, die das gegen die Kerne aufrechnet, mit den `Threads`, die
-jede Zeile hier verlangt. Diese Seite legt nur fest, was ein Prozess kostet.
+**Warteschlangenprozesse** dieses Servers, die Slots jedes Remote Runners, und eine
+Bilanzzeile, die das gegen die Kerne aufrechnet, mit den `Threads`, die jede Zeile hier
+verlangt. Diese Seite legt nur fest, was ein Prozess kostet.
 
 ## Eine Engine fürs Fernschach { #an-engine-for-correspondence }
 
 Eine Fernschachsuche ist kein Auftrag aus der Warteschlange: Sie ist eine Engine, die
-stunden- oder tagelang auf einer Stellung sitzt, und sie wird getrennt gezählt.
-**Suchplätze** auf der Karte dieses Servers unter [Maschinen](runners.md#how-much-at-once)
-legt fest, wie viele davon hier gleichzeitig laufen dürfen – voreingestellt zwei –, und es
-sind eigene Plätze: Eine Suche nimmt nie den weg, auf den die Schnellanalyse einer
-importierten Partie wartet. Gib dem Fernschach **eine eigene Engine-Zeile** statt der, die
-deine Durchläufe benutzen: eine Zeile mit hohem `Threads` und so viel `Hash`, wie du
-entbehren kannst, und wähl sie unter **Suchen mit …** an der Stellung. Ändern der Optionen
-startet ohnehin einen frischen Prozess, die beiden Zeilen kommen sich also nie in die Quere.
+stunden- oder tagelang auf einer Stellung sitzt. Sie belegt einen der
+**Warteschlangenprozesse** dieses Servers unter [Maschinen](runners.md#how-much-at-once),
+solange sie läuft – dieselben Plätze, die Schnell- und Tiefenanalysen nutzen; eine Suche,
+die tagelang läuft, ist also ein Platz, ohne den die Warteschlange auskommt, bis du sie
+pausierst oder stoppst. Die Karte unter Maschinen und die Kapazitätsleiste der
+Fernschachseite zählen sie beide, das Warten der Warteschlange hinter einer Suche ist also
+nie ein Rätsel. Gib dem Fernschach **eine eigene Engine-Zeile** statt der, die deine
+Durchläufe benutzen: eine Zeile mit hohem `Threads` und so viel `Hash`, wie du entbehren
+kannst, und wähl sie unter **Suchen mit …** an der Stellung. Ändern der Optionen startet
+ohnehin einen frischen Prozess, die beiden Zeilen kommen sich also nie in die Quere.
 
-Ein Suchplatz ist nicht dieselbe Einheit wie die **Warteschlangenprozesse** daneben, und
-die beiden addieren sich, statt sich zu teilen: Diese Obergrenze sind die Engine-Prozesse
-der *Warteschlange* über alle Stufen, **Suchplätze** begrenzt die Suchen daneben. Zwei
-Plätze und sechs Warteschlangenprozesse sind bis zu acht Engine-Prozesse gleichzeitig auf
-diesem Rechner; setz `Threads` in der Fernschach-Zeile also gegen das, was die Warteschlange
-ohnehin schon belegt – die Bilanzzeile auf der Karte des Servers rechnet das vor und sagt,
-wann die Maschine ins Schwimmen käme.
+Weil jeder Platz gerade die Fernschach-Engine halten kann, bemisst die Bilanzzeile auf der
+Karte des Servers jeden Platz mit der schwersten hier eingeschalteten Engine, solange der
+Modus an ist: Vier Prozesse einer Zeile mit acht Threads sind zweiunddreißig Threads, und
+die Zeile sagt, wann das mehr ist, als die Maschine hat. Setz `Threads` in der
+Fernschach-Zeile mit dieser Summe im Kopf, oder senk die Obergrenze.
 
 Zwei Dinge zum Speicher, bevor du `Hash` groß setzt. Eine **pausierte** Suche behält ihren
 Prozess samt Hash, damit das Fortsetzen Sekunden statt Stunden kostet – die Kapazitätsleiste
@@ -117,15 +117,16 @@ Eine GPU-Engine wird genauso gezählt und teilt sich anders. Zwei Leela-Suchen g
 sind zwei `lc0`-Prozesse auf einer Karte; sie teilen sich deren Speicher und deren Zeit,
 jede ist also langsamer als eine allein, und eine Karte, die ein Netz bequem hält, hält
 zwei vielleicht nicht. Verhindert wird es nicht – für eine lokale Engine gibt es keine
-Grenze, wie viele Kopien laufen –, aber gedacht sind zwei Plätze für eine CPU-Engine und
-eine GPU-Engine, jede auf ihrer eigenen Hardware.
+Grenze, wie viele Kopien laufen –, aber der Aufbau, der funktioniert, ist eine CPU-Engine
+und eine GPU-Engine, die gleichzeitig suchen, jede auf ihrer eigenen Hardware.
 
 **Aufgaben sind die andere Hälfte des Modus, und sie sind gewöhnliche
 Warteschlangenarbeit.** Eine Aufgabe – ein begrenzter Blick auf eine Stellung, und das,
 woraus eine [Erweiterung](../guide/correspondence.md#tasks-and-expansion) besteht – ist ein
-`AnalysisRun` wie jeder andere: Sie belegt keinen Suchplatz, sie zählt zusammen mit der
-Schnell- und der Tiefenanalyse gegen die **Warteschlangenprozesse**, und sie läuft auf
-dem Host, dem die Warteschlange sie gibt – [Remote Runner](runners.md) eingeschlossen. Die
+`AnalysisRun` wie jeder andere: Sie zählt zusammen mit der Schnell- und der Tiefenanalyse
+und den Suchen gegen die **Warteschlangenprozesse**, gibt ihren Platz nach ein, zwei
+Minuten zurück, wo eine Suche ihn behält, und sie läuft auf dem Host, dem die Warteschlange
+sie gibt – [Remote Runner](runners.md) eingeschlossen. Die
 Engine, die du für eine Aufgabe wählst – in **Aufgabe einreihen …**, **Erweitern …** oder
 **Teilbaum auffrischen …** –, darf also auf einem Runner liegen, und wo du einen Runner
 hast, gehört sie dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre

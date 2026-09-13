@@ -2,10 +2,10 @@
 
 Everything the focused pages edit lives here: the Maia levels (a list of one to five), the
 three 0/1 flags over the Maia pass itself, the two node budgets and the deep line count,
-the three classification thresholds, and the five that correspondence mode is configured
-with — whether it exists at all, the default reply window, how many lines a search keeps,
-how many searches this host runs at once, and which engines the search picker offers (the
-second list here, written like the Maia levels). They
+the three classification thresholds, whether new games arrive with the engine hidden, the
+machine's engine cap, and the five that correspondence mode is configured with — whether it
+exists at all, how many lines a search keeps, a task's budget and line count, and the depth
+below which a verdict is stale. They
 are stored settings rather than environment variables
 because they are the ones an owner changes as their play changes, and a restart is not a
 thing to ask of them for that. `services/app_settings.py` owns what they mean; this is the
@@ -26,7 +26,7 @@ by a save of a node budget.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sqlalchemy.orm import Session
 
 from backend.api.deps import SessionDep
@@ -42,7 +42,7 @@ def get_settings(session: SessionDep) -> AppSettings:
 
 
 @router.put("", response_model=AppSettings, summary="Change the settings")
-def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
+def put_settings(session: SessionDep, body: AppSettingsUpdate, request: Request) -> AppSettings:
     """Answers with what is in force afterwards — the clamped values, or null once cleared.
 
     The Maia levels are written by their own call, because they are a list rather than one
@@ -50,6 +50,12 @@ def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
     only the older `maia_target_elo` asks for that single level, which is what it always
     meant; one that names neither clears them back to the default, exactly as a PUT clears
     every other setting it leaves out.
+
+    The queue's cap is the one setting with a live object behind it: the analysis workers
+    in this process are resized to what is now in force (`AnalysisWorkers.resize`), so
+    **Queue processes** takes effect on save. The environment override wins there as it
+    does everywhere — `get_analysis_concurrency` resolves it — so a pinned deployment is
+    resized to the number it was already running on.
     """
     values = body.model_dump()
     thresholds = {key: values.get(key) for key in app_settings_service.KEYS}
@@ -60,6 +66,9 @@ def put_settings(session: SessionDep, body: AppSettingsUpdate) -> AppSettings:
         app_settings_service.set_maia_elos(session, [body.maia_target_elo])
     else:
         app_settings_service.set_maia_elos(session, None)
+    workers = getattr(request.app.state, "workers", None)
+    if workers is not None and workers.running:
+        workers.resize(app_settings_service.get_analysis_concurrency(session))
     return _answer(session, stored)
 
 

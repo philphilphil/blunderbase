@@ -74,27 +74,28 @@ file.
 ## Capacity
 
 How many engine processes a machine runs at once is a fact about the machine, and it lives
-on [Machines](runners.md#how-much-at-once): this server's **Queue processes** and **Search
-slots**, each remote runner's slots, and a budget line that adds them up against the cores
-at the `Threads` every row here asks for. This page only sets what one process costs.
+on [Machines](runners.md#how-much-at-once): this server's **Queue processes**, each remote
+runner's slots, and a budget line that weighs them against the cores at the `Threads` every
+row here asks for. This page only sets what one process costs.
 
 ## An engine for correspondence
 
 A correspondence search is not a queue job: it is one engine sitting on one position for
-hours or days, and it is counted separately. **Search slots** on this server's card under
-[Machines](runners.md#how-much-at-once) says how many of those may run at once here — two
-by default — and they are slots of their own, so a search never takes the one an imported
-game's quick pass is waiting for. Give correspondence **its own engine row** rather than
-the one your passes use: a row with `Threads` set high and `Hash` set to as much memory as
-you can spare, and pick it in **Search with…** on the position. Editing the options of an
-engine starts a fresh process, so the two rows never fight over one.
+hours or days. It holds one of this server's **Queue processes** under
+[Machines](runners.md#how-much-at-once) for as long as it runs — the same slots the quick
+and deep passes use, so a search that runs for days is one slot the queue does without
+until you pause or stop it. The Machines card and the correspondence page's capacity strip
+both count it, so the queue waiting behind a search is never a mystery. Give correspondence
+**its own engine row** rather than the one your passes use: a row with `Threads` set high
+and `Hash` set to as much memory as you can spare, and pick it in **Search with…** on the
+position. Editing the options of an engine starts a fresh process, so the two rows never
+fight over one.
 
-A search slot is not the same unit as **Queue processes** beside it, and the two are added
-rather than shared: that cap is the engine processes the *queue* runs across all tiers,
-**Search slots** caps the searches beside them. Two slots and six queue processes are up to
-eight engine processes on this machine at once, so set `Threads` on the correspondence row
-against what the queue is already using — the budget line on the server's card does the
-sum and says when the machine would thrash.
+Because any slot may be holding the correspondence engine, the budget line on the server's
+card prices every slot at the heaviest engine switched on here while the mode is on: four
+processes of a row with eight threads are thirty-two threads, and the line says when that
+is more than the machine has. Set `Threads` on the correspondence row with that sum in
+mind, or lower the cap.
 
 Two things about memory are worth knowing before you set `Hash` to something large. A
 **paused** search keeps its process, hash and all, so that resuming it costs seconds
@@ -108,15 +109,16 @@ lost either way; the whole of it is
 A GPU engine is counted the same way and shares differently. Two Leela searches at once are
 two `lc0` processes on one card, sharing its memory and its time, so each is slower than one
 would be and a card that holds one network comfortably may not hold two. Nothing stops you —
-a local engine carries no limit on how many copies of it run — but the setup two slots are
-meant for is one CPU engine and one GPU engine, each on its own hardware.
+a local engine carries no limit on how many copies of it run — but the setup that works is
+one CPU engine and one GPU engine searching at once, each on its own hardware.
 
 **Tasks are the other half of the mode, and they are ordinary queue work.** A task — a
 bounded look at one position, and what an
 [expansion](../guide/correspondence.md#tasks-and-expansion) is made of — is an
-`AnalysisRun` like any other: it takes no search slot, it counts against **Queue
-processes** along with the quick and deep passes, and it runs on whichever host the queue
-hands it to, [remote runners](runners.md) included. So the engine
+`AnalysisRun` like any other: it counts against **Queue processes** along with the quick
+and deep passes and the searches, gives its slot back after a minute or two where a search
+keeps it, and it runs on whichever host the queue hands it to, [remote runners](runners.md)
+included. So the engine
 picked for a task — in **Queue task…**, **Expand…** or **Refresh subtree…** — may live on a
 runner, and where you have a runner that is where it belongs: the tasks go to the other
 machine and this one keeps its cores for the searches and for the passes. Tasks sit between the tiers in the queue, ahead of the quick pass every import gets

@@ -293,6 +293,123 @@ async def test_a_second_caller_waits_when_one_process_is_all_the_cap_allows() ->
     await pool.close()
 
 
+# --- the cap moving while callers are inside it ------------------------------
+
+
+async def test_raising_the_cap_admits_the_waiting_caller_at_once() -> None:
+    """A grow mints permits on the spot, and the group that was built under the old cap
+    is allowed a second process rather than queueing the newcomer on the first."""
+    log: list[str] = []
+    pool = build(log, concurrency=1)
+    inside = asyncio.Event()
+    release = asyncio.Event()
+    second_in = asyncio.Event()
+
+    async def first() -> None:
+        async with pool.acquire(STOCKFISH):
+            inside.set()
+            await release.wait()
+
+    async def second() -> None:
+        async with pool.acquire(STOCKFISH):
+            second_in.set()
+            await release.wait()
+
+    one = asyncio.create_task(first())
+    await inside.wait()
+    two = asyncio.create_task(second())
+    await asyncio.sleep(0)
+    assert not second_in.is_set()
+
+    assert pool.resize(2) == 2
+    await asyncio.wait_for(second_in.wait(), 1.0)
+    assert log == ["start:Stockfish", "start:Stockfish"], "the group kept the old limit"
+
+    release.set()
+    await asyncio.gather(one, two)
+    await pool.close()
+
+
+async def test_lowering_the_cap_interrupts_nothing_and_admits_less_afterwards() -> None:
+    """Two callers inside a cap of two; the cap drops to one. Both finish; the next caller
+    waits until *both* are out, because the first permit handed back is withdrawn rather
+    than passed on."""
+    log: list[str] = []
+    pool = build(log, concurrency=2)
+    inside = 0
+    both_in = asyncio.Event()
+    release_first = asyncio.Event()
+    release_second = asyncio.Event()
+    third_in = asyncio.Event()
+
+    async def hold(release: asyncio.Event) -> None:
+        nonlocal inside
+        async with pool.acquire(STOCKFISH):
+            inside += 1
+            if inside == 2:
+                both_in.set()
+            await release.wait()
+
+    async def third() -> None:
+        async with pool.acquire(STOCKFISH):
+            third_in.set()
+
+    one = asyncio.create_task(hold(release_first))
+    two = asyncio.create_task(hold(release_second))
+    await both_in.wait()
+
+    assert pool.resize(1) == 1
+    waiting = asyncio.create_task(third())
+    await asyncio.sleep(0)
+    assert pool.active == 2, "a shrink must not throw anyone out"
+
+    release_first.set()
+    await one
+    await asyncio.sleep(0.01)
+    assert not third_in.is_set(), "the freed permit was withdrawn, not handed on"
+
+    release_second.set()
+    await asyncio.gather(two, waiting)
+    assert third_in.is_set()
+    await pool.close()
+
+
+async def test_a_grow_calls_off_a_shrink_that_is_still_waiting() -> None:
+    log: list[str] = []
+    pool = build(log, concurrency=2)
+    inside = 0
+    both_in = asyncio.Event()
+    release = asyncio.Event()
+    third_in = asyncio.Event()
+
+    async def hold() -> None:
+        nonlocal inside
+        async with pool.acquire(STOCKFISH):
+            inside += 1
+            if inside == 2:
+                both_in.set()
+            await release.wait()
+
+    async def third() -> None:
+        async with pool.acquire(STOCKFISH):
+            third_in.set()
+
+    held = [asyncio.create_task(hold()), asyncio.create_task(hold())]
+    await both_in.wait()
+    pool.resize(1)
+    await asyncio.sleep(0)
+    # Back to two before anyone finished: the withdrawal has nothing left to withdraw, so
+    # the permit the first caller hands back goes straight to the next one in line.
+    pool.resize(2)
+    waiting = asyncio.create_task(third())
+    release.set()
+    await asyncio.gather(*held)
+    await asyncio.wait_for(waiting, 1.0)
+    assert third_in.is_set()
+    assert pool.concurrency == 2
+    await pool.close()
+
+
 async def test_the_concurrency_cap_holds_across_different_engines() -> None:
     log: list[str] = []
     pool = build(log, concurrency=1)

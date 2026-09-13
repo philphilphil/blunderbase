@@ -5,7 +5,7 @@ boot (`backend/config.py`). These are not: they are the ones a person changes wh
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are twenty-four of them, in seven groups, plus two rows that are not settings at all
+There are twenty-four of them, in eight groups, plus two rows that are not settings at all
 (`queue_paused` and `tour_seen`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
@@ -36,37 +36,47 @@ they are the budget of the *next* run rather than of every run ever queued.
 points lost by the mover. Read per plan, which means a game re-analysed after they moved
 is judged by the new ones and one analysed before it keeps what it was judged by.
 
-**Correspondence** — `correspondence_enabled`, `correspondence_multipv`,
-`correspondence_slots`, and the three the bounded half of the
-mode is configured with, `correspondence_task_nodes`, `correspondence_task_multipv` and
-`correspondence_stale_depth`. Whether the mode exists at all for this owner (off by
-default, because most owners never play correspondence and should never see the rail
-entry), how many lines a
-search over one node keeps, how many searches this host runs at once, what one *task*
-costs and how many lines it keeps, and below what depth a stored verdict counts as stale.
-Ordinary members of `SETTINGS`: seven numbers with a range, read where they are used — the
-first by the rail and the router, the next as the defaults a new game and a new search are
-created with, and the two task numbers as the budget copied onto a task's run when it is
-queued, so changing one never moves a game already being played or a task already waiting.
-Two exceptions to "read where it is used": the slot count sizes the search worker's engine
-pool, so it is read once at startup and a change takes a restart, and the stale depth is
-read on every tree payload, because staleness is a reading of the eval table rather than
-something written into it.
+**Whether a new game arrives with its engine hidden** — `hide_engine_new_games`, 0 or 1.
+The quick pass still runs over every imported game; what this decides is whether its
+verdict is *shown* before the owner has read the game themselves. On, every game of the
+owner's that an import stores gets `Game.engine_hidden` set, and the game screen keeps
+every evaluation off it until they press "Show the engine" on that game — the per-game
+twin of the browser's ⇧E mode, which hides everything everywhere and is not stored here at
+all. Read when a game is stored, so a game already in the library is left as it is either
+way. A model game from the reference books and a correspondence game are never hidden by
+it: neither is a game of theirs to be reviewed before the engine speaks.
+
+**Correspondence** — `correspondence_enabled`, `correspondence_multipv`, and the three the
+bounded half of the mode is configured with, `correspondence_task_nodes`,
+`correspondence_task_multipv` and `correspondence_stale_depth`. Whether the mode exists at
+all for this owner (off by default, because most owners never play correspondence and
+should never see the rail entry), how many lines a search over one node keeps, what one
+*task* costs and how many lines it keeps, and below what depth a stored verdict counts as
+stale. Ordinary members of `SETTINGS`: six numbers with a range, read where they are used
+— the first by the rail and the router, the next as the defaults a new game and a new
+search are created with, and the two task numbers as the budget copied onto a task's run
+when it is queued, so changing one never moves a game already being played or a task
+already waiting. The one exception to "read where it is used" is the stale depth, read on
+every tree payload, because staleness is a reading of the eval table rather than something
+written into it. There is deliberately no cap on searches of their own: a search holds one
+of the machine's engine slots (`analysis_concurrency`) like a pass or a board does. There
+used to be a `correspondence_slots` beside it, and it went because a search is visible
+wherever the slots are counted, so one number the owner can see beats two to add up.
 
 There is deliberately no engine setting for the mode: every enabled UCI engine is offered
 wherever an engine is chosen, and the deep role's engine is the one preselected.
 
-**How many engine processes the queue runs at once** — `analysis_concurrency`, the cap the
-analysis workers and the analysis boards on this host share, and the twin of
-`correspondence_slots`: the two are added, not shared, and together they are the engine
-processes this machine may have going. It used to be an environment variable only; it is a
-setting now because it is the number an owner reasons about against the cores, on the same
-page as the search slots and beside every engine row's `Threads`. The variable
-`BLUNDERBASE_ANALYSIS_CONCURRENCY` survives as an override for a deployment that pins the
-cap from outside — when it is set the row is ignored and the page says so — and
-`get_analysis_concurrency` is the one place the override, the row and the cores-minus-two
-default are put in order. Like the search slots it sizes a pool, so it is read once when
-the workers start and a change takes a restart.
+**How many engine processes this host runs at once** — `analysis_concurrency`, the one cap
+the analysis workers, the analysis boards and the correspondence searches on this host all
+share: it is the engine processes this machine may have going, whatever asked for them. It
+used to be an environment variable only; it is a setting now because it is the number an
+owner reasons about against the cores, on the Machines page beside every engine row's
+`Threads`. The variable `BLUNDERBASE_ANALYSIS_CONCURRENCY` survives as an override for a
+deployment that pins the cap from outside — when it is set the row is ignored and the page
+says so — and `get_analysis_concurrency` is the one place the override, the row and the
+cores-minus-two default are put in order. It sizes a pool, and the pool moves while the
+server runs: a save of the settings resizes the running workers (`AnalysisWorkers.resize`),
+so the number on the Machines page is the number in force.
 
 **The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
 engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
@@ -146,18 +156,17 @@ DEEP_MULTIPV = "deep_multipv"
 INACCURACY_THRESHOLD = "inaccuracy_threshold"
 MISTAKE_THRESHOLD = "mistake_threshold"
 BLUNDER_THRESHOLD = "blunder_threshold"
+# Whether a game the owner imports arrives with `Game.engine_hidden` set — the engine's
+# verdict kept off the screen until they ask for it on that game. A flag like the Maia
+# switches, and a member of `SETTINGS` for the same reason they are.
+HIDE_ENGINE_NEW_GAMES = "hide_engine_new_games"
 # Correspondence mode: whether it is on at all, and how many lines a search over one node
 # keeps. There is deliberately no reply window: the server a game is played on is the
 # authority on its clock, and the owner types the deadline off that page.
 CORRESPONDENCE_ENABLED = "correspondence_enabled"
 CORRESPONDENCE_MULTIPV = "correspondence_multipv"
-# How many correspondence searches this host may run at once. A member of `SETTINGS` like
-# the rest: a number with a range. Read when the search worker starts rather than per
-# search, because it sizes an engine pool — changing it takes a restart, and the manual
-# says so.
-CORRESPONDENCE_SLOTS = "correspondence_slots"
-# Engine processes the analysis queue may run on this host at once. The twin of the slot
-# count above, read the same way — once, when the workers start — and overridden by the
+# Engine processes this host may run at once — passes, boards and correspondence searches
+# together. Applied live (a save resizes the running workers) and overridden by the
 # environment variable of the same name; see the module docstring.
 ANALYSIS_CONCURRENCY = "analysis_concurrency"
 # What one correspondence *task* costs and how many lines it keeps. A task is the bounded
@@ -220,6 +229,9 @@ DEEP_MULTIPV_DEFAULT = 4
 INACCURACY_DEFAULT = 5.0
 MISTAKE_DEFAULT = 10.0
 BLUNDER_DEFAULT = 15.0
+# Off: an install that said nothing shows what the quick pass found as soon as it has found
+# it, which is what every game imported before this switch existed already does.
+HIDE_ENGINE_NEW_GAMES_DEFAULT = 0
 # The levels an install that configured nothing asks Maia at: the top of what the model can
 # answer, and only that one. The same default the single target elo had, as a list of one.
 MAIA_ELOS_DEFAULT: tuple[int, ...] = (MAIA_MAX_RATING,)
@@ -229,10 +241,6 @@ CORRESPONDENCE_ENABLED_DEFAULT = 0
 # Three candidate moves is the shape of correspondence work: the question is which of a
 # handful of moves survives a week of looking, not what the single best move is.
 CORRESPONDENCE_MULTIPV_DEFAULT = 3
-# Two searches at once: one CPU engine and one GPU engine, which is the ordinary
-# correspondence setup. A one-slot install can still run one, and a machine with cores to
-# spare can say so.
-CORRESPONDENCE_SLOTS_DEFAULT = 2
 # The machine's cores minus two, which is what the environment variable defaulted to for as
 # long as it was the only way to set this. Worked out once at import: it is a fact about
 # the machine the process runs on, not about a request.
@@ -265,10 +273,6 @@ FLAG_ON = 1
 # Five candidates is as many as an engine pane can be read at a glance, and every extra
 # line is engine time taken off the ones that matter.
 MAX_CORRESPONDENCE_MULTIPV = 5
-# A deployment with no search slot at all cannot search anything, and sixteen long
-# searches on one machine is already more processes than any owner's cores.
-MIN_CORRESPONDENCE_SLOTS = 1
-MAX_CORRESPONDENCE_SLOTS = 16
 # One process is the least a queue can drain with; sixty-four is more engine processes
 # than any single machine this runs on has cores for, so a bigger number is a typo.
 MAX_ANALYSIS_CONCURRENCY = 64
@@ -366,6 +370,13 @@ SETTINGS: tuple[Setting, ...] = (
         whole=False,
     ),
     Setting(
+        key=HIDE_ENGINE_NEW_GAMES,
+        default=HIDE_ENGINE_NEW_GAMES_DEFAULT,
+        low=FLAG_OFF,
+        high=FLAG_ON,
+        whole=True,
+    ),
+    Setting(
         key=CORRESPONDENCE_ENABLED,
         default=CORRESPONDENCE_ENABLED_DEFAULT,
         low=FLAG_OFF,
@@ -377,13 +388,6 @@ SETTINGS: tuple[Setting, ...] = (
         default=CORRESPONDENCE_MULTIPV_DEFAULT,
         low=MIN_MULTIPV,
         high=MAX_CORRESPONDENCE_MULTIPV,
-        whole=True,
-    ),
-    Setting(
-        key=CORRESPONDENCE_SLOTS,
-        default=CORRESPONDENCE_SLOTS_DEFAULT,
-        low=MIN_CORRESPONDENCE_SLOTS,
-        high=MAX_CORRESPONDENCE_SLOTS,
         whole=True,
     ),
     Setting(
@@ -669,6 +673,16 @@ def get_maia_both_sides(session: Session) -> bool:
     return _flag(session, MAIA_BOTH_SIDES)
 
 
+def get_hide_engine_new_games(session: Session) -> bool:
+    """Whether a game the owner imports now arrives with its engine hidden.
+
+    Read when the game is stored (`import_service.ingest_game`) and copied onto the row as
+    `Game.engine_hidden`, so flipping it later moves no game already in the library —
+    the same rule a run's budget follows.
+    """
+    return _flag(session, HIDE_ENGINE_NEW_GAMES)
+
+
 def maia_for_tier(session: Session, tier: Tier) -> bool:
     """Whether a run of this tier, queued now, carries a Maia pass at all."""
     return get_maia_on_deep(session) if Tier(tier) is Tier.DEEP else get_maia_on_quick(session)
@@ -705,17 +719,6 @@ def get_correspondence_multipv(session: Session) -> int:
     return CORRESPONDENCE_MULTIPV_DEFAULT if value is None else int(value)
 
 
-def get_correspondence_slots(session: Session) -> int:
-    """How many correspondence searches this host runs at once.
-
-    Read once, when the search worker starts: it sizes an engine pool and a semaphore, and
-    a cap that changed under a search already running would be a cap nothing enforced. A
-    change takes effect on the next restart, which is what the manual says.
-    """
-    value = stored(session, CORRESPONDENCE_SLOTS)
-    return CORRESPONDENCE_SLOTS_DEFAULT if value is None else int(value)
-
-
 ConcurrencySource = Literal["env", "setting", "default"]
 
 
@@ -735,8 +738,9 @@ def get_analysis_concurrency(session: Session, settings: Settings | None = None)
     """How many engine processes the analysis queue runs on this host at once.
 
     The environment variable wins when it is set, then the stored row, then the machine's
-    cores minus two. Read once, when the workers start, for the reason the search slots
-    are: it sizes a pool and a semaphore, and a change takes effect on the next restart.
+    cores minus two. Read when the workers start, and again by the settings route on every
+    save, which hands the answer to `AnalysisWorkers.resize` — so a change here needs no
+    restart. The correspondence searches draw on the same pool, so this is their cap too.
     """
     resolved = settings or get_settings()
     if resolved.analysis_concurrency is not None:

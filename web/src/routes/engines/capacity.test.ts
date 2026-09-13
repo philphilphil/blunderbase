@@ -47,42 +47,35 @@ describe('hostBudget', () => {
     engine({ id: 4, kind: 'maia', options: { Threads: 32 } }),
   ]
 
-  it('adds the two caps rather than sharing them, each at its own thread cost', () => {
+  it('prices every slot at the heaviest engine a search could hold while the mode is on', () => {
     const budget = hostBudget({
       cores: 8,
-      queueProcesses: 2,
-      searchSlots: 1,
+      processes: 3,
       correspondenceOn: true,
       engines,
       roles,
     })
-    // Queue: two processes of the heaviest tier engine (3). Searches: one of the heaviest
-    // search engine on the host (4). A Maia's threads are never a search's.
-    expect(budget.queue).toEqual({ processes: 2, threads: 3 })
-    expect(budget.searches).toEqual({ processes: 1, threads: 4 })
-    expect(budget.total).toBe(10)
-    expect(budget.over).toBe(true)
+    // Any of the three slots may be holding the four-thread search engine; a Maia's threads
+    // are never a search's.
+    expect(budget).toMatchObject({ processes: 3, threads: 4, total: 12, over: true })
   })
 
-  it('counts no searches while correspondence mode is off', () => {
+  it('prices only the tier engines while correspondence mode is off', () => {
     const budget = hostBudget({
       cores: 8,
-      queueProcesses: 2,
-      searchSlots: 2,
+      processes: 2,
       correspondenceOn: false,
       engines,
       roles,
     })
-    expect(budget.searches).toBeNull()
-    expect(budget.total).toBe(6)
-    expect(budget.over).toBe(false)
+    // The heaviest engine holding Quick or Deep (3); the four-thread row never runs here.
+    expect(budget).toMatchObject({ processes: 2, threads: 3, total: 6, over: false })
   })
 
   it('never claims an overrun when it does not know the cores', () => {
     const budget = hostBudget({
       cores: null,
-      queueProcesses: 64,
-      searchSlots: 16,
+      processes: 64,
       correspondenceOn: true,
       engines,
       roles,
@@ -94,29 +87,26 @@ describe('hostBudget', () => {
   it('prices the queue at the heaviest search engine when no tier is assigned here', () => {
     const budget = hostBudget({
       cores: 8,
-      queueProcesses: 1,
-      searchSlots: 1,
-      correspondenceOn: true,
+      processes: 1,
+      correspondenceOn: false,
       engines,
       roles: new Map(),
     })
-    expect(budget.queue.threads).toBe(4)
+    expect(budget.threads).toBe(4)
   })
 
   it('draws the overrun as its own share of the meter', () => {
     const shares = budgetShares(
       hostBudget({
         cores: 8,
-        queueProcesses: 2,
-        searchSlots: 1,
+        processes: 3,
         correspondenceOn: true,
         engines,
         roles,
       }),
     )
-    // Ten threads on eight cores: six for the queue, two of the search's four fit, two over.
-    expect(shares.queue).toBeCloseTo(60)
-    expect(shares.searches).toBeCloseTo(20)
-    expect(shares.over).toBeCloseTo(20)
+    // Twelve threads on eight cores: eight fit, four over, on a scale of twelve.
+    expect(shares.used).toBeCloseTo((8 / 12) * 100)
+    expect(shares.over).toBeCloseTo((4 / 12) * 100)
   })
 })

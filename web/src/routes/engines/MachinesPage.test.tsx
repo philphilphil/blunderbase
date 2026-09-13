@@ -62,53 +62,67 @@ describe('MachinesPage — this server', () => {
     expect(screen.queryByText('queue only')).not.toBeInTheDocument()
   })
 
-  it('adds the two caps up against the cores, at the engines’ own thread cost', async () => {
+  it('weighs the one cap against the cores, at the engines’ own thread cost', async () => {
     stubFetch(ROUTES)
     renderPage()
     const budget = await screen.findByTestId('core-budget')
-    // Six queue processes of the four-thread Stockfish, two search slots of the same: 32
-    // threads on 8 cores, which the card says is more than the machine has. The searches
-    // join once the settings have said the mode is on.
-    await waitFor(() => expect(budget).toHaveTextContent('searches 2 × 4'))
-    expect(budget).toHaveTextContent('queue 6 × 4 threads + searches 2 × 4 = 32 threads · 8 cores')
+    // Six processes of the four-thread Stockfish: 24 threads on 8 cores, which the card
+    // says is more than the machine has. With correspondence on, every slot is priced at
+    // the heaviest engine a search could hold, and the card says that too.
+    await waitFor(() => expect(budget).toHaveTextContent(/heaviest engine a search could hold/))
+    expect(budget).toHaveTextContent('6 processes × 4 threads = 24 threads · 8 cores')
     expect(budget).toHaveTextContent(/more threads than cores/)
+    // There is no second box any more: searches hold the same slots.
+    expect(screen.queryByLabelText('Search slots')).not.toBeInTheDocument()
   })
 
-  it('follows the boxes as they are typed, before anything is saved', async () => {
+  it('follows the box as it is typed, before anything is saved', async () => {
     stubFetch(ROUTES)
     renderPage()
     const budget = await screen.findByTestId('core-budget')
-    await waitFor(() => expect(budget).toHaveTextContent('searches'))
+    await waitFor(() => expect(budget).toHaveTextContent('6 processes'))
     await userEvent.type(screen.getByLabelText('Queue processes'), '1')
-    await userEvent.type(screen.getByLabelText('Search slots'), '1')
-    expect(budget).toHaveTextContent('queue 1 × 4 threads + searches 1 × 4 = 8 threads')
+    expect(budget).toHaveTextContent('1 processes × 4 threads = 4 threads')
     expect(budget).toHaveTextContent(/everything fits/)
   })
 
-  it('saves both caps as part of the whole record', async () => {
+  it('saves the cap as part of the whole record', async () => {
     const fetchMock = stubFetch({
       ...ROUTES,
-      'PUT /api/settings': { ...SETTINGS, analysis_concurrency: 2, correspondence_slots: 1 },
+      'PUT /api/settings': { ...SETTINGS, analysis_concurrency: 2 },
     })
     renderPage()
     await userEvent.type(await screen.findByLabelText('Queue processes'), '2')
-    await userEvent.type(screen.getByLabelText('Search slots'), '1')
     await userEvent.click(screen.getByRole('button', { name: /Save/ }))
 
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true),
     )
     const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')!
-    // A PUT is a replace: every other key rides along untouched.
-    expect(JSON.parse(String(put[1]?.body))).toMatchObject({
+    // A PUT is a replace: every other key rides along untouched, and the slot count the
+    // searches used to have is not among them any more.
+    const body = JSON.parse(String(put[1]?.body))
+    expect(body).toMatchObject({
       analysis_concurrency: 2,
-      correspondence_slots: 1,
       correspondence_enabled: 1,
       maia_elos: [2000],
     })
+    expect(body).not.toHaveProperty('correspondence_slots')
   })
 
-  it('says a saved cap is not the one in force until the server restarts', async () => {
+  it('counts the searches among the slots in use', async () => {
+    stubFetch({
+      ...ROUTES,
+      '/api/runners/status': runnersStatus([], { busy: 1, streams: 0, searches: 2 }),
+    })
+    renderPage()
+    expect(await screen.findByText('3 of 6 in use · 2 searching')).toBeInTheDocument()
+  })
+
+  it('says the queue cap applies on save, and never asks for a restart over it', async () => {
+    // The moment between a save and the resize landing: the setting is ahead of the cap
+    // the workers report. The card no longer warns about it — the workers are resized by
+    // the save itself — and nothing on it asks for a restart any more.
     stubFetch({
       ...ROUTES,
       '/api/settings': { ...SETTINGS, analysis_concurrency: 3 },
@@ -119,9 +133,10 @@ describe('MachinesPage — this server', () => {
       }),
     })
     renderPage()
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Saved 3; the queue is running on 6 until the server restarts.',
-    )
+    expect(
+      await screen.findByText(/take effect when you save|Saving applies the number at once/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/until the server restarts/)).not.toBeInTheDocument()
   })
 
   it('shows the queue cap read-only when the environment pins it', async () => {
@@ -134,20 +149,17 @@ describe('MachinesPage — this server', () => {
     expect(queue).toHaveAttribute('readonly')
     expect(queue).toHaveValue('6')
     expect(screen.getByText('Set by BLUNDERBASE_ANALYSIS_CONCURRENCY')).toBeInTheDocument()
-    // The other cap is still the owner's to set.
-    expect(await screen.findByLabelText('Search slots')).not.toHaveAttribute('readonly')
   })
 
-  it('hides the search slots and counts no searches while correspondence mode is off', async () => {
+  it('prices only the tier engines while correspondence mode is off', async () => {
     stubFetch({ ...ROUTES, '/api/settings': { ...SETTINGS, correspondence_enabled: 0 } })
     renderPage()
     const budget = await screen.findByTestId('core-budget')
-    // Wait for the settings to have answered, or "no searches" would be trivially true.
+    // Wait for the settings to have answered, or the mode-off wording would be trivially
+    // absent.
     await waitFor(() => expect(screen.getByText(/run the analysis passes/)).toBeInTheDocument())
-    expect(budget).toHaveTextContent('queue 6 × 4 threads = 24 threads · 8 cores')
-    expect(budget).not.toHaveTextContent('searches')
-    // The slots exist only for correspondence searches, so the box goes with the mode.
-    expect(screen.queryByLabelText('Search slots')).not.toBeInTheDocument()
+    expect(budget).toHaveTextContent('6 processes × 4 threads = 24 threads · 8 cores')
+    expect(budget).not.toHaveTextContent(/search could hold/)
   })
 
   it('calls this machine a computer, alone, when remote runners are unavailable', async () => {

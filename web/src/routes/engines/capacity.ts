@@ -1,19 +1,19 @@
 /**
- * The arithmetic the Machines page does for this server: how many threads its two caps
- * would use at full load, against the cores it has.
+ * The arithmetic the Machines page does for this server: how many threads its cap would
+ * use at full load, against the cores it has.
  *
- * Two caps because two kinds of work never share a slot — the analysis queue's engine
- * processes (`analysis_concurrency`) and the correspondence searches beside them
- * (`correspondence_slots`) — and they are *added*, which is the thing nobody could read off
- * the old page: two slots and a concurrency of six are up to eight processes. A process
- * costs its engine's `Threads`, so the sum that has to fit the cores is
- * `processes × threads` for each cap, and the page draws that sum rather than asking the
- * owner to work it out from three screens.
+ * One cap, `analysis_concurrency`, because every engine process on the host — a quick or
+ * deep pass, an analysis board, a correspondence search — holds one of the same slots.
+ * There used to be a second cap for the searches, added to this one, and the page had to
+ * explain that two slots and a concurrency of six were up to eight processes; with one
+ * number there is nothing to add. A process costs its engine's `Threads`, so the sum that
+ * has to fit the cores is `processes × threads`, and the page draws it rather than asking
+ * the owner to work it out from two screens.
  *
- * The threads a cap costs are the rows' own. The queue runs the engines holding Quick and
- * Deep on this host, so its per-process cost is the most threads any of them asks for; a
- * search may run on any enabled search engine here, so its cost is the most any of those
- * asks for. Nothing set means UCI's own default, one thread.
+ * The threads a slot costs are the rows' own, priced at the heaviest engine a slot may be
+ * holding. While correspondence mode is on that is any enabled search engine here, since a
+ * search may run on any of them; off, only the engines holding Quick and Deep ever run, so
+ * only they are priced. Nothing set means UCI's own default, one thread.
  *
  * Pure, so the sentence and the meter the page draws from it can be asserted on their own.
  */
@@ -24,19 +24,13 @@ import type { EngineRoles } from './roles'
 /** UCI engines default to one thread when nothing sets `Threads`. */
 const DEFAULT_THREADS = 1
 
-export interface CapShare {
-  /** Processes this cap allows at once. */
-  processes: number
-  /** Threads one of them costs — the most any engine the cap may run here asks for. */
-  threads: number
-}
-
 export interface HostBudget {
   cores: number | null
-  queue: CapShare
-  /** Null while correspondence mode is off: no search can start, so none is counted. */
-  searches: CapShare | null
-  /** Threads at full load, both caps added. */
+  /** Engine processes the cap allows at once. */
+  processes: number
+  /** Threads one of them costs — the most any engine a slot may be holding asks for. */
+  threads: number
+  /** Threads at full load: `processes × threads`. */
   total: number
   /** Whether the total exceeds what the machine has; false when the cores are unknown. */
   over: boolean
@@ -62,60 +56,49 @@ function mostThreads(engines: EngineResponse[]): number {
 
 export function hostBudget({
   cores,
-  queueProcesses,
-  searchSlots,
+  processes,
   correspondenceOn,
   engines,
   roles,
 }: {
   cores: number | null | undefined
-  queueProcesses: number
-  searchSlots: number
+  processes: number
+  /** Whether a search may be holding a slot — which is what puts every engine in the price. */
   correspondenceOn: boolean
   /** The engines on this host only — a runner's threads are that machine's business. */
   engines: EngineResponse[]
   roles: Map<number, EngineRoles>
 }): HostBudget {
   const enabledSearch = engines.filter((engine) => engine.enabled && engine.kind === 'uci')
-  // The queue runs whatever holds a tier; with nothing assigned the honest cost is the
-  // heaviest search engine it could be handed, and with no engine at all it is one thread.
+  // With the mode off only the tiers' engines run here; with nothing assigned the honest
+  // cost is the heaviest engine the queue could be handed, and with no engine at all it is
+  // one thread. With the mode on any slot may be holding any search engine.
   const tierEngines = enabledSearch.filter((engine) =>
     (roles.get(engine.id) ?? []).some((role) => role === 'quick' || role === 'deep'),
   )
-  const queueThreads =
-    mostThreads(tierEngines) || mostThreads(enabledSearch) || DEFAULT_THREADS
-  const searchThreads = mostThreads(enabledSearch) || DEFAULT_THREADS
-  const queue: CapShare = { processes: Math.max(0, queueProcesses), threads: queueThreads }
-  const searches: CapShare | null = correspondenceOn
-    ? { processes: Math.max(0, searchSlots), threads: searchThreads }
-    : null
-  const total =
-    queue.processes * queue.threads +
-    (searches ? searches.processes * searches.threads : 0)
+  const threads =
+    (correspondenceOn ? 0 : mostThreads(tierEngines)) ||
+    mostThreads(enabledSearch) ||
+    DEFAULT_THREADS
+  const allowed = Math.max(0, processes)
+  const total = allowed * threads
   const known = typeof cores === 'number' && cores > 0
   return {
     cores: known ? cores : null,
-    queue,
-    searches,
+    processes: allowed,
+    threads,
     total,
     over: known && total > cores,
   }
 }
 
-/** The meter's three widths in percent of the wider of the cores and the total. */
-export function budgetShares(budget: HostBudget): {
-  queue: number
-  searches: number
-  over: number
-} {
+/** The meter's two widths in percent of the wider of the cores and the total. */
+export function budgetShares(budget: HostBudget): { used: number; over: number } {
   const scale = Math.max(budget.cores ?? 0, budget.total, 1)
-  const queue = budget.queue.processes * budget.queue.threads
-  const searches = budget.searches ? budget.searches.processes * budget.searches.threads : 0
   const within = budget.cores ?? budget.total
   const over = Math.max(0, budget.total - within)
   return {
-    queue: (Math.min(queue, within) / scale) * 100,
-    searches: (Math.min(searches, Math.max(0, within - queue)) / scale) * 100,
+    used: (Math.min(budget.total, within) / scale) * 100,
     over: (over / scale) * 100,
   }
 }

@@ -3,9 +3,10 @@
 A second owner of the machinery `workers/local_streams.py` drives, with different rules.
 An analysis board is one search per surface, replaced on the next click and reaped when
 nobody is looking; a correspondence search is one engine on one node for three days with
-nobody looking at all, and the broker's policies are exactly wrong for it. So this set has
-an `EnginePool` of its own, sized by `correspondence_slots`, and the stream broker is left
-alone.
+nobody looking at all, and the broker's policies are exactly wrong for it. So this set
+drives the engines itself and the stream broker is left alone — but the *pool* is the one
+the analysis workers and the boards use, because an engine process is an engine process
+whatever asked for it, and the machine has one number of them.
 
 **It reacts to events, not to a queue.** `services/correspondence.py` writes the row and
 emits `correspondence.search` on every transition; this subscribes to that hub and acts on
@@ -14,12 +15,19 @@ about which rows this process is already running, a poll interval to argue about
 lag between pressing Pause and the engine stopping. The rows are still the durable state:
 nothing here is lost across a restart, because `recover_at_boot` reads them back.
 
-**A slot is this worker's semaphore, and the pool is where a warm process lives.** Every
-search holds one of `correspondence_slots` permits from start to pause; a fresh search
-takes its process from the pool (so the next search on the same engine starts with a hash
-full of relevant entries), and a paused one takes its process *out* of the pool — the pool's
-idle reaper would otherwise quit the very thing a pause exists to keep. The setting is read
-once, at start: it sizes the pool and the semaphore, so changing it takes a restart.
+**A slot is one of the machine's engine slots, and the pool is where a warm process
+lives.** Every search holds one of the shared pool's permits from start to pause — the same
+permits the quick and deep passes and the analysis boards take, capped by **Queue
+processes** on the Machines page. There used to be a second cap, `correspondence_slots`,
+with a pool and a semaphore of its own, so that a days-long search could never take a slot
+the quick tier was counting on; it went because a search *is* visible — on the page, in
+the capacity strip, on the Machines card — and one number an owner can see beats two they
+have to add. A search holding a slot means the queue waits; that is what the owner asked
+for. A fresh search takes its process from the pool (so the next search on the same engine
+starts with a hash full of relevant entries), a paused one takes its process *out* of the
+pool — the pool's idle reaper would otherwise quit the very thing a pause exists to keep —
+and a resumed one drives that kept process while holding a permit and no pooled process
+(`EnginePool.reserve`), so it still counts.
 
 **Two destinations for a snapshot, at two rates.** Every picture the driver throttles out
 goes to `/events` as `correspondence.snapshot` — the live pane, never written to the
@@ -189,7 +197,7 @@ class CorrespondenceSearches:
         settings: Settings | None = None,
         sessions: sessionmaker[Session] | None = None,
         pool: EnginePool | None = None,
-        slots: int | None = None,
+        owns_pool: bool | None = None,
         stop_grace: float = STOP_GRACE_SECONDS,
         checkpoint_seconds: float = CHECKPOINT_SECONDS,
         gateway: RunnerGateway | None = None,
@@ -199,10 +207,13 @@ class CorrespondenceSearches:
         self.checkpoint_seconds = checkpoint_seconds
         self.gateway = gateway
         self._sessions = sessions
+        # The app hands in the analysis workers' pool, so searches, passes and boards stand
+        # in one line, and that pool is the workers' to close. A set built without one
+        # (tests, a headless process) makes its own, sized by the same setting, at `start()`
+        # and closes it at `stop()`; `owns_pool` says so explicitly for a set handed a pool
+        # nobody else will close.
         self._pool = pool
-        self._owns_pool = pool is None
-        self._slots = slots
-        self._permits: asyncio.Semaphore | None = None
+        self._owns_pool = pool is None if owns_pool is None else owns_pool
         self._runs: dict[int, _Run] = {}
         # The processes of paused searches: warm, holding their hash, outside the pool and
         # outside the cap. Nothing but a resume, a stop or this process ending touches one.
@@ -225,8 +236,9 @@ class CorrespondenceSearches:
 
     @property
     def slots(self) -> int:
-        """How many searches may run at once here. Read at start; a change takes a restart."""
-        return int(self._slots or 1)
+        """The machine's engine slots — the shared pool's cap, which searches draw on like
+        everything else. Moves when **Queue processes** is saved, since the pool is resized."""
+        return self.pool.concurrency if self._pool is not None else 1
 
     @property
     def busy(self) -> int:
@@ -246,9 +258,10 @@ class CorrespondenceSearches:
             max_workers=DB_THREADS, thread_name_prefix="correspondence-db"
         )
         try:
-            if self._slots is None:
-                self._slots = await self._db(self._read_slots)
-            self._permits = asyncio.Semaphore(self.slots)
+            if self._pool is None:
+                from backend.adapters.pool import EnginePool
+
+                self._pool = EnginePool(concurrency=await self._db(self._read_concurrency))
             # Subscribed before the recovery, so a row it queues is launched by its own
             # event; the explicit launch below is what makes that not a requirement.
             self._cancel_events = events_service.subscribe(self._on_event)
@@ -266,7 +279,10 @@ class CorrespondenceSearches:
         except BaseException:
             await self.stop()
             raise
-        logger.info("correspondence: %s search slot(s) on this host", self.slots)
+        logger.info(
+            "correspondence: searches share this host's %s engine slot(s) with the queue",
+            self.slots,
+        )
         for search_id in recovered["relaunch"]:
             self._launch(int(search_id))
 
@@ -309,7 +325,6 @@ class CorrespondenceSearches:
         if self._owns_pool and self._pool is not None:
             await self._pool.close()
             self._pool = None
-        self._permits = None
         executor, self._db_executor = self._db_executor, None
         if executor is not None:
             executor.shutdown(wait=False, cancel_futures=True)
@@ -341,26 +356,33 @@ class CorrespondenceSearches:
         }
 
     def capacity(self) -> dict[str, Any]:
-        """What this process is actually sized to, for `status` to print.
+        """What this machine is sized to and what is in it, for `status` to print.
 
-        The slots the pool and the semaphore were built with, which is the setting as it
-        read at boot — a save since then has not moved either of them, and the strip is
-        about what the machine will do rather than what has been asked of it.
+        `slots` is the shared pool's cap as it stands — resized live when **Queue processes**
+        is saved — `in_use` the searches holding one of them here, `busy` everything holding
+        one (passes, boards and searches together), so the strip can say that the queue, and
+        not another search, is what a waiting search is behind.
         """
-        return {"slots": self.slots, "in_use": len(self._runs), "parked": len(self._parked)}
+        pool = self._pool
+        return {
+            "slots": self.slots,
+            "in_use": len(self._runs),
+            "busy": pool.active if pool is not None else len(self._runs),
+            "parked": len(self._parked),
+        }
 
     @property
     def pool(self) -> EnginePool:
-        """This worker's own warm processes, capped at `correspondence_slots`.
+        """The machine's warm processes — the analysis workers' pool, handed in by the app.
 
-        Its own rather than the analysis workers': a search that runs for three days must
-        not take a slot the quick tier is counting on, and a machine that wants both sized
-        together says so by giving the two caps the same number.
+        Shared on purpose: a search is one more engine on this host, and the owner sees it
+        as one of the same slots the quick pass uses. A set built without one is given its
+        own at `start()`, sized by the same setting.
         """
-        if self._pool is None:
+        if self._pool is None:  # pragma: no cover - `start()` always makes one
             from backend.adapters.pool import EnginePool
 
-            self._pool = EnginePool(concurrency=self.slots)
+            self._pool = EnginePool(concurrency=1)
         return self._pool
 
     @property
@@ -482,23 +504,28 @@ class CorrespondenceSearches:
                 await self._serve_remote(run)
                 return
 
-            permits = self._permits
-            if permits is None:  # pragma: no cover - start() always makes one
-                return
-            async with permits:
+            # One of the machine's engine slots, the same line the queue stands in. A run
+            # that kept its process from a park owes the count and nothing else
+            # (`reserve`); a fresh one takes a warm process with the slot (`acquire`).
+            slot = (
+                self.pool.reserve()
+                if adapter is not None
+                else self.pool.acquire(context["spec"])
+            )
+            async with slot as pooled_engine:
                 if run.closing:
                     # Stopped while it was queueing: `finally` quits whatever it took.
                     return
                 if run.pausing:
                     # Paused while it was queueing for a slot: it never searched, so there
-                    # is nothing to flush and nothing to say but that it is parked.
+                    # is nothing to flush and nothing to say but that it is parked. A pooled
+                    # process it may have started goes back warm on the way out.
                     await self._park(run, adapter, pooled=False)
                     return
                 if adapter is not None:
                     await self._drive(run, adapter, pooled=False)
-                else:
-                    async with self.pool.acquire(context["spec"]) as engine:
-                        await self._drive(run, engine, pooled=True)
+                elif pooled_engine is not None:
+                    await self._drive(run, pooled_engine, pooled=True)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -1068,9 +1095,10 @@ class CorrespondenceSearches:
                 await asyncio.sleep(delay)
                 delay = min(DB_RETRY_MAX_SECONDS, delay * 2)
 
-    def _read_slots(self) -> int:
+    def _read_concurrency(self) -> int:
+        """The machine's engine cap, for a set that has to size its own pool."""
         with self.sessions() as session:
-            return app_settings_service.get_correspondence_slots(session)
+            return app_settings_service.get_analysis_concurrency(session, self.settings)
 
     def _spawn(self, coroutine: Any) -> asyncio.Task[Any]:
         task = asyncio.ensure_future(coroutine)

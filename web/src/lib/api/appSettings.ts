@@ -27,9 +27,9 @@ export const SETTING_DEFAULTS = {
   inaccuracy_threshold: 5,
   mistake_threshold: 10,
   blunder_threshold: 15,
+  hide_engine_new_games: 0,
   correspondence_enabled: 0,
   correspondence_multipv: 3,
-  correspondence_slots: 2,
   correspondence_task_nodes: 40_000_000,
   correspondence_task_multipv: 3,
   correspondence_stale_depth: 30,
@@ -63,13 +63,15 @@ export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
     inaccuracy_threshold: settings.inaccuracy_threshold,
     mistake_threshold: settings.mistake_threshold,
     blunder_threshold: settings.blunder_threshold,
-    // Correspondence mode's six, and the queue's cap. A settings form that left them out would switch the
+    // Whether new games arrive with the engine hidden: the Engine passes page edits it, and
+    // every other form has to carry it or its next save would switch it off.
+    hide_engine_new_games: settings.hide_engine_new_games ?? null,
+    // Correspondence mode's five, and the machine's cap. A settings form that left them out would switch the
     // mode off on its next save — the PUT is a replace, and an absent key is a cleared one.
     correspondence_enabled: settings.correspondence_enabled ?? null,
     correspondence_multipv: settings.correspondence_multipv ?? null,
-    correspondence_slots: settings.correspondence_slots ?? null,
-    // The queue's cap lives on the Machines page beside the search slots, and is a full
-    // member of the registry like them.
+    // The machine's engine cap lives on the Machines page, and is a full member of the
+    // registry like the rest.
     analysis_concurrency: settings.analysis_concurrency ?? null,
     correspondence_task_nodes: settings.correspondence_task_nodes ?? null,
     correspondence_task_multipv: settings.correspondence_task_multipv ?? null,

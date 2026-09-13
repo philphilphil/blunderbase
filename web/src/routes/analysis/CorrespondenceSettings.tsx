@@ -7,10 +7,11 @@
  * switch that brings it into existence, and everything under it is what that mode will do
  * once it is on.
  *
- * **Search slots is not here.** How many searches run at once is a fact about a machine —
- * the twin of the queue's own cap, added to it, both against the same cores — so it is set
- * on Compute → Machines beside that cap, and this page only says so. Nothing here needs a
- * restart.
+ * **No slot count is here.** A search holds one of the machine's engine slots — the same
+ * **Queue processes** the passes and the boards use, set on Compute → Machines — and this
+ * page only says so. There used to be a cap of the searches' own beside it; it went, because
+ * a search is visible wherever slots are counted and one number beats two to add up.
+ * Nothing here needs a restart.
  *
  * **There is no engine setting here.** Every enabled UCI engine is offered wherever an
  * engine is chosen — the search dialog, Queue task, Expand, Refresh — with the deep role's
@@ -238,21 +239,21 @@ export function CorrespondenceSettingsPage() {
             </CardTitle>
             <CardDescription>
               <Trans>
-                A search is one engine on one position for as long as you let it. They have
-                slots of their own, so a search that runs for days never takes one an
-                imported game&rsquo;s quick pass is waiting for.
+                A search is one engine on one position for as long as you let it. It holds one
+                of the machine&rsquo;s engine slots the whole time, so while it runs the queue
+                has one fewer to work with.
               </Trans>
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-[0.625rem] leading-[1.6] text-dim-2">
               <Trans>
-                How many searches this machine runs at once is set on{' '}
+                How many engine processes this machine runs at once — searches, passes and
+                boards together — is <strong>Queue processes</strong> on{' '}
                 <Link to="/compute/machines" className="text-accent-teal hover:text-accent-link">
                   Machines
                 </Link>
-                , beside the queue&rsquo;s own cap — the two are added, and both are read when
-                the server starts.
+                , and it takes effect when saved.
               </Trans>
             </p>
             <p className="border-t border-hairline pt-3 text-[0.625rem] leading-[1.6] text-dim-2">
@@ -271,8 +272,9 @@ export function CorrespondenceSettingsPage() {
             <CardDescription>
               <Trans>
                 A task is one bounded look at one position, through the ordinary analysis
-                queue — it takes no search slot, and an expansion is a dozen of them at
-                once. Unlike a search, it can run on a remote runner; which engine is
+                queue — it holds a slot for a minute or two where a search keeps its own, and
+                an expansion is a dozen of them at once. Unlike a search, it can run on a
+                remote runner; which engine is
                 chosen when the task is queued, with the deep role&rsquo;s suggested.
               </Trans>
             </CardDescription>

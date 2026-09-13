@@ -152,7 +152,7 @@ of the column puts another engine on the position.
 The picker offers every engine that is switched on and speaks UCI, on this machine and on
 your runners, with the one holding the deep role suggested. A search on a
 [remote runner](../operate/runners.md)'s engine runs over there, holds one of that runner's
-slots rather than one of this machine's search slots, and is read here exactly as a local
+slots rather than one of this machine's, and is read here exactly as a local
 one. The ones a search cannot run on are greyed rather than hidden, and say why under the
 pointer: a runner that is not connected, one whose link carries queue work but no search
 (a browser tab, or a runner that fell back to polling), an engine that cannot drive a
@@ -198,12 +198,15 @@ One engine on one node has one search: asking the same engine again while it is 
 running or paused there is refused, and a finished game takes no searches at all — its tree
 is frozen.
 
-Each search on this machine holds one of its **search slots** — two by default, under
-**Compute → Machines** on this server's card — and each search on a runner holds one of
-that runner's slots, shared with its queue work and never taken from a run already going.
-With all of them busy a new search is **queued** and
-starts by itself the moment one comes free. Searches have their own slots, so one that runs
-for three days never takes the slot an imported game's quick pass is waiting for.
+Each search on this machine holds one of its engine slots — **Queue processes** under
+**Compute → Machines** on this server's card, the same slots the quick and deep passes and
+the analysis boards use — and each search on a runner holds one of that runner's slots,
+shared with its queue work and never taken from a run already going. With all of them busy
+a new search is **queued** and starts by itself the moment one comes free. A search that
+runs for three days holds its slot for three days, and while it does the queue has one
+fewer: an imported game's quick pass waits behind it until you pause or stop it. The
+capacity strip on this page and the Machines card both show the searches among what is in
+use, so you always know what the queue is waiting for.
 
 **Stockfish and Leela at the same time** is the point of the stack: two engines on the same
 position, two slots, two live panes, two verdicts you can compare. Read Stockfish by its
@@ -236,9 +239,9 @@ before believing either number.
 
 A search is one engine thinking about one position for as long as you let it. A **task** is
 the other half: a bounded look — forty million nodes by default, a minute or two — over one
-position, queued into the ordinary analysis queue. It takes no search slot, so it never
-stands in the way of a search, and it runs wherever the queue has room, including on a
-[remote runner](../operate/runners.md). Which engine works it is chosen when it is queued,
+position, queued into the ordinary analysis queue. It takes a slot for a minute or two and
+gives it back, where a search keeps its own, and it runs wherever the queue has room,
+including on a [remote runner](../operate/runners.md). Which engine works it is chosen when it is queued,
 from the same list the search picker shows — and here a runner's engine is not greyed,
 because a task is ordinary queue work and the machine bought for correspondence is usually
 that runner. The engine holding the deep role is suggested.
@@ -332,10 +335,11 @@ queued with. A task streams nothing while it waits, so it carries no depth — w
 about its size is what it will spend.
 
 The **capacity strip** under the page heading counts the same work over the whole
-installation: search slots in use of the slots this machine has, searches waiting for one,
-engines parked warm and the memory they hold, how many tasks are out and how many of them
-an engine has already, and a line per remote host. Tasks are counted beside the slots rather
-than against them: they hold none. The same figures
+installation: how many of this machine's engine slots searches are holding, searches
+waiting for one, engines parked warm and the memory they hold, how many tasks are out and
+how many of them an engine has already, and a line per remote host. Tasks are counted
+beside the searches rather than with them: they hold a slot only for a minute or two, and
+may be holding one on another machine. The same figures
 sit along the foot of the sidebar, so they are answered from every screen. Both the strip
 and the list follow the searches as they report — there is no page here to refresh.
 

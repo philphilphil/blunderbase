@@ -41,6 +41,7 @@ import type {
   EngineUpdate,
   GameFilters,
   GamesDeleted,
+  GameSummary,
   DeletionsForgotten,
   GamesRemoved,
   ImportRequest,
@@ -209,6 +210,9 @@ export function useSaveAppSettings(
       void client.invalidateQueries({ queryKey: queryKeys.maia() })
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
       void client.invalidateQueries({ queryKey: queryKeys.correspondence() })
+      // The queue's cap is applied to the running workers on save, and `/runners/status`
+      // is where the Machines card reads the cap in force — so it is asked again.
+      void client.invalidateQueries({ queryKey: queryKeys.runners() })
       // `/runners/status` reports the queue's cap and whether the row has moved past it,
       // so the Machines page says "saved N, running on M" the moment the save lands.
       void client.invalidateQueries({ queryKey: queryKeys.runnersStatus() })
@@ -271,6 +275,27 @@ export function useGame(
     queryKey: queryKeys.gameDetail(id, query),
     queryFn: () => api.getGame(id, query),
     ...options,
+  })
+}
+
+/**
+ * Show the engine on one game, or hold it back again (`GameSummary.engine_hidden`).
+ *
+ * Every games query goes: the detail this button sits on, the list rows and the dashboard
+ * cards all carry the flag and all hide the verdict by it. Stats and the explorer do not
+ * move — nothing about the analysis changed, only whether this game's screens show it.
+ */
+export function useSetGameEngineHidden(
+  options?: UseMutationOptions<GameSummary, Error, { gameId: number; hidden: boolean }>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ gameId, hidden }) => api.setGameEngineHidden(gameId, hidden),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.games() })
+      options?.onSuccess?.(...args)
+    },
   })
 }
 

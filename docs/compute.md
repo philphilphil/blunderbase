@@ -68,13 +68,17 @@ with" needs a page to link to.
 - One card per host, stacked full-width rather than three across: this server, this
   browser, each remote runner. A card is: identity (name, cores, memory, kind), *how much
   at once*, what is running now, and the engines on it with what each is doing.
-- *How much at once* on this server is two editable settings: **Queue processes** (today's
-  `analysis_concurrency`) and **Search slots** (today's `correspondence_slots`). Under them
-  a **budget line** does the arithmetic the manual currently asks the owner to do —
-  `queue processes × threads + search slots × threads` against the cores — and says in
-  words when both at full load would exceed the machine, with a meter. The threads in the
-  sum are the actual rows' `Threads`, the queue's from the engines holding Quick and Deep on
-  this host, the searches' from the highest `Threads` among this host's UCI rows.
+- *How much at once* on this server is one editable setting: **Queue processes**
+  (`analysis_concurrency`), the engine processes the machine runs at once whatever asked
+  for them — passes, analysis boards and correspondence searches all hold the same slots.
+  (It shipped as two settings, with **Search slots** (`correspondence_slots`) beside it and
+  a budget line adding the two; the second went once the searches were visible wherever
+  slots are counted, and the setting takes effect on save rather than on restart.) Under
+  the box a **budget line** does the arithmetic the manual used to ask the owner to do —
+  `processes × threads` against the cores — and says in words when full load would exceed
+  the machine, with a meter. The threads in the sum are the actual rows' `Threads`: the
+  heaviest UCI row switched on here while correspondence is on, since any slot may be
+  holding it, and the heaviest engine holding Quick or Deep otherwise.
 - A runner's card keeps its collapsible shape: slots and status on the row, the advertised
   engines, rename / resize and revoke in the detail. This browser's card keeps install /
   remove.

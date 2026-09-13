@@ -2,16 +2,17 @@
  * This server on the Machines page: what it has, how much it may run at once, and what
  * that adds up to.
  *
- * Always open, unlike the browser and runner cards under it, because its two numbers are
- * the page's reason to exist. **Queue processes** is `analysis_concurrency` and **Search
- * slots** is `correspondence_slots` — the caps the analysis queue and the correspondence
- * searches each get, added rather than shared — and under them the budget line does the
- * sum the manual used to ask the owner to do: processes × the engines' `Threads`, against
- * the cores. Both are read by the server when it starts, so the card says when a saved
- * number is not yet the one in force rather than pretending a save applied it.
+ * Always open, unlike the browser and runner cards under it, because its one number is the
+ * page's reason to exist. **Queue processes** is `analysis_concurrency` — the engine
+ * processes this machine runs at once, whatever asked for them: a quick or deep pass, an
+ * analysis board, a correspondence search. There used to be a second box beside it for the
+ * searches' own slots; it went because a search is visible wherever slots are counted, and
+ * one number beats two to add up. Under the box the budget line does the sum the manual
+ * used to ask the owner to do: processes × the engines' `Threads`, against the cores. A
+ * save resizes the running workers, so the number saved is the number in force.
  *
- * The queue's cap can be pinned from outside (`BLUNDERBASE_ANALYSIS_CONCURRENCY`); then the
- * field is read-only and says so, because a save would change nothing.
+ * The cap can be pinned from outside (`BLUNDERBASE_ANALYSIS_CONCURRENCY`); then the field
+ * is read-only and says so, because a save would change nothing.
  *
  * Saves go through `completeUpdate` like every settings form: `PUT /settings` replaces the
  * lot, so a form that sent only its own two keys would clear what the other pages hold.
@@ -37,7 +38,7 @@ import { MachineEngineList } from './MachineEngineList'
 import { budgetShares, hostBudget } from './capacity'
 import type { EngineRoles } from './roles'
 
-type CapKey = 'analysis_concurrency' | 'correspondence_slots'
+type CapKey = 'analysis_concurrency'
 
 export function ServerCard({
   local,
@@ -68,8 +69,8 @@ export function ServerCard({
   // and what an empty box means. A paragraph beside the boxes was tried and read as a wall.
   const queueDefault =
     local.slots_source === 'default' && configured !== null
-      ? t`Passes and tasks · default ${configured}`
-      : t`Passes and tasks · default cores − 2`
+      ? t`Passes, boards and searches · default ${configured}`
+      : t`Passes, boards and searches · default cores − 2`
   const queueField: SettingSpec<CapKey> = {
     key: 'analysis_concurrency',
     label: t`Queue processes`,
@@ -78,16 +79,9 @@ export function ServerCard({
     step: 1,
     unset: queueDefault,
   }
-  const searchField: SettingSpec<CapKey> = {
-    key: 'correspondence_slots',
-    label: t`Search slots`,
-    min: 1,
-    max: 16,
-    step: 1,
-    unset: t`Correspondence · default ${DEFAULTS.correspondence_slots}`,
-  }
-  const keys: CapKey[] = ['analysis_concurrency', 'correspondence_slots']
-  const dirty = stored !== undefined && keys.some((key) => text(key) !== storedText(stored, key))
+  const dirty =
+    stored !== undefined &&
+    text('analysis_concurrency') !== storedText(stored, 'analysis_concurrency')
 
   // The local engines by id: what `/runners/status` says is here, joined to the rows that
   // carry the options. A runner's engines are that machine's budget, not this one's.
@@ -99,19 +93,17 @@ export function ServerCard({
     (stored?.correspondence_enabled ?? DEFAULTS.correspondence_enabled) === 1
   // The budget follows the boxes as they are typed, so the owner sees the sum move before
   // saving — the number in force is the field's business, the arithmetic is the draft's.
-  const queueWanted = parse(text('analysis_concurrency')) ?? configured ?? inForce ?? 1
-  const searchWanted = parse(text('correspondence_slots')) ?? DEFAULTS.correspondence_slots
+  const wanted = parse(text('analysis_concurrency')) ?? configured ?? inForce ?? 1
   const budget = useMemo(
     () =>
       hostBudget({
         cores: local.cores,
-        queueProcesses: queueWanted,
-        searchSlots: searchWanted,
+        processes: wanted,
         correspondenceOn,
         engines: here,
         roles,
       }),
-    [local.cores, queueWanted, searchWanted, correspondenceOn, here, roles],
+    [local.cores, wanted, correspondenceOn, here, roles],
   )
   const shares = budgetShares(budget)
 
@@ -125,21 +117,19 @@ export function ServerCard({
       analysis_concurrency: pinned
         ? (stored.analysis_concurrency ?? null)
         : parse(text('analysis_concurrency')),
-      correspondence_slots: parse(text('correspondence_slots')),
     })
   }
 
-  const used = local.busy + local.streams
+  // Everything holding a slot right now: the passes, the analysis boards and the
+  // correspondence searches, which are the same slots spent three ways.
+  const used = local.busy + local.streams + (local.searches ?? 0)
+  const searching = local.searches ?? 0
   const cores = local.cores ?? null
   const name = localOnly ? t`This computer` : t`This server`
-  const queueThreads = budget.queue.threads
-  const queueProcesses = budget.queue.processes
-  const searchThreads = budget.searches?.threads ?? 0
-  const searchProcesses = budget.searches?.processes ?? 0
+  const processes = budget.processes
+  const threads = budget.threads
   const total = budget.total
   const coresLabel = cores !== null ? t`${cores} cores` : t`cores unknown`
-  const restartPending =
-    !pinned && local.workers && inForce !== null && configured !== null && inForce !== configured
 
   return (
     <section
@@ -162,12 +152,24 @@ export function ServerCard({
             'font-mono text-[0.6875rem] tabular',
             local.workers ? 'text-soft' : 'text-mistake',
           )}
-          title={local.workers ? undefined : t`Runs wait until a worker picks them up.`}
+          title={
+            !local.workers
+              ? t`Runs wait until a worker picks them up.`
+              : searching > 0
+                ? t`${searching} held by correspondence searches; the queue works with the rest.`
+                : undefined
+          }
         >
           {local.workers ? (
-            <Trans>
-              queue {used} of {inForce ?? '?'} in use
-            </Trans>
+            searching > 0 ? (
+              <Trans>
+                {used} of {inForce ?? '?'} in use · {searching} searching
+              </Trans>
+            ) : (
+              <Trans>
+                queue {used} of {inForce ?? '?'} in use
+              </Trans>
+            )
           ) : (
             <Trans>not draining the queue</Trans>
           )}
@@ -206,37 +208,22 @@ export function ServerCard({
                 />
               )}
             </div>
-            {/* The slots exist only for correspondence searches, so an install with the
-                mode off never sees a box for them; the row it may hold rides along unchanged. */}
-            {correspondenceOn ? (
-              <SettingField
-                field={searchField}
-                value={text('correspondence_slots')}
-                onChange={(next) => setDraft({ ...draft, correspondence_slots: next })}
-              />
-            ) : null}
           </div>
           <p className="max-w-[30rem] text-[0.625rem] leading-[1.5] text-dim-2">
             {correspondenceOn ? (
               <Trans>
-                Queue processes run the passes and tasks; search slots exist only for
-                correspondence searches and are added on top. Read when the server starts:
-                change, then restart.
+                Queue processes run the passes, the tasks, the analysis boards and the
+                correspondence searches — a search holds one for as long as it runs, and the
+                queue waits behind it. Saving applies the number at once; a lower one lets
+                the runs in flight finish first.
               </Trans>
             ) : (
               <Trans>
-                Queue processes run the analysis passes. Read when the server starts: change,
-                then restart.
+                Queue processes run the analysis passes and the analysis boards. Saving applies
+                the number at once; a lower one lets the runs in flight finish first.
               </Trans>
             )}
           </p>
-          {restartPending ? (
-            <p className="text-[0.6875rem] text-mistake" role="status">
-              <Trans>
-                Saved {configured}; the queue is running on {inForce} until the server restarts.
-              </Trans>
-            </p>
-          ) : null}
           {save.isError ? (
             <p role="alert" className="text-[0.6875rem] text-blunder">
               {save.error.message}
@@ -252,34 +239,22 @@ export function ServerCard({
             )}
           >
             <p className="font-mono tabular">
-              {budget.searches ? (
-                <Trans>
-                  queue {queueProcesses} × {queueThreads} threads + searches {searchProcesses} ×{' '}
-                  {searchThreads} ={' '}
-                  <span className={cn('font-semibold', budget.over ? 'text-mistake' : 'text-ink')}>
-                    {total} threads
-                  </span>{' '}
-                  · {coresLabel}
-                </Trans>
-              ) : (
-                <Trans>
-                  queue {queueProcesses} × {queueThreads} threads ={' '}
-                  <span className={cn('font-semibold', budget.over ? 'text-mistake' : 'text-ink')}>
-                    {total} threads
-                  </span>{' '}
-                  · {coresLabel}
-                </Trans>
-              )}
+              <Trans>
+                {processes} processes × {threads} threads ={' '}
+                <span className={cn('font-semibold', budget.over ? 'text-mistake' : 'text-ink')}>
+                  {total} threads
+                </span>{' '}
+                · {coresLabel}
+              </Trans>
             </p>
             <div className="flex h-1.5 overflow-hidden rounded-sm bg-track">
-              <div className="bg-accent-teal" style={{ width: `${shares.queue}%` }} />
-              <div className="bg-good" style={{ width: `${shares.searches}%` }} />
+              <div className="bg-accent-teal" style={{ width: `${shares.used}%` }} />
               <div className="bg-blunder" style={{ width: `${shares.over}%` }} />
             </div>
             <p className="text-[0.625rem] text-dim">
               {budget.over ? (
                 <Trans>
-                  At full load, more threads than cores. Lower a cap, or an engine&rsquo;s
+                  At full load, more threads than cores. Lower the cap, or an engine&rsquo;s
                   threads on Engines.
                 </Trans>
               ) : cores !== null ? (
@@ -287,6 +262,14 @@ export function ServerCard({
               ) : (
                 <Trans>Threads × processes is what has to fit the cores.</Trans>
               )}
+              {correspondenceOn ? (
+                <>
+                  {' '}
+                  <Trans>
+                    Every slot is priced at the heaviest engine a search could hold.
+                  </Trans>
+                </>
+              ) : null}
             </p>
           </div>
         </form>

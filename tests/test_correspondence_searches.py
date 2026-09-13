@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.adapters.pool import EnginePool
 from backend.api.app import create_app
 from backend.config import Settings
 from backend.db.base import Base
@@ -408,7 +409,9 @@ async def test_two_engines_search_one_node_at_the_same_time(
     game = make_game(db)
     node_id = game["tree"]["id"]
 
-    async with CorrespondenceSearches(settings=settings, sessions=db, slots=2) as worker:
+    async with CorrespondenceSearches(
+        settings=settings, sessions=db, pool=EnginePool(concurrency=2), owns_pool=True
+    ) as worker:
         one = call(db, correspondence_service.start_search, node_id=node_id, engine_id=first.id)
         two = call(db, correspondence_service.start_search, node_id=node_id, engine_id=second.id)
         await wait_for_status(db, one["id"], SearchStatus.RUNNING)
@@ -430,15 +433,26 @@ async def test_two_engines_search_one_node_at_the_same_time(
 async def test_the_worker_tells_the_status_payload_what_it_sized_itself_to(
     settings: Settings, db: Any, tmp_path: Path
 ) -> None:
-    """A running worker is where the strip's slot count comes from, setting or no setting."""
-    call(db, app_settings_service.set_value, app_settings_service.CORRESPONDENCE_SLOTS, 6)
+    """A running worker is where the strip's slot count comes from: the shared pool's cap,
+    which is the machine's engine slots — searches hold the same ones the queue does."""
+    call(db, app_settings_service.set_value, app_settings_service.ANALYSIS_CONCURRENCY, 6)
 
-    async with CorrespondenceSearches(settings=settings, sessions=db, slots=3) as worker:
+    pool = EnginePool(concurrency=3)
+    async with CorrespondenceSearches(
+        settings=settings, sessions=db, pool=pool, owns_pool=True
+    ) as worker:
         assert worker.capacity()["slots"] == 3
+        assert worker.capacity()["busy"] == 0
         assert call(db, correspondence_service.status)["slots"] == 3
+        # The cap moves with the pool — saving Queue processes resizes it — and so does
+        # the strip, with no restart anywhere.
+        pool.resize(4)
+        assert worker.capacity()["slots"] == 4
+        assert call(db, correspondence_service.status)["slots"] == 4
 
     # The registration goes with the worker: nothing left behind to answer for a process
-    # that is no longer driving any engine.
+    # that is no longer driving any engine. What is left is the setting the pool would be
+    # built from.
     assert call(db, correspondence_service.status)["slots"] == 6
 
 
@@ -505,7 +519,9 @@ async def test_the_worker_answers_pause_all_and_resume_all(
     game = make_game(db)
     node_id = game["tree"]["id"]
 
-    async with CorrespondenceSearches(settings=settings, sessions=db, slots=2) as worker:
+    async with CorrespondenceSearches(
+        settings=settings, sessions=db, pool=EnginePool(concurrency=2), owns_pool=True
+    ) as worker:
         one = call(db, correspondence_service.start_search, node_id=node_id, engine_id=first.id)
         two = call(db, correspondence_service.start_search, node_id=node_id, engine_id=second.id)
         await wait_for_status(db, one["id"], SearchStatus.RUNNING)
@@ -961,6 +977,8 @@ def test_the_status_payload_counts_slots_and_parked_processes(session: Session) 
     )
     correspondence_service.mark_running(session, started["id"])
 
+    # No worker in this process, so the slots are what the machine's cap would give one.
+    app_settings_service.set_value(session, app_settings_service.ANALYSIS_CONCURRENCY, 2)
     live = correspondence_service.status(session)
     assert live["slots"] == 2
     assert live["in_use"] == 1
@@ -1002,14 +1020,13 @@ def test_the_status_payload_counts_slots_and_parked_processes(session: Session) 
 def test_the_slots_in_the_strip_are_the_running_pool_not_the_saved_setting(
     session: Session,
 ) -> None:
-    """Raising the setting without a restart must not invent slots the machine has not got.
+    """The strip reads the pool the worker is actually running on, not the row.
 
-    The pool and the semaphore are sized once, at boot. A strip that read the setting would
-    answer "2 of 6 in use" the moment the owner saved 6, with two searches sitting at
-    "waiting for a slot" beside four slots that do not exist — and the strip is exactly the
-    number the owner is being asked to act on.
+    The two agree once a save has resized the pool, but a process pinned from outside
+    (`BLUNDERBASE_ANALYSIS_CONCURRENCY`) runs on a number the row never held, and the strip
+    is exactly the number the owner is being asked to act on — "is there a slot free?".
     """
-    app_settings_service.set_value(session, app_settings_service.CORRESPONDENCE_SLOTS, 6)
+    app_settings_service.set_value(session, app_settings_service.ANALYSIS_CONCURRENCY, 6)
     assert correspondence_service.status(session)["slots"] == 6
 
     correspondence_service.register_capacity(lambda: {"slots": 2})
@@ -1200,12 +1217,6 @@ def test_a_root_move_that_is_not_legal_is_refused(session: Session) -> None:
         )
 
 
-def test_the_slot_count_is_a_setting(session: Session) -> None:
-    assert app_settings_service.get_correspondence_slots(session) == 2
-    app_settings_service.set_value(session, app_settings_service.CORRESPONDENCE_SLOTS, 99)
-    assert app_settings_service.get_correspondence_slots(session) == 16
-
-
 # --- the HTTP surface ------------------------------------------------------
 
 
@@ -1345,6 +1356,9 @@ def test_the_status_route_answers_the_capacity_strip(
     api: TestClient, settings_for_api: Settings
 ) -> None:
     api_engine(settings_for_api, options={"Hash": 2048})
+    # The strip's slots are the machine's engine cap: no worker runs in the test app, so
+    # the setting is what answers, and it is pinned here so the machine's cores do not.
+    api.put("/settings", json={"analysis_concurrency": 2})
     body = api.get("/correspondence/status").json()
     assert body["slots"] == 2
     assert body["in_use"] == 0
@@ -1354,17 +1368,19 @@ def test_the_status_route_answers_the_capacity_strip(
     assert body["engines"][0]["search_trouble"] is None
 
 
-def test_the_settings_carry_the_slots(api: TestClient) -> None:
+def test_the_settings_carry_no_slot_count_of_their_own(api: TestClient) -> None:
+    """Searches hold the machine's engine slots (`analysis_concurrency`); the cap they used
+    to have beside it is gone, and a client that still sends it is told so, the way every
+    unknown field is."""
     before = api.get("/settings").json()
-    assert before["correspondence_slots"] is None
+    assert "correspondence_slots" not in before
     assert "correspondence_search_engine_ids" not in before
     assert "correspondence_task_engine_id" not in before
 
-    saved = api.put("/settings", json={"correspondence_slots": 4}).json()
-    assert saved["correspondence_slots"] == 4
-    # A save that leaves it out clears it, which is what `completeUpdate` is for.
-    cleared = api.put("/settings", json={}).json()
-    assert cleared["correspondence_slots"] is None
+    assert api.put("/settings", json={"correspondence_slots": 4}).status_code == 422
+    saved = api.put("/settings", json={"analysis_concurrency": 3}).json()
+    assert "correspondence_slots" not in saved
+    assert saved["analysis_concurrency"] == 3
 
 
 # --- helpers that need the module's names ----------------------------------
