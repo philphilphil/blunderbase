@@ -3533,6 +3533,11 @@ msgid "Unknown"
 msgstr "Unbekannt"
 
 #: src/routes/dashboard/RecentGamesList.tsx
+#: src/routes/games/components/GameRow.tsx
+msgid "Engine hidden on this game until you show it"
+msgstr "Engine bei dieser Partie ausgeblendet, bis du sie zeigst"
+
+#: src/routes/dashboard/RecentGamesList.tsx
 msgid "Recent games"
 msgstr "Neueste Partien"
 
@@ -5821,10 +5826,6 @@ msgstr "Partie {id} auswählen"
 #: src/routes/games/components/GameRow.tsx
 msgid "Unknown opening"
 msgstr "Unbekannte Eröffnung"
-
-#: src/routes/games/components/GameRow.tsx
-msgid "Engine hidden on this game until you show it"
-msgstr "Engine bei dieser Partie ausgeblendet, bis du sie zeigst"
 
 #: src/routes/games/components/GameRow.tsx
 msgid "queueing…"

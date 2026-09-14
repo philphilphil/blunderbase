@@ -112,6 +112,23 @@ describe('RecentGamesList — component states (design 2a rail)', () => {
     expect(screen.getByRole('link', { name: 'All 15' })).toHaveAttribute('href', '/games')
   })
 
+  it('shows the eye in the swing’s place for a game whose engine is held back', () => {
+    draw({
+      data: {
+        ...CARDS,
+        games: CARDS.games.map((game) =>
+          game.opponent === 'jazzoz' ? { ...game, engine_hidden: true } : game,
+        ),
+      },
+    })
+
+    const game = screen.getByRole('link', { name: /jazzoz/ })
+    expect(game).not.toHaveTextContent('−44.2%')
+    expect(game).not.toHaveTextContent('—')
+    expect(screen.getByRole('img', { name: 'Engine hidden on this game until you show it' })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/blunder/i)).not.toBeInTheDocument()
+  })
+
   it('keeps the swing and the badge off the row while the engine is hidden', () => {
     setEngineHidden(true)
     draw({ data: CARDS })

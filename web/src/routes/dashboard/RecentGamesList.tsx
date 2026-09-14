@@ -7,6 +7,7 @@
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { EyeOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
@@ -82,10 +83,12 @@ function titleOf(game: GameCardRow, i18n: I18n): string {
 function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: boolean }) {
   const { t, i18n } = useLingui()
   const outcome = outcomeOf(game)
-  // Quiet under ⇧E, and quiet for a game imported with its engine held back
-  // (`engine_hidden`): the swing reads `—` and the badge is left out, as for a game nothing
-  // has analysed — the row says what was played and not how well.
-  const worst = engineHidden || game.engine_hidden ? null : worstOf(game)
+  // Quiet under ⇧E, which takes the swing off every row, and quiet for a game imported with
+  // its engine held back (`engine_hidden`). The second keeps the swing's place and puts the
+  // eye the games list shows there, so the row says *why* it is quiet rather than reading
+  // like a game nothing has analysed.
+  const heldBack = !engineHidden && game.engine_hidden === true
+  const worst = engineHidden || heldBack ? null : worstOf(game)
   return (
     <Link
       to={`/games/${game.id}`}
@@ -105,7 +108,15 @@ function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: bool
       <span className="font-mono text-[0.625rem] tabular text-dim">
         {game.opponent_rating ?? '—'}
       </span>
-      {engineHidden ? null : (
+      {engineHidden ? null : heldBack ? (
+        <span className="flex items-center text-dim">
+          <EyeOff
+            className="size-3"
+            role="img"
+            aria-label={t`Engine hidden on this game until you show it`}
+          />
+        </span>
+      ) : (
         <span className={cn('font-mono text-[0.6875rem] tabular', worst ? 'text-body' : 'text-dim-2')}>
           {worst ? formatWinLoss(worst.win_loss) : '—'}
         </span>
