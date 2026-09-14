@@ -123,10 +123,10 @@ correspondence functions, "ICCF" is the rulebook.
    correspondence worker is a second owner of the same machinery with its own rules.
 4. **Two engine modes, one pool.** *Searches* (IDeA's infinite analysis) hold one of the
    machine's engine slots — the analysis workers' `EnginePool`, capped by
-   `analysis_concurrency` — for as long as they run, the same slots the quick and deep
+   `analysis_concurrency` — for as long as they run, the same slots the analysis
    passes and the analysis boards take. They used to have a pool and a cap of their own
-   (`correspondence_slots`), so that a days-long search could never take a slot the quick
-   tier was counting on; that went, because a search is visible wherever slots are counted
+   (`correspondence_slots`), so that a days-long search could never take a slot the import
+   pass was counting on; that went, because a search is visible wherever slots are counted
    and one number the owner can see beats two to add up. A search holding a slot means the
    queue waits, and the worker claims no run while the pool is full (`EnginePool.free`), so
    a waiting run reads as queued rather than running. *Tasks* (IDeA's bounded tasks) are
@@ -257,14 +257,14 @@ result never overwrites a deeper one" would have nothing to read.
 Games: `create_game` (names, owner colour, event, url, optional start FEN, due date),
 `import_game` (one PGN pasted from the ICCF site, moves so far), `update_game` (due date,
 event, url), `play_move` (either side; appends to the `Game` and marks the node played),
-`undo_move`, `finish_game` (result and termination; queues the ordinary quick and deep
-passes; the tree becomes read-only), `list_games`, `get_game`.
+`undo_move`, `finish_game` (result and termination; queues the ordinary analysis
+pass; the tree becomes read-only), `list_games`, `get_game`.
 
 `play_move` is where `Game` is mutated: `moves_uci`, `moves_san`, `ply_count`, the PGN
 (rebuilt from headers and moves), `dedup_hash`, one new `GamePosition` with its `Position`
 upserted and marked for the book sweep, `card` cleared so it recomputes on the way out. This
 lives in `games_service.append_move` / `pop_move`, next to the immutability it breaks, and
-nothing else may call it. A correspondence game is imported with the quick pass **off**:
+nothing else may call it. A correspondence game is imported with the analysis pass **off**:
 the tree is its analysis while it runs, and a pass over an ongoing game would be redone
 after every move.
 
@@ -276,8 +276,9 @@ Python, refused while a search runs inside it), `get_tree` — the whole tree in
 with its evals and active searches, assembled in memory as the repertoire is.
 
 Tasks: `queue_task` writes a `task` search row and an `AnalysisRun` with the node's
-position, the engine asked for (else the deep role's), `correspondence_task_nodes` as its
-budget and `correspondence_task_multipv`, at a priority between quick and deep. An
+position, the engine asked for (else the analysis role's), `correspondence_task_nodes` as its
+budget and `correspondence_task_multipv`, at a priority between `IMPORT_PRIORITY` and
+`REQUESTED_PRIORITY`. An
 expansion's engine rides on each task's row, and `_expand_after` queues the next stage on
 it, so an expansion started on Leela stays on Leela. `analysis.complete_run`
 calls `correspondence.absorb_run` when the run names a search: the eval row is written from
@@ -420,7 +421,7 @@ has to be in both or the next save of any settings form wipes it:
 | `correspondence_stale_depth` | below what depth a stored verdict is stale, whatever engine wrote it (default 30) |
 
 There is no engine setting. `GET /correspondence/status` lists every enabled UCI engine,
-this host's and the runners', with the deep role's flagged `default` and a
+this host's and the runners', with the analysis role's flagged `default` and a
 `search_trouble` sentence on the ones a search cannot run on; every picker — **Search
 with…**, **Queue task…**, **Expand…**, **Refresh subtree…** — draws that one list, greying
 by mode. Two settings that narrowed it (a search list, a task engine) shipped in 1.2.0 and

@@ -144,9 +144,9 @@ def test_a_connected_runner_reports_its_link_its_engines_and_its_backlog(
 
     with connect(api, token) as runner:
         engine_id = runner.engine_ids["sf-remote"]
-        held = enqueue(api, game_id, engine_id, tier="deep")
+        held = enqueue(api, game_id, engine_id)
         dispatch_for(runner)
-        waiting = enqueue(api, game_id, engine_id, tier="deep")
+        waiting = enqueue(api, game_id, engine_id)
 
         row = listed(api)[0]
         # Read while the link is up: closing it hands the dispatched run straight back.
@@ -178,7 +178,7 @@ def test_status_puts_this_host_beside_the_runners(api: TestClient, settings: Set
     game_id = seed_game(api)
 
     with connect(api, token) as runner:
-        enqueue(api, game_id, runner.engine_ids["sf-remote"], tier="deep")
+        enqueue(api, game_id, runner.engine_ids["sf-remote"])
         dispatch_for(runner)
 
         payload = api.get("/runners/status").json()
@@ -242,9 +242,9 @@ def test_a_new_cap_reaches_the_live_link_without_a_reconnect(
 
     with connect(api, token) as runner:
         engine_id = runner.engine_ids["sf-remote"]
-        enqueue(api, game_id, engine_id, tier="deep")
+        enqueue(api, game_id, engine_id)
         dispatch_for(runner)
-        second = enqueue(api, game_id, engine_id, tier="deep")
+        second = enqueue(api, game_id, engine_id)
 
         assert api.patch(f"/runners/{runner_id}", json={"slots": 2}).status_code == 200
 
@@ -277,7 +277,7 @@ def test_revoking_closes_the_link_and_gives_the_work_back(
     game_id = seed_game(api)
 
     with connect(api, token) as runner:
-        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"])
         dispatch_for(runner)
 
         revoked = api.delete(f"/runners/{runner_id}")
@@ -421,10 +421,10 @@ def test_the_queue_says_where_the_backlog_will_be_worked(
 
     with connect(api, token) as runner:
         engine_id = runner.engine_ids["sf-remote"]
-        enqueue(api, game_id, engine_id, tier="deep")
+        enqueue(api, game_id, engine_id)
         dispatch_for(runner)
-        enqueue(api, game_id, engine_id, tier="deep")
-        enqueue(api, game_id, here, tier="quick")
+        enqueue(api, game_id, engine_id)
+        enqueue(api, game_id, here)
 
         payload = api.get("/analysis/queue").json()
 

@@ -230,15 +230,15 @@ describe('engineHosts', () => {
   })
 
   it('orders local first, then runners, and by name within a host', () => {
-    // Not by role: which engine serves Quick or Deep is an assignment the owner makes, and
+    // Not by role: which engine serves the analysis role is an assignment the owner makes, and
     // a list that re-sorted itself when they changed it would move rows under the cursor.
     const hosts = engineHosts(
       status({
         local: {
           ...status().local,
           engines: [
-            engine({ id: 1, name: 'sf-quick' }),
-            engine({ id: 2, name: 'sf-deep' }),
+            engine({ id: 1, name: 'sf-fast' }),
+            engine({ id: 2, name: 'sf-big' }),
             engine({ id: 3, name: 'maia', kind: 'maia', streams: false }),
           ],
         },
@@ -247,7 +247,7 @@ describe('engineHosts', () => {
         ],
       }),
     )
-    expect(hosts.map((host) => host.name)).toEqual(['maia', 'sf-deep', 'sf-quick', 'sf-remote'])
+    expect(hosts.map((host) => host.name)).toEqual(['maia', 'sf-big', 'sf-fast', 'sf-remote'])
   })
 
   it('is empty before the status has been read', () => {

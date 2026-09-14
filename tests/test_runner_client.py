@@ -27,7 +27,7 @@ import pytest
 
 from backend.api.app import create_app
 from backend.config import Settings
-from backend.db.enums import RunStatus, Tier
+from backend.db.enums import RunStatus
 from backend.db.models import Engine
 from backend.db.session import get_sessionmaker
 from backend.runners import protocol
@@ -164,12 +164,10 @@ def engine_row(settings: Settings, name: str) -> Engine | None:
         return session.scalars(select(Engine).where(Engine.name == name)).first()
 
 
-def enqueue(settings: Settings, engine_id: int, tier: Tier = Tier.DEEP) -> int:
+def enqueue(settings: Settings, engine_id: int) -> int:
     """A one-position run bound to the runner's engine, straight into the queue."""
     with get_sessionmaker(settings)() as session:
-        run = analysis.request_analysis(
-            session, fen=STARTING_FEN, tier=tier, engine_id=engine_id
-        )
+        run = analysis.request_analysis(session, fen=STARTING_FEN, engine_id=engine_id)
         return run.id
 
 
@@ -416,7 +414,6 @@ def welcome(**changes: Any) -> dict[str, Any]:
 def dispatch(run_id: int, token: str, *, engine: str = "sf-remote") -> dict[str, Any]:
     plan = analysis.RunPlan(
         run_id=run_id,
-        tier=Tier.DEEP,
         game_id=None,
         fen=STARTING_FEN,
         variant="standard",

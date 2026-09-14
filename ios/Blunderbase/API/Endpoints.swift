@@ -53,7 +53,6 @@ struct GameQuery: Sendable, Equatable {
     var timeControl: String?
     var hasBlunders: Bool?
     var analyzed: Bool?
-    var deepAnalyzed: Bool?
     var since: Date?
     var until: Date?
     var whose: Whose = .mine
@@ -79,7 +78,6 @@ struct GameQuery: Sendable, Equatable {
             .text("time_control", timeControl),
             .flag("has_blunders", hasBlunders),
             .flag("analyzed", analyzed),
-            .flag("deep_analyzed", deepAnalyzed),
             .timestamp("since", since),
             .timestamp("until", until),
         ]

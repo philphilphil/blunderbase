@@ -129,29 +129,21 @@ export function role(
     engine_name: null,
     available: false,
     configured: false,
-    reason: `no engine is assigned to ${over.role === 'human' ? 'human moves' : `the ${over.role} tier`}`,
+    reason: `no engine is assigned to ${over.role === 'human' ? 'human moves' : 'the analysis role'}`,
     ...over,
   }
 }
 
-/** Quick on `stockfish`, Deep on an engine that is away, and no human-move model at all. */
+/**
+ * Analysis on an engine that is away, and no human-move model at all — the two shapes of a
+ * role that does not run, one a fault and one a choice not yet made.
+ */
 export function roles(...over: EngineRoleStatus[]): EngineRolesResponse {
   const base = new Map<EngineRoleName, EngineRoleStatus>([
     [
-      'quick',
+      'analysis',
       role({
-        role: 'quick',
-        engine_id: 1,
-        engine_name: 'stockfish',
-        available: true,
-        configured: true,
-        reason: null,
-      }),
-    ],
-    [
-      'deep',
-      role({
-        role: 'deep',
+        role: 'analysis',
         engine_id: 7,
         engine_name: 'sf-remote',
         configured: true,
@@ -252,12 +244,10 @@ export const PROBE = {
 export const SETTINGS: AppSettings = {
   maia_target_elo: 2000,
   maia_elos: [2000],
-  maia_on_quick: null,
-  maia_on_deep: null,
+  maia_on_analysis: null,
   maia_both_sides: null,
-  quick_nodes: null,
-  deep_nodes: null,
-  deep_multipv: null,
+  analysis_nodes: null,
+  analysis_multipv: null,
   inaccuracy_threshold: null,
   mistake_threshold: null,
   blunder_threshold: null,

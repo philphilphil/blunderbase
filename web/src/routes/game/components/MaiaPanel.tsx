@@ -2,7 +2,9 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronDown, Columns3, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { AnalyseButton, type AnalyseButtonProps } from '@/components/analysis/AnalyseButton'
 import { LiveLinesChip, LiveSwitch } from '@/components/analysis/AnalysisControls'
+import { LiveAnalysisIcon } from '@/components/analysis/ScanIcons'
 import {
   LiveSearchLines,
   LiveSearchMeta,
@@ -162,6 +164,11 @@ export interface MaiaPanelProps {
    * off and when the board leaves the game line, and the panel only reports a click.
    */
   search?: EnginePaneSearch
+  /**
+   * The Analyse… button's state, drawn at the end of the title strip on the Run tab. Left
+   * out where nothing can be queued — a model game nobody has added to the library.
+   */
+  analyse?: Omit<AnalyseButtonProps, 'variant'>
   className?: string
 }
 
@@ -237,6 +244,7 @@ export function MaiaPanel({
   orientation = 'white',
   onPlayLine,
   search,
+  analyse,
   className,
 }: MaiaPanelProps) {
   const { t } = useLingui()
@@ -355,8 +363,16 @@ export function MaiaPanel({
         as one instrument rather than as four boxes that happen to be adjacent.
       */}
       <section className="flex min-w-0 flex-col overflow-hidden">
-        <div className="bb-pane-title flex-nowrap">
-          <span className="size-1.5 flex-none rounded-full bg-brilliant" />
+        {/* A container, because this column is usually at its 9rem floor: there the "live"
+            word leaves and the pulsing dot beside the level says it instead, so the compare
+            toggle at the end is never the thing pushed off. */}
+        <div className="bb-pane-title @container flex-nowrap">
+          <span
+            className={cn(
+              'size-1.5 flex-none rounded-full bg-brilliant',
+              showHuman && live?.pending && '@max-[12rem]:animate-pulse',
+            )}
+          />
           {/*
             The visible label is the level itself, with the picker laid over it: the
             header has room for one reading of who this column speaks for, and "Maia
@@ -414,7 +430,10 @@ export function MaiaPanel({
           data-testid="maia-engine-lines"
           className="flex min-w-0 flex-col overflow-hidden border-l border-edge-strong max-md:border-t max-md:border-l-0"
         >
-          <div className="bb-pane-title">
+          {/* A container, so the readouts on the strip can give way by the strip's own
+              width rather than the window's: this pane is narrow at widths where the screen
+              is not, and it is the switch at the end that must survive (`LiveSearchMeta`). */}
+          <div className="bb-pane-title @container">
             {search ? (
               <EnginePaneTabs search={search} />
             ) : (
@@ -450,31 +469,44 @@ export function MaiaPanel({
               The label is the column's category, paired with the human column's own —
               never the run's protocol kind, which lives on the engines page.
             */}
-            <div className="flex-1" />
-            {onLive && search ? (
-              <>
+            {/* The spacer and the readouts are one element, and the only one on the strip
+                that yields: it takes what is left and clips its own contents, so when the
+                pane runs out of width the numbers go and the chips and the switch after
+                them stay where a hand expects them. */}
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden">
+              {onLive && search ? (
                 <LiveSearchMeta stream={search.stream} />
-                {/* The search's line count, where the run's `MPV` chip stands on the
-                    other tab: the same fact about the other claim, in the same shape. */}
-                <LiveLinesChip stream={search.stream} />
-              </>
-            ) : (
-              <>
-                {run?.depth ? (
-                  <span className="font-mono text-[0.625rem] tabular text-dim">d{run.depth}</span>
-                ) : null}
-                {nodes !== '—' ? (
-                  <span className="font-mono text-[0.625rem] tabular text-dim">
-                    <Trans>{nodes} nodes</Trans>
-                  </span>
-                ) : null}
-                {run?.multipv ? (
-                  <span className="rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
-                    MPV {run.multipv}
-                  </span>
-                ) : null}
-              </>
-            )}
+              ) : (
+                <>
+                  {/* The limit the run stopped each move at, whichever of the three it was:
+                      a run from the Analyse dialog carries one, an import pass nodes. */}
+                  {run?.depth ? (
+                    <span className="flex-none font-mono text-[0.625rem] tabular text-dim">
+                      d{run.depth}
+                    </span>
+                  ) : null}
+                  {run?.seconds ? (
+                    <span className="flex-none font-mono text-[0.625rem] tabular text-dim">
+                      <Trans>{run.seconds}s a move</Trans>
+                    </span>
+                  ) : null}
+                  {nodes !== '—' ? (
+                    <span className="flex-none font-mono text-[0.625rem] tabular text-dim @max-[30rem]:hidden">
+                      <Trans>{nodes} nodes</Trans>
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </div>
+            {onLive && search ? (
+              // The search's line count, where the run's `MPV` chip stands on the other
+              // tab: the same fact about the other claim, in the same shape.
+              <LiveLinesChip stream={search.stream} />
+            ) : run?.multipv ? (
+              <span className="flex-none rounded-sm border border-edge px-[0.3125rem] py-px font-mono text-[0.625rem] tabular text-dim">
+                MPV {run.multipv}
+              </span>
+            ) : null}
             {/*
               The one-click cycler for what hovering a line does. The gear that held the
               rest of those settings used to sit beside it and is now under the board
@@ -489,8 +521,34 @@ export function MaiaPanel({
               rather than a view. `h-7`, because the strip is 35 design pixels and the
               switch was sized for a 2rem footer row it no longer sits in.
             */}
+            {/*
+              The stored run's verb, on the Run tab only: on Live the readouts beside it are
+              the search's, and a button there would seem to act on them.
+            */}
+            {analyse && !onLive ? <AnalyseButton {...analyse} variant="strip" /> : null}
+            {/*
+              A rule, then the live search's icon and switch. Left of the rule is the stored
+              run and what changes it; right of it the search that stores nothing. The two
+              icons are one family (`ScanIcons`) because both are an engine looking at this
+              position, and the rule is what keeps them from reading as two ways to do one
+              thing. The icon's line sweeps while the search runs.
+            */}
             {search ? (
-              <LiveSwitch stream={search.stream} fen={fen ?? null} className="-mr-1.5 h-7" />
+              <>
+                <span aria-hidden className="h-4 w-px flex-none bg-edge" />
+                <LiveAnalysisIcon
+                  on={search.stream.phase === 'running'}
+                  className={cn(
+                    'size-3',
+                    search.stream.enabled ? 'text-accent-teal' : 'text-dim',
+                  )}
+                />
+                <LiveSwitch
+                  stream={search.stream}
+                  fen={fen ?? null}
+                  className="-mr-1.5 -ml-1 h-7 flex-none"
+                />
+              </>
             ) : null}
           </div>
 
@@ -879,7 +937,7 @@ function LivePill({ pending }: { pending: boolean }) {
   return (
     <span
       data-testid="maia-live"
-      className="inline-flex flex-none items-center gap-1 rounded-sm border border-brilliant/30 bg-brilliant/10 px-1.5 py-px font-mono text-[0.59375rem] text-brilliant"
+      className="inline-flex flex-none items-center gap-1 rounded-sm border border-brilliant/30 bg-brilliant/10 px-1.5 py-px font-mono text-[0.59375rem] text-brilliant @max-[12rem]:hidden"
     >
       <span
         className={cn('size-1 rounded-full bg-brilliant', pending && 'animate-pulse')}

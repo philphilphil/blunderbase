@@ -44,7 +44,7 @@ async def list_streams(broker: StreamsDep) -> list[Any]:
     summary="Open an analysis board",
 )
 async def open_stream(broker: StreamsDep, body: StreamCreate) -> Any:
-    """Start an infinite search. Omitting `engine_id` takes the deep tier's engine."""
+    """Start an infinite search. Omitting `engine_id` takes the analysis role's engine."""
     session = await broker.open(
         fen=body.fen,
         engine_id=body.engine_id,

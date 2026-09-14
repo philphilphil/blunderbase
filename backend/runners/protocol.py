@@ -26,7 +26,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from backend.db.enums import Classification, Color, EngineKind, Tier
+from backend.db.enums import Classification, Color, EngineKind
 from backend.db.models import MoveEval
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -72,7 +72,17 @@ STREAM_RESUME = "stream_resume"
 # runner that lacks a feature still connects and takes everything else.
 FEATURE_ROOT_MOVES = "root_moves"
 FEATURE_STREAM_PAUSE = "stream_pause"
-FEATURES = (FEATURE_ROOT_MOVES, FEATURE_STREAM_PAUSE)
+# A plan may stop on nodes, depth or seconds, and `nodes` may be null. A runner without it
+# decodes `nodes` as required and knows no time limit, so the gateway only claims
+# node-budget runs for it — the queue's own import passes — and leaves the rest for a
+# runner (or the server) that can honour what the person asked for.
+FEATURE_RUN_LIMITS = "run_limits"
+FEATURES = (FEATURE_ROOT_MOVES, FEATURE_STREAM_PAUSE, FEATURE_RUN_LIMITS)
+
+# What every plan says in its `tier` field. The server has one analysis pass now and
+# nothing reads the word, but a runner from before still requires it when it decodes a
+# plan, and would fail the run without it.
+LEGACY_PLAN_TIER = "quick"
 
 # What a frame of each type has to carry beyond its `type`. Anything else on it is the
 # handler's business: a field one side does not know about is ignored, never fatal.
@@ -135,7 +145,6 @@ CLOSE_REASONS: dict[int, str] = {
 STREAM_REASONS = ("closed", "replaced", "idle", "engine_failed", "runner_gone")
 
 ENGINE_KINDS = tuple(kind.value for kind in EngineKind)
-TIERS = tuple(tier.value for tier in Tier)
 
 
 class ProtocolError(ValueError):
@@ -203,8 +212,8 @@ def hello(
     """The runner's first frame. `active_runs` is what a reconnect is still executing.
 
     `features` is what this runner can do beyond the baseline (`FEATURES`); a server reads
-    it to decide, per runner, whether a search may carry root moves and whether a pause is
-    warm or cold.
+    it to decide, per runner, whether a search may carry root moves, whether a pause is
+    warm or cold, and whether a run may stop on depth or seconds rather than nodes.
 
     `browser` is the runner saying what kind of host it is, and it is here rather than
     inferred from the transport because this frame is already where a runner describes
@@ -466,7 +475,7 @@ def encode_plan(plan: RunPlan) -> dict[str, Any]:
     """A `RunPlan` as JSON: tuples become arrays, enums become their stored string."""
     return {
         "run_id": plan.run_id,
-        "tier": Tier(plan.tier).value,
+        "tier": LEGACY_PLAN_TIER,
         "game_id": plan.game_id,
         "fen": plan.fen,
         "variant": plan.variant,
@@ -477,8 +486,11 @@ def encode_plan(plan: RunPlan) -> dict[str, Any]:
         "position_ids": list(plan.position_ids),
         "ply_start": plan.ply_start,
         "ply_end": plan.ply_end,
+        # The run's stop condition: one of the three is set. `nodes` may be null, which is
+        # why a runner without `FEATURE_RUN_LIMITS` is only ever sent plans that carry it.
         "nodes": plan.nodes,
         "depth": plan.depth,
+        "seconds": plan.seconds,
         "multipv": plan.multipv,
         "thresholds": {
             "inaccuracy": plan.thresholds.inaccuracy,
@@ -505,16 +517,25 @@ def encode_plan(plan: RunPlan) -> dict[str, Any]:
 
 
 def decode_plan(data: Mapping[str, Any]) -> RunPlan:
-    """The inverse of `encode_plan`, field for field."""
+    """The inverse of `encode_plan`, field for field. `tier` is not read: it is only on the
+    wire for runners that predate one analysis pass."""
     from backend.services.analysis import RunPlan, Thresholds
 
     thresholds = data.get("thresholds")
     if not isinstance(thresholds, Mapping):
         raise ProtocolError("a plan carries its classification thresholds")
+    # A search with no bound never answers. A Maia-only fill searches nothing, so it is the
+    # one plan that may carry none.
+    if (
+        data.get("nodes") is None
+        and data.get("depth") is None
+        and data.get("seconds") is None
+        and not data.get("maia_only")
+    ):
+        raise ProtocolError("a plan stops each move on nodes, depth or seconds")
     try:
         return RunPlan(
             run_id=_int(data, "run_id"),
-            tier=Tier(_str(data, "tier")),
             game_id=_optional_int(data, "game_id"),
             fen=_optional_str(data, "fen"),
             variant=_str(data, "variant"),
@@ -529,8 +550,9 @@ def decode_plan(data: Mapping[str, Any]) -> RunPlan:
             ),
             ply_start=_int(data, "ply_start"),
             ply_end=_int(data, "ply_end"),
-            nodes=_int(data, "nodes"),
+            nodes=_optional_int(data, "nodes"),
             depth=_optional_int(data, "depth"),
+            seconds=_optional_float(data, "seconds"),
             multipv=_int(data, "multipv"),
             thresholds=Thresholds(
                 inaccuracy=float(thresholds["inaccuracy"]),
@@ -682,10 +704,10 @@ class EngineAd:
     kind: str = EngineKind.UCI.value
     path: str = ""
     version: str | None = None
-    # Accepted and ignored. A runner cannot claim a job: the owner assigns one engine to
-    # each of Quick, Deep and Human moves on the server. The field survives so that a
-    # runner built before that — and every `runner.yaml` still carrying `tier:` — keeps
-    # connecting rather than being refused over a word nothing reads.
+    # Accepted and ignored, whatever it says. A runner cannot claim a job: the owner assigns
+    # one engine to each of the analysis and human-move roles on the server. The field
+    # survives so that a runner built before that — and every `runner.yaml` still carrying
+    # `tier:` — keeps connecting rather than being refused over a word nothing reads.
     tier: str | None = None
     options: dict[str, Any] = field(default_factory=dict)
     declared_options: tuple[dict[str, Any], ...] = ()
@@ -705,8 +727,6 @@ class EngineAd:
         if not isinstance(path, str) or not path.strip():
             raise ProtocolError(f"{name!r} advertises no path on the runner")
         tier = data.get("tier")
-        if tier is not None and str(tier) not in TIERS:
-            raise ProtocolError(f"{tier!r} is not a tier ({', '.join(TIERS)})")
         options = data.get("options") or {}
         if not isinstance(options, Mapping):
             raise ProtocolError(f"{name!r} advertises options that are not an object")
@@ -784,6 +804,15 @@ def _int(data: Mapping[str, Any], key: str) -> int:
 
 def _optional_int(data: Mapping[str, Any], key: str) -> int | None:
     return None if data.get(key) is None else _int(data, key)
+
+
+def _optional_float(data: Mapping[str, Any], key: str) -> float | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ProtocolError(f"{key} is not a number")
+    return float(value)
 
 
 def _sequence(data: Mapping[str, Any], key: str) -> Sequence[Any]:

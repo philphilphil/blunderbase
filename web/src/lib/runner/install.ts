@@ -1,7 +1,7 @@
 /**
  * Installing this browser as a runner, as one function, because two screens do it.
  *
- * The Engines page has a button for it, and the no-engine dialog that a Quick, Deep or
+ * The Engines page has a button for it, and the no-engine dialog that the Analyse button or a
  * continuous-analysis gesture opens on a deployment with nothing assigned has the same
  * button — the whole point of that dialog is that the owner never has to leave the game
  * to get an engine. Two copies of "mint a runner, dodge a taken name, hand the token to the

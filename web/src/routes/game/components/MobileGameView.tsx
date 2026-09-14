@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
-import { RunStatusBadge, TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
+import { RunBadge, RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
 import type { Color, GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
@@ -49,7 +49,7 @@ const TAB_LABEL: Record<MobileTab, MessageDescriptor> = {
 
 export interface MobileGameViewProps {
   game: GameSummary
-  /** The deepest finished run, for the header's tier chip. */
+  /** The finished run that answers for the game, for the header's run chip. */
   best: GameRunSummary | null
   /** A run queued or running right now, which the chip reports instead. */
   active: RunResponse | null
@@ -224,7 +224,7 @@ export function MobileGameView({
 
 /**
  * Two lines of what the desktop `GameHeaderBar` says in four, plus the three readouts that
- * lost their homes below `md`: the tier chip, PGN out of the move table's hidden tab row,
+ * lost their homes below `md`: the run chip, PGN out of the move table's hidden tab row,
  * and the evaluation out of the transport row.
  *
  * The titlebar's breadcrumb — date and players — is hidden below `md`, so this is the only
@@ -307,7 +307,7 @@ function CompactHeader({
         {active ? (
           <RunStatusBadge status={active.status} />
         ) : best ? (
-          <TierBadge tier={best.tier} depth={best.depth} />
+          <RunBadge run={best} />
         ) : (
           <UnanalysedBadge />
         )}

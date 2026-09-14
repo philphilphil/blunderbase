@@ -16,7 +16,7 @@ import { MaiaPanel } from './MaiaPanel'
 /** The run the engine column speaks for, and what it spent getting there. */
 const RUN: GameRunSummary = {
   id: 18,
-  tier: 'deep',
+  requested: true,
   status: 'done',
   engine: 'stockfish',
   engine_kind: 'uci',

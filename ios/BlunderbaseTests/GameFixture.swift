@@ -70,7 +70,7 @@ enum GameFixture {
         {"ply": 10, "move_number": 6, "color": "white", "san": "Nxf7", "uci": "g5f7", "clock": 540, "win_before": 92, "win_after": 88, "classification": "best"}
       ],
       "runs": [
-        {"id": 4, "tier": "deep", "status": "done", "engine": "Stockfish 17", "engine_kind": "uci", "depth": 22, "multipv": 2}
+        {"id": 4, "requested": true, "status": "done", "engine": "Stockfish 17", "engine_kind": "uci", "depth": 22, "multipv": 2}
       ],
       "notes": [],
       "book": {

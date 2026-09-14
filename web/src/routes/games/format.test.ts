@@ -11,7 +11,7 @@ import {
   formatTimeControl,
   moveCount,
   outcomeTone,
-  tierOf,
+  analysisOf,
   worstDrop,
 } from './format'
 
@@ -75,7 +75,7 @@ describe('the analysis columns', () => {
     id: 1,
     source: 'lichess',
     analyzed: true,
-    deep: false,
+    requested: false,
     eval_curve: [],
     worst_moments: [
       { ply: 63, win_loss: 58.31, classification: 'blunder' },
@@ -92,12 +92,12 @@ describe('the analysis columns', () => {
     const raw = { ...analysed, analyzed: false, worst_moments: [] } as GameCard
     expect(worstDrop(raw)).toBeNull()
     expect(formatDrop(null)).toBe('—')
-    expect(tierOf(raw)).toBeNull()
+    expect(analysisOf(raw)).toBeNull()
   })
 
-  it('names the tier from the two flags the card carries', () => {
-    expect(tierOf(analysed)).toBe('quick')
-    expect(tierOf({ ...analysed, deep: true })).toBe('deep')
+  it('draws the run chip from the two flags the card carries', () => {
+    expect(analysisOf(analysed)).toEqual({ requested: false })
+    expect(analysisOf({ ...analysed, requested: true })).toEqual({ requested: true })
   })
 
   it('aggregates the flags into one chip per class, worst first', () => {

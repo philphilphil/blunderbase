@@ -116,7 +116,7 @@ def run(
     `cursor` and `since` both override the stored cursor — `since` because that is what the
     CLI calls "resume from this cursor instead of the stored one", and it reads either a
     cursor or a first month to start from. `analyze=False` lands the games without queueing
-    the automatic quick pass.
+    the automatic analysis pass.
     """
     name = (username or "").strip()
     if not USERNAME.fullmatch(name):

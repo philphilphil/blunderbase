@@ -5,18 +5,38 @@
 |  | Stockfish | Maia |
 |---|---|---|
 | asks | what's best | what a human at the levels you pick would play |
-| spends | the node budget you set per tier (250k quick, 2M deep by default) | one look, no search |
-| gives | 1 line quick; on deep as many as you keep (4 by default) | 5 moves per level, each with odds |
+| spends | on import, the node budget you set (500k by default); on a run you ask for, the seconds, depth or nodes you pick | one look, no search |
+| gives | as many lines as the run keeps (2 by default, up to 5) | 5 moves per level, each with odds |
 | lines? | yes | never |
 
-Every number in that table is a setting: the budgets and lines under **Analysis → Engine
+Every number in that table is a setting: the budget and lines under **Analysis → Engine
 passes**, the levels under **Analysis → Maia**.
 
-## Quick or deep?
+## Which pass does a game get?
 
-Quick runs on import. Deep is the one you ask for, and it jumps the queue. Queue either
-from a game with `Q` and `D`, or over selected rows in **Games**. A game that has a deep
-pass is read from it rather than from the quick one.
+Every game that arrives gets the import pass: the engine holding the **Analysis** role,
+the node budget and the line count from **Engine passes**, in the queue's own order.
+Selected rows in **Games** get the same with **Queue analysis**.
+
+When that is not enough, open the game and press **Analyse** (or `A`). You pick the
+engine, the lines, where each move stops — after so many seconds, at a depth or after so
+many nodes — and whether to look at one move, from a move to the end, or the whole game;
+the dialog is described under [Analysing a game](game.md#ask-for-a-deeper-look). A run you
+ask for goes ahead of every import pass still waiting.
+
+What a game is read from:
+
+- A run you asked for beats the import pass, whichever finished later. Between two runs of
+  the same kind, the newer one wins.
+- A whole-game run answers for the whole game, statistics included. A run over part of a
+  game answers for those moves only, and the rest is read from the pass under it.
+- The badge in the bar across the top of the game says what ran: `d24 · 2 lines`,
+  `10s · 2 lines`, `500k · 2 lines`. A run you asked for is coloured; the import pass is
+  plain. The game's row in **Games** only says **Analysed**, coloured the same way when a
+  run you asked for is among its runs.
+
+A limit in seconds depends on the machine: ten seconds on a fast server and ten seconds in
+a browser tab are not the same search. Depth and nodes mean the same wherever they run.
 
 ## What did a move cost?
 
@@ -31,14 +51,19 @@ Win% before the move minus win% after it. The default thresholds:
 ## What is left to analyse?
 
 **Analysis → Coverage** says how much of the library an engine has been over and what
-finishing it would cost. **Backfill quick** and **Backfill deep** queue the rest; a game
-that already has that tier is skipped. **Fill missing levels** does the same for Maia.
-**Clear the queue** empties it, and **Failed runs** lists what to retry.
+finishing it would cost. **Backfill** queues the import pass over every game that has no
+pass yet; a game that already has one is skipped. On a large library and a slow server that
+is a long wait, which is what the estimate on the card is for. **Fill missing levels** does
+the same for Maia. **Clear the queue** empties it, and **Failed runs** lists what to retry;
+a retry runs again with the engine, limit, moves and lines it failed with.
 
 ## How much work does a pass do?
 
-**Analysis → Engine passes** sets the node budget of each tier, how many lines a deep pass
-keeps, and the three thresholds above.
+**Analysis → Engine passes → Analysis pass** sets the import pass's node budget (500,000 by
+default) and how many lines it keeps (1 to 5, two by default), and the three thresholds
+above. The budget and the lines are copied onto a pass when it is queued, so a change
+applies to the next one. They are also where **Analyse** starts when you pick nodes, and
+the lines it offers before you type a number.
 
 ## Hide the engine on new games
 
@@ -54,8 +79,9 @@ difference is that `⇧E` is a switch of the browser, and this is stored on each
 ## What is Maia asked?
 
 **Analysis → Maia** sets which human levels are asked, up to five ratings between 1100 and
-2000 (a fresh installation asks 2000 only), whether Maia runs on quick passes, deep passes
-or both, and **Ask about both sides**: off looks at your moves only, on predicts the
+2000 (a fresh installation asks 2000 only), **Maia on the analysis pass** — on by default,
+it adds a Maia look to every pass, the import pass and the ones you ask for alike — and
+**Ask about both sides**: off looks at your moves only, on predicts the
 opponent's too. It never answers with a line: one look and no search gives a
 spread of moves, not a continuation. A *fill* pass adds levels to a game that already has
 an evaluation.
@@ -76,7 +102,7 @@ the default — there is no **Correspondence** in the sidebar and its pages send
 
 There is no engine setting: which engine searches or works a task is chosen on the
 position, in the dialog, from every engine that is switched on — see
-[Search a position](correspondence.md#search-a-position). The engine holding the **deep**
+[Search a position](correspondence.md#search-a-position). The engine holding the **Analysis**
 role is the one suggested. And there is no slot count here: how many searches this machine
 runs at once is a fact about the machine, set beside the queue's own cap on
 [Machines](../operate/runners.md#how-much-at-once).

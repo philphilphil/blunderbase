@@ -19,17 +19,17 @@ from backend.db.enums import (
     Classification,
     Color,
     EngineKind,
+    EngineRole,
     Result,
     RunStatus,
     Source,
-    Tier,
 )
 from backend.db.models import AnalysisRun, Engine, Game, MoveEval
 from backend.db.types import utcnow
 from backend.services import analysis, app_settings, explorer, stats
 from backend.services import engines as engines_service
 from backend.services import games as games_service
-from backend.services.engines import TierUnavailableError
+from backend.services.engines import EngineUnavailableError
 
 THRESHOLDS = analysis.Thresholds(inaccuracy=10.0, mistake=20.0, blunder=30.0)
 
@@ -230,7 +230,6 @@ def test_maia_is_asked_about_every_ply_of_both_sides(session: Session) -> None:
 def test_a_game_with_no_owner_is_asked_about_the_same_way(tmp_path: Any) -> None:
     plan = analysis.RunPlan(
         run_id=1,
-        tier=Tier.QUICK,
         game_id=7,
         fen=None,
         variant="standard",
@@ -300,51 +299,50 @@ def test_a_position_run_asks_about_the_one_position_it_has(session: Session) -> 
 # --- whether there is a Maia pass at all ----------------------------------
 
 
-def test_a_quick_run_carries_a_maia_pass_and_a_deep_run_does_not(session: Session) -> None:
-    """The defaults: the import pass pays for Maia, the deep pass would only repeat it."""
+def test_every_pass_carries_a_maia_pass_by_default(session: Session) -> None:
+    """The default: the import pass and a requested run both follow `maia_on_analysis`."""
     _engine(session)
     game = _game(session)
 
-    quick = analysis.request_analysis(session, game_id=game.id)
-    deep = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    imported = analysis.request_analysis(
+        session, game_id=game.id, priority=analysis.IMPORT_PRIORITY
+    )
+    requested = analysis.request_analysis(session, game_id=game.id, depth=20)
 
-    assert (quick.maia, deep.maia) == (True, False)
-    assert analysis.build_plan(session, quick).maia is True
-    assert analysis.build_plan(session, deep).maia is False
+    assert (imported.maia, requested.maia) == (True, True)
+    assert analysis.build_plan(session, imported).maia is True
 
 
-def test_a_run_records_the_tiers_setting_at_the_moment_it_was_queued(
+def test_a_run_records_the_setting_at_the_moment_it_was_queued(
     session: Session,
 ) -> None:
     """Settled at enqueue, like the budget: a setting that moves afterwards moves nothing."""
     _engine(session)
     game = _game(session)
-    app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 0)
-    app_settings.set_value(session, app_settings.MAIA_ON_DEEP, 1)
+    app_settings.set_value(session, app_settings.MAIA_ON_ANALYSIS, 0)
 
-    quick = analysis.request_analysis(session, game_id=game.id)
-    deep = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    before = analysis.request_analysis(session, game_id=game.id)
 
-    assert (quick.maia, deep.maia) == (False, True)
+    assert before.maia is False
 
-    app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 1)
+    app_settings.set_value(session, app_settings.MAIA_ON_ANALYSIS, 1)
 
-    assert analysis.build_plan(session, quick).maia is False
+    assert analysis.build_plan(session, before).maia is False
 
 
-def test_a_caller_may_ask_for_a_maia_pass_the_tier_is_not_configured_for(
+def test_a_caller_may_ask_for_a_maia_pass_the_setting_does_not(
     session: Session,
 ) -> None:
     """An override belongs to the run; the deployment's own setting does not move."""
     _engine(session)
     game = _game(session)
+    app_settings.set_value(session, app_settings.MAIA_ON_ANALYSIS, 0)
 
-    asked = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP, maia=True)
+    asked = analysis.request_analysis(session, game_id=game.id, maia=True)
     refused = analysis.request_analysis(session, game_id=game.id, maia=False)
 
     assert (asked.maia, refused.maia) == (True, False)
-    assert app_settings.get_maia_on_deep(session) is False
-    assert app_settings.get_maia_on_quick(session) is True
+    assert app_settings.get_maia_on_analysis(session) is False
 
 
 def test_a_batch_queues_every_run_with_the_maia_pass_it_was_asked_for(
@@ -416,14 +414,14 @@ def test_both_sides_is_read_per_plan_rather_than_baked_into_the_run(
     assert analysis.build_plan(session, run).maia_plies() == [0, 2, 4]
 
 
-def test_a_fill_pass_carries_its_maia_pass_whatever_the_tier_is_configured_for(
+def test_a_fill_pass_carries_its_maia_pass_whatever_the_setting_says(
     session: Session,
 ) -> None:
     """A fill with no human-move pass would search nothing and ask nothing: no pass at all."""
     _engine(session)
     _engine(session, name="maia", kind=EngineKind.MAIA)
     game = _game(session)
-    app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 0)
+    app_settings.set_value(session, app_settings.MAIA_ON_ANALYSIS, 0)
     analysis.complete_run(session, analysis.request_analysis(session, game_id=game.id), [])
 
     receipt = analysis.queue_maia_fill(session)
@@ -436,7 +434,6 @@ def test_a_plan_cannot_be_a_fill_pass_with_the_maia_pass_switched_off() -> None:
     """The invariant, wherever a plan comes from — a row, a wire frame, a test."""
     plan = analysis.RunPlan(
         run_id=1,
-        tier=Tier.QUICK,
         game_id=7,
         fen=None,
         variant="standard",
@@ -658,7 +655,6 @@ def _analysed(
     """
     run = AnalysisRun(
         game_id=game.id,
-        tier=Tier.QUICK,
         status=status,
         nodes=1,
         multipv=1,
@@ -829,16 +825,18 @@ def test_a_filled_level_is_merged_over_the_pass_that_was_already_there(
 
 
 def test_a_fill_says_it_is_one_and_counts_only_the_other_fills(session: Session) -> None:
-    """The event a client draws the queue from: a fill is not a quick pass over the library.
+    """The event a client draws the queue from: a fill is not an analysis pass over the library.
 
-    Both share the quick tier, so the tier alone cannot tell them apart; `maia_only` can,
-    and `outstanding` is the fill's own depth rather than a number an unrelated backfill
-    running alongside it would move.
+    Both are import-priority rows, so the priority alone cannot tell them apart; `maia_only`
+    can, and `outstanding` is the fill's own depth rather than a number an unrelated
+    backfill running alongside it would move.
     """
     _engine(session)
     _maia(session)
     _analysed(session, _game(session))
-    analysis.request_analysis(session, game_id=_game(session).id)
+    analysis.request_analysis(
+        session, game_id=_game(session).id, priority=analysis.IMPORT_PRIORITY
+    )
     app_settings.set_maia_elos(session, [1500])
     seen: list[dict[str, Any]] = []
     cancel = analysis.subscribe(seen.append)
@@ -851,7 +849,6 @@ def test_a_fill_says_it_is_one_and_counts_only_the_other_fills(session: Session)
     assert seen == [
         {
             "event": analysis.EVENT_BACKFILL,
-            "tier": "quick",
             "queued": 1,
             "outstanding": 1,
             "maia_only": True,
@@ -872,8 +869,8 @@ def test_a_queued_fill_announces_itself_as_one(session: Session) -> None:
     assert analysis.run_event(analysis.EVENT_RUN_QUEUED, ordinary)["maia_only"] is False
 
 
-def test_a_fill_is_not_the_quick_pass_a_backfill_owes_the_game(session: Session) -> None:
-    """A fill searches nothing, so a game whose only quick row is one is still unanalysed."""
+def test_a_fill_is_not_the_pass_a_backfill_owes_the_game(session: Session) -> None:
+    """A fill searches nothing, so a game whose only row is one is still unanalysed."""
     _engine(session)
     _maia(session)
     game = _game(session)
@@ -887,7 +884,7 @@ def test_a_fill_is_not_the_quick_pass_a_backfill_owes_the_game(session: Session)
 
 
 def test_stopping_a_backfill_leaves_the_queued_fills_alone(session: Session) -> None:
-    """`cancel_queued` is one tier's stop button; the fill belongs to a pass of its own."""
+    """`cancel_queued` is the backfill's stop button; the fill belongs to a pass of its own."""
     _engine(session)
     _maia(session)
     _analysed(session, _game(session))
@@ -913,25 +910,25 @@ def test_stopping_a_backfill_leaves_the_queued_fills_alone(session: Session) -> 
 
 
 def _asks_maia(session: Session) -> None:
-    """A deployment with a Maia, two configured levels, and both tiers asking for them."""
+    """A deployment with a Maia, two configured levels, and the analysis pass asking for them."""
     _engine(session)
     _maia(session)
     app_settings.set_maia_elos(session, [1500, 1900])
-    app_settings.set_value(session, app_settings.MAIA_ON_DEEP, 1)
+    app_settings.set_value(session, app_settings.MAIA_ON_ANALYSIS, 1)
 
 
 def test_a_game_that_carries_every_level_is_queued_without_a_maia_pass(
     session: Session,
 ) -> None:
-    """The deep pass of an imported game: the quick one already asked, so this one does not."""
+    """A requested run over an imported game: the import pass already asked, so this does not."""
     _asks_maia(session)
     game = _game(session)
     _analysed(session, game, ("1500", "1900"))
 
-    run = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    run = analysis.request_analysis(session, game_id=game.id, depth=24)
 
     assert run.maia is False
-    assert app_settings.get_maia_on_deep(session) is True
+    assert app_settings.get_maia_on_analysis(session) is True
 
 
 def test_one_missing_level_is_still_worth_a_maia_pass(session: Session) -> None:
@@ -939,7 +936,7 @@ def test_one_missing_level_is_still_worth_a_maia_pass(session: Session) -> None:
     game = _game(session)
     _analysed(session, game, ("1500",))
 
-    assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).maia is True
+    assert analysis.request_analysis(session, game_id=game.id, depth=24).maia is True
 
 
 def test_the_levels_a_run_names_are_the_ones_it_is_skipped_for(session: Session) -> None:
@@ -970,7 +967,7 @@ def test_a_run_over_a_bare_position_has_no_game_to_be_settled_by(session: Sessio
     run = analysis.request_analysis(
         session,
         fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        tier=Tier.DEEP,
+        depth=24,
     )
 
     assert run.maia is True
@@ -983,7 +980,13 @@ def test_a_backfill_skips_the_maia_pass_game_by_game(session: Session) -> None:
     _analysed(session, settled, ("1500", "1900"))
     _analysed(session, missing, ("1500",))
 
-    queued = analysis.enqueue_missing(session, Tier.DEEP)
+    # Windowed, so the runs carry their levels without covering the game: a backfill still
+    # owes both games a pass, and only the Maia half of it differs between them.
+    for run in session.scalars(select(AnalysisRun)):
+        run.ply_start, run.ply_end = 0, 1
+    session.commit()
+
+    queued = analysis.enqueue_missing(session)
 
     assert {run.game_id: run.maia for run in queued} == {settled.id: False, missing.id: True}
 
@@ -991,17 +994,18 @@ def test_a_backfill_skips_the_maia_pass_game_by_game(session: Session) -> None:
 # --- enqueueing -----------------------------------------------------------
 
 
-def test_a_quick_run_carries_the_configured_budget(session: Session) -> None:
+def test_an_import_run_carries_the_configured_budget(session: Session) -> None:
     _engine(session)
     game = _game(session)
-    app_settings.set_value(session, app_settings.QUICK_NODES, 1234)
+    app_settings.set_value(session, app_settings.ANALYSIS_NODES, 1234)
+    app_settings.set_value(session, app_settings.ANALYSIS_MULTIPV, 3)
 
-    run = analysis.request_analysis(session, game_id=game.id)
+    run = analysis.request_analysis(session, game_id=game.id, priority=analysis.IMPORT_PRIORITY)
 
-    assert run.tier is Tier.QUICK
+    assert run.tier is None
     assert run.status is RunStatus.QUEUED
-    assert (run.nodes, run.multipv) == (1234, 1)
-    assert run.priority == analysis.QUICK_PRIORITY
+    assert (run.nodes, run.depth, run.seconds, run.multipv) == (1234, None, None, 3)
+    assert run.priority == analysis.IMPORT_PRIORITY
     assert (run.ply_start, run.ply_end) == (None, None)
 
 
@@ -1011,20 +1015,87 @@ def test_an_unconfigured_deployment_queues_the_default_budget(session: Session) 
 
     run = analysis.request_analysis(session, game_id=game.id)
 
-    assert run.nodes == app_settings.QUICK_NODES_DEFAULT
+    assert run.nodes == app_settings.ANALYSIS_NODES_DEFAULT
+    assert run.multipv == app_settings.ANALYSIS_MULTIPV_DEFAULT
 
 
-def test_a_deep_run_gets_multiple_lines_and_jumps_the_queue(session: Session) -> None:
+def test_a_requested_run_carries_its_one_limit_and_jumps_the_queue(session: Session) -> None:
     _engine(session)
     game = _game(session)
-    app_settings.set_value(session, app_settings.DEEP_NODES, 999_999)
-    app_settings.set_value(session, app_settings.DEEP_MULTIPV, 5)
 
-    run = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP, ply_range=(2, 5))
+    run = analysis.request_analysis(session, game_id=game.id, depth=24, multipv=5, ply_range=(2, 5))
 
-    assert (run.nodes, run.multipv) == (999_999, 5)
-    assert run.priority == analysis.DEEP_PRIORITY > analysis.QUICK_PRIORITY
+    assert (run.nodes, run.depth, run.seconds, run.multipv) == (None, 24, None, 5)
+    assert run.priority == analysis.REQUESTED_PRIORITY > analysis.IMPORT_PRIORITY
     assert (run.ply_start, run.ply_end) == (2, 5)
+    plan = analysis.build_plan(session, run)
+    assert (plan.nodes, plan.depth, plan.seconds, plan.requested) == (None, 24, None, True)
+
+
+def test_a_time_limit_is_carried_as_seconds_and_never_given_a_node_budget(
+    session: Session,
+) -> None:
+    _engine(session)
+    game = _game(session)
+
+    run = analysis.request_analysis(session, game_id=game.id, seconds=2.5)
+
+    assert (run.nodes, run.depth, run.seconds) == (None, None, 2.5)
+    assert (analysis.build_plan(session, run).nodes, analysis.build_plan(session, run).seconds) == (
+        None,
+        2.5,
+    )
+
+
+@pytest.mark.parametrize(
+    "limits",
+    [
+        {"nodes": 1000, "depth": 20},
+        {"depth": 20, "seconds": 1.0},
+        {"nodes": 0},
+        {"depth": 0},
+        {"seconds": 0},
+        {"seconds": float("nan")},
+        {"multipv": 0},
+        {"multipv": 6},
+    ],
+)
+def test_a_request_with_a_bad_limit_is_refused(session: Session, limits: dict[str, Any]) -> None:
+    _engine(session)
+    game = _game(session)
+
+    with pytest.raises(analysis.AnalysisRequestError):
+        analysis.request_analysis(session, game_id=game.id, **limits)
+    assert session.scalars(select(AnalysisRun)).all() == []
+
+
+def test_a_window_over_the_whole_game_is_stored_as_a_full_game_run(session: Session) -> None:
+    """"From here on" asked at the first move is the whole pass, and has its one spelling."""
+    _engine(session)
+    game = _game(session, plies=6)
+
+    run = analysis.request_analysis(session, game_id=game.id, depth=20, ply_range=(0, 6))
+
+    assert (run.ply_start, run.ply_end) == (None, None)
+    assert analysis.count_missing(session) == 0
+
+
+def test_a_requested_run_may_name_any_enabled_uci_engine_but_not_a_maia(
+    session: Session,
+) -> None:
+    _engine(session)
+    other = _engine(session, name="Leela")
+    maia = _engine(session, name="maia", kind=EngineKind.MAIA)
+    off = _engine(session, name="Off", enabled=False)
+    game = _game(session)
+
+    assert analysis.request_analysis(session, game_id=game.id, engine_id=other.id).engine_id == (
+        other.id
+    )
+    with pytest.raises(analysis.AnalysisRequestError, match="human-move model"):
+        analysis.request_analysis(session, game_id=game.id, engine_id=maia.id, maia=False)
+    with pytest.raises(EngineUnavailableError, match="switched off"):
+        analysis.request_analysis(session, game_id=game.id, engine_id=off.id)
 
 
 def test_a_run_needs_exactly_one_target(session: Session) -> None:
@@ -1071,8 +1142,11 @@ def test_a_ply_range_is_clamped_to_the_game(session: Session) -> None:
     _engine(session)
     game = _game(session)
 
-    run = analysis.request_analysis(session, game_id=game.id, ply_range=(0, 400))
-    assert (run.ply_start, run.ply_end) == (0, game.ply_count)
+    run = analysis.request_analysis(session, game_id=game.id, ply_range=(2, 400))
+    assert (run.ply_start, run.ply_end) == (2, game.ply_count)
+    # Clamped to the whole game, it is a full-game run and stored as one.
+    whole = analysis.request_analysis(session, game_id=game.id, ply_range=(-3, 400))
+    assert (whole.ply_start, whole.ply_end) == (None, None)
 
     with pytest.raises(analysis.AnalysisRequestError, match="empty"):
         analysis.request_analysis(session, game_id=game.id, ply_range=(9, 12))
@@ -1090,9 +1164,9 @@ def test_an_unknown_game_is_refused(session: Session) -> None:
         analysis.request_analysis(session, game_id=999)
 
 
-def test_no_engine_at_all_is_a_tier_that_degrades(session: Session) -> None:
+def test_no_engine_at_all_is_a_role_that_degrades(session: Session) -> None:
     game = _game(session)
-    with pytest.raises(TierUnavailableError):
+    with pytest.raises(EngineUnavailableError, match="analysis role"):
         analysis.request_analysis(session, game_id=game.id)
 
 
@@ -1136,7 +1210,7 @@ def test_a_search_on_a_runner_and_the_only_maia_here_is_refused(session: Session
 
     with pytest.raises(analysis.AnalysisRequestError, match="must be on one machine"):
         analysis.request_analysis(
-            session, game_id=game.id, engine_id=remote.id, tier=Tier.DEEP, maia=True
+            session, game_id=game.id, engine_id=remote.id, maia=True
         )
 
 
@@ -1152,7 +1226,7 @@ def test_a_run_that_asks_for_no_maia_has_nothing_to_strand(session: Session) -> 
     game = _game(session)
 
     run = analysis.request_analysis(
-        session, game_id=game.id, engine_id=remote.id, tier=Tier.DEEP, maia=False
+        session, game_id=game.id, engine_id=remote.id, maia=False
     )
 
     assert run.status is RunStatus.QUEUED
@@ -1178,7 +1252,7 @@ def test_a_deployment_with_no_maia_at_all_has_nothing_to_mix(session: Session) -
     _remote_engine(session, "sf-remote")
     game = _game(session)
 
-    assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
+    assert analysis.request_analysis(session, game_id=game.id, depth=20).id
 
 
 def test_a_maia_that_is_switched_off_strands_nobody(session: Session) -> None:
@@ -1186,16 +1260,17 @@ def test_a_maia_that_is_switched_off_strands_nobody(session: Session) -> None:
     _engine(session, name="maia", kind=EngineKind.MAIA, enabled=False)
     game = _game(session)
 
-    assert analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
+    assert analysis.request_analysis(session, game_id=game.id, depth=20).id
 
 
-def test_a_run_on_the_maia_itself_is_not_a_mixed_host_run(session: Session) -> None:
-    """Nothing is stranded when the engine named *is* the model."""
+def test_a_run_named_on_the_maia_itself_is_refused_before_the_host_rule(session: Session) -> None:
+    """A human-move model answers with a policy, so it cannot be the search half of a run."""
     maia = _remote_engine(session, "maia-remote", kind=EngineKind.MAIA)
     _engine(session, name="maia", kind=EngineKind.MAIA)
     game = _game(session)
 
-    assert analysis.request_analysis(session, game_id=game.id, engine_id=maia.id).id
+    with pytest.raises(analysis.AnalysisRequestError, match="cannot search"):
+        analysis.request_analysis(session, game_id=game.id, engine_id=maia.id)
 
 
 def test_re_analysis_is_a_new_run_and_keeps_the_old_one(session: Session) -> None:
@@ -1204,11 +1279,10 @@ def test_re_analysis_is_a_new_run_and_keeps_the_old_one(session: Session) -> Non
 
     first = analysis.request_analysis(session, game_id=game.id)
     analysis.complete_run(session, first, [])
-    second = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    second = analysis.request_analysis(session, game_id=game.id, depth=24)
 
     assert second.id != first.id
     assert [run.id for run in analysis.list_runs(session, game.id)] == [second.id, first.id]
-    assert [run.id for run in analysis.list_runs(session, game.id, Tier.QUICK)] == [first.id]
 
 
 def test_a_batch_queues_every_game_in_one_transaction(session: Session) -> None:
@@ -1222,12 +1296,12 @@ def test_a_batch_queues_every_game_in_one_transaction(session: Session) -> None:
         nonlocal commits
         commits += 1
 
-    queued, refused = analysis.request_analysis_batch(
-        session, [game.id for game in games], tier=Tier.DEEP
-    )
+    queued, refused = analysis.request_analysis_batch(session, [game.id for game in games])
 
     assert [run.game_id for run in queued] == [game.id for game in games]
     assert refused == []
+    # The Games table's "Queue analysis": the import budget, at import priority.
+    assert {run.priority for run in queued} == {analysis.IMPORT_PRIORITY}
     assert commits == 1
     stored = session.scalars(select(AnalysisRun.id).order_by(AnalysisRun.id)).all()
     assert list(stored) == [run.id for run in queued]
@@ -1254,7 +1328,7 @@ def test_a_batch_announces_each_run_once_the_batch_has_committed(session: Sessio
 
     try:
         queued, _refused = analysis.request_analysis_batch(
-            session, [games[0].id, 999, games[1].id], tier=Tier.DEEP
+            session, [games[0].id, 999, games[1].id]
         )
     finally:
         cancel()
@@ -1279,11 +1353,11 @@ def test_a_batch_with_nothing_to_queue_commits_nothing(session: Session) -> None
     assert seen == []
 
 
-def test_a_batch_refuses_as_a_whole_when_no_engine_serves_the_tier(session: Session) -> None:
+def test_a_batch_refuses_as_a_whole_when_no_engine_holds_the_role(session: Session) -> None:
     """Not per game: the reason is the deployment's, and it is the same for every id."""
     game = _game(session)
 
-    with pytest.raises(TierUnavailableError):
+    with pytest.raises(EngineUnavailableError):
         analysis.request_analysis_batch(session, [game.id])
 
 
@@ -1330,14 +1404,14 @@ def test_the_backfill_preview_counts_exactly_what_the_backfill_takes(session: Se
     assert analysis.count_missing(session) == 0
 
 
-def test_a_backfill_of_one_tier_says_nothing_about_the_other(session: Session) -> None:
+def test_a_requested_full_game_run_is_coverage_whatever_it_stopped_on(session: Session) -> None:
+    """A game somebody analysed to depth 30 is not one a backfill owes a node-budget pass."""
     _engine(session)
-    _game(session)
+    requested, fresh = _game(session, plies=4), _game(session, plies=6)
+    analysis.request_analysis(session, game_id=requested.id, depth=30)
 
-    analysis.enqueue_missing(session)
-
-    assert analysis.count_missing(session, Tier.QUICK) == 0
-    assert analysis.count_missing(session, Tier.DEEP) == 1
+    assert analysis.count_missing(session) == 1
+    assert [run.game_id for run in analysis.enqueue_missing(session)] == [fresh.id]
 
 
 def test_a_backfill_can_take_a_bite_of_the_backlog(session: Session) -> None:
@@ -1382,7 +1456,6 @@ def test_a_backfill_announces_the_write_once_and_never_a_run(session: Session) -
     assert seen == [
         {
             "event": analysis.EVENT_BACKFILL,
-            "tier": "quick",
             "queued": 3,
             "outstanding": 3,
             "maia_only": False,
@@ -1421,17 +1494,24 @@ def test_a_backfill_with_nothing_to_queue_commits_nothing(session: Session) -> N
     assert seen == []
 
 
-def test_cancelling_a_backfill_leaves_running_and_windowed_runs_alone(session: Session) -> None:
-    """The stop button shortens the queue; it does not reach into what is already working."""
+def test_cancelling_a_backfill_leaves_running_windowed_and_requested_runs_alone(
+    session: Session,
+) -> None:
+    """The stop button shortens the queue; it does not reach into what is already working,
+    nor take back a run somebody asked for by hand."""
     _engine(session)
     games = [_game(session, plies=plies) for plies in (4, 6, 4)]
     analysis.enqueue_missing(session)
-    windowed = analysis.request_analysis(session, game_id=games[1].id, ply_range=(0, 4))
+    imported = analysis.IMPORT_PRIORITY
+    windowed = analysis.request_analysis(
+        session, game_id=games[1].id, ply_range=(0, 4), priority=imported
+    )
     position = analysis.request_analysis(
-        session, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        session, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", priority=imported
     )
     running = analysis.claim_next_run(session)
     assert running is not None and running.ply_start is None
+    requested = analysis.request_analysis(session, game_id=games[2].id, depth=20)
     seen: list[dict[str, Any]] = []
     cancel = analysis.subscribe(seen.append)
 
@@ -1442,12 +1522,11 @@ def test_cancelling_a_backfill_leaves_running_and_windowed_runs_alone(session: S
 
     assert dropped == 2
     left = set(session.scalars(select(AnalysisRun.id)))
-    assert left == {running.id, windowed.id, position.id}
+    assert left == {running.id, windowed.id, position.id, requested.id}
     assert analysis.outstanding_runs(session) == 1
     assert seen == [
         {
             "event": analysis.EVENT_BACKFILL,
-            "tier": "quick",
             "queued": 0,
             "outstanding": 1,
             "maia_only": False,
@@ -1469,13 +1548,15 @@ def test_cancelling_with_nothing_queued_says_nothing(session: Session) -> None:
     assert seen == []
 
 
-def test_clearing_the_queue_drops_every_tier_windowed_and_fill_alike(session: Session) -> None:
+def test_clearing_the_queue_drops_every_priority_windowed_and_fill_alike(
+    session: Session,
+) -> None:
     """The reset button reaches further than `cancel_queued`: nothing queued survives it."""
     _engine(session)
     _maia(session)
     games = [_game(session, plies=plies) for plies in (4, 6, 4, 4)]
-    analysis.request_analysis(session, game_id=games[0].id)
-    analysis.request_analysis(session, game_id=games[1].id, tier=Tier.DEEP)
+    analysis.request_analysis(session, game_id=games[0].id, priority=analysis.IMPORT_PRIORITY)
+    analysis.request_analysis(session, game_id=games[1].id, depth=20)
     analysis.request_analysis(session, game_id=games[2].id, ply_range=(0, 4))
     _analysed(session, games[3])
     app_settings.set_maia_elos(session, [1500])
@@ -1503,7 +1584,6 @@ def test_clearing_the_queue_drops_every_tier_windowed_and_fill_alike(session: Se
     assert seen == [
         {
             "event": analysis.EVENT_BACKFILL,
-            "tier": "quick",
             "queued": 0,
             "outstanding": 1,
             "maia_only": False,
@@ -1528,12 +1608,13 @@ def test_clearing_an_empty_queue_says_nothing(session: Session) -> None:
 # --- the queue ------------------------------------------------------------
 
 
-def test_deep_runs_jump_the_queue_and_quick_runs_stay_fifo(session: Session) -> None:
+def test_requested_runs_jump_the_queue_and_import_runs_stay_fifo(session: Session) -> None:
     _engine(session)
     first, second = _game(session, plies=4), _game(session, plies=6)
-    early = analysis.request_analysis(session, game_id=first.id)
-    late = analysis.request_analysis(session, game_id=second.id)
-    deep = analysis.request_analysis(session, game_id=second.id, tier=Tier.DEEP)
+    imported = analysis.IMPORT_PRIORITY
+    early = analysis.request_analysis(session, game_id=first.id, priority=imported)
+    late = analysis.request_analysis(session, game_id=second.id, priority=imported)
+    deep = analysis.request_analysis(session, game_id=second.id, depth=20)
 
     claimed = [analysis.claim_next_run(session) for _ in range(3)]
 
@@ -1558,7 +1639,7 @@ def test_the_queue_reports_its_depth(session: Session) -> None:
     _engine(session)
     game = _game(session)
     analysis.request_analysis(session, game_id=game.id)
-    analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    analysis.request_analysis(session, game_id=game.id, depth=20)
     analysis.claim_next_run(session)
 
     assert analysis.queue_depth(session) == {"queued": 1, "running": 1}
@@ -1569,7 +1650,7 @@ def test_a_paused_queue_is_not_claimed_from_and_a_resumed_one_is(session: Sessio
     _engine(session)
     game = _game(session)
     analysis.request_analysis(session, game_id=game.id)
-    analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    analysis.request_analysis(session, game_id=game.id, depth=20)
 
     assert analysis.set_queue_paused(session, True) is True
     assert analysis.claim_next_run(session) is None
@@ -1604,7 +1685,7 @@ def test_pausing_the_queue_survives_a_save_of_the_analysis_settings(session: Ses
     analysis.request_analysis(session, game_id=game.id)
     analysis.set_queue_paused(session, True)
 
-    app_settings.replace(session, {app_settings.QUICK_NODES: 100_000})
+    app_settings.replace(session, {app_settings.ANALYSIS_NODES: 100_000})
 
     assert analysis.get_queue_paused(session) is True
     assert analysis.claim_next_run(session) is None
@@ -1654,7 +1735,7 @@ def test_move_evals_can_be_read_back_over_a_window(session: Session) -> None:
 def test_finishing_a_run_stores_the_game_card_in_the_same_commit(session: Session) -> None:
     _engine(session)
     game = _game(session)
-    run = analysis.request_analysis(session, game_id=game.id)
+    run = analysis.request_analysis(session, game_id=game.id, priority=analysis.IMPORT_PRIORITY)
     rows = [
         MoveEval(ply=0, win_after=52.0, win_loss=4.0),
         MoveEval(ply=2, win_after=12.0, win_loss=40.0, classification=Classification.BLUNDER),
@@ -1667,7 +1748,7 @@ def test_finishing_a_run_stores_the_game_card_in_the_same_commit(session: Sessio
     assert commits.count == 1
     assert game.card is not None
     assert game.card["analyzed"] is True
-    assert game.card["deep"] is False
+    assert game.card["requested"] is False
     assert game.card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 2, "win": 12.0}]
     assert [moment["ply"] for moment in game.card["worst_moments"]] == [2, 0]
 
@@ -1675,14 +1756,14 @@ def test_finishing_a_run_stores_the_game_card_in_the_same_commit(session: Sessio
 def test_the_card_a_run_stores_covers_every_run_over_the_game(session: Session) -> None:
     _engine(session)
     game = _game(session)
-    quick = analysis.request_analysis(session, game_id=game.id)
+    quick = analysis.request_analysis(session, game_id=game.id, priority=analysis.IMPORT_PRIORITY)
     analysis.complete_run(session, quick, [MoveEval(ply=0, win_after=52.0, win_loss=4.0)])
-    deep = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    deep = analysis.request_analysis(session, game_id=game.id, depth=24)
 
     analysis.complete_run(session, deep, [MoveEval(ply=2, win_after=12.0, win_loss=40.0)])
 
     assert game.card is not None
-    assert game.card["deep"] is True
+    assert game.card["requested"] is True
     assert game.card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 2, "win": 12.0}]
 
 
@@ -1706,7 +1787,7 @@ def test_a_failed_run_leaves_the_card_of_the_passes_that_did_finish(session: Ses
     first = analysis.request_analysis(session, game_id=game.id)
     analysis.complete_run(session, first, [MoveEval(ply=0, win_after=52.0, win_loss=4.0)])
     stored = game.card
-    second = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    second = analysis.request_analysis(session, game_id=game.id, depth=24)
 
     analysis.fail_run(session, second, "engine died", retry=False)
 
@@ -1765,7 +1846,7 @@ def test_a_newer_pass_replaces_the_summary_the_last_one_left(session: Session) -
     analysis.complete_run(
         session, first, [MoveEval(ply=0, win_loss=40.0, classification=Classification.BLUNDER)]
     )
-    second = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP)
+    second = analysis.request_analysis(session, game_id=game.id, depth=24)
 
     analysis.complete_run(
         session,
@@ -1973,13 +2054,17 @@ def test_the_lifecycle_is_published_to_subscribers(session: Session) -> None:
     assert events[2]["stderr"] == "boom"
     assert events[-1]["evals"] == 0
     assert all(event["game_id"] == game.id for event in events)
-    assert all("at" in event and "tier" in event for event in events)
+    assert all("at" in event and "tier" not in event for event in events)
+    assert all(
+        {"engine_id", "nodes", "depth", "seconds", "multipv", "requested"} <= set(event)
+        for event in events
+    )
 
 
 def test_a_queued_event_waits_for_the_transaction_that_created_the_run(
     session: Session,
 ) -> None:
-    """The import pipeline queues the quick pass inside the transaction that stores the
+    """The import pipeline queues the analysis pass inside the transaction that stores the
     game. Announcing it before that commit hands the UI a run id a rolled-back import
     never created, and polling it answers 404."""
     _engine(session)
@@ -2110,7 +2195,7 @@ def test_every_run_of_a_game_is_listed_newest_first(session: Session) -> None:
 
 def _queued(session: Session, engine_id: int | None) -> AnalysisRun:
     """A queued run bound to whatever engine — including none at all."""
-    run = AnalysisRun(engine_id=engine_id, tier=Tier.QUICK, status=RunStatus.QUEUED)
+    run = AnalysisRun(engine_id=engine_id, status=RunStatus.QUEUED)
     session.add(run)
     session.commit()
     return run
@@ -2308,6 +2393,41 @@ def test_a_claim_can_be_narrowed_to_one_hosts_engines(session: Session) -> None:
     assert analysis.claim_next_run(session, engine_ids=[mine.id]) is None
 
 
+def test_a_runner_without_run_limits_is_only_offered_node_budget_runs(session: Session) -> None:
+    """An old runner's plan decoder needs a node count and knows no time limit, so a depth
+    or seconds request waits for a machine that can read it instead of failing on this one."""
+    engine = _engine(session)
+    game = _game(session)
+    by_depth = analysis.request_analysis(session, game_id=game.id, depth=24)
+    by_time = analysis.request_analysis(session, game_id=game.id, seconds=5.0)
+    by_nodes = analysis.request_analysis(session, game_id=game.id, nodes=1000)
+
+    old = analysis.claim_next_run(session, engine_ids=[engine.id], node_budget_only=True)
+
+    assert old is not None and old.id == by_nodes.id
+    assert analysis.claim_next_run(session, engine_ids=[engine.id], node_budget_only=True) is None
+    rest = {analysis.claim_next_run(session).id, analysis.claim_next_run(session).id}
+    assert rest == {by_depth.id, by_time.id}
+
+
+def test_the_analyse_dialog_is_offered_every_uci_engine_with_the_role_preselected(
+    session: Session,
+) -> None:
+    """The correspondence pickers' shape, so the dialog reuses their picker as it stands."""
+    first = _engine(session)
+    second = _engine(session, name="Leela")
+    _maia(session)
+    engines_service.set_role_engine(session, EngineRole.ANALYSIS, second.id)
+
+    listed = analysis.analysis_engines(session)
+
+    assert [entry["engine_id"] for entry in listed] == [first.id, second.id]
+    assert [entry["default"] for entry in listed] == [False, True]
+    assert {
+        "engine_id", "name", "version", "hash_mb", "default", "runner_id", "host", "search_trouble"
+    } <= set(listed[0])
+
+
 def test_a_claim_for_no_engines_at_all_takes_nothing(session: Session) -> None:
     engine = _engine(session)
     _queued(session, engine.id)
@@ -2402,28 +2522,28 @@ def test_abandoning_a_run_announces_that_it_is_queued_again(session: Session) ->
 def _finished(
     session: Session,
     game: Game,
-    tier: Tier = Tier.QUICK,
+    priority: int = analysis.IMPORT_PRIORITY,
     *,
     status: RunStatus = RunStatus.DONE,
     seconds: float = 6.0,
     nodes: int | None = None,
+    depth: int | None = None,
     multipv: int | None = None,
     maia_only: bool = False,
     elos: list[int] | None = None,
 ) -> AnalysisRun:
-    """A full-game run over `game` that took `seconds`, at today's budget unless told otherwise."""
+    """A full-game run over `game` that took `seconds`, at today's import budget unless told
+    otherwise. A `depth` replaces the node budget rather than joining it, as a request does."""
     started = utcnow()
-    deep = Tier(tier) is Tier.DEEP
     run = AnalysisRun(
         game_id=game.id,
-        tier=tier,
+        priority=priority,
         status=status,
         nodes=nodes
         if nodes is not None
-        else (app_settings.DEEP_NODES_DEFAULT if deep else app_settings.QUICK_NODES_DEFAULT),
-        multipv=multipv
-        if multipv is not None
-        else (app_settings.DEEP_MULTIPV_DEFAULT if deep else 1),
+        else (None if depth is not None else app_settings.ANALYSIS_NODES_DEFAULT),
+        depth=depth,
+        multipv=multipv if multipv is not None else app_settings.ANALYSIS_MULTIPV_DEFAULT,
         maia_only=maia_only,
         maia_elos=elos,
         started_at=started,
@@ -2447,9 +2567,7 @@ def test_a_run_whose_first_row_holds_a_json_null_still_reports_its_levels(
     _engine(session)
     _maia(session)
     game = _game(session)
-    run = AnalysisRun(
-        game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE, nodes=1, multipv=1
-    )
+    run = AnalysisRun(game_id=game.id, status=RunStatus.DONE, nodes=1, multipv=1)
     session.add(run)
     session.flush()
     session.add_all(
@@ -2480,9 +2598,7 @@ def test_a_policy_that_is_not_there_is_stored_as_sql_null(session: Session) -> N
     """The column half of the same fix: no row written from here on needs the migration."""
     _engine(session)
     game = _game(session)
-    run = AnalysisRun(
-        game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE, nodes=1, multipv=1
-    )
+    run = AnalysisRun(game_id=game.id, status=RunStatus.DONE, nodes=1, multipv=1)
     session.add(run)
     session.flush()
     session.add(MoveEval(run_id=run.id, ply=0, move_uci="e2e4"))
@@ -2499,12 +2615,12 @@ def test_a_policy_that_is_not_there_is_stored_as_sql_null(session: Session) -> N
 def test_coverage_splits_the_library_by_the_pass_each_game_has(session: Session) -> None:
     """Every field of the page's picture, over a library with one game of each shape."""
     _engine(session)
-    quick_only = _game(session, plies=6)
-    deep = _game(session, plies=4)
+    imported = _game(session, plies=6)
+    requested = _game(session, plies=4)
     _game(session, plies=2)
     failed = _game(session, plies=6)
-    run = _finished(session, quick_only)
-    _finished(session, deep, Tier.DEEP)
+    run = _finished(session, imported)
+    _finished(session, requested, analysis.REQUESTED_PRIORITY, depth=24)
     _finished(session, failed, status=RunStatus.FAILED)
     # A level nobody asks about any more: Maia used to be centred on the game's own rating.
     session.add(
@@ -2514,12 +2630,11 @@ def test_coverage_splits_the_library_by_the_pass_each_game_has(session: Session)
 
     assert analysis.coverage(session, settings=Settings(analysis_concurrency=3)) == {
         "total": 4,
+        # One bucket, whoever queued the pass and whatever it stopped on.
+        "analysed": 2,
         "no_pass": 2,
-        "quick_only": 1,
-        "deep": 1,
-        # Not the complement of the split: the deep-only game is missing a quick pass, and
-        # a failed run leaves its game as unanalysed as it was.
-        "missing": {"quick": 3, "deep": 3},
+        # A failed run leaves its game as unanalysed as it was.
+        "missing": 2,
         "failed": 1,
         "maia": {
             "configured": [MAIA_MAX_RATING],
@@ -2529,8 +2644,7 @@ def test_coverage_splits_the_library_by_the_pass_each_game_has(session: Session)
             "orphan_levels": [{"elo": 1234, "games": 1}],
         },
         "estimates": {
-            "quick_seconds": None,
-            "deep_seconds": None,
+            "analysis_seconds": None,
             "maia_seconds": None,
             "concurrency": 3,
         },
@@ -2538,22 +2652,27 @@ def test_coverage_splits_the_library_by_the_pass_each_game_has(session: Session)
 
 
 def test_the_estimate_averages_only_the_budget_that_is_configured_now(session: Session) -> None:
-    """The 447 deep runs from an experiment at 500 nodes are not what a pass costs today."""
+    """Runs at an old budget, and runs somebody asked for, are not what a backfill costs."""
     _engine(session)
     for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
         _finished(session, _game(session, plies=6), seconds=6.0)
     for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
         _finished(session, _game(session, plies=6), seconds=60.0, nodes=500)
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
+        # Today's node budget, but a person's run: not what the import pass is sampled from.
+        _finished(session, _game(session, plies=6), analysis.REQUESTED_PRIORITY, seconds=60.0)
+    for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
+        _finished(session, _game(session, plies=6), seconds=60.0, depth=30)
     _game(session, plies=4)
 
-    estimate = analysis.coverage(session)["estimates"]["quick_seconds"]
+    estimate = analysis.coverage(session)["estimates"]["analysis_seconds"]
 
     # A second per ply over the four plies with no pass — not the 5.5 the two budgets
     # averaged together would have promised.
     assert estimate == pytest.approx(4.0)
 
 
-def test_the_estimate_includes_work_of_that_tier_already_in_the_queue(session: Session) -> None:
+def test_the_estimate_includes_import_work_already_in_the_queue(session: Session) -> None:
     """After Backfill is pressed, its remaining time must not collapse to zero."""
     _engine(session)
     for _ in range(analysis.ESTIMATE_MIN_SAMPLES):
@@ -2561,7 +2680,7 @@ def test_the_estimate_includes_work_of_that_tier_already_in_the_queue(session: S
     _finished(session, _game(session, plies=4), status=RunStatus.QUEUED)
     _game(session, plies=2)
 
-    estimate = analysis.coverage(session)["estimates"]["quick_seconds"]
+    estimate = analysis.coverage(session)["estimates"]["analysis_seconds"]
 
     # A second per ply over four already queued plies plus two not queued yet.
     assert estimate == pytest.approx(6.0)
@@ -2576,16 +2695,17 @@ def test_coverage_scans_each_library_wide_source_once(
     settled_original = analysis._settled_maia_levels
     missing_original = analysis._missing_games
     settled_calls = 0
-    missing_calls: list[Tier] = []
+    missing_calls = 0
 
     def counted_settled(*args: Any, **kwargs: Any) -> dict[int, set[str]]:
         nonlocal settled_calls
         settled_calls += 1
         return settled_original(*args, **kwargs)
 
-    def counted_missing(tier: Tier, **kwargs: Any) -> Any:
-        missing_calls.append(Tier(tier))
-        return missing_original(tier, **kwargs)
+    def counted_missing(**kwargs: Any) -> Any:
+        nonlocal missing_calls
+        missing_calls += 1
+        return missing_original(**kwargs)
 
     monkeypatch.setattr(analysis, "_settled_maia_levels", counted_settled)
     monkeypatch.setattr(analysis, "_missing_games", counted_missing)
@@ -2593,7 +2713,7 @@ def test_coverage_scans_each_library_wide_source_once(
     analysis.coverage(session)
 
     assert settled_calls == 1
-    assert missing_calls == [Tier.QUICK, Tier.DEEP]
+    assert missing_calls == 1
 
 
 def test_the_estimate_is_none_until_there_is_history_worth_averaging(session: Session) -> None:
@@ -2603,8 +2723,7 @@ def test_the_estimate_is_none_until_there_is_history_worth_averaging(session: Se
     _game(session, plies=4)
 
     assert analysis.coverage(session)["estimates"] == {
-        "quick_seconds": None,
-        "deep_seconds": None,
+        "analysis_seconds": None,
         "maia_seconds": None,
         "concurrency": app_settings.get_analysis_concurrency(session),
     }
@@ -2615,7 +2734,7 @@ def test_the_fill_is_priced_off_the_fills_this_deployment_has_finished(
 ) -> None:
     """The third button's estimate: fill seconds per ply, over the plies still missing a level.
 
-    A fill searches nothing, so the quick tier's per-ply cost is no guide to it at all —
+    A fill searches nothing, so the analysis pass's per-ply cost is no guide to it at all —
     the sample is `maia_only` runs and the games priced are the ones `maia_fill_targets`
     would queue.
     """
@@ -2641,12 +2760,12 @@ def test_the_fill_is_priced_off_the_fills_this_deployment_has_finished(
 
     estimate = analysis.coverage(session)["estimates"]["maia_seconds"]
 
-    # Half a second a ply over four new and two queued plies — not the ten a quick pass costs.
+    # Half a second a ply over four new and two queued plies — not the ten a search costs.
     assert estimate == pytest.approx(3.0)
 
 
 def test_the_fill_estimate_ignores_the_passes_that_searched(session: Session) -> None:
-    """Five finished quick passes and no fill measure nothing about what a fill costs."""
+    """Five finished analysis passes and no fill measure nothing about what a fill costs."""
     _engine(session)
     _maia(session)
     app_settings.set_maia_elos(session, [1500])
@@ -2679,10 +2798,16 @@ def test_a_run_listing_has_to_narrow_by_something(session: Session) -> None:
         analysis.list_runs(session)
 
 
-def test_a_retry_is_a_new_run_under_the_tier_that_failed(session: Session) -> None:
-    _engine(session)
+def test_a_retry_is_a_new_copy_of_the_run_that_failed(session: Session) -> None:
+    """Its engine, limit, window, lines, Maia pass and priority — the same request again."""
+    engine = _engine(session)
+    other = _engine(session, name="Leela")
     game = _game(session)
-    failed = _finished(session, game, Tier.DEEP, status=RunStatus.FAILED)
+    failed = analysis.request_analysis(
+        session, game_id=game.id, engine_id=other.id, seconds=3.0, multipv=4, ply_range=(2, 5)
+    )
+    failed.attempts = analysis.MAX_ATTEMPTS
+    analysis.fail_run(session, failed, "engine died")
 
     assert analysis.retry_failed(session) == {"queued": 1, "skipped": 0}
 
@@ -2690,9 +2815,45 @@ def test_a_retry_is_a_new_run_under_the_tier_that_failed(session: Session) -> No
         select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
     ).one()
     assert queued.id != failed.id
-    assert (queued.game_id, queued.tier) == (game.id, Tier.DEEP)
+    assert (
+        queued.game_id,
+        queued.engine_id,
+        queued.nodes,
+        queued.depth,
+        queued.seconds,
+        queued.multipv,
+        queued.ply_start,
+        queued.ply_end,
+        queued.maia,
+        queued.priority,
+    ) == (game.id, other.id, None, None, 3.0, 4, 2, 5, failed.maia, analysis.REQUESTED_PRIORITY)
+    assert queued.engine_id != engine.id
     # The failure stays where it is: it is the record of what went wrong.
     assert session.get(AnalysisRun, failed.id).status is RunStatus.FAILED
+
+
+def test_a_retry_moves_an_import_pass_to_the_roles_engine_but_not_a_requested_run(
+    session: Session,
+) -> None:
+    """The queue's own work takes whatever holds the role; a person's run named its engine."""
+    engine = _engine(session)
+    gone = _engine(session, name="Gone")
+    imported_game, requested_game = _game(session, plies=4), _game(session, plies=6)
+    imported = _finished(session, imported_game, status=RunStatus.FAILED)
+    imported.engine_id = gone.id
+    requested = _finished(
+        session, requested_game, analysis.REQUESTED_PRIORITY, status=RunStatus.FAILED, depth=24
+    )
+    requested.engine_id = gone.id
+    gone.enabled = False
+    session.commit()
+
+    assert analysis.retry_failed(session) == {"queued": 1, "skipped": 1}
+
+    queued = session.scalars(
+        select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
+    ).one()
+    assert (queued.game_id, queued.engine_id) == (imported_game.id, engine.id)
 
 
 def test_a_retry_skips_a_game_that_already_has_a_live_run(session: Session) -> None:
@@ -2703,6 +2864,50 @@ def test_a_retry_skips_a_game_that_already_has_a_live_run(session: Session) -> N
 
     assert analysis.retry_failed(session) == {"queued": 0, "skipped": 1}
     assert analysis.list_runs(session, game.id, status=RunStatus.QUEUED) == []
+
+
+def test_a_retry_is_not_answered_by_the_import_pass_done_before_the_request(
+    session: Session,
+) -> None:
+    """Every game has its import pass before somebody asks for more; that pass is not the ask."""
+    engine = _engine(session)
+    game = _game(session)
+    _finished(session, game)
+    failed = _finished(
+        session, game, analysis.REQUESTED_PRIORITY, status=RunStatus.FAILED, depth=30
+    )
+    failed.engine_id = engine.id
+    session.commit()
+
+    assert analysis.retry_failed(session, [failed.id]) == {"queued": 1, "skipped": 0}
+    queued = session.scalars(
+        select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED)
+    ).one()
+    assert (queued.depth, queued.priority) == (30, analysis.REQUESTED_PRIORITY)
+
+
+def test_a_retry_takes_back_a_failed_request_and_a_failed_import_pass_on_one_game(
+    session: Session,
+) -> None:
+    """Two different asks over the same window: neither stands in for the other."""
+    engine = _engine(session)
+    game = _game(session)
+    requested = _finished(
+        session, game, analysis.REQUESTED_PRIORITY, status=RunStatus.FAILED, depth=30
+    )
+    requested.engine_id = engine.id
+    _finished(session, game, status=RunStatus.FAILED)
+
+    assert analysis.retry_failed(session) == {"queued": 2, "skipped": 0}
+
+
+def test_a_retry_skips_a_request_that_has_been_made_again_since(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    _finished(session, game, analysis.REQUESTED_PRIORITY, status=RunStatus.FAILED, depth=30)
+    _finished(session, game, analysis.REQUESTED_PRIORITY, depth=30)
+
+    assert analysis.retry_failed(session) == {"queued": 0, "skipped": 1}
 
 
 def test_a_retry_can_be_narrowed_to_the_runs_that_were_named(session: Session) -> None:

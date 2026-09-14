@@ -36,8 +36,8 @@ Reihenfolge.
   Baum der Kandidatenzüge, das Abschließen. Aus, bis du es einschaltest.
 - [Bibliothek](guide/library.md) – Import von Lichess, Chess.com, FICS und PGN, automatische
   Synchronisierung, Export, Sicherung, Zurücksetzen.
-- [Analyse](guide/analysis.md) – Schnell- und Tiefenanalyse, Maia, Abdeckung, Budgets, was
-  als grober Patzer gilt.
+- [Analyse](guide/analysis.md) – Importanalyse und eigene Analysen, Maia, Abdeckung, Budgets,
+  was als grober Patzer gilt.
 - Rechenleistung ist der nächste Eintrag in der Seitenleiste, Engines und Maschinen; beide
   sind unter Betrieb beschrieben, in [Engines](operate/engines.md) und
   [Maschinen](operate/runners.md).
@@ -53,7 +53,7 @@ Für alle, die die Installation betreiben.
   Anmeldung.
 - [Hinter einem Proxy](operate/deploy.md) – Reverse Proxy und TLS, die öffentliche URL, der
   schreibgeschützte Modus.
-- [Engines](operate/engines.md) – Stockfish und Maia, die drei Rollen, was ein Prozess kostet.
+- [Engines](operate/engines.md) – Stockfish und Maia, die zwei Rollen, was ein Prozess kostet.
 - [Maschinen](operate/runners.md) – wie viel gleichzeitig läuft, und Engines auf einem anderen Rechner.
 - [Konfiguration](operate/configuration.md) – alle Umgebungsvariablen.
 - [Kommandozeile](operate/cli.md) – alle Befehle und Optionen.

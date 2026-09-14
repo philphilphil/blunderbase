@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, NamedTuple
 
-from sqlalchemy import Integer, and_, func, or_, select
+from sqlalchemy import Integer, and_, case, func, or_, select
 from sqlalchemy.orm import Session, undefer
 
 from backend.db.enums import Classification, Color, EngineKind, RunStatus
@@ -154,7 +154,6 @@ class EvalRow(NamedTuple):
     best_move_uci: str | None
     fen: str | None
     run_id: int
-    tier: str
 
 
 @dataclass(slots=True)
@@ -566,7 +565,6 @@ def _worst_entry(row: EvalRow) -> dict[str, Any]:
         "win_loss": row.win_loss,
         "fen": row.fen,
         "best_move_uci": row.best_move_uci,
-        "tier": row.tier,
     }
 
 
@@ -591,7 +589,6 @@ def _moment_of(game: Game, entry: Mapping[str, Any], run_id: int) -> dict[str, A
         "best_move_uci": entry["best_move_uci"],
         "best_move_san": best_move_san(entry["fen"], entry["best_move_uci"]),
         "run_id": run_id,
-        "tier": entry["tier"],
     }
 
 
@@ -948,17 +945,27 @@ def _hashable(value: Any) -> Any:
     return value
 
 
-def primary_runs(game_id: int | None = None) -> Any:
-    """The one run per game that stats read: the newest done full-game UCI pass.
+# What a requested run's id is lifted by when `primary_runs` ranks runs in one integer.
+_REQUESTED_LIFT = 1 << 40
 
-    A run over a ply range is deliberately excluded — a deep pass over the endgame would
-    otherwise shadow the quick pass for the plies it covers and leave the game's numbers
+
+def primary_runs(game_id: int | None = None) -> Any:
+    """The one run per game that stats read: the last done full-game UCI pass by rank.
+
+    Rank is `games.run_rank`, `(priority > 0, id)`: a whole-game run somebody asked for
+    beats every import pass, and among equals the newer one wins. SQL has no tuple max, so
+    the key is folded into one integer — the id, lifted by `_REQUESTED_LIFT` for a
+    requested run — and the lift is taken off again with a modulo. Ids never come near
+    2**40, so the fold cannot mix the two halves up.
+
+    A run over a ply range is deliberately excluded — a requested look at the endgame would
+    otherwise shadow the import pass for the plies it covers and leave the game's numbers
     half from one engine budget and half from another. Maia runs are excluded too: they
     predict a human move, they do not judge one. That is two conditions and not one, because
-    a Maia pass wears the engine it was queued under: a `maia_only` fill runs on the quick
-    tier's Stockfish row, so only the flag says it stored policies and no evaluations. Were
-    it allowed to become primary, filling in a level would silently empty out every number
-    folded from the search that came before it.
+    a Maia pass wears the engine it was queued under: a `maia_only` fill runs on the
+    analysis role's Stockfish row, so only the flag says it stored policies and no
+    evaluations. Were it allowed to become primary, filling in a level would silently empty
+    out every number folded from the search that came before it.
 
     `game_id` narrows the same definition to one game, which is what turns a fold of one
     game's summary from a grouped pass over every run in the library into an index lookup.
@@ -966,8 +973,11 @@ def primary_runs(game_id: int | None = None) -> Any:
     selects for it.
     """
     conditions = [] if game_id is None else [AnalysisRun.game_id == game_id]
+    ranked = case(
+        (AnalysisRun.priority > 0, AnalysisRun.id + _REQUESTED_LIFT), else_=AnalysisRun.id
+    )
     return (
-        select(func.max(AnalysisRun.id))
+        select(func.max(ranked) % _REQUESTED_LIFT)
         .select_from(AnalysisRun)
         .outerjoin(Engine, AnalysisRun.engine_id == Engine.id)
         .where(
@@ -1026,7 +1036,6 @@ def _eval_rows(
             MoveEval.best_move_uci,
             Position.fen,
             AnalysisRun.id,
-            AnalysisRun.tier,
         )
         .select_from(MoveEval)
         .join(AnalysisRun, MoveEval.run_id == AnalysisRun.id)
@@ -1060,7 +1069,6 @@ def _eval_rows(
             best_move_uci=row[6],
             fen=row[7],
             run_id=row[8],
-            tier=str(row[9]),
         )
         for row in session.execute(statement)
     ]

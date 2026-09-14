@@ -171,9 +171,9 @@ describe('InfiniteAnalysisPanel', () => {
     resetLinePreviewPrefs()
   })
 
-  it('offers setup after continuous analysis is refused for an unassigned deep role', async () => {
+  it('offers setup after continuous analysis is refused for an unassigned analysis role', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ roles: [
-      { role: 'deep', configured: false, available: false },
+      { role: 'analysis', configured: false, available: false },
     ] }), { status: 200, headers: { 'content-type': 'application/json' } })))
     render(<InfiniteAnalysisPanel fen={SICILIAN} ply={3} stream={streamApi({
       phase: 'error',
@@ -196,10 +196,10 @@ describe('InfiniteAnalysisPanel', () => {
   })
 
   it('leaves an engine that is merely away to the toast that names it', async () => {
-    // Deep *is* assigned — the engine holding it is on a machine that is not connected.
+    // The analysis role *is* assigned — the engine holding it is on a machine that is not connected.
     // Browser Stockfish is not what that deployment is missing, so no dialog is offered.
     const roles = vi.fn(async () => new Response(JSON.stringify({ roles: [
-      { role: 'deep', configured: true, available: false },
+      { role: 'analysis', configured: true, available: false },
     ] }), { status: 200, headers: { 'content-type': 'application/json' } }))
     vi.stubGlobal('fetch', roles)
     render(<InfiniteAnalysisPanel fen={SICILIAN} ply={3} stream={streamApi({
@@ -488,12 +488,12 @@ describe('InfiniteAnalysisPanel', () => {
     // The queue-only engine is not offered at all — the picker is a choice, not a roster.
     expect(within(picker).queryByRole('option', { name: /sf-remote/ })).not.toBeInTheDocument()
     expect(within(picker).getByRole('option', { name: 'stockfish · local' })).toBeEnabled()
-    // The default is the deep tier, resolved by the server.
+    // The default is the analysis role's engine, resolved by the server.
     expect(picker).toHaveValue('')
-    expect(within(picker).getByRole('option', { name: 'deep tier' })).toBeInTheDocument()
+    expect(within(picker).getByRole('option', { name: 'analysis engine' })).toBeInTheDocument()
   })
 
-  it('names the deep tier’s engine once a session has resolved it', () => {
+  it('names the analysis role’s engine once a session has resolved it', () => {
     render(
       <InfiniteAnalysisPanel
         stream={streamApi({ enabled: true, phase: 'running', session: SESSION })}
@@ -501,7 +501,7 @@ describe('InfiniteAnalysisPanel', () => {
       />,
     )
     expect(
-      screen.getByRole('option', { name: 'deep tier — stockfish' }),
+      screen.getByRole('option', { name: 'analysis engine — stockfish' }),
     ).toBeInTheDocument()
   })
 

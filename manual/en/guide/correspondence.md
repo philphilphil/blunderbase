@@ -150,7 +150,7 @@ has already left a verdict on it, stacked one under the other. **Search with…*
 of the column puts another engine on the position.
 
 The picker offers every engine that is switched on and speaks UCI, on this machine and on
-your runners, with the one holding the deep role suggested. A search on a
+your runners, with the one holding the Analysis role suggested. A search on a
 [remote runner](../operate/runners.md)'s engine runs over there, holds one of that runner's
 slots rather than one of this machine's, and is read here exactly as a local
 one. The ones a search cannot run on are greyed rather than hidden, and say why under the
@@ -199,12 +199,12 @@ running or paused there is refused, and a finished game takes no searches at all
 is frozen.
 
 Each search on this machine holds one of its engine slots — **Queue processes** under
-**Compute → Machines** on this server's card, the same slots the quick and deep passes and
+**Compute → Machines** on this server's card, the same slots the analysis passes and
 the analysis boards use — and each search on a runner holds one of that runner's slots,
 shared with its queue work and never taken from a run already going. With all of them busy
 a new search is **queued** and starts by itself the moment one comes free. A search that
 runs for three days holds its slot for three days, and while it does the queue has one
-fewer: an imported game's quick pass waits behind it until you pause or stop it. The
+fewer: an imported game's analysis pass waits behind it until you pause or stop it. The
 capacity strip on this page and the Machines card both show the searches among what is in
 use, so you always know what the queue is waiting for.
 
@@ -244,7 +244,7 @@ gives it back, where a search keeps its own, and it runs wherever the queue has 
 including on a [remote runner](../operate/runners.md). Which engine works it is chosen when it is queued,
 from the same list the search picker shows — and here a runner's engine is not greyed,
 because a task is ordinary queue work and the machine bought for correspondence is usually
-that runner. The engine holding the deep role is suggested.
+that runner. The engine holding the Analysis role is suggested.
 
 A node's menu carries both. **Queue task…** asks for one look at that position and which
 engine should take it. **Expand…** is the one that does the work of an evening:
@@ -263,7 +263,7 @@ browser: the expansion lives on the queued rows and not in the page. **Expand…
 tree does the same for the position you have selected, without going through the menu.
 
 Tasks go into the queue ahead of the automatic pass every imported game gets and behind a
-deep pass you are sitting and waiting for, and among themselves **the nearest deadline is
+run you asked for from a game's **Analyse** and are sitting and waiting for, and among themselves **the nearest deadline is
 worked first** — one game due tomorrow comes out of the queue before one due next week,
 however they were queued. A node with a task waiting on it carries a queue mark; one being
 worked on carries a spinner. **Cancel** takes a waiting task back out of the queue; one an
@@ -381,9 +381,9 @@ game shows it as text instead.
 **Finish…** asks for the result — `1-0`, `0-1` or `½-½` — and, if you want it, how it ended
 (resignation, adjudication, time). Then:
 
-- The quick and the deep pass are queued over the game, as for any game that arrives. A
-  deployment with no engine in a role queues nothing for it and says so; the game still
-  finishes, and you can ask for the pass later.
+- The analysis pass is queued over the game, as for any game that arrives. A deployment
+  with no engine in the Analysis role queues nothing and says so; the game still finishes,
+  and you can ask for a pass later.
 - The deadline is cleared and the game leaves **Your move**.
 - The tree freezes. It is kept with the game and stays readable, but nothing in it can be
   changed again, and it takes no new searches and no new tasks.

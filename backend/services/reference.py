@@ -221,7 +221,7 @@ def import_game(
 
     The PGN is fetched the way `model_game` fetches it and then goes in through the PGN
     adapter and `import_service.import_one`, so the game gets everything a pasted PGN
-    gets: positions, a job row, the quick pass, and the events that refresh the page. Two
+    gets: positions, a job row, the analysis pass, and the events that refresh the page. Two
     things are set by hand. The source is the book it came from, with the book's own id,
     so the game is found again by name (asking twice opens the same row) and a lichess
     game keeps the link to its original. And `presume_owner` is off: unless an owner

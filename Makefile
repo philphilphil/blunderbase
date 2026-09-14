@@ -128,7 +128,7 @@ MAIA_ARGS = --use-uci-history$(if $(MAIA_MODELS), --cache-dir $(MAIA_MODELS) --l
 
 engines: migrate
 	uv run blunderbase engines add stockfish-local "$(SF)" \
-		--option Threads=$(SF_THREADS) --role quick --role deep --replace
+		--option Threads=$(SF_THREADS) --role analysis --replace
 	@if [ -n "$(MAIA)" ]; then \
 		uv run blunderbase engines add maia-local "$(MAIA) $(MAIA_ARGS)" \
 			--kind maia --role human --replace; \

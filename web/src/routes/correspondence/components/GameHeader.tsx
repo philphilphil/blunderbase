@@ -185,8 +185,8 @@ export function FinishDialog({
           </h2>
           <p className="text-[0.75rem] leading-[1.65] text-dim">
             <Trans>
-              It becomes a library game: the quick and deep passes are queued, it counts in
-              the statistics, and the tree stays attached to it — read-only from here on.
+              It becomes a library game: its analysis pass is queued, it counts in the
+              statistics, and the tree stays attached to it — read-only from here on.
             </Trans>
           </p>
         </div>

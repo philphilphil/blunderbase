@@ -65,13 +65,13 @@ class CoachError(Exception):
 
 
 # Service failures that mean something specific to a caller. Ordered most specific first:
-# `UnknownRunError` is also an `AnalysisError`, and `TierUnavailableError` is also an
+# `UnknownRunError` is also an `AnalysisError`, and `EngineUnavailableError` is also an
 # `EngineServiceError`.
 TRANSLATIONS: tuple[tuple[type[Exception], str], ...] = (
     (analysis_service.UnknownRunError, UNKNOWN_RUN),
     (analysis_service.AnalysisRequestError, BAD_ARGUMENT),
     (analysis_service.AnalysisError, ENGINE_FAILED),
-    (engines_service.TierUnavailableError, ENGINE_UNAVAILABLE),
+    (engines_service.EngineUnavailableError, ENGINE_UNAVAILABLE),
     # A deployment with no local Maia has less to answer with, not a broken tool: the code
     # is the one a coach already knows for "there is no engine here to ask".
     (maia_live_service.LivePolicyRequestError, BAD_FEN),

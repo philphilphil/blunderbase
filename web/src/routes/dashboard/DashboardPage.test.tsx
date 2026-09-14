@@ -36,7 +36,7 @@ const CARDS: GameCardList = {
       eco: 'B02',
       opening: 'Alekhine Defense: Maróczy Variation',
       analyzed: true,
-      deep: true,
+      requested: true,
       eval_curve: [],
       worst_moments: [{ ply: 23, san: 'Ba6', classification: 'blunder', win_loss: 44.2 }],
     },
@@ -49,7 +49,7 @@ const CARDS: GameCardList = {
       eco: 'B22',
       opening: 'Sicilian, Alapin',
       analyzed: false,
-      deep: false,
+      requested: false,
       eval_curve: [],
       worst_moments: [],
     },
@@ -94,9 +94,9 @@ describe('RecentGamesList — component states (design 2a rail)', () => {
     expect(game).toHaveTextContent('1272')
     // 44.2 win percentage points given away, written the way the move list writes it.
     expect(game).toHaveTextContent('−44.2%')
-    // Opening/source/tier moved off the row and into the tooltip.
+    // Opening/source/analysis moved off the row and into the tooltip.
     expect(game).toHaveAttribute('title', expect.stringContaining('B02'))
-    expect(game).toHaveAttribute('title', expect.stringContaining('deep'))
+    expect(game).toHaveAttribute('title', expect.stringMatching(/· analysed$/))
   })
 
   it('marks a game no engine has been over as unanalysed, with no swing to show', () => {
@@ -140,6 +140,6 @@ describe('RecentGamesList — component states (design 2a rail)', () => {
     // The game, and the app's own bookkeeping about it, stay.
     expect(game).toHaveTextContent('L')
     expect(game).toHaveTextContent('1272')
-    expect(game).toHaveAttribute('title', expect.stringContaining('deep'))
+    expect(game).toHaveAttribute('title', expect.stringMatching(/· analysed$/))
   })
 })

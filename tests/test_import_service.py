@@ -18,7 +18,6 @@ from backend.db.enums import (
     Result,
     RunStatus,
     Source,
-    Tier,
 )
 from backend.db.models import (
     Account,
@@ -426,7 +425,9 @@ def test_an_account_on_another_platform_does_not_claim_a_platform_game(session: 
     assert index.match(Source.PGN, "") == (None, False)
 
 
-def test_an_import_enqueues_a_quick_run_per_game(session: Session, fixtures_dir: Path) -> None:
+def test_an_import_enqueues_an_import_pass_per_game(session: Session, fixtures_dir: Path) -> None:
+    """At import priority and the import budget: nodes alone, the configured lines, and
+    no tier written — the column is only read for old rows now."""
     engine = _add_engine(session)
 
     import_service.run_import(session, "pgn", path=_multi_game(fixtures_dir))
@@ -434,9 +435,13 @@ def test_an_import_enqueues_a_quick_run_per_game(session: Session, fixtures_dir:
     runs = list(session.scalars(select(AnalysisRun)))
     assert len(runs) == 3
     assert {run.status for run in runs} == {RunStatus.QUEUED}
-    assert {run.tier for run in runs} == {Tier.QUICK}
+    assert {run.tier for run in runs} == {None}
     assert {run.engine_id for run in runs} == {engine.id}
-    assert {run.priority for run in runs} == {import_service.QUICK_PRIORITY}
+    assert {run.priority for run in runs} == {import_service.IMPORT_PRIORITY}
+    assert {(run.nodes, run.depth, run.seconds) for run in runs} == {
+        (app_settings.ANALYSIS_NODES_DEFAULT, None, None)
+    }
+    assert {run.multipv for run in runs} == {app_settings.ANALYSIS_MULTIPV_DEFAULT}
 
 
 def test_an_import_that_skips_evaluation_stores_the_games_and_queues_nothing(
@@ -468,7 +473,7 @@ def test_a_later_import_still_evaluates_after_one_that_skipped_it(
     assert _count(session, AnalysisRun) == 1
 
 
-def test_an_import_queues_against_the_engine_assigned_to_the_quick_tier(
+def test_an_import_queues_against_the_engine_assigned_to_the_analysis_role(
     session: Session, fixtures_dir: Path
 ) -> None:
     engine = _add_engine(session)
@@ -491,9 +496,9 @@ def test_no_enabled_engine_means_no_run_and_a_clean_import(
     assert _count(session, AnalysisRun) == 0
 
 
-def test_a_maia_engine_is_never_the_quick_stand_in(session: Session) -> None:
+def test_a_maia_engine_is_never_the_analysis_stand_in(session: Session) -> None:
     _add_engine(session, name="Maia 1700", kind=EngineKind.MAIA)
-    assert import_service.quick_tier_engine(session) is None
+    assert import_service.analysis_role_engine(session) is None
 
 
 def test_progress_events_report_every_game_and_the_end(

@@ -394,13 +394,6 @@ function GroupPanel({
             yes={t`Analysed`}
             no={t`Unanalysed`}
           />
-          <PopoverLabel>
-            <Trans>Deep pass done</Trans>
-          </PopoverLabel>
-          <TriState
-            value={filters.deep_analyzed}
-            onChange={(deep_analyzed) => patch({ deep_analyzed })}
-          />
         </>
       )
   }

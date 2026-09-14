@@ -85,10 +85,12 @@ export type BoardAction =
   | 'play-best'
   | 'type-move'
   | 'board-settings'
-  | 'queue-quick'
-  | 'queue-deep'
+  | 'analyse'
   | 'copy-pgn'
-  | 'toggle-move-tab'
+  | 'maia-compare'
+  | 'graph-eval'
+  | 'graph-time'
+  | 'book-tab'
   | 'autoplay'
   | 'previous-game'
   | 'next-game'
@@ -257,6 +259,38 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     keys: ['E'],
     label: msg`The live engine on this position`,
   },
+  // One key per pane, named after what it opens: `L` for Maia's levels (`M` types a move,
+  // `H` is hints), `V` for the eValuation (`E` is the live engine), `T` for time, `B` for
+  // book. A key that opens a tab opens it rather than cycling, so pressing it twice never
+  // lands somewhere else.
+  {
+    section: BOARD,
+    action: 'maia-compare',
+    press: ['l', 'L'],
+    keys: ['L'],
+    label: msg`Maia — every level side by side, or back to one`,
+  },
+  {
+    section: BOARD,
+    action: 'graph-eval',
+    press: ['v', 'V'],
+    keys: ['V'],
+    label: msg`The evaluation graph`,
+  },
+  {
+    section: BOARD,
+    action: 'graph-time',
+    press: ['t', 'T'],
+    keys: ['T'],
+    label: msg`The move-time graph`,
+  },
+  {
+    section: BOARD,
+    action: 'book-tab',
+    press: ['b', 'B'],
+    keys: ['B'],
+    label: msg`Your book for this position`,
+  },
   {
     section: BOARD,
     action: 'play-best',
@@ -264,6 +298,8 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     keys: ['↵'],
     label: msg`Play the engine’s move onto the board`,
   },
+  // `M` as on Lichess, where the same key opens the same box: a reader who plays there has
+  // it in their hand already.
   {
     section: BOARD,
     action: 'type-move',
@@ -294,19 +330,14 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     keys: ['N'],
     label: msg`Write a note about this position`,
   },
+  // One key for one dialog rather than a key per kind of run: what to stop at, how many
+  // lines and which moves are choices, and a key cannot carry them.
   {
     section: GAME,
-    action: 'queue-quick',
-    press: ['q', 'Q'],
-    keys: ['Q'],
-    label: msg`Queue a quick pass`,
-  },
-  {
-    section: GAME,
-    action: 'queue-deep',
-    press: ['d', 'D'],
-    keys: ['D'],
-    label: msg`Queue a deep pass`,
+    action: 'analyse',
+    press: ['a', 'A'],
+    keys: ['A'],
+    label: msg`Analyse this game…`,
   },
   {
     section: GAME,
@@ -314,13 +345,6 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     press: ['c', 'C'],
     keys: ['C'],
     label: msg`Copy the PGN`,
-  },
-  {
-    section: GAME,
-    action: 'toggle-move-tab',
-    press: ['t', 'T'],
-    keys: ['T'],
-    label: msg`Swap the move column between Moves and Flagged`,
   },
 ]
 

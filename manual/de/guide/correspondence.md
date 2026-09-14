@@ -162,7 +162,7 @@ rechnet oder schon ein Urteil zu ihm hinterlassen hat, gestapelt untereinander.
 **Suchen mit …** oben in der Spalte setzt eine weitere Engine auf die Stellung.
 
 Zur Auswahl steht jede Engine, die eingeschaltet ist und UCI spricht, auf diesem Rechner
-und auf deinen Runnern; vorgeschlagen wird die mit der Rolle Tiefenanalyse. Eine Suche auf
+und auf deinen Runnern; vorgeschlagen wird die mit der Rolle Analyse. Eine Suche auf
 der Engine eines [Remote Runners](../operate/runners.md) läuft dort drüben, belegt einen
 Slot dieses Runners statt einen dieses Rechners und wird hier genau wie eine
 lokale gelesen. Die, auf denen keine Suche laufen kann, sind ausgegraut statt versteckt und
@@ -218,12 +218,12 @@ Partie nimmt gar keine Suche mehr an, ihr Baum ist eingefroren.
 
 Jede Suche auf diesem Rechner belegt einen seiner Engine-Plätze – die
 **Warteschlangenprozesse** unter **Rechenleistung → Maschinen** auf der Karte dieses
-Servers, dieselben Plätze, die Schnell- und Tiefenanalysen und die Analysebretter nutzen –,
+Servers, dieselben Plätze, die die Analysedurchläufe und die Analysebretter nutzen –,
 und jede Suche auf einem Runner belegt einen Slot dieses Runners, geteilt mit seiner
 Warteschlangenarbeit und nie einem laufenden Durchlauf weggenommen. Sind alle belegt, wird
 die Suche **eingereiht** und startet von selbst, sobald einer frei wird. Eine Suche, die
 drei Tage läuft, hält ihren Platz drei Tage, und solange hat die Warteschlange einen
-weniger: Die Schnellanalyse einer importierten Partie wartet hinter ihr, bis du sie
+weniger: Die Analyse einer importierten Partie wartet hinter ihr, bis du sie
 pausierst oder stoppst. Die Kapazitätsleiste dieser Seite und die Karte unter Maschinen
 zählen die Suchen beide zu dem, was belegt ist, du weißt also immer, worauf die
 Warteschlange wartet.
@@ -269,7 +269,7 @@ eine Suche ihren behält, und sie läuft dort, wo die Warteschlange Platz hat �
 Einreihen, aus derselben Liste, die auch die Suche zeigt – nur ist hier die Engine eines
 Runners nicht ausgegraut, denn eine Aufgabe ist gewöhnliche Warteschlangenarbeit, und die
 für Fernschach gekaufte Maschine ist meist dieser Runner. Vorgeschlagen wird die Engine mit
-der Rolle Tiefenanalyse.
+der Rolle Analyse.
 
 Das Menü eines Knotens trägt beides. **Aufgabe einreihen …** bittet um einen Blick auf diese
 Stellung und fragt, welche Engine ihn tun soll. **Erweitern …** ist das, was die Arbeit
@@ -290,7 +290,8 @@ den eingereihten Zeilen und nicht in der Seite. **Erweitern …** über dem Baum
 für die Stellung, die du gewählt hast, ohne den Umweg über das Menü.
 
 Aufgaben stehen in der Warteschlange vor der automatischen Analyse jeder importierten Partie
-und hinter einer Tiefenanalyse, auf die du gerade wartest, und untereinander gilt: **die
+und hinter einer Analyse, die du über **Analysieren** in einer Partie angefordert hast und
+auf die du gerade wartest, und untereinander gilt: **die
 nächste Frist zuerst**. Eine Partie, die morgen fällig ist, kommt vor einer, die nächste
 Woche fällig ist – gleich in welcher Reihenfolge sie eingereiht wurden. Ein Knoten, auf dem
 eine Aufgabe wartet, trägt eine Warteschlangenmarke; einer, an dem gerechnet wird, einen
@@ -417,10 +418,9 @@ er gehört zum eingefrorenen Baum, und eine beendete Partie zeigt ihn nur noch a
 **Beenden…** fragt nach dem Ergebnis – `1-0`, `0-1` oder `½-½` – und, wenn du magst, wie die
 Partie ausging (Aufgabe, Schiedsspruch, Zeit). Danach:
 
-- Schnell- und Tiefenanalyse werden über die Partie eingereiht, wie bei jeder ankommenden
-  Partie. Ist für eine Rolle keine Engine eingerichtet, wird dafür nichts eingereiht und die
-  Meldung sagt es; die Partie ist trotzdem beendet, und den Durchlauf kannst du später
-  nachholen.
+- Der Analysedurchlauf wird über die Partie eingereiht, wie bei jeder ankommenden Partie.
+  Hat die Rolle Analyse keine Engine, wird nichts eingereiht und die Meldung sagt es; die
+  Partie ist trotzdem beendet, und eine Analyse kannst du später nachholen.
 - Die Frist wird gelöscht und die Partie verlässt **Du bist am Zug**.
 - Der Baum friert ein. Er bleibt bei der Partie und lesbar, aber nichts darin lässt sich
   noch ändern, und er nimmt weder eine neue Suche noch eine neue Aufgabe mehr an.

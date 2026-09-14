@@ -53,7 +53,7 @@ Sie steht sofort unter **Partien**, noch ohne Züge und ohne Ergebnis, die
 Synchronisierungs-Historie darunter führt sie als Lauf mit einer Partie unter ihrer Quelle,
 und sie wächst Zug um Zug mit dem, was du einträgst. Solange sie läuft, wird sie nicht
 analysiert – ihr Baum ist der Ort, an dem die Arbeit der Engines liegt –, und beim
-Abschließen werden der übliche schnelle und tiefe Durchgang eingereiht. Danach liest sie
+Abschließen wird der übliche Analysedurchlauf eingereiht. Danach liest sie
 sich wie jede andere Partie.
 
 ### Die Synchronisierungs-Historie

@@ -1,5 +1,5 @@
 /**
- * The engine chips every correspondence dialog chooses from — one list, two modes.
+ * The engine chips every engine dialog chooses from — one list, two modes.
  *
  * `GET /correspondence/status` answers with every enabled UCI engine the deployment has,
  * this host's and the runners', and says per engine why a *search* could not run on it
@@ -8,17 +8,21 @@
  * decides what is greyed: in `search` mode an engine with trouble is shown disabled with
  * the reason under the pointer, because an owner who sees their runner's Stockfish and
  * reads why it cannot search yet knows more than one who never sees it; in `task` mode
- * everything is live.
+ * everything is live. The game's Analyse… dialog reads the same rows from
+ * `GET /analysis/engines`, where `search_trouble` instead says why a *run* would be
+ * refused (a local binary gone, Maia on another host). It picks in `run` mode, which greys
+ * those the way `search` mode greys its own — an engine the press would only bounce off is
+ * not one to preselect — and the dialog spells the reasons out under the chips.
  *
- * The engine flagged `default` is the deep role's, and both modes open on it where the
- * mode allows — the two modes must never suggest different engines for one position.
+ * The engine flagged `default` is the analysis role's, and every mode opens on it where the
+ * mode allows — the modes must never suggest different engines for one position.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 
 import type { CorrespondenceSearchEngine } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
-export type EngineMode = 'search' | 'task'
+export type EngineMode = 'search' | 'task' | 'run'
 
 /** Whether this engine may be chosen in this mode. */
 export function allowed(engine: CorrespondenceSearchEngine, mode: EngineMode): boolean {

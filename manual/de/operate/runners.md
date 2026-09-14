@@ -22,11 +22,11 @@ lässt, zählt gegen sie.
 
 | Einstellung | |
 |---|---|
-| **Warteschlangenprozesse** | Engine-Prozesse, die diese Maschine gleichzeitig laufen lassen darf – Schnell- und Tiefenanalysen, Fernschach-Aufgaben, die Analysebretter und [Fernschachsuchen](../guide/correspondence.md). 1 bis 64; leer heißt die Kerne der Maschine minus zwei |
+| **Warteschlangenprozesse** | Engine-Prozesse, die diese Maschine gleichzeitig laufen lassen darf – Analysedurchläufe, Fernschach-Aufgaben, die Analysebretter und [Fernschachsuchen](../guide/correspondence.md). 1 bis 64; leer heißt die Kerne der Maschine minus zwei |
 
 Eine Fernschachsuche belegt einen davon vom Start bis zur Pause, solange sie läuft, und
 solange hat die Warteschlange einen weniger: Bei vier Prozessen und vier laufenden Suchen
-wartet die Schnellanalyse einer importierten Partie, bis du eine pausierst oder stoppst.
+wartet die Analyse einer importierten Partie, bis du eine pausierst oder stoppst.
 Das ist so gewollt – eine Suche ist auf der Fernschachseite, in ihrer Kapazitätsleiste und
 auf dieser Karte zu sehen, das Warten also nie ein Rätsel –, und deshalb zählt die Karte
 die Suchen zu dem, was belegt ist. Eine eigene Obergrenze für sie gibt es nicht mehr.
@@ -49,8 +49,9 @@ die Maschine übersteigt. Sechs Prozesse eines Stockfish mit vier Threads sind
 vierundzwanzig Threads; auf acht Kernen kommt das ins Schwimmen, und die Zeile sagt es. Senk
 die Obergrenze, oder gib einer Zeile unter Engines weniger Threads. Threads gelten je
 Engine; wie viele Prozesse, gilt je Maschine. Solange der
-[Fernschachmodus](../guide/analysis.md#correspondence) aus ist, werden nur die Engines mit
-den Rollen Schnell und Tief bemessen, weil sonst nichts hier läuft.
+[Fernschachmodus](../guide/analysis.md#correspondence) aus ist, wird nur die Engine mit
+der Rolle Analyse bemessen, weil sonst nichts hier läuft, es sei denn, du wählst in
+**Analysieren** einer Partie eine andere.
 
 Die Slots eines Remote Runners werden beim Registrieren festgelegt und lassen sich auf
 seiner Karte ändern (**Umbenennen oder Größe ändern**); die Threads jener Maschine stehen in
@@ -138,7 +139,7 @@ Jeder Schlüssel, mit seiner Voreinstellung.
 | `options` | `{}` | UCI-Optionen, beim Start gegen das geprüft, was die Datei meldet |
 | `streams` | `true` bei `uci` | Ob diese Engine ein Analysebrett steuern darf. Eine Maia streamt nie, egal was hier steht |
 | `instances` | ein Prozess je Slot | Wie viele Kopien dieser Datei gleichzeitig laufen dürfen |
-| `tier` | – | Wird angenommen und ignoriert. Eine Datei, die vor den Rollen geschrieben wurde, startet trotzdem |
+| `tier` | – | Wird angenommen und ignoriert, egal, was dort steht. Eine Datei aus der Zeit vor den Rollen oder vor dem einen Analysedurchlauf startet trotzdem |
 
 Eine ganze Datei:
 
@@ -188,7 +189,7 @@ einer Slot-Zahl ist ein Fehler und keine Vorliebe, und die Ablehnung nennt das F
 Datei, aus der es kam.
 
 Ein Runner meldet, was er *hat*, und behauptet nichts darüber, wofür er *da ist*. Welche
-Engine Schnell, Tief und Menschliche Züge bedient, wird auf der Seite
+Engine Analyse und Menschliche Züge bedient, wird auf der Seite
 [Engines](engines.md) vergeben.
 
 Vier Werte können aus der Umgebung statt aus der Datei kommen und schlagen die Datei, damit
@@ -278,6 +279,13 @@ Logzeilen.
 | Close-Code `4426` | Die beiden Seiten sprechen nicht dasselbe Runner-Protokoll; der Prozess endet mit `2` |
 | Close-Code `4429` | Dieses Token wurde so oft abgewiesen, dass der Server ihm die Tür zugemacht hat. Weiter anzuklopfen hält sie nur zu – reparier das Token und warte. Ab zehn Fehlschlägen läuft ein Backoff, der sich von einer Sekunde auf eine Minute verdoppelt |
 | im Log steht „polling“ | Der Socket ist dreimal fehlgeschlagen. Der Runner arbeitet weiter, über HTTP, und versucht den Socket jede Minute erneut |
+
+Ein Runner aus der Zeit, bevor eine Analyse bei einer Tiefe oder nach Sekunden enden
+konnte, verbindet sich weiterhin und arbeitet weiter: Er bekommt jeden Durchlauf, der bei
+einem Knotenbudget endet – die Analyse jeder importierten Partie und alles, was in Knoten
+angefordert wurde. Eine angeforderte Analyse mit Tiefe oder Sekunden auf einer seiner
+Engines wartet in der Warteschlange, bis der Runner aktualisiert ist – die Warteschlange
+zeigt sie wartend auf dieser Maschine, und die Lösung ist das Update.
 
 ## Widerrufen { #revoking }
 

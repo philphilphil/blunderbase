@@ -2,8 +2,8 @@
  * The arithmetic the Machines page does for this server: how many threads its cap would
  * use at full load, against the cores it has.
  *
- * One cap, `analysis_concurrency`, because every engine process on the host — a quick or
- * deep pass, an analysis board, a correspondence search — holds one of the same slots.
+ * One cap, `analysis_concurrency`, because every engine process on the host — an analysis
+ * pass, an analysis board, a correspondence search — holds one of the same slots.
  * There used to be a second cap for the searches, added to this one, and the page had to
  * explain that two slots and a concurrency of six were up to eight processes; with one
  * number there is nothing to add. A process costs its engine's `Threads`, so the sum that
@@ -12,8 +12,11 @@
  *
  * The threads a slot costs are the rows' own, priced at the heaviest engine a slot may be
  * holding. While correspondence mode is on that is any enabled search engine here, since a
- * search may run on any of them; off, only the engines holding Quick and Deep ever run, so
- * only they are priced. Nothing set means UCI's own default, one thread.
+ * search may run on any of them; off, the engine holding the analysis role is priced. That
+ * is an approximation: the Analyse dialog may put a single run on any enabled engine, but
+ * the queue's steady load — every import and backfill — is the role's engine, and pricing
+ * every slot at a heavy engine used once a week would cry overrun at a machine that is
+ * fine. Nothing set means UCI's own default, one thread.
  *
  * Pure, so the sentence and the meter the page draws from it can be asserted on their own.
  */
@@ -70,14 +73,15 @@ export function hostBudget({
   roles: Map<number, EngineRoles>
 }): HostBudget {
   const enabledSearch = engines.filter((engine) => engine.enabled && engine.kind === 'uci')
-  // With the mode off only the tiers' engines run here; with nothing assigned the honest
-  // cost is the heaviest engine the queue could be handed, and with no engine at all it is
-  // one thread. With the mode on any slot may be holding any search engine.
-  const tierEngines = enabledSearch.filter((engine) =>
-    (roles.get(engine.id) ?? []).some((role) => role === 'quick' || role === 'deep'),
+  // With the mode off the analysis role's engine is what the queue mostly runs here; with
+  // nothing assigned the honest cost is the heaviest engine the queue could be handed, and
+  // with no engine at all it is one thread. With the mode on any slot may be holding any
+  // search engine.
+  const roleEngines = enabledSearch.filter((engine) =>
+    (roles.get(engine.id) ?? []).includes('analysis'),
   )
   const threads =
-    (correspondenceOn ? 0 : mostThreads(tierEngines)) ||
+    (correspondenceOn ? 0 : mostThreads(roleEngines)) ||
     mostThreads(enabledSearch) ||
     DEFAULT_THREADS
   const allowed = Math.max(0, processes)

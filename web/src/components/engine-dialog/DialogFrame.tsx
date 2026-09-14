@@ -1,11 +1,14 @@
 /**
- * The frame every correspondence dialog wears, and the labelled field inside it.
+ * The frame every engine dialog wears, and the labelled field inside it.
  *
- * Five dialogs now stand on it — new game, import PGN, the opponent's move, search with…,
- * expand… —
- * and they must not each invent their own overlay: a reader who has learned that Escape
- * closes one, that the backdrop closes it, and that the title is what the screen reader
- * announces has learned it for all of them.
+ * The correspondence dialogs — new game, import PGN, the opponent's move, search with…,
+ * expand… — and the game's Analyse… all stand on it, and they must not each invent their
+ * own overlay: a reader who has learned that Escape closes one, that the backdrop closes
+ * it, and that the title is what the screen reader announces has learned it for all of
+ * them. It lives outside either screen because both use it.
+ *
+ * `role="dialog"` is load-bearing beyond accessibility: the game board's keys stand down
+ * while one is open (`useBoardKeys`), so a key pressed on a chip here never moves the board.
  */
 import { useEffect, type ReactNode } from 'react'
 

@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     # and a browser engine falls back to one thread. See `api/web.py`.
     cross_origin_isolation: bool = True
 
-    # Engine processes running at once, shared across tiers. Workers are asyncio tasks in
+    # Engine processes running at once, shared by every kind of run. Workers are asyncio tasks in
     # the API process, so this caps CPU rather than connections. None means the variable
     # is not set, and the number in force is the `analysis_concurrency` app setting (or
     # `default_analysis_concurrency()` when nobody set that either) — this is the override

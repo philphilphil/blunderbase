@@ -1,11 +1,11 @@
-"""The analysis settings the owner changes from the Engine passes and Maia pages.
+"""The analysis settings the owner changes from the Analysis pass and Maia pages.
 
 Everything else Blunderbase is configured with is an environment variable read once at
 boot (`backend/config.py`). These are not: they are the ones a person changes while the
 app is running and expects to take effect on the next thing they click, so they live in
 the database and are read where they are used rather than cached in the process.
 
-There are twenty-four of them, in eight groups, plus two rows that are not settings at all
+There are twenty-one of them, in eight groups, plus two rows that are not settings at all
 (`queue_paused` and `tour_seen`, at the bottom).
 
 **The Maia levels.** The ratings every Maia question is asked at — the ratings the owner
@@ -18,26 +18,28 @@ clamped to what Maia can answer; an install that never changed the Maia page is 
 to the top of that range alone, [2000]. `maia_target_elo` survives as the first of them,
 which is what every caller that only ever wanted one level still reads.
 
-**Where the Maia pass runs at all** — `maia_on_quick`, `maia_on_deep`, `maia_both_sides`,
-each 0 or 1. The Maia pass costs 40-70% of a quick run, so which tiers pay for it is a
-choice rather than a fact about a run. Quick is on by default because it is the pass every
-imported game gets; deep is off, because a deep run would recompute a policy identical to
-the one the quick run stored, and the fill flow (`maia_only`) is what adds levels to a game
-that only ever had a deep pass. `maia_both_sides` off asks Maia about the owner's own moves
-only, which halves what a run pays for it. The two tier flags are read when a run is
-enqueued, alongside its budget; `maia_both_sides` is read per plan, alongside the
-thresholds.
+**Where the Maia pass runs at all** — `maia_on_analysis`, `maia_both_sides`, each 0 or 1.
+The Maia pass costs 40-70% of a node-budget run, so whether a run pays for it is a choice
+rather than a fact about a run. On by default because the analysis pass is what every
+imported game gets, and it is the one place the human-move columns are worth their price;
+one flag rather than one per kind of run, because Maia answers a position rather than a
+search budget, so a run the owner asked for with a longer limit would store the same policy
+the import pass did. The fill flow (`maia_only`) is what adds levels to a game analysed
+without it. `maia_both_sides` off asks Maia about the owner's own moves only, which halves
+what a run pays for it. `maia_on_analysis` is read when a run is enqueued, alongside its
+budget; `maia_both_sides` is read per plan, alongside the thresholds.
 
-**The analysis budgets** — `quick_nodes`, `deep_nodes`, `deep_multipv`. What one position
-costs in each tier, and how many lines a deep run keeps. Read when a run is enqueued, so
-they are the budget of the *next* run rather than of every run ever queued.
+**The analysis budget** — `analysis_nodes`, `analysis_multipv`. What one position costs in
+the pass every imported game gets, and how many lines it keeps; also what the Analyse
+dialog falls back to when a person names no limit or line count. Read when a run is
+enqueued, so they are the budget of the *next* run rather than of every run ever queued.
 
 **The classification thresholds** — `inaccuracy`, `mistake`, `blunder`, in win-percentage
 points lost by the mover. Read per plan, which means a game re-analysed after they moved
 is judged by the new ones and one analysed before it keeps what it was judged by.
 
 **Whether a new game arrives with its engine hidden** — `hide_engine_new_games`, 0 or 1.
-The quick pass still runs over every imported game; what this decides is whether its
+The analysis pass still runs over every imported game; what this decides is whether its
 verdict is *shown* before the owner has read the game themselves. On, every game of the
 owner's that an import stores gets `Game.engine_hidden` set, and the game screen keeps
 every evaluation off it until they press "Show the engine" on that game — the per-game
@@ -64,7 +66,7 @@ used to be a `correspondence_slots` beside it, and it went because a search is v
 wherever the slots are counted, so one number the owner can see beats two to add up.
 
 There is deliberately no engine setting for the mode: every enabled UCI engine is offered
-wherever an engine is chosen, and the deep role's engine is the one preselected.
+wherever an engine is chosen, and the analysis role's engine is the one preselected.
 
 **How many engine processes this host runs at once** — `analysis_concurrency`, the one cap
 the analysis workers, the analysis boards and the correspondence searches on this host all
@@ -78,12 +80,12 @@ cores-minus-two default are put in order. It sizes a pool, and the pool moves wh
 server runs: a save of the settings resizes the running workers (`AnalysisWorkers.resize`),
 so the number on the Machines page is the number in force.
 
-**The engine roles** — `quick_engine_id`, `deep_engine_id`, `human_engine_id`. Which
-engine runs each of the three jobs, chosen by the owner rather than claimed by an engine.
+**The engine roles** — `analysis_engine_id`, `human_engine_id`. Which engine runs each of
+the two jobs, chosen by the owner rather than claimed by an engine.
 They are identities, not numbers with a range, so they are outside `SETTINGS` and outside
 `replace` entirely — there is no clamp that could rescue an engine id, and a save of the
 analysis form must not wipe the deployment's wiring. `services.engines` is where they mean
-something; here they are three rows and their accessors, the way `maia_elos` is.
+something; here they are two rows and their accessors, the way `maia_elos` is.
 
 **The owner's Lichess token** — `lichess_token`, the personal API token the reference
 explorer sends to `explorer.lichess.ovh`, which no longer answers an anonymous request. A
@@ -96,7 +98,7 @@ is stored, never what it is.
 Not one of the settings proper and deliberately not a member of `SETTINGS`: it is a switch over
 the *queue* rather than a number with a clamp, nobody sets it from the analysis form, and
 `replace` rewrites the whole set of keys it knows — so a member would be un-paused by the
-next save of the Engine passes page, which is exactly the bug a pause button must not have.
+next save of the Analysis pass page, which is exactly the bug a pause button must not have.
 Its own read/write pair goes at the row directly, the way the engine roles and `maia_elos`
 do. `services.analysis.claim_next_run` is the only thing that reads it in anger.
 
@@ -134,7 +136,7 @@ from backend.config import (
     default_analysis_concurrency,
     get_settings,
 )
-from backend.db.enums import EngineRole, Tier
+from backend.db.enums import EngineRole
 from backend.db.models import AppSetting
 
 # --- the keys -------------------------------------------------------------
@@ -144,15 +146,13 @@ MAIA_TARGET_ELO = "maia_target_elo"
 # and a range, and this is a set of them, so it is read and written by its own pair of
 # functions rather than through `set_value` / `replace`.
 MAIA_ELOS = "maia_elos"
-# The three switches over the Maia pass itself, each stored as 0 or 1. Ordinary members of
+# The two switches over the Maia pass itself, each stored as 0 or 1. Ordinary members of
 # `SETTINGS`: a flag is a number with a range of one step, and giving it its own machinery
 # would buy nothing but a second way to read a row.
-MAIA_ON_QUICK = "maia_on_quick"
-MAIA_ON_DEEP = "maia_on_deep"
+MAIA_ON_ANALYSIS = "maia_on_analysis"
 MAIA_BOTH_SIDES = "maia_both_sides"
-QUICK_NODES = "quick_nodes"
-DEEP_NODES = "deep_nodes"
-DEEP_MULTIPV = "deep_multipv"
+ANALYSIS_NODES = "analysis_nodes"
+ANALYSIS_MULTIPV = "analysis_multipv"
 INACCURACY_THRESHOLD = "inaccuracy_threshold"
 MISTAKE_THRESHOLD = "mistake_threshold"
 BLUNDER_THRESHOLD = "blunder_threshold"
@@ -171,19 +171,18 @@ CORRESPONDENCE_MULTIPV = "correspondence_multipv"
 ANALYSIS_CONCURRENCY = "analysis_concurrency"
 # What one correspondence *task* costs and how many lines it keeps. A task is the bounded
 # half of the mode — an `AnalysisRun` over one node's position, queued into the ordinary
-# analysis queue — so these two are the task's budget in exactly the sense `quick_nodes`
-# and `deep_multipv` are a pass's: read when the task is queued and copied onto its run.
+# analysis queue — so these two are the task's budget in exactly the sense `analysis_nodes`
+# and `analysis_multipv` are a pass's: read when the task is queued and copied onto its run.
 CORRESPONDENCE_TASK_NODES = "correspondence_task_nodes"
 CORRESPONDENCE_TASK_MULTIPV = "correspondence_task_multipv"
 # Below what depth a stored verdict counts as stale, whatever engine wrote it. The other
 # half of "stale" is the engine's version, which is a comparison rather than a number and
 # so has no setting.
 CORRESPONDENCE_STALE_DEPTH = "correspondence_stale_depth"
-# The three role assignments, each a nullable engine id. Not in `SETTINGS` for the same
+# The two role assignments, each a nullable engine id. Not in `SETTINGS` for the same
 # reason `MAIA_ELOS` is not: those are single numbers with a range and a clamp, and an
 # engine id has neither — the nearest sensible engine to one that is gone is no engine.
-QUICK_ENGINE_ID = "quick_engine_id"
-DEEP_ENGINE_ID = "deep_engine_id"
+ANALYSIS_ENGINE_ID = "analysis_engine_id"
 HUMAN_ENGINE_ID = "human_engine_id"
 
 # The owner's Lichess personal API token, as the reference explorer sends it. Outside
@@ -201,35 +200,36 @@ AUTO_SYNC_MINUTES = "auto_sync_minutes"
 # Whether the owner has been through the orientation tour. Outside `SETTINGS` for the same
 # reason `queue_paused` is: it is a fact about the person rather than a number with a
 # range, and a member of the set `replace` rewrites would be un-seen by the next save of
-# the Engine passes page.
+# the Analysis pass page.
 TOUR_SEEN = "tour_seen"
 
 ROLE_KEYS: dict[EngineRole, str] = {
-    EngineRole.QUICK: QUICK_ENGINE_ID,
-    EngineRole.DEEP: DEEP_ENGINE_ID,
+    EngineRole.ANALYSIS: ANALYSIS_ENGINE_ID,
     EngineRole.HUMAN: HUMAN_ENGINE_ID,
 }
 
 # --- what each one falls back to, and what it may be ----------------------
 
-# The quick pass is the one every imported game gets, so it is where the human-move columns
-# are worth their 40-70%. A deep pass is not: it would recompute a policy identical to the
-# one already stored, since Maia answers a position rather than a search budget. Both sides
-# by default, because "what will a human opposite me fall into" is a question about the
-# positions the opponent moves in.
-MAIA_ON_QUICK_DEFAULT = 1
-MAIA_ON_DEEP_DEFAULT = 0
+# The analysis pass is the one every imported game gets, so it is where the human-move
+# columns are worth their 40-70%. Both sides by default, because "what will a human opposite
+# me fall into" is a question about the positions the opponent moves in.
+MAIA_ON_ANALYSIS_DEFAULT = 1
 MAIA_BOTH_SIDES_DEFAULT = 1
-QUICK_NODES_DEFAULT = 250_000
-DEEP_NODES_DEFAULT = 2_000_000
-DEEP_MULTIPV_DEFAULT = 4
+# Half a million nodes is between what the old quick pass (250k) and deep pass (2M) spent: one
+# pass has to be good enough to stand on its own, since there is no longer a second tier
+# every game is expected to get, and cheap enough that a fresh import of a few thousand
+# games still drains overnight.
+ANALYSIS_NODES_DEFAULT = 500_000
+# Two lines, so a move's classification can say what else was on the board without paying
+# for a full candidate list on every ply of every imported game.
+ANALYSIS_MULTIPV_DEFAULT = 2
 # Lichess's own judgment thresholds: winning-chance deltas of .1/.2/.3 on its -1..1 scale,
 # which on this 0-100 win-percentage scale are 5/10/15 points. Same curve, same cuts, so a
 # game reads the same here as it does on lichess.org until the owner says otherwise.
 INACCURACY_DEFAULT = 5.0
 MISTAKE_DEFAULT = 10.0
 BLUNDER_DEFAULT = 15.0
-# Off: an install that said nothing shows what the quick pass found as soon as it has found
+# Off: an install that said nothing shows what the analysis pass found as soon as it has found
 # it, which is what every game imported before this switch existed already does.
 HIDE_ENGINE_NEW_GAMES_DEFAULT = 0
 # The levels an install that configured nothing asks Maia at: the top of what the model can
@@ -247,9 +247,9 @@ CORRESPONDENCE_MULTIPV_DEFAULT = 3
 ANALYSIS_CONCURRENCY_DEFAULT = default_analysis_concurrency()
 # Forty million nodes is a minute or two of a modern Stockfish on a few cores: long enough
 # that the verdict is worth keeping in the tree, short enough that an expansion of a dozen
-# positions finishes while the owner is still looking at the board. Two orders of magnitude
-# above a deep pass's per-position budget, because a task is one position rather than
-# eighty.
+# positions finishes while the owner is still looking at the board. Almost two orders of
+# magnitude above the analysis pass's per-position budget, because a task is one position
+# rather than eighty.
 CORRESPONDENCE_TASK_NODES_DEFAULT = 40_000_000
 # Three lines, for the reason a search keeps three: expansion turns the first moves of
 # these lines into children, and the question a correspondence player is asking is which of
@@ -263,7 +263,9 @@ CORRESPONDENCE_STALE_DEPTH_DEFAULT = 30
 # no ceiling, because how long the owner is willing to wait is theirs to decide.
 MIN_NODES = 1
 MIN_MULTIPV = 1
-MAX_MULTIPV = 10
+# Five, the same ceiling the Analyse dialog offers and a correspondence search keeps: as many
+# lines as an engine pane can be read at a glance.
+MAX_ANALYSIS_MULTIPV = 5
 # The thresholds are win percentage, which is the whole of the scale.
 MIN_THRESHOLD = 0.0
 MAX_THRESHOLD = 100.0
@@ -319,15 +321,8 @@ SETTINGS: tuple[Setting, ...] = (
         whole=True,
     ),
     Setting(
-        key=MAIA_ON_QUICK,
-        default=MAIA_ON_QUICK_DEFAULT,
-        low=FLAG_OFF,
-        high=FLAG_ON,
-        whole=True,
-    ),
-    Setting(
-        key=MAIA_ON_DEEP,
-        default=MAIA_ON_DEEP_DEFAULT,
+        key=MAIA_ON_ANALYSIS,
+        default=MAIA_ON_ANALYSIS_DEFAULT,
         low=FLAG_OFF,
         high=FLAG_ON,
         whole=True,
@@ -339,13 +334,14 @@ SETTINGS: tuple[Setting, ...] = (
         high=FLAG_ON,
         whole=True,
     ),
-    Setting(key=QUICK_NODES, default=QUICK_NODES_DEFAULT, low=MIN_NODES, high=None, whole=True),
-    Setting(key=DEEP_NODES, default=DEEP_NODES_DEFAULT, low=MIN_NODES, high=None, whole=True),
     Setting(
-        key=DEEP_MULTIPV,
-        default=DEEP_MULTIPV_DEFAULT,
+        key=ANALYSIS_NODES, default=ANALYSIS_NODES_DEFAULT, low=MIN_NODES, high=None, whole=True
+    ),
+    Setting(
+        key=ANALYSIS_MULTIPV,
+        default=ANALYSIS_MULTIPV_DEFAULT,
         low=MIN_MULTIPV,
-        high=MAX_MULTIPV,
+        high=MAX_ANALYSIS_MULTIPV,
         whole=True,
     ),
     Setting(
@@ -654,18 +650,10 @@ def _flag(session: Session, key: str) -> bool:
     return bool(BY_KEY[key].default if value is None else value)
 
 
-def get_maia_on_quick(session: Session) -> bool:
-    """Whether a quick pass queued now also asks the human-move model."""
-    return _flag(session, MAIA_ON_QUICK)
-
-
-def get_maia_on_deep(session: Session) -> bool:
-    """Whether a deep pass queued now also asks the human-move model.
-
-    Off unless the owner turns it on: Maia answers a position rather than a search budget,
-    so a deep run's policy is the quick run's policy computed a second time.
-    """
-    return _flag(session, MAIA_ON_DEEP)
+def get_maia_on_analysis(session: Session) -> bool:
+    """Whether a run queued now — the import pass or one a person asked for — also asks the
+    human-move model. Copied onto the run as `AnalysisRun.maia` when it is queued."""
+    return _flag(session, MAIA_ON_ANALYSIS)
 
 
 def get_maia_both_sides(session: Session) -> bool:
@@ -683,25 +671,17 @@ def get_hide_engine_new_games(session: Session) -> bool:
     return _flag(session, HIDE_ENGINE_NEW_GAMES)
 
 
-def maia_for_tier(session: Session, tier: Tier) -> bool:
-    """Whether a run of this tier, queued now, carries a Maia pass at all."""
-    return get_maia_on_deep(session) if Tier(tier) is Tier.DEEP else get_maia_on_quick(session)
+def get_analysis_nodes(session: Session) -> int:
+    """The node budget of the analysis pass, as the next import-priority run will carry it —
+    and what a requested run falls back to when it names no limit of its own."""
+    value = stored(session, ANALYSIS_NODES)
+    return ANALYSIS_NODES_DEFAULT if value is None else int(value)
 
 
-def get_quick_nodes(session: Session) -> int:
-    """The node budget of a quick pass, as the next run enqueued will carry it."""
-    value = stored(session, QUICK_NODES)
-    return QUICK_NODES_DEFAULT if value is None else int(value)
-
-
-def get_deep_nodes(session: Session) -> int:
-    value = stored(session, DEEP_NODES)
-    return DEEP_NODES_DEFAULT if value is None else int(value)
-
-
-def get_deep_multipv(session: Session) -> int:
-    value = stored(session, DEEP_MULTIPV)
-    return DEEP_MULTIPV_DEFAULT if value is None else int(value)
+def get_analysis_multipv(session: Session) -> int:
+    """How many lines the analysis pass keeps, and a requested run unless it says otherwise."""
+    value = stored(session, ANALYSIS_MULTIPV)
+    return ANALYSIS_MULTIPV_DEFAULT if value is None else int(value)
 
 
 def get_correspondence_enabled(session: Session) -> bool:
@@ -752,8 +732,8 @@ def get_analysis_concurrency(session: Session, settings: Settings | None = None)
 def get_correspondence_task_nodes(session: Session) -> int:
     """The node budget one correspondence task is queued with.
 
-    Read when the task is queued and copied onto its `AnalysisRun`, exactly as a quick or
-    deep pass's budget is: a task already waiting in the queue keeps what it was queued
+    Read when the task is queued and copied onto its `AnalysisRun`, exactly as the analysis
+    pass's budget is: a task already waiting in the queue keeps what it was queued
     with, and changing this sizes the next one.
     """
     value = stored(session, CORRESPONDENCE_TASK_NODES)

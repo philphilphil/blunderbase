@@ -143,7 +143,7 @@ def test_a_poll_carries_the_work_the_socket_would_have_pushed(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
 
     answer = announce(api, token)
 
@@ -157,6 +157,46 @@ def test_a_poll_carries_the_work_the_socket_would_have_pushed(
     assert run_row(settings, run_id).status is RunStatus.RUNNING
 
 
+def test_a_runner_from_before_run_limits_is_only_given_node_budgets(
+    api: TestClient, settings: Settings
+) -> None:
+    """Its decoder needs a node count and knows no time, so a depth or seconds run waits.
+
+    The depth run is queued first and outranks nothing here, which is the point: the filter
+    is in the claim, so the node run behind it still goes out rather than the queue stalling.
+    """
+    runner_id, token = register(settings, slots=4)
+    game_id = seed_game(api)
+    engine_id = announce(api, token, slots=4, features=())["engines"][0]["engine_id"]
+    to_depth = enqueue(api, game_id, engine_id, depth=24)
+    to_seconds = enqueue(api, game_id, engine_id, seconds=2.0)
+    on_nodes = enqueue(api, game_id, engine_id, nodes=1000)
+
+    answer = announce(api, token, slots=4, features=())
+
+    assert [entry["run_id"] for entry in answer["dispatch"]] == [on_nodes]
+    plan = answer["dispatch"][0]["plan"]
+    assert (plan["tier"], plan["nodes"], plan["depth"], plan["seconds"]) == (
+        "quick", 1000, None, None
+    )
+    assert run_row(settings, to_depth).status is RunStatus.QUEUED
+    assert run_row(settings, to_seconds).status is RunStatus.QUEUED
+    assert api.app.state.gateway.state(runner_id).busy == 1
+
+
+def test_a_runner_with_run_limits_takes_a_depth_run(api: TestClient, settings: Settings) -> None:
+    _runner_id, token = register(settings)
+    game_id = seed_game(api)
+    engine_id = announce(api, token)["engines"][0]["engine_id"]
+    run_id = enqueue(api, game_id, engine_id, depth=24)
+
+    answer = announce(api, token)
+
+    assert [entry["run_id"] for entry in answer["dispatch"]] == [run_id]
+    plan = protocol.decode_plan(answer["dispatch"][0]["plan"])
+    assert (plan.nodes, plan.depth, plan.seconds) == (None, 24, None)
+
+
 def test_a_poll_never_takes_more_than_the_room_it_reports(
     api: TestClient, settings: Settings
 ) -> None:
@@ -164,7 +204,7 @@ def test_a_poll_never_takes_more_than_the_room_it_reports(
     game_id = seed_game(api)
     engine_id = announce(api, token, slots=4)["engines"][0]["engine_id"]
     for _ in range(3):
-        enqueue(api, game_id, engine_id, tier="deep")
+        enqueue(api, game_id, engine_id)
 
     answer = announce(api, token, slots=4, free_slots=1)
 
@@ -178,7 +218,7 @@ def test_a_heartbeat_keeps_a_run_alive_and_a_stolen_one_is_taken_back(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
 
     beat = poll_heartbeat(api, token, dispatch, done=4, total=9)
@@ -206,7 +246,7 @@ def test_a_beat_inside_the_window_is_not_a_second_write(
     runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
 
     assert poll_heartbeat(api, token, dispatch, done=1, total=9).json()["ok"] is True
@@ -247,7 +287,7 @@ def test_a_poll_heartbeat_moves_the_progress_bar_the_way_a_socket_one_does(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
 
     with api.websocket_connect("/events", headers=socket_headers(api)) as events:
@@ -267,7 +307,7 @@ def test_a_completed_run_over_the_fallback_writes_its_rows(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
 
     answer = poll_complete(
@@ -293,7 +333,7 @@ def test_a_failure_over_the_fallback_is_stored_with_its_stderr(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
 
     answer = poll_complete(
@@ -313,7 +353,7 @@ def test_a_replayed_result_is_a_200_that_says_it_was_dropped(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
     poll_complete(api, token, dispatch, evals=[eval_row(0)])
 
@@ -347,7 +387,7 @@ def test_a_run_the_poller_no_longer_names_goes_back_to_the_queue(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
 
     # The runner restarted: it holds nothing, and says so.
@@ -375,7 +415,7 @@ def test_a_run_the_poller_still_holds_is_left_alone(
     _runner_id, token = register(settings)
     game_id = seed_game(api)
     engine_id = announce(api, token)["engines"][0]["engine_id"]
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     dispatch = announce(api, token)["dispatch"][0]
 
     answer = announce(

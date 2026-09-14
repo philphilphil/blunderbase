@@ -202,23 +202,26 @@ export function GamesPage() {
   }, [rows])
 
   const queueAnalysis = useCallback(
-    async (ids: number[], tier: 'quick' | 'deep') => {
+    async (ids: number[]) => {
       if (ids.length === 0) return
       setAnalysing((current) => new Set([...current, ...ids]))
       setMessage(null)
       // The whole selection in one call: the backend queues it in one transaction and
       // answers with what it took per game, so the receipt is that answer rather than a
-      // tally kept across as many round-trips as there were rows.
+      // tally kept across as many round-trips as there were rows. The body is ids and nothing
+      // else: a selection gets the import pass at the Settings page's budget and the import
+      // pass's place in the queue, so five hundred ticked rows never jump ahead of a game
+      // somebody is waiting on. Deeper work is Analyse… on the game.
       let queued = 0
       let refused = ids.length
       let reason: string | null = null
       try {
-        const receipt = await analysis.mutateAsync({ game_ids: ids, tier })
+        const receipt = await analysis.mutateAsync({ game_ids: ids })
         queued = receipt.queued.length
         refused = receipt.refused.length
       } catch (error) {
         // A call that never landed refused the selection whole, and the backend always
-        // says why — a selection over the batch cap, a tier with no engine behind it.
+        // says why — a selection over the batch cap, an analysis role with no engine behind it.
         // Without the reason on the receipt the refusal reads as the server losing the
         // selection for no stated cause, which is the one thing that never happened.
         reason = refusalReason(error, t`the request never landed`)
@@ -228,12 +231,7 @@ export function GamesPage() {
         for (const id of ids) next.delete(id)
         return next
       })
-      // One whole message per tier rather than the tier word dropped into a shared frame:
-      // "quick" and "deep" decline with the noun beside them in most languages.
-      const queuedMessage =
-        tier === 'quick'
-          ? t`${plural(queued, { one: '# quick run', other: '# quick runs' })} queued`
-          : t`${plural(queued, { one: '# deep run', other: '# deep runs' })} queued`
+      const queuedMessage = t`${plural(queued, { one: '# run', other: '# runs' })} queued`
       setMessage(
         refused === 0
           ? queuedMessage
@@ -359,7 +357,7 @@ export function GamesPage() {
         onToggle={toggle}
         onToggleAll={toggleAll}
         onOpen={open}
-        onAnalyse={(id) => void queueAnalysis([id], 'quick')}
+        onAnalyse={(id) => void queueAnalysis([id])}
         analysing={analysing}
         onDelete={(id) => setDoomed([id])}
         status={library.status}
@@ -376,7 +374,7 @@ export function GamesPage() {
         total={library.total}
         queueing={analysis.isPending}
         deleting={deletion.isPending}
-        onQueue={(tier) => void queueAnalysis([...selectedVisible], tier)}
+        onQueue={() => void queueAnalysis([...selectedVisible])}
         onDelete={() => setDoomed([...selectedVisible])}
         onClearSelection={() => setSelected(new Set())}
         message={message}

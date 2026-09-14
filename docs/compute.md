@@ -35,7 +35,7 @@ The confusion has a shape. There are three kinds of thing:
 
 - **A machine** has cores and a number of engine processes it may run at once.
 - **An engine** is a binary with options; `Threads` and `Hash` are per process of it.
-- **A job** — quick, deep, human moves, a correspondence search or task — is what an engine
+- **A job** — an analysis pass, human moves, a correspondence search or task — is what an engine
   is asked to do.
 
 The page mixes the first two: engines are created inside a machine's card, a runner's
@@ -78,7 +78,7 @@ with" needs a page to link to.
   `processes × threads` against the cores — and says in words when full load would exceed
   the machine, with a meter. The threads in the sum are the actual rows' `Threads`: the
   heaviest UCI row switched on here while correspondence is on, since any slot may be
-  holding it, and the heaviest engine holding Quick or Deep otherwise.
+  holding it, and the engine holding Analysis otherwise.
 - A runner's card keeps its collapsible shape: slots and status on the row, the advertised
   engines, rename / resize and revoke in the detail. This browser's card keeps install /
   remove.

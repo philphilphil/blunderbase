@@ -425,7 +425,7 @@ describe('the correspondence game view: tasks and expansion', () => {
   })
 
   it('shows in the dialog why a task could not be queued', async () => {
-    refuseSearch = 'no engine holds the deep role'
+    refuseSearch = 'no engine holds the analysis role'
     draw()
     await userEvent.pointer({
       keys: '[MouseRight]',
@@ -436,11 +436,11 @@ describe('the correspondence game view: tasks and expansion', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: 'Queue task' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('no engine holds the deep role')
+    expect(await screen.findByRole('alert')).toHaveTextContent('no engine holds the analysis role')
   })
 
   it('opens the search picker without the refusal the last task earned', async () => {
-    refuseSearch = 'no engine holds the deep role'
+    refuseSearch = 'no engine holds the analysis role'
     draw()
     await userEvent.pointer({
       keys: '[MouseRight]',
@@ -455,7 +455,7 @@ describe('the correspondence game view: tasks and expansion', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Search with…' }))
 
-    expect(screen.queryByText('no engine holds the deep role')).not.toBeInTheDocument()
+    expect(screen.queryByText('no engine holds the analysis role')).not.toBeInTheDocument()
   })
 
   it('expands the selected node from the pane’s own button', async () => {

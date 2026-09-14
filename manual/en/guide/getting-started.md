@@ -21,7 +21,7 @@ press **Connect**. Or drop a PGN file anywhere in the window. Both are covered i
 
 ## What happens automatically
 
-Every game that arrives is queued for a quick Stockfish pass, so evaluations fill in
+Every game that arrives is queued for a Stockfish pass, so evaluations fill in
 behind a sync. The [Dashboard](dashboard.md) shows what is waiting and what is running.
 
 ## Where to find help

@@ -4,7 +4,7 @@
  *
  * Always open, unlike the browser and runner cards under it, because its one number is the
  * page's reason to exist. **Queue processes** is `analysis_concurrency` — the engine
- * processes this machine runs at once, whatever asked for them: a quick or deep pass, an
+ * processes this machine runs at once, whatever asked for them: an analysis pass, an
  * analysis board, a correspondence search. There used to be a second box beside it for the
  * searches' own slots; it went because a search is visible wherever slots are counted, and
  * one number beats two to add up. Under the box the budget line does the sum the manual

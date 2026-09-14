@@ -10,9 +10,9 @@ import { Link } from 'react-router-dom'
 import { QueueDestinations } from '@/components/shell/QueueDestinations'
 import { QueueMeter } from '@/components/shell/QueueMeter'
 import { SectionHead } from '@/components/shell/Section'
-import { useGames, useMaiaFill, useQueueStatus, useRequestAnalysis } from '@/lib/api/queries'
-import type { RunStatus, Tier } from '@/lib/api/types'
-import { TIER_STYLES } from '@/lib/chess/classification'
+import { useGames, useMaiaFill, useQueueStatus, useRetryFailed } from '@/lib/api/queries'
+import type { RunStatus } from '@/lib/api/types'
+import { RUN_STYLES, runKind, runLabel } from '@/lib/chess/classification'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -21,11 +21,11 @@ import { Bar, ErrorBlock } from '@/routes/stats/kit/states'
 import { useRunActivity, type RunActivity } from './useRunActivity'
 
 /**
- * What a row calls the work. A Maia fill is queued under the quick tier — for its engine
- * and for its place behind the deep passes — so the tier is where it was filed, not what
- * it did: it searches nothing and only asks the human-move model for the levels a game is
- * missing. Labelling one "quick" is how the card came to report a quick pass over a game
- * to an owner who had asked for the missing Maia levels and nothing else.
+ * What a row calls the work. A Maia fill is queued like an import pass — for its engine
+ * and for its place in the queue — so the node budget it carries is where it was filed,
+ * not what it did: it searches nothing and only asks the human-move model for the levels a
+ * game is missing. Labelling one with its budget is how the card would report a pass over
+ * a game to an owner who had asked for the missing Maia levels and nothing else.
  */
 const MAIA_CHIP = 'border-brilliant/40 bg-brilliant/10 text-brilliant'
 
@@ -42,15 +42,9 @@ const DOT: Record<RunStatus, string> = {
 }
 
 /**
- * A row's own words for a tier and a status. Lower case and one word each, because they are
- * chips in a 10.5px column rather than headings — `TIER_STYLES.label` is the sentence-case
- * name the rest of the app uses and would read as a different control here.
+ * A row's own words for a status. Lower case and one word each, because they are chips in a
+ * 10.5px column rather than headings.
  */
-const TIER_WORD: Record<Tier, MessageDescriptor> = {
-  quick: msg`quick`,
-  deep: msg`deep`,
-}
-
 const STATUS_WORD: Record<RunStatus, MessageDescriptor> = {
   queued: msg`queued`,
   running: msg`running`,
@@ -69,7 +63,7 @@ function RunRow({
   onRetry: () => void
   retrying: boolean
 }) {
-  const style = TIER_STYLES[run.tier]
+  const style = RUN_STYLES[runKind(run)]
   const { t, i18n } = useLingui()
   return (
     <div
@@ -90,11 +84,11 @@ function RunRow({
       <span
         title={run.maiaOnly ? t`the missing Maia levels only; nothing is searched` : undefined}
         className={cn(
-          'rounded-sm border px-1.5 py-px text-[0.59375rem]',
+          'rounded-sm border px-1.5 py-px text-[0.59375rem] whitespace-nowrap',
           run.maiaOnly ? MAIA_CHIP : style.chipClass,
         )}
       >
-        {run.maiaOnly ? 'maia' : i18n._(TIER_WORD[run.tier])}
+        {run.maiaOnly ? 'maia' : runLabel(run)}
       </span>
       {run.status === 'failed' ? (
         <>
@@ -141,9 +135,19 @@ export function QueueCard() {
   // Neither mutation has a panel of its own on this card — a row's only trace of the press
   // is the "queued" label going back to "retry", which said nothing at all if the retry
   // itself failed. A toast is the whole fix: there is nowhere here to put a red sentence.
-  const retry = useRequestAnalysis({ onError: (error) => toast.error(error.message) })
-  // A failed fill is retried as a fill: `retry` would queue a whole engine pass over a
-  // game that has already had one, which is hours of search for the levels it is missing.
+  //
+  // A failed run is retried by its id rather than re-POSTed: the retry keeps the run's own
+  // engine, limit, window, lines and priority, which a row assembled from socket frames
+  // does not all know — and a POST from here would turn an import pass into one somebody
+  // asked for, jumping it ahead of the queue it came from.
+  const retry = useRetryFailed({
+    onError: (error) => toast.error(error.message),
+    onSuccess: (receipt) => {
+      if (receipt.queued === 0) toast.info(t`Nothing queued — that game has been analysed since.`)
+    },
+  })
+  // A failed fill is retried as a fill: a retry by id would do the same, but the fill
+  // endpoint is what knows to ask only for the levels still missing now.
   const refill = useMaiaFill({ onError: (error) => toast.error(error.message) })
 
   const queued = queue.data?.queued ?? 0
@@ -222,7 +226,7 @@ export function QueueCard() {
                   onRetry={() => {
                     if (run.gameId === null) return
                     if (run.maiaOnly) refill.mutate([run.gameId])
-                    else retry.mutate({ game_id: run.gameId, tier: run.tier })
+                    else retry.mutate([run.runId])
                   }}
                 />
               ))}

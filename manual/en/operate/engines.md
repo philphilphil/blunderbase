@@ -12,7 +12,7 @@ download in every case.
 
 **Compute → Engines** is what is installed, in two parts from top to bottom.
 
-*What runs what*: one row each for Quick, Deep and Human moves, naming the engine assigned
+*What runs what*: one row each for Analysis and Human moves, naming the engine assigned
 to it and, when it cannot run, saying why in words.
 
 **Engines**: every configured engine — its kind, the machine it runs on, its `Threads`
@@ -42,13 +42,15 @@ The first engine of a kind to be registered takes the roles it fits, so a fresh
 installation works without a visit to the roles form. It never takes a role that is already
 assigned.
 
-## The three roles
+## The two roles
 
 | Role | What it runs |
 |---|---|
-| Quick | The fast pass every imported game gets |
-| Deep | The slower, multi-line pass you ask for |
+| Analysis | The pass every imported game gets, and the engine **Analyse** on a game and the correspondence pickers suggest |
 | Human moves | Maia — what a player of your rating would have played |
+
+A run you ask for with **Analyse** can use any engine that is switched on and speaks UCI;
+the role only decides which one the dialog opens on.
 
 Assign them at the top of the Engines page. **Nothing falls back.** If the engine holding a role is
 switched off, deleted, or on a machine that is not connected, that role does not run and
@@ -82,8 +84,8 @@ row here asks for. This page only sets what one process costs.
 
 A correspondence search is not a queue job: it is one engine sitting on one position for
 hours or days. It holds one of this server's **Queue processes** under
-[Machines](runners.md#how-much-at-once) for as long as it runs — the same slots the quick
-and deep passes use, so a search that runs for days is one slot the queue does without
+[Machines](runners.md#how-much-at-once) for as long as it runs — the same slots the analysis
+passes use, so a search that runs for days is one slot the queue does without
 until you pause or stop it. The Machines card and the correspondence page's capacity strip
 both count it, so the queue waiting behind a search is never a mystery. Give correspondence
 **its own engine row** rather than the one your passes use: a row with `Threads` set high
@@ -115,14 +117,14 @@ one CPU engine and one GPU engine searching at once, each on its own hardware.
 **Tasks are the other half of the mode, and they are ordinary queue work.** A task — a
 bounded look at one position, and what an
 [expansion](../guide/correspondence.md#tasks-and-expansion) is made of — is an
-`AnalysisRun` like any other: it counts against **Queue processes** along with the quick
-and deep passes and the searches, gives its slot back after a minute or two where a search
+`AnalysisRun` like any other: it counts against **Queue processes** along with the analysis
+passes and the searches, gives its slot back after a minute or two where a search
 keeps it, and it runs on whichever host the queue hands it to, [remote runners](runners.md)
 included. So the engine
 picked for a task — in **Queue task…**, **Expand…** or **Refresh subtree…** — may live on a
 runner, and where you have a runner that is where it belongs: the tasks go to the other
-machine and this one keeps its cores for the searches and for the passes. Tasks sit between the tiers in the queue, ahead of the quick pass every import gets
-and behind a deep pass somebody is waiting on, and among themselves the game with the
+machine and this one keeps its cores for the searches and for the passes. Tasks sit in the middle of the queue, ahead of the pass every import gets
+and behind a run somebody asked for with **Analyse** and is waiting on, and among themselves the game with the
 nearest deadline is worked first. **Clear the queue** on the Analysis page drops the tasks
 still waiting along with everything else waiting, and each of their nodes says so.
 
@@ -136,10 +138,12 @@ the searches counted in.
 
 ## The engine in your browser
 
-When Quick, Deep or continuous analysis is refused because a role has no engine, the game
-screen offers **Set up browser engine**. It installs this browser as a runner, waits for
-its Stockfish to register, gives it the role if that role is still empty, and then runs the
-pass you asked for. It never leaves the board.
+When there is no engine at all, the game screen offers **Set up browser engine** in place
+of the **Analyse…** dialog, and when you switch on continuous analysis. It installs this
+browser as a runner, waits for its Stockfish to register and gives it the Analysis role if
+that role is still empty. Continuous analysis then starts on its own; for a run, the
+**Analyse…** dialog opens with the new engine picked, and nothing is queued until you press
+**Analyse** in it. It never leaves the board.
 
 A browser engine wants cross-origin isolation to run multi-threaded. Behind a proxy, that
 is [`BLUNDERBASE_CROSS_ORIGIN_ISOLATION`](deploy.md#settings-worth-knowing).
@@ -173,9 +177,9 @@ A Maia never drives the analysis board — it produces a move policy, not a sear
 The same thing without a browser, for a headless machine or a script.
 
 ```console
-$ blunderbase engines add sf-local stockfish --option Threads=4 --role quick --role deep
+$ blunderbase engines add sf-local stockfish --option Threads=4 --role analysis
 engine 'sf-local' Stockfish 18 registered: uci at stockfish
-serves the quick tier, the deep tier
+serves the analysis role
 $ blunderbase engines list
 $ blunderbase engines remove sf-local
 ```

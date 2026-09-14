@@ -133,7 +133,7 @@ describe('EventsProvider', () => {
 
     // A batch of sixty analyses: a `done` frame every 100ms for two seconds. Left alone,
     // that is a refetch per 200ms window — ten of them, over the most expensive read there is.
-    const done = { event: 'analysis.done', game_id: 4, tier: 'quick', status: 'done' }
+    const done = { event: 'analysis.done', game_id: 4, requested: false, status: 'done' }
     for (let run = 0; run < 20; run += 1) {
       socket().receive({ ...done, run_id: run })
       await act(() => vi.advanceTimersByTimeAsync(100))
@@ -194,7 +194,7 @@ describe('EventsProvider', () => {
   it("leaves a game's own analysis runs alone during a queue burst", async () => {
     vi.useFakeTimers()
     const queryFn = vi.fn(async () => 'the runs')
-    const socket = renderProbe(queryFn, queryKeys.runs(4, 'quick'))
+    const socket = renderProbe(queryFn, queryKeys.runs(4))
     await act(() => vi.advanceTimersByTimeAsync(0))
     socket().open()
     expect(queryFn).toHaveBeenCalledTimes(1)

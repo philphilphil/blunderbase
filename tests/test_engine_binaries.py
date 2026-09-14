@@ -125,7 +125,7 @@ def test_a_real_maia_answers_with_a_human_policy(session: Session) -> None:
     assert sample["policy"]["any"]
 
 
-async def test_a_real_quick_pass_runs_a_whole_game_through_the_workers(
+async def test_a_real_analysis_pass_runs_a_whole_game_through_the_workers(
     tmp_path: Path, fixtures_dir: Path
 ) -> None:
     """The same pipeline the fake-UCI suite covers, driven by a real Stockfish."""
@@ -135,9 +135,9 @@ async def test_a_real_quick_pass_runs_a_whole_game_through_the_workers(
     settings = Settings(root=tmp_path, analysis_concurrency=1)
     try:
         with sessions() as owned:
-            # A budget a real engine gets through in a test: the import queues its quick
+            # A budget a real engine gets through in a test: the import queues its analysis
             # pass with whatever is stored when it runs, so this is set before the import.
-            app_settings.set_value(owned, app_settings.QUICK_NODES, 20_000)
+            app_settings.set_value(owned, app_settings.ANALYSIS_NODES, 20_000)
             add_engine(
                 owned,
                 name="Stockfish",

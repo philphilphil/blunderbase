@@ -14,7 +14,7 @@
  * Nothing here needs a restart.
  *
  * **There is no engine setting here.** Every enabled UCI engine is offered wherever an
- * engine is chosen — the search dialog, Queue task, Expand, Refresh — with the deep role's
+ * engine is chosen — the search dialog, Queue task, Expand, Refresh — with the analysis role's
  * preselected; a search greys out the engines it cannot run on and says why. A list kept
  * here was a second place for the same choice, and one that hid engines from the dialogs.
  *
@@ -259,7 +259,7 @@ export function CorrespondenceSettingsPage() {
             <p className="border-t border-hairline pt-3 text-[0.625rem] leading-[1.6] text-dim-2">
               <Trans>
                 Which engine searches is chosen on the position: Search with… offers every
-                engine that is switched on, with the one holding the deep role suggested.
+                engine that is switched on, with the one holding the analysis role suggested.
               </Trans>
             </p>
           </CardContent>
@@ -275,7 +275,7 @@ export function CorrespondenceSettingsPage() {
                 queue — it holds a slot for a minute or two where a search keeps its own, and
                 an expansion is a dozen of them at once. Unlike a search, it can run on a
                 remote runner; which engine is
-                chosen when the task is queued, with the deep role&rsquo;s suggested.
+                chosen when the task is queued, with the analysis role&rsquo;s suggested.
               </Trans>
             </CardDescription>
           </CardHeader>

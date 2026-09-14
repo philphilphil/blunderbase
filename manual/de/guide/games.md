@@ -15,7 +15,7 @@ stehen je für eine Filtergruppe:
 | **Eröffnung** | Ein ECO-Code oder ein Präfix: `C6` ist jede Caro-Kann von C60 bis C69 |
 | **Bedenkzeit** | Eine Kategorie und eine genaue Uhr wie `600+0` |
 | **Gegner** | Ein Teil des Namens |
-| **Analyse** | Enthält einen groben Patzer, ist analysiert, hat eine Tiefenanalyse |
+| **Analyse** | Enthält einen groben Patzer, ist analysiert |
 
 Die Zeile über der Tabelle zeigt, wie viele Partien passen. **Leeren** daneben setzt alle
 Chips auf einmal zurück; jeder Chip hat zusätzlich sein eigenes Kreuz.
@@ -33,8 +33,8 @@ ist nur ein Chip.
 ## Einen Filter speichern
 
 **Filter speichern** gibt dem aktuellen Filter einen Namen und hängt ihn in der
-Seitenleiste unter **Partien** ein, mit der Trefferzahl daneben. Drei sind vorgegeben:
-**Niederlagen mit Schwarz**, **Grobe Patzer** und **Ohne Tiefenanalyse**. Fährst du über
+Seitenleiste unter **Partien** ein, mit der Trefferzahl daneben. Zwei sind vorgegeben:
+**Niederlagen mit Schwarz** und **Grobe Patzer**. Fährst du über
 einen selbst gespeicherten, erscheint das Kreuz zum Entfernen.
 
 ## Sortieren und blättern
@@ -50,8 +50,8 @@ den Pfeilen neben der Zahl.
 Symbole. Die Tabelle sagt dann, was du gespielt hast, und nicht, wie gut. Eine Liste, die
 nach **Verlust** sortiert war, fällt solange auf „neueste zuerst“ zurück. Die Chips unter
 **Analyse** wirken weiter – eine Frage, die du gestellt hast, ist keine Antwort, die dir
-jemand gegeben hat – und **analysieren** steht bei einer Partie, die noch niemand
-angesehen hat, weiterhin da. Alles zum Modus steht unter
+jemand gegeben hat – und die Schaltfläche, die eine Analyse einreiht, steht bei einer
+Partie, die noch niemand angesehen hat, weiterhin da. Alles zum Modus steht unter
 [Einstellungen](settings.md#hide-the-engine).
 
 Eine Zeile, die in der Spalte **Verlust** ein Auge zeigt, während der Rest der Tabelle
@@ -62,8 +62,11 @@ zeigen**, wenn du sie gelesen hast.
 ## Mehrere Partien auf einmal bearbeiten
 
 Hake Zeilen an, oder das Kästchen im Kopf für die ganze Seite. Die Fußzeile bietet dann
-**Schnellanalyse einreihen**, **Tiefenanalyse einreihen**, **Löschen** und **Auswahl
-aufheben**. Was ein Durchlauf kostet, steht unter [Analyse](analysis.md).
+**Analyse einreihen**, **Löschen** und **Auswahl aufheben**. **Analyse einreihen** gibt
+jeder Partie die Importanalyse, mit dem Budget und dem Platz in der Warteschlange, den jede
+importierte Partie bekommt; genauer hinsehen lässt du bei einer einzelnen Partie mit
+**Analysieren** in der Partie selbst. Was ein Durchlauf kostet, steht unter
+[Analyse](analysis.md#which-pass-does-a-game-get).
 
 ## Partien löschen { #delete-games }
 

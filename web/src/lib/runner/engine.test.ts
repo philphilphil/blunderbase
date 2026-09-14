@@ -161,7 +161,7 @@ describe('analyse', () => {
     const { engine, module } = await boot()
     const result = await engine.analyse(
       'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-      { nodes: 200_000, depth: null },
+      { nodes: 200_000, depth: null, seconds: null },
       { multipv: 2, chess960: false },
     )
 
@@ -187,10 +187,29 @@ describe('analyse', () => {
     const { engine } = await boot(module)
     const result = await engine.analyse(
       'rnbqkbnr/pppppppp/8/8/8/5P2/PPPPP1PP/RNBQKBNR b KQkq - 0 1',
-      { nodes: 500, depth: null },
+      { nodes: 500, depth: null, seconds: null },
       { multipv: 1, chess960: false },
     )
     expect(result.score).toEqual({ cp: -60, mateIn: null, foldedCp: -60 })
+  })
+
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+  it('stops on whichever limit the plan set, and seconds go to the engine as movetime', async () => {
+    const { engine, module } = await boot()
+    await engine.analyse(START, { nodes: null, depth: 24, seconds: null }, { multipv: 1, chess960: false })
+    await engine.analyse(START, { nodes: null, depth: null, seconds: 2.5 }, { multipv: 1, chess960: false })
+    expect(module.commands).toContain('go depth 24')
+    expect(module.commands).toContain('go movetime 2500')
+    expect(module.commands.filter((command) => command === 'go')).toEqual([])
+  })
+
+  it('refuses a search with no limit rather than sending a bare go', async () => {
+    const { engine, module } = await boot()
+    await expect(
+      engine.analyse(START, { nodes: null, depth: null, seconds: null }, { multipv: 1, chess960: false }),
+    ).rejects.toThrow('a search needs a node, depth or time limit')
+    expect(module.commands.some((command) => command.startsWith('go'))).toBe(false)
   })
 
   it('drops a line whose own first move the position refuses', async () => {
@@ -203,7 +222,7 @@ describe('analyse', () => {
     const { engine } = await boot(module)
     const result = await engine.analyse(
       'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-      { nodes: 100, depth: null },
+      { nodes: 100, depth: null, seconds: null },
       { multipv: 2, chess960: false },
     )
     expect(result.candidates.map((candidate) => candidate.rank)).toEqual([1])
@@ -222,7 +241,7 @@ describe('analyse', () => {
     const { engine } = await boot(module)
     const result = await engine.analyse(
       'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-      { nodes: 900, depth: 20 },
+      { nodes: 900, depth: 20, seconds: null },
       { multipv: 1, chess960: false },
     )
     expect(module.commands).toContain('go nodes 900 depth 20')
@@ -236,14 +255,14 @@ describe('analyse', () => {
     const { engine } = await boot(module)
     module.onError('out of memory')
     await expect(
-      engine.analyse('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', { nodes: 10, depth: null }, { multipv: 1, chess960: false }),
+      engine.analyse('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', { nodes: 10, depth: null, seconds: null }, { multipv: 1, chess960: false }),
     ).rejects.toThrow('out of memory')
   })
 
   it('refuses a position nothing can read', async () => {
     const { engine } = await boot()
     await expect(
-      engine.analyse('not a fen', { nodes: 10, depth: null }, { multipv: 1, chess960: false }),
+      engine.analyse('not a fen', { nodes: 10, depth: null, seconds: null }, { multipv: 1, chess960: false }),
     ).rejects.toThrow('not a fen')
   })
 })
@@ -387,7 +406,7 @@ describe('searchInfinite', () => {
     // client can leave the run alone and let the server's `run_cancel` do the preempting.
     const { engine, module } = await boot()
     module.hold = true
-    const run = engine.analyse(START, { nodes: 1000, depth: null }, { multipv: 1, chess960: false })
+    const run = engine.analyse(START, { nodes: 1000, depth: null, seconds: null }, { multipv: 1, chess960: false })
     await vi.advanceTimersByTimeAsync(0)
     expect(module.commands).toContain('go nodes 1000')
 

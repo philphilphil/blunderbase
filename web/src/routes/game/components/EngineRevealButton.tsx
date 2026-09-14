@@ -2,9 +2,9 @@
  * "Show the engine" — the button on a game whose verdict an import held back.
  *
  * `GameSummary.engine_hidden` is the per-game twin of the browser's ⇧E mode: set when the
- * game was imported under **Analysis → Engine passes → New games**, so the owner reads the
+ * game was imported with **New games** set to hold it back in the Analysis settings, so the owner reads the
  * game first and asks for the engine's opinion afterwards. This is the asking. It sits in
- * the transport row's actions band, beside Quick and Deep, because that is the row that
+ * the transport row's actions band, beside Analyse…, because that is the row that
  * says what to *do* to the game, and it is the one control on the screen that is about
  * this game's verdict being kept from view — so it is the one place the reader looks for
  * the way to see it. On the phone the same row is under the board, so there is no second

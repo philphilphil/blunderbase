@@ -104,7 +104,7 @@ Die Engine-Programme auf **dieser** Maschine. Ausführlich: [Engines](engines.md
 
 ```console
 $ blunderbase engines list
-$ blunderbase engines add sf-local stockfish --option Threads=4 --role quick --role deep
+$ blunderbase engines add sf-local stockfish --option Threads=4 --role analysis
 $ blunderbase engines remove sf-local
 ```
 
@@ -121,7 +121,7 @@ $ blunderbase engines remove sf-local
 |---|---|---|
 | `--kind` | `uci` | `uci` oder `maia` |
 | `--option NAME=VALUE` | — | Eine UCI-Option, geprüft gegen das, was das Programm angibt. Mehrfach möglich |
-| `--role` | — | `quick`, `deep` oder `human`, weggenommen von dem, der die Rolle gerade hält. Mehrfach möglich. Ohne die Angabe werden nur unbesetzte Rollen gefüllt |
+| `--role` | — | `analysis` oder `human`, weggenommen von dem, der die Rolle gerade hält. Mehrfach möglich. Ohne die Angabe werden nur unbesetzte Rollen gefüllt |
 | `--replace` | aus | Die Engine dieses Namens aktualisieren, statt abzulehnen, und einschalten |
 | `--disabled` | aus | Registrieren, ohne sie einzuschalten |
 
@@ -132,18 +132,32 @@ Warteschlange sind Zeilen in der Datenbank und kein Broker; das hier läuft also
 neben dem Server, und ein Neustart verliert nichts.
 
 ```console
-$ blunderbase analyze --tier deep --limit 50
-$ blunderbase analyze --fen "rn1qkb1r/..." --nodes 4000000
+$ blunderbase analyze --limit 50
+$ blunderbase analyze --game-id 812 --depth 24 --lines 3
+$ blunderbase analyze --fen "rn1qkb1r/..." --engine sf-local --seconds 30
 ```
+
+Ohne `--game-id` und ohne `--fen` ist das der Nachtrag: die Importanalyse für jede Partie,
+die noch keine hat, mit Budget und Variantenzahl aus **Analyse → Engine-Durchläufe**, in der
+Reihenfolge der Warteschlange. Mit einem von beiden ist es eine angeforderte Analyse, so wie
+**Analysieren** in einer Partie sie einreiht: vor jeder noch wartenden Importanalyse, mit
+der Engine, den Varianten und der Grenze aus den Flags. Die Flags von `--engine` bis
+`--seconds` gehören nur dorthin: Ohne `--game-id` oder `--fen` lehnt der Befehl sie ab, statt
+einen Nachtrag einzureihen, der sie übergeht. Von `--nodes`, `--depth` und `--seconds` geht
+nur eines:
+Eine Suche, die bei der ersten von zwei Grenzen aufhört, träfe keine der beiden Zahlen, die
+du getippt hast. Ohne eines der drei nimmt die Analyse das gespeicherte Knotenbudget.
 
 | Flag | Standard | Wirkung |
 |---|---|---|
 | `--game-id N` | jede ausstehende Partie | Eine einzelne Partie analysieren |
-| `--tier` | `quick` | `quick` oder `deep` |
 | `--fen` | — | Eine Stellung analysieren statt einer Partie |
-| `--ply-range START:END` | die ganze Partie | Die Halbzüge, die eine Tiefenanalyse ansehen soll, Ende exklusiv |
-| `--multipv N` | die gespeicherte Einstellung | Wie viele Varianten behalten werden |
-| `--nodes N` | die gespeicherte Einstellung | Das Budget je Stellung |
+| `--engine NAME` | die Engine der Rolle Analyse | Die Engine, auf der gerechnet wird, per Name oder ID |
+| `--ply-range START:END` | die ganze Partie | Die Halbzüge, die angesehen werden sollen, Ende exklusiv |
+| `--lines N` | die gespeicherte Einstellung | Wie viele Varianten behalten werden, 1 bis 5 |
+| `--nodes N` | die gespeicherte Einstellung | Jeden Zug nach N Knoten beenden |
+| `--depth N` | — | Jeden Zug bei Tiefe N beenden |
+| `--seconds S` | — | Jeden Zug nach S Sekunden beenden |
 | `--limit N` | — | Höchstens N Partien einreihen |
 | `--queue-only` | aus | Einreihen, ohne die Worker laufen zu lassen |
 | `--timeout` | `3600` | Nach so vielen Sekunden das Warten aufgeben |
@@ -212,7 +226,7 @@ $ blunderbase demo create --games 3000
 `blunderbase demo create` liest eine bunt gemischte Auswahl analysierter Partien aus der
 konfigurierten Bibliothek und schreibt eine eigene Datenbank. Es baut den PGN-Text ohne
 Kommentare neu auf und erfindet jede Angabe, an der jemand zu erkennen wäre; Zugangsdaten und
-persönliche Notizen werden nie kopiert. Jede Partie kommt mit einer fertigen Schnellanalyse
+persönliche Notizen werden nie kopiert. Jede Partie kommt mit einem fertigen Analysedurchlauf
 an, und das Ergebnis trägt keine Engine-Zeile, auf der Maschine, die es ausliefert, muss also
 nie etwas rechnen.
 

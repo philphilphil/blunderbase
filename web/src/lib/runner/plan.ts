@@ -211,7 +211,7 @@ export async function analysePlan(
   const { progress, signal } = options
   const boards = replay(plan)
   const chess960 = isChess960(plan, rootPosition(plan))
-  const limit = { nodes: plan.nodes, depth: plan.depth }
+  const limit = { nodes: plan.nodes, depth: plan.depth, seconds: plan.seconds }
   const wanted = positionsOf(plan)
   const scores = new Map<number, Score>()
   const results = new Map<number, AnalysisResult>()

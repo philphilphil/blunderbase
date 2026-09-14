@@ -710,7 +710,7 @@ describe('useStreamSession', () => {
     expect(streamCalls('POST')[0]!.body).toMatchObject({ engine_id: 7 })
   })
 
-  it('remembers what the picker was set to, and forgets it for the deep tier', async () => {
+  it('remembers what the picker was set to, and forgets it for the analysis role', async () => {
     const store = rememberedEngine(null)
     renderHook(START)
     await screen.findByText('off')
@@ -722,7 +722,7 @@ describe('useStreamSession', () => {
     expect(store.getItem(STREAM_ENGINE_KEY)).toBeNull()
   })
 
-  it('falls back to the deep tier when the remembered engine is not on the roster', async () => {
+  it('falls back to the analysis role when the remembered engine is not on the roster', async () => {
     // Engine 99 was picked on a deployment that still had it — or on a machine that has not
     // come back. Opening on it would be answered with a refusal that flips the toggle off.
     const store = rememberedEngine(99)

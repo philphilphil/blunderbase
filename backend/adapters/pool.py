@@ -16,7 +16,7 @@ kept — but the shape had to change on re-review:
   a semaphore and every caller passes through it. The slot is released in a `finally`: a
   crashed engine must cost its process, never its slot.
 - "One warm process per engine" is one process per *caller* of an engine, up to the cap.
-  Every worker of an archive sync asks for the same quick-tier engine, so a single process
+  Every worker of an archive sync asks for the same analysis-role engine, so a single process
   per spec would put the whole pool in a queue behind one search and make
   `analysis_concurrency` mean nothing. An engine that cannot be run twice — a Maia holding
   one GPU — says so with `EngineSpec.instances`, and then its callers do queue.

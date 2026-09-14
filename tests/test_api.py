@@ -28,7 +28,6 @@ from backend.db.enums import (
     Platform,
     RunStatus,
     Source,
-    Tier,
 )
 from backend.db.migrate import head_revision, upgrade_to_head
 from backend.db.models import (
@@ -128,7 +127,7 @@ def empty_live_board() -> Iterator[None]:
 
 @pytest.fixture()
 def seeded(settings: Settings, fixtures_dir: Path, engine_command: str) -> dict[str, int]:
-    """Six games, an owner account, an engine and one finished quick run."""
+    """Six games, an owner account, an engine and one finished import pass."""
     return _seed(settings, fixtures_dir / "query_games.pgn", engine_command)
 
 
@@ -175,7 +174,7 @@ def _seed(settings: Settings, pgn: Path, engine_command: str) -> dict[str, int]:
 
 
 def _seed_run(session: Session, engine_id: int) -> tuple[int, int, int]:
-    """One done quick run over the owner's oldest game, with a blunder they played."""
+    """One done import pass over the owner's oldest game, with a blunder they played."""
     game = session.scalars(
         select(Game).where(Game.owner_color.is_not(None)).order_by(Game.id)
     ).first()
@@ -183,7 +182,6 @@ def _seed_run(session: Session, engine_id: int) -> tuple[int, int, int]:
     run = AnalysisRun(
         game_id=game.id,
         engine_id=engine_id,
-        tier=Tier.QUICK,
         status=RunStatus.DONE,
         nodes=1000,
         multipv=1,
@@ -291,7 +289,7 @@ def test_a_game_card_carries_the_eval_curve_and_the_worst_moments(
     card = next(game for game in body["games"] if game["id"] == seeded["game_id"])
 
     assert card["analyzed"] is True
-    assert card["deep"] is False
+    assert card["requested"] is False
     assert len(card["eval_curve"]) == seeded["plies"]
     assert card["worst_moments"][0]["classification"] == "blunder"
 
@@ -526,12 +524,9 @@ def test_a_wipe_takes_the_queued_runs_with_it_but_leaves_a_position_run(
         over_the_game = AnalysisRun(
             game_id=seeded["game_id"],
             engine_id=seeded["engine_id"],
-            tier=Tier.QUICK,
             status=RunStatus.QUEUED,
         )
-        over_a_fen = AnalysisRun(
-            fen=FRENCH, engine_id=seeded["engine_id"], tier=Tier.QUICK, status=RunStatus.QUEUED
-        )
+        over_a_fen = AnalysisRun(fen=FRENCH, engine_id=seeded["engine_id"], status=RunStatus.QUEUED)
         session.add_all([over_the_game, over_a_fen])
         session.commit()
         standalone_id = over_a_fen.id
@@ -677,7 +672,7 @@ def test_a_pgn_file_can_be_uploaded_as_the_request_body(api: TestClient) -> None
 
     assert response.status_code == 200
     assert response.json()["job"]["games_imported"] == 1
-    # Nothing said about evaluation, so the game landed queued for its quick pass.
+    # Nothing said about evaluation, so the game landed queued for its analysis pass.
     assert api.get("/analysis/queue").json()["queued"] == 1
 
 
@@ -828,13 +823,15 @@ def test_a_failed_adapter_is_reported_on_the_job_rather_than_as_a_500(
 
 def test_a_run_can_be_enqueued_for_a_game(api: TestClient, seeded: dict[str, int]) -> None:
     response = api.post(
-        "/analysis", json={"game_id": seeded["game_id"], "tier": "deep", "multipv": 3}
+        "/analysis", json={"game_id": seeded["game_id"], "depth": 24, "multipv": 3}
     )
 
     assert response.status_code == 202
     body = response.json()
     assert body["status"] == "queued"
-    assert body["tier"] == "deep"
+    assert "tier" not in body
+    assert (body["depth"], body["nodes"], body["seconds"]) == (24, None, None)
+    assert body["requested"] is True
     assert body["multipv"] == 3
     assert body["engine_id"] == seeded["engine_id"]
     queue = api.get("/analysis/queue").json()
@@ -844,10 +841,22 @@ def test_a_run_can_be_enqueued_for_a_game(api: TestClient, seeded: dict[str, int
     assert queue["destinations"][0]["queued"] == 1
 
 
+def test_a_request_stops_at_one_limit_and_names_no_tier(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    """Two limits are a 422, and so is the old `tier` key: the body is strict."""
+    both = api.post("/analysis", json={"game_id": seeded["game_id"], "depth": 20, "nodes": 1000})
+    tiered = api.post("/analysis", json={"game_id": seeded["game_id"], "tier": "deep"})
+    too_many_lines = api.post("/analysis", json={"game_id": seeded["game_id"], "multipv": 6})
+
+    assert (both.status_code, tiered.status_code, too_many_lines.status_code) == (422, 422, 422)
+    assert api.get("/analysis/queue").json()["queued"] == 0
+
+
 def test_a_batch_queues_one_run_per_game_in_one_call(api: TestClient) -> None:
     ids = [game["id"] for game in api.get("/games", params={"limit": 3}).json()["games"]]
 
-    response = api.post("/analysis/batch", json={"game_ids": ids, "tier": "deep"})
+    response = api.post("/analysis/batch", json={"game_ids": ids})
 
     assert response.status_code == 202
     body = response.json()
@@ -856,8 +865,9 @@ def test_a_batch_queues_one_run_per_game_in_one_call(api: TestClient) -> None:
     assert body["refused"] == []
     # All three landed together: the queue is three deep after the one call.
     assert api.get("/analysis/queue").json()["queued"] == 3
+    # The Games table's "Queue analysis" is the import pass, and never jumps the queue.
     for row in body["queued"]:
-        assert api.get(f"/analysis/runs/{row['run_id']}").json()["tier"] == "deep"
+        assert api.get(f"/analysis/runs/{row['run_id']}").json()["requested"] is False
 
 
 def test_a_batch_queues_around_the_game_it_cannot_take(api: TestClient) -> None:
@@ -919,10 +929,10 @@ def test_a_fill_queues_a_maia_only_pass_and_then_has_nothing_left(
 
 
 def test_the_backfill_preview_counts_the_games_with_no_pass(api: TestClient) -> None:
-    """`seeded` finished a quick run over exactly one of its games; the rest are the work."""
+    """`seeded` finished a pass over exactly one of its games; the rest are the work."""
     total = api.get("/games", params={"limit": 1}).json()["total"]
 
-    assert api.get("/analysis/backfill").json() == {"tier": "quick", "pending": total - 1}
+    assert api.get("/analysis/backfill").json() == {"pending": total - 1}
 
 
 def test_a_backfill_queues_every_game_that_has_none(api: TestClient) -> None:
@@ -931,9 +941,9 @@ def test_a_backfill_queues_every_game_that_has_none(api: TestClient) -> None:
     response = api.post("/analysis/backfill")
 
     assert response.status_code == 202
-    assert response.json() == {"tier": "quick", "queued": pending, "outstanding": pending}
+    assert response.json() == {"queued": pending, "outstanding": pending}
     assert api.get("/analysis/queue").json()["queued"] == pending
-    # Every game now has a live quick run, so the button has nothing left to offer.
+    # Every game now has a live pass, so the button has nothing left to offer.
     assert api.get("/analysis/backfill").json()["pending"] == 0
 
 
@@ -942,10 +952,23 @@ def test_cancelling_a_backfill_empties_the_queue_it_filled(api: TestClient) -> N
 
     body = api.post("/analysis/backfill/cancel").json()
 
-    assert body == {"tier": "quick", "dropped": queued, "outstanding": 0}
+    assert body == {"dropped": queued, "outstanding": 0}
     assert api.get("/analysis/queue").json()["queued"] == 0
     # The games are uncovered again, which is what makes the button offer them once more.
     assert api.get("/analysis/backfill").json()["pending"] == queued
+
+
+def test_cancelling_a_backfill_spares_a_run_somebody_asked_for(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    requested = api.post("/analysis", json={"game_id": seeded["game_id"], "depth": 20}).json()
+    api.post("/analysis/backfill")
+
+    body = api.post("/analysis/backfill/cancel").json()
+
+    assert body["dropped"] > 0
+    assert api.get("/analysis/queue").json()["queued"] == 1
+    assert api.get(f"/analysis/runs/{requested['id']}").json()["status"] == "queued"
 
 
 def test_clearing_the_queue_leaves_a_running_run_to_finish(
@@ -953,7 +976,7 @@ def test_clearing_the_queue_leaves_a_running_run_to_finish(
 ) -> None:
     """The reset button is not a stop button for what an engine has already claimed."""
     api.post("/analysis/backfill")
-    api.post("/analysis/backfill", json={"tier": "deep"})
+    api.post("/analysis", json={"game_id": api.get("/games").json()["games"][0]["id"]})
     with get_sessionmaker(settings)() as session:
         claimed = session.scalars(
             select(AnalysisRun).where(AnalysisRun.status == RunStatus.QUEUED).order_by(
@@ -1013,7 +1036,7 @@ def test_enqueueing_for_a_game_that_is_not_there_is_a_typed_refusal(api: TestCli
     assert response.json()["detail"] == "no game with id 9999"
 
 
-def test_a_tier_with_no_usable_engine_is_a_typed_conflict(
+def test_an_analysis_role_with_no_usable_engine_is_a_typed_conflict(
     api: TestClient, seeded: dict[str, int]
 ) -> None:
     api.patch(f"/engines/{seeded['engine_id']}", json={"enabled": False})
@@ -1021,7 +1044,17 @@ def test_a_tier_with_no_usable_engine_is_a_typed_conflict(
     response = api.post("/analysis", json={"game_id": seeded["game_id"]})
 
     assert response.status_code == 409
-    assert error_of(response) == "tier_unavailable"
+    assert error_of(response) == "engine_unavailable"
+
+
+def test_the_analyse_dialog_lists_the_engines_with_the_analysis_roles_marked(
+    api: TestClient, seeded: dict[str, int]
+) -> None:
+    engines = api.get("/analysis/engines").json()
+
+    assert [engine["engine_id"] for engine in engines] == [seeded["engine_id"]]
+    assert engines[0]["default"] is True
+    assert engines[0]["host"] == "this host"
 
 
 def _failed_run(settings: Settings, game_id: int, engine_id: int) -> int:
@@ -1030,12 +1063,16 @@ def _failed_run(settings: Settings, game_id: int, engine_id: int) -> int:
         run = AnalysisRun(
             game_id=game_id,
             engine_id=engine_id,
-            tier=Tier.DEEP,
+            # A requested look at one phase: the game's done import pass does not cover it,
+            # so a retry has something to queue.
+            priority=10,
+            ply_start=2,
+            ply_end=6,
+            depth=20,
             status=RunStatus.FAILED,
-            nodes=1000,
             multipv=1,
             attempts=2,
-            error="no engine is available for this tier",
+            error="no engine is available for the analysis role",
             started_at=utcnow(),
             finished_at=utcnow(),
         )
@@ -1072,16 +1109,16 @@ def test_a_run_listing_that_narrows_by_nothing_is_a_422(api: TestClient) -> None
 def test_the_coverage_answer_adds_up_to_the_library(
     api: TestClient, settings: Settings, seeded: dict[str, int]
 ) -> None:
-    """`seeded` finished one quick run over one of its games and nothing else."""
+    """`seeded` finished one import pass over one of its games and nothing else."""
     total = api.get("/games", params={"limit": 1}).json()["total"]
     _failed_run(settings, seeded["game_id"], seeded["engine_id"])
 
     body = api.get("/analysis/coverage").json()
 
     assert body["total"] == total
-    assert body["no_pass"] + body["quick_only"] + body["deep"] == total
-    assert (body["quick_only"], body["deep"], body["no_pass"]) == (1, 0, total - 1)
-    assert body["missing"] == {"quick": total - 1, "deep": total}
+    assert body["no_pass"] + body["analysed"] == total
+    assert (body["analysed"], body["no_pass"]) == (1, total - 1)
+    assert body["missing"] == total - 1
     assert body["failed"] == 1
     assert body["maia"] == {
         "configured": [MAIA_MAX_RATING],
@@ -1092,8 +1129,7 @@ def test_the_coverage_answer_adds_up_to_the_library(
     }
     # One run, at a budget nobody is enqueueing today: there is nothing honest to say yet.
     assert body["estimates"] == {
-        "quick_seconds": None,
-        "deep_seconds": None,
+        "analysis_seconds": None,
         "maia_seconds": None,
         "concurrency": app_settings.ANALYSIS_CONCURRENCY_DEFAULT,
     }
@@ -1147,7 +1183,6 @@ def test_the_workers_pick_up_what_the_api_enqueues(
             "/analysis",
             json={
                 "game_id": seeded["game_id"],
-                "tier": "deep",
                 "nodes": 1000,
                 "engine_id": engine["id"],
             },
@@ -1392,24 +1427,19 @@ def test_probing_a_binary_stores_nothing(api: TestClient, engine_command: str) -
     assert len(api.get("/engines").json()) == 1
 
 
-def test_the_tiers_say_which_engine_answers_for_them(api: TestClient) -> None:
-    tiers = api.get("/engines/tiers").json()
-
-    assert [tier["tier"] for tier in tiers] == ["quick", "deep"]
-    assert all(tier["available"] for tier in tiers)
-    assert tiers[0]["engine_name"] == "FakeFish"
+def test_the_tier_status_route_is_gone(api: TestClient) -> None:
+    assert api.get("/engines/tiers").status_code in {404, 422}
 
 
-def test_the_roles_read_carries_the_two_tiers_and_human_moves_beside_them(
+def test_the_roles_read_carries_the_analysis_and_human_moves_beside_it(
     api: TestClient,
 ) -> None:
-    """Human moves is a role, not a third `Tier`, so it is a row of the same list."""
     body = api.get("/engines/roles").json()
 
-    assert [role["role"] for role in body["roles"]] == ["quick", "deep", "human"]
+    assert [role["role"] for role in body["roles"]] == ["analysis", "human"]
     assert body["roles"][0]["engine_name"] == "FakeFish"
     # This deployment registered no Maia: nothing assigned, and not a fault either.
-    assert body["roles"][2] == {
+    assert body["roles"][1] == {
         "role": "human",
         "engine_id": None,
         "engine_name": None,
@@ -1425,22 +1455,25 @@ def test_a_role_is_assigned_by_id_and_unassigned_with_null(
     """Only the keys that were sent are applied, so one dropdown never clears another."""
     second = api.post("/engines", json={"name": "Second Fish", "path": engine_command}).json()
 
-    body = api.put("/engines/roles", json={"deep": second["id"]}).json()
+    body = api.put("/engines/roles", json={"analysis": second["id"]}).json()
 
     roles = {role["role"]: role for role in body["roles"]}
-    assert roles["deep"]["engine_id"] == second["id"]
-    assert roles["quick"]["engine_id"] == seeded["engine_id"]
+    assert roles["analysis"]["engine_id"] == second["id"]
+    assert roles["analysis"]["engine_id"] != seeded["engine_id"]
 
-    emptied = api.put("/engines/roles", json={"deep": None}).json()
+    untouched = api.put("/engines/roles", json={"human": None}).json()
+    untouched_roles = {role["role"]: role for role in untouched["roles"]}
+    assert untouched_roles["analysis"]["engine_id"] == second["id"]
+
+    emptied = api.put("/engines/roles", json={"analysis": None}).json()
     emptied_roles = {role["role"]: role for role in emptied["roles"]}
-    assert emptied_roles["deep"]["configured"] is False
-    assert emptied_roles["quick"]["engine_id"] == seeded["engine_id"]
+    assert emptied_roles["analysis"]["configured"] is False
 
 
 def test_a_role_refuses_an_engine_that_cannot_serve_it(
     api: TestClient, seeded: dict[str, int]
 ) -> None:
-    unknown = api.put("/engines/roles", json={"quick": 4242})
+    unknown = api.put("/engines/roles", json={"analysis": 4242})
     assert unknown.status_code == 422
     assert error_of(unknown) == "invalid_engine"
 
@@ -1477,9 +1510,7 @@ def test_removing_an_engine_unqueues_its_pending_runs_but_keeps_the_rest(
 ) -> None:
     """`seeded` already has one done run with move evals; add a queued one alongside it."""
     with get_sessionmaker(settings)() as session:
-        queued = AnalysisRun(
-            tier=Tier.QUICK, engine_id=seeded["engine_id"], status=RunStatus.QUEUED
-        )
+        queued = AnalysisRun(engine_id=seeded["engine_id"], status=RunStatus.QUEUED)
         session.add(queued)
         session.commit()
         queued_id = queued.id
@@ -1777,7 +1808,7 @@ def test_the_events_socket_sees_an_import_from_start_to_finish(api: TestClient) 
     assert {event["job_id"] for event in progress} == {job_id}
     assert progress[1]["status"] == "imported"
     assert progress[2]["imported"] == 1
-    # The import's own automatic quick pass reaches the same socket.
+    # The import's own automatic analysis pass reaches the same socket.
     assert any(event["event"] == "analysis.queued" for event in events)
 
 
@@ -1785,12 +1816,13 @@ def test_the_events_socket_sees_a_run_being_queued(
     api: TestClient, seeded: dict[str, int]
 ) -> None:
     with api.websocket_connect("/events", headers=socket_headers(api)) as socket:
-        run = api.post("/analysis", json={"game_id": seeded["game_id"], "tier": "deep"}).json()
+        run = api.post("/analysis", json={"game_id": seeded["game_id"], "seconds": 5}).json()
         event = _drain(socket, "analysis.queued")[-1]
 
     assert event["run_id"] == run["id"]
     assert event["game_id"] == seeded["game_id"]
-    assert event["tier"] == "deep"
+    assert "tier" not in event
+    assert (event["seconds"], event["requested"]) == (5, True)
 
 
 def test_the_events_socket_sees_one_frame_for_a_whole_backfill(api: TestClient) -> None:
@@ -1802,7 +1834,6 @@ def test_the_events_socket_sees_one_frame_for_a_whole_backfill(api: TestClient) 
     assert [event["event"] for event in events] == ["analysis.backfill"]
     assert events[-1] == {
         "event": "analysis.backfill",
-        "tier": "quick",
         "queued": receipt["queued"],
         "outstanding": receipt["outstanding"],
         "maia_only": False,

@@ -107,7 +107,6 @@ final class GamesStore {
             || query.timeControl != nil
             || query.hasBlunders != nil
             || query.analyzed != nil
-            || query.deepAnalyzed != nil
             || query.since != nil
             || query.until != nil
             || !search.isEmpty

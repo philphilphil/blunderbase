@@ -152,7 +152,7 @@ class Engine(Base):
         Boolean, nullable=False, default=True, server_default="1"
     )
     # No `default_tier`: an engine says what kind of thing it is and nothing about which
-    # job it does. The three jobs are assignments the owner makes, stored as settings and
+    # job it does. The two jobs are assignments the owner makes, stored as settings and
     # resolved by `services.engines` — see `EngineRole`.
     # NULL means the binary is on this host. A row that names a runner is that runner's
     # advertisement of what it can run, and `path` is a path on *its* filesystem.
@@ -168,7 +168,7 @@ class Runner(Base):
     database is then not a way to impersonate a runner.
 
     `connected` is a persisted column rather than a fact the gateway keeps in memory,
-    because the questions that need it — can this tier run, where will the backlog be
+    because the questions that need it — can this role run, where will the backlog be
     worked — are answered by pure database reads that have no gateway to ask. A process
     that dies leaves the flag set, so a starting one clears every row the way it collects
     the runs a dead process left `running`.
@@ -384,11 +384,11 @@ class Game(Base):
     ply_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # The analysis half of the game's card — the eval curve, the worst moments, whether a
-    # deep pass reached it — as `services.games` builds it. Written in the same commit that
-    # changes the game's finished runs, because a listing of fifty games cannot afford to
-    # read every MoveEval of every run behind each of them. NULL for a game nothing has
-    # analysed yet, and for one analysed before this column existed: a reader that finds
-    # NULL computes the card the slow way.
+    # run somebody asked for reached it — as `services.games` builds it. Written in the
+    # same commit that changes the game's finished runs, because a listing of fifty games
+    # cannot afford to read every MoveEval of every run behind each of them. NULL for a
+    # game nothing has analysed yet, and for one analysed before this column existed: a
+    # reader that finds NULL computes the card the slow way.
     card: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # The stats half of the same idea: this game's contribution to every aggregation,
@@ -572,22 +572,35 @@ class AnalysisRun(Base):
     # two enforced references between the same pair of tables is a cycle, and adding a
     # constraint to this table at all would mean a batch rebuild of `analysis_runs` on
     # SQLite — which would silently recreate the mixed-direction claim index below without
-    # its directions. A search that is gone reads as no search, which is what the absorbing
-    # side does with it anyway.
+    # its directions (0028 had to rebuild it anyway, and re-creates the index by hand). A
+    # search that is gone reads as no search, which is what the absorbing side does with it.
     correspondence_search_id: Mapped[int | None] = mapped_column(Integer)
     engine_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("engines.id"))
-    tier: Mapped[Tier] = mapped_column(EnumString(Tier), nullable=False)
+    # What a run queued before the single analysis pass was queued as, quick or deep. Kept
+    # so those rows still load; nothing writes it, and a run's budget is its limit columns.
+    tier: Mapped[Tier | None] = mapped_column(EnumString(Tier), nullable=True)
     status: Mapped[RunStatus] = mapped_column(
         EnumString(RunStatus), nullable=False, default=RunStatus.QUEUED
     )
+    # Where each move's search stops — the request, not what the engine reached (that is
+    # `MoveEval.depth` / `MoveEval.nodes`). An import-priority run carries `nodes` alone,
+    # copied off `analysis_nodes` when it is queued; a run a person asked for carries exactly
+    # one of the three. `seconds` is per move, handed to python-chess as `Limit(time=)`. The
+    # service enforces "one of", not a CHECK: a constraint would mean rebuilding this table.
     depth: Mapped[int | None] = mapped_column(Integer)
     nodes: Mapped[int | None] = mapped_column(Integer)
+    seconds: Mapped[float | None] = mapped_column(Float)
     multipv: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # The window a run covers. NULL/NULL is the whole game; a request that names the first
+    # and last ply is stored as NULL/NULL too, so "a full-game run" has one spelling.
     ply_start: Mapped[int | None] = mapped_column(Integer)
     ply_end: Mapped[int | None] = mapped_column(Integer)
-    # Higher runs first: deep jobs jump the FIFO queue because someone is waiting on them.
+    # Higher runs first. 0 is the import priority (imports, backfill, the Games table's
+    # "Queue analysis", fills); 10 is a run a person asked for and is waiting on, which is
+    # also what an old deep run was queued with; correspondence tasks sit in between. Also
+    # what decides which of a game's runs answers: requested beats import, then newest.
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    # Whether a Maia pass follows this run's search at all. Copied off the tier's setting
+    # Whether a Maia pass follows this run's search at all. Copied off `maia_on_analysis`
     # when the run is queued, for the reason the budget is: a run queued to be searched and
     # nothing else must not grow a human-move pass because a setting moved while it waited.
     # Always true on a `maia_only` row — a fill with no Maia would be no pass at all.
@@ -673,10 +686,11 @@ class MoveEval(Base):
     best_lines: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON(none_as_null=True))
     # Where the search that produced `eval_before_*` actually got to, as the engine
     # reported it: the depth of its last iteration and the nodes it had visited. What the
-    # budget bought rather than what it asked for — `AnalysisRun.nodes` is the request, and
-    # these are the answer, which is why a correspondence task can only be compared with a
-    # three-day search on these. NULL on a terminal position, which no engine was asked
-    # about, and on a row that came from a runner too old to send them.
+    # budget bought rather than what it asked for — `AnalysisRun.nodes`/`depth`/`seconds`
+    # are the request, and these are the answer, which is why a correspondence task can
+    # only be compared with a three-day search on these. NULL on a terminal position,
+    # which no engine was asked about, and on a row that came from a runner too old to send
+    # them.
     depth: Mapped[int | None] = mapped_column(Integer)
     nodes: Mapped[int | None] = mapped_column(Integer)
     # Maia's predicted human move per rating level: {"1700": [{"uci": "e2e4", "p": 0.31}, ...]}

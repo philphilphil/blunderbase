@@ -37,7 +37,7 @@ enum StreamSurface: String, Codable, Sendable, Equatable {
 /// what is wanted here — every optional below means "let the server decide" when absent.
 struct StreamCreate: Encodable, Sendable, Equatable {
     var fen: String
-    /// Absent takes the engine holding the deep tier's role, which may itself live on a
+    /// Absent takes the engine holding the analysis role, which may itself live on a
     /// remote runner. That is the normal case; a picker is what would set this.
     var engineID: Int?
     /// 1...5. The server refuses anything else, so a caller clamps rather than discovers.

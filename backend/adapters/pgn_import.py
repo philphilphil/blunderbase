@@ -64,7 +64,7 @@ def run(
 ) -> ImportResult:
     """Read one PGN file (or one uploaded blob) and hand every game to the pipeline.
 
-    `analyze=False` lands the games without queueing the automatic quick pass.
+    `analyze=False` lands the games without queueing the automatic analysis pass.
 
     `mine=False` is a file of somebody else's games — a master collection, a friend's
     export, an opening survey. They land like any other game and can be analysed and

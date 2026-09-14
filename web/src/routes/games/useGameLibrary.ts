@@ -1,7 +1,7 @@
 /**
  * The library's data: one page of `/games?cards=true` at a time.
  *
- * `cards=true` is what makes the analysis columns possible — `analyzed`, `deep` and the
+ * `cards=true` is what makes the analysis columns possible — `analyzed`, `requested` and the
  * three worst moments come with the row, so the table never fans out into a request per
  * game. The key stays under the `['games']` prefix, which is what the `/events` socket
  * invalidates (`src/lib/events/invalidation.ts`), so an import or a finished run refreshes

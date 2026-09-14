@@ -29,8 +29,8 @@ import SwiftUI
 ///
 /// With the engine hidden the row keeps line one whole and loses three things from line
 /// two and the right: the stamp, the drop and the chips, which are the engine's verdict on
-/// how the game went. The tier word stays — which pass has run is what Blunderbase did,
-/// not what it concluded, and it is how a reader annotating unaided knows there is a
+/// how the game went. The run marker stays — which run has finished is what Blunderbase
+/// did, not what it concluded, and it is how a reader annotating unaided knows there is a
 /// verdict to check against afterwards.
 struct GameRowView: View {
     let card: GameCard
@@ -121,7 +121,7 @@ struct GameRowView: View {
 
             Spacer(minLength: 4)
 
-            tier
+            runMarker
             if !engineHidden {
                 Text(Format.winLoss(worstDrop))
                     .font(Theme.Font.mono(11, weight: .medium))
@@ -139,18 +139,19 @@ struct GameRowView: View {
             .foregroundStyle(Theme.faint2)
     }
 
-    /// Which pass has run over the game, said as quietly as the fact deserves.
+    /// What has run over the game, said as quietly as the fact deserves.
     ///
     /// Both markers are corner-of-the-row information: the reader is scanning for games,
     /// not for work to queue, and an unanalysed row is still a game they played. The web
-    /// paints a badge; here it is a word at nine points, and nothing at all on the common
-    /// case of a quick pass having finished.
+    /// paints a badge; here it is a word at nine points, in the colour the web gives a run
+    /// somebody asked for, and nothing at all on the common case of the import pass having
+    /// finished.
     @ViewBuilder
-    private var tier: some View {
+    private var runMarker: some View {
         if card.analyzed != true {
             marker("unanalysed", color: Theme.faint2)
-        } else if card.deep == true {
-            marker("deep", color: Theme.deep)
+        } else if card.requested == true {
+            marker("requested", color: Theme.deep)
         }
     }
 
@@ -260,7 +261,7 @@ enum GameRowPreview {
       {"id": 2, "source": "chesscom", "played_at": "2025-12-07T09:00:00Z", "color": "black",
        "result": "0-1", "outcome": "win", "white": "aVeryLongOpponentHandle", "black": "phib",
        "white_rating": 1690, "black_rating": 1701, "time_control": "180+2", "ply_count": 44,
-       "speed": "blitz", "analyzed": true, "deep": true,
+       "speed": "blitz", "analyzed": true, "requested": true,
        "worst_moments": [{"ply": 12, "san": "h6", "win_loss": 9, "classification": "inaccuracy"}],
        "eval_curve": [{"ply": 0, "win": 50}, {"ply": 20, "win": 44}, {"ply": 44, "win": 4}]},
       {"id": 3, "source": "pgn", "played_at": "2026-09-01T12:00:00Z", "color": "white",

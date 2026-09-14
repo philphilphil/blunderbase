@@ -136,7 +136,7 @@ has said about your games so you can annotate a game yourself first and check af
 the list loses the stamps, the drops and the `??` chips and the worst-moments strip; the game
 loses the eval bar, the glyph on the board, the advice arrows, the Eval and Engine tabs and
 the live board; the Book keeps its counts and scores but not its average drop. What stays is
-the game and what Blunderbase has *done* — the `deep` and `unanalysed` markers on the rows.
+the game and what Blunderbase has *done* — the `requested` and `unanalysed` markers on the rows.
 It is a setting of this phone, it survives relaunches, and the games list's computer goes
 dim while it is on so a clean move list is not mistaken for an unanalysed game.
 
@@ -221,7 +221,7 @@ imagesets are checked in so the app builds without `node_modules`.
 
 Analysis lines and variations on the board, PGN copy (there is no per-game
 PGN endpoint), and any offline cache. Live analysis cannot yet be pointed at
-a specific engine from the phone: it takes whichever engine holds the deep-tier role, which
+a specific engine from the phone: it takes whichever engine holds the analysis role, which
 is also the one that may live on a runner. There is also no per-device revocable token: the app authenticates with
 the owner password like a browser does, because `AuthGuard` accepts only the session cookie
 on the REST API today.

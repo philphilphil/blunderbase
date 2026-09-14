@@ -22,7 +22,8 @@ export type SortKey =
   | 'ply_count'
   | 'worst'
   | 'source'
-  | 'tier'
+// No `tier`: it ranked games by which pass they had, and with one pass there is nothing left
+// to rank. The backend still reads an old `order=tier` as the default order.
 
 export interface Sort {
   key: SortKey
@@ -55,5 +56,4 @@ const NATURAL_DIRECTION: Record<SortKey, 'asc' | 'desc'> = {
   ply_count: 'desc',
   worst: 'desc',
   source: 'asc',
-  tier: 'desc',
 }

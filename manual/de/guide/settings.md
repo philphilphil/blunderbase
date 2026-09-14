@@ -23,8 +23,8 @@ Ausgeblendet verliert die Partieansicht den Bewertungsbalken und die Bewertung, 
 Engine und Maia und die Live-Engine; die Partienliste verliert die Spalte **Verlust** und
 ihre Symbole, und die neuesten Partien auf der Startseite verlieren den Verlust und das
 Symbol in jeder Zeile. Es bleibt die Partie selbst – die Züge, die Uhren, deine Notizen – und das,
-was Blunderbase *getan* hat: welcher Durchlauf gelaufen ist und wie tief, samt den
-Schaltflächen, die den nächsten einreihen. Genau die drückst du, wenn dein eigenes Urteil
+was Blunderbase *getan* hat: die Markierung, die sagt, was gelaufen ist und wie weit es
+geschaut hat, und **Analysieren**. Genau das drückst du, wenn dein eigenes Urteil
 geschrieben ist.
 
 Wenn du die Ruhe nur bei *neuen* Partien willst – jede erst durchgehen, wie sie
@@ -92,6 +92,10 @@ aktuellen Bildschirm gelten.
 | `F` | Brett drehen |
 | `H` | Hinweise: die Pfeile auf dem Brett und die Engine-Spalten |
 | `E` | Die Engine auf dieser Stellung rechnen lassen |
+| `L` | Maia – alle Spielstärken nebeneinander, oder zurück zu einer |
+| `V` | Der Bewertungsverlauf |
+| `T` | Die Bedenkzeit je Zug |
+| `B` | Dein Buch zu dieser Stellung |
 | `↵` | Den Zug der Engine aufs Brett spielen |
 | `M` | Einen Zug tippen – `Sf3`, `exd5`, `O-O` – statt ihn zu ziehen |
 | `S` | Bretteinstellungen |
@@ -102,10 +106,8 @@ aktuellen Bildschirm gelten.
 | Taste | Wirkung |
 |---|---|
 | `N` | Eine Notiz zu dieser Stellung schreiben |
-| `Q` | Schnellanalyse einreihen |
-| `D` | Tiefenanalyse einreihen |
+| `A` | Analysieren – genauer hinsehen lassen |
 | `C` | PGN kopieren |
-| `T` | Zugspalte zwischen Züge und Markiert umschalten |
 
 ### Die Partientabelle
 

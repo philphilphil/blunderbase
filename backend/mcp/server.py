@@ -9,7 +9,7 @@ from mcp.types import TextContent
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import NoteSource, Platform, Result, Tier
+from backend.db.enums import NoteSource, Platform, Result
 from backend.db.session import get_sessionmaker
 from backend.mcp import arguments as args
 from backend.mcp import payloads
@@ -84,7 +84,7 @@ Evaluations are in win percentage (0-100) from the mover's side; `win_loss` is h
 of it a move gave away, and a classification only appears on an inaccuracy, mistake or
 blunder. Start wide (get_last_games, get_worst_recent_moments, get_stats) and drill down
 (get_game, opening_explorer, find_positions) rather than pulling whole games first.
-Deep analysis is queued, not immediate: request_analysis returns a run id to poll.
+A requested analysis is queued, not immediate: request_analysis returns a run id to poll.
 Write what you learn down with save_note, and open a session with search_notes; a note can
 be pinned to a variation as well as to a move (save_line, get_lines), and export_notes
 hands the memory back as one document.
@@ -260,7 +260,6 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
         variant: str | None = None,
         has_blunders: bool | None = None,
         analyzed: bool | None = None,
-        deep_analyzed: bool | None = None,
         text: str | None = None,
         limit: int = DEFAULT_SEARCH,
         offset: int = 0,
@@ -288,7 +287,6 @@ def _register_query(server: MCPServer, coach: Coach) -> None:
             variant=variant,
             has_blunders=has_blunders,
             analyzed=analyzed,
-            deep_analyzed=deep_analyzed,
             text=text,
             mine=args.whose(whose),
         )
@@ -504,7 +502,7 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
     @guarded
     def import_reference_game(source: str, game_id: str) -> TextContent:
         """Add one reference game to the owner's library, by the same `source` and id
-        get_reference_game takes. It becomes a library game they did not play: the quick
+        get_reference_game takes. It becomes a library game they did not play: the
         analysis pass is queued, get_game reads it with engine numbers once done, notes
         can be pinned to it — but it counts in no statistic and is not in opening_explorer,
         and search_games leaves it out unless `include_reference` is set. Asking twice
@@ -612,25 +610,32 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
     def request_analysis(
         game_id: int | None = None,
         fen: str | None = None,
-        tier: str = str(Tier.DEEP),
+        engine_id: int | None = None,
+        lines: int | None = None,
+        nodes: int | None = None,
+        depth: int | None = None,
+        seconds: float | None = None,
         ply_start: int | None = None,
         ply_end: int | None = None,
-        multipv: int | None = None,
-        nodes: int | None = None,
         elos: list[int] | None = None,
         maia: bool | None = None,
     ) -> TextContent:
-        """Queue an engine pass over one game or one position and get a run id back.
-        Deep analysis takes minutes, so this never blocks: poll get_analysis_status, and
-        read the result with get_game once it is done. A ply range (half-moves, end
-        exclusive) analyses one phase deeply. Re-analysis never overwrites an old run.
-        `elos` asks Maia at those ratings for this run only; left out, the run uses the
-        deployment's configured levels, which is what keeps games comparable. `maia` says
-        whether this run asks the human-move model at all — it is most of what a pass
-        costs; left out, the tier's own setting decides."""
+        """Queue an engine run over one game or one position and get a run id back.
+        It goes ahead of the import backlog, the way the owner's own Analyse dialog does.
+        A run takes minutes, so this never blocks: poll get_analysis_status, and read the
+        result with get_game once it is done — a requested run answers over the import
+        pass wherever it reaches. Each move's search stops at one limit: `nodes`, `depth`
+        or `seconds` (give at most one; none uses the deployment's node budget). `lines`
+        is how many lines to keep, 1 to 5. `engine_id` picks any enabled engine; left out,
+        the analysis role's. A ply range (half-moves, end exclusive) looks at one phase
+        only. Re-analysis never overwrites an old run. `elos` asks Maia at those ratings
+        for this run only; left out, the run uses the deployment's configured levels,
+        which is what keeps games comparable. `maia` says whether this run asks the
+        human-move model at all; left out, the deployment's setting decides."""
         window = args.ply_range(ply_start, ply_end)
         levels = args.ratings(elos)
-        wanted = args.tier(tier)
+        multipv = args.lines(lines)
+        want_nodes, want_depth, want_seconds = args.limit(nodes, depth, seconds)
         human = args.flag(maia, "maia")
         position = args.fen(fen, required=False)
         with coach.session() as session:
@@ -655,24 +660,33 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
                 session,
                 game_id=int(game_id) if game_id is not None else None,
                 fen=position,
-                tier=wanted,
+                engine_id=int(engine_id) if engine_id is not None else None,
                 ply_range=window,
                 multipv=multipv,
-                nodes=nodes,
+                nodes=want_nodes,
+                depth=want_depth,
+                seconds=want_seconds,
+                priority=analysis_service.REQUESTED_PRIORITY,
                 elos=levels,
                 maia=human,
             )
+            engine = run.engine
             payload = {
                 "run_id": run.id,
                 "status": str(run.status),
-                "tier": str(run.tier),
                 "game_id": run.game_id,
                 "fen": run.fen,
+                "requested": run.priority > 0,
+                "engine_id": run.engine_id,
+                "engine": engine.name if engine is not None else None,
                 "nodes": run.nodes,
+                "depth": run.depth,
+                "seconds": run.seconds,
                 "multipv": run.multipv,
                 "ply_start": run.ply_start,
                 "ply_end": run.ply_end,
                 "maia": run.maia,
+                "maia_only": bool(run.maia_only),
                 "maia_elos": run.maia_elos,
                 "queue": _queue_state(session),
             }
@@ -681,7 +695,7 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
     @server.tool()
     @guarded
     def clear_queue() -> TextContent:
-        """Drop every run still queued, of any tier, windowed or full-game, fill or not —
+        """Drop every run still queued, requested or not, windowed or full-game, fill or not —
         the undo for a queue built up by mistake, such as a fill or a backfill fired at the
         wrong scope. A run a worker has already claimed is left to finish, since there is
         no cancelled status to move it to. Answers how many rows went and how deep the
@@ -706,14 +720,19 @@ def _register_analysis(server: MCPServer, coach: Coach) -> None:
             payload = {
                 "run_id": run.id,
                 "status": str(run.status),
-                "tier": str(run.tier),
+                "requested": run.priority > 0,
                 "game_id": run.game_id,
                 "fen": run.fen,
+                "engine_id": run.engine_id,
                 "engine": engine.name if engine is not None else None,
                 "nodes": run.nodes,
+                "depth": run.depth,
+                "seconds": run.seconds,
                 "multipv": run.multipv,
                 "ply_start": run.ply_start,
                 "ply_end": run.ply_end,
+                "maia": run.maia,
+                "maia_only": bool(run.maia_only),
                 "attempts": run.attempts,
                 "created_at": payloads.stamp(run.created_at),
                 "started_at": payloads.stamp(run.started_at),

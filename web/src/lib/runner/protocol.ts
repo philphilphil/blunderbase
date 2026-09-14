@@ -20,6 +20,13 @@ import type { BestLine } from './search'
 
 export const PROTO_VERSION = 1
 
+/**
+ * `protocol.FEATURE_RUN_LIMITS`. A new stop condition is a hello feature rather than a
+ * version bump because the gateway refuses any other `proto` outright: a feature lets a
+ * runner from before keep connecting and be handed only the node-budget runs it can do.
+ */
+export const FEATURE_RUN_LIMITS = 'run_limits'
+
 /** `runners/config.py: WS_SUBPROTOCOL`. Both halves have to spell it identically. */
 export const WS_SUBPROTOCOL = 'blunderbase.runner.v1'
 
@@ -52,7 +59,6 @@ export interface Thresholds {
 /** `encode_plan`'s object, field for field. */
 export interface RunPlan {
   run_id: number
-  tier: string
   game_id: number | null
   fen: string | null
   variant: string
@@ -63,8 +69,14 @@ export interface RunPlan {
   position_ids: (number | null)[]
   ply_start: number
   ply_end: number
-  nodes: number
+  /**
+   * The stop condition: one of the three is set. The wire also carries a `tier`, always
+   * `"quick"`, for runners from before one analysis pass; nothing here reads it.
+   */
+  nodes: number | null
   depth: number | null
+  /** Seconds per move. */
+  seconds: number | null
   multipv: number
   thresholds: Thresholds
   owner_color: 'white' | 'black' | null
@@ -142,6 +154,10 @@ export function hello(fields: {
     engines: fields.engines,
     active_runs: fields.activeRuns,
     browser: true,
+    // `protocol.FEATURE_RUN_LIMITS`: this tab stops a search on nodes, depth or seconds
+    // (`WasmEngine.search`). Without it the gateway would only hand the tab import passes,
+    // and a run somebody asked for at depth 24 on this engine would wait for nobody.
+    features: [FEATURE_RUN_LIMITS],
   }
 }
 
@@ -293,9 +309,16 @@ export function decodePlan(data: unknown): RunPlan {
   }
   const limits = thresholds as Record<string, unknown>
   const owner = raw.owner_color
+  const nodes = optionalInt(raw.nodes)
+  const depth = optionalInt(raw.depth)
+  const seconds = optionalNumber(raw.seconds)
+  // A search with no bound would run until the tab closed. A Maia-only pass searches
+  // nothing, but this runner refuses those in `analysePlan` with a better sentence.
+  if (nodes === null && depth === null && seconds === null && !raw.maia_only) {
+    throw new ProtocolError('a plan stops each move on nodes, depth or seconds')
+  }
   return {
     run_id: requireInt(raw, 'run_id'),
-    tier: requireString(raw, 'tier'),
     game_id: optionalInt(raw.game_id),
     fen: optionalString(raw.fen),
     variant: requireString(raw, 'variant'),
@@ -307,8 +330,9 @@ export function decodePlan(data: unknown): RunPlan {
     ),
     ply_start: requireInt(raw, 'ply_start'),
     ply_end: requireInt(raw, 'ply_end'),
-    nodes: requireInt(raw, 'nodes'),
-    depth: optionalInt(raw.depth),
+    nodes,
+    depth,
+    seconds,
     multipv: requireInt(raw, 'multipv'),
     thresholds: {
       inaccuracy: Number(limits.inaccuracy),
@@ -347,6 +371,12 @@ function requireInt(data: Record<string, unknown>, key: string): number {
   const value = Number(data[key])
   if (!Number.isFinite(value)) throw new ProtocolError(`${key} is missing or is not a number`)
   return Math.trunc(value)
+}
+
+function optionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function optionalInt(value: unknown): number | null {

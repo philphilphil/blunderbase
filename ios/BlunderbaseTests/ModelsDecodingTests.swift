@@ -108,7 +108,7 @@ final class ModelsDecodingTests: XCTestCase {
               "opening": "Ruy Lopez",
               "ply_count": 61,
               "analyzed": true,
-              "deep": false,
+              "requested": false,
               "eval_curve": [
                 {"ply": 0, "win": 50.4},
                 {"ply": 1, "win": 43.2},
@@ -147,7 +147,7 @@ final class ModelsDecodingTests: XCTestCase {
         XCTAssertEqual(card.game.opening, "Ruy Lopez")
         XCTAssertEqual(card.game.playedAt, utc(2026, 8, 22, 19, 4, 11))
         XCTAssertEqual(card.analyzed, true)
-        XCTAssertEqual(card.deep, false)
+        XCTAssertEqual(card.requested, false)
         XCTAssertEqual(card.evalCurve?.count, 3)
         XCTAssertEqual(card.evalCurve?[1].win, 43.2)
         // A curve point whose win percentage was dropped is still a point on the ply axis.
@@ -288,11 +288,11 @@ final class ModelsDecodingTests: XCTestCase {
           "runs": [
             {
               "id": 9,
-              "tier": "deep",
+              "requested": true,
               "status": "done",
               "engine": "Stockfish 17",
               "engine_kind": "uci",
-              "nodes": 2000000,
+              "seconds": 10.0,
               "multipv": 3,
               "finished_at": "2026-08-22T19:44:02.123456Z"
             }
@@ -318,7 +318,9 @@ final class ModelsDecodingTests: XCTestCase {
         XCTAssertEqual(detail.moves.count, 1)
         XCTAssertEqual(detail.move(atPly: 0)?.san, "e4", "ply 0 is White's first move")
         XCTAssertNil(detail.notes)
-        XCTAssertEqual(detail.runs.first?.tier, "deep")
+        XCTAssertEqual(detail.runs.first?.requested, true)
+        XCTAssertEqual(detail.runs.first?.seconds, 10.0)
+        XCTAssertNil(detail.runs.first?.nodes)
         XCTAssertEqual(detail.runs.first?.multipv, 3)
         XCTAssertNil(detail.runs.first?.maiaOnly)
 
@@ -420,8 +422,8 @@ final class ModelsDecodingTests: XCTestCase {
 
     /// One row of `GET /stats/worst-moments`, written the way `_moment_of` in
     /// `backend/services/stats.py` builds it: the game **nested** under `game` rather than
-    /// flattened as a game card is, `move_number` already `ply / 2 + 1`, and `run_id` and
-    /// `tier` present and unread. The nesting is the part worth pinning — `WorstMoment` and
+    /// flattened as a game card is, `move_number` already `ply / 2 + 1`, and `run_id`
+    /// present and unread. The nesting is the part worth pinning — `WorstMoment` and
     /// this one are two shapes over the same idea, and decoding one as the other would
     /// silently lose the game.
     func testWorstMomentDecodesWithItsGameNested() throws {
@@ -452,8 +454,7 @@ final class ModelsDecodingTests: XCTestCase {
           "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4",
           "best_move_uci": "d7d6",
           "best_move_san": "d6",
-          "run_id": 88,
-          "tier": "deep"
+          "run_id": 88
         }
         """
 

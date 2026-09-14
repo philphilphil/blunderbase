@@ -20,7 +20,6 @@ export type Platform = 'lichess' | 'chesscom' | 'fics' | 'otb'
 export type Color = 'white' | 'black'
 export type Result = '1-0' | '0-1' | '1/2-1/2' | '*'
 export type Speed = 'bullet' | 'blitz' | 'rapid' | 'classical' | 'correspondence'
-export type Tier = 'quick' | 'deep'
 export type RunStatus = 'queued' | 'running' | 'done' | 'failed'
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
 export type Classification = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blunder'
@@ -50,7 +49,6 @@ export const CLASSIFICATIONS: readonly Classification[] = [
   'mistake',
   'blunder',
 ]
-export const TIERS: readonly Tier[] = ['quick', 'deep']
 
 // --- errors ---------------------------------------------------------------
 
@@ -148,15 +146,17 @@ export interface AppSettings {
    * — they are rows of the same numeric settings table as the budgets, and the PUT has to
    * carry them as the numbers the backend clamps.
    *
-   * `maia_on_quick` defaults on, `maia_on_deep` off (a deep pass would recompute the policy
-   * the quick pass already stored), `maia_both_sides` on.
+   * `maia_on_analysis` defaults on, `maia_both_sides` on.
    */
-  maia_on_quick: number | null
-  maia_on_deep: number | null
+  maia_on_analysis: number | null
   maia_both_sides: number | null
-  quick_nodes: number | null
-  deep_nodes: number | null
-  deep_multipv: number | null
+  /**
+   * The analysis pass: nodes per move for every import and backfill run, and the lines it
+   * keeps (1 to 5). A run somebody asks for from the Analyse dialog starts from these too,
+   * which is why one pair serves both rather than a budget per kind of run.
+   */
+  analysis_nodes: number | null
+  analysis_multipv: number | null
   inaccuracy_threshold: number | null
   mistake_threshold: number | null
   blunder_threshold: number | null
@@ -186,7 +186,7 @@ export interface AppSettings {
   analysis_concurrency?: number | null
   /**
    * The bounded half of the mode. A *task* is one `AnalysisRun` over one node's position,
-   * so these two are its budget in the sense `quick_nodes` is a pass's: read when the task
+   * so these two are its budget in the sense `analysis_nodes` is a pass's: read when the task
    * is queued and copied onto its run. The line count doubles as how wide an expansion can
    * be, because the children come from those lines.
    */
@@ -292,7 +292,8 @@ export interface WorstMoment extends Extra {
 /** `GET /games?cards=true` and the dashboard strip. */
 export interface GameCard extends GameSummary {
   analyzed: boolean
-  deep: boolean
+  /** A run somebody asked for — whole game or a window — is done over this game. */
+  requested: boolean
   eval_curve: EvalPoint[]
   worst_moments: WorstMoment[]
 }
@@ -471,19 +472,36 @@ export interface MoveRow extends Extra {
  */
 export interface GameRunSummary extends Extra {
   id: number
-  tier: Tier
+  engine_id?: number | null
   /**
-   * A pass that asked the human-move model and searched nothing. It is filed under a tier
-   * to borrow that tier's engine, so the tier alone does not say what the run did; only
-   * a fill carries the key.
+   * Somebody asked for this run from the Analyse dialog (or an assistant did), rather than
+   * an import or a backfill queuing it. Always sent, because it is what the badge colours
+   * by and what decides which run answers for a move (`gameModel.bestRun`).
+   */
+  requested: boolean
+  /**
+   * A pass that asked the human-move model and searched nothing. It borrows the analysis
+   * role's engine, so the engine alone does not say what the run did; only a fill carries
+   * the key.
    */
   maia_only?: boolean
+  /** Whether a human-move pass followed the search, as settled when the run was queued. */
+  maia?: boolean | null
   status: RunStatus
   engine?: string | null
   engine_kind?: EngineKind | null
+  /**
+   * The limit each move's search stopped at. A requested run carries one of the three, an
+   * import pass `nodes`; a legacy row may carry nodes alone. Never the depth a search
+   * reached — that lives on each move's eval.
+   */
   depth?: number | null
   nodes?: number | null
+  seconds?: number | null
   multipv?: number
+  /** The window a run covered; both absent is the whole game. */
+  ply_start?: number | null
+  ply_end?: number | null
   finished_at?: string | null
 }
 
@@ -561,7 +579,6 @@ export interface GameFilters {
   variant?: string
   has_blunders?: boolean
   analyzed?: boolean
-  deep_analyzed?: boolean
   text?: string
   /**
    * Whose games: the owner's (`mine`, the default when absent), the ones added from the
@@ -580,7 +597,7 @@ export interface ImportRequest {
   text?: string
   since?: string
   max_games?: number
-  /** Left unset by default; `false` lands the games without queueing a quick pass. */
+  /** Left unset by default; `false` lands the games without queueing an analysis pass. */
   analyze?: boolean
   wait?: boolean
 }
@@ -647,35 +664,41 @@ export interface ImportCancelling {
 
 // --- analysis -------------------------------------------------------------
 
+/**
+ * One run somebody asked for — what the game's Analyse dialog sends. Always queued at the
+ * requested priority, so there is no priority to send.
+ *
+ * The search stops each move at one limit: `nodes`, `depth` or `seconds`. None takes the
+ * `analysis_nodes` setting; two is a 422, because "whichever comes first" is not what
+ * either number on the dialog promised. `ply_start`/`ply_end` go together, and a window
+ * over the whole game is stored as no window at all.
+ */
 export interface AnalysisRequest {
   game_id?: number
   fen?: string
-  tier?: Tier
   ply_start?: number
   ply_end?: number
+  /** Any enabled UCI engine; omitted, the analysis role's. */
   engine_id?: number
+  /** Lines kept per position, 1 to 5; omitted, `analysis_multipv`. */
   multipv?: number
   nodes?: number
   depth?: number
-  priority?: number
+  seconds?: number
   /** Maia levels for this run alone; omitted, it uses the deployment's configured ones. */
   elos?: number[]
+  /** Whether a human-move pass follows; omitted, `maia_on_analysis` decides. */
+  maia?: boolean
 }
 
 /**
- * One pass over each of several games. Its own body rather than a list on
- * `AnalysisRequest`, because the answer is not a run — see `BatchAnalysisResponse`.
+ * The import pass over each of several games — the Games table's "Queue analysis". Its own
+ * body rather than a list on `AnalysisRequest`, because the answer is not a run (see
+ * `BatchAnalysisResponse`), and nothing but ids, because a selection of five hundred games
+ * runs at the Settings page's budget and must not jump ahead of what a person asked for.
  */
 export interface BatchAnalysisRequest {
   game_ids: number[]
-  tier?: Tier
-  engine_id?: number
-  multipv?: number
-  nodes?: number
-  depth?: number
-  priority?: number
-  /** Maia levels for these runs alone; omitted, they use the configured ones. */
-  elos?: number[]
 }
 
 /**
@@ -720,31 +743,32 @@ export interface BatchAnalysisResponse {
 /**
  * The whole library in one pass, for the nights the owner wants every game covered.
  *
- * `pending` is how many games have no live run of that tier — what a backfill would take
- * on. `outstanding` is queued-plus-running full-game runs of the tier, which is what tells
- * a caller whether a pass it started is still going.
+ * `pending` is how many games have no live analysis pass — what a backfill would take on.
+ * `outstanding` is queued-plus-running full-game passes, which is what tells a caller
+ * whether a pass it started is still going.
  */
 export interface BackfillPreview {
-  tier: Tier
   pending: number
 }
 
 export interface BackfillStarted {
-  tier: Tier
   queued: number
   outstanding: number
 }
 
-/** Cancelling drops what is still queued; what is already running is left to finish. */
+/**
+ * Cancelling drops the import passes still queued; what is already running is left to
+ * finish, and a run somebody asked for from a game is not a backfill and stays.
+ */
 export interface BackfillCancelled {
-  tier: Tier
   dropped: number
   outstanding: number
 }
 
 /**
- * The whole-queue reset: every tier and every shape of queued run, dropped in one call.
- * No `tier` — unlike `BackfillCancelled`, this was never scoped to one.
+ * The whole-queue reset: every shape of queued run — requested, windowed, full-game,
+ * Maia-fill — dropped in one call. Wider than `BackfillCancelled`, which takes back only
+ * import passes.
  */
 export interface QueueCleared {
   dropped: number
@@ -756,14 +780,23 @@ export interface RunResponse {
   game_id?: number | null
   fen?: string | null
   engine_id?: number | null
-  tier: Tier
   status: RunStatus
+  /**
+   * The limit each move's search stopped at: a requested run carries one of the three, an
+   * import pass `nodes`. What a badge prints comes from these, not from a name for the pass.
+   */
   depth?: number | null
   nodes?: number | null
+  seconds?: number | null
   multipv: number
   ply_start?: number | null
   ply_end?: number | null
   priority: number
+  /**
+   * Somebody asked for this run rather than an import or a backfill queuing it. Read this,
+   * not `priority > 0`: the band a correspondence task sits in is the queue's business.
+   */
+  requested: boolean
   attempts: number
   /** A Maia fill: this run asks the human-move model and searches nothing. */
   maia_only?: boolean
@@ -784,18 +817,6 @@ export interface RunResponse {
 export interface CoverageLevel {
   elo: number
   games: number
-}
-
-/**
- * What a backfill of each tier would queue if it were started now.
- *
- * Not the complement of the coverage buckets: a game with a deep pass and no quick one is
- * missing a quick pass, and counts here under `quick` while counting as analysed in the
- * split above.
- */
-export interface CoverageMissing {
-  quick: number
-  deep: number
 }
 
 /**
@@ -825,9 +846,12 @@ export interface CoverageMaia {
  * page whose whole purpose is "what will this cost me".
  */
 export interface CoverageEstimates {
-  quick_seconds: number | null
-  deep_seconds: number | null
-  /** The fill, priced off finished `maia_only` runs rather than off a tier that searches. */
+  /**
+   * The backfill, sampled only off import passes at the node budget configured now: a
+   * requested run at depth 30 says nothing about what the next backfill costs.
+   */
+  analysis_seconds: number | null
+  /** The fill, priced off finished `maia_only` runs rather than off a pass that searches. */
   maia_seconds: number | null
   concurrency: number
 }
@@ -836,15 +860,17 @@ export interface CoverageEstimates {
  * `GET /analysis/coverage` — the whole library's analysis state in one answer.
  *
  * One call rather than six, so the page cannot show a breakdown that fails to add up to
- * its own total: `no_pass`, `quick_only` and `deep` partition the library and sum to
- * `total`.
+ * its own total: `no_pass` and `analysed` partition the library and sum to `total`.
  */
 export interface AnalysisCoverage {
   total: number
+  analysed: number
   no_pass: number
-  quick_only: number
-  deep: number
-  missing: CoverageMissing
+  /**
+   * What a backfill would queue now. Not quite `no_pass`: a game whose pass is already
+   * queued has none yet and is not missing one.
+   */
+  missing: number
   failed: number
   maia: CoverageMaia
   estimates: CoverageEstimates
@@ -1250,7 +1276,6 @@ export interface MomentResponse extends Extra {
   best_move_uci?: string | null
   best_move_san?: string | null
   run_id?: number | null
-  tier?: Tier | null
 }
 
 export interface DimensionList {
@@ -1344,24 +1369,16 @@ export interface SampleResponse extends Extra {
   policy?: MaiaPolicy | null
 }
 
-export interface TierStatusResponse {
-  tier: Tier
-  engine_id?: number | null
-  engine_name?: string | null
-  available: boolean
-  reason?: string | null
-}
-
 /**
- * The three jobs an engine can be assigned to, in the order `/engines/roles` lists them.
+ * The two jobs an engine can be assigned to, in the order `/engines/roles` lists them.
  *
- * Human moves is a role beside the two tiers rather than a third `Tier`: `Tier` is a search
- * budget stored on every analysis run, and Maia searches nothing. `db.enums.EngineRole` is
+ * Two because there are two different questions — what the best move was, and what a
+ * person would have played — and one engine seldom answers both. `db.enums.EngineRole` is
  * the same list on the backend.
  */
-export type EngineRoleName = 'quick' | 'deep' | 'human'
+export type EngineRoleName = 'analysis' | 'human'
 
-export const ENGINE_ROLES: readonly EngineRoleName[] = ['quick', 'deep', 'human']
+export const ENGINE_ROLES: readonly EngineRoleName[] = ['analysis', 'human']
 
 /**
  * One role and the engine assigned to it — `services.engines.role_status`.
@@ -1390,12 +1407,11 @@ export interface EngineRolesResponse {
 /**
  * The assignment to write. A key that is left out is left alone; `null` unassigns.
  *
- * That distinction is the whole shape: saving one dropdown must not clear the other two,
- * so absence cannot mean "no engine" — only an explicit `null` does.
+ * That distinction is the whole shape: saving one dropdown must not clear the other, so
+ * absence cannot mean "no engine" — only an explicit `null` does.
  */
 export interface EngineRolesUpdate {
-  quick?: number | null
-  deep?: number | null
+  analysis?: number | null
   human?: number | null
 }
 
@@ -1732,7 +1748,7 @@ export interface StreamLine extends Extra {
 
 export interface StreamCreate {
   fen: string
-  /** Omitted or null ⇒ the deep tier's engine. */
+  /** Omitted or null ⇒ the analysis role's engine. */
   engine_id?: number | null
   /** 1..5, default 1. */
   multipv?: number
@@ -1945,7 +1961,7 @@ export interface CorrespondenceSearchCreate {
    * `search`, which is what the dialog sends.
    */
   kind?: CorrespondenceSearchKind
-  /** Required for a search; for a task, null is the deep role's engine. */
+  /** Required for a search; for a task, null is the analysis role's engine. */
   engine_id?: number | null
   /** null is the deployment's `correspondence_multipv`. */
   multipv?: number | null
@@ -1968,11 +1984,11 @@ export interface CorrespondenceExpand {
   /** 1 to 3. */
   stages?: number
   tasks?: boolean
-  /** The engine every task of the expansion runs on, later stages too; null is the deep role's. */
+  /** The engine every task of the expansion runs on, later stages too; null is the analysis role's. */
   engine_id?: number | null
 }
 
-/** Which engine a refresh queues its tasks on; null is the deep role's engine. */
+/** Which engine a refresh queues its tasks on; null is the analysis role's engine. */
 export interface CorrespondenceRefresh {
   engine_id?: number | null
 }
@@ -2010,13 +2026,20 @@ export interface CorrespondenceHost extends Extra {
   connected?: boolean
 }
 
-/** One engine a search can run on; `default` marks the picker's first. */
+/**
+ * One engine a search can run on; `default` marks the picker's first.
+ *
+ * `GET /analysis/engines` answers with the same rows for the game's Analyse dialog, so one
+ * engine picker serves both. There `search_trouble` is why a *run* queued on it now would
+ * be refused (a local binary gone, Maia stranded on another host) — a runner that is not
+ * connected is no trouble, because the run waits in the queue for it.
+ */
 export interface CorrespondenceSearchEngine extends Extra {
   engine_id: number
   name: string
   version?: string | null
   hash_mb?: number | null
-  /** The deep role's engine, which every picker opens on. */
+  /** The analysis role's engine, which every picker opens on. */
   default?: boolean
   runner_id?: number | null
   /** Where it lives, in the backend's words: `this host` or the runner's name. */
@@ -2041,7 +2064,7 @@ export interface CorrespondenceStatus extends Extra {
   parked: CorrespondenceParked[]
   hosts: CorrespondenceHost[]
   /**
-   * Every enabled UCI engine the deployment has, this host's first. The deep role's
+   * Every enabled UCI engine the deployment has, this host's first. The analysis role's
    * carries `default`; the ones a search cannot run on carry `search_trouble`.
    */
   engines: CorrespondenceSearchEngine[]

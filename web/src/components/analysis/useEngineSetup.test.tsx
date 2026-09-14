@@ -33,7 +33,7 @@ vi.mock('@/lib/api/endpoints', () => ({
 
 function Harness({ resume }: { resume: (id: number) => void }) {
   const setup = useEngineSetup()
-  return <><button onClick={() => setup.show('quick', resume)}>Quick</button>{setup.dialog}</>
+  return <><button onClick={() => setup.show(resume)}>Analyse</button>{setup.dialog}</>
 }
 function mount(resume = vi.fn()) {
   const view = render(<Providers><MemoryRouter><Harness resume={resume} /></MemoryRouter></Providers>)
@@ -45,7 +45,7 @@ beforeEach(() => {
   fake.runnerId = null
   fake.install.mockImplementation(async () => { fake.runnerId = 7 })
   fake.ready.mockResolvedValue(undefined)
-  fake.roles.mockResolvedValue({ roles: [{ role: 'quick', configured: false }] })
+  fake.roles.mockResolvedValue({ roles: [{ role: 'analysis', configured: false }] })
   fake.assign.mockResolvedValue({})
 })
 
@@ -57,31 +57,31 @@ describe('engine setup', () => {
         <Harness resume={vi.fn()} />
       </RuntimeCapabilitiesContext>
     </MemoryRouter></Providers>)
-    await user.click(screen.getByText('Quick'))
+    await user.click(screen.getByText('Analyse'))
     expect(screen.getByRole('button', { name: 'Set up browser engine' })).toBeEnabled()
   })
 
-  it('waits for registration, assigns the missing tier, then resumes without navigation', async () => {
+  it('waits for registration, assigns the empty analysis role, then resumes without navigation', async () => {
     let ready!: () => void
     fake.ready.mockImplementation(() => new Promise<void>((resolve) => { ready = resolve }))
     const user = userEvent.setup()
     const { resume } = mount()
-    await user.click(screen.getByText('Quick'))
+    await user.click(screen.getByText('Analyse'))
     expect(screen.getByRole('link', { name: 'Go to Machines' })).toHaveAttribute('href', '/compute/machines')
     await user.click(screen.getByRole('button', { name: 'Set up browser engine' }))
     expect(resume).not.toHaveBeenCalled()
     await act(async () => ready())
     await waitFor(() => expect(resume).toHaveBeenCalledExactlyOnceWith(42))
-    expect(fake.assign).toHaveBeenCalledWith({ quick: 42 })
+    expect(fake.assign).toHaveBeenCalledWith({ analysis: 42 })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('reuses an installed runner and preserves configured roles', async () => {
     fake.runnerId = 7
-    fake.roles.mockResolvedValue({ roles: [{ role: 'quick', configured: true }] })
+    fake.roles.mockResolvedValue({ roles: [{ role: 'analysis', configured: true }] })
     const user = userEvent.setup()
     const { resume } = mount()
-    await user.click(screen.getByText('Quick'))
+    await user.click(screen.getByText('Analyse'))
     await user.click(screen.getByRole('button', { name: 'Set up browser engine' }))
     await waitFor(() => expect(resume).toHaveBeenCalledWith(42))
     expect(fake.resume).toHaveBeenCalledOnce()
@@ -93,7 +93,7 @@ describe('engine setup', () => {
     fake.ready.mockRejectedValueOnce(new Error('Stockfish could not load'))
     const user = userEvent.setup()
     const { resume } = mount()
-    await user.click(screen.getByText('Quick'))
+    await user.click(screen.getByText('Analyse'))
     await user.click(screen.getByRole('button', { name: 'Set up browser engine' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Stockfish could not load')
     expect(resume).not.toHaveBeenCalled()
@@ -106,7 +106,7 @@ describe('engine setup', () => {
     fake.ready.mockImplementation(() => new Promise<void>((resolve) => { ready = resolve }))
     const user = userEvent.setup()
     const { resume } = mount()
-    await user.click(screen.getByText('Quick'))
+    await user.click(screen.getByText('Analyse'))
     await user.click(screen.getByRole('button', { name: 'Set up browser engine' }))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await act(async () => ready())

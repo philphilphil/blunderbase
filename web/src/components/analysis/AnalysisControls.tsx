@@ -79,6 +79,18 @@ export function engineOptionLabel(host: EngineHost): string {
   return `${host.name} · ${host.runnerName ?? 'local'}`
 }
 
+/**
+ * The picker's first option: no engine named, so the server's analysis role decides. Who
+ * that is can only be known from a session that is actually open, so before the first one
+ * the option says what it does rather than who. One helper because the footer picker and
+ * the engine pane's title strip both carry this option, and must never word it apart.
+ */
+export function useDefaultEngineLabel(stream: StreamSessionApi): string {
+  const { t } = useLingui()
+  const name = stream.engineId === null ? (stream.session?.engine ?? null) : null
+  return name ? t`analysis engine — ${name}` : t`analysis engine`
+}
+
 // Pickers you can actually hit: a 2rem row, text at the size the rest of the panel reads
 // at, and room around it. Anything smaller was a target you had to aim for.
 const SELECT_CLASS =
@@ -106,22 +118,22 @@ export function LiveSwitch({ stream, fen, className }: ControlProps) {
   const { error, resume } = stream
   const { show } = setup
   // Switching the board on with no engine behind it is a missing step, not a failure, so
-  // it opens the same setup dialog Quick and Deep do and turns the board on once Stockfish
+  // it opens the same setup dialog Analyse… does and turns the board on once Stockfish
   // is there. Two refusals reach here. `browser_engine_missing` is this tab's own — the
   // demo's board never asked a server — and needs no confirming. `stream_unavailable` is
-  // the server's, and is the *same* status whether the deep role has no engine or its
+  // the server's, and is the *same* status whether the analysis role has no engine or its
   // engine is simply away, so the roles are read to tell which; only the first is
   // something a browser engine fixes, and the second stays the sentence the panel shows.
   useEffect(() => {
     if (!(error instanceof ApiError)) return
-    if (error.error === 'browser_engine_missing') return show('deep', resume)
+    if (error.error === 'browser_engine_missing') return show(resume)
     if (error.error !== 'stream_unavailable') return
     let cancelled = false
     void listEngineRoles()
       .then((roles) => {
         if (cancelled) return
-        if (roles.roles.some((role) => role.role === 'deep' && !role.configured)) {
-          show('deep', resume)
+        if (roles.roles.some((role) => role.role === 'analysis' && !role.configured)) {
+          show(resume)
         }
       })
       .catch(() => {})
@@ -153,9 +165,7 @@ export function LiveSwitch({ stream, fen, className }: ControlProps) {
 export function LivePickers({ stream, fen, className }: ControlProps) {
   const { t } = useLingui()
   const idle = fen === null || fen === ''
-  // The name the server resolved "the deep tier" to. It is only knowable from a session
-  // that is actually open, so before the first one the option says what it does, not who.
-  const deepName = stream.engineId === null ? stream.session?.engine ?? null : null
+  const defaultLabel = useDefaultEngineLabel(stream)
 
   return (
     <div className={cn('flex min-w-0 flex-1 flex-wrap items-center gap-2', className)}>
@@ -170,7 +180,7 @@ export function LivePickers({ stream, fen, className }: ControlProps) {
         // row has left, and never less than enough for a name to be read.
         className={cn(SELECT_CLASS, 'min-w-40 flex-1 truncate')}
       >
-        <option value="">{deepName ? t`deep tier — ${deepName}` : t`deep tier`}</option>
+        <option value="">{defaultLabel}</option>
         {stream.engines
           .filter((host) => host.streams)
           .map((host) => (

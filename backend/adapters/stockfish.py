@@ -7,7 +7,7 @@ module's command handling, option model and error taxonomy rather than repeating
 What changed on the way in:
 
 - The predecessor read node budgets and thread counts off `Settings` and exposed one method
-  per tier of its puzzle detector. Engines are database rows here, so the adapter takes a
+  per budget of its puzzle detector. Engines are database rows here, so the adapter takes a
   path plus the UCI options that row stores and nothing else; budgets belong to the caller.
 - Ranks now come from the engine's own `multipv` field. Ranking by enumeration silently
   renumbered every line below one that had to be skipped.

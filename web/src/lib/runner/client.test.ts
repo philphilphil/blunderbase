@@ -31,7 +31,6 @@ const DECLARED: UciOption[] = [
 /** One ply of the fool's mate, so a dispatch is two positions and finishes at once. */
 const PLAN: RunPlan = {
   run_id: 42,
-  tier: 'quick',
   game_id: 3,
   fen: null,
   variant: 'standard',
@@ -43,6 +42,7 @@ const PLAN: RunPlan = {
   ply_end: 1,
   nodes: 1000,
   depth: null,
+  seconds: null,
   multipv: 1,
   thresholds: { inaccuracy: 5, mistake: 10, blunder: 20 },
   owner_color: 'white',
@@ -259,6 +259,8 @@ describe('the handshake', () => {
     expect(hello.browser).toBe(true)
     expect(hello.slots).toBe(1)
     expect(hello.active_runs).toEqual([])
+    // Without it the gateway hands this tab only node-budget runs.
+    expect(hello.features).toEqual(['run_limits'])
 
     const engines = hello.engines as Record<string, unknown>[]
     expect(engines).toHaveLength(1)

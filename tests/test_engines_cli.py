@@ -48,16 +48,15 @@ def test_add_probes_the_binary_and_takes_the_roles_its_kind_fits(
     output = capsys.readouterr().out
     # The version comes from the binary's own `id name`, which is the proof it was started.
     assert "FakeFish 1" in output
-    assert "the quick tier, the deep tier" in output
+    assert "serves the analysis role" in output
 
     with session_scope(settings) as session:
         engine = session.scalars(select(Engine)).one()
         assert (engine.name, engine.kind, engine.enabled) == ("sf-local", EngineKind.UCI, True)
         assert engine.options == {"Threads": 4}
-        # A first UCI engine fills the two search roles on its way in, so a fresh install
+        # A first UCI engine fills the analysis role on its way in, so a fresh install
         # analyses without a second command.
-        for role in (EngineRole.QUICK, EngineRole.DEEP):
-            assert engines_service.engine_for_role(session, role) is not None
+        assert engines_service.engine_for_role(session, EngineRole.ANALYSIS) is not None
         assert engines_service.engine_for_role(session, EngineRole.HUMAN) is None
 
 
@@ -99,15 +98,17 @@ def test_role_takes_the_role_from_whatever_held_it(
     settings: Settings, uci: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(["engines", "add", "first", uci]) == 0
-    assert main(["engines", "add", "second", uci, "--role", "deep"]) == 0
+    with session_scope(settings) as session:
+        held = engines_service.engine_for_role(session, EngineRole.ANALYSIS)
+        assert held is not None and held.name == "first"
+
+    assert main(["engines", "add", "second", uci, "--role", "analysis"]) == 0
     capsys.readouterr()
 
     with session_scope(settings) as session:
-        quick = engines_service.engine_for_role(session, EngineRole.QUICK)
-        deep = engines_service.engine_for_role(session, EngineRole.DEEP)
-        assert quick is not None and quick.name == "first"
+        analysis = engines_service.engine_for_role(session, EngineRole.ANALYSIS)
         # Explicitly asked for, so it is taken — `assign_default_roles` alone never would.
-        assert deep is not None and deep.name == "second"
+        assert analysis is not None and analysis.name == "second"
 
 
 def test_a_maia_takes_human_moves_and_never_a_search_role(
@@ -120,7 +121,7 @@ def test_a_maia_takes_human_moves_and_never_a_search_role(
         engine = session.scalars(select(Engine)).one()
         assert engine.kind is EngineKind.MAIA
         assert engines_service.engine_for_role(session, EngineRole.HUMAN) is not None
-        assert engines_service.engine_for_role(session, EngineRole.QUICK) is None
+        assert engines_service.engine_for_role(session, EngineRole.ANALYSIS) is None
 
 
 def test_an_option_the_binary_does_not_declare_is_refused_by_name(
@@ -199,5 +200,5 @@ def test_list_names_each_engine_where_it_lives_and_what_it_serves(
 
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == 2
-    assert "sf-local" in lines[0] and "this host" in lines[0] and "quick, deep" in lines[0]
+    assert "sf-local" in lines[0] and "this host" in lines[0] and "analysis" in lines[0]
     assert "maia-local" in lines[1] and "human" in lines[1]

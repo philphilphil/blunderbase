@@ -8,18 +8,27 @@ import { demoAnalysis, DEMO_ENGINE_ID } from '@/lib/demo/analysis'
 
 import { Button } from '@/components/ui/button'
 import { createRunner, getRunnersStatus, listEngineRoles, setEngineRoles } from '@/lib/api/endpoints'
-import type { Tier } from '@/lib/api/types'
 import { engineHosts } from '@/lib/engines/hosts'
 import { browserRunner, browserRunnerSupport } from '@/lib/runner'
 import { installBrowserRunner, whenBrowserEngineReady } from '@/lib/runner/install'
 import { useRuntimeCapabilities } from '@/lib/runtime/capabilities'
 
-/** Keep the user's requested action until Stockfish has registered and can receive work. */
+/**
+ * Keep the user's requested action until Stockfish has registered and can receive work.
+ *
+ * Only the analysis role is ever filled in: it is the one a search or a run falls back to
+ * when nobody named an engine, and a browser engine cannot answer for human moves. A role
+ * that already holds an engine is left alone — the owner assigned it, and a tab that set
+ * up Stockfish to get past one refusal has no business overriding that.
+ */
 export function useEngineSetup() {
   const { t } = useLingui()
   const client = useQueryClient()
   const capabilities = useRuntimeCapabilities()
-  const [pending, setPending] = useState<{ tier: Tier; resume: (engineId: number) => void } | null>(null)
+  const [pending, setPending] = useState<{
+    resume: (engineId: number) => void
+    dismiss?: () => void
+  } | null>(null)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const epoch = useRef(0)
@@ -36,11 +45,20 @@ export function useEngineSetup() {
     setFailure(null)
   }, [])
 
-  const show = useCallback((tier: Tier, resume: (engineId: number) => void) => {
+  // `dismiss` is the caller's hook for the person saying no — Cancel, Escape, a click
+  // outside, or leaving for Machines — as opposed to `close`, which also ends a setup that
+  // worked. A caller holding something open behind the setup has to let go of it on a no,
+  // or the next engine list that arrives would bring it back unasked.
+  const show = useCallback((resume: (engineId: number) => void, dismiss?: () => void) => {
     epoch.current += 1
     setFailure(null)
-    setPending({ tier, resume })
+    setPending({ resume, dismiss })
   }, [])
+
+  const decline = () => {
+    pending?.dismiss?.()
+    close()
+  }
 
   async function install() {
     if (!pending || busy) return
@@ -66,8 +84,8 @@ export function useEngineSetup() {
       const host = hosts.find((entry) => entry.runnerId === browserRunner.getSnapshot().runnerId && entry.kind === 'uci' && entry.enabled)
       if (!host) throw new Error(t`Browser Stockfish did not register an engine.`)
       const roles = await listEngineRoles()
-      if (!roles.roles.find((role) => role.role === pending.tier)?.configured) {
-        await setEngineRoles({ [pending.tier]: host.engineId })
+      if (!roles.roles.find((role) => role.role === 'analysis')?.configured) {
+        await setEngineRoles({ analysis: host.engineId })
       }
       await Promise.all([
         client.invalidateQueries({ queryKey: ['engines'] }),
@@ -86,7 +104,7 @@ export function useEngineSetup() {
   return {
     close,
     show,
-    dialog: <Dialog.Root open={pending !== null} onOpenChange={(open) => { if (!open) close() }}>
+    dialog: <Dialog.Root open={pending !== null} onOpenChange={(open) => { if (!open) decline() }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-void/75" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-edge bg-elevated p-6 shadow-xl">
@@ -99,7 +117,7 @@ export function useEngineSetup() {
           {!support.supported ? <p className="mt-3 text-sm text-blunder">{support.reason}</p> : null}
           {failure ? <p role="alert" className="mt-3 text-sm text-blunder">{failure}</p> : null}
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button asChild variant="outline"><Link to="/compute/machines" onClick={close}><Trans>Go to Machines</Trans></Link></Button>
+            <Button asChild variant="outline"><Link to="/compute/machines" onClick={decline}><Trans>Go to Machines</Trans></Link></Button>
             <Button disabled={busy || !support.supported} onClick={() => void install()}>
               {busy ? <Trans>Setting up Stockfish…</Trans> : <Trans>Set up browser engine</Trans>}
             </Button>

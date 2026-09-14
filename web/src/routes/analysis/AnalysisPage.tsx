@@ -22,8 +22,8 @@ import { MaiaLevels } from './MaiaLevels'
  * card, "Clear the queue" inside a titlebar widget that only appears while something is
  * queued — and none of them said what they would cost. So a pass over eight thousand games
  * was one click from an owner who had no way to learn it was forty hours until it was
- * running, and a deep pass was not reachable at all, which is why 7,253 games had never had
- * one.
+ * running, and the games an import had skipped had no way back into the queue but one at a
+ * time.
  *
  * It renders from a single `GET /analysis/coverage`. One read rather than six, because
  * this is one picture: a page that assembled the split, the backlogs and the Maia counts
@@ -38,9 +38,7 @@ export function AnalysisPage() {
 
   // Named locals rather than expressions in the template: the identifier is what a
   // translator sees as the placeholder.
-  const analysed = coverage.data
-    ? formatCount(coverage.data.deep + coverage.data.quick_only)
-    : undefined
+  const analysed = coverage.data ? formatCount(coverage.data.analysed) : undefined
   const games = coverage.data ? formatCount(coverage.data.total) : undefined
 
   return (

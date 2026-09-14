@@ -21,7 +21,7 @@ import { useNotation } from '@/lib/chess/notationPrefs'
 import { WHEEL_STEP } from '@/lib/board/wheelStep'
 import { cn } from '@/lib/utils'
 
-import { AnalysisControls, engineOptionLabel } from './AnalysisControls'
+import { AnalysisControls, engineOptionLabel, useDefaultEngineLabel } from './AnalysisControls'
 
 // What a hovered line *is* belongs to the preview, not to the panel that reports one, so
 // the type lives beside the hook that consumes it — and is re-exported here because this
@@ -171,7 +171,7 @@ function HostChip({ runner }: { runner: string | null }) {
   return runner === null ? (
     <span
       data-testid="infinite-analysis-host"
-      className="rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-[0.59375rem] text-dim"
+      className="flex-none rounded-sm border border-edge bg-elevated px-1.5 py-px font-mono text-[0.59375rem] text-dim"
     >
       local
     </span>
@@ -237,20 +237,18 @@ export function LiveSearchStatus({
       data-testid="infinite-analysis-engine"
       title={session?.engine}
       className={cn(
-        'flex-none truncate text-xs font-semibold text-ink',
-        pick ? 'max-w-[10rem]' : 'max-w-[45%]',
+        'truncate text-xs font-semibold text-ink',
+        pick ? 'min-w-0 max-w-[10rem] shrink' : 'max-w-[45%] flex-none',
       )}
     >
       {session
         ? displayEngine(session.engine, session.runner ?? null)
         : pick
-          ? t`deep tier`
+          ? t`analysis engine`
           : t`Live analysis`}
     </span>
   )
-  // The name the server resolved "the deep tier" to. It is only knowable from a session
-  // that is actually open, so before the first one the option says what it does, not who.
-  const deepName = stream.engineId === null ? (session?.engine ?? null) : null
+  const defaultLabel = useDefaultEngineLabel(stream)
   return (
     <>
       {dot ? (
@@ -268,7 +266,9 @@ export function LiveSearchStatus({
         />
       ) : null}
       {pick ? (
-        <span className="relative inline-flex min-w-0 flex-none items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised">
+        // Shrinks rather than holding its width: the name truncates before anything to its
+        // right is pushed off a strip that has run out of room.
+        <span className="relative inline-flex min-w-0 shrink items-center gap-0.5 rounded-[0.1875rem] hover:bg-raised">
           {name}
           <ChevronDown className="size-2.5 flex-none text-faint" aria-hidden />
           <select
@@ -279,7 +279,7 @@ export function LiveSearchStatus({
             }
             className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
           >
-            <option value="">{deepName ? t`deep tier — ${deepName}` : t`deep tier`}</option>
+            <option value="">{defaultLabel}</option>
             {stream.engines
               .filter((host) => host.streams)
               .map((host) => (
@@ -309,18 +309,22 @@ export function LiveSearchMeta({ stream }: { stream: StreamSessionApi }) {
   const nodes = snapshot?.nodes ? formatNodes(snapshot.nodes) : null
   return (
     <div className="flex min-w-0 flex-none items-center gap-2" data-testid="infinite-analysis-meta">
+      {/* The readouts leave in reverse order of use when the strip around them is a
+          container too narrow for everything (the engine pane's title, `MaiaPanel`): speed
+          first, then nodes, then depth. They are what a glance can do without; the switch
+          at the end of that strip is not. Outside a container these never apply. */}
       {snapshot?.depth ? (
-        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim @max-[24rem]:hidden">
           d{snapshot.depth}
         </span>
       ) : null}
       {nodes ? (
-        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim @max-[30rem]:hidden">
           <Trans>{nodes} nodes</Trans>
         </span>
       ) : null}
       {snapshot?.nps ? (
-        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim">
+        <span className="flex-none whitespace-nowrap font-mono text-[0.625rem] tabular text-dim @max-[36rem]:hidden">
           {formatNps(snapshot.nps)}
         </span>
       ) : null}

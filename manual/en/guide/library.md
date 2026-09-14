@@ -50,7 +50,7 @@ It is a library game from the day you create it, not from the day it ends: it st
 **Games** straight away with no moves yet and the result still open, the sync history below
 records it as a one-game run under its source, and it grows a move at a time as you enter
 the moves. It is left unanalysed while it runs — its tree is where the engines' work is
-kept — and finishing it queues the ordinary quick and deep pass, after which it reads like
+kept — and finishing it queues the ordinary analysis pass, after which it reads like
 every other game.
 
 ### Read the sync history

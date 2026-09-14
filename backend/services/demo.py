@@ -37,7 +37,6 @@ from backend.db.enums import (
     RunStatus,
     Source,
     Speed,
-    Tier,
 )
 from backend.db.migrate import upgrade_to_head
 from backend.db.models import Account, AnalysisRun, Game, ImportJob, MoveEval, Runner
@@ -114,7 +113,6 @@ class DemoSummary:
     path: Path
     games: int
     analyzed: int
-    deep: int
     notes: int
 
 
@@ -144,7 +142,7 @@ def create_demo_database(
     ``runners`` copies the source's runner rows — name, slots and the token's hash — so a
     runner already dialling into the source library dials into the demo with the token it
     has. Only the rows: the engines a runner advertises are written when it says hello, and
-    the first search engine to do so takes the quick and deep roles, which nothing else in
+    the first search engine to do so takes the analysis role, which nothing else in
     the demo holds. Off by default, because a token hash is the one credential a demo
     otherwise never carries, and a demo built for screenshots has no reason to.
     """
@@ -313,11 +311,10 @@ def _seed(
         source_runs.append(original_run)
 
     target.flush()
-    # Every game has a Quick pass copied from the source library.
+    # Every game has an import pass copied from the source library.
     analyzed = len(imported)
-    deep = 0
     for game, original_run in zip(imported, source_runs, strict=True):
-        _analysis(target, source, game, original_run, Tier.QUICK)
+        _analysis(target, source, game, original_run)
 
     for job in jobs.values():
         job.status = JobStatus.DONE
@@ -332,7 +329,6 @@ def _seed(
         path=path,
         games=len(imported),
         analyzed=analyzed,
-        deep=deep,
         notes=notes,
     )
 
@@ -559,18 +555,19 @@ def _analysis(
     source: Session,
     game: Game,
     original_run: AnalysisRun,
-    tier: Tier,
 ) -> None:
     # No engine row: the numbers were computed elsewhere, and a run that named an engine
     # the demo does not have would be a run the Engines page could not account for.
+    # An import pass's shape — a node budget and nothing else to stop on. `depth` on a run
+    # is the limit it was asked for, so a number put there would badge every demo game "d18"
+    # for a search nobody ran to a depth.
     run = AnalysisRun(
         game_id=game.id,
         engine_id=None,
-        tier=tier,
         status=RunStatus.RUNNING,
-        depth=max(original_run.depth or 18, 18 if tier is Tier.QUICK else 24),
-        nodes=250_000 if tier is Tier.QUICK else 2_000_000,
-        multipv=1 if tier is Tier.QUICK else 4,
+        nodes=250_000,
+        multipv=max(1, original_run.multipv or 1),
+        priority=analysis_service.IMPORT_PRIORITY,
         maia=True,
         maia_elos=list(MAIA_ELOS),
         attempts=1,
@@ -606,7 +603,7 @@ def _analysis(
     ]
     analysis_service.complete_run(target, run, copied)
     finished = (game.played_at or datetime.now(UTC)) + timedelta(minutes=3)
-    duration = 11 if tier is Tier.QUICK else 68
+    duration = 11
     run.started_at = finished - timedelta(seconds=duration)
     run.finished_at = finished
     target.commit()

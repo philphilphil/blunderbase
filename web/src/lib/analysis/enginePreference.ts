@@ -1,7 +1,7 @@
 /**
  * Which engine the analysis board was last pointed at, in this browser.
  *
- * The picker in `AnalysisControls` used to start at "deep tier" on every page load, so an
+ * The picker in `AnalysisControls` used to start at the default engine on every page load, so an
  * owner who analyses on the machine down the hall picked it again on every game. Which
  * engine to think with is a preference, not a fact about a position, so it belongs beside
  * the theme and the Maia level rather than in component state that dies with the route.
@@ -9,7 +9,7 @@
  * Plain read and write rather than the `useSyncExternalStore` adapter the other preferences
  * use (`lib/board/linePreviewPrefs.ts`, `routes/game/maiaPreferences.ts`): one analysis
  * board is on screen at a time, and `useStreamSession` takes ownership of the pick the
- * moment it mounts — it has to be free to fall back to the deep tier when the remembered
+ * moment it mounts — it has to be free to fall back to the analysis role's engine when the remembered
  * engine is not on the roster *without* erasing what the owner chose. Nothing else reads
  * the value, so there is nothing for a subscription to keep in step.
  */
@@ -24,7 +24,7 @@ function storage(): Storage | null {
   }
 }
 
-/** The engine id the owner last picked, or null for "let the server take the deep tier". */
+/** The engine id the owner last picked, or null for "let the server take the analysis role's engine". */
 export function readStreamEnginePick(): number | null {
   let raw: string | null = null
   try {
@@ -34,7 +34,7 @@ export function readStreamEnginePick(): number | null {
   }
   if (raw === null) return null
   const id = Number(raw)
-  // Anything that is not an engine id is no pick, and the deep tier stands.
+  // Anything that is not an engine id is no pick, and the analysis role's engine stands.
   return Number.isInteger(id) && id > 0 ? id : null
 }
 

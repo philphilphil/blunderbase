@@ -29,7 +29,6 @@ from backend.db.enums import (
     RunStatus,
     Source,
     Speed,
-    Tier,
 )
 from backend.db.models import (
     Account,
@@ -58,14 +57,15 @@ PLATFORM_FOR_SOURCE: dict[Source, Platform] = {
     Source.FICS: Platform.FICS,
 }
 
-# A deep pass is the better answer wherever it reaches; a quick pass fills in the rest.
-TIER_RANK: dict[Tier, int] = {Tier.QUICK: 0, Tier.DEEP: 1}
-
 # How the games table may be ordered, and the order it takes when nothing says otherwise.
 # The expressions themselves are `GAME_ORDERS`, below the helpers they are built from.
 SORT_DIRECTIONS = ("asc", "desc")
 DEFAULT_ORDER = "played_at"
 DEFAULT_DIRECTION = "desc"
+# Orders the table no longer offers but an old bookmark may still carry. `tier` sorted by
+# which pass a game had, and with one pass there is nothing left to rank, so it reads as
+# the default rather than as a 400 on a link somebody saved.
+LEGACY_ORDERS = {"tier": DEFAULT_ORDER}
 
 # Rating series are read by a chat model as often as by a chart, so they are downsampled
 # before they are handed over rather than after.
@@ -125,7 +125,6 @@ class GameFilters:
     variant: str | None = None
     has_blunders: bool | None = None
     analyzed: bool | None = None
-    deep_analyzed: bool | None = None
     text: str | None = None
     # Whose games: True is the owner's own (the default everywhere, which is what keeps a
     # game added from the reference books out of every statistic without each one having
@@ -155,7 +154,7 @@ def order_clauses(order: str, direction: str) -> list[UnaryExpression[Any]]:
     with the same opponent cannot swap places between page 2 and page 3 — an order without
     a total tiebreak is an order that shows a row twice and hides another.
     """
-    build = GAME_ORDERS.get(order)
+    build = GAME_ORDERS.get(LEGACY_ORDERS.get(order, order))
     if build is None:
         raise ValueError(f"unknown order {order!r}; known orders: {', '.join(GAME_ORDERS)}")
     if direction not in SORT_DIRECTIONS:
@@ -194,11 +193,6 @@ def _outcome_column() -> ColumnElement[Any]:
     )
 
 
-def _tier_column() -> ColumnElement[Any]:
-    """Unanalysed < quick < deep, the rank the table's tier badge sorts by."""
-    return case((_has_deep_run(), 2), (_has_done_run(), 1), else_=0)
-
-
 # The orders `/games` will return, keyed the way the table's columns are named.
 #
 # Every one of them sorts on the value the cell shows rather than on a near neighbour of
@@ -225,7 +219,6 @@ GAME_ORDERS: dict[str, Callable[[], ColumnElement[Any]]] = {
     "ply_count": lambda: Game.ply_count,
     "worst": lambda: Game.card["worst_moments"][0]["win_loss"].as_float(),
     "source": lambda: Game.source,
-    "tier": _tier_column,
 }
 
 
@@ -591,9 +584,6 @@ def game_conditions(filters: GameFilters) -> list[ColumnElement[bool]]:
     if filters.analyzed is not None:
         done = _has_done_run()
         conditions.append(done if filters.analyzed else ~done)
-    if filters.deep_analyzed is not None:
-        deep = _has_deep_run()
-        conditions.append(deep if filters.deep_analyzed else ~deep)
     if filters.text:
         conditions.append(_text_condition(filters.text))
     if filters.mine is not None:
@@ -939,10 +929,11 @@ def get_game_detail(
 ) -> dict[str, Any] | None:
     """One game as the coach reads it: moves, evals, Maia predictions, notes and book.
 
-    Every ply carries the eval of the newest run that reaches it, a deep run beating a
-    quick one for the plies it covers, so a deep pass over the endgame shows up as deep
-    evals for the endgame and quick evals everywhere else. Maia's policy is merged the
-    same way but separately, because it usually arrives from a run of its own.
+    Every ply carries the eval of the run that ranks last among those reaching it — a run
+    somebody asked for over any import pass, then the newer — so a requested look at the
+    endgame shows up for the endgame and the import pass answers everywhere else. Maia's
+    policy is merged the same way but separately, because it usually arrives from a run of
+    its own.
 
     `book` is the explorer's answer for the positions this game stood in, keyed by ply and
     carried *with* the game rather than fetched as the reader steps through it — see
@@ -1040,13 +1031,26 @@ def game_book(
 
 
 def analysis_runs(session: Session, game_id: int, done_only: bool = True) -> list[AnalysisRun]:
-    """Every run over a game, oldest first, quick before deep at the same age."""
+    """Every run over a game in `run_rank` order, so the one that should answer comes last."""
     statement = select(AnalysisRun).where(AnalysisRun.game_id == game_id)
     if done_only:
         statement = statement.where(AnalysisRun.status == RunStatus.DONE)
     runs = list(session.scalars(statement))
-    runs.sort(key=lambda run: (TIER_RANK.get(run.tier, 0), run.created_at, run.id))
+    runs.sort(key=run_rank)
     return runs
+
+
+def run_rank(run: AnalysisRun) -> tuple[bool, int]:
+    """Which of two runs over the same plies answers: the later one by this key wins.
+
+    A run somebody asked for (priority above the import pass) outranks any import pass
+    whatever their ages, because a person chose its engine and its limit and an import
+    pass that happens to be re-queued afterwards must not quietly replace that answer.
+    Among equals the higher id wins. Legacy deep rows carry priority 10, so a library
+    analysed under the old tiers ranks the way it always did. `stats.primary_runs` and
+    `explorer._ranked_occurrences` order by the same key in SQL.
+    """
+    return (run.priority > 0, run.id)
 
 
 def merge_run_evals(
@@ -1180,7 +1184,10 @@ def game_card(session: Session, game: Game, *, worst: int = 3) -> dict[str, Any]
     return {
         **game_summary(game),
         "analyzed": card["analyzed"],
-        "deep": card["deep"],
+        # A card folded before there was one pass says `deep` instead; a deep run then was
+        # exactly what a requested run is now, and refolding every card to rename the key
+        # would be a library-wide write for nothing.
+        "requested": bool(card.get("requested", card.get("deep", False))),
         "eval_curve": card["eval_curve"],
         "worst_moments": card["worst_moments"][: max(worst, 0)],
     }
@@ -1217,7 +1224,7 @@ def build_card(session: Session, game: Game, *, worst: int = CARD_WORST_MOMENTS)
     ranked = sorted(owned, key=lambda row: row.win_loss or 0.0, reverse=True)
     return {
         "analyzed": bool(runs),
-        "deep": any(run.tier == Tier.DEEP for run in runs),
+        "requested": any(run.priority > 0 for run in runs),
         "eval_curve": curve,
         "worst_moments": [_moment_row(game, row) for row in ranked[:worst]],
     }
@@ -1598,18 +1605,6 @@ def _has_done_run() -> ColumnElement[bool]:
     )
 
 
-def _has_deep_run() -> ColumnElement[bool]:
-    return exists(
-        select(AnalysisRun.id)
-        .where(
-            AnalysisRun.game_id == Game.id,
-            AnalysisRun.tier == Tier.DEEP,
-            AnalysisRun.status == RunStatus.DONE,
-        )
-        .correlate(Game)
-    )
-
-
 def _opponent_condition(name: str) -> ColumnElement[bool]:
     """Whoever was on the other side of the board — either name when there is no owner."""
     return or_(
@@ -1719,7 +1714,12 @@ def _run_summary(run: AnalysisRun) -> dict[str, Any]:
     return _compact(
         {
             "id": run.id,
-            "tier": str(run.tier),
+            "engine_id": run.engine_id,
+            # False rather than dropped by `_compact`: whether a person asked for this run
+            # is what the badge colours by, so it is always said.
+            "requested": run.priority > 0,
+            "seconds": run.seconds,
+            "maia": run.maia,
             # None rather than False, so `_compact` leaves the key off every ordinary
             # pass: a run that searched is the reader's default, a fill is what is said.
             "maia_only": True if run.maia_only else None,

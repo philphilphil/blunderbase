@@ -24,6 +24,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
+import { Field, Frame } from '@/components/engine-dialog/DialogFrame'
+import { EnginePicker, preferredEngine } from '@/components/engine-dialog/EnginePicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,9 +36,6 @@ import type {
 } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
-
-import { Field, Frame } from './DialogFrame'
-import { EnginePicker, preferredEngine } from './EnginePicker'
 
 /** 1 to 3, and the server clamps to the same — see `MAX_EXPAND_STAGES`. */
 const STAGES = [1, 2, 3] as const

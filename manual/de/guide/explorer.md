@@ -26,7 +26,7 @@ Token.
 **Musterpartien** listet Partien aus diesen Datenbanken. Eine geöffnete Musterpartie sieht
 aus wie deine eigenen: mit Engine und Maia. Was fehlt, ist alles, was einen gespeicherten
 Datensatz braucht: Analysedurchläufe, Notizen, angeheftete Varianten. **+ Zur Bibliothek
-hinzufügen** speichert sie als fremde Partie. Sie bekommt dann eine Schnellanalyse und
+hinzufügen** speichert sie als fremde Partie. Sie bekommt dann den Analysedurchlauf und
 nimmt Notizen an, zählt aber in keiner Statistik und taucht nicht in deinem Eröffnungsbaum
 auf.
 

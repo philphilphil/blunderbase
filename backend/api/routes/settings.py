@@ -1,7 +1,7 @@
 """`/settings` — analysis configuration shared by the focused UI pages.
 
 Everything the focused pages edit lives here: the Maia levels (a list of one to five), the
-three 0/1 flags over the Maia pass itself, the two node budgets and the deep line count,
+two 0/1 flags over the Maia pass itself, the analysis pass's node budget and line count,
 the three classification thresholds, whether new games arrive with the engine hidden, the
 machine's engine cap, and the five that correspondence mode is configured with — whether it
 exists at all, how many lines a search keeps, a task's budget and line count, and the depth

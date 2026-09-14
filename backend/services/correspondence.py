@@ -11,7 +11,7 @@ The shapes worth knowing before reading the code:
   `Source.ICCF` (its `source_id` the ICCF game number) or `Source.MANUAL`,
   `Speed.CORRESPONDENCE`, `Result.UNKNOWN` and an explicit `owner_color`, so it has
   positions, a job row and the same events as any other game, and is a library game like
-  any other the moment it finishes. It is imported with the quick pass **off**: the tree is
+  any other the moment it finishes. It is imported with the analysis pass **off**: the tree is
   its analysis while it runs, and a pass over an ongoing game would be redone after every
   move.
 * **`Game` is mutated here and nowhere else.** `games.append_move` / `pop_move` are the one
@@ -50,13 +50,13 @@ from backend.db.enums import (
     Color,
     CorrespondenceMark,
     EngineKind,
+    EngineRole,
     Result,
     RunStatus,
     SearchKind,
     SearchStatus,
     Source,
     Speed,
-    Tier,
 )
 from backend.db.models import (
     AnalysisRun,
@@ -148,9 +148,9 @@ DISAGREEMENT_CP = 50
 # the distance to mate is subtracted so that mate in two outranks mate in nine.
 MATE_SCORE = 1_000_000
 
-# Where a task sits in the analysis queue: between the quick tier (0) and the deep tier
-# (10), so a bounded look at one correspondence position jumps the import backlog and never
-# gets in front of the deep pass somebody is sitting and waiting for.
+# Where a task sits in the analysis queue: between the import priority (0) and a requested
+# run (10), so a bounded look at one correspondence position jumps the import backlog and
+# never gets in front of the run somebody asked for from the Analyse dialog and is waiting on.
 #
 # The band is nine wide because that is where the *due date* is encoded. `claim_next_run`
 # orders by priority and then FIFO, so a game whose reply is due tomorrow has to come out
@@ -309,7 +309,7 @@ def create_game(
     know it is special: it gets its `positions`, its `import_jobs` row and the same events
     every other game gets, and the only differences are the ones that matter —
     `Speed.CORRESPONDENCE`, `Result.UNKNOWN`, an explicit `owner_color`, and no automatic
-    quick pass.
+    analysis pass.
 
     An ICCF game number makes it a `Source.ICCF` game with that id, so a later importer can
     reconcile the finished game by number rather than by hash; without one it is
@@ -545,12 +545,12 @@ def finish_game(
     """Record how the game ended, and hand it to the library.
 
     Which is the whole ceremony: a result is what makes a `Game` immutable again, so the
-    tree becomes read-only in the same breath, and the two ordinary passes — quick and deep
-    — are queued through `services.analysis` exactly as they would be for any other game.
-    From here it is a game like any other: on the eval graph, in the stats under the
-    correspondence chip, with its tree still attached.
+    tree becomes read-only in the same breath, and the ordinary analysis pass is queued
+    through `services.analysis` exactly as it would be for an imported game. From here it is
+    a game like any other: on the eval graph, in the stats under the correspondence chip,
+    with its tree still attached.
 
-    A deployment with no engine assigned to a tier queues nothing for that tier and says so
+    A deployment with no engine in the analysis role queues nothing and says so in the log
     rather than refusing the finish: the game did end, and the pass can be asked for later.
     """
     row, game = _load(session, game_id)
@@ -883,21 +883,28 @@ def offered_engines(session: Session) -> list[Engine]:
     )
 
 
-def default_engine(session: Session, engines: Sequence[Engine]) -> Engine | None:
-    """The engine every picker preselects: the deep role's if it is offered, else the first
-    a search could run on, else the first at all.
+def default_engine(
+    session: Session,
+    engines: Sequence[Engine],
+    *,
+    trouble: Callable[[Engine], str | None] | None = None,
+) -> Engine | None:
+    """The engine every picker preselects: the analysis role's if it is offered, else the
+    first that could run, else the first at all.
 
-    The deep role because a task is a bounded search and that is the role a bounded search
-    already has; and the same default for searches so that the two modes never suggest
-    different engines for the same position.
+    The analysis role because it is the one engine the owner has named for searching
+    positions, and the same default for tasks, searches and the game's Analyse dialog so
+    that no two pickers suggest different engines for the same position. `trouble` is the
+    "could run" question; a search's by default, a queued run's for the Analyse dialog.
     """
     from backend.services import engines as engines_service
 
-    deep = engines_service.engine_for_tier(session, Tier.DEEP)
-    if deep is not None and any(engine.id == deep.id for engine in engines):
-        return deep
+    check = trouble or (lambda engine: _engine_trouble(session, engine.id, engine=engine))
+    role = engines_service.engine_for_role(session, EngineRole.ANALYSIS)
+    if role is not None and any(engine.id == role.id for engine in engines):
+        return role
     for engine in engines:
-        if _engine_trouble(session, engine.id, engine=engine) is None:
+        if check(engine) is None:
             return engine
     return engines[0] if engines else None
 
@@ -1162,7 +1169,7 @@ def status(session: Session) -> dict[str, Any]:
         ],
         # One list for every picker on the mode's screens: the search dialog greys out the
         # entries with `search_trouble`, the task and expand dialogs take any of them.
-        "engines": _engine_entries(session),
+        "engines": engine_entries(session),
     }
 
 
@@ -1209,13 +1216,21 @@ def _running_slots(session: Session) -> int:
     return app_settings_service.get_analysis_concurrency(session)
 
 
-def _engine_entries(session: Session) -> list[dict[str, Any]]:
+def engine_entries(
+    session: Session, *, trouble: Callable[[Engine], str | None] | None = None
+) -> list[dict[str, Any]]:
     """Every offered engine as the pickers draw it: where it lives, whether it is the one
-    preselected, and why a search could not run on it where one could not."""
+    preselected, and why it could not run where it could not.
+
+    Public because the game's Analyse dialog draws the same list (`analysis.analysis_engines`)
+    and one shape for both keeps the two pickers one component. `trouble` is what "could
+    not run" means for the caller: a search's `_engine_trouble` here, a queued run's there.
+    The key stays `search_trouble` either way, because the web type is shared."""
     from backend.services import engines as engines_service
 
+    check = trouble or (lambda engine: _engine_trouble(session, engine.id, engine=engine))
     engines = offered_engines(session)
-    chosen = default_engine(session, engines)
+    chosen = default_engine(session, engines, trouble=check)
     return [
         {
             "engine_id": engine.id,
@@ -1225,7 +1240,7 @@ def _engine_entries(session: Session) -> list[dict[str, Any]]:
             "default": chosen is not None and engine.id == chosen.id,
             "runner_id": engine.runner_id,
             "host": engines_service.engine_host(session, engine),
-            "search_trouble": _engine_trouble(session, engine.id, engine=engine),
+            "search_trouble": check(engine),
         }
         for engine in engines
     ]
@@ -1235,7 +1250,7 @@ def _engine_entries(session: Session) -> list[dict[str, Any]]:
 
 
 def task_engine(session: Session, engine_id: int | None = None) -> Engine:
-    """The engine a task runs on: the one asked for, else the deep tier's.
+    """The engine a task runs on: the one asked for, else the analysis role's.
 
     Unlike a search, a task is an ordinary `AnalysisRun` and goes through the ordinary
     queue — so a runner's engine is not only allowed, it is the point: a correspondence
@@ -1247,10 +1262,10 @@ def task_engine(session: Session, engine_id: int | None = None) -> Engine:
 
     wanted = engine_id
     if wanted is None:
-        chosen = engines_service.engine_for_tier(session, Tier.DEEP)
+        chosen = engines_service.engine_for_role(session, EngineRole.ANALYSIS)
         if chosen is None:
             raise CorrespondenceError(
-                "no engine was named for this task, and no engine holds the deep role to "
+                "no engine was named for this task, and no engine holds the analysis role to "
                 "fall back on; pick one in the dialog or assign the role on Analysis → Engines"
             )
         return chosen
@@ -1328,7 +1343,6 @@ def queue_task(
     run = analysis_service.request_analysis(
         session,
         fen=board.fen(),
-        tier=Tier.DEEP,
         engine_id=engine.id,
         nodes=nodes,
         multipv=multipv,
@@ -1375,7 +1389,7 @@ def expand_node(
     `engine_id` is the engine every task of this expansion runs on, the later stages
     included: it rides on each task's row and `_expand_after` reads it back, so an
     expansion started on Leela stays on Leela however many hours the stages take. None is
-    the deep role's engine.
+    the analysis role's engine.
 
     IDeA's expansion, and the reason the analysis queue was worth reusing: one call ends,
     an hour later and on whatever hosts the queue has, with a dozen evaluated positions
@@ -1812,7 +1826,7 @@ def _expand_after(
     width = _expand_width(session, row.expand_width)
     # The next stage runs on the engine this task ran on, which is the engine the owner
     # picked when they asked for the expansion. Unless that engine has gone or been switched
-    # off in the hours since — then the deep role's stands in rather than the stage failing.
+    # off in the hours since — then the analysis role's stands in rather than the stage failing.
     engine_id: int | None = row.engine_id
     try:
         task_engine(session, engine_id)
@@ -2309,7 +2323,7 @@ def disagreement(rows: Sequence[CorrespondenceEval]) -> bool:
 
 
 def _store(session: Session, parsed: import_service.ParsedGame, color: Color) -> Game:
-    """The parsed game through the ordinary import, with no quick pass and a known side.
+    """The parsed game through the ordinary import, with no analysis pass and a known side.
 
     Never with its engine hidden, whatever `hide_engine_new_games` says: a correspondence
     game is played *with* the engine, and the tree is its analysis from the first move.
@@ -2386,18 +2400,24 @@ def _seed_tree(session: Session, game: Game, board: Any) -> CorrespondenceNode:
 
 
 def _queue_passes(session: Session, game: Game) -> list[Any]:
-    """The quick and the deep pass over a game that has just finished.
+    """The analysis pass over a game that has just finished, as an import would queue it.
+
+    One pass at import priority and the import budget: a finished correspondence game joins
+    the library the way an imported one does, and a closer look at any stretch of it is the
+    game page's Analyse dialog, like anyone else's.
 
     Failures are logged and not raised: the game is over whatever the engine list says, and
-    an owner who wants the pass can ask for it from the game page like anyone else.
+    an owner who wants the pass can ask for it from the game page.
     """
-    queued = []
-    for tier in (Tier.QUICK, Tier.DEEP):
-        try:
-            queued.append(analysis_service.request_analysis(session, game_id=game.id, tier=tier))
-        except Exception as exc:
-            logger.warning("game %s finished without a %s pass: %s", game.id, tier, exc)
-    return queued
+    try:
+        return [
+            analysis_service.request_analysis(
+                session, game_id=game.id, priority=analysis_service.IMPORT_PRIORITY
+            )
+        ]
+    except Exception as exc:
+        logger.warning("game %s finished without an analysis pass: %s", game.id, exc)
+        return []
 
 
 def _settle_due(row: CorrespondenceGame, game: Game) -> None:

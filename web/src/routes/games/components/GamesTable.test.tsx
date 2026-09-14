@@ -27,7 +27,7 @@ const GAME = {
   speed: 'rapid',
   ply_count: 70,
   analyzed: true,
-  deep: false,
+  requested: false,
   eval_curve: [],
   worst_moments: [{ ply: 69, win_loss: 80.28, classification: 'blunder' }],
 } as unknown as GameCard
@@ -95,7 +95,10 @@ describe('GamesTable rows', () => {
     expect(screen.getByText('35')).toBeInTheDocument()
     expect(screen.getByText('−80%')).toBeInTheDocument()
     expect(screen.getByText('Lichess')).toBeInTheDocument()
-    expect(screen.getByText('Quick')).toBeInTheDocument()
+    // The card knows a pass is done, not what it stopped at, so the chip says just that —
+    // under a header that is no longer sortable, since there is one pass to rank by.
+    expect(screen.getByText('Analysed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Analysis/ })).not.toBeInTheDocument()
     // The Flags cell aggregates per class: one chip carrying the glyph and the count.
     expect(screen.getByLabelText('1 blunder')).toHaveTextContent('??1')
   })
@@ -126,7 +129,7 @@ describe('GamesTable rows', () => {
 
   it('offers to analyse a game nothing has looked at', async () => {
     const props = setup({
-      games: [{ ...GAME, analyzed: false, deep: false, worst_moments: [] } as GameCard],
+      games: [{ ...GAME, analyzed: false, requested: false, worst_moments: [] } as GameCard],
     })
     await userEvent.click(screen.getByRole('button', { name: 'analyse' }))
     expect(props.onAnalyse).toHaveBeenCalledWith(12)
@@ -238,14 +241,14 @@ describe('GamesTable with the engine hidden', () => {
     // Everything that is the game, or the app's own bookkeeping about it, stays.
     expect(screen.getByText('chillzone')).toBeInTheDocument()
     expect(screen.getByText('Alekhine Defense')).toBeInTheDocument()
-    expect(screen.getByText('Quick')).toBeInTheDocument()
+    expect(screen.getByText('Analysed')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete game 12' })).toBeInTheDocument()
   })
 
   it('still offers to analyse a game nothing has looked at', async () => {
     setEngineHidden(true)
     const props = setup({
-      games: [{ ...GAME, analyzed: false, deep: false, worst_moments: [] } as GameCard],
+      games: [{ ...GAME, analyzed: false, requested: false, worst_moments: [] } as GameCard],
     })
     // The whole point of reading a game unaided is checking yourself against a pass
     // afterwards, so the way to queue one never goes away.

@@ -96,7 +96,7 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (analysis_service.AnalysisError, 500, "analysis_failed"),
     (engines_service.UnknownEngineError, 404, "unknown_engine"),
     (engines_service.DuplicateEngineError, 409, "duplicate_engine"),
-    (engines_service.TierUnavailableError, 409, "tier_unavailable"),
+    (engines_service.EngineUnavailableError, 409, "engine_unavailable"),
     (engines_service.EngineProbeError, 422, "engine_probe_failed"),
     (engines_service.EngineOptionError, 422, "invalid_engine_option"),
     (engines_service.EngineValidationError, 422, "invalid_engine"),

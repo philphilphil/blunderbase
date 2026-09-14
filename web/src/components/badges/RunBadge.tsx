@@ -2,37 +2,27 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 
-import type { RunStatus, Tier } from '@/lib/api/types'
+import type { RunStatus } from '@/lib/api/types'
+import { RUN_STYLES, runKind, runLabel, type RunShape } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
 
 /**
- * The analysis-tier chips from design 1c. `depth` is what turns "Quick" into "Quick · d18",
- * which is how the design labels a run that has actually happened.
+ * A run as the chip from design 1c: what it stopped each move at and how many lines it
+ * kept (`d24 · 2 lines`), rather than a name for the kind of pass — there is one pass now,
+ * and the dialog's choices are the only honest description of what ran. The colour says
+ * whether somebody asked for it, which is the run that answers for a move. Legacy rows
+ * render from the nodes and lines they stored, the same way.
  */
-export function TierBadge({
-  tier,
-  depth,
-  nodes,
-  className,
-}: {
-  tier: Tier
-  depth?: number | null
-  nodes?: string | null
-  className?: string
-}) {
-  const suffix = depth ? ` · d${depth}` : nodes ? ` · ${nodes}` : ''
+export function RunBadge({ run, className }: { run: RunShape; className?: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-[0.3125rem] border px-2 py-[0.1875rem] text-[0.71875rem]',
-        tier === 'deep'
-          ? 'border-deep/28 bg-deep/10 text-deep'
-          : 'border-edge-strong bg-raised text-soft',
+        'inline-flex items-center rounded-[0.3125rem] border px-2 py-[0.1875rem] text-[0.71875rem] whitespace-nowrap',
+        RUN_STYLES[runKind(run)].chipClass,
         className,
       )}
     >
-      {tier === 'deep' ? <Trans>Deep</Trans> : <Trans>Quick</Trans>}
-      {suffix}
+      {runLabel(run)}
     </span>
   )
 }

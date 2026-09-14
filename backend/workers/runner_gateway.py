@@ -769,7 +769,11 @@ class RunnerGateway:
                 if room <= 0:
                     break
                 try:
-                    claim = await self._db(self._claim, runner_id)
+                    claim = await self._db(
+                        self._claim,
+                        runner_id,
+                        protocol.FEATURE_RUN_LIMITS in state.features,
+                    )
                 except Exception:
                     logger.exception("the gateway could not claim a run for %r", state.name)
                     claim = None
@@ -866,7 +870,7 @@ class RunnerGateway:
             # A poller says it is alive by coming back, so there is nothing to ping — only
             # a deadline to hold it to. Without one, a machine switched off between two
             # polls stays `connected` for the life of the process: its engines stay
-            # enabled, `tier_status` keeps calling its tier available, and the runs
+            # enabled, the analysis role keeps calling its engine available, and the runs
             # enqueued onto it are work no host can drain.
             if state.transport != WEBSOCKET:
                 if now - state.last_seen >= silence:
@@ -897,11 +901,11 @@ class RunnerGateway:
         """Hold one slot for something that is not a queue run. Was there one to hold?
 
         D6: a stream is a person waiting at a board, so it takes the slot of the most
-        recently started run rather than queueing behind a deep pass. That run goes back
+        recently started run rather than queueing behind a long analysis pass. That run goes back
         with its attempt refunded — it was taken away, it did not fail.
 
         `preempt=False` is a correspondence search: nobody is sitting at it, and a search
-        that will run for days has no business taking a deep pass off the machine. It waits
+        that will run for days has no business taking a game's analysis off the machine. It waits
         for a free slot instead, and the answer is simply False until there is one.
         """
         state = self._states.get(runner_id)
@@ -1296,10 +1300,19 @@ class RunnerGateway:
                     analysis.abandon_run(session, run)
         return resumed, sorted(cancelled)
 
-    def _claim(self, runner_id: int) -> Dispatch | None:
+    def _claim(self, runner_id: int, run_limits: bool = True) -> Dispatch | None:
+        """Claim the next run this runner can execute and build what goes down to it.
+
+        `run_limits` is whether the runner announced `FEATURE_RUN_LIMITS`. One that did not
+        would fail a plan with no node count or a time limit, so it is only offered runs
+        that stop on nodes, and what the owner asked for otherwise waits for a runner that
+        can do it.
+        """
         with self.sessions() as session:
             engine_ids = engines_service.runner_engine_ids(session, runner_id)
-            run = analysis.claim_next_run(session, engine_ids=engine_ids)
+            run = analysis.claim_next_run(
+                session, engine_ids=engine_ids, node_budget_only=not run_limits
+            )
             if run is None:
                 return None
             engine = session.get(Engine, run.engine_id) if run.engine_id else None

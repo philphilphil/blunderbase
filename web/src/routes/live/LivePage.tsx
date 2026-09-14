@@ -128,12 +128,13 @@ export function LivePage() {
       />
 
       {/*
-        The heading wraps below `md`: "Save this moment" and the flip control are the two
+        The heading wraps below `lg`: "Save this moment" and the flip control are the two
         things a phone still needs from this row, and squeezing them onto the same line as
-        the session description leaves none of the three legible.
+        the session description leaves none of the three legible. A tablet or a narrow
+        window with the rail open runs out of room the same way, so it wraps there too.
       */}
-      <header className="flex flex-none items-end gap-3 px-5 pt-4.5 pb-3 max-md:flex-wrap max-md:px-3">
-        <div className="flex flex-col gap-[0.1875rem] max-md:min-w-0">
+      <header className="flex flex-none items-end gap-3 px-5 pt-4.5 pb-3 max-lg:flex-wrap max-lg:gap-y-2 max-md:px-3">
+        <div className="flex min-w-0 flex-col gap-[0.1875rem]">
           <h1 className="flex items-center gap-2.5 text-[1.1875rem] font-semibold tracking-[-0.01em] text-ink">
             <Trans>Live</Trans>
             {active ? (

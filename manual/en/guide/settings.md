@@ -21,9 +21,9 @@ Hidden, the game screen loses the evaluation bar and the score, the `??` badges 
 tinted rows, the evaluation graph, the engine and Maia panels and the live engine; the
 games list loses its **Worst** column and its flag badges, and the dashboard's recent games
 lose the swing and the badge on each row. What stays is the game itself —
-the moves, the clocks, your notes — and what Blunderbase has *done*: which pass has run and
-how deep it went, and the buttons that queue another one, which is what you press once you
-have written your own verdict down.
+the moves, the clocks, your notes — and what Blunderbase has *done*: the badge that says
+what ran and how far it looked, and **Analyse**, which is what you press once you have
+written your own verdict down.
 
 If what you want is quiet on *new* games only — review each one as it comes in, then turn
 the engine on for it — that is a setting of the library rather than of the browser:
@@ -90,6 +90,10 @@ are on.
 | `F` | Flip the board |
 | `H` | Hints — the board's arrows and the engine columns |
 | `E` | The live engine on this position |
+| `L` | Maia — every level side by side, or back to one |
+| `V` | The evaluation graph |
+| `T` | The move-time graph |
+| `B` | Your book for this position |
 | `↵` | Play the engine's move onto the board |
 | `M` | Type a move — `Nf3`, `exd5`, `O-O` — instead of dragging it |
 | `S` | Board settings |
@@ -100,10 +104,8 @@ are on.
 | Key | Does |
 |---|---|
 | `N` | Write a note about this position |
-| `Q` | Queue a quick pass |
-| `D` | Queue a deep pass |
+| `A` | Analyse — ask for a deeper look |
 | `C` | Copy the PGN |
-| `T` | Swap the move column between Moves and Flagged |
 
 ### The library table
 

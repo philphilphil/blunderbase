@@ -48,7 +48,7 @@ export interface Column {
  *   └───┴───────────────────────────────┴─────┴───────┘
  * ```
  *
- * The opening, the clock, the move count, the source and the tier are the five that go:
+ * The opening, the clock, the move count, the source and the analysis are the five that go:
  * they are the ones a phone can look up by opening the game, and dropping them is what
  * buys the two names a readable width. The header drops their sort with them, so what a
  * phone can sort by is exactly what it can see.
@@ -103,7 +103,9 @@ export const COLUMNS: Column[] = [
   { id: 'moves', label: MV, width: 40, align: 'right', sort: 'ply_count', mono: true, phone: null },
   { id: 'worst', label: msg`Worst`, width: 56, align: 'right', sort: 'worst', mono: true, phone: CARD.worst },
   { id: 'source', label: msg`Source`, width: 82, sort: 'source', phone: null },
-  { id: 'tier', label: msg`Tier`, width: 84, sort: 'tier', phone: null },
+  // Still `tier` inside, so nothing keyed on the column id moves; no sort, because with one
+  // pass "analysed or not" is all there is to rank, and the Analysed filter already says it.
+  { id: 'tier', label: msg`Analysis`, width: 84, phone: null },
   { id: 'flags', label: msg`Flags`, width: 'flex', phone: CARD.flags },
 ]
 

@@ -30,7 +30,7 @@ from sqlalchemy import select
 
 from backend.api.app import create_app
 from backend.config import Settings
-from backend.db.enums import RunStatus, Tier
+from backend.db.enums import RunStatus
 from backend.db.models import Engine
 from backend.db.session import get_sessionmaker
 from backend.runners.client import EXIT_CONFIG, EXIT_OK
@@ -162,9 +162,7 @@ def runner_row(settings: Settings, name: str) -> Any:
 
 def enqueue(settings: Settings, engine_id: int) -> int:
     with get_sessionmaker(settings)() as session:
-        run = analysis.request_analysis(
-            session, fen=STARTING_FEN, tier=Tier.DEEP, engine_id=engine_id
-        )
+        run = analysis.request_analysis(session, fen=STARTING_FEN, engine_id=engine_id)
         return run.id
 
 

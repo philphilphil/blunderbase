@@ -1,7 +1,7 @@
 /**
  * Design 2a, "Recent games" — moved into the rail as a QueueCard-shaped list, one row per
  * game, so it sits beside the queue instead of stretching across the main column. Twelve
- * rows fit where five cards used to; opening/source/tier no longer have room on the line,
+ * rows fit where five cards used to; opening/source/analysis no longer have room on the line,
  * so they ride along in the row's `title` tooltip instead of disappearing.
  */
 import type { I18n, MessageDescriptor } from '@lingui/core'
@@ -57,10 +57,13 @@ function worstOf(game: GameCardRow): WorstMoment | null {
 
 const UNNAMED_OPENING = msg`Unnamed opening`
 
-/** How far the engine has got over the game, in the tooltip's one word. */
-const TIER_WORD = {
-  deep: msg`deep`,
-  quick: msg`quick`,
+/**
+ * Whether an engine has been over the game, in the tooltip's one word. One word for any
+ * pass, since there is one: what a run stopped at is the game's own business, and a card
+ * does not carry it.
+ */
+const ANALYSIS_WORD = {
+  done: msg`analysed`,
   none: msg`unanalysed`,
 }
 
@@ -68,16 +71,16 @@ const TIER_WORD = {
 function titleOf(game: GameCardRow, i18n: I18n): string {
   const named = game.opening ?? i18n._(UNNAMED_OPENING)
   const opening = `${named}${game.eco ? ` ${game.eco}` : ''}`
-  const tier = i18n._(TIER_WORD[game.analyzed ? (game.deep ? 'deep' : 'quick') : 'none'])
+  const analysis = i18n._(ANALYSIS_WORD[game.analyzed ? 'done' : 'none'])
   // Three translated parts joined by separators rather than one message: there is no
   // sentence here to keep whole, only a middle dot between them.
-  return `${opening} · ${game.source} · ${tier}`
+  return `${opening} · ${game.source} · ${analysis}`
 }
 
 /**
  * One game on one line. With the engine hidden (⇧E) the row keeps its result, opponent
  * and rating and loses the swing and the badge — those two are the engine's verdict on how
- * the game went. The tooltip's tier word stays: which pass has run is the app's own
+ * the game went. The tooltip's analysis word stays: whether a pass has run is the app's own
  * bookkeeping, not a verdict.
  */
 function GameRow({ game, engineHidden }: { game: GameCardRow; engineHidden: boolean }) {

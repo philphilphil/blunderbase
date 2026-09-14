@@ -2,9 +2,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { SourceBadge } from '@/components/badges/SourceBadge'
-import { RunStatusBadge, TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
+import { RunBadge, RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
 import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
-import { formatNodes } from '@/lib/chess/evaluation'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
 
@@ -44,7 +43,7 @@ export function GameHeaderBar({
   className,
 }: {
   game: GameSummary
-  /** The deepest finished run, as the tier chip reports it. */
+  /** The finished run that answers for the game (`gameModel.bestRun`), as its chip reports it. */
   best: GameRunSummary | null
   /** A run that is queued or running right now, from `/analysis/runs`. */
   active: RunResponse | null
@@ -63,7 +62,9 @@ export function GameHeaderBar({
     <div
       data-testid="game-header"
       className={cn(
-        'flex h-[2.625rem] flex-none items-center gap-2 overflow-hidden border-b border-edge-strong bg-surface px-4 whitespace-nowrap',
+        // A container, so what leaves on a narrow game area is decided by the bar's own
+        // width (see the `@max-` classes below) rather than by clipping whatever is last.
+        '@container flex h-[2.625rem] flex-none items-center gap-2 overflow-hidden border-b border-edge-strong bg-surface px-4 whitespace-nowrap',
         className,
       )}
     >
@@ -91,8 +92,10 @@ export function GameHeaderBar({
       ) : null}
 
       {/* The only element on the line allowed to shrink: everything after it is a chip or a
-          handful of mono characters, and a truncated ECO or result says nothing at all. */}
-      <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
+          handful of mono characters, and a truncated ECO or result says nothing at all. It
+          keeps a floor, so a narrow bar drops the lesser facts below rather than squeezing
+          the opening's name down to an ellipsis. */}
+      <h1 className="min-w-[6rem] truncate text-sm font-semibold text-ink">
         {game.opening ?? t`Unnamed opening`}
       </h1>
       {game.eco ? (
@@ -110,14 +113,16 @@ export function GameHeaderBar({
         title={game.url ? t`Open this game on the site it came from` : undefined}
       />
       {timeControl ? (
-        <span className="flex-none font-mono text-[0.6875rem] text-dim">{timeControl}</span>
+        <span className="flex-none font-mono text-[0.6875rem] text-dim @max-[40rem]:hidden">
+          {timeControl}
+        </span>
       ) : null}
       <span className="flex-none text-faint-2">·</span>
       <span className="flex-none font-mono text-[0.6875rem] tabular text-soft">
         {formatResult(game.result)}
       </span>
       {game.rated === false ? (
-        <span className="flex-none text-[0.6875rem] text-faint">
+        <span className="flex-none text-[0.6875rem] text-faint @max-[40rem]:hidden">
           <Trans>casual</Trans>
         </span>
       ) : null}
@@ -137,16 +142,13 @@ export function GameHeaderBar({
       {active ? (
         <RunStatusBadge status={active.status} className="flex-none" />
       ) : best ? (
-        <TierBadge
-          tier={best.tier}
-          depth={best.depth}
-          nodes={nodeLabel(best)}
-          className="flex-none"
-        />
+        <RunBadge run={best} className="flex-none" />
       ) : (
         <UnanalysedBadge className="flex-none" />
       )}
-      <span className="flex-none font-mono text-[0.625rem] text-faint">
+      {/* First to leave on a narrow bar: the badge beside it already says whether a run
+          exists, and "when" is the least of what this line tells. */}
+      <span className="flex-none font-mono text-[0.625rem] text-faint @max-[48rem]:hidden">
         {analysedAt ? t`analysed ${analysedAt}` : t`never analysed`}
       </span>
     </div>
@@ -182,10 +184,4 @@ function StepButton({
       <Icon className="size-3.5" aria-hidden />
     </button>
   )
-}
-
-function nodeLabel(run: GameRunSummary): string | null {
-  const nodes = formatNodes(run.nodes)
-  const multipv = run.multipv && run.multipv > 1 ? ` · MPV ${run.multipv}` : ''
-  return nodes === '—' ? null : `${nodes}n${multipv}`
 }

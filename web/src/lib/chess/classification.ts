@@ -1,6 +1,8 @@
 import { plural, t } from '@lingui/core/macro'
 
-import type { Classification, Source, Tier } from '@/lib/api/types'
+import type { Classification, Source } from '@/lib/api/types'
+
+import { formatNodes } from './evaluation'
 
 /**
  * The glyph vocabulary from design 1c ("Eval badges — glyph"). It is wider than the
@@ -201,28 +203,74 @@ export const SOURCE_STYLES: Record<Source, SourceStyle> = {
   },
 }
 
-// --- analysis tiers (design 1c, "Analysis tiers") -------------------------
+// --- analysis runs (design 1c's run chips) -----------------------------------
 
-export interface TierStyle {
-  /** Read on access for the same reason `GlyphStyle.label` is. */
-  readonly label: string
+/**
+ * What a run chip is drawn from: the limit each move's search stopped at and the lines it
+ * kept, plus whether somebody asked for it. The fields of `RunResponse`, `GameRunSummary`
+ * and the `analysis.*` frames alike, so one label serves the queue, the game and the table.
+ */
+export interface RunShape {
+  nodes?: number | null
+  depth?: number | null
+  seconds?: number | null
+  multipv?: number | null
+  requested?: boolean | null
+  maia_only?: boolean | null
+}
+
+export type RunKind = 'requested' | 'import'
+
+export interface RunStyle {
   chipClass: string
   color: string
 }
 
-export const TIER_STYLES: Record<Tier, TierStyle> = {
-  quick: {
-    get label() {
-      return t`Quick`
-    },
+/**
+ * Two looks, not one per limit: what the owner needs to see at a glance is whether a run is
+ * one they asked for — which is also the run that answers for a move — or the pass every
+ * import gets. The limit is in the text. Requested runs keep the `deep` token the old Deep
+ * chip wore, so a library analysed before one pass existed looks the way it did.
+ */
+export const RUN_STYLES: Record<RunKind, RunStyle> = {
+  import: {
     chipClass: 'border-edge-strong bg-raised text-soft',
     color: 'var(--bb-muted)',
   },
-  deep: {
-    get label() {
-      return t`Deep`
-    },
+  requested: {
     chipClass: 'border-deep/28 bg-deep/10 text-deep',
     color: 'var(--bb-deep)',
   },
+}
+
+export function runKind(run: RunShape): RunKind {
+  return run.requested ? 'requested' : 'import'
+}
+
+/**
+ * `d24 · 2 lines`, `10s · 2 lines`, `500k · 1 line` — a run as the dialog that queued it
+ * would describe it. Depth before seconds before nodes, which only matters on a legacy row
+ * that stored two: a requested run carries exactly one. A Maia fill searched nothing, so it
+ * says so instead of printing the node budget it was queued with. A game card knows only
+ * that a run happened and whether one was asked for, and says `Analysed` rather than
+ * inventing a line count.
+ */
+export function runLabel(run: RunShape): string {
+  if (run.maia_only) return t`Maia fill`
+  const limit =
+    run.depth != null
+      ? t`d${run.depth}`
+      : run.seconds != null
+        ? t`${formatSeconds(run.seconds)}s`
+        : run.nodes != null
+          ? formatNodes(run.nodes)
+          : null
+  if (limit === null && run.multipv == null) return t`Analysed`
+  const count = run.multipv ?? 1
+  const lines = plural(count, { one: '# line', other: '# lines' })
+  return limit === null ? lines : `${limit} · ${lines}`
+}
+
+function formatSeconds(seconds: number): string {
+  return String(Math.round(seconds * 10) / 10)
 }

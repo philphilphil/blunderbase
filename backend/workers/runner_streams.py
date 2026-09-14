@@ -10,7 +10,7 @@ Two things are worth knowing:
 
 - **The slot is the gateway's, and a stream outranks queue work.** `reserve_slot` takes one
   from the runner's count, preempting the most recently started run if it has to (D6):
-  somebody is sitting at a board, and a deep pass can wait a minute and start again with
+  somebody is sitting at a board, and an analysis pass can wait a minute and start again with
   its attempt refunded. `release_slot` gives it back and wakes the dispatcher.
 - **Nothing here edits the gateway.** The frames a runner sends about a session have no
   built-in handler; `register_handler` is the seam, and this module is the only thing that

@@ -11,15 +11,25 @@ import { useCallback, useState } from 'react'
 
 import { useEventListener } from '@/lib/events/EventsProvider'
 import type { AnyEvent } from '@/lib/events/types'
-import type { RunStatus, Tier } from '@/lib/api/types'
+import type { RunStatus } from '@/lib/api/types'
 
 export interface RunActivity {
   runId: number
   gameId: number | null
-  tier: Tier
   /**
-   * A Maia fill rather than an engine pass. Fills are queued under the quick tier for its
-   * engine and its place in the queue, so `tier` is not what a row should be labelled by.
+   * What the run stops each move at and the lines it keeps, as the socket said — the row's
+   * chip is drawn from these (`runLabel`), because there is no name for a kind of pass to
+   * draw it from any more. Null until a frame carries them; a progress frame need not.
+   */
+  nodes: number | null
+  depth: number | null
+  seconds: number | null
+  multipv: number | null
+  /** Somebody asked for it from a game, rather than an import or a backfill queuing it. */
+  requested: boolean
+  /**
+   * A Maia fill rather than an engine pass. Fills carry the import pass's node budget, so
+   * the limits alone are not what a row should be labelled by.
    */
   maiaOnly: boolean
   status: RunStatus
@@ -36,7 +46,11 @@ function isAnalysisEvent(event: AnyEvent): event is AnyEvent & {
   event: string
   run_id: number
   game_id?: number | null
-  tier?: Tier
+  nodes?: number | null
+  depth?: number | null
+  seconds?: number | null
+  multipv?: number
+  requested?: boolean
   status?: RunStatus
   maia_only?: boolean
   done?: number
@@ -73,7 +87,13 @@ export function useRunActivity(): RunActivity[] {
       const next: RunActivity = {
         runId: event.run_id,
         gameId: event.game_id ?? previous?.gameId ?? null,
-        tier: event.tier ?? previous?.tier ?? 'quick',
+        // `undefined` is a frame that did not say, and keeps what an earlier one did; `null`
+        // is a frame saying the run has no such limit.
+        nodes: event.nodes !== undefined ? event.nodes : (previous?.nodes ?? null),
+        depth: event.depth !== undefined ? event.depth : (previous?.depth ?? null),
+        seconds: event.seconds !== undefined ? event.seconds : (previous?.seconds ?? null),
+        multipv: event.multipv ?? previous?.multipv ?? null,
+        requested: event.requested ?? previous?.requested ?? false,
         maiaOnly: event.maia_only ?? previous?.maiaOnly ?? false,
         status,
         progress:

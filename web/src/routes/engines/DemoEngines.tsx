@@ -53,7 +53,8 @@ export function DemoEngines() {
           </h2>
           <p className="mt-1.5 text-[0.78125rem] leading-[1.6] text-dim">
             <Trans>
-              Quick, Deep and continuous analysis, all in this tab. Nothing is saved.
+              The analysis pass, Analyse… and continuous analysis, all in this tab. Nothing is
+              saved.
             </Trans>
           </p>
           {state.ready ? (
@@ -105,8 +106,8 @@ export function DemoEngines() {
               />
               <span>
                 <Trans>
-                  <span className="font-medium text-soft">Roles</span> — which engine does Quick,
-                  Deep and human moves.
+                  <span className="font-medium text-soft">Roles</span> — which engine does the
+                  analysis and which the human moves.
                 </Trans>
               </span>
             </li>

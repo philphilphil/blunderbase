@@ -10,7 +10,8 @@
  *
  * **A toast is for an action whose failure has no panel of its own** — a button on a row
  * or in a titlebar widget that has nowhere to put a red sentence without disturbing
- * everything around it: pressing "Deep" on a game, queueing a batch, retrying a run.
+ * everything around it: "Queue analysis" on a games-table row, queueing a batch, retrying a
+ * run.
  *
  * This is a one-way door: existing inline errors are not converted just because a toast
  * now exists. Only new call sites with nowhere else to speak reach for one.

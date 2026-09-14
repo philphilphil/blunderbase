@@ -10,7 +10,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.db.enums import EngineKind, EngineRole, RunStatus, Tier
+from backend.db.enums import EngineKind, EngineRole, RunStatus
 from backend.db.models import AnalysisRun, Credential, Engine, Runner
 from backend.runners.protocol import EngineAd
 from backend.services import analysis
@@ -72,7 +72,7 @@ def _local_engine(session: Session, name: str = "stockfish", **changes: Any) -> 
 
 
 def _run(session: Session, engine_id: int | None, status: RunStatus) -> AnalysisRun:
-    run = AnalysisRun(engine_id=engine_id, tier=Tier.QUICK, status=status)
+    run = AnalysisRun(engine_id=engine_id, status=status)
     session.add(run)
     session.commit()
     return run
@@ -629,8 +629,7 @@ def test_an_advertisement_becomes_an_engine_row(session: Session) -> None:
     assert engine.enabled is True
     # The ad's `tier: deep` is accepted and ignored — a runner cannot claim a job — but a
     # role nobody had filled goes to the first engine that fits it.
-    assert engines_service.engine_for_tier(session, Tier.QUICK).id == engine.id
-    assert engines_service.engine_for_tier(session, Tier.DEEP).id == engine.id
+    assert engines_service.engine_for_role(session, EngineRole.ANALYSIS).id == engine.id
 
 
 def test_re_advertising_updates_the_row_rather_than_adding_one(session: Session) -> None:
@@ -786,10 +785,12 @@ def test_a_local_only_ask_never_reaches_for_a_remote_binary(session: Session) ->
     _local_engine(session, "stockfish")
     runner, _token = runners_service.create_runner(session, "gpu-box")
     accepted = engines_service.sync_runner_engines(session, runner, [_ad()])
-    engines_service.set_role_engine(session, EngineRole.DEEP, accepted[0].engine_id)
+    engines_service.set_role_engine(session, EngineRole.ANALYSIS, accepted[0].engine_id)
 
-    assert engines_service.engine_for_tier(session, Tier.DEEP).name == "sf-remote"
-    assert engines_service.engine_for_tier(session, Tier.DEEP, local_only=True) is None
+    assert engines_service.engine_for_role(session, EngineRole.ANALYSIS).name == "sf-remote"
+    assert (
+        engines_service.engine_for_role(session, EngineRole.ANALYSIS, local_only=True) is None
+    )
 
 
 def test_a_first_time_runners_engine_fills_a_role_nobody_has_filled(session: Session) -> None:
@@ -798,8 +799,7 @@ def test_a_first_time_runners_engine_fills_a_role_nobody_has_filled(session: Ses
 
     accepted = engines_service.sync_runner_engines(session, runner, [_ad(), _ad("spare")])
 
-    assert engines_service.engine_for_tier(session, Tier.QUICK).id == accepted[0].engine_id
-    assert engines_service.engine_for_tier(session, Tier.DEEP).id == accepted[0].engine_id
+    assert engines_service.engine_for_role(session, EngineRole.ANALYSIS).id == accepted[0].engine_id
 
 
 def test_a_re_advertised_engine_does_not_refill_a_role_the_owner_emptied(
@@ -807,11 +807,11 @@ def test_a_re_advertised_engine_does_not_refill_a_role_the_owner_emptied(
 ) -> None:
     runner, _token = runners_service.create_runner(session, "gpu-box")
     engines_service.sync_runner_engines(session, runner, [_ad()])
-    engines_service.set_role_engine(session, EngineRole.DEEP, None)
+    engines_service.set_role_engine(session, EngineRole.ANALYSIS, None)
 
     engines_service.sync_runner_engines(session, runner, [_ad()])
 
-    assert engines_service.engine_for_tier(session, Tier.DEEP) is None
+    assert engines_service.engine_for_role(session, EngineRole.ANALYSIS) is None
 
 
 def test_the_maia_a_host_uses_is_the_one_the_owner_chose(session: Session) -> None:
@@ -839,18 +839,18 @@ def test_a_host_without_maia_simply_has_none(session: Session) -> None:
     assert engines_service.maia_engine_for_host(session, runner.id) is None
 
 
-def test_a_tier_on_a_runner_that_is_not_connected_is_unavailable(session: Session) -> None:
+def test_a_role_on_a_runner_that_is_not_connected_is_unavailable(session: Session) -> None:
     runner, _token = runners_service.create_runner(session, "gpu-box")
     engines_service.sync_runner_engines(session, runner, [_ad()])
 
-    status = engines_service.tier_status(session, Tier.DEEP)
+    status = engines_service.role_status(session, EngineRole.ANALYSIS)
 
     assert status.available is False
     assert "not connected" in status.reason
     assert status.engine_name == "sf-remote"
 
 
-def test_a_tier_on_a_connected_runner_is_available_without_a_binary_here(
+def test_a_role_on_a_connected_runner_is_available_without_a_binary_here(
     session: Session,
 ) -> None:
     """`binary_present` is meaningless for a path on another machine."""
@@ -858,7 +858,7 @@ def test_a_tier_on_a_connected_runner_is_available_without_a_binary_here(
     engines_service.sync_runner_engines(session, runner, [_ad(path="/nowhere/at/all")])
     runners_service.mark_connected(session, runner)
 
-    assert engines_service.tier_status(session, Tier.DEEP).available is True
+    assert engines_service.role_status(session, EngineRole.ANALYSIS).available is True
 
 
 def test_a_run_bound_to_a_runners_engine_is_left_for_that_runner(session: Session) -> None:

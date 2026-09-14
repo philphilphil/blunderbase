@@ -13,7 +13,7 @@ ist in jedem Fall ein eigener Download.
 
 **Rechenleistung → Engines** ist, was installiert ist, in zwei Teilen von oben nach unten.
 
-*Was läuft womit*: je eine Zeile für Schnell, Tief und Menschliche Züge, mit der Engine,
+*Was läuft womit*: je eine Zeile für Analyse und Menschliche Züge, mit der Engine,
 die die Rolle hält, und, wenn sie nicht laufen kann, dem Grund in Worten.
 
 **Engines**: jede eingerichtete Engine – ihre Art, die Maschine, auf der sie läuft, ihre
@@ -45,13 +45,15 @@ Die erste Engine ihrer Art, die registriert wird, übernimmt die Rollen, zu dene
 damit eine frische Installation ohne einen Besuch im Rollen-Formular funktioniert. Eine
 bereits vergebene Rolle übernimmt sie nie.
 
-## Die drei Rollen { #the-three-roles }
+## Die zwei Rollen { #the-two-roles }
 
 | Rolle | Was sie ausführt |
 |---|---|
-| Schnell | Den schnellen Durchlauf, den jede importierte Partie bekommt |
-| Tief | Den langsameren Durchlauf mit mehreren Varianten, den du anforderst |
+| Analyse | Den Durchlauf, den jede importierte Partie bekommt; außerdem schlagen **Analysieren** in einer Partie und die Auswahl im Fernschach diese Engine vor |
 | Menschliche Züge | Maia – was ein Spieler deiner Wertung gezogen hätte |
+
+Eine Analyse, die du mit **Analysieren** anforderst, darf jede eingeschaltete UCI-Engine
+nehmen; die Rolle entscheidet nur, mit welcher der Dialog öffnet.
 
 Vergeben werden sie oben auf der Engines-Seite. **Es gibt keinen Ersatz.** Ist die Engine, die
 eine Rolle hält, abgeschaltet, gelöscht oder auf einer Maschine, die nicht verbunden ist,
@@ -90,7 +92,7 @@ verlangt. Diese Seite legt nur fest, was ein Prozess kostet.
 Eine Fernschachsuche ist kein Auftrag aus der Warteschlange: Sie ist eine Engine, die
 stunden- oder tagelang auf einer Stellung sitzt. Sie belegt einen der
 **Warteschlangenprozesse** dieses Servers unter [Maschinen](runners.md#how-much-at-once),
-solange sie läuft – dieselben Plätze, die Schnell- und Tiefenanalysen nutzen; eine Suche,
+solange sie läuft – dieselben Plätze, die die Analysedurchläufe nutzen; eine Suche,
 die tagelang läuft, ist also ein Platz, ohne den die Warteschlange auskommt, bis du sie
 pausierst oder stoppst. Die Karte unter Maschinen und die Kapazitätsleiste der
 Fernschachseite zählen sie beide, das Warten der Warteschlange hinter einer Suche ist also
@@ -123,16 +125,16 @@ und eine GPU-Engine, die gleichzeitig suchen, jede auf ihrer eigenen Hardware.
 **Aufgaben sind die andere Hälfte des Modus, und sie sind gewöhnliche
 Warteschlangenarbeit.** Eine Aufgabe – ein begrenzter Blick auf eine Stellung, und das,
 woraus eine [Erweiterung](../guide/correspondence.md#tasks-and-expansion) besteht – ist ein
-`AnalysisRun` wie jeder andere: Sie zählt zusammen mit der Schnell- und der Tiefenanalyse
+`AnalysisRun` wie jeder andere: Sie zählt zusammen mit den Analysedurchläufen
 und den Suchen gegen die **Warteschlangenprozesse**, gibt ihren Platz nach ein, zwei
 Minuten zurück, wo eine Suche ihn behält, und sie läuft auf dem Host, dem die Warteschlange
 sie gibt – [Remote Runner](runners.md) eingeschlossen. Die
 Engine, die du für eine Aufgabe wählst – in **Aufgabe einreihen …**, **Erweitern …** oder
 **Teilbaum auffrischen …** –, darf also auf einem Runner liegen, und wo du einen Runner
 hast, gehört sie dorthin: Die Aufgaben gehen auf die andere Maschine, und diese behält ihre
-Kerne für die Suchen und die Durchläufe. Aufgaben stehen in der Warteschlange zwischen den Stufen, vor der
-Schnellanalyse jeder importierten Partie und hinter einer Tiefenanalyse, auf die jemand
-wartet, und untereinander gilt: die nächste Frist zuerst. **Warteschlange leeren** auf der
+Kerne für die Suchen und die Durchläufe. Aufgaben stehen in der Mitte der Warteschlange, vor der
+Analyse jeder importierten Partie und hinter einer, die jemand mit **Analysieren**
+angefordert hat und auf die er wartet, und untereinander gilt: die nächste Frist zuerst. **Warteschlange leeren** auf der
 Analyseseite wirft die noch wartenden Aufgaben mit allem anderen hinaus, und jeder betroffene
 Knoten sagt es.
 
@@ -147,11 +149,13 @@ die Suchen mitgezählt sind.
 
 ## Die Engine im Browser { #the-engine-in-your-browser }
 
-Wird eine Schnellanalyse, eine Tiefenanalyse oder die fortlaufende Analyse abgelehnt, weil
-eine Rolle keine Engine hat, bietet der Partiebildschirm **Browser-Engine einrichten** an.
-Das richtet diesen Browser als Runner ein, wartet, bis sein Stockfish registriert ist, gibt
-ihm die Rolle, falls sie noch frei ist, und führt dann den Durchlauf aus, den du angefordert
-hast. Du verlässt das Brett dabei nie.
+Gibt es gar keine Engine, bietet der Partiebildschirm **Browser-Engine einrichten** an –
+anstelle des Dialogs **Analysieren…** und wenn du die fortlaufende Analyse einschaltest.
+Das richtet diesen Browser als Runner ein, wartet, bis sein Stockfish registriert ist, und
+gibt ihm die Rolle Analyse, falls sie noch frei ist. Die fortlaufende Analyse startet dann
+von selbst; für eine eigene Analyse öffnet sich der Dialog **Analysieren…** mit der neuen
+Engine, und eingereiht wird erst, wenn du darin **Analysieren** drückst. Du verlässt das
+Brett dabei nie.
 
 Eine Browser-Engine will Cross-Origin-Isolation, um mit mehreren Threads zu laufen. Hinter
 einem Proxy ist das [`BLUNDERBASE_CROSS_ORIGIN_ISOLATION`](deploy.md#settings-worth-knowing).
@@ -189,9 +193,9 @@ Eine Maia steuert nie das Analysebrett – sie liefert eine Verteilung von Züge
 Dasselbe ohne Browser, für eine Maschine ohne Bildschirm oder für ein Skript.
 
 ```console
-$ blunderbase engines add sf-local stockfish --option Threads=4 --role quick --role deep
+$ blunderbase engines add sf-local stockfish --option Threads=4 --role analysis
 engine 'sf-local' Stockfish 18 registered: uci at stockfish
-serves the quick tier, the deep tier
+serves the analysis role
 $ blunderbase engines list
 $ blunderbase engines remove sf-local
 ```

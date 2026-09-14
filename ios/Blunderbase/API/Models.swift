@@ -433,8 +433,10 @@ struct GameCard: Decodable, Sendable, Equatable, Identifiable {
     let game: GameSummary
     /// Whether any pass has finished. Absent on a row the backend built without the cards.
     var analyzed: Bool?
-    /// Whether a deep pass has.
-    var deep: Bool?
+    /// Whether a run somebody asked for — whole game or a window — has finished. A card the
+    /// server folded before there was one analysis pass says `deep`, which the server
+    /// already reads as this, so the app never sees the old key.
+    var requested: Bool?
     var evalCurve: [EvalPoint]?
     var worstMoments: [WorstMoment]?
 
@@ -442,7 +444,7 @@ struct GameCard: Decodable, Sendable, Equatable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case analyzed
-        case deep
+        case requested
         case evalCurve = "eval_curve"
         case worstMoments = "worst_moments"
     }
@@ -451,7 +453,7 @@ struct GameCard: Decodable, Sendable, Equatable, Identifiable {
         game = try GameSummary(from: decoder)
         let container = try decoder.container(keyedBy: CodingKeys.self)
         analyzed = try container.decodeIfPresent(Bool.self, forKey: .analyzed)
-        deep = try container.decodeIfPresent(Bool.self, forKey: .deep)
+        requested = try container.decodeIfPresent(Bool.self, forKey: .requested)
         evalCurve = try container.decodeIfPresent([EvalPoint].self, forKey: .evalCurve)
         worstMoments = try container.decodeIfPresent([WorstMoment].self, forKey: .worstMoments)
     }
@@ -670,18 +672,22 @@ struct MoveRow: Decodable, Sendable, Equatable, Identifiable {
 /// The compact run row a game detail carries — the service names the engine instead of its
 /// id and leaves the queue bookkeeping out.
 ///
-/// `maiaOnly` is the one that matters when reading a tier: a fill pass borrows a tier's
-/// engine to ask the human model and searches nothing, so `tier` alone does not say what the
-/// run did.
+/// What a run stopped each move at is on the row — one of `nodes`, `depth` or `seconds` — so
+/// the label is built from those rather than from a name for the pass. `maiaOnly` is the one
+/// that matters before reading them: a fill pass borrows the analysis role's engine to ask
+/// the human model and searches nothing, so the engine and the limits alone do not say what
+/// the run did. `requested` is whether a person asked for it, which is what the web's badge
+/// colours by.
 struct RunSummary: Decodable, Sendable, Equatable, Identifiable {
     let id: Int
-    var tier: String?
+    var requested: Bool?
     var maiaOnly: Bool?
     var status: String?
     var engine: String?
     var engineKind: String?
     var depth: Int?
     var nodes: Int?
+    var seconds: Double?
     var multipv: Int?
     var plyStart: Int?
     var plyEnd: Int?
@@ -689,13 +695,14 @@ struct RunSummary: Decodable, Sendable, Equatable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case tier
+        case requested
         case maiaOnly = "maia_only"
         case status
         case engine
         case engineKind = "engine_kind"
         case depth
         case nodes
+        case seconds
         case multipv
         case plyStart = "ply_start"
         case plyEnd = "ply_end"
