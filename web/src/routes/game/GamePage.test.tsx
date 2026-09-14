@@ -839,6 +839,31 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
   })
 
+  it('steps the game with the wheel over either tab of the graph pane', async () => {
+    // The two tabs are two different elements behind one wheel listener: the listener has
+    // to follow the swap, or the wheel scrolls the page over whichever plot came second.
+    const user = userEvent.setup()
+    const clocked: GameDetail = {
+      ...DETAIL,
+      game: { ...DETAIL.game, initial_clock: 180, increment: 2 },
+      moves: DETAIL.moves.map((row, index) => ({ ...row, clock: [175, 160, 165, 150][index] })),
+    }
+    vi.stubGlobal('fetch', stubFetch({ '/games/14': clocked }))
+    renderPage()
+    await screen.findByRole('tab', { name: 'Move time' })
+
+    expect(fireEvent.wheel(screen.getByTestId('evaluation-plot'), { deltaY: 120 })).toBe(false)
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Move time' }))
+    expect(fireEvent.wheel(screen.getByTestId('move-time-plot'), { deltaY: 120 })).toBe(false)
+    expect(screen.getByText('ply 2 / 4')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Evaluation' }))
+    expect(fireEvent.wheel(screen.getByTestId('evaluation-plot'), { deltaY: -120 })).toBe(false)
+    expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
+  })
+
   it('jumps to the position the next flagged move was made from with .', async () => {
     const user = userEvent.setup()
     renderPage()

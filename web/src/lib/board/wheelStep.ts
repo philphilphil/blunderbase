@@ -28,8 +28,11 @@ interface Seeking {
  * threshold, the trackpad accumulation, and the reset when the reader turns round.
  *
  * The listener is attached by hand because React's `onWheel` is passive, and a passive
- * listener cannot stop the page scrolling underneath the gesture. It binds once, so the
- * caller's live cursor and callbacks are read through a ref rather than closed over.
+ * listener cannot stop the page scrolling underneath the gesture. The caller's live cursor
+ * and callbacks are read through a ref rather than closed over, so the listener never has to
+ * be rebound for them. It is rebound when the element behind `ref` changes: the eval graph
+ * swaps its plot for the move-time plot, or for a placeholder until evaluations arrive, and a
+ * listener left on the element that went away would let the wheel scroll the page instead.
  */
 export function useWheelStep(ref: RefObject<HTMLElement | null>, seeking: Seeking): void {
   const live = useRef(seeking)
@@ -38,8 +41,15 @@ export function useWheelStep(ref: RefObject<HTMLElement | null>, seeking: Seekin
   })
   const travel = useRef(0)
 
+  const bound = useRef<{ node: HTMLElement; detach: () => void } | null>(null)
+
+  // No dependency list: a ref changing does not render, so every render checks whether the
+  // element is still the one listened on. Cheap, since it is one comparison when it is.
   useEffect(() => {
     const node = ref.current
+    if (node === (bound.current?.node ?? null)) return
+    bound.current?.detach()
+    bound.current = null
     if (!node) return
     function onWheel(event: WheelEvent) {
       // A pinch-zoom is a wheel event too, and is not a request for the next move.
@@ -60,6 +70,14 @@ export function useWheelStep(ref: RefObject<HTMLElement | null>, seeking: Seekin
       else onSeek(cursor + step)
     }
     node.addEventListener('wheel', onWheel, { passive: false })
-    return () => node.removeEventListener('wheel', onWheel)
-  }, [ref])
+    bound.current = { node, detach: () => node.removeEventListener('wheel', onWheel) }
+  })
+
+  useEffect(
+    () => () => {
+      bound.current?.detach()
+      bound.current = null
+    },
+    [],
+  )
 }
