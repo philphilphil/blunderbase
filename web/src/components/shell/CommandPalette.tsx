@@ -14,21 +14,7 @@
 import type { I18n, MessageDescriptor } from '@lingui/core'
 import { msg, plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import {
-  Bot,
-  ChartNoAxesColumn,
-  Cpu,
-  Database,
-  Gauge,
-  LayoutDashboard,
-  Library,
-  Network,
-  Radio,
-  Signpost,
-  StickyNote,
-  Swords,
-  User,
-} from 'lucide-react'
+import { Bot, Signpost, Swords, User } from 'lucide-react'
 import {
   createContext,
   useContext,
@@ -41,6 +27,19 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+// The rail's own glyphs for the rail's own destinations, so a page reads the same here as
+// it does in the sidebar (`NavIcons`).
+import {
+  AnalysisIcon,
+  ComputeIcon,
+  DashboardIcon,
+  ExplorerIcon,
+  GamesIcon,
+  LibraryIcon,
+  LiveIcon,
+  NotesIcon,
+  StatsIcon,
+} from '@/components/icons/NavIcons'
 import { useSearch } from '@/lib/api/queries'
 import type { GameSummary, NoteResponse, OpeningHit, OpponentHit } from '@/lib/api/types'
 import type { RuntimeCapabilities } from '@/lib/api/types'
@@ -103,14 +102,14 @@ const PAGES: PageRoute[] = [
   {
     label: msg`Dashboard`,
     hint: msg`the last games and what went wrong`,
-    icon: LayoutDashboard,
+    icon: DashboardIcon,
     to: '/',
   },
-  { label: msg`Games`, hint: msg`the library`, icon: Library, to: '/games' },
+  { label: msg`Games`, hint: msg`the library`, icon: GamesIcon, to: '/games' },
   {
     label: msg`Explorer`,
     hint: msg`your games, the reference books and model games`,
-    icon: Network,
+    icon: ExplorerIcon,
     to: '/explorer',
   },
   // `/repertoire` is deliberately absent, as it is from the rail: routed, not yet offered
@@ -118,52 +117,52 @@ const PAGES: PageRoute[] = [
   {
     label: msg`Stats`,
     hint: msg`reports over the library`,
-    icon: ChartNoAxesColumn,
+    icon: StatsIcon,
     to: '/stats',
   },
-  { label: msg`Notes`, hint: msg`everything written down`, icon: StickyNote, to: '/notes' },
-  { label: msg`Live`, hint: msg`the game being played now`, icon: Radio, to: '/live' },
+  { label: msg`Notes`, hint: msg`everything written down`, icon: NotesIcon, to: '/notes' },
+  { label: msg`Live`, hint: msg`the game being played now`, icon: LiveIcon, to: '/live' },
   {
     label: msg`Library`,
     hint: msg`import, export and reset`,
-    icon: Database,
+    icon: LibraryIcon,
     to: '/library',
   },
   {
     label: msg`Analysis`,
     hint: msg`coverage, backfills and what they cost`,
-    icon: Gauge,
+    icon: AnalysisIcon,
     to: '/analysis/coverage',
   },
   {
     label: msg`Engines`,
     hint: msg`what is installed, and what runs what`,
-    icon: Cpu,
+    icon: ComputeIcon,
     to: '/compute/engines',
   },
   {
     label: msg`Machines`,
     hint: msg`where engines run, and how much at once`,
-    icon: Cpu,
+    icon: ComputeIcon,
     to: '/compute/machines',
   },
   {
     label: msg`Engine passes`,
     hint: msg`budgets and move labels`,
-    icon: Gauge,
+    icon: AnalysisIcon,
     to: '/analysis/engine',
   },
-  { label: msg`Maia`, hint: msg`human levels and when they run`, icon: Gauge, to: '/analysis/maia' },
+  { label: msg`Maia`, hint: msg`human levels and when they run`, icon: AnalysisIcon, to: '/analysis/maia' },
   {
     label: msg`Import`,
     hint: msg`lichess, chess.com, FICS and PGN`,
-    icon: Database,
+    icon: LibraryIcon,
     to: '/library/import',
   },
   {
     label: msg`Manage Library`,
     hint: msg`export or reset`,
-    icon: Database,
+    icon: LibraryIcon,
     to: '/library/manage',
   },
   { label: msg`Assistant`, hint: msg`MCP keys and client setup`, icon: Bot, to: '/assistant' },
@@ -226,7 +225,7 @@ function pageItems(
       group: 'Pages',
       label,
       hint: i18n._(msg`report · ${hint}`),
-      icon: ChartNoAxesColumn,
+      icon: StatsIcon,
       to: `/stats?report=${report.key}`,
     })
   }
@@ -305,7 +304,7 @@ function searchItems(
       label: opening.name || opening.eco,
       hint: opening.name ? opening.eco : '',
       trailing: `${opening.games}`,
-      icon: Network,
+      icon: ExplorerIcon,
       to: `/games?eco=${encodeURIComponent(opening.eco)}`,
     })
   }
@@ -320,7 +319,7 @@ function searchItems(
       label: oneLine(note),
       hint: note.tags.length ? note.tags.join(' · ') : i18n._(msg`note`),
       trailing: formatGameDate(note.updated_at),
-      icon: StickyNote,
+      icon: NotesIcon,
       to: noteHref(note),
     })
   }
