@@ -4,6 +4,18 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.4.0 — 2026-09-14
+
+- Added typing moves on the board with M
+- Added hiding the engine on new games until you show it
+- Added links from a game to its page on the site
+- Added live search as a tab of the engine pane
+- Added a move-time tab to the graph pane
+- Changed Queue processes to apply on save, without a restart
+- Changed correspondence searches to share the machine's engine slots
+- Changed notes to come first on a game and open by default
+- Fixed the engine pane name vanishing in a narrow pane
+
 ## v1.3.0 — 2026-09-12
 
 - Added correspondence searches on remote runners, with warm pause (update the runner for warm pause and shortlists)
