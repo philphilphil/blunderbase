@@ -22,11 +22,11 @@ import { MOBILE_QUERY } from '@/lib/ui/media'
 
 import { COMPOSER_TEXT_ID } from './components/NoteComposer'
 import { GamePage, MOVES_WIDTH_KEY } from './GamePage'
+import { setMaiaCompare } from './maiaPreferences'
 import { resetSessionVariations } from './sessionVariations'
 
-// The Deep button has nowhere to put a red sentence, so a refused run is toasted. Mocked
-// rather than rendered: what these tests are about is that the backend's own words get
-// there, not how sonner draws them.
+// A refused run is said in the Analyse dialog now, so nothing here should reach a toast;
+// mocked so the tests that care can say so, rather than to see how sonner draws one.
 vi.mock('@/lib/toast', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
 
 // jsdom builds PointerEvents but captures nothing, and the splitter asks for the capture
@@ -118,7 +118,7 @@ const DETAIL: GameDetail = {
   runs: [
     {
       id: 18,
-      tier: 'deep',
+      requested: true,
       status: 'done',
       engine: 'stockfish',
       engine_kind: 'uci',
@@ -146,13 +146,19 @@ const DETAIL: GameDetail = {
 const QUEUED_RUN: RunResponse = {
   id: 21,
   game_id: 14,
-  tier: 'deep',
+  requested: true,
   status: 'queued',
+  depth: 24,
   multipv: 4,
   priority: 10,
   attempts: 0,
   created_at: new Date().toISOString(),
 }
+
+/** What the Analyse dialog offers: the one local engine, holding the analysis role. */
+const ANALYSIS_ENGINES = [
+  { engine_id: 1, name: 'stockfish', default: true, runner_id: null, host: 'this host' },
+]
 
 /** Where engine work can run. One local engine, no runners — today's single-host install. */
 const RUNNERS_STATUS: RunnersStatus = {
@@ -308,6 +314,7 @@ function stubFetch(
       if (url.includes(fragment)) return json(payload)
     }
     if (url.includes('/games/14')) return json(DETAIL)
+    if (url.includes('/analysis/engines')) return json(ANALYSIS_ENGINES)
     if (url.includes('/analysis/runs')) return json([])
     if (url.includes('/stats/worst-moments')) return json([])
     if (url.includes('/health')) return json({ status: 'ok' })
@@ -344,7 +351,7 @@ function renderPage(entry = '/games/14') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   })
-  return render(
+  const view = render(
     <Providers client={client}>
       <EventsProvider>
         <MemoryRouter initialEntries={[entry]}>
@@ -356,6 +363,7 @@ function renderPage(entry = '/games/14') {
       </EventsProvider>
     </Providers>,
   )
+  return Object.assign(view, { client })
 }
 
 beforeEach(() => {
@@ -416,13 +424,26 @@ describe('GamePage', () => {
     expect(within(screen.getByTestId('maia-panel')).getByText('stockfish')).toBeInTheDocument()
     expect(screen.getByText('MPV 3')).toBeInTheDocument()
 
-    // The deep-analysis trigger lives in the board's transport row now, rather than as a
-    // card of its own further down the column — in the row's third group, past the rule from
-    // the settings group Flip belongs to.
-    const deepButton = screen.getByRole('button', { name: 'Deep' })
+    // The analysis trigger lives in the engine pane's title strip, beside the live switch
+    // it is fenced off from, and not in the board's transport row.
+    const analyse = screen.getByRole('button', { name: 'Analyse' })
+    expect(within(screen.getByTestId('maia-engine-lines')).getByRole('button', { name: 'Analyse' })).toBe(
+      analyse,
+    )
     const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement
-    expect(settings?.contains(deepButton)).toBe(false)
-    expect(settings?.parentElement?.contains(deepButton)).toBe(true)
+    expect(settings?.parentElement?.contains(analyse)).toBe(false)
+  })
+
+  it('moves Analyse… into the board row while the engine is hidden', async () => {
+    setEngineHidden(true)
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // ⇧E takes the engine pane away, and asking is what a reader does next.
+    expect(screen.queryByTestId('maia-engine-lines')).not.toBeInTheDocument()
+    const analyse = screen.getByRole('button', { name: 'Analyse' })
+    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement
+    expect(settings?.parentElement?.contains(analyse)).toBe(true)
   })
 
   it('puts both players’ Lichess-style totals to the left of the evaluation chart', async () => {
@@ -533,13 +554,13 @@ describe('GamePage', () => {
     expect(screen.getByText('Back to game')).toBeInTheDocument()
   })
 
-  it('puts the multi-PV box over the move table once a deep pass has run', async () => {
+  it('puts the multi-PV box over the move table once a pass has run', async () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
     const engine = screen.getByTestId('maia-panel')
     const moveButton = screen.getByRole('button', { name: 'Qxd5' })
-    // A finished deep run is in the payload, so the lines lead the column.
+    // A finished run is in the payload, so the lines lead the column.
     expect(engine.compareDocumentPosition(moveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
@@ -579,20 +600,46 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
   })
 
-  it('queues a deep pass with d and a quick one with q', async () => {
+  it('opens the Analyse dialog with a, and keeps the board keys off while it is up', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.keyboard('d')
-    await waitFor(() => expect(posted).toHaveLength(1))
-    expect(posted[0].body).toEqual({ game_id: 14, tier: 'deep' })
+    await user.keyboard('a')
+    const dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
+    // A key is not a run: nothing is queued until the dialog is answered.
+    expect(posted).toHaveLength(0)
+    // The engine chips are buttons, not inputs, so an arrow pressed on one must not walk
+    // the game hidden behind the dim.
+    await user.click(within(dialog).getByRole('button', { name: /stockfish/ }))
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByText('ply 0 / 4')).toBeInTheDocument()
+  })
 
-    // Quick is bound even though the fixture's finished deep run hides its button: the
-    // button is hidden because the pass would add nothing, not because it is refused.
-    await user.keyboard('q')
-    await waitFor(() => expect(posted).toHaveLength(2))
-    expect(posted[1].body).toEqual({ game_id: 14, tier: 'quick' })
+  it('offers only the whole game at the starting position, and a window from a move', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
+    expect(within(dialog).getByRole('button', { name: 'This move' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'From here on' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Whole game' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    // Two plies in: the board shows the position after 1…d5, so "this move" is 1…d5 —
+    // ply 1, the move whose classification is on show.
+    await user.keyboard('{ArrowRight}{ArrowRight}')
+    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
+    await user.click(within(dialog).getByRole('button', { name: 'This move' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Seconds' }))
+    expect(within(dialog).getByLabelText('Limit')).toHaveValue(5)
+    await user.click(within(dialog).getByRole('button', { name: 'Analyse' }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].body).toEqual({ game_id: 14, engine_id: 1, seconds: 5, ply_start: 1, ply_end: 2 })
   })
 
   it('copies the PGN with c, through the button that owns the clipboard', async () => {
@@ -610,19 +657,6 @@ describe('GamePage', () => {
     // The button's own flash is the receipt, which is the point of going through it.
     expect(await screen.findByText('copied')).toBeInTheDocument()
     expect(copied[0]).toContain('[White "phib"]')
-  })
-
-  it('swaps the move column between Moves and Flagged with t', async () => {
-    const user = userEvent.setup()
-    renderPage()
-    await screen.findByText('Scandinavian Defense')
-
-    const flagged = () => screen.getByRole('button', { name: /Flagged/ })
-    expect(flagged()).toHaveAttribute('aria-pressed', 'false')
-    await user.keyboard('t')
-    expect(flagged()).toHaveAttribute('aria-pressed', 'true')
-    await user.keyboard('t')
-    expect(flagged()).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('jumps five moves at a time with shift and an arrow', async () => {
@@ -770,6 +804,46 @@ describe('GamePage', () => {
     expect(ranks()[0]).toBe('8')
   })
 
+  it('opens the graph tabs with t and v, and the book with b', async () => {
+    const user = userEvent.setup()
+    const clocked: GameDetail = {
+      ...DETAIL,
+      game: { ...DETAIL.game, initial_clock: 180, increment: 2 },
+      moves: DETAIL.moves.map((row, index) => ({ ...row, clock: [175, 160, 165, 150][index] })),
+    }
+    vi.stubGlobal('fetch', stubFetch({ '/games/14': clocked }))
+    renderPage()
+    await screen.findByRole('tab', { name: 'Evaluation' })
+
+    await user.keyboard('t')
+    expect(screen.getByRole('tab', { name: 'Move time' })).toHaveAttribute('aria-selected', 'true')
+    // A tab key opens its tab rather than cycling: pressed again, it stays put.
+    await user.keyboard('t')
+    expect(screen.getByRole('tab', { name: 'Move time' })).toHaveAttribute('aria-selected', 'true')
+    await user.keyboard('v')
+    expect(screen.getByRole('tab', { name: 'Evaluation' })).toHaveAttribute('aria-selected', 'true')
+
+    expect(screen.getByRole('tab', { name: 'Notes' })).toHaveAttribute('aria-selected', 'true')
+    await user.keyboard('b')
+    expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('switches Maia between one level and every level with l', async () => {
+    const user = userEvent.setup()
+    setMaiaCompare(false)
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    // This game carries one level, so the toggle is only offered while compare is on — which
+    // is exactly the state the key has to be able to get into and back out of.
+    await user.keyboard('l')
+    expect(screen.getByTestId('maia-compare-toggle')).toHaveAttribute('aria-pressed', 'true')
+    await user.keyboard('l')
+    expect(screen.queryByTestId('maia-compare-toggle')?.getAttribute('aria-pressed') ?? 'false').toBe(
+      'false',
+    )
+  })
+
   it('turns hints off and on with h', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -914,15 +988,21 @@ describe('GamePage', () => {
     expect(screen.getByText('ply 4 / 4')).toBeInTheDocument()
   })
 
-  it('posts a deep run and then reflects the queued run in the chrome', async () => {
+  it('posts the dialog’s run and then reflects the queued run in the chrome', async () => {
     const user = userEvent.setup()
     const { rerender } = renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.click(screen.getByRole('button', { name: 'Deep' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
+    // The analysis role's engine is preselected, and the limit opens on depth 24.
+    expect(within(dialog).getByRole('button', { name: /stockfish/ })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(dialog).getByRole('button', { name: 'Analyse' }))
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0].url).toContain('/analysis')
-    expect(posted[0].body).toEqual({ game_id: 14, tier: 'deep' })
+    // Blank lines and the whole game send nothing: the deployment and the service decide.
+    expect(posted[0].body).toEqual({ game_id: 14, engine_id: 1, depth: 24 })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     // The run list now answers with the queued run; the button and the header follow it.
     vi.stubGlobal('fetch', stubFetch({ '/analysis/runs': [QUEUED_RUN] }))
@@ -933,63 +1013,102 @@ describe('GamePage', () => {
     )
   })
 
-  it.each(['q', 'd'])('offers inline setup when %s has no engine assigned', async (key) => {
+  it('offers inline setup when no engine is switched on at all', async () => {
     const user = userEvent.setup()
-    refusePost = { status: 409, body: { error: 'tier_unavailable', detail: 'no engine is assigned' } }
-    vi.stubGlobal('fetch', stubFetch({ '/engines/roles': { roles: [
-      { role: 'quick', configured: false, available: false },
-      { role: 'deep', configured: false, available: false },
-    ] } }))
+    vi.stubGlobal('fetch', stubFetch({ '/analysis/engines': [] }))
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.keyboard(key)
-    expect(await screen.findByRole('dialog')).toHaveTextContent('No engine is set up')
+    await user.keyboard('a')
+    // The Analyse dialog gives way as soon as the list comes back empty: a form with no
+    // engine to pick is not a step anyone can take.
+    expect(await screen.findByText('No engine is set up')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Analyse…' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to Machines' })).toHaveAttribute('href', '/compute/machines')
     expect(screen.getByRole('button', { name: 'Set up browser engine' })).toBeInTheDocument()
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  it('toasts the engine sentence when the deep run is refused', async () => {
-    // Nothing falls back: if the engine assigned to Deep is on a machine that is away, the
-    // press is refused with a sentence naming it, and the button's only trace of that is a
-    // tint and a tooltip nobody hovers.
+  it('does not bring the dialog back unasked after the setup was cancelled', async () => {
+    // An engine list that fills in later — a runner saying hello, an engine added in another
+    // tab — must not open a dialog over the board that nobody pressed for.
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', stubFetch({ '/analysis/engines': [] }))
+    const { client } = renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('a')
+    await screen.findByText('No engine is set up')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    vi.stubGlobal('fetch', stubFetch())
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ['engines'] })
+    })
+    expect(screen.queryByRole('dialog', { name: 'Analyse…' })).not.toBeInTheDocument()
+
+    // Pressed again, it opens with the list as it is now.
+    await user.keyboard('a')
+    expect(await screen.findByRole('dialog', { name: 'Analyse…' })).toBeInTheDocument()
+  })
+
+  it('does not open the dialog from the key while a requested run is live', async () => {
+    // The button is disabled then; the key is the same press and holds the same way.
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', stubFetch({ '/analysis/runs': [QUEUED_RUN] }))
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled())
+    await user.keyboard('a')
+    expect(screen.queryByRole('dialog', { name: 'Analyse…' })).not.toBeInTheDocument()
+  })
+
+  it('says in the dialog why the run was refused', async () => {
+    // Nothing falls back: if the engine picked is on a machine that is away, the press is
+    // refused with a sentence naming it, and the dialog — where the engine can still be
+    // changed — is where it is said.
     const user = userEvent.setup()
     refusePost = {
       status: 409,
       body: {
-        error: 'tier_unavailable',
+        error: 'engine_unavailable',
         detail: "'sf-nuc' runs on 'nuc', which is not connected",
       },
     }
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    await user.click(screen.getByRole('button', { name: 'Deep' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Analyse…' })
+    await user.click(within(dialog).getByRole('button', { name: 'Analyse' }))
 
     // The backend's own words, passed through rather than replaced by a generic one.
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("'sf-nuc' runs on 'nuc', which is not connected"),
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      "'sf-nuc' runs on 'nuc', which is not connected",
     )
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
-  it('cannot be pressed into two deep passes while the run list catches up', async () => {
+  it('cannot be pressed into two runs while the run list catches up', async () => {
     // `POST /analysis` never dedupes, and `/analysis/runs` only learns about the run a
     // debounced invalidation and a refetch later. Between the two the button must already
-    // be disabled, or an impatient second click queues a whole second pass.
+    // be disabled, or an impatient second press queues a whole second run.
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    const trigger = screen.getByRole('button', { name: 'Deep' })
+    const trigger = screen.getByRole('button', { name: 'Analyse' })
     await user.click(trigger)
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Analyse…' })).getByRole('button', { name: 'Analyse' }),
+    )
     await waitFor(() => expect(posted).toHaveLength(1))
 
     // The run list still answers with [] — only the mutation's own run stands in, and the
     // button is disabled while it is active.
-    expect(trigger).toBeDisabled()
+    await waitFor(() => expect(trigger).toBeDisabled())
 
-    // Clicking a disabled button is not a second request.
+    // Neither a click nor the key opens a second dialog.
     await user.click(trigger).catch(() => {})
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(posted).toHaveLength(1)
   })
 
@@ -997,43 +1116,46 @@ describe('GamePage', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Scandinavian Defense')
-    await user.click(screen.getByRole('button', { name: 'Deep' }))
+    await user.click(screen.getByRole('button', { name: 'Analyse' }))
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Analyse…' })).getByRole('button', { name: 'Analyse' }),
+    )
     await waitFor(() => expect(posted).toHaveLength(1))
-    // The mutation's own run stands in until the run list catches up: run 21, deep. No
-    // progress frame has arrived yet, so the button just sits disabled.
-    expect(screen.getByRole('button', { name: 'Deep' })).toBeDisabled()
+    // The mutation's own run stands in until the run list catches up: run 21, requested.
+    // No progress frame has arrived yet, so the button just sits disabled.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled())
 
     const socket = SilentSocket.instances.at(-1)!
-    // The quick pass an import auto-queued over the same game is not this button's run.
+    // The pass an import queued over the same game is not this button's run.
     socket.emit({
       event: 'analysis.progress',
       run_id: 99,
       game_id: 14,
-      tier: 'quick',
+      requested: false,
       status: 'running',
       done: 2,
       total: 4,
     })
-    expect(screen.getByRole('button', { name: 'Deep' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: '50%' })).toBeNull()
 
     socket.emit({
       event: 'analysis.progress',
       run_id: 21,
       game_id: 14,
-      tier: 'deep',
+      requested: true,
       status: 'running',
       done: 3,
       total: 4,
     })
     expect(screen.getByRole('button', { name: '75%' })).toBeInTheDocument()
 
-    // …and the quick run finishing does not wipe the deep run's counter.
+    // …and the import pass finishing does not wipe the requested run's counter.
     socket.emit({
       event: 'analysis.done',
       run_id: 99,
       game_id: 14,
-      tier: 'quick',
+      requested: false,
       status: 'done',
     })
     expect(screen.getByRole('button', { name: '75%' })).toBeInTheDocument()
@@ -1073,9 +1195,9 @@ describe('GamePage', () => {
     // An empty column is a bare dash, not a sentence.
     expect(within(screen.getByTestId('maia-panel')).getAllByText('–').length).toBeGreaterThan(0)
     expect(screen.getByText('No engine run')).toBeInTheDocument()
-    // The deep pass is the obvious next thing to do, so the button is idle and enabled
-    // rather than describing a run that has already happened.
-    expect(screen.getByRole('button', { name: 'Deep' })).toBeEnabled()
+    // A run is the obvious next thing to do, so the button is idle and enabled rather than
+    // describing a run that has already happened.
+    expect(screen.getByRole('button', { name: 'Analyse' })).toBeEnabled()
   })
 
   it('offers a live search beside the stored run, and opens one when asked', async () => {
@@ -1570,7 +1692,7 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // The fixture's second move is a blunder, and the game carries a finished deep run.
+    // The fixture's second move is a blunder, and the game carries a finished run.
     expect(document.querySelector('[data-classification="blunder"]')).toBeInTheDocument()
     expect(screen.getByLabelText(/^Evaluation:/)).toBeInTheDocument()
     expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
@@ -1584,9 +1706,10 @@ describe('GamePage', () => {
     expect(screen.queryByTestId('evaluation-plot')).not.toBeInTheDocument()
     // The move table is still the game: the moves, and the note somebody wrote about one.
     expect(screen.getByText('d5')).toBeInTheDocument()
-    // And so is what the app has *done* — the run happened, whatever it found. (Two of
-    // them: the tier chip in the header, and the button that queues another pass.)
-    expect(screen.getAllByText(/deep/i).length).toBeGreaterThan(0)
+    // And so is what the app has *done* — the run happened, whatever it found: the run chip
+    // in the header, and the button that asks for another.
+    expect(screen.getByText('400k · 3 lines')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Analyse' })).toBeInTheDocument()
 
     act(() => setEngineHidden(false))
     expect(document.querySelector('[data-classification="blunder"]')).toBeInTheDocument()

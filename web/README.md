@@ -21,7 +21,7 @@ repo root.
 | `src/index.css` | The design tokens from `docs/design/Blunderbase Game View.dc.html`, the shadcn variable layer mapped onto them, and the chessground board theme. |
 | `src/lib/api/` | `types.ts` mirrors `backend/api/schemas.py`; `client.ts` is the fetch wrapper; `endpoints.ts` is one function per route; `keys.ts` is the query-key factory; `queries.ts` the TanStack hooks. |
 | `src/lib/events/` | The `/events` socket: `types.ts` (frames), `invalidation.ts` (event → query keys), `EventsProvider.tsx` (reconnect, coalesced invalidation, `subscribe`). |
-| `src/lib/chess/` | Evaluation formatting and the win-percentage curve (same constants as the backend), plus the classification/source/tier style tables. |
+| `src/lib/chess/` | Evaluation formatting and the win-percentage curve (same constants as the backend), plus the classification/source/run-badge style tables. |
 | `src/components/shell/` | Layout 1a "Studio": titlebar, 200px rail, queue and MCP indicators, `SetPageChrome`. |
 | `src/components/board/` | The chessground wrapper and its brushes. |
 | `src/routes/<page>/` | One directory per screen. Add files freely inside your own directory; `src/app/router.tsx` and the shell should not need to change. |

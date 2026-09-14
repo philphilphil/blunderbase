@@ -6,7 +6,7 @@
  * while a game is being read: the whole screen below it is board and moves, and a reader
  * three plies into a model game had no way of knowing the door was there at all. They ride
  * in the board's control row now, as one more group in the band that says what to do to the
- * game — beside the analysis tiers and Note, which are the same kind of decision, and within
+ * game — beside Analyse… and Note, which are the same kind of decision, and within
  * a hand's reach of the board they are about.
  *
  * A component rather than a node built inside `GamePage` because it holds a react-query
@@ -111,7 +111,7 @@ function CorrespondenceTreeButton({ gameId }: { gameId: number }) {
  *
  * A model game is fetched, read and forgotten; nothing else on the screen writes it
  * anywhere. This stores it as a game the owner did not play (`is_owner_game` off, so it
- * counts in nothing), which queues its quick pass, and then goes to the real game at its own
+ * counts in nothing), which queues its analysis pass, and then goes to the real game at its own
  * id — carrying the explorer position along, so the way back does not become the way back to
  * the explorer's start. `replace`, because the reference URL is now a worse copy of the page
  * the reader is on and the browser's Back should skip it.

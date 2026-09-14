@@ -25,17 +25,46 @@ msgstr "That route does not exist."
 msgid "Back to the dashboard"
 msgstr "Back to the dashboard"
 
-#: src/components/analysis/AnalysisControls.tsx
-msgid "Analyse this position continuously"
-msgstr "Analyse this position continuously"
+#: src/components/analysis/AnalyseButton.tsx
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Analyse"
+msgstr "Analyse"
 
-#: src/components/analysis/AnalysisControls.tsx
-msgid "nothing is on the board"
-msgstr "nothing is on the board"
+#: src/components/analysis/AnalyseButton.tsx
+#: src/components/badges/RunBadge.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Queued"
+msgstr "Queued"
 
+#: src/components/analysis/AnalyseButton.tsx
+#: src/components/shell/QueueIndicator.tsx
+msgid "Analysing"
+msgstr "Analysing"
+
+#: src/components/analysis/AnalyseButton.tsx
+msgid "An analysis pass is waiting over this game; a run you ask for goes ahead of it (A)"
+msgstr "An analysis pass is waiting over this game; a run you ask for goes ahead of it (A)"
+
+#: src/components/analysis/AnalyseButton.tsx
+msgid "Analysed — choose a run to go deeper (A)"
+msgstr "Analysed — choose a run to go deeper (A)"
+
+#: src/components/analysis/AnalyseButton.tsx
+msgid "Choose an engine, a limit and the moves to analyse (A)"
+msgstr "Choose an engine, a limit and the moves to analyse (A)"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Analyse…"
+msgstr "Analyse…"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "One run over this game, ahead of every import in the queue. Where it covers a move, its verdict replaces the analysis pass's."
+msgstr "One run over this game, ahead of every import in the queue. Where it covers a move, its verdict replaces the analysis pass's."
+
+#: src/components/analysis/AnalyseDialog.tsx
 #: src/components/analysis/AnalysisControls.tsx
 #: src/components/analysis/InfiniteAnalysisPanel.tsx
-#: src/routes/correspondence/components/EnginePicker.tsx
+#: src/components/engine-dialog/EnginePicker.tsx
 #: src/routes/correspondence/components/ExpandDialog.tsx
 #: src/routes/correspondence/components/RunningNow.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
@@ -46,18 +75,121 @@ msgstr "nothing is on the board"
 msgid "Engine"
 msgstr "Engine"
 
-#: src/components/analysis/AnalysisControls.tsx
-#: src/components/analysis/InfiniteAnalysisPanel.tsx
-msgid "deep tier — {deepName}"
-msgstr "deep tier — {deepName}"
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Looking for engines…"
+msgstr "Looking for engines…"
 
-#: src/components/analysis/AnalysisControls.tsx
-#: src/components/analysis/InfiniteAnalysisPanel.tsx
-msgid "deep tier"
-msgstr "deep tier"
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Stop each move at"
+msgstr "Stop each move at"
 
-#: src/components/analysis/AnalysisControls.tsx
+#: src/components/analysis/AnalyseDialog.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+msgid "Depth"
+msgstr "Depth"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Seconds"
+msgstr "Seconds"
+
+#: src/components/analysis/AnalyseDialog.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TreePane.tsx
+#: src/routes/engines/EngineDetail.tsx
+msgid "Nodes"
+msgstr "Nodes"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "The same depth on every move, so two runs compare, whatever the machine."
+msgstr "The same depth on every move, so two runs compare, whatever the machine."
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "The same time on every move: sharp positions get no more than quiet ones."
+msgstr "The same time on every move: sharp positions get no more than quiet ones."
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "The analysis pass stops at {budget} nodes."
+msgstr "The analysis pass stops at {budget} nodes."
+
+#: src/components/analysis/AnalyseDialog.tsx
+#: src/routes/game/components/MobileGameView.tsx
+#: src/routes/game/components/MoveList.tsx
+msgid "Moves"
+msgstr "Moves"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "No move has been played at the starting position"
+msgstr "No move has been played at the starting position"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "This move"
+msgstr "This move"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "From here on"
+msgstr "From here on"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Whole game"
+msgstr "Whole game"
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Every move of the game."
+msgstr "Every move of the game."
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "Only {moveName}, the move that led to the board."
+msgstr "Only {moveName}, the move that led to the board."
+
+#: src/components/analysis/AnalyseDialog.tsx
+msgid "From {moveName} to the end of the game."
+msgstr "From {moveName} to the end of the game."
+
+#: src/components/analysis/AnalyseDialog.tsx
+#: src/components/analysis/useEngineSetup.tsx
+#: src/lib/desktop/PgnDropOverlay.tsx
+#: src/routes/auth/ChangePasswordDialog.tsx
+#: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/correspondence/components/EnginePane.tsx
+#: src/routes/correspondence/components/ExpandDialog.tsx
+#: src/routes/correspondence/components/GameHeader.tsx
+#: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/correspondence/components/SearchDialog.tsx
+#: src/routes/correspondence/components/TaskDialog.tsx
+#: src/routes/engines/AddEngineForm.tsx
+#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/engines/CreateRunnerForm.tsx
+#: src/routes/engines/EngineDetail.tsx
+#: src/routes/engines/RunnerCard.tsx
+#: src/routes/games/components/DeleteGamesDialog.tsx
+#: src/routes/import/DeleteAllGamesDialog.tsx
+#: src/routes/live/SaveMoment.tsx
+#: src/routes/mcp/McpKeys.tsx
+#: src/routes/notes/components/NoteEditor.tsx
+msgid "Cancel"
+msgstr "Cancel"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "analysis engine — {name}"
+msgstr "analysis engine — {name}"
+
+#: src/components/analysis/AnalysisControls.tsx
+#: src/components/analysis/InfiniteAnalysisPanel.tsx
+msgid "analysis engine"
+msgstr "analysis engine"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "Analyse this position continuously"
+msgstr "Analyse this position continuously"
+
+#: src/components/analysis/AnalysisControls.tsx
+msgid "nothing is on the board"
+msgstr "nothing is on the board"
+
+#: src/components/analysis/AnalysisControls.tsx
+#: src/components/engine-dialog/LinesField.tsx
+#: src/routes/analysis/AnalysisSettings.tsx
 #: src/routes/engines/EngineDetail.tsx
 msgid "Lines"
 msgstr "Lines"
@@ -268,28 +400,28 @@ msgstr "Setting up Stockfish…"
 msgid "Set up browser engine"
 msgstr "Set up browser engine"
 
-#: src/components/analysis/useEngineSetup.tsx
-#: src/lib/desktop/PgnDropOverlay.tsx
-#: src/routes/auth/ChangePasswordDialog.tsx
-#: src/routes/correspondence/CorrespondenceGamePage.tsx
-#: src/routes/correspondence/components/EnginePane.tsx
-#: src/routes/correspondence/components/ExpandDialog.tsx
-#: src/routes/correspondence/components/GameHeader.tsx
-#: src/routes/correspondence/components/NewGameDialog.tsx
-#: src/routes/correspondence/components/SearchDialog.tsx
-#: src/routes/correspondence/components/TaskDialog.tsx
-#: src/routes/engines/AddEngineForm.tsx
-#: src/routes/engines/BrowserRunnerSection.tsx
+#: src/components/badges/RunBadge.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Unanalysed"
+msgstr "Unanalysed"
+
+#: src/components/badges/RunBadge.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Running"
+msgstr "Running"
+
+#: src/components/badges/RunBadge.tsx
+#: src/components/tour/TourCoachmark.tsx
 #: src/routes/engines/CreateRunnerForm.tsx
-#: src/routes/engines/EngineDetail.tsx
-#: src/routes/engines/RunnerCard.tsx
-#: src/routes/games/components/DeleteGamesDialog.tsx
-#: src/routes/import/DeleteAllGamesDialog.tsx
-#: src/routes/live/SaveMoment.tsx
+#: src/routes/import/SyncHistory.tsx
 #: src/routes/mcp/McpKeys.tsx
-#: src/routes/notes/components/NoteEditor.tsx
-msgid "Cancel"
-msgstr "Cancel"
+msgid "Done"
+msgstr "Done"
+
+#: src/components/badges/RunBadge.tsx
+#: src/routes/import/SyncHistory.tsx
+msgid "Failed"
+msgstr "Failed"
 
 #: src/components/badges/SideDot.tsx
 #: src/routes/correspondence/components/NewGameDialog.tsx
@@ -314,47 +446,6 @@ msgstr "Black"
 #: src/components/badges/SideDot.tsx
 msgid "Side unknown"
 msgstr "Side unknown"
-
-#: src/components/badges/TierBadge.tsx
-#: src/lib/chess/classification.ts
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Quick"
-msgstr "Quick"
-
-#: src/components/badges/TierBadge.tsx
-#: src/lib/chess/classification.ts
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Deep"
-msgstr "Deep"
-
-#: src/components/badges/TierBadge.tsx
-#: src/routes/games/components/FilterBar.tsx
-msgid "Unanalysed"
-msgstr "Unanalysed"
-
-#: src/components/badges/TierBadge.tsx
-#: src/routes/game/components/BoardPanel.tsx
-#: src/routes/import/SyncHistory.tsx
-msgid "Queued"
-msgstr "Queued"
-
-#: src/components/badges/TierBadge.tsx
-#: src/routes/import/SyncHistory.tsx
-msgid "Running"
-msgstr "Running"
-
-#: src/components/badges/TierBadge.tsx
-#: src/components/tour/TourCoachmark.tsx
-#: src/routes/engines/CreateRunnerForm.tsx
-#: src/routes/import/SyncHistory.tsx
-#: src/routes/mcp/McpKeys.tsx
-msgid "Done"
-msgstr "Done"
-
-#: src/components/badges/TierBadge.tsx
-#: src/routes/import/SyncHistory.tsx
-msgid "Failed"
-msgstr "Failed"
 
 #: src/components/board/BoardSettings.tsx
 msgid "Engine move"
@@ -488,6 +579,19 @@ msgstr "What pointing at an engine line does to the board."
 #: src/components/board/MiniBoard.tsx
 msgid "Chess position"
 msgstr "Chess position"
+
+#: src/components/engine-dialog/EnginePicker.tsx
+msgid "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
+msgstr "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
+
+#. placeholder {0}: engine.hash_mb
+#: src/components/engine-dialog/EnginePicker.tsx
+msgid "{0} MB"
+msgstr "{0} MB"
+
+#: src/components/engine-dialog/LimitField.tsx
+msgid "Limit"
+msgstr "Limit"
 
 #: src/components/import/WhoseGamesToggle.tsx
 #: src/routes/games/components/FilterBar.tsx
@@ -716,6 +820,7 @@ msgstr "import, export and reset"
 #: src/routes/analysis/AnalysisPage.tsx
 #: src/routes/analysis/AnalysisSettings.tsx
 #: src/routes/analysis/CorrespondenceSettings.tsx
+#: src/routes/games/components/columns.ts
 #: src/routes/games/filters.ts
 msgid "Analysis"
 msgstr "Analysis"
@@ -899,11 +1004,6 @@ msgstr "{queued} queued, {running} running"
 #: src/components/shell/QueueIndicator.tsx
 msgid "{queued} queued, {running} running — workers are not draining the queue"
 msgstr "{queued} queued, {running} running — workers are not draining the queue"
-
-#: src/components/shell/QueueIndicator.tsx
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Analysing"
-msgstr "Analysing"
 
 #: src/components/shell/QueueIndicator.tsx
 msgid "Paused"
@@ -1267,6 +1367,30 @@ msgstr "{count, plural, one {# best} other {# bests}}"
 msgid "{count, plural, one {# brilliant} other {# brilliants}}"
 msgstr "{count, plural, one {# brilliant} other {# brilliants}}"
 
+#: src/lib/chess/classification.ts
+msgid "Maia fill"
+msgstr "Maia fill"
+
+#. placeholder {0}: run.depth
+#: src/lib/chess/classification.ts
+msgid "d{0}"
+msgstr "d{0}"
+
+#. placeholder {0}: formatSeconds(run.seconds)
+#: src/lib/chess/classification.ts
+msgid "{0}s"
+msgstr "{0}s"
+
+#: src/lib/chess/classification.ts
+#: src/routes/analysis/CoverageSplit.tsx
+#: src/routes/games/components/FilterBar.tsx
+msgid "Analysed"
+msgstr "Analysed"
+
+#: src/lib/chess/classification.ts
+msgid "{count, plural, one {# line} other {# lines}}"
+msgstr "{count, plural, one {# line} other {# lines}}"
+
 #: src/lib/desktop/NativeFeedback.tsx
 msgid "Analysis finished with errors"
 msgstr "Analysis finished with errors"
@@ -1509,6 +1633,22 @@ msgid "The live engine on this position"
 msgstr "The live engine on this position"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Maia — every level side by side, or back to one"
+msgstr "Maia — every level side by side, or back to one"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The evaluation graph"
+msgstr "The evaluation graph"
+
+#: src/lib/ui/shortcuts.ts
+msgid "The move-time graph"
+msgstr "The move-time graph"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Your book for this position"
+msgstr "Your book for this position"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Play the engine’s move onto the board"
 msgstr "Play the engine’s move onto the board"
 
@@ -1529,20 +1669,12 @@ msgid "Write a note about this position"
 msgstr "Write a note about this position"
 
 #: src/lib/ui/shortcuts.ts
-msgid "Queue a quick pass"
-msgstr "Queue a quick pass"
-
-#: src/lib/ui/shortcuts.ts
-msgid "Queue a deep pass"
-msgstr "Queue a deep pass"
+msgid "Analyse this game…"
+msgstr "Analyse this game…"
 
 #: src/lib/ui/shortcuts.ts
 msgid "Copy the PGN"
 msgstr "Copy the PGN"
-
-#: src/lib/ui/shortcuts.ts
-msgid "Swap the move column between Moves and Flagged"
-msgstr "Swap the move column between Moves and Flagged"
 
 #: src/lib/ui/shortcuts.ts
 msgid "Moving about the game"
@@ -1637,28 +1769,16 @@ msgid "Try again"
 msgstr "Try again"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Quick nodes"
-msgstr "Quick nodes"
+msgid "Nodes per move"
+msgstr "Nodes per move"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Default 250,000"
-msgstr "Default 250,000"
+msgid "Default 500,000"
+msgstr "Default 500,000"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Deep nodes"
-msgstr "Deep nodes"
-
-#: src/routes/analysis/AnalysisSettings.tsx
-msgid "Default 2,000,000"
-msgstr "Default 2,000,000"
-
-#: src/routes/analysis/AnalysisSettings.tsx
-msgid "Deep lines"
-msgstr "Deep lines"
-
-#: src/routes/analysis/AnalysisSettings.tsx
-msgid "Default 4"
-msgstr "Default 4"
+msgid "Default 2"
+msgstr "Default 2"
 
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Inaccuracy"
@@ -1685,20 +1805,12 @@ msgid "Default 15"
 msgstr "Default 15"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Run Maia on quick passes"
-msgstr "Run Maia on quick passes"
+msgid "Maia on the analysis pass"
+msgstr "Maia on the analysis pass"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Adds human-move predictions to the automatic pass each imported game receives."
-msgstr "Adds human-move predictions to the automatic pass each imported game receives."
-
-#: src/routes/analysis/AnalysisSettings.tsx
-msgid "Run Maia on deep passes"
-msgstr "Run Maia on deep passes"
-
-#: src/routes/analysis/AnalysisSettings.tsx
-msgid "A game that already has every configured level is skipped, so this only pays for what a quick pass missed."
-msgstr "A game that already has every configured level is skipped, so this only pays for what a quick pass missed."
+msgid "Adds human-move predictions to every pass — the one each imported game receives and the ones you ask for with Analyse…"
+msgstr "Adds human-move predictions to every pass — the one each imported game receives and the ones you ask for with Analyse…"
 
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Ask about both sides"
@@ -1714,16 +1826,16 @@ msgid "The analysis configuration could not be read."
 msgstr "The analysis configuration could not be read."
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "How much work quick and deep passes do, and how their results become move labels."
-msgstr "How much work quick and deep passes do, and how their results become move labels."
+msgid "How much work the analysis pass does, and how its results become move labels."
+msgstr "How much work the analysis pass does, and how its results become move labels."
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Pass budgets"
-msgstr "Pass budgets"
+msgid "Analysis pass"
+msgstr "Analysis pass"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Quick runs automatically on import; deep is requested explicitly and keeps several candidate lines."
-msgstr "Quick runs automatically on import; deep is requested explicitly and keeps several candidate lines."
+msgid "Runs automatically on every imported game and on a backfill. Deeper work on one game is asked for there, with Analyse…, which starts from these numbers."
+msgstr "Runs automatically on every imported game and on a backfill. Deeper work on one game is asked for there, with Analyse…, which starts from these numbers."
 
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Move classification"
@@ -1779,8 +1891,8 @@ msgid "When Maia runs"
 msgstr "When Maia runs"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Choose which passes pay for human-move predictions and whose moves they cover."
-msgstr "Choose which passes pay for human-move predictions and whose moves they cover."
+msgid "Choose whether passes pay for human-move predictions and whose moves they cover."
+msgstr "Choose whether passes pay for human-move predictions and whose moves they cover."
 
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Changed the levels? <0>Fill missing levels</0> from Analysis overview."
@@ -1859,36 +1971,24 @@ msgid "How many engine processes this machine runs at once — searches, passes 
 msgstr "How many engine processes this machine runs at once — searches, passes and boards together — is <0>Queue processes</0> on <1>Machines</1>, and it takes effect when saved."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
-msgstr "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the deep role suggested."
+msgid "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the analysis role suggested."
+msgstr "Which engine searches is chosen on the position: Search with… offers every engine that is switched on, with the one holding the analysis role suggested."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Tasks"
 msgstr "Tasks"
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
-msgid "A task is one bounded look at one position, through the ordinary analysis queue — it holds a slot for a minute or two where a search keeps its own, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
-msgstr "A task is one bounded look at one position, through the ordinary analysis queue — it holds a slot for a minute or two where a search keeps its own, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the deep role’s suggested."
+msgid "A task is one bounded look at one position, through the ordinary analysis queue — it holds a slot for a minute or two where a search keeps its own, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the analysis role’s suggested."
+msgstr "A task is one bounded look at one position, through the ordinary analysis queue — it holds a slot for a minute or two where a search keeps its own, and an expansion is a dozen of them at once. Unlike a search, it can run on a remote runner; which engine is chosen when the task is queued, with the analysis role’s suggested."
 
 #: src/routes/analysis/CorrespondenceSettings.tsx
 msgid "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
 msgstr "Forty million nodes is a minute or two of a modern engine. The line count is also how wide an expansion can be, since the branches are made from those lines. Below the stale depth a stored verdict is marked on the tree as one to ask again."
 
 #: src/routes/analysis/CoverageSplit.tsx
-msgid "Deep pass"
-msgstr "Deep pass"
-
-#: src/routes/analysis/CoverageSplit.tsx
-msgid "a full deep pass, several lines a position"
-msgstr "a full deep pass, several lines a position"
-
-#: src/routes/analysis/CoverageSplit.tsx
-msgid "Quick only"
-msgstr "Quick only"
-
-#: src/routes/analysis/CoverageSplit.tsx
-msgid "the automatic pass on import, and no deep pass yet"
-msgstr "the automatic pass on import, and no deep pass yet"
+msgid "an engine has been over every move, on import or when asked"
+msgstr "an engine has been over every move, on import or when asked"
 
 #: src/routes/analysis/CoverageSplit.tsx
 msgid "No pass"
@@ -1903,25 +2003,12 @@ msgid "{games} games"
 msgstr "{games} games"
 
 #: src/routes/analysis/FailedRuns.tsx
-#: src/routes/dashboard/QueueCard.tsx
-#: src/routes/dashboard/RecentGamesList.tsx
-msgid "quick"
-msgstr "quick"
-
-#: src/routes/analysis/FailedRuns.tsx
-#: src/routes/dashboard/QueueCard.tsx
-#: src/routes/dashboard/RecentGamesList.tsx
-#: src/routes/games/filters.ts
-msgid "deep"
-msgstr "deep"
-
-#: src/routes/analysis/FailedRuns.tsx
 msgid "no message was recorded"
 msgstr "no message was recorded"
 
 #: src/routes/analysis/FailedRuns.tsx
-msgid "Nothing was queued: the tier these runs failed under still has no engine that can take them, so a retry would fail the same way. <0>Register or enable an engine</0> for it first."
-msgstr "Nothing was queued: the tier these runs failed under still has no engine that can take them, so a retry would fail the same way. <0>Register or enable an engine</0> for it first."
+msgid "Nothing was queued: the engine these runs failed on still cannot take them, so a retry would fail the same way. <0>Register or enable an engine</0> for them first."
+msgstr "Nothing was queued: the engine these runs failed on still cannot take them, so a retry would fail the same way. <0>Register or enable an engine</0> for them first."
 
 #: src/routes/analysis/FailedRuns.tsx
 msgid "Failed runs"
@@ -1965,20 +2052,12 @@ msgid "{label} remaining"
 msgstr "{label} remaining"
 
 #: src/routes/analysis/LibraryActions.tsx
-msgid "Backfill deep"
-msgstr "Backfill deep"
+msgid "Backfill"
+msgstr "Backfill"
 
 #: src/routes/analysis/LibraryActions.tsx
-msgid "Backfill quick"
-msgstr "Backfill quick"
-
-#: src/routes/analysis/LibraryActions.tsx
-msgid "A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass."
-msgstr "A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass."
-
-#: src/routes/analysis/LibraryActions.tsx
-msgid "The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off."
-msgstr "The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off."
+msgid "The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off. On a slow server a big library takes a long time — the estimate says how long."
+msgstr "The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off. On a slow server a big library takes a long time — the estimate says how long."
 
 #: src/routes/analysis/LibraryActions.tsx
 msgid "nothing to queue"
@@ -1989,14 +2068,14 @@ msgid "{waiting} {pending, plural, one {game} other {games}}"
 msgstr "{waiting} {pending, plural, one {game} other {games}}"
 
 #: src/routes/analysis/LibraryActions.tsx
-msgid "Nothing to queue — every game already has a pass of this tier."
-msgstr "Nothing to queue — every game already has a pass of this tier."
+msgid "Nothing to queue — every game already has a pass."
+msgstr "Nothing to queue — every game already has a pass."
 
 #. placeholder {0}: receipt.queued
 #. placeholder {1}: receipt.outstanding
 #: src/routes/analysis/LibraryActions.tsx
-msgid "Queued {queued} {0, plural, one {game} other {games}}; {outstanding} {1, plural, one {run} other {runs}} outstanding at this tier."
-msgstr "Queued {queued} {0, plural, one {game} other {games}}; {outstanding} {1, plural, one {run} other {runs}} outstanding at this tier."
+msgid "Queued {queued} {0, plural, one {game} other {games}}; {outstanding} {1, plural, one {run} other {runs}} outstanding."
+msgstr "Queued {queued} {0, plural, one {game} other {games}}; {outstanding} {1, plural, one {run} other {runs}} outstanding."
 
 #: src/routes/analysis/LibraryActions.tsx
 msgid "Fill missing Maia levels"
@@ -2029,8 +2108,8 @@ msgid "Clear the queue"
 msgstr "Clear the queue"
 
 #: src/routes/analysis/LibraryActions.tsx
-msgid "Drops everything still queued, whatever tier or shape it is queued in. Runs already on an engine are left to finish, and no game loses the analysis it already has."
-msgstr "Drops everything still queued, whatever tier or shape it is queued in. Runs already on an engine are left to finish, and no game loses the analysis it already has."
+msgid "Drops everything still queued, whatever shape it is queued in — imported or asked for, whole game or a few moves. Runs already on an engine are left to finish, and no game loses the analysis it already has."
+msgstr "Drops everything still queued, whatever shape it is queued in — imported or asked for, whole game or a few moves. Runs already on an engine are left to finish, and no game loses the analysis it already has."
 
 #: src/routes/analysis/LibraryActions.tsx
 msgid "nothing queued"
@@ -2722,15 +2801,6 @@ msgstr "to {0} nodes"
 msgid "for {0}"
 msgstr "for {0}"
 
-#: src/routes/correspondence/components/EnginePicker.tsx
-msgid "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
-msgstr "No engine is switched on that speaks UCI. Add one under Analysis → Engines."
-
-#. placeholder {0}: engine.hash_mb
-#: src/routes/correspondence/components/EnginePicker.tsx
-msgid "{0} MB"
-msgstr "{0} MB"
-
 #: src/routes/correspondence/components/EnginesPane.tsx
 msgid "No engine has looked at this position yet."
 msgstr "No engine has looked at this position yet."
@@ -2809,8 +2879,8 @@ msgid "Finish this game"
 msgstr "Finish this game"
 
 #: src/routes/correspondence/components/GameHeader.tsx
-msgid "It becomes a library game: the quick and deep passes are queued, it counts in the statistics, and the tree stays attached to it — read-only from here on."
-msgstr "It becomes a library game: the quick and deep passes are queued, it counts in the statistics, and the tree stays attached to it — read-only from here on."
+msgid "It becomes a library game: its analysis pass is queued, it counts in the statistics, and the tree stays attached to it — read-only from here on."
+msgstr "It becomes a library game: its analysis pass is queued, it counts in the statistics, and the tree stays attached to it — read-only from here on."
 
 #: src/routes/correspondence/components/GameHeader.tsx
 #: src/routes/games/filters.ts
@@ -3079,23 +3149,8 @@ msgid "Stop it at"
 msgstr "Stop it at"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-msgid "Depth"
-msgstr "Depth"
-
-#: src/routes/correspondence/components/SearchDialog.tsx
-#: src/routes/correspondence/components/TreePane.tsx
-#: src/routes/engines/EngineDetail.tsx
-msgid "Nodes"
-msgstr "Nodes"
-
-#: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Minutes"
 msgstr "Minutes"
-
-#: src/routes/correspondence/components/SearchDialog.tsx
-msgid "Limit"
-msgstr "Limit"
 
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Runs until you pause or stop it. Worth it only where the number is still moving between depths; the tree gains more from the time than the root does."
@@ -3408,6 +3463,10 @@ msgid "retry"
 msgstr "retry"
 
 #: src/routes/dashboard/QueueCard.tsx
+msgid "Nothing queued — that game has been analysed since."
+msgstr "Nothing queued — that game has been analysed since."
+
+#: src/routes/dashboard/QueueCard.tsx
 msgid "Game #{id}"
 msgstr "Game #{id}"
 
@@ -3521,6 +3580,11 @@ msgstr "D"
 #: src/routes/game/components/GameHeaderBar.tsx
 msgid "Unnamed opening"
 msgstr "Unnamed opening"
+
+#: src/routes/dashboard/RecentGamesList.tsx
+#: src/routes/games/filters.ts
+msgid "analysed"
+msgstr "analysed"
 
 #: src/routes/dashboard/RecentGamesList.tsx
 #: src/routes/games/filters.ts
@@ -3866,8 +3930,8 @@ msgid "Browser Stockfish"
 msgstr "Browser Stockfish"
 
 #: src/routes/engines/DemoEngines.tsx
-msgid "Quick, Deep and continuous analysis, all in this tab. Nothing is saved."
-msgstr "Quick, Deep and continuous analysis, all in this tab. Nothing is saved."
+msgid "The analysis pass, Analyse… and continuous analysis, all in this tab. Nothing is saved."
+msgstr "The analysis pass, Analyse… and continuous analysis, all in this tab. Nothing is saved."
 
 #: src/routes/engines/DemoEngines.tsx
 msgid "Stockfish is ready in this browser."
@@ -3886,8 +3950,8 @@ msgid "<0>Remote runners</0> — other machines, dialling in."
 msgstr "<0>Remote runners</0> — other machines, dialling in."
 
 #: src/routes/engines/DemoEngines.tsx
-msgid "<0>Roles</0> — which engine does Quick, Deep and human moves."
-msgstr "<0>Roles</0> — which engine does Quick, Deep and human moves."
+msgid "<0>Roles</0> — which engine does the analysis and which the human moves."
+msgstr "<0>Roles</0> — which engine does the analysis and which the human moves."
 
 #: src/routes/engines/DemoEngines.tsx
 msgid "Free and self-hosted — <0>run your own</0>."
@@ -3978,8 +4042,8 @@ msgid "Assigned to <0>{assignment}</0>."
 msgstr "Assigned to <0>{assignment}</0>."
 
 #: src/routes/engines/EngineDetail.tsx
-msgid "Assigned to nothing, so it runs only when a test run or an analysis board asks for it by name."
-msgstr "Assigned to nothing, so it runs only when a test run or an analysis board asks for it by name."
+msgid "Assigned to nothing, so it runs only when it is picked by name — in a game’s Analyse dialog, a test run or an analysis board."
+msgstr "Assigned to nothing, so it runs only when it is picked by name — in a game’s Analyse dialog, a test run or an analysis board."
 
 #: src/routes/engines/EngineDetail.tsx
 msgid "Which engine runs what is chosen under <0>What runs what</0> at the top of this page."
@@ -4596,13 +4660,8 @@ msgstr "one of {choices}"
 
 #: src/routes/engines/roles.ts
 msgctxt "engine role"
-msgid "Quick"
-msgstr "Quick"
-
-#: src/routes/engines/roles.ts
-msgctxt "engine role"
-msgid "Deep"
-msgstr "Deep"
+msgid "Analysis"
+msgstr "Analysis"
 
 #: src/routes/engines/roles.ts
 msgctxt "engine role"
@@ -5088,22 +5147,6 @@ msgstr "Up {advantage} in material"
 msgid "Down {deficit} in material"
 msgstr "Down {deficit} in material"
 
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Quick analysis complete — click to re-run"
-msgstr "Quick analysis complete — click to re-run"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Deep analysis complete — click to re-run"
-msgstr "Deep analysis complete — click to re-run"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Queue a quick analysis pass over this game"
-msgstr "Queue a quick analysis pass over this game"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Queue a deep analysis pass over this game"
-msgstr "Queue a deep analysis pass over this game"
-
 #: src/routes/game/components/BookPanel.tsx
 msgid "None of your games reached this position."
 msgstr "None of your games reached this position."
@@ -5264,6 +5307,11 @@ msgstr "The rest of the line this run gave, from where the board now stands"
 msgid "along its line"
 msgstr "along its line"
 
+#. placeholder {0}: run.seconds
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "{0}s a move"
+msgstr "{0}s a move"
+
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "Run"
 msgstr "Run"
@@ -5308,11 +5356,6 @@ msgstr "played"
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "likely continuation"
 msgstr "likely continuation"
-
-#: src/routes/game/components/MobileGameView.tsx
-#: src/routes/game/components/MoveList.tsx
-msgid "Moves"
-msgstr "Moves"
 
 #: src/routes/game/components/MobileGameView.tsx
 #: src/routes/game/components/MoveList.tsx
@@ -5567,17 +5610,17 @@ msgstr "a variation"
 msgid "ply {count}"
 msgstr "ply {count}"
 
+#: src/routes/game/useAnalysisRequest.ts
+msgid "Stockfish in this tab"
+msgstr "Stockfish in this tab"
+
 #: src/routes/games/GamesPage.tsx
 msgid "the request never landed"
 msgstr "the request never landed"
 
 #: src/routes/games/GamesPage.tsx
-msgid "{queued, plural, one {# quick run} other {# quick runs}} queued"
-msgstr "{queued, plural, one {# quick run} other {# quick runs}} queued"
-
-#: src/routes/games/GamesPage.tsx
-msgid "{queued, plural, one {# deep run} other {# deep runs}} queued"
-msgstr "{queued, plural, one {# deep run} other {# deep runs}} queued"
+msgid "{queued, plural, one {# run} other {# runs}} queued"
+msgstr "{queued, plural, one {# run} other {# runs}} queued"
 
 #: src/routes/games/GamesPage.tsx
 msgid "{queued} queued, {refused} refused — {reason}"
@@ -5799,14 +5842,6 @@ msgstr "Contains a blunder"
 msgid "Any analysis done"
 msgstr "Any analysis done"
 
-#: src/routes/games/components/FilterBar.tsx
-msgid "Analysed"
-msgstr "Analysed"
-
-#: src/routes/games/components/FilterBar.tsx
-msgid "Deep pass done"
-msgstr "Deep pass done"
-
 #: src/routes/games/components/FilterPopover.tsx
 msgid "Clear {label} filter"
 msgstr "Clear {label} filter"
@@ -5856,12 +5891,8 @@ msgid "{selected} selected"
 msgstr "{selected} selected"
 
 #: src/routes/games/components/TableFooter.tsx
-msgid "Queue quick analysis"
-msgstr "Queue quick analysis"
-
-#: src/routes/games/components/TableFooter.tsx
-msgid "Queue deep analysis"
-msgstr "Queue deep analysis"
+msgid "Queue analysis"
+msgstr "Queue analysis"
 
 #: src/routes/games/components/TableFooter.tsx
 msgctxt "button"
@@ -5936,10 +5967,6 @@ msgstr "Worst"
 #: src/routes/live/SessionMeta.tsx
 msgid "Source"
 msgstr "Source"
-
-#: src/routes/games/components/columns.ts
-msgid "Tier"
-msgstr "Tier"
 
 #: src/routes/games/components/columns.ts
 msgid "Flags"
@@ -6017,14 +6044,6 @@ msgstr "has blunders"
 #: src/routes/games/filters.ts
 msgid "no blunders"
 msgstr "no blunders"
-
-#: src/routes/games/filters.ts
-msgid "analysed"
-msgstr "analysed"
-
-#: src/routes/games/filters.ts
-msgid "not deep"
-msgstr "not deep"
 
 #: src/routes/games/format.ts
 msgctxt "month abbreviation"
@@ -6113,10 +6132,6 @@ msgstr "Losses as black"
 #: src/routes/stats/cards/BlundersByPieceCard.tsx
 msgid "Blunders"
 msgstr "Blunders"
-
-#: src/routes/games/savedFilters.ts
-msgid "No deep pass"
-msgstr "No deep pass"
 
 #: src/routes/import/AccountCard.tsx
 msgid "Walks the NDJSON archive from the last cursor. The first sync of a long account takes minutes."
@@ -6433,8 +6448,8 @@ msgid "Skip evaluation"
 msgstr "Skip evaluation"
 
 #: src/routes/import/SourcesPanel.tsx
-msgid "Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards."
-msgstr "Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards."
+msgid "Store the games and stop there — no analysis pass is queued. Worth it on a first sync of a long archive; Backfill on the Analysis page queues the passes afterwards."
+msgstr "Store the games and stop there — no analysis pass is queued. Worth it on a first sync of a long archive; Backfill on the Analysis page queues the passes afterwards."
 
 #: src/routes/import/SyncHistory.tsx
 msgid "Sync history"

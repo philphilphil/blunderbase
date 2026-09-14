@@ -21,7 +21,7 @@ import type { EngineKind, EngineResponse, ProbeResponse } from '@/lib/api/types'
  * the owner's words rather than the protocol's — a normal engine, or one that plays like a
  * person. Which job it does is not asked here: a new engine fills any role still empty
  * (`services.engines.assign_default_roles`), and the rest is decided under "What runs what"
- * where all three roles are seen together.
+ * where both roles are seen together.
  */
 export function AddEngineForm({
   onAdded,

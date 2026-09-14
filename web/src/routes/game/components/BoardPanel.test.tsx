@@ -79,8 +79,7 @@ function arrows(): string[] {
 
 function renderPanel(props: Partial<Parameters<typeof BoardPanel>[0]> = {}) {
   const onSeek = vi.fn()
-  const onRequestQuick = vi.fn()
-  const onRequestDeep = vi.fn()
+  const onAnalyse = vi.fn()
   const view = render(
     <TooltipProvider delayDuration={0}>
       <BoardPanel
@@ -98,24 +97,21 @@ function renderPanel(props: Partial<Parameters<typeof BoardPanel>[0]> = {}) {
         onHintsChange={vi.fn()}
         onFlip={vi.fn()}
         onSeek={onSeek}
-        quickRun={null}
-        deepRun={null}
+        finishedRun={null}
         activeRun={null}
         progress={null}
         pending={false}
-        error={null}
-        onRequestQuick={onRequestQuick}
-        onRequestDeep={onRequestDeep}
+        onAnalyse={onAnalyse}
         {...props}
       />
     </TooltipProvider>,
   )
-  return { onSeek, onRequestQuick, onRequestDeep, ...view }
+  return { onSeek, onAnalyse, ...view }
 }
 
-const DEEP_RUN: GameRunSummary = {
+const FINISHED_RUN: GameRunSummary = {
   id: 9,
-  tier: 'deep',
+  requested: true,
   status: 'done',
   multipv: 3,
   finished_at: '2026-08-20T12:00:00Z',
@@ -157,10 +153,10 @@ afterEach(() => {
 
 const ACTIVE_RUN: RunResponse = {
   id: 11,
-  tier: 'deep',
+  requested: true,
   status: 'running',
   multipv: 3,
-  priority: 0,
+  priority: 10,
   attempts: 0,
   created_at: '2026-08-20T12:00:00Z',
 }
@@ -224,14 +220,11 @@ describe('BoardPanel arrows', () => {
           onHintsChange={vi.fn()}
           onFlip={vi.fn()}
           onSeek={vi.fn()}
-          quickRun={null}
-          deepRun={null}
+          finishedRun={null}
           activeRun={null}
           progress={null}
           pending={false}
-          error={null}
-          onRequestQuick={vi.fn()}
-          onRequestDeep={vi.fn()}
+          onAnalyse={vi.fn()}
         />
       </TooltipProvider>,
     )
@@ -402,35 +395,28 @@ describe('BoardPanel flagged jumps', () => {
 
 })
 
-const QUICK_RUN: GameRunSummary = {
-  id: 5,
-  tier: 'quick',
-  status: 'done',
-  multipv: 1,
-  finished_at: '2026-08-19T12:00:00Z',
-}
-
-const ACTIVE_QUICK_RUN: RunResponse = {
+const IMPORT_RUN: RunResponse = {
   id: 12,
-  tier: 'quick',
-  status: 'running',
-  multipv: 1,
+  requested: false,
+  status: 'queued',
+  multipv: 2,
+  nodes: 500_000,
   priority: 0,
   attempts: 0,
   created_at: '2026-08-20T12:00:00Z',
 }
 
-describe('BoardPanel deep-analysis button', () => {
-  it('is idle when there is no run and none has ever finished', () => {
-    const { onRequestDeep } = renderPanel()
-    const button = screen.getByRole('button', { name: 'Deep' })
+describe('BoardPanel analyse button', () => {
+  it('is idle when there is no run and none has ever finished, and opens the dialog', () => {
+    const { onAnalyse } = renderPanel()
+    const button = screen.getByRole('button', { name: 'Analyse' })
     expect(button).toBeEnabled()
 
     fireEvent.click(button)
-    expect(onRequestDeep).toHaveBeenCalledTimes(1)
+    expect(onAnalyse).toHaveBeenCalledTimes(1)
   })
 
-  it('is disabled and shows progress while a run is queued or running', () => {
+  it('is disabled and shows progress while a requested run is queued or running', () => {
     renderPanel({
       activeRun: ACTIVE_RUN,
       progress: { done: 27, total: 50 },
@@ -442,53 +428,31 @@ describe('BoardPanel deep-analysis button', () => {
 
   it('stays disabled without a percent when no progress frame has arrived yet', () => {
     renderPanel({ activeRun: ACTIVE_RUN })
-    const button = screen.getByRole('button', { name: 'Deep' })
-    expect(button).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled()
   })
 
-  it('shows a done state once a deep run has finished, and stays clickable to re-run', () => {
-    const { onRequestDeep } = renderPanel({ deepRun: DEEP_RUN })
-    const button = screen.getByRole('button', { name: 'Deep' })
+  it('stays pressable while only an import pass is waiting over the game', () => {
+    // A requested run goes ahead of that pass, so asking for one is what the button is for.
+    const { onAnalyse } = renderPanel({ activeRun: IMPORT_RUN })
+    const button = screen.getByRole('button', { name: 'Analyse' })
+    expect(button).toBeEnabled()
+    fireEvent.click(button)
+    expect(onAnalyse).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a done state once a run has finished, and stays clickable to run another', () => {
+    const { onAnalyse } = renderPanel({ finishedRun: FINISHED_RUN })
+    const button = screen.getByRole('button', { name: 'Analyse' })
     expect(button).toBeEnabled()
     expect(button.className).toContain('accent-teal')
 
     fireEvent.click(button)
-    expect(onRequestDeep).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('BoardPanel quick-analysis button', () => {
-  it('is idle beside Deep when neither has ever finished', () => {
-    const { onRequestQuick } = renderPanel()
-    const button = screen.getByRole('button', { name: 'Quick' })
-    expect(button).toBeEnabled()
-
-    fireEvent.click(button)
-    expect(onRequestQuick).toHaveBeenCalledTimes(1)
+    expect(onAnalyse).toHaveBeenCalledTimes(1)
   })
 
-  it('disappears once the game has a completed deep run', () => {
-    renderPanel({ deepRun: DEEP_RUN, quickRun: QUICK_RUN })
-    expect(screen.queryByRole('button', { name: /Quick/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Deep' })).toBeInTheDocument()
-  })
-
-  it('disables both buttons while either tier is running, spinning only the matching one', () => {
-    renderPanel({ activeRun: ACTIVE_QUICK_RUN, progress: { done: 10, total: 40 } })
-    const quick = screen.getByRole('button', { name: '25%' })
-    const deep = screen.getByRole('button', { name: 'Deep' })
-    expect(quick).toBeDisabled()
-    expect(deep).toBeDisabled()
-  })
-
-  it('shows a done state once a quick run has finished, and stays clickable to re-run', () => {
-    const { onRequestQuick } = renderPanel({ quickRun: QUICK_RUN })
-    const button = screen.getByRole('button', { name: 'Quick' })
-    expect(button).toBeEnabled()
-    expect(button.className).toContain('accent-teal')
-
-    fireEvent.click(button)
-    expect(onRequestQuick).toHaveBeenCalledTimes(1)
+  it('is absent from a read-only board', () => {
+    renderPanel({ readOnly: true })
+    expect(screen.queryByRole('button', { name: 'Analyse' })).not.toBeInTheDocument()
   })
 })
 
@@ -506,16 +470,16 @@ describe('BoardPanel transport row', () => {
     const navigation = screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!
 
     // Flip, Hints and the gear together; the arrows and the flagged jumps together; and the
-    // analysis buttons in neither.
+    // analysis button in neither.
     for (const name of ['Hints', 'Board settings']) {
       expect(settings.contains(screen.getByRole('button', { name }))).toBe(true)
     }
     for (const name of ['Last', 'Next flagged move']) {
       expect(navigation.contains(screen.getByRole('button', { name }))).toBe(true)
     }
-    expect(settings.contains(screen.getByRole('button', { name: 'Deep' }))).toBe(false)
-    expect(navigation.contains(screen.getByRole('button', { name: 'Deep' }))).toBe(false)
-    expect(row.contains(screen.getByRole('button', { name: 'Deep' }))).toBe(true)
+    expect(settings.contains(screen.getByRole('button', { name: 'Analyse' }))).toBe(false)
+    expect(navigation.contains(screen.getByRole('button', { name: 'Analyse' }))).toBe(false)
+    expect(row.contains(screen.getByRole('button', { name: 'Analyse' }))).toBe(true)
 
     // The arrows anchor the right end of the row, last in the document — and the phone puts
     // them back on top, because the thumb rests under the board and what it is there for is

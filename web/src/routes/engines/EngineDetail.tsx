@@ -293,8 +293,10 @@ export function EngineDetail({
         {/*
           There is no field here for what this engine runs, and there was one: a "default
           tier" the resolution could fall back away from, so the card offered a setting that
-          did not decide anything. What it runs is an assignment, made in one place for all
-          three roles — this card says which of them this engine holds and points at it.
+          did not decide anything. What it runs is an assignment, made in one place for both
+          roles — this card says which of them this engine holds and points at it. An engine
+          with no role still runs whatever names it: the Analyse dialog, a correspondence
+          search, an analysis board.
         */}
         <p className="text-[0.65625rem] leading-[1.5] text-dim">
           {roles.length > 0 ? (
@@ -303,8 +305,8 @@ export function EngineDetail({
             </Trans>
           ) : (
             <Trans>
-              Assigned to nothing, so it runs only when a test run or an analysis board asks for
-              it by name.
+              Assigned to nothing, so it runs only when it is picked by name — in a game&rsquo;s
+              Analyse dialog, a test run or an analysis board.
             </Trans>
           )}{' '}
           <Trans>

@@ -35,14 +35,12 @@ describe('engineThreads', () => {
 })
 
 describe('hostBudget', () => {
-  const roles = new Map<number, EngineRoles>([
-    [1, ['quick']],
-    [2, ['deep']],
-  ])
+  const roles = new Map<number, EngineRoles>([[2, ['analysis']]])
   const engines = [
     engine({ id: 1, options: { Threads: 2 } }),
     engine({ id: 2, options: { Threads: 3 } }),
-    // Holds no role, so the queue never runs it — but a search may, so it prices those.
+    // Holds no role, so only an occasional dialog run lands on it — but a search may, so it
+    // prices those.
     engine({ id: 3, options: { Threads: 4 } }),
     engine({ id: 4, kind: 'maia', options: { Threads: 32 } }),
   ]
@@ -60,7 +58,7 @@ describe('hostBudget', () => {
     expect(budget).toMatchObject({ processes: 3, threads: 4, total: 12, over: true })
   })
 
-  it('prices only the tier engines while correspondence mode is off', () => {
+  it('prices the analysis role engine while correspondence mode is off', () => {
     const budget = hostBudget({
       cores: 8,
       processes: 2,
@@ -68,7 +66,7 @@ describe('hostBudget', () => {
       engines,
       roles,
     })
-    // The heaviest engine holding Quick or Deep (3); the four-thread row never runs here.
+    // The engine holding the analysis role (3), not the four-thread row the queue seldom runs.
     expect(budget).toMatchObject({ processes: 2, threads: 3, total: 6, over: false })
   })
 
@@ -84,7 +82,7 @@ describe('hostBudget', () => {
     expect(budget.over).toBe(false)
   })
 
-  it('prices the queue at the heaviest search engine when no tier is assigned here', () => {
+  it('prices the queue at the heaviest search engine when no role is assigned here', () => {
     const budget = hostBudget({
       cores: 8,
       processes: 1,

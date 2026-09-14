@@ -14,13 +14,12 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
+import { Frame } from '@/components/engine-dialog/DialogFrame'
+import { EnginePicker, preferredEngine } from '@/components/engine-dialog/EnginePicker'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import type { CorrespondenceSearchEngine, CorrespondenceTreeNode } from '@/lib/api/types'
 import { useNotation } from '@/lib/chess/notationPrefs'
-
-import { Frame } from './DialogFrame'
-import { EnginePicker, preferredEngine } from './EnginePicker'
 
 export type TaskVerb = 'task' | 'refresh'
 

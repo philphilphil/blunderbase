@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 
-import type { Color, GameFilters, Source, Tier } from './types'
+import type { Color, GameFilters, Source } from './types'
 import type {
   CompareQuery,
   ExplorerQuery,
@@ -63,7 +63,7 @@ export const queryKeys = {
 
   analysis: (): QueryKey => ['analysis'],
   queue: (): QueryKey => ['analysis', 'queue'],
-  backfill: (tier: Tier): QueryKey => ['analysis', 'backfill', tier],
+  backfill: (): QueryKey => ['analysis', 'backfill'],
   /**
    * Under `['analysis']` on purpose: every analysis event marks it stale, so the count on
    * the fill button catches up as the runs it queued come back.
@@ -75,7 +75,7 @@ export const queryKeys = {
    * estimates stale, and `invalidationsFor` already names that prefix.
    */
   coverage: (): QueryKey => ['analysis', 'coverage'],
-  runs: (gameId: number, tier?: Tier): QueryKey => ['analysis', 'runs', gameId, tier ?? null],
+  runs: (gameId: number): QueryKey => ['analysis', 'runs', gameId],
   /** The failures, listed by status rather than by game — no game to key them under. */
   failedRuns: (limit: number): QueryKey => ['analysis', 'runs', 'failed', limit],
   run: (runId: number): QueryKey => ['analysis', 'run', runId],
@@ -161,8 +161,13 @@ export const queryKeys = {
   engines: (): QueryKey => ['engines'],
   engineList: (enabledOnly = false): QueryKey => ['engines', 'list', enabledOnly],
   engine: (id: number): QueryKey => ['engines', 'detail', id],
-  engineTiers: (): QueryKey => ['engines', 'tiers'],
   engineRoles: (): QueryKey => ['engines', 'roles'],
+  /**
+   * The Analyse dialog's engine list. Under `['engines']` rather than `['analysis']`: what
+   * moves it is an engine added, switched off, reassigned or a runner coming and going —
+   * all of which already invalidate that prefix — and not every run the queue finishes.
+   */
+  analysisEngines: (): QueryKey => ['engines', 'analysis'],
 
   runners: (): QueryKey => ['runners'],
   runnerList: (): QueryKey => ['runners', 'list'],

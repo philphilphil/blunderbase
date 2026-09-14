@@ -13,6 +13,8 @@ const badgeVariants = cva(
         outline: 'border-edge-strong bg-transparent text-soft',
         dashed: 'border-dashed border-edge-strong bg-transparent text-dim-2',
         accent: 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal',
+        // The colour a run somebody asked for wears (`RUN_STYLES.requested`), borrowed for
+        // anything else that is "the owner's own choice" rather than a default.
         deep: 'border-deep/28 bg-deep/10 text-deep',
         danger: 'border-blunder/30 bg-blunder/10 text-blunder',
         warn: 'border-mistake/30 bg-mistake/10 text-mistake',

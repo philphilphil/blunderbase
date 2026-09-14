@@ -22,7 +22,6 @@ from backend.db.enums import (
     RunStatus,
     Source,
     Speed,
-    Tier,
 )
 from backend.db.models import (
     Account,
@@ -110,7 +109,7 @@ def analyse(
     evals: Sequence[dict[str, Any]],
     *,
     engine: Engine | None = None,
-    tier: Tier = Tier.QUICK,
+    priority: int = 0,
     status: RunStatus = RunStatus.DONE,
     ply_start: int | None = None,
     ply_end: int | None = None,
@@ -121,7 +120,7 @@ def analyse(
     run = AnalysisRun(
         game_id=game.id,
         engine_id=engine.id if engine is not None else None,
-        tier=tier,
+        priority=priority,
         status=status,
         ply_start=ply_start,
         ply_end=ply_end,
@@ -157,7 +156,7 @@ def analyse(
 
 @pytest.fixture()
 def analysed(library: Library, engine_row: Engine) -> Library:
-    """Quick passes over the short Ruy Lopez and the long Italian, plus a decoy.
+    """Import passes over the short Ruy Lopez and the long Italian, plus a decoy.
 
     The decoy — a game where only the opponent blundered — is what proves every count
     below is the owner's own moves and not simply every classified ply.
@@ -304,15 +303,11 @@ def test_ordering_by_the_worst_moment_reads_the_stored_card(
     assert [game.source_id for game in least_first][:2] == ["qg000001", "qg000003"]
 
 
-def test_ordering_by_tier_ranks_unanalysed_below_quick_below_deep(
-    library: Library, engine_row: Engine
-) -> None:
+def test_an_old_bookmark_ordering_by_tier_reads_as_the_default_order(library: Library) -> None:
     session = library.session
-    analyse(session, library["qg000001"], [{"ply": 0}], engine=engine_row)
-    analyse(session, library["qg000003"], [{"ply": 0}], engine=engine_row, tier=Tier.DEEP)
-
-    best_first = games_service.search_games(session, GameFilters(), order="tier", direction="desc")
-    assert [game.source_id for game in best_first][:2] == ["qg000003", "qg000001"]
+    legacy = games_service.search_games(session, GameFilters(), order="tier", direction="desc")
+    default = games_service.search_games(session, GameFilters())
+    assert [game.id for game in legacy] == [game.id for game in default]
 
 
 # --------------------------------------------------------------------------- deleting games
@@ -567,20 +562,34 @@ def test_has_blunders_counts_only_the_owners_own_moves(analysed: Library) -> Non
     assert "qg000003" in {game.source_id for game in without}
 
 
-def test_deep_analyzed_filter(analysed: Library, engine_row: Engine) -> None:
+def test_a_card_says_when_a_requested_run_is_done(analysed: Library, engine_row: Engine) -> None:
     session = analysed.session
-    assert games_service.search_games(session, GameFilters(deep_analyzed=True)) == []
+    game = analysed["qg000001"]
+    assert games_service.build_card(session, game)["requested"] is False
     analyse(
         session,
-        analysed["qg000001"],
+        game,
         [{"ply": 6, "classification": Classification.MISTAKE, "win_loss": 11.0}],
         engine=engine_row,
-        tier=Tier.DEEP,
+        priority=10,
         ply_start=6,
         ply_end=8,
     )
-    found = games_service.search_games(session, GameFilters(deep_analyzed=True))
-    assert [game.source_id for game in found] == ["qg000001"]
+    assert games_service.build_card(session, game)["requested"] is True
+
+
+def test_a_card_folded_before_the_single_pass_still_reads(analysed: Library) -> None:
+    """Stored cards are not refolded by the migration, so the old `deep` key still answers."""
+    session = analysed.session
+    game = analysed["qg000001"]
+    games_service.refresh_card(session, game)
+    stored = dict(game.card or {})
+    del stored["requested"]
+    stored["deep"] = True
+    game.card = stored
+    session.commit()
+
+    assert games_service.game_cards(session, [game])[0]["requested"] is True
 
 
 def test_analyzed_filter_means_a_finished_pass(analysed: Library, engine_row: Engine) -> None:
@@ -629,15 +638,16 @@ def test_game_detail_carries_moves_clocks_and_evals(analysed: Library) -> None:
     assert blunder["best_move_uci"] == "d2d3"
     # Ply 5 was never analysed, so it carries the move and nothing else.
     assert "classification" not in detail["moves"][5]
-    assert [run["tier"] for run in detail["runs"]] == ["quick"]
+    assert [run["requested"] for run in detail["runs"]] == [False]
+    assert all("tier" not in run for run in detail["runs"])
 
 
-def test_a_deep_run_wins_only_over_the_plies_it_covers(
+def test_a_requested_run_wins_only_over_the_plies_it_covers(
     analysed: Library, engine_row: Engine
 ) -> None:
     session = analysed.session
     game = analysed["qg000001"]
-    deep = analyse(
+    requested = analyse(
         session,
         game,
         [
@@ -645,18 +655,45 @@ def test_a_deep_run_wins_only_over_the_plies_it_covers(
             {"ply": 8, "classification": Classification.MISTAKE, "win_loss": 19.0},
         ],
         engine=engine_row,
-        tier=Tier.DEEP,
+        priority=10,
         ply_start=6,
         ply_end=8,
     )
     detail = games_service.get_game_detail(session, game.id)
     assert detail is not None
     assert detail["moves"][8]["classification"] == "mistake"
-    assert detail["moves"][8]["run_id"] == deep.id
-    # Outside the deep window the quick pass still answers.
+    assert detail["moves"][8]["run_id"] == requested.id
+    # Outside the requested window the import pass still answers.
     assert detail["moves"][4]["classification"] == "mistake"
     assert detail["moves"][4]["win_loss"] == 12.0
-    assert detail["moves"][4]["run_id"] != deep.id
+    assert detail["moves"][4]["run_id"] != requested.id
+
+
+def test_a_later_import_pass_does_not_replace_a_requested_run(
+    analysed: Library, engine_row: Engine
+) -> None:
+    """Rank is (requested, id): a backfill re-queued afterwards must not take over."""
+    session = analysed.session
+    game = analysed["qg000001"]
+    requested = analyse(
+        session,
+        game,
+        [{"ply": 8, "classification": Classification.MISTAKE, "win_loss": 19.0}],
+        engine=engine_row,
+        priority=10,
+    )
+    later = analyse(
+        session,
+        game,
+        [{"ply": 8, "classification": Classification.INACCURACY, "win_loss": 6.0}],
+        engine=engine_row,
+    )
+    assert later.id > requested.id
+
+    detail = games_service.get_game_detail(session, game.id)
+    assert detail is not None
+    assert detail["moves"][8]["run_id"] == requested.id
+    assert stats.primary_run_id(session, game.id) == requested.id
 
 
 def test_a_maia_run_adds_a_policy_without_replacing_the_eval(analysed: Library) -> None:
@@ -821,7 +858,7 @@ def test_get_last_games_and_cards(analysed: Library) -> None:
 
     card = games_service.game_card(session, analysed["qg000001"], worst=2)
     assert card["analyzed"] is True
-    assert card["deep"] is False
+    assert card["requested"] is False
     assert card["opponent"] == "ruyfan"
     assert [moment["win_loss"] for moment in card["worst_moments"]] == [42.0, 30.0]
     assert card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 8, "win": 12.0}]
@@ -844,7 +881,7 @@ def test_a_stored_card_answers_without_touching_the_evals(
     card = games_service.game_cards(session, [game], worst=2)[0]
 
     assert card["analyzed"] is True
-    assert card["deep"] is False
+    assert card["requested"] is False
     assert card["opponent"] == "ruyfan"
     assert [moment["win_loss"] for moment in card["worst_moments"]] == [42.0, 30.0]
     assert card["eval_curve"] == [{"ply": 0, "win": 52.0}, {"ply": 8, "win": 12.0}]
@@ -1248,7 +1285,6 @@ def test_a_finished_run_sends_the_games_positions_back_to_the_sweep(
     run = AnalysisRun(
         game_id=library["qg000001"].id,
         engine_id=engine_row.id,
-        tier=Tier.QUICK,
         status=RunStatus.RUNNING,
     )
     session.add(run)
@@ -1802,7 +1838,7 @@ def test_stats_ignore_partial_and_maia_runs(library: Library, engine_row: Engine
         game,
         [{"ply": 0, "classification": Classification.BLUNDER, "win_loss": 80.0}],
         engine=engine_row,
-        tier=Tier.DEEP,
+        priority=10,
         ply_start=0,
         ply_end=2,
     )
@@ -2308,7 +2344,7 @@ def test_a_game_offers_its_worst_moment_and_no_other_however_it_is_read(
 def test_a_maia_fill_never_becomes_the_run_a_game_is_read_from(
     analysed: Library, engine_row: Engine
 ) -> None:
-    """A fill pass is queued under the quick tier's Stockfish row, so its engine says
+    """A fill pass is queued under the analysis role's Stockfish row, so its engine says
     nothing about what it stored: rows with a policy and no evaluation. Let one be the
     game's primary run and adding a Maia level to an analysed game would refold it off
     those rows, and a game with two blunders would quietly become a game with none."""

@@ -32,16 +32,18 @@ describe('useRunActivity', () => {
     const base = {
       run_id: 7,
       game_id: 4,
-      tier: 'deep' as const,
       status: 'queued' as const,
     }
 
-    emit({ ...base, event: 'analysis.queued' })
+    emit({ ...base, event: 'analysis.queued', depth: 24, nodes: null, multipv: 2, requested: true })
     expect(result.current).toHaveLength(1)
     expect(result.current[0]).toMatchObject({
       runId: 7,
       gameId: 4,
-      tier: 'deep',
+      depth: 24,
+      nodes: null,
+      multipv: 2,
+      requested: true,
       status: 'queued',
     })
 
@@ -57,6 +59,9 @@ describe('useRunActivity', () => {
     expect(result.current[0]).toMatchObject({
       status: 'running',
       progress: 25,
+      // A progress frame that did not repeat the limits keeps the ones the run was queued with.
+      depth: 24,
+      requested: true,
     })
 
     emit({ ...base, event: 'analysis.done', status: 'done', evals: 120 })
@@ -70,7 +75,6 @@ describe('useRunActivity', () => {
       event: 'analysis.progress',
       run_id: 3,
       game_id: 1,
-      tier: 'quick',
       status: 'running',
       done: 5,
       total: 10,
@@ -79,7 +83,6 @@ describe('useRunActivity', () => {
       event: 'analysis.running',
       run_id: 3,
       game_id: 1,
-      tier: 'quick',
       status: 'running',
     })
     expect(result.current[0].progress).toBe(50)
@@ -91,7 +94,6 @@ describe('useRunActivity', () => {
       event: 'analysis.failed',
       run_id: 9,
       game_id: 2,
-      tier: 'quick',
       status: 'failed',
       error: 'engine exited',
     })
@@ -107,21 +109,18 @@ describe('useRunActivity', () => {
       event: 'analysis.queued',
       run_id: 1,
       game_id: 1,
-      tier: 'quick',
       status: 'queued',
     })
     emit({
       event: 'analysis.queued',
       run_id: 2,
       game_id: 2,
-      tier: 'quick',
       status: 'queued',
     })
     emit({
       event: 'analysis.running',
       run_id: 1,
       game_id: 1,
-      tier: 'quick',
       status: 'running',
     })
     expect(result.current.map((run) => run.runId)).toEqual([1, 2])
@@ -133,14 +132,12 @@ describe('useRunActivity', () => {
       event: 'analysis.queued',
       run_id: 5,
       game_id: 12,
-      tier: 'quick',
       status: 'queued',
     })
     emit({
       event: 'analysis.progress',
       run_id: 5,
       game_id: null,
-      tier: 'quick',
       status: 'running',
       done: 1,
       total: 4,
@@ -148,24 +145,22 @@ describe('useRunActivity', () => {
     expect(result.current[0].gameId).toBe(12)
   })
 
-  it('remembers that a run is a Maia fill, whatever tier it was filed under', () => {
+  it('remembers that a run is a Maia fill, whatever budget it was filed with', () => {
     const { result } = renderHook(() => useRunActivity())
     emit({
       event: 'analysis.queued',
       run_id: 8,
       game_id: 3,
-      tier: 'quick',
       status: 'queued',
       maia_only: true,
     })
-    expect(result.current[0]).toMatchObject({ tier: 'quick', maiaOnly: true })
+    expect(result.current[0]).toMatchObject({ requested: false, maiaOnly: true })
 
     // The later frames of the same run need not repeat it.
     emit({
       event: 'analysis.done',
       run_id: 8,
       game_id: 3,
-      tier: 'quick',
       status: 'done',
     })
     expect(result.current[0]).toMatchObject({ status: 'done', maiaOnly: true })
@@ -177,7 +172,6 @@ describe('useRunActivity', () => {
       event: 'analysis.queued',
       run_id: 2,
       game_id: 1,
-      tier: 'quick',
       status: 'queued',
     })
     expect(result.current[0].maiaOnly).toBe(false)

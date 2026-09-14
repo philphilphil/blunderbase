@@ -7,10 +7,11 @@
  * `./filters` — it is replayed as a link, so it survives a reload, works in a new tab and
  * needs no server round trip.
  *
- * Three built-ins ship so a fresh install has the rail the mock draws. They are not quite
- * the mock's names: the design lists "Losses as black / Time trouble / Unanalysed", and
- * `backend/api/deps.py:game_filters` has no clock filter and no plain `analyzed` flag — so
- * the two it cannot express are the nearest cuts it can, `has_blunders` and `deep_analyzed`.
+ * Two built-ins ship so a fresh install has most of the rail the mock draws. The design lists
+ * "Losses as black / Time trouble / Unanalysed"; there is no clock filter, so time trouble
+ * became `has_blunders`. A third, "No deep pass", stood in for the unanalysed cut while the
+ * library had two passes, and went with the deep one: every game gets the pass on import,
+ * and the Analysis filter's Unanalysed is one click away for the few that did not.
  *
  * "Blunders" is one of them, and is all the design's separate Blunder-log rail entry ever
  * was: the library under `has_blunders`. A second permanent row for one saved cut said the
@@ -23,6 +24,7 @@ import { useSyncExternalStore } from 'react'
 
 import {
   FILTER_GROUPS,
+  filtersFromParams,
   groupSummary,
   paramsFromFilters,
   prune,
@@ -57,13 +59,6 @@ export const BUILT_IN_FILTERS: readonly SavedFilter[] = [
     dotClass: 'bg-mistake',
     builtin: true,
   },
-  {
-    id: 'no-deep-pass',
-    label: 'No deep pass',
-    filters: { deep_analyzed: false },
-    dotClass: 'bg-faint',
-    builtin: true,
-  },
 ]
 
 /**
@@ -79,7 +74,6 @@ export const BUILT_IN_FILTERS: readonly SavedFilter[] = [
 const BUILT_IN_LABELS: Record<string, MessageDescriptor> = {
   'losses-as-black': msg`Losses as black`,
   'with-blunders': msg`Blunders`,
-  'no-deep-pass': msg`No deep pass`,
 }
 
 /**
@@ -119,7 +113,11 @@ function parseEntry(value: unknown): SavedFilter | null {
   const row = value as { id?: unknown; label?: unknown; filters?: unknown }
   if (typeof row.id !== 'string' || typeof row.label !== 'string') return null
   if (!row.filters || typeof row.filters !== 'object') return null
-  const filters = prune(row.filters as LibraryFilters)
+  // Through the query string and back rather than trusting the stored object: that is the
+  // one reading that drops a key the table no longer has (a cut saved over `deep_analyzed`)
+  // and a value it no longer accepts, so an old entry replays as what it can still mean.
+  // One left with nothing to filter on is dropped, rather than kept as a second "all games".
+  const filters = filtersFromParams(paramsFromFilters(prune(row.filters as LibraryFilters)))
   if (Object.keys(filters).length === 0) return null
   return { id: row.id, label: row.label, filters, dotClass: SAVED_DOT }
 }

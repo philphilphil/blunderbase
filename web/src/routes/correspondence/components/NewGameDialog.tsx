@@ -19,6 +19,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
+import { Field, Frame } from '@/components/engine-dialog/DialogFrame'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,7 +31,6 @@ import type {
 import { cn } from '@/lib/utils'
 
 import { dateInputToIso } from '../format'
-import { Field, Frame } from './DialogFrame'
 
 /** Empty is "leave it out", never an empty string the backend would have to interpret. */
 function text(value: string): string | null {

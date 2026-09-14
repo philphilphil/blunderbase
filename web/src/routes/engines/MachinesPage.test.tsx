@@ -151,7 +151,7 @@ describe('MachinesPage — this server', () => {
     expect(screen.getByText('Set by BLUNDERBASE_ANALYSIS_CONCURRENCY')).toBeInTheDocument()
   })
 
-  it('prices only the tier engines while correspondence mode is off', async () => {
+  it('prices the queue without the searches while correspondence mode is off', async () => {
     stubFetch({ ...ROUTES, '/api/settings': { ...SETTINGS, correspondence_enabled: 0 } })
     renderPage()
     const budget = await screen.findByTestId('core-budget')

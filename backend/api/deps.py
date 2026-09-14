@@ -69,7 +69,6 @@ def game_filters(
     variant: str | None = None,
     has_blunders: bool | None = None,
     analyzed: Annotated[bool | None, Query(description="whether any analysis pass is done")] = None,
-    deep_analyzed: bool | None = None,
     text: Annotated[str | None, Query(description="free text over names and openings")] = None,
     whose: Annotated[
         Literal["mine", "others", "all"],
@@ -101,7 +100,6 @@ def game_filters(
         variant=variant,
         has_blunders=has_blunders,
         analyzed=analyzed,
-        deep_analyzed=deep_analyzed,
         text=text,
         mine=WHOSE[whose],
     )

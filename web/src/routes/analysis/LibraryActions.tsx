@@ -1,18 +1,18 @@
 import type { I18n } from '@lingui/core'
 import { msg, plural } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
-import { Loader2, ListX, Microscope, Wand2, Zap } from 'lucide-react'
+import { Loader2, ListX, Wand2, Zap } from 'lucide-react'
 import { type ComponentType, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { useClearQueue, useMaiaFill, useQueueStatus, useStartBackfill } from '@/lib/api/queries'
-import type { AnalysisCoverage, Tier } from '@/lib/api/types'
+import type { AnalysisCoverage } from '@/lib/api/types'
 import { formatCount } from '@/routes/games/format'
 
 import { estimateLabel } from './estimate'
 
 /**
- * The four passes an owner can start over the whole library, each carrying what it would
+ * The three things an owner can start over the whole library, each carrying what it would
  * cost before it is pressed.
  *
  * This is the reason the page exists. The only whole-library button the app had was an
@@ -84,23 +84,27 @@ function ActionCard({
   )
 }
 
-/** One of the two backfills: the count, the estimate, and the press that fills the queue. */
+/**
+ * The backfill: the count, the estimate, and the press that fills the queue.
+ *
+ * One card, because there is one pass — the one every import gets, at the budget on the
+ * Settings page. Deeper work is asked for game by game from the Analyse dialog, where the
+ * owner is looking at the game it is for; spending that over eight thousand games is not
+ * something a library button should make easy, so the blurb says plainly what a backfill
+ * costs on a slow machine instead of offering a bigger one.
+ */
 function BackfillCard({
-  tier,
   pending,
   seconds,
   concurrency,
 }: {
-  tier: Tier
   pending: number
   seconds: number | null
   concurrency: number
 }) {
   const { i18n, t } = useLingui()
-  // One mutation per card, so the quick card's receipt is never the deep card's.
   const start = useStartBackfill()
   const receipt = start.data ?? null
-  const deep = tier === 'deep'
   // Named locals: the identifier is what a translator sees as the placeholder.
   const waiting = formatCount(pending)
   const queued = formatCount(receipt?.queued ?? 0)
@@ -108,13 +112,9 @@ function BackfillCard({
 
   return (
     <ActionCard
-      icon={deep ? Microscope : Zap}
-      title={deep ? t`Backfill deep` : t`Backfill quick`}
-      blurb={
-        deep
-          ? t`A full deep pass over every game that has never had one — the budget a single game gets when somebody is waiting on it, spent over the library. Many times the cost of a quick pass.`
-          : t`The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off.`
-      }
+      icon={Zap}
+      title={t`Backfill`}
+      blurb={t`The pass every imported game gets automatically, over the games that arrived before it existed or were imported with analysis off. On a slow server a big library takes a long time — the estimate says how long.`}
       figure={
         pending === 0
           ? t`nothing to queue`
@@ -126,14 +126,14 @@ function BackfillCard({
           {receipt ? (
             <p role="status" className="text-[0.6875rem] leading-[1.5] text-dim">
               {receipt.queued === 0
-                ? t`Nothing to queue — every game already has a pass of this tier.`
+                ? t`Nothing to queue — every game already has a pass.`
                 : t`Queued ${queued} ${plural(receipt.queued, {
                     one: 'game',
                     other: 'games',
                   })}; ${outstanding} ${plural(receipt.outstanding, {
                     one: 'run',
                     other: 'runs',
-                  })} outstanding at this tier.`}
+                  })} outstanding.`}
             </p>
           ) : null}
           {start.isError ? (
@@ -149,16 +149,10 @@ function BackfillCard({
         variant="outline"
         size="sm"
         disabled={start.isPending || pending === 0}
-        onClick={() => start.mutate(tier)}
+        onClick={() => start.mutate()}
       >
-        {start.isPending ? (
-          <Loader2 className="animate-spin" aria-hidden />
-        ) : deep ? (
-          <Microscope aria-hidden />
-        ) : (
-          <Zap aria-hidden />
-        )}
-        {deep ? <Trans>Backfill deep</Trans> : <Trans>Backfill quick</Trans>}
+        {start.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Zap aria-hidden />}
+        <Trans>Backfill</Trans>
       </Button>
     </ActionCard>
   )
@@ -257,7 +251,7 @@ function ClearQueueCard() {
     <ActionCard
       icon={ListX}
       title={t`Clear the queue`}
-      blurb={t`Drops everything still queued, whatever tier or shape it is queued in. Runs already on an engine are left to finish, and no game loses the analysis it already has.`}
+      blurb={t`Drops everything still queued, whatever shape it is queued in — imported or asked for, whole game or a few moves. Runs already on an engine are left to finish, and no game loses the analysis it already has.`}
       figure={
         queued === 0
           ? t`nothing queued`
@@ -304,17 +298,10 @@ export function LibraryActions({ coverage }: { coverage: AnalysisCoverage }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <BackfillCard
-          tier="quick"
-          pending={coverage.missing.quick}
-          seconds={coverage.estimates.quick_seconds}
-          concurrency={concurrency}
-        />
-        <BackfillCard
-          tier="deep"
-          pending={coverage.missing.deep}
-          seconds={coverage.estimates.deep_seconds}
+          pending={coverage.missing}
+          seconds={coverage.estimates.analysis_seconds}
           concurrency={concurrency}
         />
         <MaiaFillCard

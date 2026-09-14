@@ -21,7 +21,7 @@ in [Bibliothek](library.md#import) beschrieben.
 
 ## Was automatisch passiert
 
-Jede neue Partie landet in der Warteschlange für eine Schnellanalyse mit Stockfish. Die
+Jede neue Partie landet in der Warteschlange für eine Analyse mit Stockfish. Die
 Bewertungen füllen sich also nach einer Synchronisierung von selbst. Die
 [Übersicht](dashboard.md) zeigt, was wartet und was gerade läuft.
 

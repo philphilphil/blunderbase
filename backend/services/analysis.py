@@ -1,4 +1,4 @@
-"""The analysis tier: what a run is, how it is queued, and what computing one means.
+"""The analysis pass: what a run is, how it is queued, and what computing one means.
 
 Three things live here and nothing else does:
 
@@ -45,7 +45,7 @@ from sqlalchemy import event as sa_event
 from sqlalchemy.orm import Session
 
 from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING, Settings, get_settings
-from backend.db.enums import Classification, Color, EngineKind, EngineRole, RunStatus, Tier
+from backend.db.enums import Classification, Color, EngineKind, EngineRole, RunStatus
 from backend.db.models import AnalysisRun, Engine, Game, GamePosition, MoveEval, Position
 from backend.db.types import utcnow
 from backend.services import app_settings as app_settings_service
@@ -60,9 +60,13 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from backend.adapters.maia import MaiaAdapter
     from backend.adapters.stockfish import Score, StockfishAdapter
 
-# Deep runs jump the FIFO queue: someone is waiting on them.
-QUICK_PRIORITY = 0
-DEEP_PRIORITY = 10
+# Who queued a run decides where it waits. The queue's own work — the pass on import, a
+# backfill, a retry, a Maia fill, the Games table's "Queue analysis" — sits at the bottom
+# and goes FIFO; a run a person asked for from the Analyse dialog, MCP or the CLI jumps it,
+# because someone is waiting on that one. Correspondence tasks sit in the band between
+# (`correspondence.TASK_PRIORITY_LOW`..`HIGH`), which is why the two keep these numbers.
+IMPORT_PRIORITY = 0
+REQUESTED_PRIORITY = 10
 MAX_ATTEMPTS = 2
 
 # Lichess's win-percentage curve: win% = 50 + 50 * (2 / (1 + exp(-K * cp)) - 1), with the
@@ -194,7 +198,7 @@ def emit_on_commit(session: Session, event: dict[str, Any]) -> None:
     """Publish `event` when this session's transaction commits, and never if it rolls back.
 
     A run that is enqueued inside someone else's transaction — the import pipeline queues
-    the quick pass as part of storing the game — is not a run yet. Announcing it before the
+    the analysis pass as part of storing the game — is not a run yet. Announcing it before the
     commit hands the UI a run id that a rolled-back import never created.
     """
     pending = session.info.get(_PENDING_EVENTS)
@@ -248,7 +252,6 @@ class RunPlan:
     """
 
     run_id: int
-    tier: Tier
     game_id: int | None
     fen: str | None
     variant: str
@@ -259,10 +262,18 @@ class RunPlan:
     position_ids: tuple[int | None, ...]
     ply_start: int
     ply_end: int
-    nodes: int
+    # The run's stopping rule, per position. An import pass carries `nodes` alone; a run a
+    # person asked for carries exactly one of the three. None of them is backfilled from
+    # another, because python-chess stops at whichever limit it reaches first, and a node
+    # budget quietly added to a depth-24 request would cut it short.
+    nodes: int | None
     depth: int | None
     multipv: int
     thresholds: Thresholds
+    # Seconds per position, python-chess `Limit(time=)`. Last of the limits and defaulted
+    # only because a dataclass field after `thresholds` has to be: a plan from a runner that
+    # predates it simply has no time limit.
+    seconds: float | None = None
     # Who the owner was in this game and what they were rated. The colour is what an
     # owner's-moves-only Maia pass filters on; the rating no pass reads at all, and is here
     # because it is part of what a plan says about the player and crosses the wire to a
@@ -286,6 +297,11 @@ class RunPlan:
     # Whether that pass asks about every ply or only the ones the owner moved in. A live
     # setting rather than a column, so it is read per plan the way the thresholds are.
     maia_both_sides: bool = True
+    # Who the run is for, off its row: the engine it names and whether a person asked for it.
+    # Never on the wire — a runner has no use for either — and here only so a progress event
+    # built from a plan says what every other event about the run says.
+    engine_id: int | None = None
+    requested: bool = False
 
     def __post_init__(self) -> None:
         # The one thing a plan cannot be: a fill pass with the human-move pass switched off,
@@ -416,15 +432,16 @@ def _raw_chances(cp: float) -> float:
 class _RunDefaults:
     """What a queued row takes from configuration rather than from the game it is over.
 
-    Resolved once and reused for every row of a bulk enqueue. Each of the five is a per
-    tier answer, not a per game one, and asking for them ten thousand times over — an
-    engine lookup, a host check and three app-settings reads apiece — is the difference
-    between a backfill that returns and one that times out.
+    Resolved once and reused for every row of a bulk enqueue. Each of these is a per call
+    answer, not a per game one, and asking for them ten thousand times over — an engine
+    lookup, a host check and three app-settings reads apiece — is the difference between a
+    backfill that returns and one that times out.
     """
 
-    tier: Tier
     engine_id: int
-    nodes: int
+    nodes: int | None
+    depth: int | None
+    seconds: float | None
     multipv: int
     priority: int
     maia: bool
@@ -432,32 +449,86 @@ class _RunDefaults:
 
 def _run_defaults(
     session: Session,
-    tier: Tier,
     *,
     engine_id: int | None = None,
     nodes: int | None = None,
+    depth: int | None = None,
+    seconds: float | None = None,
     multipv: int | None = None,
-    priority: int | None = None,
+    priority: int = IMPORT_PRIORITY,
     maia: bool | None = None,
 ) -> _RunDefaults:
     """Settle what every run of this call will be queued with. Anything given wins.
+
+    The limits are one choice, not three settings: a caller that names depth or seconds
+    gets exactly that and no node budget beside it, and only a caller that names none gets
+    `analysis_nodes`. Which is also what an import pass is — a run nobody chose a limit for.
 
     `maia` is settled before the one-host rule is applied, and that order is the whole
     point: the rule is about a run whose two passes would land on two machines, and a run
     that asks for no human-move pass has only one place to be.
     """
-    engine = _resolve_engine(session, tier, engine_id)
-    wants_maia = maia if maia is not None else app_settings_service.maia_for_tier(session, tier)
+    nodes, depth, seconds = _limits(session, nodes=nodes, depth=depth, seconds=seconds)
+    engine = _resolve_engine(session, engine_id)
+    wants_maia = maia if maia is not None else app_settings_service.get_maia_on_analysis(session)
     if wants_maia:
         _require_one_host(session, engine)
     return _RunDefaults(
-        tier=tier,
         engine_id=engine.id,
-        nodes=nodes if nodes is not None else _default_nodes(session, tier),
-        multipv=max(1, multipv if multipv is not None else _default_multipv(session, tier)),
-        priority=priority if priority is not None else default_priority(tier),
+        nodes=nodes,
+        depth=depth,
+        seconds=seconds,
+        multipv=_multipv(session, multipv),
+        priority=int(priority),
         maia=wants_maia,
     )
+
+
+def _limits(
+    session: Session,
+    *,
+    nodes: int | None,
+    depth: int | None,
+    seconds: float | None,
+) -> tuple[int | None, int | None, float | None]:
+    """The one stopping rule a run is queued with, or a refusal naming what is wrong.
+
+    Exactly one kind, because python-chess stops at whichever limit is reached first: a run
+    carrying both a depth and a node budget is a depth request that the budget silently
+    cuts short, and a badge reading "d24" over it would be untrue. None of the three given
+    is the import pass's rule, `analysis_nodes`.
+    """
+    given = [value for value in (nodes, depth, seconds) if value is not None]
+    if len(given) > 1:
+        raise AnalysisRequestError("a run stops on one limit: give nodes, depth or seconds")
+    if nodes is not None and int(nodes) < 1:
+        raise AnalysisRequestError("nodes must be at least 1")
+    if depth is not None and int(depth) < 1:
+        raise AnalysisRequestError("depth must be at least 1")
+    if seconds is not None and not (math.isfinite(float(seconds)) and float(seconds) > 0):
+        raise AnalysisRequestError("seconds must be more than 0")
+    if not given:
+        return app_settings_service.get_analysis_nodes(session), None, None
+    return (
+        None if nodes is None else int(nodes),
+        None if depth is None else int(depth),
+        None if seconds is None else float(seconds),
+    )
+
+
+def _multipv(session: Session, multipv: int | None) -> int:
+    """How many lines a run keeps: what was asked for, else the deployment's setting.
+
+    Refused rather than clamped when out of range, because the number is what someone
+    typed into a dialog and a quiet clamp would give them a run they did not ask for.
+    """
+    if multipv is None:
+        return max(1, app_settings_service.get_analysis_multipv(session))
+    lines = int(multipv)
+    ceiling = app_settings_service.MAX_ANALYSIS_MULTIPV
+    if not 1 <= lines <= ceiling:
+        raise AnalysisRequestError(f"lines must be between 1 and {ceiling}")
+    return lines
 
 
 def _queued_row(
@@ -466,26 +537,29 @@ def _queued_row(
     game_id: int | None = None,
     fen: str | None = None,
     window: tuple[int, int] | None = None,
-    depth: int | None = None,
     maia: bool,
     maia_only: bool = False,
     maia_elos: Sequence[int] | None = None,
 ) -> AnalysisRun:
-    """The one place a queued run row is built, so the single and bulk paths cannot drift."""
+    """The one place a queued run row is built, so the single and bulk paths cannot drift.
+
+    No `tier`: the column is kept for reading rows written before there was one analysis
+    pass, and nothing writes it any more.
+    """
     return AnalysisRun(
         game_id=game_id,
         fen=fen,
         engine_id=defaults.engine_id,
-        tier=defaults.tier,
         status=RunStatus.QUEUED,
         nodes=defaults.nodes,
-        depth=depth,
+        depth=defaults.depth,
+        seconds=defaults.seconds,
         multipv=defaults.multipv,
         ply_start=None if window is None else window[0],
         ply_end=None if window is None else window[1],
         priority=defaults.priority,
         # A fill pass is its Maia pass, so it can never be queued without one, whatever the
-        # tier's setting says: the row would search nothing and ask nothing.
+        # setting says: the row would search nothing and ask nothing.
         maia=bool(maia or maia_only),
         maia_only=maia_only,
         # NULL rather than the levels in force: a run that names none is analysed at
@@ -501,7 +575,7 @@ def _games_with_every_maia_level(
 
     Maia's answer to a position at a level is the same answer next week, so a run over a
     game that already carries every level it would ask about pays for a pass that rewrites
-    what is there — the deep pass of a game the import pass already asked, most of all.
+    what is there — a person's run over a game the import pass already asked, most of all.
     The levels a game has are the ones `_settled_maia_levels` reports, the same source the
     fill button counts from, so the two can never disagree about what a game holds.
 
@@ -519,16 +593,16 @@ def _games_with_every_maia_level(
 
 def request_analysis(
     session: Session,
-    *,
     game_id: int | None = None,
+    *,
     fen: str | None = None,
-    tier: Tier = Tier.QUICK,
-    ply_range: tuple[int, int] | None = None,
     engine_id: int | None = None,
     multipv: int | None = None,
     nodes: int | None = None,
     depth: int | None = None,
-    priority: int | None = None,
+    seconds: float | None = None,
+    ply_range: tuple[int, int] | None = None,
+    priority: int = REQUESTED_PRIORITY,
     elos: Sequence[int] | None = None,
     maia: bool | None = None,
     commit: bool = True,
@@ -538,13 +612,24 @@ def request_analysis(
 
     Re-analysis is always a new run; existing runs are never overwritten.
 
-    A run carries the budget it was queued with rather than looking one up when it runs,
-    and that budget is read from the app settings here — so changing it on the Settings
-    page sizes the next run enqueued and leaves everything already in the queue alone.
+    The default priority is a person's: this is what the Analyse dialog, MCP and the CLI
+    call, and the callers that queue work on nobody's behalf — import, backfill, the Games
+    table, a correspondence game finishing — pass `IMPORT_PRIORITY` themselves.
 
-    `maia` is settled here for the same reason and in the same breath. Given none, the
-    tier's own setting decides — `maia_on_quick`, `maia_on_deep` — and what it said at
-    enqueue is what the run pays for, whoever moves it afterwards. A game that already
+    A run carries the limit it was queued with rather than looking one up when it runs.
+    Exactly one of `nodes`, `depth` and `seconds` may be given (see `_limits`); given none,
+    the run takes `analysis_nodes` from the app settings here — so changing it on the
+    Settings page sizes the next run enqueued and leaves everything already queued alone.
+    `multipv` is 1 to `MAX_ANALYSIS_MULTIPV`, or `analysis_multipv` when not given.
+
+    `engine_id` may name any enabled UCI engine; left out, it is the analysis role's.
+
+    A `ply_range` covering the whole game is stored as a full-game run (NULL bounds), so
+    "from here on" asked at the first move counts as the whole pass it is.
+
+    `maia` is settled here for the same reason and in the same breath. Given none,
+    `maia_on_analysis` decides, and what it said at enqueue is what the run pays for,
+    whoever moves it afterwards. A game that already
     carries every level the run would ask about settles to no pass at all whatever the
     setting says, because a second pass over it would only rewrite what is there; a caller
     who asks for `maia=True` outright still gets one.
@@ -565,7 +650,6 @@ def request_analysis(
     `announce=False` queues the run silently. Only a bulk path passes it, and only because
     it announces the whole write once instead; a run enqueued on its own always says so.
     """
-    tier = Tier(tier)
     if (game_id is None) == (fen is None):
         raise AnalysisRequestError("a run analyses exactly one of a game or a FEN")
 
@@ -575,6 +659,10 @@ def request_analysis(
         if game is None:
             raise AnalysisRequestError(f"no game with id {game_id}")
         window = ply_window(game.ply_count, ply_range)
+        # "From here on" asked at the first move is the whole game, and a full-game run has
+        # one spelling — NULL bounds — which is what coverage and the stats layer look for.
+        if window == (0, game.ply_count):
+            window = None
     else:
         fen = normalise_fen(fen)
         if ply_range is not None:
@@ -583,16 +671,21 @@ def request_analysis(
     run_elos = None if elos is None else app_settings_service.clean_maia_elos(list(elos))
     # Before `_run_defaults`, not after: the one-host rule is asked only of a run that
     # carries a Maia pass, and a run about to drop its own must not be refused by it.
-    if maia is None and game_id is not None and app_settings_service.maia_for_tier(session, tier):
+    if (
+        maia is None
+        and game_id is not None
+        and app_settings_service.get_maia_on_analysis(session)
+    ):
         wanted = run_elos if run_elos is not None else app_settings_service.get_maia_elos(session)
         if _games_with_every_maia_level(session, [game_id], wanted):
             maia = False
 
     defaults = _run_defaults(
         session,
-        tier,
         engine_id=engine_id,
         nodes=nodes,
+        depth=depth,
+        seconds=seconds,
         multipv=multipv,
         priority=priority,
         maia=maia,
@@ -602,7 +695,6 @@ def request_analysis(
         game_id=game_id,
         fen=fen,
         window=window,
-        depth=depth,
         maia=defaults.maia,
         maia_elos=run_elos,
     )
@@ -627,23 +719,27 @@ def request_analysis_batch(
     session: Session,
     game_ids: Sequence[int],
     *,
-    tier: Tier = Tier.QUICK,
     engine_id: int | None = None,
     multipv: int | None = None,
     nodes: int | None = None,
     depth: int | None = None,
-    priority: int | None = None,
+    seconds: float | None = None,
+    priority: int = IMPORT_PRIORITY,
     elos: Sequence[int] | None = None,
     maia: bool | None = None,
 ) -> tuple[list[AnalysisRun], list[BatchRefusal]]:
     """Enqueue one pass per game in a single transaction, and report what was refused.
+
+    Import priority by default: this is the Games table's "Queue analysis" over a row or a
+    selection, which is the queue's own kind of work and must not jump a run somebody is
+    sitting in front of.
 
     A game the single-game path will not take — one that is not there — takes itself out
     of the batch rather than the rest of the selection with it. Everything that could be
     queued is, and the caller is handed the ids that were not with the reason each was
     given.
 
-    What is *not* per game still raises: a tier with no usable engine refuses all five
+    What is *not* per game still raises: an analysis role with no usable engine refuses all five
     hundred ids for the same reason, and saying so once, as the typed conflict the single
     path already reports, is more use than saying it five hundred times.
 
@@ -659,11 +755,11 @@ def request_analysis_batch(
                 request_analysis(
                     session,
                     game_id=game_id,
-                    tier=tier,
                     engine_id=engine_id,
                     multipv=multipv,
                     nodes=nodes,
                     depth=depth,
+                    seconds=seconds,
                     priority=priority,
                     elos=elos,
                     maia=maia,
@@ -677,71 +773,70 @@ def request_analysis_batch(
     return queued, refused
 
 
-def _live_run_clause(tier: Tier | None = None) -> ColumnElement[bool]:
+def _live_run_clause() -> ColumnElement[bool]:
     """What "this game already has a pass" means, in the one place it is defined.
 
     "Live" means queued, running or done: a run that failed twice is not retried by a bulk
     command, because whatever is wrong with it will still be wrong. Coverage is a *whole*
-    pass, so only a run with both ply bounds NULL counts — a deep look at one phase leaves
-    the game as unanalysed as it was. A Maia fill is not coverage either: it is queued
-    under a tier to borrow its engine and its place in the queue, but it searches nothing,
-    and a game whose only quick-tier row is a fill has still never been analysed.
+    pass, so only a run with both ply bounds NULL counts — a closer look at one phase leaves
+    the game as unanalysed as it was. A Maia fill is not coverage either: it borrows the
+    analysis role's engine and a place in the queue, but it searches nothing, and a game
+    whose only row is a fill has still never been analysed.
+
+    Any priority and any limit counts: a game somebody analysed to depth 30 from the
+    Analyse dialog is not a game a backfill should queue a node-budget pass over.
 
     Shared by the backfills, the coverage answer and the retry, so that a count on a button,
-    a number on the Analysis page and the rows a press writes are all one definition. A
-    `tier` of None asks about a pass of any tier, which is what the coverage split needs.
+    a number on the Analysis page and the rows a press writes are all one definition.
     """
-    clauses = [
+    return and_(
         AnalysisRun.game_id.is_not(None),
         AnalysisRun.status != RunStatus.FAILED,
         AnalysisRun.ply_start.is_(None),
         AnalysisRun.ply_end.is_(None),
         AnalysisRun.maia_only.is_(False),
-    ]
-    if tier is not None:
-        clauses.append(AnalysisRun.tier == Tier(tier))
-    return and_(*clauses)
+    )
 
 
-def _missing_games(tier: Tier, *, limit: int | None = None) -> Select[tuple[int]]:
-    """The games with no live full-game run of this tier, oldest id first.
+def _missing_games(*, limit: int | None = None) -> Select[tuple[int]]:
+    """The games with no live full-game run, oldest id first.
 
     One statement behind both the count a preview shows and the set an enqueue takes, so
     the number on the owner's button and the number of rows it writes cannot drift apart.
     What counts as covered is `_live_run_clause`.
     """
-    covered = select(AnalysisRun.game_id).where(_live_run_clause(tier)).scalar_subquery()
+    covered = select(AnalysisRun.game_id).where(_live_run_clause()).scalar_subquery()
     statement = select(Game.id).where(Game.id.not_in(covered)).order_by(Game.id)
     if limit:
         statement = statement.limit(limit)
     return statement
 
 
-def count_missing(session: Session, tier: Tier = Tier.QUICK) -> int:
-    """How many games a backfill of this tier would queue if it ran now."""
-    total = session.scalar(select(func.count()).select_from(_missing_games(tier).subquery()))
+def count_missing(session: Session) -> int:
+    """How many games a backfill would queue if it ran now."""
+    total = session.scalar(select(func.count()).select_from(_missing_games().subquery()))
     return int(total or 0)
 
 
-def outstanding_runs(
-    session: Session, tier: Tier = Tier.QUICK, *, maia_only: bool = False
-) -> int:
-    """How deep this tier's full-game queue is: the queued and running rows together.
+def outstanding_runs(session: Session, *, maia_only: bool = False) -> int:
+    """How deep the import-priority full-game queue is: the queued and running rows together.
 
     What a backfill receipt reports and what its event carries. Running rows are in it
     because they are work still to come off the queue, and a client watching a library-wide
     pass wants the number of games it is still waiting for, not the number not yet started.
+    Import priority only, because that is the work a backfill queues and its Stop drops: a
+    run somebody asked for from the Analyse dialog is not part of the pass being watched.
 
-    `maia_only` picks which of the two kinds of work sharing the tier is being counted: an
-    analysis backfill counts passes that search, a Maia fill counts fills. Neither watcher
-    is told a number the other's work moved.
+    `maia_only` picks which of the two kinds of work is being counted: an analysis backfill
+    counts passes that search, a Maia fill counts fills. Neither watcher is told a number
+    the other's work moved.
     """
     total = session.scalar(
         select(func.count())
         .select_from(AnalysisRun)
         .where(
             AnalysisRun.game_id.is_not(None),
-            AnalysisRun.tier == Tier(tier),
+            AnalysisRun.priority == IMPORT_PRIORITY,
             AnalysisRun.status.in_([RunStatus.QUEUED, RunStatus.RUNNING]),
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
@@ -751,13 +846,11 @@ def outstanding_runs(
     return int(total or 0)
 
 
-def enqueue_missing(
-    session: Session,
-    tier: Tier = Tier.QUICK,
-    *,
-    limit: int | None = None,
-) -> list[AnalysisRun]:
-    """Queue a full-game pass for every game that has no live run of this tier.
+def enqueue_missing(session: Session, *, limit: int | None = None) -> list[AnalysisRun]:
+    """Queue the analysis pass for every game that has no live full-game run.
+
+    At import priority and the import budget (`analysis_nodes`, `analysis_multipv`): a
+    backfill is the pass on import for games that never got one.
 
     Sized for the whole library: what the games have in common — the engine, the budget,
     the priority — is resolved once for the call, the rows go in with one `add_all`, and
@@ -775,12 +868,11 @@ def enqueue_missing(
     every configured level is queued without one, and that answer takes a single batch
     query for the whole bite rather than one per game.
     """
-    tier = Tier(tier)
-    pending = list(session.scalars(_missing_games(tier, limit=limit)))
+    pending = list(session.scalars(_missing_games(limit=limit)))
     if not pending:
         return []
 
-    defaults = _run_defaults(session, tier)
+    defaults = _run_defaults(session, priority=IMPORT_PRIORITY)
     settled: set[int] = set()
     if defaults.maia:
         settled = _games_with_every_maia_level(
@@ -794,30 +886,30 @@ def enqueue_missing(
     session.flush()
     emit_on_commit(
         session,
-        backfill_event(tier, queued=len(queued), outstanding=outstanding_runs(session, tier)),
+        backfill_event(queued=len(queued), outstanding=outstanding_runs(session)),
     )
     session.commit()
     return queued
 
 
-def cancel_queued(session: Session, tier: Tier = Tier.QUICK) -> int:
-    """Drop this tier's queued full-game runs and say how many went.
+def cancel_queued(session: Session) -> int:
+    """Drop the queued import-priority full-game runs and say how many went.
 
     The stop button on an overnight pass, and the only kind of cancelling there is: a run
     already being worked is left to finish, because there is no cancelled status for it to
-    move to and one is not worth a migration for the handful of rows in flight. A windowed
-    run is a deep look at one phase that somebody asked for by hand and no backfill ever
-    queued, so it stays as well, and so does a Maia fill: it rides in this tier's queue but
-    belongs to a pass of its own, and `clear_queue` is what takes one of those back.
+    move to and one is not worth a migration for the handful of rows in flight. A run a
+    person asked for — from the Analyse dialog, MCP or the CLI — is not the backfill's to
+    stop, whatever its window, so only `priority == IMPORT_PRIORITY` rows go. A windowed run
+    stays for the same reason, and so does a Maia fill: it belongs to a pass of its own, and
+    `clear_queue` is what takes one of those back.
 
     Announced with the same `analysis.backfill` event the enqueue side emits, for the same
     reason: one frame for the whole write.
     """
-    tier = Tier(tier)
     dropped = session.execute(
         delete(AnalysisRun).where(
             AnalysisRun.game_id.is_not(None),
-            AnalysisRun.tier == tier,
+            AnalysisRun.priority == IMPORT_PRIORITY,
             AnalysisRun.status == RunStatus.QUEUED,
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
@@ -826,28 +918,25 @@ def cancel_queued(session: Session, tier: Tier = Tier.QUICK) -> int:
     ).rowcount
     if not dropped:
         return 0
-    emit_on_commit(
-        session, backfill_event(tier, queued=0, outstanding=outstanding_runs(session, tier))
-    )
+    emit_on_commit(session, backfill_event(queued=0, outstanding=outstanding_runs(session)))
     session.commit()
     return int(dropped)
 
 
 def clear_queue(session: Session) -> int:
-    """Drop every queued run, of any tier, windowed or full-game, fill or not.
+    """Drop every queued run, of any priority, windowed or full-game, fill or not.
 
-    Wider than `cancel_queued`: that one leaves a windowed run, a Maia fill and any tier
-    but its own alone, because it is the stop button for one backfill. This is the stop
+    Wider than `cancel_queued`: that one leaves a windowed run, a Maia fill and a run a
+    person asked for alone, because it is the stop button for one backfill. This is the stop
     button for the queue itself — the one place an owner who fat-fingered eight hundred
-    Maia-fill runs, or queued the wrong tier over the whole library, can take all of it
+    Maia-fill runs, or queued a pass over the whole library by mistake, can take all of it
     back at once. A run
     already being worked is left to finish, for the reason `cancel_queued` leaves it: there
     is no cancelled status to move it to.
 
     Announced with the same `analysis.backfill` event the other queue-wide writes use, so a
-    client refetches the queue without being handed every dropped row — the tier and the
-    `maia_only` it carries are nominal here, since nothing about this drop was scoped to
-    either.
+    client refetches the queue without being handed every dropped row — the `maia_only` it
+    carries is nominal here, since nothing about this drop was scoped to it.
 
     A correspondence task is one of these rows, so the searches whose runs are about to go
     are collected first and told afterwards. Without that the tree would keep a row saying
@@ -871,7 +960,7 @@ def clear_queue(session: Session) -> int:
     depth = queue_depth(session)
     emit_on_commit(
         session,
-        backfill_event(Tier.QUICK, queued=0, outstanding=depth["queued"] + depth["running"]),
+        backfill_event(queued=0, outstanding=depth["queued"] + depth["running"]),
     )
     session.commit()
     if tasks:
@@ -882,10 +971,6 @@ def clear_queue(session: Session) -> int:
 
 
 # --- filling in the Maia levels a game was never analysed at ---------------
-
-# A fill run searches nothing, so the tier it is queued under only decides which engine row
-# it names and where it sits in the queue: behind the deep passes somebody is waiting on.
-MAIA_FILL_TIER = Tier.QUICK
 
 
 def maia_fill_targets(
@@ -1048,9 +1133,12 @@ def queue_maia_fill(session: Session, game_ids: Sequence[int] | None = None) -> 
     if not targets:
         return {"queued": 0, "already_complete": complete, "runs": []}
 
-    # `maia=True` rather than the tier's setting: a fill pass *is* its Maia pass, so it
-    # asks for one whatever `maia_on_quick` says — and so the one-host rule applies to it.
-    defaults = _run_defaults(session, MAIA_FILL_TIER, maia=True)
+    # `maia=True` rather than the setting: a fill pass *is* its Maia pass, so it asks for
+    # one whatever `maia_on_analysis` says — and so the one-host rule applies to it. Import
+    # priority and the import budget: a fill searches nothing, so the budget only names the
+    # engine row it is queued against and the rows its estimate is sampled from, and it
+    # waits behind any run somebody is sitting in front of.
+    defaults = _run_defaults(session, priority=IMPORT_PRIORITY, maia=True)
     queued = [
         _queued_row(defaults, game_id=game_id, maia=True, maia_only=True, maia_elos=missing)
         for game_id, missing in sorted(targets.items())
@@ -1062,9 +1150,8 @@ def queue_maia_fill(session: Session, game_ids: Sequence[int] | None = None) -> 
     emit_on_commit(
         session,
         backfill_event(
-            MAIA_FILL_TIER,
             queued=len(queued),
-            outstanding=outstanding_runs(session, MAIA_FILL_TIER, maia_only=True),
+            outstanding=outstanding_runs(session, maia_only=True),
             maia_only=True,
         ),
     )
@@ -1099,13 +1186,11 @@ def coverage(session: Session, *, settings: Settings | None = None) -> dict[str,
     `maia_fill_status` for the fill — so what the page promises and what a press queues
     cannot drift.
 
-    The three coverage buckets partition the library: `deep` is every game with a live deep
-    pass, `quick_only` the ones with a quick pass and no deep, `no_pass` the rest. They are
-    counted in one grouped statement rather than three, because this runs over the whole
-    games table on a page load.
-
-    `missing` is not the complement of those buckets: a game with a deep pass and no quick
-    one is missing a quick pass, which is what a backfill of that tier would queue.
+    One bucket: `analysed` is every game with a live full-game pass, whoever queued it and
+    whatever it stopped on, `no_pass` the rest. Both come from one statement over the games
+    table, because this runs on a page load. `missing` is what the Backfill button would
+    queue, read off `_missing_games` itself; it is the same games as `no_pass` today, and is
+    counted by the button's own statement so that the two could not drift if either moved.
 
     The Maia block distinguishes "has some Maia" from "has the levels you currently care
     about" — a library analysed while Maia was centred on each game's own rating carries a
@@ -1113,22 +1198,13 @@ def coverage(session: Session, *, settings: Settings | None = None) -> dict[str,
     that reading as a library with no Maia at all.
     """
     live = (
-        select(
-            AnalysisRun.game_id.label("game_id"),
-            func.max(case((AnalysisRun.tier == Tier.QUICK, 1), else_=0)).label("quick"),
-            func.max(case((AnalysisRun.tier == Tier.DEEP, 1), else_=0)).label("deep"),
-        )
+        select(AnalysisRun.game_id.label("game_id"))
         .where(_live_run_clause())
         .group_by(AnalysisRun.game_id)
         .subquery()
     )
-    total, no_pass, quick_only, deep = session.execute(
-        select(
-            func.count(),
-            _counted(live.c.game_id.is_(None)),
-            _counted(and_(live.c.quick == 1, live.c.deep == 0)),
-            _counted(live.c.deep == 1),
-        )
+    total, no_pass = session.execute(
+        select(func.count(), _counted(live.c.game_id.is_(None)))
         .select_from(Game)
         .outerjoin(live, live.c.game_id == Game.id)
     ).one()
@@ -1143,22 +1219,18 @@ def coverage(session: Session, *, settings: Settings | None = None) -> dict[str,
     # the Maia block counts and what its estimate is priced over, and asking twice would
     # mean walking every finished run of the library a second time.
     fill_targets, _complete, configured, settled = _maia_fill_picture(session)
-    quick_missing, quick_plies = _missing_work(session, Tier.QUICK)
-    deep_missing, deep_plies = _missing_work(session, Tier.DEEP)
+    missing, missing_plies = _missing_work(session)
+    total_games = int(total or 0)
+    unanalysed = int(no_pass or 0)
     return {
-        "total": int(total or 0),
-        "no_pass": int(no_pass or 0),
-        "quick_only": int(quick_only or 0),
-        "deep": int(deep or 0),
-        "missing": {
-            "quick": quick_missing,
-            "deep": deep_missing,
-        },
+        "total": total_games,
+        "analysed": total_games - unanalysed,
+        "no_pass": unanalysed,
+        "missing": missing,
         "failed": int(failed or 0),
         "maia": _maia_coverage(fill_targets, configured, settled),
         "estimates": {
-            "quick_seconds": _tier_estimate(session, Tier.QUICK, quick_plies),
-            "deep_seconds": _tier_estimate(session, Tier.DEEP, deep_plies),
+            "analysis_seconds": _analysis_estimate(session, missing_plies),
             "maia_seconds": _maia_estimate(session, fill_targets),
             "concurrency": app_settings_service.get_analysis_concurrency(session, resolved),
         },
@@ -1214,8 +1286,8 @@ def _maia_coverage(
     }
 
 
-def _tier_estimate(session: Session, tier: Tier, missing_plies: int) -> float | None:
-    """Engine-seconds a backfill of this tier would take, or None because nothing measured it.
+def _analysis_estimate(session: Session, missing_plies: int) -> float | None:
+    """Engine-seconds a backfill would take, or None because nothing measured it.
 
     Measured rather than guessed, from the runs this deployment has actually finished:
     their wall time over their games' plies is what a ply costs here, and the plies a
@@ -1223,19 +1295,19 @@ def _tier_estimate(session: Session, tier: Tier, missing_plies: int) -> float | 
     are left. The caller divides by the concurrency it is told and formats — this is the
     raw cost of the work, not of the wait.
 
-    Only runs carrying the budget a run enqueued *today* would carry count. A budget is
-    what the time was spent on, so averaging across two of them measures nothing: this
-    library holds 447 deep runs from an experiment at 500 nodes, and letting those into
-    the average would promise an overnight pass that in fact takes a weekend. Full-game
-    runs only, for the same reason — a windowed run's minutes divided by its game's whole
-    ply count is a per-ply cost several times too cheap.
+    Only runs carrying the budget a backfill enqueued *today* would carry count — import
+    priority, `analysis_nodes` and nothing else to stop on, `analysis_multipv` lines. A
+    budget is what the time was spent on, so averaging across two of them measures nothing:
+    a library holding a few hundred depth-30 runs somebody asked for from the Analyse dialog
+    would otherwise promise an overnight pass that in fact takes a weekend. Full-game runs
+    only, for the same reason — a windowed run's minutes divided by its game's whole ply
+    count is a per-ply cost several times too cheap.
 
     None under `ESTIMATE_MIN_SAMPLES`: a page whose entire purpose is "what will this cost
     me" is better with an empty space than with a number nobody measured.
     """
-    tier = Tier(tier)
-    rate = _seconds_per_ply(session, tier)
-    work_plies = missing_plies + _outstanding_plies(session, tier)
+    rate = _seconds_per_ply(session)
+    work_plies = missing_plies + _outstanding_plies(session)
     return None if rate is None else rate * work_plies
 
 
@@ -1245,42 +1317,43 @@ def _maia_estimate(session: Session, fill_targets: Mapping[int, list[int]]) -> f
     The third button on the page and the third estimate, measured exactly as the other two
     are: this deployment's own finished fills over the plies they covered, times the plies
     the games still missing a level add up to. A fill is its own kind of work — it searches
-    nothing and asks the human-move model about every ply — so a tier's per-ply cost says
-    nothing about it, which is why the sample is `maia_only` runs and only those.
+    nothing and asks the human-move model about every ply — so the analysis pass's per-ply
+    cost says nothing about it, which is why the sample is `maia_only` runs and only those.
 
     Priced over `fill_targets` plus matching fills already queued or running. The Maia
     block's `missing_games` remains what another press would newly queue; the estimate is
     all of the matching work still left, so it keeps counting after that press.
     """
-    rate = _seconds_per_ply(session, MAIA_FILL_TIER, maia_only=True)
-    work_plies = _fill_plies(session, fill_targets) + _outstanding_plies(
-        session, MAIA_FILL_TIER, maia_only=True
-    )
+    rate = _seconds_per_ply(session, maia_only=True)
+    work_plies = _fill_plies(session, fill_targets) + _outstanding_plies(session, maia_only=True)
     return None if rate is None else rate * work_plies
 
 
-def _seconds_per_ply(session: Session, tier: Tier, *, maia_only: bool = False) -> float | None:
+def _seconds_per_ply(session: Session, *, maia_only: bool = False) -> float | None:
     """What one ply of this kind of work has actually cost this deployment, or None.
 
-    One rule for every estimate on the page. Only runs carrying the budget a run enqueued
-    *today* would carry count — a budget is what the time was spent on, so averaging across
-    two of them measures nothing — and only full-game runs, because a windowed run's
-    minutes over its game's whole ply count is a per-ply cost several times too cheap. A
-    fill borrows `MAIA_FILL_TIER`'s budget when it is queued (`queue_maia_fill`), so the
-    same budget clause picks the fills that were queued the way one would be queued now.
+    One rule for every estimate on the page. Only runs queued the way a backfill would queue
+    one *today* count: import priority, a node budget of `analysis_nodes` with no depth or
+    time limit beside it, and `analysis_multipv` lines. A budget is what the time was spent
+    on, so averaging across two of them measures nothing, and a run somebody asked for
+    carries whatever limit they typed. Only full-game runs, because a windowed run's minutes
+    over its game's whole ply count is a per-ply cost several times too cheap. A fill takes
+    the same budget when it is queued (`queue_maia_fill`), so the same clause picks the
+    fills that were queued the way one would be queued now.
     """
-    tier = Tier(tier)
     samples = session.execute(
         select(AnalysisRun.started_at, AnalysisRun.finished_at, Game.ply_count)
         .join(Game, Game.id == AnalysisRun.game_id)
         .where(
-            AnalysisRun.tier == tier,
+            AnalysisRun.priority == IMPORT_PRIORITY,
             AnalysisRun.status == RunStatus.DONE,
             AnalysisRun.maia_only.is_(maia_only),
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
-            AnalysisRun.nodes == _default_nodes(session, tier),
-            AnalysisRun.multipv == max(1, _default_multipv(session, tier)),
+            AnalysisRun.nodes == app_settings_service.get_analysis_nodes(session),
+            AnalysisRun.depth.is_(None),
+            AnalysisRun.seconds.is_(None),
+            AnalysisRun.multipv == max(1, app_settings_service.get_analysis_multipv(session)),
             AnalysisRun.started_at.is_not(None),
             AnalysisRun.finished_at.is_not(None),
             Game.ply_count > 0,
@@ -1298,9 +1371,9 @@ def _seconds_per_ply(session: Session, tier: Tier, *, maia_only: bool = False) -
     return seconds / plies
 
 
-def _missing_work(session: Session, tier: Tier) -> tuple[int, int]:
-    """How many games and plies a backfill would newly put into this tier's queue."""
-    missing = _missing_games(tier).subquery()
+def _missing_work(session: Session) -> tuple[int, int]:
+    """How many games and plies a backfill would newly put into the queue."""
+    missing = _missing_games().subquery()
     games, plies = session.execute(
         select(func.count(), func.coalesce(func.sum(Game.ply_count), 0))
         .select_from(missing)
@@ -1309,14 +1382,17 @@ def _missing_work(session: Session, tier: Tier) -> tuple[int, int]:
     return int(games or 0), int(plies or 0)
 
 
-def _outstanding_plies(session: Session, tier: Tier, *, maia_only: bool = False) -> int:
-    """Plies of this kind already queued or running, and therefore still to be paid for."""
+def _outstanding_plies(session: Session, *, maia_only: bool = False) -> int:
+    """Import-priority plies of this kind already queued or running, still to be paid for.
+
+    The same rows `outstanding_runs` counts: what the backfill being priced is still owed.
+    """
     total = session.scalar(
         select(func.coalesce(func.sum(Game.ply_count), 0))
         .select_from(AnalysisRun)
         .join(Game, Game.id == AnalysisRun.game_id)
         .where(
-            AnalysisRun.tier == Tier(tier),
+            AnalysisRun.priority == IMPORT_PRIORITY,
             AnalysisRun.status.in_([RunStatus.QUEUED, RunStatus.RUNNING]),
             AnalysisRun.ply_start.is_(None),
             AnalysisRun.ply_end.is_(None),
@@ -1340,24 +1416,35 @@ def _fill_plies(session: Session, fill_targets: Mapping[int, list[int]]) -> int:
 
 
 def retry_failed(session: Session, run_ids: Sequence[int] | None = None) -> dict[str, int]:
-    """Queue a fresh pass for every game behind a failed run. Says what it queued and skipped.
+    """Queue a fresh copy of every failed game run. Says what it queued and skipped.
 
-    The failures are usually one deployment mistake repeated a few hundred times — a tier
-    with no engine on the day the library was imported — so this is the one press that
-    clears them, rather than a hunt through rows nothing lists.
+    The failures are usually one deployment mistake repeated a few hundred times — no
+    engine in the analysis role on the day the library was imported — so this is the one
+    press that clears them, rather than a hunt through rows nothing lists.
 
     A retry is always a *new* run, never the failed row moved back to queued: a run row is
     the record of an attempt and its error, and resurrecting it would erase the only
-    evidence of what went wrong while spending an attempt it already spent. The new run
-    carries the tier its failure had — that is what the owner asked for — and today's
-    budget, engine and Maia setting, exactly as any other enqueue does.
+    evidence of what went wrong while spending an attempt it already spent. The new run is
+    the failed one asked again: its engine, its limit, its window, its lines, its Maia pass
+    and levels, its priority. Retrying a depth-24 look at one phase that somebody asked for
+    and getting back an import pass over the whole game would be a different request.
 
-    One run per *game*, not per failed row: a game whose quick pass failed twice needs one
-    pass, and a game that has since been analysed needs none, which is why a game with a
-    live run of that tier is skipped rather than queued a second time. `skipped` counts
-    every failed row this call did not turn into a run, so `queued + skipped` is how many
-    failures were looked at — including the runs over a bare FEN, which name no game to
-    re-analyse.
+    The one thing not copied as-is is an engine that has gone. An import-priority run is
+    the queue's own work and takes the analysis role's engine instead, exactly as the worker
+    would stand it in; a run a person asked for named its engine on purpose, so it is
+    skipped rather than quietly moved to another one.
+
+    One run per request, newest failure first: a game whose pass failed twice needs one
+    pass, and a request that has since been made again — a run queued, running or done
+    *after* the failure, asking for the same thing — needs none. "The same thing" is the
+    window, the fill flag and who asked: any later import pass answers a failed import
+    pass (its engine and budget are the queue's to pick), but a requested run is answered
+    only by a later requested run on the same engine with the same limit and lines. The
+    game's import pass, done long before somebody's depth-24 look failed, answers nothing
+    about that look. `skipped` counts every failed row this call did not turn into a run, so
+    `queued + skipped` is how many failures were looked at — including the runs over a bare
+    FEN, which name no game to re-analyse, and the correspondence tasks, whose search owns
+    its own retry.
 
     Announced per run, the way `request_analysis_batch` announces itself: these are tens or
     hundreds of rows rather than a library-wide write, and the queue widgets fold them in.
@@ -1370,34 +1457,63 @@ def retry_failed(session: Session, run_ids: Sequence[int] | None = None) -> dict
         statement = statement.where(AnalysisRun.id.in_(wanted))
     failures = list(session.scalars(statement.order_by(AnalysisRun.id.desc())))
 
-    # Newest failure first, so a game that failed under two tiers is retried under the one
-    # it was last asked for.
-    by_tier: dict[Tier, list[int]] = {}
-    seen: set[int] = set()
+    seen: set[tuple[object, ...]] = set()
     skipped = 0
+    candidates: list[AnalysisRun] = []
     for run in failures:
-        if run.game_id is None or run.game_id in seen:
+        key = _retry_key(run)
+        if run.game_id is None or run.correspondence_search_id is not None or key in seen:
             skipped += 1
             continue
-        seen.add(run.game_id)
-        by_tier.setdefault(run.tier, []).append(run.game_id)
+        seen.add(key)
+        candidates.append(run)
 
-    queued: list[AnalysisRun] = []
-    for tier, games in sorted(by_tier.items()):
-        live = set(
-            session.scalars(
-                select(AnalysisRun.game_id).where(
-                    _live_run_clause(tier), AnalysisRun.game_id.in_(games)
-                )
+    # The newest non-failed run per request: a failure is answered only by one made after it.
+    latest_live: dict[tuple[object, ...], int] = {}
+    if candidates:
+        for later in session.scalars(
+            select(AnalysisRun).where(
+                AnalysisRun.game_id.in_([run.game_id for run in candidates]),
+                AnalysisRun.status != RunStatus.FAILED,
             )
-        )
-        skipped += sum(1 for game_id in games if game_id in live)
-        pending = [game_id for game_id in sorted(games) if game_id not in live]
-        if not pending:
+        ):
+            key = _retry_key(later)
+            latest_live[key] = max(latest_live.get(key, 0), int(later.id))
+
+    role_engine: Engine | None = None
+    queued: list[AnalysisRun] = []
+    for run in sorted(candidates, key=lambda row: row.id):
+        if latest_live.get(_retry_key(run), 0) > run.id:
+            skipped += 1
             continue
-        defaults = _run_defaults(session, tier)
-        queued.extend(
-            _queued_row(defaults, game_id=game_id, maia=defaults.maia) for game_id in pending
+        engine = _retry_engine(session, run)
+        if engine is None and run.priority == IMPORT_PRIORITY:
+            role_engine = role_engine or engines_service.engine_for_role(
+                session, EngineRole.ANALYSIS
+            )
+            engine = role_engine
+        # The one-host rule, as at any enqueue — but per run, since each names its own engine,
+        # and as a skip rather than a refusal of the whole press.
+        wants_maia = bool(run.maia or run.maia_only)
+        if engine is None or (wants_maia and engines_service.stranded_maia(session, engine)):
+            skipped += 1
+            continue
+        queued.append(
+            AnalysisRun(
+                game_id=run.game_id,
+                engine_id=engine.id,
+                status=RunStatus.QUEUED,
+                nodes=run.nodes,
+                depth=run.depth,
+                seconds=run.seconds,
+                multipv=max(1, run.multipv),
+                ply_start=run.ply_start,
+                ply_end=run.ply_end,
+                priority=run.priority,
+                maia=wants_maia,
+                maia_only=bool(run.maia_only),
+                maia_elos=run.maia_elos,
+            )
         )
 
     if not queued:
@@ -1408,6 +1524,40 @@ def retry_failed(session: Session, run_ids: Sequence[int] | None = None) -> dict
         emit_on_commit(session, run_event(EVENT_RUN_QUEUED, run))
     session.commit()
     return {"queued": len(queued), "skipped": skipped}
+
+
+def _retry_key(run: AnalysisRun) -> tuple[object, ...]:
+    """What a run asked for, as far as a retry cares whether it has been asked again.
+
+    An import pass is the queue's own request, so its engine and budget are left out — a
+    later pass on whatever holds the role answers it. A requested run is its engine, limit
+    and lines too, because a person chose each of those.
+    """
+    base: tuple[object, ...] = (
+        int(run.game_id or 0),
+        run.ply_start,
+        run.ply_end,
+        bool(run.maia_only),
+    )
+    if run.priority == IMPORT_PRIORITY:
+        return (*base, False)
+    return (*base, True, run.engine_id, run.nodes, run.depth, run.seconds, run.multipv)
+
+
+def _retry_engine(session: Session, run: AnalysisRun) -> Engine | None:
+    """The failed run's own engine, if it is still there to run a search on.
+
+    A runner's engine switched off only because its machine is away still counts, for the
+    reason `_resolve_engine` gives: the retry waits in the queue for that machine.
+    """
+    if run.engine_id is None:
+        return None
+    engine = session.get(Engine, run.engine_id)
+    if engine is None or engine.kind is not EngineKind.UCI:
+        return None
+    if not engine.enabled and engine.runner_id is None:
+        return None
+    return engine
 
 
 def ply_window(ply_count: int, ply_range: tuple[int, int] | None) -> tuple[int, int] | None:
@@ -1444,22 +1594,6 @@ def normalise_fen(fen: str | None) -> str:
     return epd
 
 
-def default_priority(tier: Tier) -> int:
-    return DEEP_PRIORITY if Tier(tier) is Tier.DEEP else QUICK_PRIORITY
-
-
-def _default_nodes(session: Session, tier: Tier) -> int:
-    if tier is Tier.DEEP:
-        return app_settings_service.get_deep_nodes(session)
-    return app_settings_service.get_quick_nodes(session)
-
-
-def _default_multipv(session: Session, tier: Tier) -> int:
-    # A quick pass keeps one line: it is the automatic pass on import, and the alternatives
-    # are what someone asks for when they stop to look.
-    return app_settings_service.get_deep_multipv(session) if tier is Tier.DEEP else 1
-
-
 def _require_one_host(session: Session, engine: Engine) -> None:
     """Refuse a run whose two engine passes would have to happen on different machines.
 
@@ -1486,13 +1620,76 @@ def _require_one_host(session: Session, engine: Engine) -> None:
     )
 
 
-def _resolve_engine(session: Session, tier: Tier, engine_id: int | None) -> Engine:
+def analysis_engines(session: Session) -> list[dict[str, Any]]:
+    """The engines the game's Analyse dialog offers, behind `GET /analysis/engines`.
+
+    The correspondence pickers' list and shape (`correspondence.engine_entries`), so the
+    dialog can reuse their engine picker as it stands: every enabled UCI engine, this
+    host's first, with the analysis role's preselected. What differs is what "cannot run"
+    means — a run is queue work, so a runner's engine is as good as this host's, and the
+    reasons left are the ones `request_analysis` would refuse with.
+    """
+    from backend.services import correspondence as correspondence_service
+
+    wants_maia = app_settings_service.get_maia_on_analysis(session)
+    return correspondence_service.engine_entries(
+        session, trouble=lambda engine: _run_trouble(session, engine, maia=wants_maia)
+    )
+
+
+def _run_trouble(session: Session, engine: Engine, *, maia: bool) -> str | None:
+    """Why a run queued on this engine now would be refused or never searched, or None.
+
+    A runner that is not connected is not trouble: the run waits in the queue for it, which
+    is what a queue is for. A local binary that has gone is, and so is the one-host rule for
+    a run that would carry a Maia pass — the two refusals an owner can act on before pressing.
+    """
+    if (
+        engine.runner_id is None
+        and engines_service.is_binary_path(engine.path)
+        and not engines_service.binary_present(engine.path)
+    ):
+        return f"the binary for {engine.name!r} is no longer at {engine.path}"
+    if maia:
+        stranded = engines_service.stranded_maia(session, engine)
+        if stranded is not None:
+            return (
+                f"{engine.name!r} is on {engines_service.engine_host(session, engine)} and the "
+                f"Maia model for human moves, {stranded.name!r}, is on "
+                f"{engines_service.engine_host(session, stranded)}"
+            )
+    return None
+
+
+def _resolve_engine(session: Session, engine_id: int | None) -> Engine:
+    """The engine a run is queued against: the one named, else the analysis role's.
+
+    A named engine may be any enabled UCI engine — the Analyse dialog offers every one —
+    and is refused rather than swapped when it cannot search: somebody picked it. A Maia
+    row answers with a policy and cannot be the search half of a run at all.
+
+    A runner's engine is the exception to "enabled": its row is switched off while that
+    machine is away (`engines.disable_runner_engines`) and on again when it says hello, so
+    a run queued against it in between is work that waits for the machine, which is what a
+    queue is for. Only an engine on this host that the owner switched off is refused.
+    """
     if engine_id is not None:
-        return engines_service.require_engine(session, engine_id)
-    engine = engines_service.engine_for_tier(session, tier)
+        engine = engines_service.require_engine(session, engine_id)
+        if engine.kind is not EngineKind.UCI:
+            raise AnalysisRequestError(
+                f"{engine.name!r} is a human-move model and cannot search; pick a UCI engine"
+            )
+        if not engine.enabled and engine.runner_id is None:
+            raise engines_service.EngineUnavailableError(
+                f"{engine.name!r} is switched off; enable it or pick another engine"
+            )
+        return engine
+    engine = engines_service.engine_for_role(session, EngineRole.ANALYSIS)
     if engine is None:
-        status = engines_service.tier_status(session, tier)
-        raise engines_service.TierUnavailableError(tier, status.reason or "no engine")
+        status = engines_service.role_status(session, EngineRole.ANALYSIS)
+        raise engines_service.EngineUnavailableError(
+            status.reason or "no engine is assigned to the analysis role"
+        )
     return engine
 
 
@@ -1514,7 +1711,6 @@ def require_run(session: Session, run_id: int) -> AnalysisRun:
 def list_runs(
     session: Session,
     game_id: int | None = None,
-    tier: Tier | None = None,
     *,
     status: RunStatus | None = None,
     limit: int | None = None,
@@ -1539,8 +1735,6 @@ def list_runs(
         statement = statement.where(AnalysisRun.game_id == game_id)
     if status is not None:
         statement = statement.where(AnalysisRun.status == RunStatus(status))
-    if tier is not None:
-        statement = statement.where(AnalysisRun.tier == Tier(tier))
     if limit is not None:
         statement = statement.limit(limit)
     return list(session.scalars(statement))
@@ -1589,8 +1783,15 @@ def claim_next_run(
     *,
     engine_ids: Sequence[int] | None = None,
     exclude_engine_ids: Sequence[int] | None = None,
+    node_budget_only: bool = False,
 ) -> AnalysisRun | None:
     """Take the highest-priority queued run and mark it running, or return None if idle.
+
+    `node_budget_only` is for a runner that does not announce the `run_limits` feature: its
+    plan decoder needs a node count and knows no time limit, so it is only offered runs
+    that stop on nodes alone. The filter sits in the candidate query rather than after the
+    claim, because a claim handed back for being the wrong kind would come straight back
+    round as the same row on the next pump.
 
     The candidate subquery and conditional UPDATE are one statement. SQLite has no row
     locks, so selecting first made every worker choose the same id and race to update it;
@@ -1634,6 +1835,12 @@ def claim_next_run(
         candidate = candidate.where(
             (AnalysisRun.engine_id.is_(None))
             | (AnalysisRun.engine_id.not_in(list(exclude_engine_ids)))
+        )
+    if node_budget_only:
+        candidate = candidate.where(
+            AnalysisRun.nodes.is_not(None),
+            AnalysisRun.depth.is_(None),
+            AnalysisRun.seconds.is_(None),
         )
     claimed_id = session.scalar(
         update(AnalysisRun)
@@ -1927,7 +2134,7 @@ def fail_run(
 
     The first failure puts the run back in the queue with its error still on it, so the
     UI can show what went wrong while the retry is pending; the second gives up. Either
-    way the game stays browsable with whatever tiers it already has.
+    way the game stays browsable with whatever runs it already has.
 
     `attempt_token` guards exactly as it does in `complete_run`: a failure reported by a
     runner whose run was already taken away must not fail the attempt that replaced it.
@@ -1973,7 +2180,7 @@ def abandon_run(
 
     With its attempt refunded by default: a worker that was cancelled, or a runner whose
     socket dropped, did not fail the pass — it had it taken away mid-search. Counting that
-    against the retry budget would let two restarts during one long deep run mark it
+    against the retry budget would let two restarts during one long run mark it
     permanently failed with no engine ever having crashed.
     """
     if run.status is not RunStatus.RUNNING:
@@ -2006,43 +2213,45 @@ def run_event(event: str, run: AnalysisRun, **extra: Any) -> dict[str, Any]:
         "run_id": run.id,
         "game_id": run.game_id,
         "fen": run.fen,
-        "tier": str(run.tier),
         "status": str(run.status),
         "engine_id": run.engine_id,
         "priority": run.priority,
+        # What the run stops on and whether somebody is waiting on it — the two facts a
+        # badge is drawn from — so a client can label a run it has only heard about.
+        "nodes": run.nodes,
+        "depth": run.depth,
+        "seconds": run.seconds,
+        "multipv": run.multipv,
+        "requested": run.priority > IMPORT_PRIORITY,
         "attempts": run.attempts,
-        # What kind of work this is, not only which tier it was filed under: a Maia fill is
-        # a quick-tier row that searches nothing, and a client reading the tier alone
-        # reports it as a quick pass over the game.
+        # What kind of work this is: a Maia fill searches nothing, and a client reading the
+        # limits alone would report it as a pass over the game.
         "maia_only": bool(run.maia_only),
         "at": utcnow().isoformat(),
         **extra,
     }
 
 
-def backfill_event(
-    tier: Tier, *, queued: int, outstanding: int, maia_only: bool = False
-) -> dict[str, Any]:
+def backfill_event(*, queued: int, outstanding: int, maia_only: bool = False) -> dict[str, Any]:
     """The one event a library-wide enqueue or a cancel announces, in place of thousands.
 
     The shape is the contract, because the web client mirrors it by hand and nothing
     generates it from here:
 
-        {"event": "analysis.backfill", "tier": "quick", "queued": 0, "outstanding": 0,
-         "maia_only": false}
+        {"event": "analysis.backfill", "queued": 0, "outstanding": 0, "maia_only": false}
 
     `queued` is how many runs this call added — zero on the cancel path, which took some
-    away instead — and `outstanding` is that tier's queued-and-running full-game depth once
-    the write landed. `maia_only` says which of the two passes that share a tier this was:
-    a Maia fill queues quick-tier rows that search nothing, and a client that announced one
-    as "a quick pass over the library" would be describing work nobody asked for.
+    away instead — and `outstanding` is the import-priority queued-and-running full-game
+    depth once the write landed (`outstanding_runs`). `maia_only` says which of the two
+    passes this was: a Maia fill queues rows that search nothing, and a client that
+    announced one as "an analysis pass over the library" would be describing work nobody
+    asked for.
 
     It names no run, deliberately: a client that sees one refetches the queue rather than
     trying to fold ten thousand rows in one at a time.
     """
     return {
         "event": EVENT_BACKFILL,
-        "tier": str(Tier(tier)),
         "queued": queued,
         "outstanding": outstanding,
         "maia_only": maia_only,
@@ -2058,7 +2267,7 @@ def queue_paused_event(*, paused: bool, queued: int, running: int) -> dict[str, 
         {"event": "analysis.paused", "paused": true, "queued": 0, "running": 0}
 
     Not an `analysis.backfill`: no run was queued and none was dropped, so that frame's
-    `tier`, `queued` and `outstanding` would each be a statement about work that did not
+    `queued` and `outstanding` would each be a statement about work that did not
     happen. `queued` and `running` are the depth as it stands, unchanged by the switch —
     they are here so a client hears the whole of the queue's state in one frame.
 
@@ -2079,8 +2288,13 @@ def progress_event(plan: RunPlan, done: int, total: int) -> dict[str, Any]:
         "event": EVENT_RUN_PROGRESS,
         "run_id": plan.run_id,
         "game_id": plan.game_id,
-        "tier": str(plan.tier),
         "status": str(RunStatus.RUNNING),
+        "engine_id": plan.engine_id,
+        "nodes": plan.nodes,
+        "depth": plan.depth,
+        "seconds": plan.seconds,
+        "multipv": plan.multipv,
+        "requested": plan.requested,
         "maia_only": plan.maia_only,
         "done": done,
         "total": total,
@@ -2101,19 +2315,26 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
     or an explicit override — which carries them on its row and is not re-pointed at
     whatever is configured when it finally runs. Whether there is a Maia pass at all is on
     the row too, for the reason the budget is: it was settled when the run was queued.
+
+    The limit is the row's, passed through as it stands: a depth or a time limit is never
+    given a node budget beside it, because python-chess would stop at whichever came first.
+    Only a row that carries no limit at all — which nothing queues any more — is searched
+    to `analysis_nodes`, so it cannot become an unbounded search.
     """
     thresholds = Thresholds.from_session(session)
     elos = maia_levels(run.maia_elos or app_settings_service.get_maia_elos(session))
     target_elo = elos[0]
-    quick_nodes = app_settings_service.get_quick_nodes(session)
     both_sides = app_settings_service.get_maia_both_sides(session)
+    nodes = run.nodes
+    if nodes is None and run.depth is None and run.seconds is None:
+        nodes = app_settings_service.get_analysis_nodes(session)
+    requested = run.priority > IMPORT_PRIORITY
 
     if run.game_id is None:
         fen = run.fen or ""
         position_id = session.scalar(select(Position.id).where(Position.fen == fen))
         return RunPlan(
             run_id=run.id,
-            tier=run.tier,
             game_id=None,
             fen=fen,
             variant="standard",
@@ -2123,15 +2344,18 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
             position_ids=(position_id,),
             ply_start=0,
             ply_end=0,
-            nodes=run.nodes or quick_nodes,
+            nodes=nodes,
             depth=run.depth,
             multipv=max(1, run.multipv),
             thresholds=thresholds,
+            seconds=run.seconds,
             maia_target_elo=target_elo,
             maia_elos=tuple(elos),
             maia_only=bool(run.maia_only),
             maia=bool(run.maia),
             maia_both_sides=both_sides,
+            engine_id=run.engine_id,
+            requested=requested,
         )
 
     game = session.get(Game, run.game_id)
@@ -2163,7 +2387,6 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
 
     return RunPlan(
         run_id=run.id,
-        tier=run.tier,
         game_id=game.id,
         fen=None,
         variant=game.variant,
@@ -2173,10 +2396,11 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
         position_ids=position_ids,
         ply_start=ply_start,
         ply_end=ply_end,
-        nodes=run.nodes or quick_nodes,
+        nodes=nodes,
         depth=run.depth,
         multipv=max(1, run.multipv),
         thresholds=thresholds,
+        seconds=run.seconds,
         owner_color=game.owner_color,
         owner_rating=owner_rating(game),
         maia_target_elo=target_elo,
@@ -2184,6 +2408,8 @@ def build_plan(session: Session, run: AnalysisRun) -> RunPlan:
         maia_only=bool(run.maia_only),
         maia=bool(run.maia),
         maia_both_sides=both_sides,
+        engine_id=run.engine_id,
+        requested=requested,
     )
 
 
@@ -2214,7 +2440,7 @@ def analyse_plan(
     import chess
     import chess.engine
 
-    limit = chess.engine.Limit(nodes=plan.nodes, depth=plan.depth)
+    limit = chess.engine.Limit(nodes=plan.nodes, depth=plan.depth, time=plan.seconds)
     wanted = list(plan.positions)
     boards = dict(replay(plan))
     scores: dict[int, Score] = {}
@@ -2624,10 +2850,12 @@ def analyze_position(
 
     resolved = settings or get_settings()
     if resolved.demo:
-        raise engines_service.TierUnavailableError(
-            Tier.QUICK, "the demo does not run engines on the server; use browser Stockfish"
+        raise engines_service.EngineUnavailableError(
+            "the demo does not run engines on the server; use browser Stockfish"
         )
-    engine = engines_service.require_engine_for_tier(session, Tier.QUICK, local_only=True)
+    engine = engines_service.require_engine_for_role(
+        session, EngineRole.ANALYSIS, local_only=True
+    )
     text = (fen or "").strip()
     try:
         board = read_fen(text)

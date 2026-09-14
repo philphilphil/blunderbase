@@ -576,6 +576,29 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /*
+   * The live-analysis icon's scan line, while the search it stands for is running
+   * (`components/analysis/ScanIcons.tsx`). A slow sweep rather than a spin: the frame is
+   * fixed on the board, only the look moves. Still for anyone who asked for less motion.
+   */
+  .bb-scan-line {
+    animation: bb-scan 1.8s ease-in-out infinite alternate;
+    transform-box: view-box;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bb-scan-line {
+      animation: none;
+    }
+  }
+}
+
+@keyframes bb-scan {
+  from {
+    transform: translateY(-5px);
+  }
+  to {
+    transform: translateY(5px);
+  }
 }
 
 /* --------------------------------------------------------------------------

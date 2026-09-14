@@ -109,7 +109,7 @@ function sorted(hosts: EngineHost[]): EngineHost[] {
  * Every engine the deployment knows, as a host binding.
  *
  * Local engines first, then each runner in list order; within a host, by name. It used to
- * be by tier first — an engine carried a `default_tier` and the list put deep before quick.
+ * be by kind of pass first — an engine carried a `default_tier` and the list sorted by it.
  * There is no such field any more: which engine serves a role is an assignment the owner
  * makes (`routes/engines/roles.ts`), not a property of the row, and a picker that ordered
  * itself by a role would have to re-sort every time that assignment changed.

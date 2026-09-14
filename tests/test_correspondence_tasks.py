@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.api.app import create_app
 from backend.config import Settings
 from backend.db.base import Base
-from backend.db.enums import Color, EngineKind, RunStatus, SearchKind, SearchStatus, Tier
+from backend.db.enums import Color, EngineKind, RunStatus, SearchKind, SearchStatus
 from backend.db.models import (
     AnalysisRun,
     CorrespondenceEval,
@@ -240,8 +240,8 @@ def test_a_task_carries_the_deployments_budget_and_line_count(session: Session) 
     assert search["limit_nodes"] == 7_000_000
 
 
-def test_a_task_sits_between_the_quick_and_the_deep_tier(session: Session) -> None:
-    """Ahead of the import backlog, behind the pass somebody is sitting and waiting for."""
+def test_a_task_sits_between_import_and_requested_runs(session: Session) -> None:
+    """Ahead of the import backlog, behind the run somebody is sitting and waiting for."""
     add_engine(session)
     game = make_game(session, reply_due=datetime.now(UTC) + timedelta(days=3))
 
@@ -249,7 +249,7 @@ def test_a_task_sits_between_the_quick_and_the_deep_tier(session: Session) -> No
 
     run = session.get(AnalysisRun, search["run_id"])
     assert run is not None
-    assert analysis_service.QUICK_PRIORITY < run.priority < analysis_service.DEEP_PRIORITY
+    assert analysis_service.IMPORT_PRIORITY < run.priority < analysis_service.REQUESTED_PRIORITY
 
 
 def test_the_nearest_deadline_is_claimed_first(session: Session) -> None:
@@ -310,7 +310,9 @@ def test_an_excluded_move_never_gets_a_task(session: Session) -> None:
         correspondence_service.queue_task(session, node_id=added["tip"]["id"])
 
 
-def test_a_task_takes_the_engine_it_was_asked_for_else_the_deep_roles(session: Session) -> None:
+def test_a_task_takes_the_engine_it_was_asked_for_else_the_analysis_roles(
+    session: Session,
+) -> None:
     deep = add_engine(session, name="Stockfish")
     other = add_engine(session, name="Leela")
     game = make_game(session)
@@ -955,11 +957,11 @@ def test_deleting_a_runners_engine_leaves_its_queued_task_alone(session: Session
     assert session.get(CorrespondenceSearch, search["id"]).status is SearchStatus.QUEUED
 
 
-def test_an_expansion_whose_engine_was_switched_off_continues_on_the_deep_roles(
+def test_an_expansion_whose_engine_was_switched_off_continues_on_the_analysis_roles(
     session: Session,
 ) -> None:
     """Hours pass between the stages. An engine switched off in between must not make the
-    next stage fail on every child; the deep role's engine stands in for it."""
+    next stage fail on every child; the analysis role's engine stands in for it."""
     deep = add_engine(session, name="Stockfish")
     chosen = add_engine(session, name="Leela")
     game = make_game(session)
@@ -1006,7 +1008,7 @@ def test_cancelling_a_backfill_leaves_correspondence_tasks_alone(session: Sessio
     game = make_game(session)
     search = correspondence_service.queue_task(session, node_id=game["tree"]["id"])
 
-    analysis_service.cancel_queued(session, Tier.DEEP)
+    analysis_service.cancel_queued(session)
 
     assert session.get(AnalysisRun, search["run_id"]) is not None
     assert session.get(CorrespondenceSearch, search["id"]).status is SearchStatus.QUEUED

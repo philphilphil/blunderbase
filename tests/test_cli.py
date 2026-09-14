@@ -15,6 +15,7 @@ from backend.cli import (
     COMMANDS,
     MACOS_BINARY_DIRS,
     _import_options,
+    _print_run_event,
     build_parser,
     main,
     widen_path_for_desktop,
@@ -26,7 +27,6 @@ from backend.db.enums import (
     JobStatus,
     Platform,
     RunStatus,
-    Tier,
 )
 from backend.db.models import (
     Account,
@@ -143,7 +143,7 @@ def test_db_rebuild_cards_fills_the_column_for_a_library_analysed_before_it(
     with session_scope(settings) as session:
         game = session.scalars(select(Game).order_by(Game.id)).first()
         assert game is not None
-        run = AnalysisRun(game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE)
+        run = AnalysisRun(game_id=game.id, status=RunStatus.DONE)
         session.add(run)
         session.flush()
         session.add(MoveEval(run_id=run.id, ply=0, win_after=52.0, win_loss=40.0))
@@ -168,7 +168,7 @@ def test_db_rebuild_stats_folds_a_library_analysed_before_the_summaries(
     with session_scope(settings) as session:
         game = session.scalars(select(Game).order_by(Game.id)).first()
         assert game is not None
-        run = AnalysisRun(game_id=game.id, tier=Tier.QUICK, status=RunStatus.DONE)
+        run = AnalysisRun(game_id=game.id, status=RunStatus.DONE)
         session.add(run)
         session.flush()
         session.add(
@@ -337,11 +337,54 @@ def test_accounts_add_refuses_a_platform_that_is_not_one(settings: Settings) -> 
         build_parser(settings).parse_args(["accounts", "add", "telepathy", "owner"])
 
 
-def test_analyze_parses_the_flags_a_deep_pass_needs(settings: Settings) -> None:
+def test_analyze_parses_the_flags_a_requested_run_needs(settings: Settings) -> None:
     args = build_parser(settings).parse_args(
-        ["analyze", "--game-id", "7", "--tier", "deep", "--ply-range", "40:80", "--multipv", "5"]
+        [
+            "analyze",
+            "--game-id",
+            "7",
+            "--engine",
+            "sf",
+            "--depth",
+            "24",
+            "--ply-range",
+            "40:80",
+            "--lines",
+            "5",
+        ]
     )
-    assert (args.game_id, args.tier, args.ply_range, args.multipv) == (7, "deep", (40, 80), 5)
+    assert (args.game_id, args.engine, args.depth, args.ply_range, args.lines) == (
+        7,
+        "sf",
+        24,
+        (40, 80),
+        5,
+    )
+    assert (args.nodes, args.seconds) == (None, None)
+
+
+def test_analyze_takes_one_limit_and_at_most_five_lines(settings: Settings) -> None:
+    parser = build_parser(settings)
+    for bad in (
+        ["--nodes", "1000", "--depth", "20"],
+        ["--seconds", "5", "--depth", "20"],
+        ["--seconds", "0"],
+        ["--lines", "6"],
+    ):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["analyze", "--game-id", "7", *bad])
+
+
+def test_a_run_event_prints_the_limit_it_stopped_at(capsys: pytest.CaptureFixture[str]) -> None:
+    base = {"event": "analysis.done", "run_id": 3, "game_id": 9, "evals": 40}
+    _print_run_event({**base, "depth": 24, "multipv": 2})
+    _print_run_event({**base, "seconds": 10.0, "multipv": 1})
+    _print_run_event({**base, "nodes": 500_000, "multipv": 2})
+    assert capsys.readouterr().out.splitlines() == [
+        "run 3 (game 9, d24 · 2 lines): done 40 moves",
+        "run 3 (game 9, 10s · 1 line): done 40 moves",
+        "run 3 (game 9, 500k · 2 lines): done 40 moves",
+    ]
 
 
 def test_a_ply_range_has_to_be_a_range(settings: Settings) -> None:
@@ -366,11 +409,21 @@ def test_analyze_queues_a_pass_per_game_without_running_it(
 
     assert main(["analyze", "--queue-only"]) == 0
 
-    assert "queued 3 quick run(s)" in capsys.readouterr().out
+    assert "queued 3 run(s)" in capsys.readouterr().out
     with session_scope(settings) as session:
         runs = list(session.scalars(select(AnalysisRun)))
     assert len(runs) == 3
     assert {run.status for run in runs} == {RunStatus.QUEUED}
+
+
+def test_analyze_refuses_the_flags_of_one_run_without_a_game(
+    settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`analyze --depth 30` queued a plain backfill and said nothing; now it says why not."""
+    for flags in (["--depth", "30"], ["--engine", "sf17"], ["--lines", "3"]):
+        with pytest.raises(SystemExit):
+            main(["analyze", "--queue-only", *flags])
+        assert "need --game-id or --fen" in capsys.readouterr().err
 
 
 def test_analyze_runs_the_queue_down_in_this_process(
@@ -401,21 +454,21 @@ def test_analyze_runs_the_queue_down_in_this_process(
     assert main(["analyze"]) == 0
 
     output = capsys.readouterr().out
-    assert "queued 0 quick run(s)" in output, "the import already queued this game's pass"
+    assert "queued 0 run(s)" in output,"the import already queued this game's pass"
     assert "done 6 moves" in output
     with session_scope(settings) as session:
         run = session.scalars(select(AnalysisRun)).one()
     assert run.status is RunStatus.DONE
 
 
-def test_analyze_says_so_when_no_engine_is_assigned_to_the_tier(
+def test_analyze_says_so_when_no_engine_is_assigned_to_the_analysis_role(
     settings: Settings, fixtures_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(["import", "pgn", str(fixtures_dir / "multi_game.pgn")]) == 0
     capsys.readouterr()
 
     assert main(["analyze", "--queue-only"]) == 1
-    assert "no engine is assigned to the quick tier" in capsys.readouterr().out
+    assert "no engine is assigned to the analysis role" in capsys.readouterr().out
 
 
 def test_set_password_asks_twice_and_stores_a_hash(

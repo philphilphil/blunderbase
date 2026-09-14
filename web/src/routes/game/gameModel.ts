@@ -1119,28 +1119,36 @@ export function runFor(runs: GameRunSummary[], move: MoveRow | undefined): GameR
 }
 
 /**
- * The deepest tier that has finished over this game — what the header chip reports.
+ * The finished run that answers for this game — what the header chip reports.
  *
- * Maia fills are left out of it entirely. A fill is filed under the quick tier and carries
- * that tier's node budget on its row, but it searched nothing, so letting one win the
- * "newest run" contest would have the header claim the game was analysed at 250k nodes at
- * the moment the missing Maia levels landed.
+ * The same rule the backend merges evaluations by (`games` detail, `stats.primary_runs`,
+ * the explorer): a run somebody asked for beats an import pass, and among equals the
+ * later id wins. Ids rather than `finished_at`, because runs finish out of order — a
+ * requested run jumps the queue — and the chip must name the run whose numbers the moves
+ * actually show. A library analysed before one pass existed ranks the same way: its old
+ * deep runs carry the requested priority.
+ *
+ * Maia fills are left out of it entirely. A fill borrows the analysis pass's node budget on
+ * its row, but it searched nothing, so letting one win would have the header claim the
+ * game was analysed at that budget at the moment the missing Maia levels landed.
  */
 export function bestRun(runs: GameRunSummary[]): GameRunSummary | null {
-  const searched = runs.filter((run) => !run.maia_only)
-  const deep = searched.filter((run) => run.tier === 'deep')
-  const pool = deep.length > 0 ? deep : searched
-  return (
-    pool.reduce<GameRunSummary | null>((best, run) => {
+  return runs
+    .filter((run) => !run.maia_only)
+    .reduce<GameRunSummary | null>((best, run) => {
       if (!best) return run
-      return finishedAt(run) >= finishedAt(best) ? run : best
-    }, null) ?? null
-  )
+      return outranks(run, best) ? run : best
+    }, null)
 }
 
-function finishedAt(run: GameRunSummary): number {
-  const value = run.finished_at ? Date.parse(run.finished_at) : Number.NaN
-  return Number.isNaN(value) ? 0 : value
+/**
+ * `(requested, id)` compared as a tuple, ties to the challenger. Not folded into one number:
+ * an offset big enough to put every requested run above every import pass leaves too few
+ * bits below it, and neighbouring ids would land on the same double.
+ */
+function outranks(run: GameRunSummary, best: GameRunSummary): boolean {
+  if (Boolean(run.requested) !== Boolean(best.requested)) return Boolean(run.requested)
+  return run.id >= best.id
 }
 
 // --- recurring mistakes ---------------------------------------------------

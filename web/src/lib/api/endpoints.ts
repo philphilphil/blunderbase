@@ -37,6 +37,7 @@ import type {
   CorrespondenceRefresh,
   CorrespondenceSearch,
   CorrespondenceSearchCreate,
+  CorrespondenceSearchEngine,
   CorrespondenceSearchList,
   CorrespondenceState,
   CorrespondenceStatus,
@@ -118,8 +119,6 @@ import type {
   StreamResponse,
   StreamUpdate,
   TagCount,
-  Tier,
-  TierStatusResponse,
   TourState,
 } from './types'
 
@@ -298,37 +297,48 @@ export const putSyncSchedule = (body: SyncSchedule) =>
 
 // --- analysis -------------------------------------------------------------
 
+/**
+ * One run somebody asked for — the Analyse dialog's press. Always the requested priority;
+ * a refusal is a 409 `engine_unavailable` or a 422 naming the field.
+ */
 export const requestAnalysis = (body: AnalysisRequest) =>
   http.post<RunResponse>('/analysis', { body })
 
 /**
- * One pass over each of several games, in one call and one transaction. A game that
+ * The import pass over each of several games, in one call and one transaction. A game that
  * could not be queued comes back in `refused` rather than failing the rest of them.
  */
 export const requestAnalysisBatch = (body: BatchAnalysisRequest) =>
   http.post<BatchAnalysisResponse>('/analysis/batch', { body })
 
+/**
+ * The engines the Analyse dialog offers: every enabled UCI engine, the analysis role's
+ * marked `default`. The correspondence status's `engines` rows, so one picker reads both.
+ */
+export const listAnalysisEngines = () =>
+  http.get<CorrespondenceSearchEngine[]>('/analysis/engines')
+
 export const getQueue = () => http.get<QueueStatus>('/analysis/queue')
 
-/** How many games a backfill of this tier would take on, without taking any of them on. */
-export const getBackfill = (tier: Tier = 'quick') =>
-  http.get<BackfillPreview>('/analysis/backfill', { query: { tier } })
+/** How many games a backfill would take on, without taking any of them on. */
+export const getBackfill = () => http.get<BackfillPreview>('/analysis/backfill')
 
 /**
  * A pass over the whole library, in one call. Unlike `/analysis/batch` there is no cap and
  * no per-game receipt: the answer is a count, and the socket says `analysis.backfill` once
  * rather than once per game.
  */
-export const startBackfill = (tier: Tier = 'quick') =>
-  http.post<BackfillStarted>('/analysis/backfill', { body: { tier } })
-
-/** Drops what is still queued. Runs already on an engine are left to finish. */
-export const cancelBackfill = (tier: Tier = 'quick') =>
-  http.post<BackfillCancelled>('/analysis/backfill/cancel', { body: { tier } })
+export const startBackfill = () => http.post<BackfillStarted>('/analysis/backfill')
 
 /**
- * Drops everything still queued, whatever tier or shape it is queued in — the undo for a
- * queue built up by mistake. Runs already on an engine are left to finish.
+ * Drops the import passes still queued. Runs already on an engine are left to finish, and
+ * a run somebody asked for from a game stays — that is `clearQueue`'s job.
+ */
+export const cancelBackfill = () => http.post<BackfillCancelled>('/analysis/backfill/cancel')
+
+/**
+ * Drops everything still queued, whatever shape it is queued in — the undo for a queue
+ * built up by mistake. Runs already on an engine are left to finish.
  */
 export const clearQueue = () => http.post<QueueCleared>('/analysis/queue/clear')
 
@@ -343,7 +353,7 @@ export const resumeQueue = () => http.post<QueuePaused>('/analysis/queue/resume'
 
 /**
  * The whole library's analysis state in one call — what has been analysed with what, what
- * a backfill of each tier would queue, and what this deployment's own history says either
+ * a backfill would queue, and what this deployment's own history says it and the Maia fill
  * would cost. The Analysis page renders from nothing else.
  */
 export const getCoverage = () => http.get<AnalysisCoverage>('/analysis/coverage')
@@ -352,19 +362,16 @@ export const getCoverage = () => http.get<AnalysisCoverage>('/analysis/coverage'
  * Newest first. One of `gameId` and `status` has to be given: the backend refuses a
  * listing that narrows by neither rather than paging the whole run table.
  */
-export const listRuns = (
-  gameId?: number,
-  tier?: Tier,
-  query: { status?: RunStatus; limit?: number } = {},
-) =>
+export const listRuns = (gameId?: number, query: { status?: RunStatus; limit?: number } = {}) =>
   http.get<RunResponse[]>('/analysis/runs', {
-    query: { game_id: gameId, tier, status: query.status, limit: query.limit },
+    query: { game_id: gameId, status: query.status, limit: query.limit },
   })
 
 /**
- * Queue a fresh pass for every game behind a failed run — the one press that clears a few
- * hundred failures from a tier that had no engine on the day the library was imported.
- * No ids means every failure. 409 `tier_unavailable` when that tier still has no engine.
+ * Queue a fresh run for every game behind a failed one — the one press that clears a few
+ * hundred failures from a day the analysis role had no engine. Each keeps its failure's
+ * engine, limit, window and priority. No ids means every failure. 409 `engine_unavailable`
+ * when the engine still cannot run.
  */
 export const retryFailedRuns = (runIds?: number[]) =>
   http.post<RetryFailedReceipt>('/analysis/runs/retry-failed', {
@@ -553,24 +560,16 @@ export const deleteEngine = (id: number) => http.delete<EngineDeleteResult>(`/en
 export const probeEngine = (body: ProbeRequest) =>
   http.post<ProbeResponse>('/engines/probe', { body })
 
-export const listTierStatus = () => http.get<TierStatusResponse[]>('/engines/tiers')
-
-/**
- * What runs what: the engine assigned to each of the three roles, in one read.
- *
- * Supersedes `listTierStatus` for anything drawing the whole picture — human moves is a
- * role the tier list has no member for, and widening `Tier` to give it one would corrupt a
- * type the whole analysis pipeline stores on every run.
- */
+/** What runs what: the engine assigned to each of the two roles, in one read. */
 export const listEngineRoles = () => http.get<EngineRolesResponse>('/engines/roles')
 
 /**
  * Assign engines to roles. Only the keys that are sent are written, so the roles form saves
- * one dropdown without touching the other two, and `null` is how a role is emptied.
+ * one dropdown without touching the other, and `null` is how a role is emptied.
  *
- * The response is the whole assignment afterwards — every role's status, not just the ones
- * that changed — because switching Deep to an engine that is switched off changes nothing
- * about Quick but does change what the page has to say about Deep.
+ * The response is the whole assignment afterwards — every role's status, not just the one
+ * that changed — because the page redraws both from one answer rather than guessing what a
+ * write did to the role it did not name.
  */
 export const setEngineRoles = (body: EngineRolesUpdate) =>
   http.put<EngineRolesResponse>('/engines/roles', { body })
@@ -764,7 +763,7 @@ export const playCorrespondenceMove = (gameId: number, uci: string) =>
 export const undoCorrespondenceMove = (gameId: number) =>
   http.delete<CorrespondenceGameDetail>(`/correspondence/games/${gameId}/moves/last`)
 
-/** Queues the ordinary quick and deep passes and freezes the tree. */
+/** Queues the ordinary analysis pass and freezes the tree. */
 export const finishCorrespondenceGame = (gameId: number, body: CorrespondenceFinishRequest) =>
   http.post<CorrespondenceGameFinished>(`/correspondence/games/${gameId}/finish`, { body })
 

@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from backend.cli import main
 from backend.config import Settings
-from backend.db.enums import EngineKind, EngineRole, Platform, RunStatus, Tier
+from backend.db.enums import EngineKind, EngineRole, Platform, RunStatus
 from backend.db.models import (
     Account,
     AnalysisRun,
@@ -45,7 +45,6 @@ def _analyzed_source(settings: Settings, fixture: Path) -> tuple[int, int]:
         run = AnalysisRun(
             game_id=game.id,
             engine_id=engine.id,
-            tier=Tier.QUICK,
             status=RunStatus.DONE,
             depth=18,
             nodes=250_000,
@@ -88,7 +87,7 @@ def test_demo_database_copies_chess_facts_but_no_personal_data(
         as_of=date(2026, 8, 29),
     )
 
-    assert (summary.games, summary.analyzed, summary.deep, summary.notes) == (1, 1, 0, 9)
+    assert (summary.games, summary.analyzed, summary.notes) == (1, 1, 9)
     demo_settings = Settings(
         root=tmp_path,
         data_dir=tmp_path,
@@ -152,7 +151,7 @@ def test_demo_cli_reports_the_created_library(
 
     printed = capsys.readouterr().out
     assert f"demo database: {output}" in printed
-    assert "1 games, 1 analyzed, 0 deep, 9 notes" in printed
+    assert "1 games, 1 analyzed, 9 notes" in printed
     assert output.is_file()
 
 
@@ -177,7 +176,16 @@ def test_demo_owns_no_engine_and_every_game_arrives_analyzed(
             assert not engines_service.role_status(session, role).configured
         runs = session.scalars(select(AnalysisRun)).all()
         assert [run.engine_id for run in runs] == [None]
-        assert all(run.tier is Tier.QUICK and run.status is RunStatus.DONE for run in runs)
+        # An import pass's shape: no tier, a node budget and no fabricated depth limit.
+        assert all(
+            run.tier is None
+            and run.status is RunStatus.DONE
+            and run.priority == 0
+            and run.nodes is not None
+            and run.depth is None
+            and run.seconds is None
+            for run in runs
+        )
         assert {run.game_id for run in runs} == {game.id for game in session.scalars(select(Game))}
     assert "BLUNDERBASE_RUNTIME_MODE=demo" in capsys.readouterr().out
 

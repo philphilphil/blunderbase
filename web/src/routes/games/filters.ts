@@ -29,7 +29,9 @@ export interface LibraryFilters {
   opponent?: string
   has_blunders?: boolean
   analyzed?: boolean
-  deep_analyzed?: boolean
+  // No `deep_analyzed`: with one pass there is no deeper one to have or lack. An old link
+  // or saved cut that carries it is read without it (`filtersFromParams` drops what it does
+  // not know), never refused.
   text?: string
   /**
    * Whose games: `others` is the ones added from the reference books, `all` is both.
@@ -99,7 +101,6 @@ export function filtersFromParams(params: URLSearchParams): LibraryFilters {
     opponent: text(params.get('opponent')),
     has_blunders: bool(params.get('has_blunders')),
     analyzed: bool(params.get('analyzed')),
-    deep_analyzed: bool(params.get('deep_analyzed')),
     text: text(params.get('q')),
     whose: oneOf(params.get('whose'), WHOSE),
   })
@@ -168,7 +169,7 @@ export const GROUP_KEYS: Record<FilterGroup, (keyof LibraryFilters)[]> = {
   opening: ['eco'],
   time: ['speed', 'time_control'],
   opponent: ['opponent'],
-  analysis: ['has_blunders', 'analyzed', 'deep_analyzed'],
+  analysis: ['has_blunders', 'analyzed'],
 }
 
 export const FILTER_GROUPS: FilterGroup[] = [
@@ -248,9 +249,6 @@ export function groupSummary(group: FilterGroup, filters: LibraryFilters): strin
       }
       if (filters.analyzed !== undefined) {
         parts.push(filters.analyzed ? t`analysed` : t`unanalysed`)
-      }
-      if (filters.deep_analyzed !== undefined) {
-        parts.push(filters.deep_analyzed ? t`deep` : t`not deep`)
       }
       return parts.length ? parts.join(' · ') : null
     }

@@ -25,7 +25,7 @@ opens on that move. Empty means nothing analysed has gone badly wrong yet.
 ## Recent games
 
 The last twelve to arrive, newest first. Point at a row for the opening, the source and
-which pass has run over it; **All games** opens [Games](games.md).
+what has run over it; **All games** opens [Games](games.md).
 
 ## The analysis queue
 

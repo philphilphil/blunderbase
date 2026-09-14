@@ -26,7 +26,7 @@
  *
  * - A `stream_open` that arrives while a run is mid-analysis **waits for the slot and never
  *   touches the run**. `RunnerGateway.reserve_slot` has already taken the slot off that run
- *   — D6: a board is a person waiting, a deep pass can start again in a minute — and sent
+ *   — D6: a board is a person waiting, an analysis pass can start again in a minute — and sent
  *   it back to the queue with its attempt refunded, so the `run_cancel` is on its way and
  *   arrives just behind the `stream_open`. The tab's job is to let the position in flight
  *   finish (the cancel's `stop` brings its `bestmove` forward) and hand the slot over.
@@ -491,8 +491,8 @@ export class BrowserRunnerClient {
       path: ENGINE_PATH,
       version: engine.version,
       // No tier claimed, and the server would ignore one anyway: a runner cannot claim a
-      // job, because the owner assigns one engine to each of Quick, Deep and Human moves
-      // (`services.engines.EngineRole`). The field is still on the wire — `protocol.EngineAd`
+      // job, because the owner assigns one engine to each of the analysis and human-move
+      // roles (`services.engines.EngineRole`). The field is still on the wire — `protocol.EngineAd`
       // accepts and drops it — so a runner built before that keeps connecting; sending null
       // is this client saying the same thing the server already assumes.
       tier: null,

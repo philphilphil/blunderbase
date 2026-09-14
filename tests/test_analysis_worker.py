@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.adapters import stockfish
 from backend.config import MAIA_MAX_RATING, Settings
 from backend.db.base import Base
-from backend.db.enums import Classification, EngineKind, EngineRole, Platform, RunStatus, Tier
+from backend.db.enums import Classification, EngineKind, EngineRole, Platform, RunStatus
 from backend.db.models import Account, AnalysisRun, Engine, Game, MoveEval
 from backend.db.session import create_db_engine
 from backend.services import analysis, app_settings, import_service
@@ -213,7 +213,7 @@ async def _drain(settings: Settings, sessions: sessionmaker[Session], **kwargs: 
         await workers.stop()
 
 
-# --- the quick tier end to end --------------------------------------------
+# --- the import pass end to end -------------------------------------------
 
 
 async def test_a_quick_pass_evaluates_every_move_and_names_it(
@@ -229,7 +229,7 @@ async def test_a_quick_pass_evaluates_every_move_and_names_it(
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE
-    assert run.tier is Tier.QUICK
+    assert run.tier is None
     assert run.attempts == 1
     assert (run.error, run.stderr) == (None, None)
     assert run.finished_at is not None
@@ -359,16 +359,20 @@ async def test_a_finished_game_is_scored_without_asking_the_engine(
 async def test_importing_a_game_queues_a_pass_the_workers_can_actually_run(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
-    """Item six: the import's automatic quick run is a complete, runnable row."""
+    """Item six: the import's automatic pass is a complete, runnable row."""
     _register(db, tmp_path, go=QUICK_REPLIES)
     _import_game(db, fixtures_dir)
 
     with db() as session:
         queued = session.scalars(select(AnalysisRun)).one()
         assert queued.status is RunStatus.QUEUED
-        assert queued.nodes == app_settings.QUICK_NODES_DEFAULT
-        assert queued.multipv == 1
-        assert queued.priority == analysis.QUICK_PRIORITY
+        assert (queued.nodes, queued.depth, queued.seconds) == (
+            app_settings.ANALYSIS_NODES_DEFAULT,
+            None,
+            None,
+        )
+        assert queued.multipv == app_settings.ANALYSIS_MULTIPV_DEFAULT
+        assert queued.priority == analysis.IMPORT_PRIORITY
 
     await _drain(settings, db)
 
@@ -376,22 +380,20 @@ async def test_importing_a_game_queues_a_pass_the_workers_can_actually_run(
         assert session.scalars(select(AnalysisRun)).one().status is RunStatus.DONE
 
 
-# --- the deep tier --------------------------------------------------------
+# --- a requested run ------------------------------------------------------
 
 
-async def test_a_deep_pass_covers_only_its_ply_range_with_several_lines(
+async def test_a_requested_run_covers_only_its_ply_range_with_several_lines(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
     _register(db, tmp_path, go=DEEP_REPLIES)
     game = _import_game(db, fixtures_dir)
     with db() as session:
-        session.execute(select(AnalysisRun))  # the import's quick run
+        session.execute(select(AnalysisRun))  # the import's own pass
         session.query(AnalysisRun).delete()
         session.commit()
-        app_settings.set_value(session, app_settings.DEEP_NODES, 9000)
-        app_settings.set_value(session, app_settings.DEEP_MULTIPV, 3)
         deep = analysis.request_analysis(
-            session, game_id=game.id, tier=Tier.DEEP, ply_range=(2, 5)
+            session, game_id=game.id, nodes=9000, multipv=3, ply_range=(2, 5)
         )
         deep_id = deep.id
 
@@ -415,15 +417,15 @@ async def test_a_deep_pass_covers_only_its_ply_range_with_several_lines(
     ]
 
 
-async def test_a_deep_pass_jumps_ahead_of_a_queued_quick_one(
+async def test_a_requested_run_jumps_ahead_of_a_queued_import_pass(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
-    """One worker, two runs: the deep one is claimed first because someone is waiting."""
+    """One worker, two runs: the requested one is claimed first because someone is waiting."""
     _register(db, tmp_path, go_default=NEUTRAL_REPLY)
     game = _import_game(db, fixtures_dir)
     with db() as session:
         quick_id = session.scalars(select(AnalysisRun)).one().id
-        deep_id = analysis.request_analysis(session, game_id=game.id, tier=Tier.DEEP).id
+        deep_id = analysis.request_analysis(session, game_id=game.id, depth=8).id
 
     finished: list[int] = []
     cancel = analysis.subscribe(
@@ -464,7 +466,7 @@ async def test_a_crashed_engine_fails_the_run_with_its_last_words(
     assert run.error
     assert run.stderr is not None
     assert "illegal instruction" in run.stderr
-    # The game stays browsable with whatever tiers it has, which here is none.
+    # The game stays browsable with whatever runs it has, which here is none.
     assert stored.ply_count == 6
 
 
@@ -567,7 +569,7 @@ async def test_a_shutdown_hands_a_run_back_without_spending_its_retry(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
     """Stopping the process is not an attempt that failed. Counting it would let two
-    restarts during one long deep pass mark the run failed with no engine ever crashing."""
+    restarts during one long run mark the run failed with no engine ever crashing."""
     _register(db, tmp_path, go=[{**NEUTRAL_REPLY, "delay": 5}], go_default=NEUTRAL_REPLY)
     _import_game(db, fixtures_dir)
     workers = AnalysisWorkers(settings=settings, sessions=db, stop_grace=0.05)
@@ -631,13 +633,13 @@ async def test_an_engine_whose_binary_has_gone_is_failed_without_a_retry(
     assert "no longer at" in (run.error or "")
 
 
-async def test_an_engine_switched_off_after_enqueueing_hands_over_to_the_tiers_engine(
+async def test_an_engine_switched_off_after_enqueueing_hands_over_to_the_roles_engine(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
-    """Disabling an engine must not fail the runs already queued against it.
+    """Disabling an engine must not fail the import passes already queued against it.
 
-    What stands in is the engine the owner has assigned to the tier — here, the one they
-    moved the role to — and never merely the next one that happens to be registered.
+    What stands in is the engine the owner has assigned to the analysis role — here, the one
+    they moved the role to — and never merely the next one that happens to be registered.
     """
     first = _register(db, tmp_path, name="Old", go_default={"crash": True})
     _import_game(db, fixtures_dir)
@@ -645,7 +647,7 @@ async def test_an_engine_switched_off_after_enqueueing_hands_over_to_the_tiers_e
     with db() as session:
         session.get(Engine, first.id).enabled = False
         session.commit()
-        engines_service.set_role_engine(session, EngineRole.QUICK, replacement.id)
+        engines_service.set_role_engine(session, EngineRole.ANALYSIS, replacement.id)
 
     await _drain(settings, db)
 
@@ -659,7 +661,33 @@ async def test_an_engine_switched_off_after_enqueueing_hands_over_to_the_tiers_e
     assert len(rows) == 6
 
 
-async def test_nothing_stands_in_for_the_tiers_own_engine_when_it_is_switched_off(
+async def test_nothing_stands_in_for_a_requested_runs_engine_when_it_is_switched_off(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """A run somebody asked for named its engine; a result from another would answer a
+    different question. It fails naming the engine, even with the role moved elsewhere."""
+    first = _register(db, tmp_path, name="Old", go=QUICK_REPLIES)
+    game = _import_game(db, fixtures_dir)
+    replacement = _register(db, tmp_path, name="New", go_default=NEUTRAL_REPLY)
+    with db() as session:
+        session.query(AnalysisRun).delete()
+        session.commit()
+        requested = analysis.request_analysis(session, game_id=game.id, engine_id=first.id).id
+        session.get(Engine, first.id).enabled = False
+        session.commit()
+        engines_service.set_role_engine(session, EngineRole.ANALYSIS, replacement.id)
+
+    await _drain(settings, db)
+
+    with db() as session:
+        run = analysis.require_run(session, requested)
+
+    assert run.status is RunStatus.FAILED
+    assert run.attempts == 1, "the engine will not be back on a second try either"
+    assert "'Old', the engine this run was asked for, is switched off" in (run.error or "")
+
+
+async def test_nothing_stands_in_for_the_roles_own_engine_when_it_is_switched_off(
     db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
 ) -> None:
     """The owner's rule: no silent substitution. A second engine nobody assigned is not it."""
@@ -677,7 +705,7 @@ async def test_nothing_stands_in_for_the_tiers_own_engine_when_it_is_switched_of
 
     assert run.status is RunStatus.FAILED
     assert run.attempts == 1, "the assignment will not have changed on a second try either"
-    assert "'Old' is assigned to the quick tier and is switched off" in (run.error or "")
+    assert "'Old' is assigned to the analysis role and is switched off" in (run.error or "")
 
 
 # --- restart --------------------------------------------------------------
@@ -751,7 +779,7 @@ async def test_maia_predicts_a_human_move_at_the_default_level(
     await _drain(settings, db)
 
     with db() as session:
-        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(False))).one()
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE
@@ -791,7 +819,7 @@ async def test_a_target_elo_bakes_one_level_into_every_ply_of_both_sides(
     await _drain(settings, db)
 
     with db() as session:
-        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(False))).one()
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE
@@ -838,7 +866,7 @@ async def test_every_configured_level_is_baked_into_every_ply(
     await _drain(settings, db)
 
     with db() as session:
-        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(False))).one()
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE
@@ -856,7 +884,7 @@ async def test_a_run_queued_without_a_maia_pass_never_asks_the_model(
     Which is the saving: the process is never started and the pool slot is never taken.
     """
     with db() as session:
-        app_settings.set_value(session, app_settings.MAIA_ON_QUICK, 0)
+        app_settings.set_value(session, app_settings.MAIA_ON_ANALYSIS, 0)
     _register(db, tmp_path, go=QUICK_REPLIES)
     _register(db, tmp_path, kind=EngineKind.MAIA, name="Maia", go=_maia_script())
     _import_game(db, fixtures_dir)
@@ -864,7 +892,7 @@ async def test_a_run_queued_without_a_maia_pass_never_asks_the_model(
     await _drain(settings, db)
 
     with db() as session:
-        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(False))).one()
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE
@@ -929,7 +957,7 @@ async def test_a_maia_that_will_not_answer_degrades_instead_of_failing_the_run(
     await _drain(settings, db)
 
     with db() as session:
-        run = session.scalars(select(AnalysisRun).where(AnalysisRun.tier == Tier.QUICK)).one()
+        run = session.scalars(select(AnalysisRun).where(AnalysisRun.maia_only.is_(False))).one()
         rows = analysis.get_move_evals(session, run.id)
 
     assert run.status is RunStatus.DONE, "an evaluation is worth having without a policy"
@@ -1014,7 +1042,7 @@ async def test_the_workers_take_their_concurrency_cap_from_configuration(
 async def test_notify_wakes_a_worker_that_is_between_polls(
     db: sessionmaker[Session], tmp_path: Path, fixtures_dir: Path
 ) -> None:
-    """The API layer calls this after enqueueing so a deep pass does not wait for a poll."""
+    """The API layer calls this after enqueueing so a requested run does not wait for a poll."""
     settings = Settings(root=tmp_path, analysis_concurrency=1, analysis_poll_seconds=600.0)
     _register(db, tmp_path, go_default=NEUTRAL_REPLY)
     workers = AnalysisWorkers(settings=settings, sessions=db)
@@ -1086,13 +1114,13 @@ def test_the_demo_never_starts_a_local_position_engine(
     db: sessionmaker[Session], tmp_path: Path
 ) -> None:
     """Even a stale demo with a local engine row must never start that binary."""
-    from backend.services.engines import TierUnavailableError
+    from backend.services.engines import EngineUnavailableError
 
     log = tmp_path / "demo-commands.jsonl"
     _register(db, tmp_path, go_default=QUICK_REPLIES[0], log=str(log))
     demo = Settings(root=tmp_path, runtime_mode="demo")
 
-    with db() as session, pytest.raises(TierUnavailableError, match="does not run engines"):
+    with db() as session, pytest.raises(EngineUnavailableError, match="does not run engines"):
         analysis.analyze_position(session, START_FEN, 50_000_000, settings=demo)
 
     assert not log.exists()

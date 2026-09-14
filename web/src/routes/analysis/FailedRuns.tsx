@@ -1,4 +1,4 @@
-import type { I18n, MessageDescriptor } from '@lingui/core'
+import type { I18n } from '@lingui/core'
 import { msg, plural } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2, RotateCcw } from 'lucide-react'
@@ -7,8 +7,8 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
 import { useFailedRuns, useRetryFailed } from '@/lib/api/queries'
-import type { RunResponse, Tier } from '@/lib/api/types'
-import { TIER_STYLES } from '@/lib/chess/classification'
+import type { RunResponse } from '@/lib/api/types'
+import { RUN_STYLES, runKind, runLabel, type RunKind } from '@/lib/chess/classification'
 import { cn } from '@/lib/utils'
 import { formatCount } from '@/routes/games/format'
 // The same absolute stamp the sync history uses, and for the same reason: a list of
@@ -24,22 +24,33 @@ import { stamp } from '@/routes/import/format'
  *
  * Grouped by the message rather than listed run by run, because a few hundred failures are
  * almost never a few hundred problems — on the library this was built for, 372 of 382 share
- * one error string, which is one deployment mistake (a tier with no engine on the day the
- * import ran) repeated once per game. One row per message says that; 382 rows hide it.
+ * one error string, which is one deployment mistake (an analysis role with no engine on the
+ * day the import ran) repeated once per game. One row per message says that; 382 rows hide it.
  *
- * Retrying queues a *new* run per game under the tier that failed; the failed row stays,
- * because it is the record of what went wrong. The refusal worth naming is a 409: the tier
- * behind these failures still has no engine, so a retry would only fail again — and the
- * fix is a page away rather than in this listing.
+ * Retrying queues a *new* run per game with the failed run's own engine, limit, window and
+ * priority; the failed row stays, because it is the record of what went wrong. The refusal
+ * worth naming is a 409: the engine behind these failures still cannot run, so a retry
+ * would only fail again — and the fix is a page away rather than in this listing.
  */
 
 /** How many of a group's games are named before the rest become a count. */
 const NAMED_GAMES = 4
 
+/** What ran, as the run chip words it, and whether somebody had asked for it. */
+interface RunChip {
+  label: string
+  kind: RunKind
+}
+
 interface Group {
   message: string
   runs: RunResponse[]
-  tiers: Tier[]
+  /**
+   * The distinct kinds of run behind one message. One chip per shape rather than per run:
+   * a message shared by 500k import passes and one run somebody asked for at d30 is two
+   * facts, and both are worth seeing before pressing Retry.
+   */
+  chips: RunChip[]
 }
 
 /**
@@ -48,19 +59,16 @@ interface Group {
  * The engine's own text is passed through untranslated; only the stand-in for a run that
  * recorded nothing is ours to say, which is why the resolver comes in.
  */
-/** The tier as the lowercase chip word; `TIER_STYLES` carries the capitalised label. */
-const TIER_WORDS: Record<Tier, MessageDescriptor> = {
-  quick: msg`quick`,
-  deep: msg`deep`,
-}
-
 function groupByError(runs: RunResponse[], i18n: I18n): Group[] {
   const groups = new Map<string, Group>()
   for (const run of runs) {
     const message = run.error?.trim() || i18n._(msg`no message was recorded`)
-    const group = groups.get(message) ?? { message, runs: [], tiers: [] }
+    const group = groups.get(message) ?? { message, runs: [], chips: [] }
     group.runs.push(run)
-    if (!group.tiers.includes(run.tier)) group.tiers.push(run.tier)
+    const chip = { label: runLabel(run), kind: runKind(run) }
+    if (!group.chips.some((each) => each.label === chip.label && each.kind === chip.kind)) {
+      group.chips.push(chip)
+    }
     groups.set(message, group)
   }
   return [...groups.values()]
@@ -74,12 +82,12 @@ function RetryError({ error }: { error: Error }) {
     <p role="alert" className="text-[0.6875rem] leading-[1.5] text-blunder">
       {unavailable ? (
         <Trans>
-          Nothing was queued: the tier these runs failed under still has no engine that can
-          take them, so a retry would fail the same way.{' '}
+          Nothing was queued: the engine these runs failed on still cannot take them, so a
+          retry would fail the same way.{' '}
           <Link to="/compute/engines" className="text-accent-teal hover:text-accent-link">
             Register or enable an engine
           </Link>{' '}
-          for it first.
+          for them first.
         </Trans>
       ) : (
         error.message
@@ -163,15 +171,15 @@ export function FailedRuns({ failed }: { failed: number }) {
                   <span className="font-mono text-[0.65625rem] tabular text-blunder">
                     {`${formatCount(group.runs.length)}×`}
                   </span>
-                  {group.tiers.map((tier) => (
+                  {group.chips.map((chip) => (
                     <span
-                      key={tier}
+                      key={`${chip.kind}:${chip.label}`}
                       className={cn(
-                        'rounded-sm border px-1.5 py-px text-[0.59375rem]',
-                        TIER_STYLES[tier].chipClass,
+                        'rounded-sm border px-1.5 py-px text-[0.59375rem] whitespace-nowrap',
+                        RUN_STYLES[chip.kind].chipClass,
                       )}
                     >
-                      {i18n._(TIER_WORDS[tier])}
+                      {chip.label}
                     </span>
                   ))}
                   <span className="flex-1 text-[0.6875rem] leading-[1.45] text-body-3">

@@ -102,7 +102,7 @@ The engine binaries on **this** machine. Full guide: [Engines](engines.md).
 
 ```console
 $ blunderbase engines list
-$ blunderbase engines add sf-local stockfish --option Threads=4 --role quick --role deep
+$ blunderbase engines add sf-local stockfish --option Threads=4 --role analysis
 $ blunderbase engines remove sf-local
 ```
 
@@ -118,7 +118,7 @@ $ blunderbase engines remove sf-local
 |---|---|---|
 | `--kind` | `uci` | `uci` or `maia` |
 | `--option NAME=VALUE` | — | A UCI option, validated against what the binary declares. Repeatable |
-| `--role` | — | `quick`, `deep` or `human`, taken from whatever holds it. Repeatable. Without it, only unassigned roles are filled |
+| `--role` | — | `analysis` or `human`, taken from whatever holds it. Repeatable. Without it, only unassigned roles are filled |
 | `--replace` | off | Update the engine of this name instead of refusing, and enable it |
 | `--disabled` | off | Register it without switching it on |
 
@@ -129,18 +129,32 @@ database rather than a broker, so this is safe to run while the server is up and
 lost across a restart.
 
 ```console
-$ blunderbase analyze --tier deep --limit 50
-$ blunderbase analyze --fen "rn1qkb1r/..." --nodes 4000000
+$ blunderbase analyze --limit 50
+$ blunderbase analyze --game-id 812 --depth 24 --lines 3
+$ blunderbase analyze --fen "rn1qkb1r/..." --engine sf-local --seconds 30
 ```
+
+Without `--game-id` or `--fen` this is the backfill: the import pass over every game that
+has none, at the budget and line count set under **Analysis → Engine passes**, in the
+queue's own order. With either, it is a run you ask for, as **Analyse** on a game queues
+it: ahead of every import pass still waiting, on the engine, lines and limit the flags
+name. The flags from `--engine` to `--seconds` belong to that case only: given without
+`--game-id` or `--fen`, the command refuses them rather than queue a backfill that ignores
+them. `--nodes`,
+`--depth` and `--seconds` are one or the other: a search stopped at whichever of two limits
+came first would be neither number you typed. With none of the three, the run takes the
+stored node budget.
 
 | Flag | Default | What it does |
 |---|---|---|
 | `--game-id N` | every pending game | Analyse one game |
-| `--tier` | `quick` | `quick` or `deep` |
 | `--fen` | — | Analyse one position instead of a game |
-| `--ply-range START:END` | the whole game | The half-moves a deep pass should look at, end exclusive |
-| `--multipv N` | the stored setting | Lines to keep |
-| `--nodes N` | the stored setting | The per-position budget |
+| `--engine NAME` | the Analysis role's engine | The engine to run on, by name or id |
+| `--ply-range START:END` | the whole game | The half-moves to look at, end exclusive |
+| `--lines N` | the stored setting | Lines to keep, 1 to 5 |
+| `--nodes N` | the stored setting | Stop each move after N nodes |
+| `--depth N` | — | Stop each move at depth N |
+| `--seconds S` | — | Stop each move after S seconds |
 | `--limit N` | — | Queue at most N games |
 | `--queue-only` | off | Enqueue without running the workers |
 | `--timeout` | `3600` | Give up waiting after this many seconds |
@@ -209,7 +223,7 @@ $ blunderbase demo create --games 3000
 `blunderbase demo create` reads a varied sample of analysed games from the configured
 library and writes a separate database. It reconstructs PGN text without comments and
 fabricates every identifying detail; credentials and personal notes are never copied. Every
-game arrives with a completed Quick pass and the result carries no engine row, so nothing
+game arrives with a completed analysis pass and the result carries no engine row, so nothing
 ever has to run on the machine serving it.
 
 | Flag | Default | What it does |

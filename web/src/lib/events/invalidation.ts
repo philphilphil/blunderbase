@@ -18,7 +18,7 @@ import type { AnyEvent } from './types'
 export function invalidationsFor(event: AnyEvent): QueryKey[] {
   switch (event.event) {
     // A sync writes games, so the tables, the counts and the aggregates all move; every
-    // imported game is also enqueued for a quick pass, which the queue widget shows.
+    // imported game is also enqueued for an analysis pass, which the queue widget shows.
     case 'import.started':
     case 'import.game':
     case 'import.finished':
@@ -93,8 +93,9 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
 
     // A link coming or going changes where work can run: the runner rows, the backlog's
     // split between destinations, and the engines themselves — a disconnect flips
-    // `enabled` on that runner's rows and with it which tiers are available (`['engines']`
-    // is a prefix of `['engines', 'tiers']`).
+    // `enabled` on that runner's rows and with it whether a role's engine is available and
+    // what the Analyse dialog offers (`['engines']` is a prefix of `['engines', 'roles']`
+    // and `['engines', 'analysis']`).
     case 'runner.connected':
     case 'runner.disconnected':
       return [queryKeys.runners(), queryKeys.queue(), queryKeys.engines()]

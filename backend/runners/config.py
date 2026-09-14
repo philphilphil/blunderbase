@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, NoReturn
 from urllib.parse import urlsplit, urlunsplit
 
-from backend.runners.protocol import ENGINE_KINDS, TIERS
+from backend.runners.protocol import ENGINE_KINDS
 
 # Where the runner looks when no `--config` is given, and the three values a container is
 # most likely to want to set without rewriting a mounted file.
@@ -94,10 +94,8 @@ class EngineConfig:
     name: str
     path: str
     kind: str = UCI_KIND
-    # Accepted and ignored, and no longer documented as a thing to set: which engine serves
-    # which job is the owner's assignment on the server, not a claim this machine can make.
-    # A yaml that still carries `tier:` starts rather than being refused.
-    tier: str | None = None
+    # There is no `tier` here although a yaml may carry one: `_engine` accepts the key and
+    # drops it, so the advertisement sends none and a server of any age accepts the engine.
     options: dict[str, Any] = field(default_factory=dict)
     # None means "whatever this kind of engine can do"; a yaml may say otherwise.
     streams: bool | None = None
@@ -372,9 +370,8 @@ def _engine(source: str, index: int, entry: Any) -> EngineConfig:
     kind = str(entry.get("kind") or UCI_KIND).strip().lower()
     if kind not in ENGINE_KINDS:
         _refuse(source, f"{name}: kind is one of {', '.join(ENGINE_KINDS)}, not {kind!r}")
-    tier = entry.get("tier")
-    if tier is not None and str(tier) not in TIERS:
-        _refuse(source, f"{name}: tier is one of {', '.join(TIERS)}, not {tier!r}")
+    # `tier` is in ENGINE_KEYS so a yaml carrying it still starts, and is read no further:
+    # whatever it says, which engine serves which job is the owner's assignment on the server.
     options = entry.get("options") or {}
     if not isinstance(options, Mapping):
         _refuse(source, f"{name}: options is a mapping of UCI option names to values")
@@ -386,7 +383,6 @@ def _engine(source: str, index: int, entry: Any) -> EngineConfig:
         name=name,
         path=path,
         kind=kind,
-        tier=None if tier is None else str(tier),
         options=dict(options),
         streams=None if streams is None else _boolean(source, f"{name}.streams", streams,
                                                       default=True),

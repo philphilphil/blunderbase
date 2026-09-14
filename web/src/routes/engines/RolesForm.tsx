@@ -4,11 +4,16 @@
  * This was a read-only panel that reported whatever the backend had resolved. Nobody could
  * tell from it why an engine was doing a job, because nothing on the page had assigned it
  * one: the tier was a *preference* the resolution was free to fall back away from. There is
- * no resolution left. Three roles, three engine ids the owner picks here, and nothing falls
+ * no resolution left. Two roles, two engine ids the owner picks here, and nothing falls
  * back — so the panel that reported the answer is the form that writes it.
  *
+ * Two rather than one per kind of pass, because there is one pass: the Analysis role is the
+ * engine every import and backfill runs on and the one the game's Analyse dialog opens on.
+ * The dialog may still pick any enabled engine for one run, which is why this is a default
+ * and not a whitelist.
+ *
  * One `<select>` per role, listing only the engines whose kind can serve it: a search engine
- * for Quick and Deep, a human-move model for Human moves. Asking a Maia for an evaluation
+ * for Analysis, a human-move model for Human moves. Asking a Maia for an evaluation
  * would answer a policy where a score was wanted, and asking Stockfish for a human move
  * would answer the best move rather than the likely one — the backend refuses both, and a
  * dropdown that offered them would be offering a refusal.
@@ -73,12 +78,12 @@ function optionLabel(
 }
 
 /**
- * One of three equal-width answers to the same question.
+ * One of two equal-width answers to the same question.
  *
- * The label sits above the native select instead of taking width from it: three cards must
+ * The label sits above the native select instead of taking width from it: both cards must
  * remain readable in one line, including engine and host names. The reason wraps underneath;
  * the parent grid stretches every card to the same height, so one broken assignment cannot
- * turn the strip into three ragged rows.
+ * turn the strip into two ragged rows.
  */
 function RolePicker({
   status,
@@ -177,8 +182,7 @@ export function RolesForm({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-3 gap-2.5 max-md:grid-cols-1" data-testid="roles-loading">
-        <Skeleton className="h-12 w-full" />
+      <div className="grid grid-cols-2 gap-2.5 max-md:grid-cols-1" data-testid="roles-loading">
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-12 w-full" />
       </div>
@@ -209,8 +213,8 @@ export function RolesForm({
           role left empty simply does not run.
         </Trans>
       </p>
-      {/* One picker per row below `md`: a third of 375px cannot hold "Stockfish · nuc". */}
-      <div className="mt-1 grid grid-cols-3 gap-2.5 max-md:grid-cols-1">
+      {/* One picker per row below `md`: half of 375px cannot hold "Stockfish · nuc". */}
+      <div className="mt-1 grid grid-cols-2 gap-2.5 max-md:grid-cols-1">
         {ENGINE_ROLES.map((role) => {
           const status = byRole.get(role)
           if (!status) return null

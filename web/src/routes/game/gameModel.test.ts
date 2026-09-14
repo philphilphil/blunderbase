@@ -472,7 +472,7 @@ describe('formatResult', () => {
 })
 
 describe('runFor', () => {
-  const RUN: GameRunSummary = { id: 5, tier: 'deep', status: 'done' }
+  const RUN: GameRunSummary = { id: 5, requested: true, status: 'done' }
 
   it('leaves a ply without a run rather than handing back what it could not find', () => {
     // A run row can be gone while the moves it evaluated still carry its `run_id` — the
@@ -489,17 +489,30 @@ describe('bestRun', () => {
   function finished(overrides: Partial<GameRunSummary>): GameRunSummary {
     return {
       id: 1,
-      tier: 'quick',
+      requested: false,
       status: 'done',
       finished_at: '2026-01-01T00:00:00Z',
       ...overrides,
     }
   }
 
-  it('takes the newest run of the deepest tier', () => {
-    const older = finished({ id: 1, tier: 'deep', finished_at: '2026-01-01T00:00:00Z' })
-    const newer = finished({ id: 2, tier: 'deep', finished_at: '2026-02-01T00:00:00Z' })
-    expect(bestRun([older, newer, finished({ id: 3 })])?.id).toBe(2)
+  it('prefers a run somebody asked for, then the later id', () => {
+    // Ids, not finish times: a requested run jumps the queue and can finish before an
+    // import pass queued ahead of it, and the chip names the run the moves are showing.
+    const imported = finished({ id: 1, finished_at: '2026-03-01T00:00:00Z' })
+    const asked = finished({ id: 2, requested: true, finished_at: '2026-01-01T00:00:00Z' })
+    const askedLater = finished({ id: 3, requested: true, finished_at: '2026-02-01T00:00:00Z' })
+    const importedLater = finished({ id: 4, finished_at: '2026-04-01T00:00:00Z' })
+    expect(bestRun([imported, asked, askedLater, importedLater])?.id).toBe(3)
+    expect(bestRun([imported, importedLater])?.id).toBe(4)
+  })
+
+  it('keeps neighbouring large ids apart, in whatever order the rows come', () => {
+    // A rank folded into one double lost the last bit above 2^52; a tuple compare does not.
+    const older = finished({ id: 2 ** 40 + 2, requested: true })
+    const newer = finished({ id: 2 ** 40 + 3, requested: true })
+    expect(bestRun([newer, older])?.id).toBe(newer.id)
+    expect(bestRun([older, newer])?.id).toBe(newer.id)
   })
 
   it('never reports a Maia fill as the pass the game had', () => {

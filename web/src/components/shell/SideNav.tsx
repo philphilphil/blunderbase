@@ -21,21 +21,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import {
-  ChartNoAxesColumn,
-  Cpu,
-  Database,
-  Gauge,
-  LayoutDashboard,
-  Library,
-  Mail,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Radio,
-  Network,
-  StickyNote,
-  X,
-} from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import {
   createContext,
   Fragment,
@@ -50,6 +36,18 @@ import {
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { StatusDot } from '@/components/badges/StatusDot'
+import {
+  AnalysisIcon,
+  ComputeIcon,
+  CorrespondenceIcon,
+  DashboardIcon,
+  ExplorerIcon,
+  GamesIcon,
+  LibraryIcon,
+  LiveIcon,
+  NotesIcon,
+  StatsIcon,
+} from '@/components/icons/NavIcons'
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
   useAppSettings,
@@ -84,17 +82,17 @@ interface NavItem {
 }
 
 const WORKSPACE: NavItem[] = [
-  { to: '/', label: msg`Dashboard`, icon: LayoutDashboard, end: true },
-  { to: '/games', label: msg`Games`, icon: Library },
-  { to: '/explorer', label: msg`Explorer`, icon: Network },
+  { to: '/', label: msg`Dashboard`, icon: DashboardIcon, end: true },
+  { to: '/games', label: msg`Games`, icon: GamesIcon },
+  { to: '/explorer', label: msg`Explorer`, icon: ExplorerIcon },
   // The repertoire page (`/repertoire`) is routed but not listed: its base version is in
   // the code and still needs work before it is offered (issue #4). When it returns it goes
   // here, next to Openings and not under it — the explorer says what the owner *has*
   // played and the repertoire what they *mean* to play, a destination of its own rather
   // than a cut of the explorer's tree.
-  { to: '/stats', label: msg`Stats`, icon: ChartNoAxesColumn },
-  { to: '/notes', label: msg`Notes`, icon: StickyNote },
-  { to: '/live', label: msg`Live`, icon: Radio },
+  { to: '/stats', label: msg`Stats`, icon: StatsIcon },
+  { to: '/notes', label: msg`Notes`, icon: NotesIcon },
+  { to: '/live', label: msg`Live`, icon: LiveIcon },
 ]
 
 /**
@@ -103,15 +101,15 @@ const WORKSPACE: NavItem[] = [
  * that the list every reader of this file sees is the list every install has, and the one
  * conditional entry says so by standing apart.
  */
-const CORRESPONDENCE: NavItem = { to: '/correspondence', label: msg`Correspondence`, icon: Mail }
+const CORRESPONDENCE: NavItem = { to: '/correspondence', label: msg`Correspondence`, icon: CorrespondenceIcon }
 
 /**
  * The data itself, what has been run over it, and what runs it — in that order.
  */
 const DATA: NavItem[] = [
-  { to: '/library', label: msg`Library`, icon: Database },
-  { to: '/analysis', label: msg`Analysis`, icon: Gauge },
-  { to: '/compute', label: msg`Compute`, icon: Cpu },
+  { to: '/library', label: msg`Library`, icon: LibraryIcon },
+  { to: '/analysis', label: msg`Analysis`, icon: AnalysisIcon },
+  { to: '/compute', label: msg`Compute`, icon: ComputeIcon },
 ]
 
 /**

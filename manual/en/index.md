@@ -36,8 +36,8 @@ One chapter per entry in the app's sidebar, in the sidebar's order.
   the tree of candidate moves, finishing one. Off until you switch it on.
 - [Library](guide/library.md) — importing from Lichess, Chess.com, FICS and PGN, syncing on
   a clock, exporting, backing up, resetting.
-- [Analysis](guide/analysis.md) — coverage, quick and deep passes, Maia levels, what counts
-  as a blunder.
+- [Analysis](guide/analysis.md) — coverage, the import pass and asking for more, Maia levels,
+  what counts as a blunder.
 - Compute is the next entry in the sidebar, Engines and Machines; both are written up
   under Operate, in [Engines](operate/engines.md) and [Machines](operate/runners.md).
 - [Your AI assistant](guide/coach.md) — connecting an MCP client and what it can ask.
@@ -49,7 +49,7 @@ For whoever runs the installation.
 
 - [Install](operate/install.md) — Docker, the desktop applications, first run, signing in.
 - [Deploy](operate/deploy.md) — reverse proxy and TLS, the public URL, read-only mode.
-- [Engines](operate/engines.md) — Stockfish and Maia, the three roles, what a process costs.
+- [Engines](operate/engines.md) — Stockfish and Maia, the two roles, what a process costs.
 - [Machines](operate/runners.md) — how much runs at once, and engines on another machine.
 - [Configuration](operate/configuration.md) — every environment variable.
 - [Command line](operate/cli.md) — every command and flag.

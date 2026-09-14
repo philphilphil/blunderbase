@@ -9,9 +9,11 @@ import type { AnalysisCoverage } from '@/lib/api/types'
 /**
  * How much of the library has been analysed, and with what.
  *
- * The three buckets partition the library — a game has a deep pass, or a quick one and no
- * deep, or nothing — so the bar is honest as a whole rather than three bars that happen to
- * sit together, and the legend restates the same three numbers as counts and shares.
+ * The two buckets partition the library — a game has had an analysis pass, or nothing — so
+ * the bar is honest as a whole rather than two bars that happen to sit together, and the
+ * legend restates the same two numbers as counts and shares. There is no bucket for games
+ * somebody asked for more on: that is a choice made game by game in the Analyse dialog,
+ * not a gap in the library a backfill could close.
  *
  * The legend is not a caption. On the library this was built for one segment is 89% of the
  * bar and another is 4.8%, and a design that leaves the reading to the bar alone would say
@@ -24,27 +26,21 @@ import type { AnalysisCoverage } from '@/lib/api/types'
 const MIN_SEGMENT = '0.375rem'
 
 interface Bucket {
-  key: 'deep' | 'quick_only' | 'no_pass'
+  key: 'analysed' | 'no_pass'
   label: MessageDescriptor
   hint: MessageDescriptor
   barClass: string
 }
 
 /**
- * Deepest first, left to right: the bar reads as progress towards a fully analysed
- * library, so the most analysed bucket is the one that grows from the left.
+ * Analysed first, left to right: the bar reads as progress towards a fully analysed
+ * library, so that bucket is the one that grows from the left.
  */
 const BUCKETS: Bucket[] = [
   {
-    key: 'deep',
-    label: msg`Deep pass`,
-    hint: msg`a full deep pass, several lines a position`,
-    barClass: 'bg-deep',
-  },
-  {
-    key: 'quick_only',
-    label: msg`Quick only`,
-    hint: msg`the automatic pass on import, and no deep pass yet`,
+    key: 'analysed',
+    label: msg`Analysed`,
+    hint: msg`an engine has been over every move, on import or when asked`,
     barClass: 'bg-accent-teal',
   },
   {
@@ -104,7 +100,7 @@ export function CoverageSplit({ coverage }: { coverage: AnalysisCoverage }) {
         )}
       </div>
 
-      <dl className="grid gap-2 sm:grid-cols-3">
+      <dl className="grid gap-2 sm:grid-cols-2">
         {rows.map((row) => (
           <div key={row.key} className="flex flex-col gap-1">
             <dt className="flex items-center gap-1.5 text-[0.6875rem] text-soft">

@@ -64,7 +64,7 @@ describe('EnginesPage', () => {
   it('says nothing can be analysed when no engine is registered', async () => {
     stubFetch({
       '/api/engines': [],
-      '/api/engines/roles': roles(role({ role: 'quick' }), role({ role: 'deep' })),
+      '/api/engines/roles': roles(role({ role: 'analysis' })),
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
@@ -81,14 +81,14 @@ describe('EnginesPage', () => {
     })
     renderPage(<EnginesPage />)
 
-    // Verbatim: it is the sentence a deep run would fail with, and rewording it here would
+    // Verbatim: it is the sentence an analysis run would fail with, and rewording it here would
     // make the two look like two different problems.
     expect(
       await screen.findByText("'sf-remote' runs on 'gpu-box', which is not connected"),
     ).toBeInTheDocument()
   })
 
-  it('offers one picker per role, human moves beside the two tiers', async () => {
+  it('offers one picker per role, human moves beside analysis', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH, MAIA],
       '/api/engines/roles': roles(
@@ -107,29 +107,39 @@ describe('EnginesPage', () => {
     renderPage(<EnginesPage />)
 
     expect(await screen.findByText('What runs what')).toBeInTheDocument()
-    expect(screen.getByLabelText<HTMLSelectElement>('Quick')).toHaveValue('1')
-    expect(screen.getByLabelText<HTMLSelectElement>('Deep')).toHaveValue('7')
+    expect(screen.getByLabelText<HTMLSelectElement>('Analysis')).toHaveValue('7')
+    expect(screen.queryByLabelText('Quick')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Deep')).not.toBeInTheDocument()
     expect(screen.getByLabelText<HTMLSelectElement>('Human moves')).toHaveValue('2')
   })
 
   it('offers a role only the engines whose kind can serve it', async () => {
     stubFetch({
       '/api/engines': [STOCKFISH, MAIA],
-      '/api/engines/roles': ROLES,
+      '/api/engines/roles': roles(
+        role({
+          role: 'analysis',
+          engine_id: 1,
+          engine_name: 'stockfish',
+          available: true,
+          configured: true,
+          reason: null,
+        }),
+      ),
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
 
-    const quick = await screen.findByLabelText<HTMLSelectElement>('Quick')
+    const analysis = await screen.findByLabelText<HTMLSelectElement>('Analysis')
     // The engine, and where it lives — two engines of the same name on two machines is the
     // case this form exists for.
-    expect([...quick.options].map((option) => option.text)).toEqual([
+    expect([...analysis.options].map((option) => option.text)).toEqual([
       'Nothing assigned',
       'stockfish · local',
     ])
     // A human-move model answers with a policy rather than a search, so it is not offered
-    // for a tier; the backend refuses it, and a dropdown offering it offers a refusal. This
+    // for analysis; the backend refuses it, and a dropdown offering it offers a refusal. This
     // model is not in the status read, so there is no host to name beside it.
     const human = screen.getByLabelText<HTMLSelectElement>('Human moves')
     expect([...human.options].map((option) => option.text)).toEqual(['Nothing assigned', 'maia3'])
@@ -146,12 +156,12 @@ describe('EnginesPage', () => {
     })
     renderPage(<EnginesPage />)
 
-    const deep = await screen.findByLabelText<HTMLSelectElement>('Deep')
-    expect(deep).toHaveValue('7')
-    expect([...deep.options].map((option) => option.text)).toContain('sf-remote')
+    const analysis = await screen.findByLabelText<HTMLSelectElement>('Analysis')
+    expect(analysis).toHaveValue('7')
+    expect([...analysis.options].map((option) => option.text)).toContain('sf-remote')
   })
 
-  it('writes one role and leaves the other two out of the body', async () => {
+  it('writes one role and leaves the other out of the body', async () => {
     const fetchMock = stubFetch({
       '/api/engines': [STOCKFISH],
       '/api/engines/roles': ROLES,
@@ -160,12 +170,12 @@ describe('EnginesPage', () => {
     })
     renderPage(<EnginesPage />)
 
-    await userEvent.selectOptions(await screen.findByLabelText('Deep'), '1')
+    await userEvent.selectOptions(await screen.findByLabelText('Analysis'), '1')
 
     await waitFor(() => expect(requestedPaths(fetchMock)).toContain('/api/engines/roles'))
     const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')!
-    // Absence means "leave alone": saving one dropdown must not clear the other two.
-    expect(JSON.parse(String(put[1]?.body))).toEqual({ deep: 1 })
+    // Absence means "leave alone": saving one dropdown must not clear the other.
+    expect(JSON.parse(String(put[1]?.body))).toEqual({ analysis: 1 })
   })
 
   it('says in the form why an assignment was refused', async () => {
@@ -174,22 +184,22 @@ describe('EnginesPage', () => {
       '/api/engines/roles': ROLES,
       'PUT /api/engines/roles': {
         status: 422,
-        body: { error: 'invalid_engine', detail: 'no engine with id 1 to assign to the deep tier' },
+        body: { error: 'invalid_engine', detail: 'no engine with id 1 to assign to the analysis role' },
       },
       '/api/engines/probe': PROBE,
       '/api/runners/status': runnersStatus(),
     })
     renderPage(<EnginesPage />)
 
-    await userEvent.selectOptions(await screen.findByLabelText('Deep'), '1')
+    await userEvent.selectOptions(await screen.findByLabelText('Analysis'), '1')
 
     // It is a form, so it owns its errors: the refusal is read beside the select that
     // caused it, not in a toast that has gone by the time the owner looks up.
     expect(
-      await screen.findByText('no engine with id 1 to assign to the deep tier'),
+      await screen.findByText('no engine with id 1 to assign to the analysis role'),
     ).toBeInTheDocument()
     // And the select is back to what is actually stored.
-    expect(screen.getByLabelText<HTMLSelectElement>('Deep')).toHaveValue('7')
+    expect(screen.getByLabelText<HTMLSelectElement>('Analysis')).toHaveValue('7')
   })
 
   it('says calmly, not in red, that a deployment simply has no human-move model', async () => {
@@ -251,7 +261,7 @@ describe('EnginesPage', () => {
       '/api/engines': [STOCKFISH, { ...SF_REMOTE, id: 4, name: 'sf-spare' }],
       '/api/engines/roles': roles(
         role({
-          role: 'deep',
+          role: 'analysis',
           engine_id: 1,
           engine_name: 'stockfish',
           available: true,
@@ -264,7 +274,9 @@ describe('EnginesPage', () => {
     })
     renderPage(<EnginesPage />)
 
-    expect(await screen.findByText('Quick + Deep')).toBeInTheDocument()
+    // The picker's label says "Analysis" too; the roster chip is the one that is not a label.
+    const named = await screen.findAllByText('Analysis')
+    expect(named.some((element) => element.tagName !== 'LABEL')).toBe(true)
     expect(screen.getByTitle('Assigned to nothing right now')).toHaveTextContent('—')
   })
 

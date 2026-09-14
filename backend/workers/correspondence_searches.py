@@ -17,10 +17,10 @@ nothing here is lost across a restart, because `recover_at_boot` reads them back
 
 **A slot is one of the machine's engine slots, and the pool is where a warm process
 lives.** Every search holds one of the shared pool's permits from start to pause — the same
-permits the quick and deep passes and the analysis boards take, capped by **Queue
+permits the analysis runs and the analysis boards take, capped by **Queue
 processes** on the Machines page. There used to be a second cap, `correspondence_slots`,
 with a pool and a semaphore of its own, so that a days-long search could never take a slot
-the quick tier was counting on; it went because a search *is* visible — on the page, in
+the import pass was counting on; it went because a search *is* visible — on the page, in
 the capacity strip, on the Machines card — and one number an owner can see beats two they
 have to add. A search holding a slot means the queue waits; that is what the owner asked
 for. A fresh search takes its process from the pool (so the next search on the same engine
@@ -380,7 +380,7 @@ class CorrespondenceSearches:
         """The machine's warm processes — the analysis workers' pool, handed in by the app.
 
         Shared on purpose: a search is one more engine on this host, and the owner sees it
-        as one of the same slots the quick pass uses. A set built without one is given its
+        as one of the same slots the analysis pass uses. A set built without one is given its
         own at `start()`, sized by the same setting.
         """
         if self._pool is None:  # pragma: no cover - `start()` always makes one
@@ -774,8 +774,8 @@ class CorrespondenceSearches:
 
         Wakes on every runner event and on the owner's verbs; None means the owner spoke
         (pause, stop) rather than the runner, and the caller looks at the flags. A free
-        slot is taken without preempting: nobody is waiting at this search, and a deep
-        pass on that machine is not this search's to take away.
+        slot is taken without preempting: nobody is waiting at this search, and a run
+        on that machine is not this search's to take away.
         """
         gateway = self.gateway
         signal = run.signal

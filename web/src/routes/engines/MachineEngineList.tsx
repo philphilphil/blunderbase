@@ -4,7 +4,7 @@
  *
  * This is `RunnerCard`'s old `EngineRow`, moved out so the local host's detail can use the
  * same row without a `RunnerResponse` to hang it off. Roles are deliberately absent: a role
- * is a fact about the deployment's policy (which engine serves quick, which serves deep),
+ * is a fact about the deployment's policy (which engine analyses, which predicts human moves),
  * not about a machine, and belongs to the role strip at the top of the page.
  */
 import { Trans, useLingui } from '@lingui/react/macro'

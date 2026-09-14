@@ -1,7 +1,7 @@
 /**
  * The deployment's `AppSettings`, as the screens that edit a slice of it need them.
  *
- * Three screens own part of these values — Engine passes, Maia and Correspondence
+ * Three screens own part of these values — the Analysis pass, Maia and Correspondence
  * — and `PUT /settings` replaces the lot: an omitted field is a cleared one. So none of
  * them may send just what it edits, and `completeUpdate` is the one place that says what
  * "everything else, untouched" means. The rest is the reading and writing of a number in a
@@ -18,12 +18,10 @@ import { DEFAULT_MAIA_TARGET_ELO } from './types'
  */
 export const SETTING_DEFAULTS = {
   maia_target_elo: DEFAULT_MAIA_TARGET_ELO,
-  maia_on_quick: 1,
-  maia_on_deep: 0,
+  maia_on_analysis: 1,
   maia_both_sides: 1,
-  quick_nodes: 250_000,
-  deep_nodes: 2_000_000,
-  deep_multipv: 4,
+  analysis_nodes: 500_000,
+  analysis_multipv: 2,
   inaccuracy_threshold: 5,
   mistake_threshold: 10,
   blunder_threshold: 15,
@@ -54,16 +52,14 @@ export function completeUpdate(settings: AppSettings): AppSettingsUpdate {
   return {
     maia_target_elo: null,
     maia_elos: settings.maia_elos ?? [settings.maia_target_elo],
-    maia_on_quick: settings.maia_on_quick,
-    maia_on_deep: settings.maia_on_deep,
+    maia_on_analysis: settings.maia_on_analysis,
     maia_both_sides: settings.maia_both_sides,
-    quick_nodes: settings.quick_nodes,
-    deep_nodes: settings.deep_nodes,
-    deep_multipv: settings.deep_multipv,
+    analysis_nodes: settings.analysis_nodes,
+    analysis_multipv: settings.analysis_multipv,
     inaccuracy_threshold: settings.inaccuracy_threshold,
     mistake_threshold: settings.mistake_threshold,
     blunder_threshold: settings.blunder_threshold,
-    // Whether new games arrive with the engine hidden: the Engine passes page edits it, and
+    // Whether new games arrive with the engine hidden: the Analysis settings page edits it, and
     // every other form has to carry it or its next save would switch it off.
     hide_engine_new_games: settings.hide_engine_new_games ?? null,
     // Correspondence mode's five, and the machine's cap. A settings form that left them out would switch the

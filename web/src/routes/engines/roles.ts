@@ -5,12 +5,12 @@
  * a preference the backend was free to fall back away from, so a row that read its own tag
  * showed nothing while doing all the work, and the human-move half was guessed from "the
  * first enabled Maia per host" because no endpoint answered for a runner's model. Both are
- * gone. A role is now three engine ids the owner chose, `/engines/roles` says which, and
+ * gone. A role is now one of two engine ids the owner chose, `/engines/roles` says which, and
  * nothing falls back — so the map below is a transcription of that answer and never a
  * second opinion about it.
  *
  * The labels live here rather than in the badge because the roster, the detail card and the
- * roles form all name the same three jobs, and three spellings of "Human moves" is how the
+ * roles form all name the same two jobs, and three spellings of "Human moves" is how the
  * page stops agreeing with itself.
  */
 import { t } from '@lingui/core/macro'
@@ -31,15 +31,15 @@ export const NO_ROLE_LABEL = '—'
 
 /** One role in the words the whole Engines page uses for it. */
 export function roleName(role: EngineRoleName): string {
-  // `context` keeps these apart from `TierBadge`'s "Quick"/"Deep", which name a pass that
-  // happened rather than a job an engine holds — the distinction this file's header is about.
-  if (role === 'quick') return t({ message: 'Quick', context: 'engine role' })
-  if (role === 'deep') return t({ message: 'Deep', context: 'engine role' })
+  // `context` keeps "Analysis" apart from the page and rail entry of the same name, which is
+  // a screen rather than a job an engine holds — a translator may want two words for them.
+  if (role === 'analysis') return t({ message: 'Analysis', context: 'engine role' })
   return t({ message: 'Human moves', context: 'engine role' })
 }
 
 /**
- * The roles in words — `Quick + Deep`, `Deep`, `Human moves`, or an em dash.
+ * The roles in words — `Analysis`, `Human moves`, or an em dash. One engine seldom holds
+ * both, since the kinds differ, but the join stays so the wire cannot make a label lie.
  *
  * Written in `ENGINE_ROLES` order rather than the order they arrived in, so the wire cannot
  * change the words.

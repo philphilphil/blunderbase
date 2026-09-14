@@ -67,7 +67,7 @@ def list_games(session: SessionDep, state: str | None = None) -> Any:
     summary="Start a correspondence game",
 )
 def create_game(session: SessionDep, body: CorrespondenceGameCreate) -> Any:
-    """The game goes in through the ordinary import path, with no automatic quick pass."""
+    """The game goes in through the ordinary import path, with no automatic analysis pass."""
     return correspondence_service.create_game(
         session,
         white=body.white,
@@ -162,7 +162,7 @@ def undo_move(session: SessionDep, game_id: int) -> Any:
     summary="Record the result and hand the game to the library",
 )
 def finish_game(session: SessionDep, game_id: int, body: CorrespondenceFinish) -> Any:
-    """Queues the ordinary quick and deep passes, and freezes the tree."""
+    """Queues the ordinary analysis pass, and freezes the tree."""
     return correspondence_service.finish_game(
         session, game_id, result=body.result, termination=body.termination
     )

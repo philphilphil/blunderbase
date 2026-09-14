@@ -28,22 +28,34 @@ export interface BoardKeyHandlers {
   /** Open the box a move is typed into, or bring the caret back to it. */
   typeMove?: () => void
   boardSettings?: () => void
-  queueQuick?: () => void
-  queueDeep?: () => void
+  /** Open the Analyse… dialog. */
+  analyse?: () => void
   copyPgn?: () => void
-  toggleMoveTab?: () => void
+  /** Maia's compare grid on or off. */
+  maiaCompare?: () => void
+  /** The graph pane's Evaluation tab. */
+  graphEval?: () => void
+  /** The graph pane's Move time tab; unbound for a game played without a clock. */
+  graphTime?: () => void
+  /** The Book tab over the notes. */
+  bookTab?: () => void
   autoplay?: () => void
   previousGame?: () => void
   nextGame?: () => void
 }
 
 /**
- * Escape belongs to whatever is on top.
+ * The keyboard belongs to whatever is on top.
  *
  * The palette, the board settings and the password sheet all close on Escape and all
  * listen on `document`, which bubbles on to this listener on `window` — so without this
  * a reader dismissing a dialog would also be thrown out of the line they were walking,
- * having pressed one key and had two things happen. An open dialog takes the key.
+ * having pressed one key and had two things happen.
+ *
+ * And not only Escape. A dialog is made of buttons that are not inputs — the Analyse
+ * dialog's engine chips, its limit and move choices — so `isTyping` lets their keys
+ * through, and an arrow or an F pressed on one would move or flip the board hidden behind
+ * the dim. An open dialog takes every key.
  */
 function dialogOpen(): boolean {
   return document.querySelector('[role="dialog"]') !== null
@@ -121,7 +133,7 @@ export function useBoardKeys(handlers: BoardKeyHandlers, enabled = true): void {
       if (isTyping(event.target)) return
       const action = BOARD_KEYS.get(chordOf(event))
       if (!action) return
-      if (action === 'exit-line' && dialogOpen()) return
+      if (dialogOpen()) return
       if (
         PRESSES_A_CONTROL.has(event.key) &&
         driving.current === 'keyboard' &&
@@ -182,14 +194,18 @@ function run(action: BoardAction, keys: BoardKeyHandlers): boolean {
       return call(keys.typeMove)
     case 'board-settings':
       return call(keys.boardSettings)
-    case 'queue-quick':
-      return call(keys.queueQuick)
-    case 'queue-deep':
-      return call(keys.queueDeep)
+    case 'analyse':
+      return call(keys.analyse)
     case 'copy-pgn':
       return call(keys.copyPgn)
-    case 'toggle-move-tab':
-      return call(keys.toggleMoveTab)
+    case 'maia-compare':
+      return call(keys.maiaCompare)
+    case 'graph-eval':
+      return call(keys.graphEval)
+    case 'graph-time':
+      return call(keys.graphTime)
+    case 'book-tab':
+      return call(keys.bookTab)
     case 'autoplay':
       return call(keys.autoplay)
     case 'previous-game':

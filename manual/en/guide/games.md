@@ -15,7 +15,7 @@ own one group:
 | **Opening** | An ECO code, or a prefix — `C6` is every Caro-Kann from C60 to C69 |
 | **Time control** | A speed, and an exact clock such as `600+0` |
 | **Opponent** | Part of a name |
-| **Analysis** | Contains a blunder, any analysis done, deep pass done |
+| **Analysis** | Contains a blunder, any analysis done |
 
 The line above the table says how many games match. **Clear** next to it drops every chip
 at once, and a chip's own clear drops just that group.
@@ -33,8 +33,8 @@ of the PGN.
 ## Save a filter
 
 **Save filter** names the current filter and puts it in the rail under **Games**, with its
-count beside it. Three come with the app: **Losses as black**, **Blunders** and **No deep
-pass**. Hovering one you saved shows the × that forgets it.
+count beside it. Two come with the app: **Losses as black** and **Blunders**. Hovering one
+you saved shows the × that forgets it.
 
 ## Sort and page
 
@@ -48,8 +48,8 @@ count.
 `⇧E`, or the computer in the title bar, drops the **Worst** column and the flag badges from
 every row, so the table says what you played and not how well. A list left sorted by
 **Worst** falls back to newest first while it is on. The **Analysis** filter chips still
-work — a question you asked is not an answer you were handed — and **analyse** is still
-there on a game nothing has looked at. The whole of the mode is under
+work — a question you asked is not an answer you were handed — and the button that queues
+analysis is still there on a game nothing has looked at. The whole of the mode is under
 [Settings](settings.md#hide-the-engine).
 
 A row that shows an eye in the **Worst** column, with the rest of the table as ever, is a
@@ -59,9 +59,11 @@ engine** when you have read it.
 
 ## Act on several games at once
 
-Tick rows, or the box in the header for the whole page, and the footer offers **Queue quick
-analysis**, **Queue deep analysis**, **Delete** and **Clear selection**. What each pass
-costs is in [Analysis](analysis.md).
+Tick rows, or the box in the header for the whole page, and the footer offers **Queue
+analysis**, **Delete** and **Clear selection**. **Queue analysis** gives each game the
+import pass, at the budget and in the place in the queue every imported game gets; a
+deeper look at one game is **Analyse** on the game itself. What a pass costs is in
+[Analysis](analysis.md#which-pass-does-a-game-get).
 
 ## Delete games
 

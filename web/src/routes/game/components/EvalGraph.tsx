@@ -116,8 +116,16 @@ export function EvalGraph({
   onSelectPly,
   scrub = false,
   time,
+  tab: controlledTab,
+  onTabChange,
   className,
 }: {
+  /**
+   * Which reading is up, when the page holds it — the game view does, so `V` and `T` can
+   * switch it from the keyboard. Left out, the pane keeps its own.
+   */
+  tab?: GraphTab
+  onTabChange?: (tab: GraphTab) => void
   points: CurvePoint[]
   plyCount: number
   /**
@@ -166,10 +174,12 @@ export function EvalGraph({
   // markers without changing the two-player tallies on the header line.
   const [onlyMine, setOnlyMine] = useState(true)
   const markedSide = onlyMine && ownerSide ? ownerSide : null
-  // Which reading is up. Only offered where the clock has something to say, and held
-  // here rather than on the page: switching it changes nothing outside this pane.
+  // Which reading is up. Only offered where the clock has something to say. Switching it
+  // changes nothing outside this pane, but the game view holds it anyway so a key can.
   const timed = (time?.points.length ?? 0) > 0
-  const [tab, setTab] = useState<GraphTab>('eval')
+  const [ownTab, setOwnTab] = useState<GraphTab>('eval')
+  const tab = controlledTab ?? ownTab
+  const setTab = (next: GraphTab) => (onTabChange ? onTabChange(next) : setOwnTab(next))
   const onTime = timed && tab === 'time'
   const { t } = useLingui()
 

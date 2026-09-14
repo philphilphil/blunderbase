@@ -32,10 +32,9 @@ function json(status: number, body: unknown) {
 /** The owner's library, as `/analysis/coverage` reports it. */
 const OWNERS_LIBRARY: AnalysisCoverage = {
   total: 7714,
+  analysed: 835,
   no_pass: 6879,
-  quick_only: 374,
-  deep: 461,
-  missing: { quick: 6879, deep: 7253 },
+  missing: 6879,
   failed: 382,
   maia: {
     configured: [1700],
@@ -45,8 +44,7 @@ const OWNERS_LIBRARY: AnalysisCoverage = {
     orphan_levels: [{ elo: 1234, games: 1 }],
   },
   estimates: {
-    quick_seconds: 12 * 3600,
-    deep_seconds: 160 * 3600,
+    analysis_seconds: 12 * 3600,
     maia_seconds: 40 * 60,
     concurrency: 4,
   },
@@ -130,11 +128,11 @@ describe('AnalysisPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('offers all four library-wide passes', async () => {
+  it('offers all three library-wide actions', async () => {
     draw()
 
-    await screen.findByText('6,879')
-    for (const name of [/backfill quick/i, /backfill deep/i, /fill missing levels/i, /clear the queue/i]) {
+    await screen.findByText('6,879 games')
+    for (const name of [/^backfill$/i, /fill missing levels/i, /clear the queue/i]) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
     // Said once, where the estimates are, rather than beside each of them.

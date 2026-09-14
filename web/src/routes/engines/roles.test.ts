@@ -20,15 +20,12 @@ function roles(...statuses: EngineRoleStatus[]): EngineRolesResponse {
 }
 
 describe('roleLabel', () => {
-  it('names both tiers when one engine holds both', () => {
-    expect(roleLabel(['quick', 'deep'])).toBe('Quick + Deep')
-    // Order on the wire must not change the words.
-    expect(roleLabel(['deep', 'quick'])).toBe('Quick + Deep')
+  it('writes both roles in their own order, whatever order the wire sent', () => {
+    expect(roleLabel(['human', 'analysis'])).toBe('Analysis + Human moves')
   })
 
   it('names one role, or a visible nothing', () => {
-    expect(roleLabel(['deep'])).toBe('Deep')
-    expect(roleLabel(['quick'])).toBe('Quick')
+    expect(roleLabel(['analysis'])).toBe('Analysis')
     expect(roleLabel(['human'])).toBe('Human moves')
     expect(roleLabel(NO_ROLES)).toBe(NO_ROLE_LABEL)
     expect(NO_ROLE_LABEL).toBe('—')
@@ -39,19 +36,18 @@ describe('engineRoles', () => {
   it('gives one engine every role it was assigned to', () => {
     const map = engineRoles(
       roles(
-        status({ role: 'quick', engine_id: 1, engine_name: 'stockfish', available: true, configured: true }),
-        status({ role: 'deep', engine_id: 1, engine_name: 'stockfish', available: true, configured: true }),
+        status({ role: 'analysis', engine_id: 1, engine_name: 'stockfish', available: true, configured: true }),
         status({ role: 'human', engine_id: 2, engine_name: 'maia3', available: true, configured: true }),
       ),
     )
 
-    expect(roleLabel(map.get(1) ?? NO_ROLES)).toBe('Quick + Deep')
+    expect(roleLabel(map.get(1) ?? NO_ROLES)).toBe('Analysis')
     expect(roleLabel(map.get(2) ?? NO_ROLES)).toBe('Human moves')
   })
 
   it('leaves an engine nobody assigned out of the map', () => {
     const map = engineRoles(
-      roles(status({ role: 'quick', engine_id: 1, engine_name: 'stockfish', available: true, configured: true })),
+      roles(status({ role: 'analysis', engine_id: 1, engine_name: 'stockfish', available: true, configured: true })),
     )
 
     expect(map.get(4)).toBeUndefined()
@@ -62,7 +58,7 @@ describe('engineRoles', () => {
     const map = engineRoles(
       roles(
         status({
-          role: 'deep',
+          role: 'analysis',
           engine_id: 3,
           engine_name: 'sf-remote',
           configured: true,
@@ -71,7 +67,7 @@ describe('engineRoles', () => {
       ),
     )
 
-    expect(roleLabel(map.get(3) ?? NO_ROLES)).toBe('Deep')
+    expect(roleLabel(map.get(3) ?? NO_ROLES)).toBe('Analysis')
   })
 
   it('maps nothing before the read has landed, and nothing for an empty role', () => {

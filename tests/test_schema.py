@@ -18,7 +18,6 @@ from backend.db.enums import (
     RunStatus,
     Source,
     Speed,
-    Tier,
 )
 from backend.db.models import (
     Account,
@@ -102,7 +101,6 @@ def seed(session: Session) -> dict[str, int]:
     run = AnalysisRun(
         game_id=game.id,
         engine_id=engine.id,
-        tier=Tier.QUICK,
         status=RunStatus.DONE,
         nodes=50_000,
         multipv=1,

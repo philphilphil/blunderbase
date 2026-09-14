@@ -29,7 +29,7 @@ describe('invalidationsFor — import', () => {
     expect(has(keys, queryKeys.stats())).toBe(true)
   })
 
-  it('touches the queue, because an imported game is enqueued for a quick pass', () => {
+  it('touches the queue, because an imported game is enqueued for an analysis pass', () => {
     expect(has(invalidationsFor({ ...started, event: 'import.game' }), queryKeys.queue())).toBe(
       true,
     )
@@ -43,7 +43,7 @@ describe('invalidationsFor — import', () => {
 })
 
 describe('invalidationsFor — analysis lifecycle', () => {
-  const base = { run_id: 9, game_id: 4, tier: 'quick' as const, status: 'queued' as const }
+  const base = { run_id: 9, game_id: 4, nodes: 500_000, requested: false, status: 'queued' as const }
 
   it('refetches the analysis rows and the queue widget when a run is queued or starts', () => {
     for (const event of ['analysis.queued', 'analysis.running'] as const) {
@@ -186,7 +186,7 @@ describe('invalidationsFor — runners', () => {
       const keys = invalidationsFor({ ...connected, event })
       expect(has(keys, queryKeys.runners())).toBe(true)
       expect(has(keys, queryKeys.queue())).toBe(true)
-      // A disconnect flips `enabled` on that runner's rows, and with it which tiers can run.
+      // A disconnect flips `enabled` on that runner's rows, and with it whether a role's engine can run.
       expect(has(keys, queryKeys.engines())).toBe(true)
     }
   })

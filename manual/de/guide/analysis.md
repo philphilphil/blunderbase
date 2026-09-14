@@ -5,19 +5,41 @@
 |  | Stockfish | Maia |
 |---|---|---|
 | fragt | was der beste Zug ist | was ein Mensch auf den gewählten Spielstärken ziehen würde |
-| rechnet | das Knotenbudget, das du je Stufe festlegst (voreingestellt 250k schnell, 2M tief) | ein Blick, keine Suche |
-| liefert | eine Variante nach der Schnellanalyse; nach der Tiefenanalyse so viele, wie du behältst (voreingestellt 4) | fünf Züge je Spielstärke, jeder mit Wahrscheinlichkeit |
+| rechnet | beim Import das Knotenbudget, das du festlegst (voreingestellt 500k); bei einer Analyse, die du anforderst, die Sekunden, die Tiefe oder die Knoten, die du wählst | ein Blick, keine Suche |
+| liefert | so viele Varianten, wie der Durchlauf behält (voreingestellt 2, höchstens 5) | fünf Züge je Spielstärke, jeder mit Wahrscheinlichkeit |
 | Varianten? | ja | nie |
 
-Jede Zahl in dieser Tabelle ist eine Einstellung: Budgets und Variantenzahl unter **Analyse
+Jede Zahl in dieser Tabelle ist eine Einstellung: Budget und Variantenzahl unter **Analyse
 → Engine-Durchläufe**, die Spielstärken unter **Analyse → Maia**.
 
-## Schnell oder tief?
+## Welche Analyse bekommt eine Partie? { #which-pass-does-a-game-get }
 
-Die Schnellanalyse läuft beim Import automatisch. Die Tiefenanalyse startest du selbst, und
-sie wird in der Warteschlange vorgezogen. Du reihst sie aus einer Partie mit `Q` und `D`
-ein oder über ausgewählte Zeilen unter **Partien**. Hat eine Partie eine Tiefenanalyse, wird
-sie daraus gelesen und nicht mehr aus der Schnellanalyse.
+Jede Partie, die ankommt, bekommt die Importanalyse: die Engine mit der Rolle **Analyse**,
+Knotenbudget und Variantenzahl aus **Engine-Durchläufe**, in der Reihenfolge der
+Warteschlange. Ausgewählte Zeilen unter **Partien** bekommen dasselbe über **Analyse
+einreihen**.
+
+Reicht dir das nicht, öffne die Partie und drück **Analysieren** (oder `A`). Du wählst die
+Engine, die Zahl der Varianten, wann jeder Zug endet – nach so vielen Sekunden, bei einer
+Tiefe oder nach so vielen Knoten – und ob ein Zug, alles ab einem Zug oder die ganze Partie
+angesehen wird; den Dialog beschreibt [Eine Partie analysieren](game.md#ask-for-a-deeper-look).
+Was du anforderst, zieht an jeder Importanalyse vorbei, die noch wartet.
+
+Woraus eine Partie gelesen wird:
+
+- Eine angeforderte Analyse schlägt die Importanalyse, egal welche später fertig wurde.
+  Zwischen zwei Analysen derselben Art gewinnt die neuere.
+- Eine Analyse über die ganze Partie gilt für die ganze Partie, Statistiken
+  eingeschlossen. Eine Analyse über einen Teil gilt nur für diese Züge; den Rest liefert
+  die Analyse darunter.
+- Die Markierung in der Leiste über der Partie sagt, was gelaufen ist: `d24 · 2 Varianten`,
+  `10s · 2 Varianten`, `500k · 2 Varianten`. Eine angeforderte Analyse ist farbig, die
+  Importanalyse schlicht. Die Zeile der Partie unter **Partien** sagt nur
+  **Analysiert** – farbig, sobald eine angeforderte Analyse darunter ist.
+
+Eine Grenze in Sekunden hängt vom Rechner ab: Zehn Sekunden auf einem schnellen Server und
+zehn Sekunden in einem Browser-Tab sind nicht dieselbe Suche. Tiefe und Knoten bedeuten
+überall dasselbe.
 
 ## Was hat ein Zug gekostet?
 
@@ -32,15 +54,22 @@ Gewinnprozent vor dem Zug minus Gewinnprozent danach. Die voreingestellten Schwe
 ## Was ist noch zu analysieren? { #what-is-left-to-analyse }
 
 **Analyse → Abdeckung** zeigt, wie viel der Bibliothek eine Engine schon gesehen hat und was
-der Rest kosten würde. **Schnellanalyse nachtragen** und **Tiefenanalyse nachtragen** reihen
-den Rest ein; Partien, die diese Stufe schon haben, werden übersprungen. **Fehlende Stufen
-nachtragen** tut dasselbe für Maia. **Warteschlange leeren** leert sie, und
-**Fehlgeschlagene Durchläufe** listet auf, was du wiederholen kannst.
+der Rest kosten würde. **Nachtragen** reiht die Importanalyse für jede Partie ein, die
+noch keine Analyse hat; Partien, die schon eine haben, werden übersprungen. Bei einer
+großen Bibliothek auf einem langsamen Server dauert das lange – dafür steht die Schätzung
+auf der Karte. **Fehlende Stufen nachtragen** tut dasselbe für Maia. **Warteschlange
+leeren** leert sie, und **Fehlgeschlagene Durchläufe** listet auf, was du wiederholen
+kannst; eine Wiederholung läuft mit derselben Engine, Grenze, Zugauswahl und Variantenzahl
+wie der fehlgeschlagene Versuch.
 
 ## Wie viel rechnet ein Durchlauf? { #how-much-work-does-a-pass-do }
 
-**Analyse → Engine-Durchläufe** legt das Knotenbudget jeder Stufe fest, wie viele Varianten
-eine Tiefenanalyse behält und die drei Schwellen von oben.
+**Analyse → Engine-Durchläufe → Analysedurchlauf** legt das Knotenbudget der Importanalyse
+fest (voreingestellt 500.000), wie viele Varianten sie behält (1 bis 5, voreingestellt
+zwei) und die drei Schwellen von oben. Budget und Variantenzahl werden beim Einreihen auf
+den Durchlauf kopiert; eine Änderung gilt also für den nächsten. Von hier nimmt auch
+**Analysieren** seine Knotenzahl, wenn du Knoten wählst, und die Variantenzahl, solange du
+keine eintippst.
 
 ## Die Engine bei neuen Partien ausblenden { #hide-the-engine-on-new-games }
 
@@ -58,8 +87,9 @@ gespeichert wird.
 ## Was wird Maia gefragt? { #what-is-maia-asked }
 
 **Analyse → Maia** legt fest, welche Spielstärken gefragt werden – bis zu fünf Wertungen
-zwischen 1100 und 2000, eine frische Installation fragt nur 2000 –, ob Maia bei
-Schnellanalysen, Tiefenanalysen oder beiden mitläuft, und **Nach beiden Seiten fragen**:
+zwischen 1100 und 2000, eine frische Installation fragt nur 2000 –, **Maia beim
+Analysedurchlauf** – voreingestellt an; dann schaut Maia bei jedem Durchlauf mit, bei der
+Importanalyse wie bei denen, die du anforderst – und **Nach beiden Seiten fragen**:
 aus betrachtet nur deine Züge, an sagt auch die des Gegners voraus. Eine Variante liefert
 Maia nie: ein Blick ohne Suche ergibt eine Verteilung von Zügen, keine Fortsetzung. Ein
 *Nachtrag* ergänzt fehlende Spielstärken bei einer Partie, die schon eine Bewertung hat.
@@ -82,7 +112,7 @@ nicht in der Seitenleiste, und seine Seiten schicken dich zur Übersicht zurück
 Eine Engine-Einstellung gibt es nicht: Welche Engine sucht oder eine Aufgabe abarbeitet,
 wählst du an der Stellung, im Dialog, aus allen eingeschalteten Engines – siehe
 [Eine Stellung rechnen lassen](correspondence.md#search-a-position). Vorgeschlagen wird die
-Engine mit der Rolle **Tiefenanalyse**. Und es gibt hier keine Platzzahl: Wie viele Suchen
+Engine mit der Rolle **Analyse**. Und es gibt hier keine Platzzahl: Wie viele Suchen
 dieser Rechner gleichzeitig laufen lässt, ist eine Eigenschaft der Maschine, eingestellt
 neben der Obergrenze der Warteschlange unter
 [Maschinen](../operate/runners.md#how-much-at-once).

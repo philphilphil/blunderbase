@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from backend.db.enums import (
     Classification,
@@ -28,7 +28,6 @@ from backend.db.enums import (
     Result,
     RunStatus,
     Source,
-    Tier,
 )
 from backend.runtime import RuntimeCapabilities
 
@@ -96,9 +95,9 @@ class PasswordChange(Input):
 
 
 class AppSettings(BaseModel):
-    """Everything the Engine passes and Maia pages show.
+    """Everything the Analysis pass and Maia sections show.
 
-    Nine of them are nullable, and null is never "not loaded yet" — it is the deployment
+    Most of them are nullable, and null is never "not loaded yet" — it is the deployment
     saying nobody has set this one, and what is in force is the default
     `services.app_settings` names, which is why the page can show that default under an
     empty box rather than pretending to a value.
@@ -117,26 +116,21 @@ class AppSettings(BaseModel):
         default_factory=list,
         description="every rating Maia is asked at, lowest first",
     )
-    maia_on_quick: int | None = Field(
-        default=None, description="1 if a quick pass also asks the human-move model"
-    )
-    maia_on_deep: int | None = Field(
-        default=None,
-        description="1 if a deep pass also asks the human-move model; off by default, "
-        "because it would recompute the policy the quick pass already stored",
+    maia_on_analysis: int | None = Field(
+        default=None, description="1 if an analysis pass also asks the human-move model"
     )
     maia_both_sides: int | None = Field(
         default=None,
         description="1 to ask Maia about every ply, 0 for the owner's own moves only",
     )
-    quick_nodes: int | None = Field(
-        default=None, description="nodes per position in the automatic pass on import"
+    analysis_nodes: int | None = Field(
+        default=None,
+        description="nodes per position in the analysis pass on import and backfill, and "
+        "the nodes limit a requested run starts from",
     )
-    deep_nodes: int | None = Field(
-        default=None, description="nodes per position in a deep pass someone is waiting on"
-    )
-    deep_multipv: int | None = Field(
-        default=None, description="how many lines a deep pass keeps per position"
+    analysis_multipv: int | None = Field(
+        default=None,
+        description="how many lines an analysis pass keeps per position, 1 to 5",
     )
     inaccuracy_threshold: float | None = Field(
         default=None, description="win-percentage points lost that make a move an inaccuracy"
@@ -199,19 +193,15 @@ class AppSettingsUpdate(Input):
         description="one to five ratings; a longer list keeps the lowest, out of range is "
         "clamped, and null clears them back to the default",
     )
-    maia_on_quick: int | None = Field(
-        default=None, description="1 if a quick pass also asks the human-move model"
-    )
-    maia_on_deep: int | None = Field(
-        default=None, description="1 if a deep pass also asks the human-move model"
+    maia_on_analysis: int | None = Field(
+        default=None, description="1 if an analysis pass also asks the human-move model"
     )
     maia_both_sides: int | None = Field(
         default=None,
         description="1 to ask Maia about every ply, 0 for the owner's own moves only",
     )
-    quick_nodes: int | None = None
-    deep_nodes: int | None = None
-    deep_multipv: int | None = None
+    analysis_nodes: int | None = None
+    analysis_multipv: int | None = None
     inaccuracy_threshold: float | None = None
     mistake_threshold: float | None = None
     blunder_threshold: float | None = None
@@ -318,7 +308,8 @@ class GameCard(GameSummary):
     """A summary plus the eval curve and the worst moments, for a dashboard strip."""
 
     analyzed: bool = False
-    deep: bool = False
+    # A run somebody asked for — whole game or a window — is done over this game.
+    requested: bool = False
     eval_curve: list[dict[str, Any]] = Field(default_factory=list)
     worst_moments: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -586,7 +577,7 @@ class ImportRequest(Input):
     since: str | None = Field(default=None, description="resume from this cursor")
     max_games: int | None = Field(default=None, ge=1)
     analyze: bool = Field(
-        default=True, description="queue a quick pass over each game as it lands"
+        default=True, description="queue the analysis pass over each game as it lands"
     )
     mine: bool = Field(
         default=True,
@@ -664,32 +655,49 @@ class ImportCancelling(BaseModel):
 
 
 class AnalysisRequest(Input):
-    """Enqueue one pass. Exactly one of `game_id` and `fen`."""
+    """Ask for one run, the way the game's Analyse dialog does. Exactly one of `game_id` and `fen`.
+
+    Always a requested run: it jumps the import queue, and there is no priority to pass
+    because nothing a person asks for from here should wait behind a backfill. The run
+    stops each move at one limit — `nodes`, `depth` or `seconds` — and giving none takes
+    the `analysis_nodes` setting; giving two is refused, because a search that stops at
+    whichever comes first is not what either number on the dialog promised.
+    """
 
     game_id: int | None = None
     fen: str | None = None
-    tier: Tier = Tier.QUICK
     ply_start: int | None = Field(default=None, ge=0)
     ply_end: int | None = Field(default=None, ge=0)
-    engine_id: int | None = None
-    multipv: int | None = Field(default=None, ge=1)
-    nodes: int | None = Field(default=None, ge=1)
-    depth: int | None = Field(default=None, ge=1)
-    priority: int | None = None
+    engine_id: int | None = Field(
+        default=None, description="any enabled UCI engine; omitted, the analysis role's"
+    )
+    multipv: int | None = Field(
+        default=None, ge=1, le=5, description="lines kept per position; omitted, `analysis_multipv`"
+    )
+    nodes: int | None = Field(default=None, ge=1, description="nodes per move")
+    depth: int | None = Field(default=None, ge=1, description="depth per move")
+    seconds: float | None = Field(default=None, gt=0, description="seconds per move")
     elos: list[int] | None = Field(
         default=None,
         description="Maia levels for this run alone; omitted, it uses the configured ones",
     )
     maia: bool | None = Field(
         default=None,
-        description="whether this run also asks the human-move model; omitted, the tier's "
-        "own setting decides (`maia_on_quick`, `maia_on_deep`)",
+        description="whether this run also asks the human-move model; omitted, "
+        "`maia_on_analysis` decides",
     )
 
     @model_validator(mode="after")
     def _paired_ply_range(self) -> AnalysisRequest:
         if (self.ply_start is None) != (self.ply_end is None):
             raise ValueError("ply_start and ply_end have to be given together")
+        return self
+
+    @model_validator(mode="after")
+    def _one_limit(self) -> AnalysisRequest:
+        given = [name for name in ("nodes", "depth", "seconds") if getattr(self, name) is not None]
+        if len(given) > 1:
+            raise ValueError(f"a run stops at one limit, not {' and '.join(given)}")
         return self
 
     @property
@@ -707,25 +715,13 @@ class BatchAnalysisRequest(Input):
     field that silently changed what a 202 carries is a thing neither the OpenAPI schema
     nor the typed client could describe.
 
-    No ply range and no FEN: a window belongs to one game, and a position is one run.
+    No ply range and no FEN: a window belongs to one game, and a position is one run. No
+    engine, limit or priority either: this is the Games table's "Queue analysis", which
+    queues the same import pass a new game gets, at the budget the Settings page shows —
+    a selection of five hundred games must not jump ahead of what a person asked for.
     """
 
     game_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_GAMES)
-    tier: Tier = Tier.QUICK
-    engine_id: int | None = None
-    multipv: int | None = Field(default=None, ge=1)
-    nodes: int | None = Field(default=None, ge=1)
-    depth: int | None = Field(default=None, ge=1)
-    priority: int | None = None
-    elos: list[int] | None = Field(
-        default=None,
-        description="Maia levels for these runs alone; omitted, they use the configured ones",
-    )
-    maia: bool | None = Field(
-        default=None,
-        description="whether these runs also ask the human-move model; omitted, the tier's "
-        "own setting decides (`maia_on_quick`, `maia_on_deep`)",
-    )
 
     @model_validator(mode="after")
     def _distinct_games(self) -> BatchAnalysisRequest:
@@ -792,38 +788,24 @@ class BatchAnalysisResponse(BaseModel):
     refused: list[RefusedGame] = Field(default_factory=list)
 
 
-class BackfillRequest(Input):
-    """Which tier a backfill is over. Its own body so the two verbs read the same.
-
-    A backfill takes no game ids and no budget: the selection *is* "everything with no
-    pass yet", and a run's nodes and multipv are the ones the Engine passes page shows at
-    the moment the button is pressed. Nothing else belongs in this body, and an empty one
-    means the quick tier.
-    """
-
-    tier: Tier = Tier.QUICK
-
-
 class BackfillPreview(BaseModel):
     """How many games a backfill would queue if it were started now.
 
     What the button reads to label itself and to switch itself off: `pending` at zero means
-    every game already has a live run of that tier and there is nothing to ask for.
+    every game already has a live analysis pass and there is nothing to ask for.
     """
 
-    tier: Tier
     pending: int
 
 
 class BackfillReceipt(BaseModel):
-    """What a backfill put in the queue, and how deep that tier's queue is now.
+    """What a backfill put in the queue, and how deep the full-game queue is now.
 
     `queued` counts only this call's rows; `outstanding` is every queued and running
-    full-game run of the tier, so a second press while the first pass is still draining
-    reports a small `queued` and a large `outstanding`.
+    full-game pass, so a second press while the first pass is still draining reports a
+    small `queued` and a large `outstanding`.
     """
 
-    tier: Tier
     queued: int
     outstanding: int
 
@@ -835,7 +817,6 @@ class BackfillCancelled(BaseModel):
     — see `analysis.cancel_queued`.
     """
 
-    tier: Tier
     dropped: int
     outstanding: int
 
@@ -843,9 +824,9 @@ class BackfillCancelled(BaseModel):
 class QueueCleared(BaseModel):
     """How many queued runs the whole-queue reset took back, and what is left working.
 
-    Unlike `BackfillCancelled`, this carries no tier: the drop was not scoped to one, so
-    `dropped` covers every tier and every shape of run — windowed, full-game, Maia-fill
-    alike. `outstanding` is what a worker had already claimed, left to finish — see
+    Wider than `BackfillCancelled`, which takes back only import passes: `dropped` covers
+    every shape of run — requested, windowed, full-game, Maia-fill alike. `outstanding` is
+    what a worker had already claimed, left to finish — see
     `analysis.clear_queue`.
     """
 
@@ -858,18 +839,6 @@ class CoverageLevel(Payload):
 
     elo: int
     games: int = 0
-
-
-class CoverageMissing(Payload):
-    """What a backfill of each tier would queue if it were started now.
-
-    Not the complement of the coverage buckets: a game with a deep pass and no quick one is
-    missing a quick pass, and is counted here under `quick` while it counts as analysed in
-    the split above.
-    """
-
-    quick: int = 0
-    deep: int = 0
 
 
 class CoverageMaia(Payload):
@@ -889,7 +858,7 @@ class CoverageMaia(Payload):
 
 
 class CoverageEstimates(Payload):
-    """What finishing each tier would cost, in engine-seconds, from this deployment's own history.
+    """What finishing the library would cost, in engine-seconds, from this deployment's own history.
 
     Raw seconds of work rather than of waiting: `concurrency` is how many of them run at
     once, so the wall-clock answer is the one divided by the other. Null where too few
@@ -897,13 +866,14 @@ class CoverageEstimates(Payload):
     page is worse than an empty space.
 
     Each estimate includes matching work already queued or running, so it remains a useful
-    remaining-time estimate after a backfill is pressed. `maia_seconds` prices the third
-    button, the fill: measured off finished `maia_only` runs, which cost what asking the
-    human-move model costs and nothing like what a search does.
+    remaining-time estimate after a backfill is pressed. `analysis_seconds` is sampled only
+    from import passes at the node budget configured now: a requested run at depth 30 says
+    nothing about what the next backfill costs. `maia_seconds` prices the other button, the
+    fill: measured off finished `maia_only` runs, which cost what asking the human-move
+    model costs and nothing like what a search does.
     """
 
-    quick_seconds: float | None = None
-    deep_seconds: float | None = None
+    analysis_seconds: float | None = None
     maia_seconds: float | None = None
     concurrency: int = 1
 
@@ -911,14 +881,15 @@ class CoverageEstimates(Payload):
 class AnalysisCoverage(Payload):
     """The whole library's analysis state, as the Analysis page reads it.
 
-    `no_pass`, `quick_only` and `deep` partition the library and add up to `total`.
+    `no_pass` and `analysed` partition the library and add up to `total`. `missing` is what
+    a backfill would queue now, which is not quite `no_pass`: a game whose pass is already
+    queued has none yet and is not missing one.
     """
 
     total: int = 0
+    analysed: int = 0
     no_pass: int = 0
-    quick_only: int = 0
-    deep: int = 0
-    missing: CoverageMissing = Field(default_factory=CoverageMissing)
+    missing: int = 0
     failed: int = 0
     maia: CoverageMaia = Field(default_factory=CoverageMaia)
     estimates: CoverageEstimates = Field(default_factory=CoverageEstimates)
@@ -948,21 +919,24 @@ class RunResponse(Row):
     game_id: int | None = None
     fen: str | None = None
     engine_id: int | None = None
-    tier: Tier
     status: RunStatus
+    # The limit each move's search stopped at. A requested run carries exactly one of the
+    # three; an import pass carries `nodes`. What a badge prints comes from these, not from
+    # a name for the pass.
     depth: int | None = None
     nodes: int | None = None
+    seconds: float | None = None
     multipv: int = 1
     ply_start: int | None = None
     ply_end: int | None = None
     priority: int = 0
     attempts: int = 0
-    # A pass that asks the human-move model and nothing else. It is queued under a tier to
-    # borrow that tier's engine and its place in the queue, so the tier alone does not say
-    # what the run did: `maia_only` is what tells a fill from an analysis pass.
+    # A pass that asks the human-move model and nothing else. It borrows the analysis role's
+    # engine and an import pass's place in the queue, so neither says what the run did:
+    # `maia_only` is what tells a fill from an analysis pass.
     maia_only: bool = False
     # Whether this run's search is followed by a human-move pass, as it was settled when the
-    # run was queued: what the caller asked for, or the tier's setting at that moment.
+    # run was queued: what the caller asked for, or `maia_on_analysis` at that moment.
     maia: bool = True
     maia_elos: list[int] | None = None
     created_at: datetime
@@ -970,6 +944,17 @@ class RunResponse(Row):
     finished_at: datetime | None = None
     error: str | None = None
     stderr: str | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def requested(self) -> bool:
+        """Somebody asked for this run, rather than an import or a backfill queuing it.
+
+        Said outright rather than left to `priority > 0` in every client, because the
+        band a correspondence task sits in is a detail of the queue and not something a
+        badge should have to know.
+        """
+        return self.priority > 0
 
 
 class MoveEvalResponse(Row):
@@ -1209,7 +1194,6 @@ class MomentResponse(Payload):
     best_move_uci: str | None = None
     best_move_san: str | None = None
     run_id: int | None = None
-    tier: Tier | None = None
 
 
 class DimensionList(BaseModel):
@@ -1308,14 +1292,6 @@ class SampleResponse(Payload):
     policy: dict[str, Any] | None = None
 
 
-class TierStatusResponse(BaseModel):
-    tier: Tier
-    engine_id: int | None = None
-    engine_name: str | None = None
-    available: bool = False
-    reason: str | None = None
-
-
 class RoleStatusResponse(BaseModel):
     """One role and the engine assigned to it — `services.engines.role_status`.
 
@@ -1335,11 +1311,10 @@ class EngineRoles(Input):
     """The assignment to write. A key that was not sent is left alone.
 
     `null` is a real value here and means "unassign", which is why absence has to mean
-    something else: a form that saves one dropdown must not clear the other two.
+    something else: a form that saves one dropdown must not clear the other.
     """
 
-    quick: int | None = None
-    deep: int | None = None
+    analysis: int | None = None
     human: int | None = None
 
     def changes(self) -> dict[str, int | None]:
@@ -1347,11 +1322,11 @@ class EngineRoles(Input):
 
 
 class EngineRolesResponse(BaseModel):
-    """What runs what: one status per role, in QUICK, DEEP, HUMAN order.
+    """What runs what: one status per role, in ANALYSIS, HUMAN order.
 
-    Human moves is a role beside the two tiers rather than a third `Tier`, because `Tier`
-    is a search budget stored on every run row and widening it to carry a role would
-    corrupt it. See `db.enums.EngineRole`.
+    Two roles because there are two different questions — what the best move was, and what
+    a person would have played — and one engine seldom answers both. See
+    `db.enums.EngineRole`.
     """
 
     roles: list[RoleStatusResponse] = Field(default_factory=list)
@@ -1839,7 +1814,7 @@ class CorrespondenceSearchCreate(Input):
     )
     engine_id: int | None = Field(
         default=None,
-        description="required for a search; for a task, null is the deep role's engine",
+        description="required for a search; for a task, null is the analysis role's engine",
     )
     multipv: int | None = Field(default=None, ge=1, description="null is the deployment's default")
     limit_depth: int | None = Field(default=None, ge=1)
@@ -1878,7 +1853,7 @@ class CorrespondenceHost(Payload):
 
 class CorrespondenceSearchEngine(Payload):
     """One engine the mode's pickers offer: every enabled UCI engine, this host's and the
-    runners'. `default` marks the deep role's engine, which every picker preselects;
+    runners'. `default` marks the analysis role's engine, which every picker preselects;
     `search_trouble` says why a *search* cannot run on it (a runner's engine, no board
     driving, a missing binary) and is null where one can — a task can run on any of them."""
 
@@ -1917,7 +1892,7 @@ class CorrespondenceStatus(Payload):
     engines: list[CorrespondenceSearchEngine] = Field(
         default_factory=list,
         description="every enabled UCI engine the deployment has, this host's first; the "
-        "deep role's carries `default`, and `search_trouble` names the ones a search "
+        "analysis role's carries `default`, and `search_trouble` names the ones a search "
         "cannot run on",
     )
 
@@ -2055,7 +2030,7 @@ class CorrespondenceExpand(Input):
     engine_id: int | None = Field(
         default=None,
         description="the engine every task of this expansion runs on, later stages "
-        "included; null is the deep role's engine",
+        "included; null is the analysis role's engine",
     )
 
 
@@ -2072,7 +2047,7 @@ class CorrespondenceExpansion(Payload):
 
 
 class CorrespondenceRefresh(Input):
-    """Which engine a refresh queues its tasks on. Null is the deep role's engine."""
+    """Which engine a refresh queues its tasks on. Null is the analysis role's engine."""
 
     engine_id: int | None = None
 
@@ -2115,6 +2090,9 @@ class RunnerPoll(Frame):
     # browser is expected here — a tab that could only poll would have no analysis board —
     # but the two transports describing themselves differently would be a trap.
     browser: bool = False
+    # `protocol.FEATURES` a poller has, as a hello names them. Without it a poller counts as
+    # a runner from before any, and is only handed runs that stop on a node budget.
+    features: list[str] = Field(default_factory=list)
 
 
 class RunnerPollResponse(BaseModel):
@@ -2309,7 +2287,7 @@ class RunnersStatus(BaseModel):
 
 
 class StreamCreate(Input):
-    """Open an analysis board. `engine_id` omitted takes the deep tier's engine."""
+    """Open an analysis board. `engine_id` omitted takes the analysis role's engine."""
 
     fen: str = Field(min_length=1)
     engine_id: int | None = None

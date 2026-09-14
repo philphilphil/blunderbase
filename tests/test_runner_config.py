@@ -93,7 +93,6 @@ def test_a_full_file_arrives_field_for_field(tmp_path: Path) -> None:
             name="sf-remote",
             path="/usr/games/stockfish",
             kind="uci",
-            tier="deep",
             options={"Threads": 8, "Hash": 4096},
         ),
         EngineConfig(name="maia-remote", path="/usr/games/lc0", kind="maia"),
@@ -256,13 +255,18 @@ def test_two_engines_of_the_same_name_are_a_refusal(tmp_path: Path) -> None:
     assert "two engines are called 'sf'" in refusal(data, tmp_path)
 
 
-def test_a_kind_or_a_tier_outside_the_vocabulary_is_a_refusal(tmp_path: Path) -> None:
+def test_a_kind_outside_the_vocabulary_is_a_refusal(tmp_path: Path) -> None:
     assert "kind is one of" in refusal(
         {**MINIMAL, "engines": [{"name": "sf", "path": "/a", "kind": "lc0"}]}, tmp_path
     )
-    assert "tier is one of" in refusal(
-        {**MINIMAL, "engines": [{"name": "sf", "path": "/a", "tier": "medium"}]}, tmp_path
-    )
+
+
+def test_a_tier_is_accepted_and_ignored_whatever_it_says(tmp_path: Path) -> None:
+    """An old runner.yaml keeps starting: which engine does what is assigned on the server."""
+    for tier in ("quick", "deep", "medium"):
+        data = {**MINIMAL, "engines": [{"name": "sf", "path": "/a", "tier": tier}]}
+        config = RunnerConfig.load(write(tmp_path, data))
+        assert config.engines == (EngineConfig(name="sf", path="/a"),)
 
 
 def test_a_log_level_that_is_not_one_is_a_refusal(tmp_path: Path) -> None:

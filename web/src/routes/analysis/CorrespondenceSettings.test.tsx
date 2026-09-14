@@ -25,12 +25,10 @@ class FakeSocket {
 const STORED: AppSettings = {
   maia_target_elo: 1500,
   maia_elos: [1500, 1800],
-  maia_on_quick: 0,
-  maia_on_deep: 1,
+  maia_on_analysis: 0,
   maia_both_sides: 0,
-  quick_nodes: 111_000,
-  deep_nodes: 2_222_000,
-  deep_multipv: 5,
+  analysis_nodes: 111_000,
+  analysis_multipv: 5,
   inaccuracy_threshold: 4,
   mistake_threshold: 9,
   blunder_threshold: 14,
@@ -101,9 +99,8 @@ describe('Analysis → Correspondence', () => {
       correspondence_task_multipv: 3,
       correspondence_stale_depth: 30,
       maia_elos: [1500, 1800],
-      quick_nodes: 111_000,
-      deep_nodes: 2_222_000,
-      deep_multipv: 5,
+      analysis_nodes: 111_000,
+      analysis_multipv: 5,
       blunder_threshold: 14,
     })
   })

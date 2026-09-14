@@ -11,7 +11,7 @@
  *
  * The engines offered are `GET /correspondence/status`'s `engines[]`, every enabled UCI
  * engine the deployment has; the ones a search cannot run on yet (a runner's, one that
- * drives no board) are greyed with the reason rather than hidden, and the deep role's is
+ * drives no board) are greyed with the reason rather than hidden, and the analysis role's is
  * preselected (`EnginePicker`).
  *
  * **Only the marked moves** is `root_moves`: the candidates already under this node, chosen
@@ -23,8 +23,11 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
+import { EnginePicker, preferredEngine } from '@/components/engine-dialog/EnginePicker'
+import { Frame } from '@/components/engine-dialog/DialogFrame'
+import { LimitField } from '@/components/engine-dialog/LimitField'
+import { LinesField } from '@/components/engine-dialog/LinesField'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type {
   CorrespondenceSearchCreate,
@@ -35,8 +38,6 @@ import { useNotation } from '@/lib/chess/notationPrefs'
 import { cn } from '@/lib/utils'
 
 import { sortSiblings } from '../tree'
-import { Field, Frame } from './DialogFrame'
-import { EnginePicker, preferredEngine } from './EnginePicker'
 
 type LimitKind = 'none' | 'depth' | 'nodes' | 'minutes'
 
@@ -134,72 +135,36 @@ export function SearchDialog({
         </div>
 
         <div className="flex flex-wrap gap-4">
-          <Field id="correspondence-search-multipv" label={<Trans>Lines</Trans>} className="w-28">
-            <Input
-              id="correspondence-search-multipv"
-              type="number"
-              min={1}
-              max={5}
-              inputMode="numeric"
-              placeholder={String(defaultMultipv)}
-              value={multipv}
-              onChange={(event) => setMultipv(event.target.value)}
-            />
-          </Field>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Label>
-              <Trans>Stop it at</Trans>
-            </Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <div role="group" aria-label={t`Stop it at`} className="flex gap-1">
-                {(['minutes', 'depth', 'nodes', 'none'] as LimitKind[]).map((kind) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    aria-pressed={limit === kind}
-                    onClick={() => chooseLimit(kind)}
-                    className={cn(
-                      'rounded-md border px-2 py-1 text-[0.6875rem] transition-colors',
-                      limit === kind
-                        ? 'border-accent-teal/40 bg-selected text-ink'
-                        : 'border-edge text-dim hover:border-edge-hover hover:text-ink',
-                    )}
-                  >
-                    {kind === 'none' ? (
-                      <Trans>Nothing</Trans>
-                    ) : kind === 'depth' ? (
-                      <Trans>Depth</Trans>
-                    ) : kind === 'nodes' ? (
-                      <Trans>Nodes</Trans>
-                    ) : (
-                      <Trans>Minutes</Trans>
-                    )}
-                  </button>
-                ))}
-              </div>
-              {limit === 'none' ? null : (
-                <Input
-                  aria-label={t`Limit`}
-                  type="number"
-                  min={1}
-                  inputMode="numeric"
-                  className="w-32"
-                  value={limitValue}
-                  onChange={(event) => setLimitValue(event.target.value)}
-                />
-              )}
-            </div>
-            <p className="text-[0.625rem] leading-[1.5] text-dim-2">
-              {limit === 'none' ? (
+          <LinesField
+            id="correspondence-search-multipv"
+            value={multipv}
+            placeholder={defaultMultipv}
+            onChange={setMultipv}
+          />
+          <LimitField
+            label={<Trans>Stop it at</Trans>}
+            groupLabel={t`Stop it at`}
+            kinds={[
+              { kind: 'minutes', label: <Trans>Minutes</Trans> },
+              { kind: 'depth', label: <Trans>Depth</Trans> },
+              { kind: 'nodes', label: <Trans>Nodes</Trans> },
+              { kind: 'none', label: <Trans>Nothing</Trans>, unbounded: true },
+            ]}
+            kind={limit}
+            value={limitValue}
+            onKindChange={chooseLimit}
+            onValueChange={setLimitValue}
+            hint={
+              limit === 'none' ? (
                 <Trans>
                   Runs until you pause or stop it. Worth it only where the number is still
                   moving between depths; the tree gains more from the time than the root does.
                 </Trans>
               ) : (
                 <Trans>Left empty, the limit is ignored and it runs on.</Trans>
-              )}
-            </p>
-          </div>
+              )
+            }
+          />
         </div>
 
         {candidates.length > 0 ? (

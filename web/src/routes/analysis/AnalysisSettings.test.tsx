@@ -24,12 +24,10 @@ class FakeSocket {
 const STORED: AppSettings = {
   maia_target_elo: 1500,
   maia_elos: [1500, 1800],
-  maia_on_quick: 0,
-  maia_on_deep: 1,
+  maia_on_analysis: 0,
   maia_both_sides: 0,
-  quick_nodes: 111_000,
-  deep_nodes: 2_222_000,
-  deep_multipv: 5,
+  analysis_nodes: 111_000,
+  analysis_multipv: 5,
   inaccuracy_threshold: 4,
   mistake_threshold: 9,
   blunder_threshold: 14,
@@ -69,22 +67,27 @@ describe('focused analysis configuration', () => {
   it('keeps engine-pass controls together and carries Maia through its whole-object save', async () => {
     draw(<EnginePassesPage />)
 
-    const quick = await screen.findByLabelText('Quick nodes')
+    const nodes = await screen.findByLabelText('Nodes per move')
+    expect(screen.getByText('Analysis pass')).toBeInTheDocument()
+    expect(screen.getByLabelText('Lines')).toHaveValue(5)
     expect(screen.getByText('Move classification')).toBeInTheDocument()
     expect(screen.queryByText('Human levels')).not.toBeInTheDocument()
 
-    await userEvent.clear(quick)
-    await userEvent.type(quick, '222000')
+    await userEvent.clear(nodes)
+    await userEvent.type(nodes, '222000')
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(sent).not.toBeNull())
     expect(sent).toMatchObject({
-      quick_nodes: 222000,
+      analysis_nodes: 222000,
+      analysis_multipv: 5,
       maia_elos: [1500, 1800],
-      maia_on_quick: 0,
-      maia_on_deep: 1,
+      maia_on_analysis: 0,
       maia_both_sides: 0,
     })
+    // The old per-tier keys are gone from the body, not sent as nulls.
+    expect(sent).not.toHaveProperty('quick_nodes')
+    expect(sent).not.toHaveProperty('maia_on_deep')
   })
 
   it('offers to hide the engine on new games, and saves the switch as a flag', async () => {
@@ -101,7 +104,7 @@ describe('focused analysis configuration', () => {
 
     await waitFor(() => expect(sent).not.toBeNull())
     // The flag rides with the whole of the settings, the budgets untouched.
-    expect(sent).toMatchObject({ hide_engine_new_games: 1, quick_nodes: 111000, maia_elos: [1500, 1800] })
+    expect(sent).toMatchObject({ hide_engine_new_games: 1, analysis_nodes: 111000, maia_elos: [1500, 1800] })
   })
 
   it('keeps Maia controls together and carries engine-pass values through its save', async () => {
@@ -109,18 +112,24 @@ describe('focused analysis configuration', () => {
 
     const level = await screen.findByLabelText('Add a level')
     expect(screen.getByText('When Maia runs')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Quick nodes')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Nodes per move')).not.toBeInTheDocument()
+    // One switch for the one pass, where there used to be one per tier.
+    expect(screen.getByRole('switch', { name: 'Maia on the analysis pass' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
 
     await userEvent.type(level, '1900')
     await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    await userEvent.click(screen.getByRole('switch', { name: 'Maia on the analysis pass' }))
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(sent).not.toBeNull())
     expect(sent).toMatchObject({
       maia_elos: [1500, 1800, 1900],
-      quick_nodes: 111000,
-      deep_nodes: 2222000,
-      deep_multipv: 5,
+      maia_on_analysis: 1,
+      analysis_nodes: 111000,
+      analysis_multipv: 5,
       inaccuracy_threshold: 4,
       mistake_threshold: 9,
       blunder_threshold: 14,

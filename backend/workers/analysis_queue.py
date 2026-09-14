@@ -19,7 +19,7 @@ where the run was queued asking for it — Maia for the human policy. They are s
 rather than nested because both draw on the same `analysis_concurrency` semaphore, and a
 worker holding a slot while waiting for a second one deadlocks the moment that cap is a
 single process. A run that carries no Maia pass never opens the process or takes the slot:
-the Maia half is 40-70% of a quick run's cost, so skipping it is the whole point of the
+the Maia half is 40-70% of an import pass's cost, so skipping it is the whole point of the
 flag rather than a detail of it.
 
 A set also says that the runs it holds are alive, every `HEARTBEAT_SECONDS`. That is what
@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import RunStatus
+from backend.db.enums import EngineRole, RunStatus
 from backend.db.models import Engine
 from backend.db.session import database_backpressure, get_sessionmaker
 from backend.services import analysis
@@ -60,8 +60,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 logger = logging.getLogger(__name__)
 
-# How long `stop()` lets a run finish on its own before the task is cancelled. A quick
-# pass over one game is well inside this; a deep pass is not, and is requeued instead.
+# How long `stop()` lets a run finish on its own before the task is cancelled. A node-budget
+# pass over one game is well inside this; a depth-30 look is not, and is requeued instead.
 STOP_GRACE_SECONDS = 5.0
 # How often `wait_idle` looks at the queue.
 IDLE_CHECK_SECONDS = 0.02
@@ -226,7 +226,7 @@ class AnalysisWorkers:
         Growing spawns the missing workers and mints the pool's permits at once. Shrinking
         interrupts nothing: a surplus worker leaves between runs (`_worker` checks its index
         against the cap) and the pool withdraws permits as searches finish
-        (`EnginePool.resize`), so a deep pass that is half done is not requeued for it.
+        (`EnginePool.resize`), so a long run that is half done is not requeued for it.
         """
         target = max(1, int(concurrency))
         self._concurrency = target
@@ -517,22 +517,30 @@ class AnalysisWorkers:
             run = analysis.require_run(session, run_id)
             if run.status is not RunStatus.RUNNING:
                 return None
-            engine = session.get(Engine, run.engine_id) if run.engine_id else None
+            named = session.get(Engine, run.engine_id) if run.engine_id else None
+            engine = named
             if engine is None or not engine.enabled or engine.runner_id is not None:
-                # The engine named at enqueue time has since been deleted, switched off or
-                # moved to a runner; the engine the owner has assigned to this tier stands
-                # in, where that one is on this host. Remote work is claimed by the gateway,
-                # not by this set, so a remote engine reaching here is a race, not a job to
-                # attempt.
-                engine = engines_service.engine_for_tier(session, run.tier, local_only=True)
+                if run.priority > analysis.IMPORT_PRIORITY:
+                    # A run somebody asked for named its engine in the Analyse dialog, MCP or
+                    # the CLI, and a result from a different engine would answer a question
+                    # they did not ask. Failed with a sentence naming it, without a retry: a
+                    # second attempt finds the same engine gone.
+                    raise analysis.AnalysisError(_named_engine_gone(run.engine_id, named))
+                # The queue's own work — an import pass, a backfill, a fill — named whatever
+                # held the analysis role at enqueue. That engine has since been deleted,
+                # switched off or moved to a runner, and the one holding the role now stands
+                # in, where it is on this host. Remote work is claimed by the gateway, not by
+                # this set, so a remote engine reaching here is a race, not a job to attempt.
+                engine = engines_service.engine_for_role(
+                    session, EngineRole.ANALYSIS, local_only=True
+                )
             if engine is None:
                 # Nothing substitutes for an assignment, so this run is one the deployment
                 # cannot serve as configured. Failed with the reason the roles form would
                 # show, and without a retry: a second attempt hits the same wall.
-                status = engines_service.tier_status(session, run.tier)
+                status = engines_service.role_status(session, EngineRole.ANALYSIS)
                 raise analysis.AnalysisError(
-                    status.reason
-                    or f"the engine assigned to the {run.tier.value} tier is not on this host"
+                    status.reason or "the engine assigned to the analysis role is not on this host"
                 )
             if not engines_service.binary_present(engine.path):
                 raise analysis.AnalysisError(
@@ -574,6 +582,24 @@ class AnalysisWorkers:
             run = analysis.get_run(session, run_id)
             if run is not None:
                 analysis.abandon_run(session, run)
+
+
+def _named_engine_gone(engine_id: int | None, engine: Engine | None) -> str:
+    """Why a requested run cannot be searched on the engine it named, in the owner's words."""
+    if engine is None:
+        return (
+            f"the engine this run was asked for (id {engine_id}) is no "
+            f"longer registered; ask for the analysis again on another engine"
+        )
+    if not engine.enabled:
+        return (
+            f"{engine.name!r}, the engine this run was asked for, is "
+            f"switched off; enable it or ask for the analysis again on another engine"
+        )
+    return (
+        f"{engine.name!r}, the engine this run was asked for, now lives "
+        f"on a runner; ask for the analysis again so it is queued there"
+    )
 
 
 def _stderr_of(adapter: Any) -> str | None:

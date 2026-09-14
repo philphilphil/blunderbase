@@ -128,7 +128,7 @@ def run(
     `since` overrides the stored cursor — a millisecond stamp, an ISO date or datetime, or
     `all` to walk the whole archive again. Nothing is filtered out unless the caller asks
     for it with `speeds` or `rated`, because a database wants every game. `analyze=False`
-    lands the games without queueing the automatic quick pass.
+    lands the games without queueing the automatic analysis pass.
     """
     player = (username or "").strip()
     if not player:

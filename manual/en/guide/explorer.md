@@ -25,7 +25,7 @@ clears the stored token.
 **Model games** lists games from those databases. One opens in the full game view, with
 the live engine and Maia working as they do on your own games. What is missing is anything
 needing a stored row: passes, notes, pinned lines. **+ Add to library** stores it as a game
-you did not play, so it gets a quick pass and takes notes but counts in no statistic and is
+you did not play, so it gets the analysis pass and takes notes but counts in no statistic and is
 not in your opening tree.
 
 ## Build a repertoire

@@ -35,8 +35,8 @@ THREADS = {
     "managed": False,
 }
 
-# No `tier`. A runner cannot claim a job — the owner assigns Quick, Deep and Human moves on
-# the server — and the key is only still tolerated so that a runner built before that keeps
+# No `tier`. A runner cannot claim a job — the owner assigns the analysis and human-move roles
+# on the server — and the key is only still tolerated so that a runner built before that keeps
 # connecting. `test_runners_service` is where an ad that still carries one is covered.
 STOCKFISH_AD: dict[str, Any] = {
     "name": "sf-remote",
@@ -249,10 +249,12 @@ def poll_once(
     engines: Sequence[Mapping[str, Any]] | None = (STOCKFISH_AD,),
     active_runs: Sequence[Mapping[str, Any]] = (),
     proto: int = protocol.PROTO_VERSION,
+    features: Sequence[str] = protocol.FEATURES,
 ) -> httpx.Response:
     """One `POST /runner/poll`. `engines=None` re-announces nothing, as a later poll does."""
     body: dict[str, Any] = {
         "proto": proto,
+        "features": list(features),
         "runner": name,
         "version": "0.1.0",
         "slots": slots,

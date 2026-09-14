@@ -67,29 +67,29 @@ class NoteSource(StrEnum):
 
 
 class Tier(StrEnum):
-    """How much engine budget one analysis pass gets."""
+    """What a run queued before the single analysis pass was queued as. Nothing writes it.
+
+    Analysis used to come in two budgets, quick and deep; a run now carries its own limits
+    (`nodes`, `depth`, `seconds`) and whether a person asked for it (`priority`). The enum
+    stays, with both members, only because `EnumString` validates on read as well as on
+    write: an old `analysis_runs` row that says `quick` or `deep` has to keep loading.
+    """
 
     QUICK = "quick"
     DEEP = "deep"
 
 
 class EngineRole(StrEnum):
-    """A job the owner assigns one engine to. Deliberately *not* `Tier`.
+    """A job the owner assigns one engine to.
 
-    `Tier` is a search budget: it is stored on every `analysis_runs` row and read by the
-    node and multipv defaults, by `default_priority`, by the coverage endpoint and by the
-    MCP surface. `HUMAN` searches nothing — Maia answers with a policy rather than a
-    search — so making it a third `Tier` member to give the owner a third dropdown would
-    corrupt a well-defined type for a display convenience.
-
-    The two share their spelling where they overlap (`quick`, `deep`) because a run of a
-    tier is served by the engine assigned to the role of the same name, and nothing but an
-    owner's assignment decides which engine that is: an engine advertises what kind of
-    thing it is, and never claims a role.
+    `ANALYSIS` is the UCI engine the import pass runs on, and the one the Analyse dialog and
+    the correspondence pickers preselect. `HUMAN` searches nothing — Maia answers with a
+    policy rather than a search — so it is a role of its own rather than a budget of the
+    analysis one. Nothing but an owner's assignment decides which engine holds a role: an
+    engine advertises what kind of thing it is, and never claims one.
     """
 
-    QUICK = "quick"
-    DEEP = "deep"
+    ANALYSIS = "analysis"
     HUMAN = "human"
 
 

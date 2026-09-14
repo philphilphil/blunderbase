@@ -119,8 +119,9 @@ def game_card(card: Mapping[str, Any], *, curve_points: int) -> dict[str, Any]:
     """A game the way "check my last two games" wants it: the row plus what went wrong."""
     row = game_row(card)
     row["analyzed"] = bool(card.get("analyzed"))
-    if card.get("deep"):
-        row["deep"] = True
+    # `deep` is what a card folded before the single analysis pass calls the same thing.
+    if card.get("requested", card.get("deep")):
+        row["requested"] = True
     points = eval_curve(card.get("eval_curve") or (), curve_points)
     if points:
         row["eval_curve"] = points
@@ -196,13 +197,24 @@ def move_row(move: Mapping[str, Any], *, include_lines: bool) -> dict[str, Any]:
 
 
 def run_row(run: Mapping[str, Any]) -> dict[str, Any]:
-    """One analysis pass over a game, as the coach needs to tell them apart."""
+    """One analysis pass over a game, as the coach needs to tell them apart.
+
+    By what it did — the engine, the limit each move stopped at, how many lines — and
+    whether somebody asked for it, which is also why it answers over an import pass.
+    `maia_only` is always said: a Maia fill carries a node budget like any pass but searched
+    nothing, and without the flag a coach reads it as the game analysed twice.
+    """
     return {
         "id": run.get("id"),
-        "tier": run.get("tier"),
         "status": run.get("status"),
+        "requested": bool(run.get("requested")),
+        "engine_id": run.get("engine_id"),
         "engine": run.get("engine"),
+        "maia": run.get("maia"),
+        "maia_only": bool(run.get("maia_only")),
         "nodes": run.get("nodes"),
+        "depth": run.get("depth"),
+        "seconds": run.get("seconds"),
         "multipv": run.get("multipv"),
         "ply_start": run.get("ply_start"),
         "ply_end": run.get("ply_end"),

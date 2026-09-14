@@ -16,11 +16,11 @@ from sqlalchemy.orm import Session
 from backend.adapters import openings
 from backend.db.enums import (
     Color,
+    EngineRole,
     JobStatus,
     Result,
     Source,
     Speed,
-    Tier,
 )
 from backend.db.models import (
     Account,
@@ -38,7 +38,7 @@ from backend.services import analysis, app_settings, engines
 from backend.services import explorer as explorer_service
 from backend.services import games as games_service
 from backend.services.accounts import AccountIndex, fold
-from backend.services.analysis import QUICK_PRIORITY  # noqa: F401  (the pipeline's own priority)
+from backend.services.analysis import IMPORT_PRIORITY  # noqa: F401  (the pipeline's own priority)
 
 logger = logging.getLogger(__name__)
 
@@ -369,7 +369,7 @@ def ingest_games(
     settled: SettledHook | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> ImportResult:
-    """Store a stream of parsed games under one job: dedup, positions, quick-tier run.
+    """Store a stream of parsed games under one job: dedup, positions, the analysis pass.
 
     Every game is its own transaction, so a sync that dies half-way keeps what it got and
     one unstorable game costs exactly that game. The counters and the error list are
@@ -383,7 +383,7 @@ def ingest_games(
     moved over such a game would never ask for it again, and only a full resync would ever
     notice; a cursor left behind it costs the next sync a handful of duplicates it skips.
 
-    `analyze=False` stores the games and stops there — no quick pass is queued, and the
+    `analyze=False` stores the games and stops there — no analysis pass is queued, and the
     owner asks for one later over the games they care about. `presume_owner=False` says the
     stream is somebody else's games — see `ingest_game`. `sleep` is what the retries wait
     with, injected so a test can fake the clock.
@@ -515,7 +515,7 @@ def ingest_game(
     """Store one parsed game, or report the one that is already there.
 
     Raises whatever the move list is wrong about — `ingest_games` turns that into a
-    per-game error record. `analyze=False` skips the automatic quick pass; a game that was
+    per-game error record. `analyze=False` skips the automatic analysis pass; a game that was
     already stored never gets one either way, because this call did not create it.
 
     `presume_owner` is what a sync does: a game it brings is the owner's even when neither
@@ -599,7 +599,7 @@ def ingest_game(
 
     store_positions(session, game, rows)
     if analyze:
-        enqueue_quick_analysis(session, game)
+        enqueue_import_analysis(session, game)
     return IngestOutcome(game=game, created=True)
 
 
@@ -734,7 +734,7 @@ def import_one(
 
     The "add this game" path, as opposed to a sync's stream: the game gets an `ImportJob`
     row like any other so its provenance reads the same in the library, the same events go
-    out so the page refreshes the same way, and the quick pass is queued the same way.
+    out so the page refreshes the same way, and the analysis pass is queued the same way.
 
     A tombstone for this game is forgotten first. A deletion exists to stop a *sync* from
     quietly bringing a game back; the owner naming the game and asking for it is the undo,
@@ -743,7 +743,7 @@ def import_one(
     A game that will not store is recorded on the job as a failure and re-raised: this is
     one game a person is waiting on, not a stream where one bad game must not stop the rest.
 
-    `analyze=False` stores the game without the automatic quick pass, which is what a
+    `analyze=False` stores the game without the automatic analysis pass, which is what a
     correspondence game being created is: it has no moves yet, its analysis is the tree
     while it is played, and a pass over it would be redone after every move. `hide_engine`
     is `ingest_game`'s: None asks the setting, and a correspondence game passes False,
@@ -816,12 +816,13 @@ def _finished_event(job: ImportJob) -> dict[str, Any]:
     }
 
 
-def enqueue_quick_analysis(session: Session, game: Game) -> AnalysisRun | None:
-    """Queue the automatic quick pass over a freshly imported game.
+def enqueue_import_analysis(session: Session, game: Game) -> AnalysisRun | None:
+    """Queue the automatic analysis pass over a freshly imported game.
 
-    The run is built by `analysis.request_analysis`, so it lands in the queue with the
-    node budget and priority the workers actually need — one enqueue path, one set of
-    defaults, whether the pass was asked for by an import, the UI or the coach.
+    The run is built by `analysis.request_analysis`, so it lands in the queue the way every
+    run does — one enqueue path, one set of defaults. At import priority and with no limit
+    given, which is what makes it the import pass: `analysis_nodes` and `analysis_multipv`,
+    behind anything somebody asked for by hand.
 
     No enabled engine to run it with means no run: an import must not fail because the
     engine list is empty, and a run pointing at nothing would only fail later. The commit
@@ -831,25 +832,25 @@ def enqueue_quick_analysis(session: Session, game: Game) -> AnalysisRun | None:
     different machines — is the same story: the games still import, and the refusal is
     logged rather than raised. An owner who asks for a pass by hand is told exactly why.
     """
-    engine = quick_tier_engine(session)
+    engine = analysis_role_engine(session)
     if engine is None:
         return None
     try:
         return analysis.request_analysis(
             session,
             game_id=game.id,
-            tier=Tier.QUICK,
             engine_id=engine.id,
+            priority=analysis.IMPORT_PRIORITY,
             commit=False,
         )
     except analysis.AnalysisRequestError as exc:
-        logger.warning("game %s was imported without a quick pass: %s", game.id, exc)
+        logger.warning("game %s was imported without an analysis pass: %s", game.id, exc)
         return None
 
 
-def quick_tier_engine(session: Session) -> Engine | None:
-    """The engine assigned to the quick tier, if it can run. None means no pass is queued."""
-    return engines.engine_for_tier(session, Tier.QUICK)
+def analysis_role_engine(session: Session) -> Engine | None:
+    """The engine holding the analysis role, if it can run. None means no pass is queued."""
+    return engines.engine_for_role(session, EngineRole.ANALYSIS)
 
 
 def get_job(session: Session, job_id: int) -> ImportJob | None:

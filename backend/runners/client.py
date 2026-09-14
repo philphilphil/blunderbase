@@ -71,7 +71,7 @@ POLL_TIMEOUT = 30.0
 # How long a close waits for a stream's task to notice and let go of its engine. Bounded
 # because the wait happens on the receive loop, which owes the server its pongs.
 CLOSE_TIMEOUT = 10.0
-# A deep multi-PV pass over a long game is a big `run_complete`. Matches uvicorn's own
+# A multi-PV pass at a high budget over a long game is a big `run_complete`. Matches uvicorn's own
 # websocket frame cap, so neither end is the one that refuses the payload.
 MAX_FRAME = 16 * 1024 * 1024
 # Until a `welcome` says otherwise.
@@ -454,7 +454,6 @@ class RunnerClient:
                     kind=engine.kind,
                     path=engine.path,
                     version=probed.name,
-                    tier=engine.tier,
                     options=dict(engine.options),
                     declared_options=tuple(protocol.encode_probe(probed)),
                     streams=engine.streams_enabled,
@@ -1281,6 +1280,8 @@ class RunnerClient:
             "slots": self.config.slots,
             "free_slots": max(0, self.config.slots - len(self._runs)),
             "active_runs": [job.active for job in self._runs.values()],
+            # As the hello says it: a poller without `run_limits` is only given node budgets.
+            "features": list(protocol.FEATURES),
         }
         if announce:
             body["engines"] = [ad.as_dict() for ad in self._ads]

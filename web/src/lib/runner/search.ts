@@ -73,10 +73,16 @@ export interface SearchSnapshot {
   lines: BestLine[]
 }
 
-/** `chess.engine.Limit(nodes=…, depth=…)`, which is all a plan ever asks for. */
+/**
+ * `chess.engine.Limit(nodes=…, depth=…, time=…)`, which is all a plan ever asks for. A plan
+ * sets one of the three; they are all here rather than as a union so the transcription of
+ * `analyse_plan` can hand the plan's fields across as they are.
+ */
 export interface SearchLimit {
-  nodes: number
+  nodes: number | null
   depth: number | null
+  /** Seconds per move, as python-chess's `time`; `go movetime` takes it in milliseconds. */
+  seconds: number | null
 }
 
 export interface SearchOptions {

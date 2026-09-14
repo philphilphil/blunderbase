@@ -161,8 +161,10 @@ describe('ReferenceGamePage', () => {
     await screen.findByRole('button', { name: 'e4' })
 
     // Nothing to queue a run against, nothing to hang a note on, nothing to pin a line to.
-    expect(screen.queryByRole('button', { name: /Quick/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Deep/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Analyse/ })).not.toBeInTheDocument()
+    // Nor the key that opens the dialog: a model game has no row a run could hang off.
+    await userEvent.keyboard('a')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Note/ })).not.toBeInTheDocument()
     expect(screen.getByText(/Notes hang off a game in your library/)).toBeInTheDocument()
 

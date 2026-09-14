@@ -2,6 +2,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
+import { AnalyseDialog } from '@/components/analysis/AnalyseDialog'
 import { BOARD_SETTINGS_ID } from '@/components/board/BoardSettings'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
@@ -40,7 +41,7 @@ import { BoardPanel } from './components/BoardPanel'
 import type { BookMove } from './components/BookPanel'
 import { ColumnSplitter } from './components/ColumnSplitter'
 import { EngineRevealButton } from './components/EngineRevealButton'
-import { EvalGraph } from './components/EvalGraph'
+import { EvalGraph, type GraphTab } from './components/EvalGraph'
 import { FlaggedMoments } from './components/FlaggedMoments'
 import { GameHeaderBar } from './components/GameHeaderBar'
 import { GameLoadError, GameViewSkeleton } from './components/GameStates'
@@ -54,7 +55,7 @@ import {
   type MoveTab,
 } from './components/MoveList'
 import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
-import { NotesTrack } from './components/NotesTrack'
+import { NotesTrack, type NotesTrackTab } from './components/NotesTrack'
 import { StudioActions } from './components/StudioActions'
 import {
   bestRun,
@@ -199,7 +200,7 @@ function writeMovesWidth(width: number | null): void {
 }
 
 /**
- * Design 1a "Studio": board with its eval bar, transport row (with the deep-analysis
+ * Design 1a "Studio": board with its eval bar, transport row (with the Analyse…
  * trigger) and a short eval curve on the left; the paired move table with everything said
  * about the position on the board stacked under it — the run's multi-PV lines, the live
  * search, Maia — on the right.
@@ -322,6 +323,12 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * not two.
    */
   const [columnTab, setColumnTab] = useState<MoveTab>('moves')
+  /**
+   * The graph pane's reading and the Book/Notes pick, held here rather than in the panes so
+   * `V`, `T` and `B` can open them. Neither follows the position — see the panes' own notes.
+   */
+  const [graphTab, setGraphTab] = useState<GraphTab>('eval')
+  const [notesTab, setNotesTab] = useState<NotesTrackTab>('notes')
 
   const [cursor, setCursor] = useState(-1)
   /** Whether the game is playing itself through, a ply at a time (Space). */
@@ -1208,19 +1215,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const finishedRuns = useMemo(() => detail?.runs ?? [], [detail])
   // Untouched by ⇧E, on both sides of the screen: which run has looked at this game, how
   // deep it went and when, is what the app has *done* rather than what it found. Hiding it
-  // would tell a reader their analysis had gone missing, and hiding the two tier buttons
-  // with it would take away the pass they are about to queue to check themselves.
+  // would tell a reader their analysis had gone missing, and hiding the Analyse… button
+  // with it would take away the run they are about to ask for to check themselves.
+  // `bestRun` drops `maia_only` rows on its own, so a Maia fill never lights the button.
   const best = useMemo(() => bestRun(finishedRuns), [finishedRuns])
-  const deepRun = useMemo(
-    () => bestRun(finishedRuns.filter((run) => run.tier === 'deep')),
-    [finishedRuns],
-  )
-  // `bestRun` drops `maia_only` rows on its own, so a Maia fill (filed under the quick
-  // tier) never lights this — only an actual quick search does.
-  const quickRun = useMemo(
-    () => bestRun(finishedRuns.filter((run) => run.tier === 'quick')),
-    [finishedRuns],
-  )
   const engineRun = useMemo(() => runFor(finishedRuns, upcoming), [finishedRuns, upcoming])
 
   // Design 1a's `PGN` affordance in the move-list tab row. No endpoint exports one, so it
@@ -1546,17 +1544,21 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       },
       // The key presses the button that owns the panel — see `BOARD_SETTINGS_ID`.
       boardSettings: () => document.getElementById(BOARD_SETTINGS_ID)?.click(),
-      // Both tiers are the buttons' own calls. Quick is bound even where its button is
-      // hidden (a finished deep run hides it): the button is hidden because it would add
-      // nothing, not because the pass is refused.
-      queueQuick: readOnly ? undefined : () => analysisRequest.request('quick'),
-      queueDeep: readOnly ? undefined : () => analysisRequest.request('deep'),
+      // The button's own call: the key opens the dialog rather than queueing anything,
+      // because what to run is the dialog's question and a key cannot answer it.
+      analyse: readOnly ? undefined : analysisRequest.openDialog,
       // The key presses the one PGN button on the screen rather than copying the game a
       // second time of its own — see `PGN_BUTTON_ID`.
       copyPgn: () => document.getElementById(PGN_BUTTON_ID)?.click(),
-      toggleMoveTab: mobile
-        ? undefined
-        : () => setColumnTab((tab) => (tab === 'moves' ? 'flagged' : 'moves')),
+      // The compare grid is the human column's, so the key is bound only where that column
+      // is drawn: with hints off there is no Maia on the screen to switch.
+      maiaCompare: hints && humanColumn ? () => setMaiaCompare(!compare) : undefined,
+      // The graph pane is engine, and gone under ⇧E; the time tab exists only with a clock.
+      // The phone reaches these panes through its own tab strip, so the keys are desktop's.
+      graphEval: mobile || engineHidden ? undefined : () => setGraphTab('eval'),
+      graphTime:
+        mobile || engineHidden || times.length === 0 ? undefined : () => setGraphTab('time'),
+      bookTab: mobile ? undefined : () => setNotesTab('book'),
       // At the end of the game there is nothing to play through, so Space starts nothing —
       // the same as the ⏭ beside it being spent.
       autoplay: () => setPlaying((was) => !was && cursor < plyCount - 1),
@@ -1590,7 +1592,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
 
   const players = `${detail.game.white ?? '?'} — ${detail.game.black ?? '?'}`
 
-  // The box sits above the move table whether or not a deep pass has finished: the panel
+  // The box sits above the move table whether or not a pass has finished: the panel
   // moving as analysis lands read as a layout bug, so it keeps one place.
   //
   // `hints` empties both columns together — it is one gesture, "do not tell me the answer
@@ -1642,6 +1644,19 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // The live search shares the engine pane behind a Run | Live switch; the tab is this
       // page's state (`enginePaneTab`), the panel only reports a click on it.
       search={search}
+      analyse={
+        readOnly
+          ? undefined
+          : {
+              finishedRun: best,
+              // Held while a run somebody asked for is live or the press is in flight; an
+              // import pass does not hold it, since a requested run goes ahead of it.
+              busy: analysisRequest.pending || analysisRequest.activeRun?.requested === true,
+              activeRun: analysisRequest.activeRun,
+              progress: analysisRequest.progress,
+              onAnalyse: analysisRequest.openDialog,
+            }
+      }
       // On the desktop the band is the workspace's top row: two panes side by side,
       // separated by a rule and ruled off from the move table below, spanning both tracks
       // and taking no margin of its own — a pane is bounded by the rules around it, not by
@@ -1725,14 +1740,13 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       onStep={stepFromBoard}
       onToggleAutoplay={() => setPlaying((was) => !was)}
       playing={playing}
-      quickRun={quickRun}
-      deepRun={deepRun}
+      finishedRun={best}
       activeRun={analysisRequest.activeRun}
       progress={analysisRequest.progress}
       pending={analysisRequest.pending}
-      error={analysisRequest.error}
-      onRequestQuick={() => analysisRequest.request('quick')}
-      onRequestDeep={() => analysisRequest.request('deep')}
+      // The button lives in the engine pane's title strip; the board row carries it only
+      // while ⇧E has taken that pane off the screen, when asking is exactly what comes next.
+      onAnalyse={engineHidden ? analysisRequest.openDialog : undefined}
       // A note hangs off a game row, so there is nothing to write one against until the
       // model game has been added to the library.
       onNote={readOnly ? undefined : focusComposer}
@@ -1776,6 +1790,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // about the game, and half of it is the opponent's.
       playerNames={{ white: detail?.game.white, black: detail?.game.black }}
       onSelectPly={selectPly}
+      tab={graphTab}
+      onTabChange={setGraphTab}
       // Desktop: the workspace's third row, spanning both tracks, ruled off from the panes
       // above rather than floating between them, at the mockup's own height for the plot
       // (170 design pixels, 150 in the narrow band) plus the padding it carries itself and
@@ -1858,6 +1874,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       activeNoteId={editedNote?.id ?? null}
       onSelectNote={selectNote}
       composer={readOnly ? referenceComposer : composer}
+      tab={notesTab}
+      onTabChange={setNotesTab}
       className={mobile ? 'flex-1' : undefined}
     />
   )
@@ -1920,11 +1938,31 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
+  // Mounted only while open, so every opening starts from the dialog's own defaults
+  // rather than whatever was chosen last time over another position. The moves it offers
+  // start at the game cursor: off the game line a run still covers the game's moves, and
+  // the cursor is where the line branched from.
+  const analyseDialog = analysisRequest.dialog.open ? (
+    <AnalyseDialog
+      engines={analysisRequest.dialog.engines}
+      defaultMultipv={analysisRequest.dialog.defaultMultipv}
+      defaultNodes={analysisRequest.dialog.defaultNodes}
+      cursor={cursor}
+      cursorSan={moves[cursor]?.san ?? null}
+      plyCount={plyCount}
+      pending={analysisRequest.pending}
+      error={analysisRequest.dialog.error}
+      onQueue={analysisRequest.request}
+      onClose={analysisRequest.closeDialog}
+    />
+  ) : null
+
   if (mobile) {
     return (
       <>
         {chrome}
         {analysisRequest.setupDialog}
+        {analyseDialog}
         <MobileGameView
           game={detail.game}
           best={best}
@@ -1957,6 +1995,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     <>
       {chrome}
       {analysisRequest.setupDialog}
+      {analyseDialog}
 
       {/*
         The screen's own heading, across the whole workspace: what the game is, and what has

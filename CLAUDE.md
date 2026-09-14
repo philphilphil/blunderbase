@@ -54,8 +54,12 @@ Full reasoning in `docs/ARCHITECTURE.md`. The short version:
   thread (`asyncio.to_thread`), never through an async Session.
 - Migrations use `render_as_batch=True` (SQLite). A run's budget is copied onto the run
   row when it is queued, not looked up when it executes.
-- Analysis has two tiers, `quick` and `deep`; both add a Maia pass when a Maia engine is
-  enabled. A `maia_only` run is a fill pass that adds levels to an already-evaluated game.
+- Analysis is one pass: the import pass at `analysis_nodes` / `analysis_multipv`, and runs a
+  person asks for (Analyse dialog, MCP, CLI) with their own engine and one limit — nodes,
+  depth or seconds — at `REQUESTED_PRIORITY`. Which run answers is `games.run_rank`
+  (`priority > 0`, then id). Every non-fill run adds a Maia pass when `maia_on_analysis` is
+  on and a Maia engine is enabled. A `maia_only` run is a fill pass that adds levels to an
+  already-evaluated game. The `tier` column is legacy, read only.
 
 ## Frontend conventions
 

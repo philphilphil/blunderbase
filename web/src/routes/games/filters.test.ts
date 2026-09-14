@@ -31,9 +31,10 @@ describe('filtersFromParams', () => {
       opponent: 'chillzone',
       has_blunders: true,
       analyzed: false,
-      deep_analyzed: false,
       text: 'alapin',
     })
+    // `deep_analyzed` is from the days of two passes: an old link carrying it still reads.
+    expect(filtersFromParams(params)).not.toHaveProperty('deep_analyzed')
   })
 
   it('reads whose games to show, and never the default spelled out', () => {
@@ -88,7 +89,7 @@ describe('prune and filterCount', () => {
   })
 
   it('counts `false` as a set filter, because it narrows', () => {
-    expect(filterCount({ deep_analyzed: false })).toBe(1)
+    expect(filterCount({ analyzed: false })).toBe(1)
     expect(filterCount({})).toBe(0)
   })
 })

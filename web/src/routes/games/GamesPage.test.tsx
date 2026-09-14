@@ -50,7 +50,7 @@ const GAMES = [11, 12, 13].map(
       speed: 'blitz',
       ply_count: 40,
       analyzed: false,
-      deep: false,
+      requested: false,
       eval_curve: [],
       worst_moments: [],
     }) as unknown as GameCard,
@@ -133,11 +133,14 @@ describe('GamesPage — queueing analysis over a selection', () => {
     await loaded()
 
     await user.click(screen.getByLabelText('Select every game on this page'))
-    await user.click(screen.getByRole('button', { name: /queue quick analysis/i }))
+    // One button: the selection gets the import pass, and nothing deeper is on offer here.
+    expect(screen.getAllByRole('button', { name: /queue .*analysis/i })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: /^queue analysis$/i }))
 
     await waitFor(() => expect(postedTo('/analysis/batch')).toHaveLength(1))
-    expect(postedTo('/analysis/batch')[0]).toEqual({ game_ids: [11, 12, 13], tier: 'quick' })
-    expect(await screen.findByText('3 quick runs queued')).toBeInTheDocument()
+    // Ids and nothing else — no tier, no budget, no priority for the client to get wrong.
+    expect(postedTo('/analysis/batch')[0]).toEqual({ game_ids: [11, 12, 13] })
+    expect(await screen.findByText('3 runs queued')).toBeInTheDocument()
   })
 
   it('reads the receipt for what the batch would not take', async () => {
@@ -148,10 +151,10 @@ describe('GamesPage — queueing analysis over a selection', () => {
 
     await user.click(screen.getByLabelText('Select game 11'))
     await user.click(screen.getByLabelText('Select game 12'))
-    await user.click(screen.getByRole('button', { name: /queue deep analysis/i }))
+    await user.click(screen.getByRole('button', { name: /^queue analysis$/i }))
 
     expect(await screen.findByText('1 queued, 1 refused')).toBeInTheDocument()
-    expect(postedTo('/analysis/batch')[0]).toEqual({ game_ids: [11, 12], tier: 'deep' })
+    expect(postedTo('/analysis/batch')[0]).toEqual({ game_ids: [11, 12] })
   })
 
   it('queues a single row through the same call', async () => {
@@ -164,15 +167,15 @@ describe('GamesPage — queueing analysis over a selection', () => {
     await user.click(within(row).getByRole('button', { name: 'analyse' }))
 
     await waitFor(() => expect(postedTo('/analysis/batch')).toHaveLength(1))
-    expect(postedTo('/analysis/batch')[0]).toEqual({ game_ids: [12], tier: 'quick' })
-    expect(await screen.findByText('1 quick run queued')).toBeInTheDocument()
+    expect(postedTo('/analysis/batch')[0]).toEqual({ game_ids: [12] })
+    expect(await screen.findByText('1 run queued')).toBeInTheDocument()
   })
 
   it('counts a call that never landed as the whole selection refused', async () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = String(input).split('?')[0]!
       if (path.endsWith('/api/analysis/batch')) {
-        return json(409, { error: 'tier_unavailable', detail: 'no engine serves deep' })
+        return json(409, { error: 'engine_unavailable', detail: 'no engine is assigned to the analysis role' })
       }
       return json(200, { games: GAMES, total: GAMES.length, limit: 50, offset: 0 })
     })
@@ -181,10 +184,10 @@ describe('GamesPage — queueing analysis over a selection', () => {
     await loaded()
 
     await user.click(screen.getByLabelText('Select every game on this page'))
-    await user.click(screen.getByRole('button', { name: /queue deep analysis/i }))
+    await user.click(screen.getByRole('button', { name: /^queue analysis$/i }))
 
     expect(
-      await screen.findByText('0 queued, 3 refused — no engine serves deep'),
+      await screen.findByText('0 queued, 3 refused — no engine is assigned to the analysis role'),
     ).toBeInTheDocument()
   })
 
@@ -201,7 +204,7 @@ describe('GamesPage — queueing analysis over a selection', () => {
     await loaded()
 
     await user.click(screen.getByLabelText('Select every game on this page'))
-    await user.click(screen.getByRole('button', { name: /queue quick analysis/i }))
+    await user.click(screen.getByRole('button', { name: /^queue analysis$/i }))
 
     expect(
       await screen.findByText('0 queued, 3 refused — a batch takes at most 500 games'),

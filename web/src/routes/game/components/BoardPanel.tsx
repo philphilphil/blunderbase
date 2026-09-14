@@ -3,12 +3,10 @@ import type { DrawShape } from '@lichess-org/chessground/draw'
 import { Trans, useLingui } from '@lingui/react/macro'
 import type { Chess } from 'chessops/chess'
 import {
-  Check,
   ChevronLeft,
   ChevronRight,
   Flag,
   Keyboard,
-  Loader2,
   Pause,
   Play,
   StickyNote,
@@ -19,7 +17,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { SideDot } from '@/components/badges/SideDot'
 import { Board, type BoardArrow, type BoardSquare } from '@/components/board/Board'
 import { BoardSettingsButton } from '@/components/board/BoardSettings'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AnalyseButton } from '@/components/analysis/AnalyseButton'
 import type { Color, GameRunSummary, GameSummary, MoveRow, RunResponse } from '@/lib/api/types'
 import { glyphFor } from '@/lib/chess/classification'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
@@ -156,19 +154,19 @@ export interface BoardPanelProps {
    * only says which way. Without it, a step is a plain seek.
    */
   onStep?: (delta: number) => void
-  /** The newest finished quick run over this game, if there is one — hidden once `deepRun`
-   * is set, since a quick pass adds nothing once the game has a completed deep one. */
-  quickRun: GameRunSummary | null
-  /** The newest finished deep run over this game, if there is one. */
-  deepRun: GameRunSummary | null
-  /** A run over this game that is queued or running right now, either tier. */
+  /** The finished run that answers for this game (`gameModel.bestRun`), if there is one. */
+  finishedRun: GameRunSummary | null
+  /** A run over this game that is queued or running right now, a requested one first. */
   activeRun: RunResponse | null
   /** Live ply counts from `analysis.progress`, while a run is working. */
   progress: RunProgress | null
   pending: boolean
-  error: Error | null
-  onRequestQuick: () => void
-  onRequestDeep: () => void
+  /**
+   * Open the Analyse… dialog. Only passed while ⇧E has taken the engine pane away: the
+   * button lives in that pane's title strip, and this row is where it stands in when the
+   * pane is not on the screen (`AnalyseButton`).
+   */
+  onAnalyse?: () => void
   /**
    * Write a note about the position on the board. The transport row is where it belongs: a
    * note is about *this* position, and this is the row that says which position that is.
@@ -242,29 +240,21 @@ export function BoardPanel({
   onStep,
   onToggleAutoplay,
   playing = false,
-  quickRun,
-  deepRun,
+  finishedRun,
   activeRun,
   progress,
   pending,
-  error,
-  onRequestQuick,
-  onRequestDeep,
+  onAnalyse,
   onNote,
   noting,
   actions,
   className,
 }: BoardPanelProps) {
   const { t } = useLingui()
-  // Both analysis buttons disable together — only one run is ever live over a game — but
-  // the spinner belongs to whichever button matches it. An unknown tier (a request just
-  // sent, before the run list catches up; a fill run that is neither) falls back to Deep
-  // rather than lighting neither button — and so does a quick-tier run while the Quick
-  // button is hidden behind a finished deep pass (a Maia fill, mostly), for the same
-  // reason: a spinner on a button that is not there spins for nobody.
-  const analysisBusy = activeRun !== null || pending
-  const spinningTier: 'quick' | 'deep' =
-    activeRun?.tier === 'quick' && deepRun == null ? 'quick' : 'deep'
+  // The button holds while a run somebody asked for is live (or the press is in flight):
+  // a second press then would be a second run of the same thing. An import pass does not
+  // hold it — a requested run goes ahead of that pass, which is the point of asking.
+  const analysisBusy = pending || activeRun?.requested === true
 
   /*
    * The standing arrows, folded to one per *move*.
@@ -543,7 +533,7 @@ export function BoardPanel({
 
       {/*
         Three groups and two rules. Left, what the board is showing: its settings, Flip,
-        Hints. Then what to do to the game: the analysis tiers, a note, leaving a line, and
+        Hints. Then what to do to the game: Analyse…, a note, leaving a line, and
         whatever the studio hangs off this particular game — adding a model game to the
         library, going back to the explorer it was opened from. And hard right, past the
         spacer, where you are and how to move: the ply and score
@@ -660,33 +650,17 @@ export function BoardPanel({
             be empty — the explorer's stand-in board queues no run, takes no note and is not
             a game anybody arrived at — so its rule is drawn only when it separates
             something. */}
-        {readOnly && !onNote && !(inLine && onExitAnalysis) && !actions ? null : <Rule />}
+        {(readOnly || !onAnalyse) && !onNote && !(inLine && onExitAnalysis) && !actions ? null : <Rule />}
 
-        {readOnly ? null : (
-          <>
-            {deepRun == null ? (
-              <AnalysisTierButton
-                label="Quick"
-                finishedRun={quickRun}
-                busy={analysisBusy}
-                spinning={analysisBusy && spinningTier === 'quick'}
-                activeRun={activeRun}
-                progress={progress}
-                error={error}
-                onRequest={onRequestQuick}
-              />
-            ) : null}
-            <AnalysisTierButton
-              label="Deep"
-              finishedRun={deepRun}
-              busy={analysisBusy}
-              spinning={analysisBusy && spinningTier === 'deep'}
-              activeRun={activeRun}
-              progress={progress}
-              error={error}
-              onRequest={onRequestDeep}
-            />
-          </>
+        {readOnly || !onAnalyse ? null : (
+          <AnalyseButton
+            variant="row"
+            finishedRun={finishedRun}
+            busy={analysisBusy}
+            activeRun={activeRun}
+            progress={progress}
+            onAnalyse={onAnalyse}
+          />
         )}
 
         {onNote ? (
@@ -953,99 +927,6 @@ function PlayerRow({
         </span>
       ) : null}
     </div>
-  )
-}
-
-/**
- * One of the two analysis triggers in the transport row — labelled "Quick" or "Deep",
- * writing `POST /analysis { game_id, tier }` for its own tier (the label lowercased is the
- * tier). Idle by default, tinted once a run of its own tier has finished (still clickable —
- * "re-analysis is always a new run"). Both buttons disable together while any run over the
- * game is queued or running (`BoardPanel` computes that), but only the one `spinning` shows
- * the spinner and progress readout — the other stays a plain disabled label, so the reader
- * is never told two runs are in flight when there is only one.
- *
- * The mutation error is shared across tiers (there is one request state, not two), so a
- * refusal tints both buttons red rather than trying to guess which one it was about.
- */
-function AnalysisTierButton({
-  label,
-  finishedRun,
-  busy,
-  spinning,
-  activeRun,
-  progress,
-  error,
-  onRequest,
-}: {
-  label: 'Quick' | 'Deep'
-  finishedRun: GameRunSummary | null
-  busy: boolean
-  spinning: boolean
-  activeRun: RunResponse | null
-  progress: RunProgress | null
-  error: Error | null
-  onRequest: () => void
-}) {
-  const { t } = useLingui()
-  const percent =
-    spinning && progress && progress.total > 0
-      ? Math.round((progress.done / progress.total) * 100)
-      : null
-
-  // `label` stays the tier's own name — it is what the caller names the button by, and what
-  // the two tooltips below are picked with. Only what is drawn and read is translated, and
-  // each sentence is whole rather than assembled around a translated word.
-  const tierName = label === 'Quick' ? t`Quick` : t`Deep`
-
-  const buttonLabel = spinning ? (
-    <>
-      <Loader2 className="size-3 animate-spin" aria-hidden />
-      {percent !== null ? `${percent}%` : tierName}
-    </>
-  ) : finishedRun ? (
-    <>
-      <Check className="size-3" aria-hidden />
-      {tierName}
-    </>
-  ) : (
-    tierName
-  )
-
-  const state = activeRun?.status === 'running' ? t`Analysing` : t`Queued`
-  const tooltip = spinning
-    ? `${state}${activeRun ? ` · ${activeRun.tier}` : ''}`
-    : error
-      ? error.message
-      : finishedRun
-        ? label === 'Quick'
-          ? t`Quick analysis complete — click to re-run`
-          : t`Deep analysis complete — click to re-run`
-        : label === 'Quick'
-          ? t`Queue a quick analysis pass over this game`
-          : t`Queue a deep analysis pass over this game`
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onRequest}
-          className={cn(
-            'flex flex-none items-center gap-1 rounded-md border px-2.5 py-[0.3125rem] text-xs disabled:cursor-default max-md:py-1.5',
-            error && !busy
-              ? 'border-blunder/30 bg-blunder/5 text-blunder'
-              : finishedRun
-                ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-                : 'border-edge bg-elevated text-soft hover:text-ink',
-          )}
-        >
-          {buttonLabel}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
-    </Tooltip>
   )
 }
 

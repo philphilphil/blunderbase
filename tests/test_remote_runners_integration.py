@@ -150,7 +150,7 @@ def test_a_token_minted_through_the_api_drains_a_run_and_writes_its_rows(
             assert [engine["name"] for engine in listed["engines"]] == ["sf-remote"]
             assert listed["engines"][0]["path"] == STOCKFISH_AD["path"]
 
-            run_id = enqueue(api, game_id, engine_id, tier="deep")
+            run_id = enqueue(api, game_id, engine_id)
             frame = dispatch_for(runner)
             assert frame["run_id"] == run_id
             assert protocol.decode_plan(frame["plan"]).run_id == run_id
@@ -183,7 +183,7 @@ def test_a_link_that_dies_mid_run_loses_it_and_its_late_answer_is_never_written(
     game_id = seed_game(api)
 
     with connect(api, token) as first:
-        run_id = enqueue(api, game_id, first.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, first.engine_ids["sf-remote"])
         lost = dispatch_for(first)
 
     # Nobody is searching it, so it is queued again — and the attempt is refunded, because
@@ -222,7 +222,7 @@ def test_the_socket_and_the_fallback_are_one_runner(api: TestClient, settings: S
 
     # The link is gone; the engine row is switched off but not deleted, and the runs
     # queued against it are still this runner's work rather than anybody else's.
-    run_id = enqueue(api, game_id, engine_id, tier="deep")
+    run_id = enqueue(api, game_id, engine_id)
     assert destinations(api)["gpu-box"]["queued"] == 1
     assert destinations(api)["local"]["queued"] == 0
 
@@ -273,7 +273,7 @@ def test_a_board_holds_a_runner_slot_the_queue_gets_back_when_it_closes(
             # The board is a slot the dispatcher no longer has, and both surfaces say so.
             held = runner_row(api, runner_id)
             assert (held["streams"], held["busy"], held["free_slots"]) == (1, 0, 0)
-            run_id = enqueue(api, game_id, engine_id, tier="deep")
+            run_id = enqueue(api, game_id, engine_id)
             time.sleep(0.2)
             assert run_row(settings, run_id).status is RunStatus.QUEUED
             assert runner_row(api, runner_id)["queued_eligible"] == 1
@@ -343,6 +343,7 @@ def test_a_one_shot_evaluation_never_starts_a_runner_s_binary(
     happens to have there.
     """
     _runner_id, token = register(settings)
+    # An old ad's `tier` is ignored, whatever it says.
     quick_ad = {**STOCKFISH_AD, "tier": "quick"}
 
     with connect(api, token, engines=[quick_ad]) as runner:
@@ -351,14 +352,14 @@ def test_a_one_shot_evaluation_never_starts_a_runner_s_binary(
         # The only engine in the deployment is the runner's: there is nothing to run here.
         refused = api.post("/analysis/position", json={"fen": STARTING_FEN, "nodes": 1000})
         assert refused.status_code == 409, refused.text
-        assert refused.json()["error"] == "tier_unavailable"
+        assert refused.json()["error"] == "engine_unavailable"
         assert "sf-remote" in refused.json()["detail"]
 
         # A binary on this host is not enough on its own: nothing falls back to an engine
-        # the owner has not assigned, so the quick role has to be moved to it.
+        # the owner has not assigned, so the analysis role has to be moved to it.
         here = local_engine(api, tmp_path)
         assert api.post("/analysis/position", json={"fen": STARTING_FEN}).status_code == 409
-        assert api.put("/engines/roles", json={"quick": here}).status_code == 200
+        assert api.put("/engines/roles", json={"analysis": here}).status_code == 200
         answered = api.post("/analysis/position", json={"fen": STARTING_FEN, "nodes": 1000})
 
     assert answered.status_code == 200, answered.text
@@ -392,7 +393,7 @@ def test_a_runner_that_is_away_keeps_its_backlog_off_this_host(
 
     with connect(api, token) as runner:
         engine_id = runner.engine_ids["sf-remote"]
-    enqueue(api, game_id, engine_id, tier="deep")
+    enqueue(api, game_id, engine_id)
 
     with get_sessionmaker(settings)() as session:
         breakdown = {row["name"]: row for row in runners_service.queue_breakdown(session)}
@@ -423,8 +424,8 @@ def test_the_local_workers_and_a_runner_drain_one_queue_without_stealing(
 
         with connect(api, token) as runner:
             there = runner.engine_ids["sf-remote"]
-            mine = enqueue(api, game_id, here, tier="quick", nodes=1000)
-            theirs = enqueue(api, game_id, there, tier="deep")
+            mine = enqueue(api, game_id, here, nodes=1000)
+            theirs = enqueue(api, game_id, there)
 
             frame = dispatch_for(runner)
             assert frame["run_id"] == theirs, "the local set never claimed the remote run"

@@ -15,8 +15,8 @@ function json(status: number, body: unknown) {
   })
 }
 
-/** Every backfill POST the case saw, as `{ tier }` bodies. */
-let started: { tier: string }[]
+/** Every backfill POST the case saw, as the bodies it sent (none, since there is one pass). */
+let started: unknown[]
 /** What the queue reports, which is what the clear button is enabled by. */
 let queued: number
 /** Whether the fill was asked for, and with which ids. */
@@ -27,9 +27,8 @@ function stubFetch() {
     const path = String(input).split('?')[0]!
     const body = init?.body === undefined ? {} : (JSON.parse(String(init.body)) as never)
     if (path.endsWith('/api/analysis/backfill')) {
-      const sent = body as { tier: string }
-      started.push(sent)
-      return json(202, { tier: sent.tier, queued: 12, outstanding: 12 })
+      started.push(init?.body)
+      return json(202, { queued: 12, outstanding: 12 })
     }
     if (path.endsWith('/api/analysis/queue')) {
       return json(200, { queued, running: 0, workers: true, busy: 0, destinations: [] })
@@ -52,10 +51,9 @@ function stubFetch() {
 function coverage(overrides: Partial<AnalysisCoverage> = {}): AnalysisCoverage {
   return {
     total: 7714,
+    analysed: 835,
     no_pass: 6879,
-    quick_only: 374,
-    deep: 461,
-    missing: { quick: 6879, deep: 7253 },
+    missing: 6879,
     failed: 0,
     maia: {
       configured: [1700],
@@ -65,8 +63,7 @@ function coverage(overrides: Partial<AnalysisCoverage> = {}): AnalysisCoverage {
       orphan_levels: [],
     },
     estimates: {
-      quick_seconds: 12 * 3600,
-      deep_seconds: 160 * 3600,
+      analysis_seconds: 12 * 3600,
       maia_seconds: 40 * 60,
       concurrency: 4,
     },
@@ -103,9 +100,6 @@ describe('LibraryActions', () => {
     // 6,879 games and twelve engine-hours over four runners.
     expect(screen.getByText('6,879 games')).toBeInTheDocument()
     expect(screen.getByText('~3h')).toBeInTheDocument()
-    // The deep backlog is its own number, and its own much larger cost.
-    expect(screen.getByText('7,253 games')).toBeInTheDocument()
-    expect(screen.getByText('~40h')).toBeInTheDocument()
     expect(screen.getByText('340 games')).toBeInTheDocument()
     expect(screen.getByText('~10m')).toBeInTheDocument()
   })
@@ -114,8 +108,7 @@ describe('LibraryActions', () => {
     draw(
       coverage({
         estimates: {
-          quick_seconds: null,
-          deep_seconds: null,
+          analysis_seconds: null,
           maia_seconds: null,
           concurrency: 4,
         },
@@ -126,30 +119,19 @@ describe('LibraryActions', () => {
   })
 
   /**
-   * The pass the app could not start. The library's old "Analyse all" hard-coded the quick
-   * tier and there was no tier picker anywhere, which is how 7,253 games came to have no
-   * deep pass.
+   * One pass, one button, and a body that names nothing: the budget is the Settings page's,
+   * read by the backend when the runs are queued, so there is nothing for the press to say.
    */
-  it('starts a deep backfill under the deep tier', async () => {
+  it('starts the backfill with no body and says what it queued', async () => {
     draw()
 
-    await userEvent.click(screen.getByRole('button', { name: /backfill deep/i }))
+    expect(screen.getAllByRole('button', { name: /backfill/i })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: /backfill/i }))
 
-    await waitFor(() => expect(started).toEqual([{ tier: 'deep' }]))
+    await waitFor(() => expect(started).toEqual([undefined]))
     // The runs go into the ordinary queue, and the card says what it put there.
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Queued 12 games; 12 runs outstanding at this tier.',
-    )
-  })
-
-  it('starts a quick backfill under the quick tier', async () => {
-    draw()
-
-    await userEvent.click(screen.getByRole('button', { name: /backfill quick/i }))
-
-    await waitFor(() => expect(started).toEqual([{ tier: 'quick' }]))
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Queued 12 games; 12 runs outstanding at this tier.',
+      'Queued 12 games; 12 runs outstanding.',
     )
   })
 
@@ -161,27 +143,25 @@ describe('LibraryActions', () => {
   it('asks nothing before it queues the pass', async () => {
     draw()
 
-    await userEvent.click(screen.getByRole('button', { name: /backfill deep/i }))
+    await userEvent.click(screen.getByRole('button', { name: /backfill/i }))
 
-    await waitFor(() => expect(started).toEqual([{ tier: 'deep' }]))
+    await waitFor(() => expect(started).toHaveLength(1))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('offers no backfill for a tier with nothing outstanding', () => {
-    draw(coverage({ missing: { quick: 0, deep: 0 } }))
+  it('offers no backfill when nothing is outstanding', () => {
+    draw(coverage({ missing: 0 }))
 
-    expect(screen.getByRole('button', { name: /backfill quick/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /backfill deep/i })).toBeDisabled()
-    expect(screen.getAllByText('nothing to queue')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /backfill/i })).toBeDisabled()
+    expect(screen.getAllByText('nothing to queue')).toHaveLength(1)
   })
 
-  it('calls a non-zero estimate remaining when that tier has nothing new to queue', () => {
+  it('calls a non-zero estimate remaining when there is nothing new to queue', () => {
     draw(
       coverage({
-        missing: { quick: 0, deep: 0 },
+        missing: 0,
         estimates: {
-          quick_seconds: 1200,
-          deep_seconds: 2400,
+          analysis_seconds: 1200,
           maia_seconds: 0,
           concurrency: 4,
         },
@@ -189,7 +169,6 @@ describe('LibraryActions', () => {
     )
 
     expect(screen.getByText('~5m remaining')).toBeInTheDocument()
-    expect(screen.getByText('~10m remaining')).toBeInTheDocument()
   })
 
   it('queues the fill over the whole library and says what it queued', async () => {

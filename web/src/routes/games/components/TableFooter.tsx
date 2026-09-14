@@ -7,9 +7,11 @@
  * at the end of it were somewhere you had to travel to.
  *
  * The design's "Add to study" and "Export PGN" still have no route behind them. What is
- * here is what is real: queue a quick or a deep pass over the selection, and delete it.
+ * here is what is real: queue the analysis pass over the selection, and delete it. There is
+ * no deeper pass to queue over a selection: asking for more is a choice about one game, made
+ * in its Analyse dialog while looking at it.
  *
- * The four actions are real buttons rather than the bare words they were: they sit in a
+ * The three actions are real buttons rather than the bare words they were: they sit in a
  * strip beside two counts and a pager, and a word with nothing around it reads as a label
  * of the row it is in. `size="sm"` is 28px inside the 46px line, which leaves the strip its
  * breathing room, and the delete is outlined in the blunder colour rather than filled with
@@ -17,7 +19,7 @@
  * about the page, not about the action. The filled one is in the confirmation.
  *
  * Below `md` the 46px line becomes as many lines as it needs. Nothing here shortens on a
- * phone: "Queue deep analysis" is what the button does, and a second line costs less than
+ * phone: "Queue analysis" is what the button does, and a second line costs less than
  * guessing which word the owner would still recognise it by.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
@@ -36,7 +38,7 @@ export interface TableFooterProps {
   total: number
   queueing: boolean
   deleting: boolean
-  onQueue: (tier: 'quick' | 'deep') => void
+  onQueue: () => void
   onDelete: () => void
   onClearSelection: () => void
   /** Set after a queue or a delete so the footer can say what happened. */
@@ -80,10 +82,10 @@ export function TableFooter({
   const games = formatCount(total)
 
   return (
-    <div className="flex h-[2.875rem] flex-none items-center gap-3 border-t border-hairline bg-panel px-5 max-md:h-auto max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1.5 max-md:px-3 max-md:py-2.5">
+    <div className="@container flex h-[2.875rem] flex-none items-center gap-3 border-t border-hairline bg-panel px-5 max-md:h-auto max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1.5 max-md:px-3 max-md:py-2.5">
       {selectedCount > 0 ? (
         <>
-          <span className="font-mono text-[0.71875rem] tabular text-accent-teal">
+          <span className="flex-none font-mono text-[0.71875rem] tabular text-accent-teal">
             <Trans>{selected} selected</Trans>
           </span>
           <span className="h-4 w-px bg-line" />
@@ -92,18 +94,9 @@ export function TableFooter({
             size="sm"
             variant="secondary"
             disabled={queueing}
-            onClick={() => onQueue('quick')}
+            onClick={onQueue}
           >
-            <Trans>Queue quick analysis</Trans>
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={queueing}
-            onClick={() => onQueue('deep')}
-          >
-            <Trans>Queue deep analysis</Trans>
+            <Trans>Queue analysis</Trans>
           </Button>
           <Button
             type="button"
@@ -125,14 +118,28 @@ export function TableFooter({
         </span>
       )}
 
-      {message ? <span className="font-mono text-[0.6875rem] text-good">{message}</span> : null}
+      {/* The one thing on the row that may truncate: it repeats what the rows already show. */}
+      {message ? (
+        <span title={message} className="min-w-0 truncate font-mono text-[0.6875rem] text-good">
+          {message}
+        </span>
+      ) : null}
 
       {/* The spacer pushes the paging right on one line; on a wrapped one it would only
           strand it on a line of its own. */}
       <div className="flex-1 max-md:hidden" />
 
-      <label className="flex items-center gap-1.5 text-[0.6875rem] text-dim-2">
-        <Trans>Rows</Trans>
+      {/*
+        One line at a fixed height on a desktop, because the table under "Fit" measures its
+        room against it and a footer that wrapped when rows were selected would page the
+        selection away. So where the games area is narrow — a laptop with the rail open, or
+        German labels — the words that the controls already imply leave instead: the range
+        text first, then the "Rows" caption. The phone wraps (`max-md:`) and keeps both.
+      */}
+      <label className="flex flex-none items-center gap-1.5 text-[0.6875rem] text-dim-2">
+        <span className="md:@max-[50rem]:sr-only">
+          <Trans>Rows</Trans>
+        </span>
         <select
           aria-label={t`Rows per page`}
           value={String(pageSize)}
@@ -150,7 +157,7 @@ export function TableFooter({
         </select>
       </label>
 
-      <div className="flex items-center gap-1">
+      <div className="flex flex-none items-center gap-1">
         <PageStep
           label={t`Previous page`}
           disabled={page <= 1}
@@ -170,7 +177,7 @@ export function TableFooter({
         </PageStep>
       </div>
 
-      <span className="font-mono text-[0.6875rem] tabular text-dim-2">
+      <span className="flex-none font-mono text-[0.6875rem] tabular text-dim-2 md:@max-[56rem]:hidden">
         <Trans>
           {firstRow}–{lastRow} of {games}
         </Trans>

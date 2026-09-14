@@ -15,7 +15,6 @@ import type {
   StreamEndReason,
   StreamLine,
   StreamSurface,
-  Tier,
 } from '@/lib/api/types'
 
 export const EVENT_NAMES = [
@@ -94,12 +93,22 @@ export type ImportEvent = ImportStartedEvent | ImportGameEvent | ImportFinishedE
 interface AnalysisBase {
   run_id: number
   game_id: number | null
-  tier: Tier
   status: RunStatus
+  engine_id?: number | null
+  /**
+   * What the run stops each move at, and whether somebody is waiting on it — the facts a
+   * run badge is drawn from — so a client can label a run it has only heard about without
+   * fetching the row. One of the three limits on a requested run, `nodes` on an import pass.
+   */
+  nodes?: number | null
+  depth?: number | null
+  seconds?: number | null
+  multipv?: number
+  requested?: boolean
   /**
    * A Maia fill: the run asks the human-move model about levels the game is missing and
-   * searches nothing. Fills ride in the quick tier's queue, so a reader that goes by
-   * `tier` alone shows one as a quick pass over the game.
+   * searches nothing. Fills carry the import pass's node budget, so a reader that goes by
+   * the limits alone shows one as a pass over the game.
    */
   maia_only?: boolean
   at?: string
@@ -108,7 +117,6 @@ interface AnalysisBase {
 export interface AnalysisRunEvent extends AnalysisBase {
   event: 'analysis.queued' | 'analysis.running' | 'analysis.done' | 'analysis.failed'
   fen?: string | null
-  engine_id?: number | null
   priority?: number
   attempts?: number
   evals?: number
@@ -125,15 +133,14 @@ export interface AnalysisProgressEvent extends AnalysisBase {
 
 /**
  * One frame per bulk operation, not per game: a backfill over ten thousand games says
- * this once. It carries no run, so it is not an `AnalysisBase` — `outstanding` is the
- * whole tier's queued-plus-running, which is what a client watching the pass reads.
+ * this once. It carries no run, so it is not an `AnalysisBase` — `outstanding` is every
+ * queued-plus-running import pass, which is what a client watching the pass reads.
  */
 export interface AnalysisBackfillEvent {
   event: 'analysis.backfill'
-  tier: Tier
   queued: number
   outstanding: number
-  /** True for a Maia fill, whose runs share the quick tier but search nothing. */
+  /** True for a Maia fill, whose runs queue like import passes but search nothing. */
   maia_only?: boolean
 }
 

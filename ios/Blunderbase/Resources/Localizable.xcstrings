@@ -178,6 +178,46 @@
         }
       }
     },
+    "%lld lines" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Variante"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Varianten"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld line"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lines"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld notes" : {
 
     },
@@ -787,16 +827,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Datum"
-          }
-        }
-      }
-    },
-    "deep" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tief"
           }
         }
       }
@@ -1708,6 +1738,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nur lesen"
+          }
+        }
+      }
+    },
+    "requested" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "angefordert"
           }
         }
       }

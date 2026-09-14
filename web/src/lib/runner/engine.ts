@@ -563,11 +563,21 @@ class WasmEngine implements BrowserEngine {
 
   /** `position fen …` then `go`, accumulating every `info` until `bestmove`. */
   private search(fen: string, limit: SearchLimit): Promise<Map<number, Accumulated>> {
+    // `chess.engine.Limit(nodes=…, depth=…, time=…)`: whichever bound the search reaches
+    // first, spelled the way python-chess spells them to the engine.
+    const bounds: string[] = []
+    if (limit.nodes !== null) bounds.push(`nodes ${Math.max(1, Math.trunc(limit.nodes))}`)
+    if (limit.depth !== null) bounds.push(`depth ${Math.max(1, Math.trunc(limit.depth))}`)
+    if (limit.seconds !== null) {
+      bounds.push(`movetime ${Math.max(1, Math.round(limit.seconds * 1000))}`)
+    }
+    // A plan with no bound at all is refused when it is decoded, so this is only ever a
+    // caller that forgot one — and a bare `go` would search until somebody said `stop`.
+    if (bounds.length === 0) {
+      return Promise.reject(new BrowserEngineError('a search needs a node, depth or time limit'))
+    }
     this.driver.send(`position fen ${fen}`)
     const lines = new Map<number, Accumulated>()
-    // `chess.engine.Limit(nodes=…, depth=…)`: whichever bound the search reaches first.
-    const bounds = [`nodes ${Math.max(1, Math.trunc(limit.nodes))}`]
-    if (limit.depth !== null) bounds.push(`depth ${Math.max(1, Math.trunc(limit.depth))}`)
     return this.driver.exchange(`go ${bounds.join(' ')}`, (line) => {
       const info = parseInfo(line)
       if (info !== null) {

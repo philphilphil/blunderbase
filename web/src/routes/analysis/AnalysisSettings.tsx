@@ -46,13 +46,15 @@ import {
 } from '@/lib/api/types'
 
 type EngineKey =
-  | 'quick_nodes'
-  | 'deep_nodes'
-  | 'deep_multipv'
+  | 'analysis_nodes'
+  | 'analysis_multipv'
   | 'inaccuracy_threshold'
   | 'mistake_threshold'
   | 'blunder_threshold'
-type MaiaFlagKey = 'maia_on_quick' | 'maia_on_deep' | 'maia_both_sides'
+type MaiaFlagKey = 'maia_on_analysis' | 'maia_both_sides'
+
+/** Every Maia flag the page edits, for the dirty check that compares them all. */
+const MAIA_FLAG_KEYS: readonly MaiaFlagKey[] = ['maia_on_analysis', 'maia_both_sides']
 
 /**
  * The same spec `SettingField` takes, with the two strings a reader sees held as messages
@@ -64,16 +66,21 @@ interface EngineSpec extends Omit<SettingSpec<EngineKey>, 'label' | 'unset'> {
   unset: MessageDescriptor
 }
 
+/**
+ * One budget and one line count, because there is one pass. The line cap is 5 rather than
+ * the 10 the old deep lines allowed: every run over a game — this pass or one asked for in
+ * the Analyse dialog — keeps at most five, and a setting above what a run may carry would
+ * be refused by the backend on save.
+ */
 const PASS_FIELDS: EngineSpec[] = [
-  { key: 'quick_nodes', label: msg`Quick nodes`, min: 1, step: 10_000, unset: msg`Default 250,000` },
   {
-    key: 'deep_nodes',
-    label: msg`Deep nodes`,
+    key: 'analysis_nodes',
+    label: msg`Nodes per move`,
     min: 1,
-    step: 100_000,
-    unset: msg`Default 2,000,000`,
+    step: 50_000,
+    unset: msg`Default 500,000`,
   },
-  { key: 'deep_multipv', label: msg`Deep lines`, min: 1, max: 10, step: 1, unset: msg`Default 4` },
+  { key: 'analysis_multipv', label: msg`Lines`, min: 1, max: 5, step: 1, unset: msg`Default 2` },
 ]
 
 const CLASSIFICATION_FIELDS: EngineSpec[] = [
@@ -91,14 +98,9 @@ const CLASSIFICATION_FIELDS: EngineSpec[] = [
 
 const FLAGS: { key: MaiaFlagKey; label: MessageDescriptor; caption: MessageDescriptor }[] = [
   {
-    key: 'maia_on_quick',
-    label: msg`Run Maia on quick passes`,
-    caption: msg`Adds human-move predictions to the automatic pass each imported game receives.`,
-  },
-  {
-    key: 'maia_on_deep',
-    label: msg`Run Maia on deep passes`,
-    caption: msg`A game that already has every configured level is skipped, so this only pays for what a quick pass missed.`,
+    key: 'maia_on_analysis',
+    label: msg`Maia on the analysis pass`,
+    caption: msg`Adds human-move predictions to every pass — the one each imported game receives and the ones you ask for with Analyse…`,
   },
   {
     key: 'maia_both_sides',
@@ -181,7 +183,7 @@ export function EnginePassesPage() {
       />
       <PageHeader
         title={t`Engine passes`}
-        description={t`How much work quick and deep passes do, and how their results become move labels.`}
+        description={t`How much work the analysis pass does, and how its results become move labels.`}
       />
       <LoadingOrError pending={settings.isPending} error={settings.error} retry={() => void settings.refetch()} />
       {settings.data ? (
@@ -189,12 +191,12 @@ export function EnginePassesPage() {
           <Card>
             <CardHeader className="flex-col items-stretch gap-1">
               <CardTitle>
-                <Trans>Pass budgets</Trans>
+                <Trans>Analysis pass</Trans>
               </CardTitle>
               <CardDescription>
                 <Trans>
-                  Quick runs automatically on import; deep is requested explicitly and keeps
-                  several candidate lines.
+                  Runs automatically on every imported game and on a backfill. Deeper work on
+                  one game is asked for there, with Analyse…, which starts from these numbers.
                 </Trans>
               </CardDescription>
             </CardHeader>
@@ -222,7 +224,7 @@ export function EnginePassesPage() {
             </CardContent>
           </Card>
           {/*
-            Not a budget, but it belongs beside them: it decides what the quick pass every
+            Not a budget, but it belongs beside them: it decides what the analysis pass every
             new game receives is allowed to *show* before the owner has read the game. The
             browser-wide ⇧E mode hides everything everywhere; this is the per-game version,
             stored on the game, so it survives a second browser and comes off one game at
@@ -341,7 +343,7 @@ function MaiaLevels({ elos, onChange }: { elos: number[]; onChange: (next: numbe
 }
 
 /**
- * Which humans Maia speaks for, and which passes pay for the answer.
+ * Which humans Maia speaks for, and whether the analysis pass pays for the answer.
  *
  * The levels are a set, not a number, because the reading is a comparison — what a 1500
  * plays here beside what a 1900 plays here — and every surface asks the same set, so the
@@ -374,7 +376,7 @@ export function MaiaSettingsPage() {
   const flag = (key: MaiaFlagKey) => (parse(text(key)) ?? DEFAULTS[key]) === 1
   const dirty =
     levels.join(',') !== storedElos(stored).join(',') ||
-    (['maia_on_quick', 'maia_on_deep', 'maia_both_sides'] as const).some((key) => text(key) !== storedText(stored, key))
+    MAIA_FLAG_KEYS.some((key) => text(key) !== storedText(stored, key))
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -383,8 +385,7 @@ export function MaiaSettingsPage() {
       ...completeUpdate(stored),
       maia_elos: levels,
       maia_target_elo: null,
-      maia_on_quick: flag('maia_on_quick') ? 1 : 0,
-      maia_on_deep: flag('maia_on_deep') ? 1 : 0,
+      maia_on_analysis: flag('maia_on_analysis') ? 1 : 0,
       maia_both_sides: flag('maia_both_sides') ? 1 : 0,
     })
   }
@@ -420,7 +421,7 @@ export function MaiaSettingsPage() {
             </CardTitle>
             <CardDescription>
               <Trans>
-                Choose which passes pay for human-move predictions and whose moves they cover.
+                Choose whether passes pay for human-move predictions and whose moves they cover.
               </Trans>
             </CardDescription>
           </CardHeader>

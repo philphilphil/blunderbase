@@ -274,7 +274,7 @@ export function MoveList({
   return (
     <div data-testid="move-list" className={cn('flex min-h-0 flex-col', className)}>
       {showTabRow ? (
-      <div className="flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5">
+      <div className="@container flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5">
         <Tab active={tab === 'moves'} onClick={() => setTab('moves')}>
           <Trans>Moves</Trans>
         </Tab>
@@ -297,7 +297,9 @@ export function MoveList({
           worth the two words.
         */}
         <div className="flex flex-none items-center gap-2.5 whitespace-nowrap font-mono text-[0.625rem] tabular text-faint">
-          <span className="max-md:hidden">
+          {/* And on a desktop whose track is at its 15.625rem floor, by the row's own width:
+              German's "Markiert" and "Halbzüge" are longer than the words this was fitted to. */}
+          <span className="max-md:hidden @max-[16.5rem]:hidden">
             <Trans>{plyCount} plies</Trans>
           </span>
           <PgnButton pgn={pgn} />

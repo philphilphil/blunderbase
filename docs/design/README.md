@@ -64,7 +64,7 @@ directory are local snapshots pulled 2026-08-25.
   notes/MCP column with recurring-mistake cards. Option 1b is not implemented.
   The "Component states" section (1c) applies to the chosen layout.
 - Palette/typography come from the design file: dark-first, bg `#08090b`,
-  accent teal `#3ecfd6`, purple `#c9b0ff` for Maia/deep-tier, fonts Geist +
+  accent teal `#3ecfd6`, purple `#c9b0ff` for Maia and for runs a person asked for, fonts Geist +
   Geist Mono.
 - **Brand**: `brand/logo.png` (+ favicon, apple-touch-icon) — the predecessor's
   pawn-robot logo with the band recolored from blue to the teal accent. It is
@@ -147,17 +147,19 @@ none of them is a layout problem, so none is fixable in `web/`.
   The slots carry that instead (`Worst`, `Win % given away`, `Blunder rate`), so
   the columns read in real units rather than invented ones. Needs a backend
   accuracy/ACPL model.
-- **The `Standard · d32` tier** (design 1a's header, 1c's tier row) —
-  `db/enums.py: Tier` is `quick | deep`, so the teal middle badge has nothing to
-  render for. Adding it is a backend scope change (a third budget, its own engine
-  binding and queue priority), not a badge.
+- **The `Standard · d32` tier name** (design 1a's header, 1c's tier row) — there
+  are no named tiers to print: a game has the import pass and any runs a person
+  asked for, each with its own limit. The header's `RunBadge` prints what the run
+  was instead — `d24 · 2 lines`, `10s · 2 lines`, `500k · 2 lines` — in the deep
+  token for a requested run and neutral for the import pass. The design's name
+  half (`Standard`) is the part left out.
 - **The `Variations` and `Book` move-list tabs** (design 1a) — `/games/{id}`
   sends a flat move list with no variation tree and takes none, and `Book` is the
   per-position question `/explorer` already answers on a screen with a board to
   walk it. The slot carries `Flagged`; the design's `PGN` affordance is
   implemented. Rationale in `MoveList.tsx`'s docblock.
 - **The sidebar footer's `2.4 GB / 3.8 GB`** (every design frame) — no endpoint
-  reports disk usage. The same three-line treatment carries deep-analysis
+  reports disk usage. The same three-line treatment once carried analysis
   coverage of the library, which is the "how full is this database" question the
   API can answer. Rationale in `SideNav.tsx`'s docblock.
 

@@ -357,7 +357,7 @@ def test_a_run_goes_out_progresses_and_comes_back_as_rows(
 
     with connect(api, token) as runner:
         engine_id = runner.engine_ids["sf-remote"]
-        run_id = enqueue(api, game_id, engine_id, tier="deep")
+        run_id = enqueue(api, game_id, engine_id)
 
         frame = dispatch_for(runner)
         assert frame["run_id"] == run_id
@@ -411,7 +411,7 @@ def test_progress_is_the_run_s_heartbeat_and_reaches_the_events_socket(
     assert beaten.heartbeat_at is not None
     assert published["run_id"] == run_id
     assert (published["done"], published["total"]) == (6, 9)
-    assert published["tier"] == "quick"
+    assert "tier" not in published
     assert published["status"] == "running"
 
 
@@ -494,8 +494,8 @@ def test_the_dispatcher_hands_out_no_more_runs_than_the_runner_has_slots(
 
     with connect(api, token, slots=1) as runner:
         engine_id = runner.engine_ids["sf-remote"]
-        first = enqueue(api, game_id, engine_id, tier="deep")
-        second = enqueue(api, game_id, engine_id, tier="deep")
+        first = enqueue(api, game_id, engine_id)
+        second = enqueue(api, game_id, engine_id)
 
         frame = dispatch_for(runner)
         state = api.app.state.gateway.state(runner_id)
@@ -757,16 +757,16 @@ def test_a_claim_that_lands_across_a_reconnect_goes_back_to_the_queue(
         claim = gateway._claim
         claimed: list[Any] = []
 
-        def claim_then_reconnect(for_runner: int) -> Any:
+        def claim_then_reconnect(for_runner: int, run_limits: bool = True) -> Any:
             """The socket dropped and the runner dialled straight back in, while the claim
             was still on its way back from the database."""
-            found = claim(for_runner)
+            found = claim(for_runner, run_limits)
             gateway._states[for_runner] = replacement
             claimed.append(found)
             return found
 
         monkeypatch.setattr(gateway, "_claim", claim_then_reconnect)
-        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"])
 
         deadline = time.monotonic() + SETTLE_SECONDS
         while not claimed and time.monotonic() < deadline:
@@ -831,7 +831,7 @@ def test_a_reconnect_is_told_about_the_run_it_no_longer_holds(
     game_id = seed_game(api)
 
     with connect(api, token) as runner:
-        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"])
         held = dispatch_for(runner)
 
     wait_for(settings, run_id, RunStatus.QUEUED)
@@ -854,7 +854,7 @@ def test_a_reconnect_resumes_a_run_that_is_still_its_own(
     game_id = seed_game(api)
 
     with connect(api, token) as first:
-        run_id = enqueue(api, game_id, first.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, first.engine_ids["sf-remote"])
         held = dispatch_for(first)
 
         with connect(api, token, say_hello=False) as second:
@@ -879,7 +879,7 @@ def test_a_run_the_reconnecting_runner_does_not_claim_goes_back_to_the_queue(
     game_id = seed_game(api)
 
     with connect(api, token) as first:
-        run_id = enqueue(api, game_id, first.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, first.engine_ids["sf-remote"])
         held = dispatch_for(first)
 
         # A second link takes the runner over without naming the run: nobody is searching
@@ -908,7 +908,7 @@ def test_a_reserved_slot_is_one_the_dispatcher_no_longer_has(
         state = gateway.state(runner_id)
         assert (state.streams, state.free_slots) == ({"str_7f3c"}, 0)
 
-        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"])
         time.sleep(0.1)
         assert run_row(settings, run_id).status is RunStatus.QUEUED
 
@@ -921,13 +921,13 @@ def test_a_reserved_slot_is_one_the_dispatcher_no_longer_has(
 def test_a_stream_takes_the_slot_of_the_run_that_started_last(
     api: TestClient, settings: Settings
 ) -> None:
-    """D6: somebody is at a board, so it does not queue behind a deep pass."""
+    """D6: somebody is at a board, so it does not queue behind an analysis pass."""
     runner_id, token = register(settings, slots=1)
     game_id = seed_game(api)
     gateway = api.app.state.gateway
 
     with connect(api, token, slots=1) as runner:
-        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"], tier="deep")
+        run_id = enqueue(api, game_id, runner.engine_ids["sf-remote"])
         dispatch_for(runner)
 
         assert api.portal.call(gateway.reserve_slot, runner_id, "str_7f3c") is True
@@ -974,7 +974,7 @@ def test_the_events_socket_follows_a_runner_arriving_working_and_leaving(
     with api.websocket_connect("/events", headers=socket_headers(api)) as events:
         with connect(api, token) as runner:
             arrived = until(events, runners_service.EVENT_RUNNER_CONNECTED)
-            enqueue(api, game_id, runner.engine_ids["sf-remote"], tier="deep")
+            enqueue(api, game_id, runner.engine_ids["sf-remote"])
             dispatch_for(runner)
             busy = until(events, runners_service.EVENT_RUNNER_UPDATED)
         gone = until(events, runners_service.EVENT_RUNNER_DISCONNECTED)

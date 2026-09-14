@@ -111,7 +111,7 @@ export function SourcesPanel({
           />
           <SyncCheckbox
             label={t`Skip evaluation`}
-            title={t`Store the games and stop there — no quick pass is queued. Worth it on a first sync of a long archive; the library can queue the passes a few at a time afterwards.`}
+            title={t`Store the games and stop there — no analysis pass is queued. Worth it on a first sync of a long archive; Backfill on the Analysis page queues the passes afterwards.`}
             checked={skipEvaluation}
             onChange={setSkipEvaluation}
             disabled={running}

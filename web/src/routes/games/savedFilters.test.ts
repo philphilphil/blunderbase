@@ -110,6 +110,33 @@ describe('readSavedFilters', () => {
     )
     expect(readSavedFilters().map((entry) => entry.id)).toEqual(['ok'])
   })
+
+  /**
+   * A cut saved while there were two passes. It must neither crash the rail nor replay a
+   * key the backend no longer takes; what it can still mean survives, and one with nothing
+   * left to mean is not kept as a second "all games".
+   */
+  it('reads an old cut over deep_analyzed as what it can still mean', () => {
+    storage.setItem(
+      SAVED_FILTERS_KEY,
+      JSON.stringify([
+        { id: 'black-no-deep', label: 'Black, no deep', filters: { color: 'black', deep_analyzed: false } },
+        { id: 'no-deep-pass', label: 'No deep pass', filters: { deep_analyzed: false } },
+      ]),
+    )
+    expect(readSavedFilters()).toEqual([
+      {
+        id: 'black-no-deep',
+        label: 'Black, no deep',
+        filters: { color: 'black' },
+        dotClass: 'bg-accent-teal',
+      },
+    ])
+  })
+
+  it('ships no built-in over a pass that no longer exists', () => {
+    expect(BUILT_IN_FILTERS.map((row) => row.id)).toEqual(['losses-as-black', 'with-blunders'])
+  })
 })
 
 describe('suggestLabel', () => {

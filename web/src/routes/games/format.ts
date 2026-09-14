@@ -8,8 +8,8 @@
 import { i18n, type MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 
-import type { Classification, GameCard, GameSummary, Outcome, Source, Tier } from '@/lib/api/types'
-import { glyphFor, type Glyph } from '@/lib/chess/classification'
+import type { Classification, GameCard, GameSummary, Outcome, Source } from '@/lib/api/types'
+import { glyphFor, type Glyph, type RunShape } from '@/lib/chess/classification'
 import { MINUS } from '@/lib/chess/evaluation'
 import { formatClock } from '@/lib/chess/timeControl'
 
@@ -157,11 +157,14 @@ export function flagCounts(game: GameCard): FlagCount[] {
   }))
 }
 
-/** Which analysis tier a card carries, or null when nothing has run over it. */
-export function tierOf(game: GameCard): Tier | null {
-  if (game.deep) return 'deep'
-  if (game.analyzed) return 'quick'
-  return null
+/**
+ * The run chip a card can draw, or null when nothing has run over it. A card knows only that
+ * a pass is done and whether somebody asked for one — not the limits — so the chip says
+ * "Analysed", coloured when a requested run is among them.
+ */
+export function analysisOf(game: GameCard): RunShape | null {
+  if (!game.analyzed) return null
+  return { requested: game.requested === true }
 }
 
 /**

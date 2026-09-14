@@ -66,7 +66,7 @@ export interface StreamOffer {
   reason: StreamEndReason
   error: string | null
   /**
-   * Engines that could take it over now, deep tier first. A runner that went away takes
+   * Engines that could take it over now, local ones first. A runner that went away takes
    * every engine it advertises with it; an engine that crashed, or a session reaped for
    * sitting idle, takes nothing with it and is offered back — on a one-engine deployment
    * it is the only way back at all.
@@ -119,14 +119,14 @@ export interface StreamSessionApi {
    */
   engines: EngineHost[]
   /**
-   * null ⇒ let the server take the deep tier's engine. Starts at whatever was picked last
+   * null ⇒ let the server take the analysis role's engine. Starts at whatever was picked last
    * in this browser, which is null until something else is picked.
    */
   engineId: number | null
   setEngineId: (id: number | null) => void
   multipv: number
   setMultipv: (lines: number) => void
-  /** Take the offer: reopen on this engine (null = the deep-tier default). */
+  /** Take the offer: reopen on this engine (null = the analysis role's engine). */
   resume: (engineId: number | null) => void
   dismissOffer: () => void
 }
@@ -239,7 +239,7 @@ function useServerStreamSession({
 
   // A remembered engine this deployment cannot open a board on — a runner that has not come
   // back, an engine switched off or deleted since — would open straight into the backend's
-  // refusal, which flips the toggle off again. So it falls back to the deep tier, and only
+  // refusal, which flips the toggle off again. So it falls back to the analysis role, and only
   // while nothing is running: an engine lost *mid-search* is the offer's business, not this
   // one's. What is stored is left alone, so the machine coming back brings the pick with it.
   useEffect(() => {

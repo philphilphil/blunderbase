@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Link, useParams } from 'react-router-dom'
 
 import { Board, type BoardArrow, type Square } from '@/components/board/Board'
+import { Frame } from '@/components/engine-dialog/DialogFrame'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -66,7 +67,6 @@ import { cn } from '@/lib/utils'
 import { EvalBar } from '@/routes/game/components/EvalBar'
 
 import { BookPane, type BookSource } from './components/BookPane'
-import { Frame } from './components/DialogFrame'
 import { EnginesPane } from './components/EnginesPane'
 import { ExpandDialog } from './components/ExpandDialog'
 import { FinishDialog, GameHeader, OpponentMoveDialog } from './components/GameHeader'
@@ -105,9 +105,11 @@ function PaneTitle({
 }) {
   return (
     <div className="flex h-[2.1875rem] flex-none items-center gap-2 border-b border-line bg-panel px-2.5 text-[0.6875rem]">
-      <strong className="font-semibold text-ink">{title}</strong>
-      {detail ? <span className="truncate text-dim">{detail}</span> : null}
-      {end ? <div className="ml-auto flex items-center gap-1.5">{end}</div> : null}
+      {/* Only the detail gives way on a narrow column: it is a count the pane itself shows,
+          while the title names the pane and the actions at the end are the only way to them. */}
+      <strong className="flex-none font-semibold text-ink">{title}</strong>
+      {detail ? <span className="min-w-0 truncate text-dim">{detail}</span> : null}
+      {end ? <div className="ml-auto flex flex-none items-center gap-1.5">{end}</div> : null}
     </div>
   )
 }

@@ -59,7 +59,6 @@ import type {
   RunnerUpdate,
   SampleRequest,
   Source,
-  Tier,
   TourState,
 } from './types'
 
@@ -419,10 +418,10 @@ export function useQueueStatus(options?: Options<Awaited<ReturnType<typeof api.g
   })
 }
 
-export function useRuns(gameId: number, tier?: Tier, options?: Options<Awaited<ReturnType<typeof api.listRuns>>>) {
+export function useRuns(gameId: number, options?: Options<Awaited<ReturnType<typeof api.listRuns>>>) {
   return useQuery({
-    queryKey: queryKeys.runs(gameId, tier),
-    queryFn: () => api.listRuns(gameId, tier),
+    queryKey: queryKeys.runs(gameId),
+    queryFn: () => api.listRuns(gameId),
     ...options,
   })
 }
@@ -448,7 +447,7 @@ export function useFailedRuns(
 ) {
   return useQuery({
     queryKey: queryKeys.failedRuns(limit),
-    queryFn: () => api.listRuns(undefined, undefined, { status: 'failed', limit }),
+    queryFn: () => api.listRuns(undefined, { status: 'failed', limit }),
     ...options,
   })
 }
@@ -460,8 +459,8 @@ export const FAILED_RUN_LIMIT = 50
  * Pick the failures back up. Invalidates `['analysis']` whole: the retry queues runs, so
  * the queue, the coverage split and the failed listing all moved at once.
  *
- * A 409 `tier_unavailable` is the expected refusal, not a bug — the tier behind the
- * failures still has no engine — and the caller is the one that can say so in words.
+ * A 409 `engine_unavailable` is the expected refusal, not a bug — the engine behind the
+ * failures still cannot run — and the caller is the one that can say so in words.
  */
 export function useRetryFailed(
   options?: UseMutationOptions<
@@ -527,8 +526,8 @@ export function useRequestAnalysisBatch(
 }
 
 /**
- * How many games a whole-library pass of this tier would take on — the number the Analysis
- * page's backfill cards are labelled with.
+ * How many games a whole-library pass would take on — the number the Analysis page's
+ * Backfill button is labelled with.
  *
  * The key lives under `['analysis']`, so every analysis event marks it stale, which is
  * what keeps those labels honest as games trickle in. That includes the pass the buttons
@@ -536,15 +535,8 @@ export function useRequestAnalysisBatch(
  * back down and the buttons relabel themselves as it goes, which is the point. The
  * `['analysis']` cooldown is what keeps that cheap under the burst.
  */
-export function useBackfillPreview(
-  tier: Tier,
-  options?: Options<Awaited<ReturnType<typeof api.getBackfill>>>,
-) {
-  return useQuery({
-    queryKey: queryKeys.backfill(tier),
-    queryFn: () => api.getBackfill(tier),
-    ...options,
-  })
+export function useBackfillPreview(options?: Options<Awaited<ReturnType<typeof api.getBackfill>>>) {
+  return useQuery({ queryKey: queryKeys.backfill(), queryFn: api.getBackfill, ...options })
 }
 
 /**
@@ -553,11 +545,11 @@ export function useBackfillPreview(
  * the queue is what the caller watches from here.
  */
 export function useStartBackfill(
-  options?: UseMutationOptions<Awaited<ReturnType<typeof api.startBackfill>>, Error, Tier>,
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.startBackfill>>, Error, void>,
 ) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (tier: Tier) => api.startBackfill(tier),
+    mutationFn: () => api.startBackfill(),
     ...options,
     onSuccess: (...args) => {
       void client.invalidateQueries({ queryKey: queryKeys.analysis() })
@@ -567,8 +559,8 @@ export function useStartBackfill(
 }
 
 /**
- * The undo for a queue built up by mistake: every tier, windowed or full-game, fill or
- * not. What an engine already has claimed is left to finish — see `api.clearQueue`.
+ * The undo for a queue built up by mistake: requested or imported, windowed or full-game,
+ * fill or not. What an engine already has claimed is left to finish — see `api.clearQueue`.
  */
 export function useClearQueue(
   options?: UseMutationOptions<Awaited<ReturnType<typeof api.clearQueue>>, Error, void>,
@@ -985,8 +977,19 @@ export function useEngines(
   })
 }
 
-export function useTierStatus(options?: Options<Awaited<ReturnType<typeof api.listTierStatus>>>) {
-  return useQuery({ queryKey: queryKeys.engineTiers(), queryFn: api.listTierStatus, ...options })
+/**
+ * The engines the game's Analyse dialog offers, the analysis role's marked `default`. Its
+ * own read rather than the correspondence status, which carries the same rows but only
+ * exists for an owner with the mode switched on — and asks the pool about slots besides.
+ */
+export function useAnalysisEngines(
+  options?: Options<Awaited<ReturnType<typeof api.listAnalysisEngines>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.analysisEngines(),
+    queryFn: api.listAnalysisEngines,
+    ...options,
+  })
 }
 
 /**

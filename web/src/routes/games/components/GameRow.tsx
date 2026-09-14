@@ -14,11 +14,12 @@ import { memo } from 'react'
 
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import { SourceBadge } from '@/components/badges/SourceBadge'
-import { TierBadge, UnanalysedBadge } from '@/components/badges/TierBadge'
+import { RunBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
 import type { GameCard } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
 import {
+  analysisOf,
   dropTone,
   flagCounts,
   formatDrop,
@@ -27,7 +28,6 @@ import {
   formatTimeControl,
   moveCount,
   outcomeTone,
-  tierOf,
   worstDrop,
 } from '../format'
 import { cellClass, cellStyle, COLUMNS, PHONE_CARD, ROW_HEIGHT } from './columns'
@@ -52,7 +52,8 @@ export interface GameRowProps {
    * The engine is hidden (⇧E, `lib/ui/engineVisibility`), so this row says nothing about
    * how the game was played: no `Worst` cell — the table has dropped that column and the
    * header with it — and no flag badges. What stays is what the engine did not decide: the
-   * tier chip (a run happened, at this depth), the "analyse" affordance where none has, and
+   * run chip (a pass happened, and whether one was asked for), the "analyse" affordance where
+   * none has, and
    * the delete button that shares the flags cell.
    */
   engineHidden?: boolean
@@ -69,7 +70,7 @@ export const GameRow = memo(function GameRow({
   engineHidden = false,
 }: GameRowProps) {
   const { t } = useLingui()
-  const tier = tierOf(game)
+  const analysis = analysisOf(game)
   const drop = worstDrop(game)
   const flags = flagCounts(game)
   // This row's verdict is held back either because the engine is hidden everywhere (⇧E,
@@ -187,15 +188,15 @@ export const GameRow = memo(function GameRow({
       </span>
 
       <span {...cell('tier')}>
-        {tier ? (
-          <TierBadge tier={tier} className="px-1.5 py-px text-[0.625rem]" />
+        {analysis ? (
+          <RunBadge run={analysis} className="px-1.5 py-px text-[0.625rem]" />
         ) : (
           <UnanalysedBadge className="px-1.5 py-px text-[0.625rem]" />
         )}
       </span>
 
       <span {...cell('flags', 'flex items-center gap-1 overflow-hidden')}>
-        {tier && quiet ? null : tier ? (
+        {analysis && quiet ? null : analysis ? (
           flags.map((flag) => (
             <ClassificationBadge
               key={flag.glyph}

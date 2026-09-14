@@ -88,7 +88,7 @@ ratings, dates, source IDs, accounts and notes, and drops engine configuration e
 one invariant: nothing a visitor does can make the machine serving the demo start a search.
 The evaluations are copied in and the runs that carry them name no engine row, so the
 Engines page has nothing to show and no role is assigned for a run to claim. In demo mode
-the browser does not fall back to the server either — the analysis board and both tiers run
+the browser does not fall back to the server either — the analysis board, the import pass and the Analyse dialog run
 on Stockfish in the visitor's own tab (`web/src/lib/demo/`), and what it computes stays
 there. Both server guards stay in place regardless: `analyze_position` and the stream broker
 refuse a local engine under `settings.demo`, because a seed that predates this is a file the
@@ -175,9 +175,10 @@ stream's place, so one broken game costs exactly that game. `ingest_games` then,
   then run `reconcile_games`: the same match re-applied to the games already stored, which
   is what repairs a library imported before any account named its owner. The repair only
   ever fills in an empty column, so it is idempotent and never revises a decided game.
-- **Enqueues the quick tier.** A `queued` `AnalysisRun` per imported game, against the
-  engine the owner assigned to the quick role. Nothing falls back, and no engine means no
-  run — an import must never fail because no engine is assigned.
+- **Enqueues the analysis pass.** A `queued` `AnalysisRun` per imported game at
+  `IMPORT_PRIORITY`, against the engine the owner assigned to the analysis role, with
+  `analysis_nodes` and `analysis_multipv` copied onto the row. Nothing falls back, and no
+  engine means no run — an import must never fail because no engine is assigned.
 
 Each game is its own transaction, so a sync that dies half-way keeps what it got, and the
 job's counters and error list are rewritten after every game.
@@ -197,8 +198,8 @@ A subscriber that raises is ignored: it must never be able to abort a sync.
 ## Analysis queue
 
 The queue is the `analysis_runs` table, not a broker: a run survives a restart because it
-is a row. Workers claim the highest `priority` queued row (deep = 10 beats quick = 0, so a
-deep request someone is waiting on jumps the FIFO) with one conditional `UPDATE …
+is a row. Workers claim the highest `priority` queued row (`REQUESTED_PRIORITY` = 10 beats
+`IMPORT_PRIORITY` = 0, so a run someone asked for and is waiting on jumps the FIFO) with one conditional `UPDATE …
 RETURNING`, mark it `running`, and on completion write every `MoveEval` and the terminal
 status in one commit. The claim index matches that mixed order — priority descending,
 then creation and id ascending — so a library backfill is an index walk rather than one
@@ -230,12 +231,20 @@ column comparison or a correlated EXISTS). `get_stats` therefore takes the same 
 object the games table is already showing. Outcomes are owner-relative — `outcome="win"`
 matches a `0-1` game the owner had Black in.
 
-**Which run answers.** `games.get_game_detail` merges *all* of a game's done runs in
-`(quick before deep, then age)` order and lets the later one win per ply, so a deep pass
-over one window shows deep evals there and quick evals everywhere else, and a Maia run
-adds a policy without erasing an eval. `stats.primary_runs()` deliberately does not do
-that: an aggregation reads exactly one run per game — the newest done, full-game, UCI
-run — because a dimension half at quick budget and half at deep budget is not a number.
+**Which run answers.** One key, `games.run_rank` = `(priority > 0, id)`, and the later run
+by it wins. A run somebody asked for outranks every import pass whatever their ages — a
+person chose its engine and its limit, and a backfill queued afterwards must not quietly
+replace that — and among equals the newer one wins. Legacy deep rows carry priority 10, so
+a library analysed under the old tiers ranks as it always did. `games.get_game_detail`
+merges *all* of a game's done runs in that order per ply, so a requested look at one window
+shows there and the import pass everywhere else, and a Maia run adds a policy without
+erasing an eval. `stats.primary_runs()` deliberately does not merge: an aggregation reads
+exactly one run per game — the last done, full-game, UCI run by the same key, folded into
+one integer because SQL has no tuple max — because a dimension half from one search and half
+from another is not a number. `explorer` breaks its occurrence ties by the same key. The
+budgets behind those primary runs do differ between games now (a d24 run on one, the import
+budget on the next); that is the price of letting a person's deeper look count, and the
+node budget is still what the bulk of a library is read from.
 
 **Aggregation in Python, filtering in SQL.** Phase (needs the board), piece moved (needs
 the SAN), time trouble (needs the game's clock list) and time of day (needs the viewer's
@@ -377,8 +386,8 @@ Engines are rows, and three modules divide the work:
   path, kind and options, so editing an engine's options in the UI starts a fresh process
   instead of leaving the old settings warm. One process per caller up to the
   `analysis_concurrency` app setting (`BLUNDERBASE_ANALYSIS_CONCURRENCY` overrides it), not
-  one per spec: every analysis worker resolves the
-  quick tier to the same engine row, and a single process would queue the whole pool behind
+  one per spec: every import pass resolves the
+  analysis role to the same engine row, and a single process would queue the whole pool behind
   one search. The pool is asyncio-facing because the analysis
   workers are asyncio tasks: every blocking engine call goes out through
   `pool.run(spec, work)` / `asyncio.to_thread`, and one semaphore of that cap governs
@@ -386,13 +395,16 @@ Engines are rows, and three modules divide the work:
   that raises drops its process (a corpse in the slot would be handed to the next caller)
   and always releases its slot.
 - `services/engines.py` owns the policy: probe on add, options validated against what the
-  binary declared, and roles that degrade. The owner assigns one engine to each of Quick,
-  Deep and Human moves (`EngineRole`, three `app_settings` rows); nothing falls back, so a
+  binary declared, and roles that degrade. The owner assigns one engine to each of Analysis
+  and Human moves (`EngineRole`, two `app_settings` rows); nothing falls back, so a
   role whose engine is missing, switched off, of the wrong kind or on a runner that is not
   connected simply does not run. `engine_for_role` returns `None`, `role_status(role)`
   explains why in words a UI can show — `configured` telling "you have not chosen one" from
-  "the one you chose is down" — and only `require_engine_for_tier` raises, as
-  `TierUnavailableError`, never as whatever the process layer threw. `assign_default_roles`
+  "the one you chose is down" — and only `require_engine_for_role` raises, as
+  `EngineUnavailableError` (`engine_unavailable` at the API and in MCP), never as whatever
+  the process layer threw. The role only names the default: a run somebody asks for may
+  name any enabled UCI engine, and `analysis_engines` lists them in the same shape the
+  correspondence pickers use. `assign_default_roles`
   is the one write that happens without the owner asking: a role nobody has filled goes to
   the first engine of a kind that fits it, at `add_engine` and for a runner's new engines,
   which is what makes a fresh install run without a visit to the form. It imports the
@@ -412,12 +424,26 @@ matches no row and it moves on to the next candidate. SQLite has no row locks at
 there is no `SELECT … FOR UPDATE SKIP LOCKED` to reach for: the conditional UPDATE is the
 claim.
 
-**Scheduling.** Quick runs are FIFO at priority 0; deep runs jump the queue at priority 10
-because someone is waiting on one. Concurrency is one semaphore of
+**Scheduling.** The queue's own work — the import pass, a backfill, a Maia fill, the Games
+table's "Queue analysis" — is FIFO at `IMPORT_PRIORITY` (0); a run somebody asked for (the
+Analyse dialog, MCP `request_analysis`, `blunderbase analyze --game-id`) jumps it at
+`REQUESTED_PRIORITY` (10) because someone is waiting on it, and correspondence tasks sit in
+between. Concurrency is one semaphore of
 `analysis_concurrency` inside the engine pool, shared across every engine process.
 
+**What a run stops at is on the row.** A run carries exactly one limit per move: `nodes`,
+`depth` or `seconds` (python-chess `Limit(time=)`), plus `multipv`. An import-priority run
+always carries `nodes` — `analysis_nodes` at enqueue — and a requested run carries whichever
+the caller chose, `analysis_nodes` when it chose none; the service refuses two. Like every
+budget it is copied when the run is queued, not looked up when it executes, and `depth` is
+only ever the limit — nothing writes "depth reached" into it. A seconds limit is the one
+that depends on the machine; that is the caller's choice, and the badge says `10s` rather
+than pretending it is a node count. `tier` stays a nullable column so rows from before read;
+nothing writes it.
+
 **One transaction per run.** `build_plan` reads what a run needs into a `RunPlan` — plain
-values, no Session, no ORM object — so `analyse_plan` can be handed to a thread. It
+values, no Session, no ORM object — so `analyse_plan` can be handed to a thread. It passes
+whichever limit is set and never backfills nodes beside a depth or a time. It
 returns unattached `MoveEval` objects that are buffered in memory until `complete_run`
 writes them all in one commit. This is the whole reason SQLite's single writer is a
 non-issue: the write lock is held for milliseconds, never for the length of a search.
@@ -432,18 +458,18 @@ makes two games comparable: a move Maia's answer changed between them is the pla
 changing, not the question. No Maia engine, or a Maia that will not answer, degrades: the
 evaluation is still worth having, and the reason is recorded on the run.
 
-**The second pass is not part of what a run is.** It costs 40-70% of a quick pass — 375 ms
-a ply against Stockfish's ~480 at 250k nodes — and a deep run spent it recomputing a policy
-identical to the quick run's, since Maia answers a position rather than a search budget. So
-a run carries a `maia` flag, written when it is queued from `maia_on_quick` /
-`maia_on_deep` the way its node budget is written from `quick_nodes` / `deep_nodes`: on for
-quick, off for deep, and a caller may say either explicitly. `maia_both_sides`, read per
+**The second pass is not part of what a run is.** It costs 40-70% of a node-budget pass —
+375 ms a ply against Stockfish's ~480 at 250k nodes — and a second search over the same
+game would spend it recomputing a policy it already has, since Maia answers a position
+rather than a search budget. So a run carries a `maia` flag, written when it is queued from
+`maia_on_analysis` the way its node budget is written from `analysis_nodes` — on by
+default, and a caller may say either explicitly. `maia_both_sides`, read per
 plan like the thresholds, is the other half of the cost — on, every ply is asked about,
 because "what will a human opposite me fall into" is a question about the positions the
 *opponent* moves in; off, only the plies the owner moved in are, which halves the pass. A
 run with no Maia pass never starts the process and never takes the pool slot. The two
 switched-off cases meet at `maia_only`, the fill pass that adds levels to a game already
-searched: it is always a Maia pass, whatever the tier's setting says, because a fill
+searched: it is always a Maia pass, whatever `maia_on_analysis` says, because a fill
 without one would be no pass at all.
 
 **Classification** is win-percentage based, à la Lichess:
@@ -461,7 +487,7 @@ while a search runs. The worker reads its tail before the exception leaves the p
 context manager (which drops the dead process), and writes it onto the run. The first
 failure requeues the run with its error still visible; the second fails it for good. A
 failure that will not improve on a retry — a binary that is no longer where the engine row
-says — skips the retry. The game stays browsable with whatever tiers it has.
+says — skips the retry. The game stays browsable with whatever runs it has.
 
 **Restart.** A worker set marks the runs it is executing alive every
 `HEARTBEAT_SECONDS`. Starting one calls `requeue_stale_runs`, which collects the `running`
@@ -474,31 +500,32 @@ pass was taken away from it, it did not fail.
 
 **Events.** `analysis.subscribe(hook)` receives every lifecycle transition as a plain
 dict: `analysis.queued` / `.running` / `.progress` / `.done` / `.failed`, each carrying
-`run_id`, `game_id`, `fen`, `tier`, `status`, `engine_id`, `priority`, `attempts`,
-`maia_only` and `at`, plus `evals` on done, `error` / `stderr` / `will_retry` on failed, and `done` /
+`run_id`, `game_id`, `fen`, `status`, `engine_id`, `priority`, `requested`, `nodes`,
+`depth`, `seconds`, `multipv`, `attempts`, `maia_only` and `at`, plus `evals` on done, `error` / `stderr` / `will_retry` on failed, and `done` /
 `total` on progress. Events are emitted from whichever thread reached the transition, so
 the WebSocket layer has to bounce them onto its own loop. A subscriber that raises is
 ignored — it must never be able to fail a run. `analysis.queued` waits for the transaction
-that created the run to commit — the import pipeline enqueues the quick pass inside the
+that created the run to commit — the import pipeline enqueues the analysis pass inside the
 one that stores the game — so a rolled-back import never announces a run id that does not
 exist.
 
-A library-wide write announces itself differently. `analysis.backfill` carries `tier`,
+A library-wide write announces itself differently. `analysis.backfill` carries
 `queued`, `outstanding` and `maia_only`, and names no run at all, because the alternative is ten thousand
 `analysis.queued` frames down every open socket in one burst — the shape of storm this
 deployment has fallen over on before. `POST /analysis/backfill` queues a full-game pass over
-every game with no live run of a tier, uncapped (`/analysis/batch` keeps its five-hundred
+every game with no live run, uncapped (`/analysis/batch` keeps its five-hundred
 ceiling: that one serves a selection made by hand), `GET /analysis/backfill` is the count the
 button labels itself with, and `POST /analysis/backfill/cancel` drops what is still queued
 while leaving the runs a worker already claimed to finish — there is no cancelled status to
-move them to. A client that sees the event refetches the queue.
+move them to — and drops import-priority runs only, so a run somebody asked for survives a
+backfill being stopped. A client that sees the event refetches the queue.
 
-Two passes share the quick tier, and `maia_only` is what tells them apart. A Maia fill
-(`POST /analysis/maia-fill`) is queued under that tier only to borrow its engine and its
-place behind the deep passes; it searches nothing and asks the human-move model for the
-levels a game is missing. So the tier a run was filed under does not say what it did: a
-client that labels a fill by its tier reports a quick pass over a game nobody asked to
-re-analyse, coverage counts that treated one as a pass would leave the game permanently
+Two kinds of import-priority work share the analysis role's engine, and `maia_only` is what
+tells them apart. A Maia fill (`POST /analysis/maia-fill`) borrows that engine and the
+import pass's place in the queue; it searches nothing and asks the human-move model for the
+levels a game is missing. So the engine and priority a run was queued with do not say what
+it did: a client that labels a fill by them reports an analysis pass over a game nobody
+asked to re-analyse, coverage counts that treated one as a pass would leave the game permanently
 out of a backfill, and `/analysis/backfill/cancel` leaves fills alone — `POST
 /analysis/queue/clear` is what takes those back.
 
@@ -571,6 +598,16 @@ unavailable while polling, and an engine advertised over a poll link reports
 `stream_unavailable` at the request, rather than opening a board that never draws and holds
 a slot until the idle reaper takes it.
 
+**A new kind of limit is a hello feature, not a protocol version.** The plan frame gained
+`seconds` and a nullable `nodes` beside `depth`, and a runner that honours all three says
+`run_limits` in its hello. `PROTO_VERSION` stayed at 1 because a bump would have refused
+every runner in the field for work most of them can still do: a runner without the feature
+is handed only runs that carry `nodes` and neither other limit (`claim_next_run(...,
+node_budget_only=True)`, filtered in the candidate query so a wrong-kind claim never comes
+back round), and every plan still carries `"tier": "quick"` as a constant because an old
+decoder requires the key. A requested depth or seconds run on such a runner's engine waits
+until the runner is updated. `runner.yaml`'s `tier:` is accepted and ignored, any value.
+
 **Whether an engine drives a board is the host's own word, and a column.** `EngineAd.streams`
 is written onto `engines.streams` by `sync_runner_engines` rather than inferred from the
 engine's kind, because a host may honestly run queue work and answer no `stream_open` at
@@ -582,8 +619,8 @@ this host advertises nothing and has always driven a board.
 
 **A runner's engine row is an advertisement, not a binary here.** Its `path` is a path on
 that machine, so the two things that start a binary in this process refuse it by name: the
-synchronous `POST /analysis/position` resolves the tier `local_only` and says plainly that
-the tier's own engine is on another machine rather than handing the work to one nobody
+synchronous `POST /analysis/position` resolves the analysis role `local_only` and says plainly that
+the role's own engine is on another machine rather than handing the work to one nobody
 assigned, and the Engines page's test-run button says whose machine the engine is on. Tunnelling a single position to a runner is deliberately outside the
 protocol — a runner carries whole runs.
 
@@ -625,7 +662,10 @@ coach's `runners_status` share, so the three cannot drift into three accounts of
 deployment; `GET /analysis/queue` splits the same backlog by destination, which is what
 tells "the queue is long" from "the only machine with that engine is offline". A run with no
 engine, or one on a *local* engine that has been switched off, counts as local work — that
-is where the worker will look for its tier's engine. A run on a runner's engine stays that runner's
+is where the worker will look for the analysis role's engine. Only import-priority work is
+moved that way: a run somebody asked for named its engine on purpose, so when that engine is
+gone `_prepare` fails it with an `engine_unavailable` sentence naming the engine rather
+than quietly running it somewhere else. A run on a runner's engine stays that runner's
 even while the runner is away: the local set claims with every remote engine excluded,
 disabled ones included, so nothing here would ever drain it, and counting it as local would
 show a backlog against a host that cannot touch it.

@@ -40,6 +40,8 @@ import type { NoteRow } from '../notesModel'
 import { BookPanel, type BookEntry, type BookMove } from './BookPanel'
 import { TAB, TAB_ON, TAB_ROW } from './paneTabs'
 
+export type NotesTrackTab = 'book' | 'notes'
+
 export interface NotesTrackProps {
   /**
    * The owner's own tree from the position on the board — `GameDetail.book[bookPly]`, passed
@@ -69,6 +71,9 @@ export interface NotesTrackProps {
 
   /** The `<NoteComposer/>` for the position on the board. Rendered, never wrapped in a tab. */
   composer: ReactNode
+  /** The open tab, when the page holds it. */
+  tab?: NotesTrackTab
+  onTabChange?: (tab: NotesTrackTab) => void
   className?: string
 }
 
@@ -94,13 +99,19 @@ export function NotesTrack({
   activeNoteId = null,
   onSelectNote,
   composer,
+  tab,
+  onTabChange,
   className,
 }: NotesTrackProps) {
   const { t } = useLingui()
   // Notes until the reader picks one, and their pick from then on. Deliberately not a
   // function of the position: a default that follows the board is a pane that changes
-  // behind the reader's back (see the note above).
-  const [active, setActive] = useState<'book' | 'notes'>('notes')
+  // behind the reader's back (see the note above). The game view holds the pick so `B`
+  // can make it; left uncontrolled, the track keeps its own.
+  const [ownActive, setOwnActive] = useState<NotesTrackTab>('notes')
+  const active = tab ?? ownActive
+  const setActive = (next: NotesTrackTab) =>
+    onTabChange ? onTabChange(next) : setOwnActive(next)
 
   const moves = book?.moves ?? []
   // The entry's own count, which includes games that *ended* here and so is not the sum of
@@ -113,7 +124,7 @@ export function NotesTrack({
       data-testid="notes-track"
       className={cn('flex min-h-0 min-w-0 flex-col', className)}
     >
-      <div role="tablist" aria-label={t`Book and notes`} className={TAB_ROW}>
+      <div role="tablist" aria-label={t`Book and notes`} className={cn(TAB_ROW, '@container')}>
         <button
           type="button"
           role="tab"
@@ -137,8 +148,10 @@ export function NotesTrack({
           <Trans>Book</Trans>
         </button>
         <span className="flex-1" />
-        {/* The count belongs to whichever pane is open, in the quietest type on the row. */}
-        <span className="flex items-center font-mono text-[0.625rem] text-faint tabular">
+        {/* The count belongs to whichever pane is open, in the quietest type on the row —
+            and it is the part that leaves when the track is too narrow for it and the
+            explorer arrow both, since the arrow is the only way out of this pane. */}
+        <span className="flex items-center font-mono text-[0.625rem] text-faint tabular @max-[13rem]:hidden">
           {active === 'book' ? (
             <Plural value={games} one="# game" other="# games" />
           ) : (
@@ -158,7 +171,7 @@ export function NotesTrack({
             onClick={onOpenInExplorer}
             aria-label={t`Open this position in the explorer`}
             title={t`Open this position in the explorer`}
-            className="ml-1.5 flex items-center rounded-sm border border-edge bg-elevated px-1 py-px text-dim transition-colors hover:border-edge-hover hover:text-ink"
+            className="ml-1.5 flex flex-none items-center rounded-sm border border-edge bg-elevated px-1 py-px text-dim transition-colors hover:border-edge-hover hover:text-ink"
           >
             <ArrowUpRight className="size-3" aria-hidden />
           </button>

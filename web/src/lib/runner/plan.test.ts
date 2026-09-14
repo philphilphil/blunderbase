@@ -27,7 +27,6 @@ import type { AnalysisResult, Searcher } from './search'
  */
 const PLAN: RunPlan = {
   run_id: 7,
-  tier: 'quick',
   game_id: 3,
   fen: null,
   variant: 'standard',
@@ -39,6 +38,7 @@ const PLAN: RunPlan = {
   ply_end: 4,
   nodes: 1000,
   depth: null,
+  seconds: null,
   multipv: 1,
   thresholds: { inaccuracy: 5, mistake: 10, blunder: 20 },
   owner_color: 'white',
@@ -80,6 +80,19 @@ function fakeEngine(answers = ANSWERS) {
 }
 
 describe('analysePlan', () => {
+  it('hands the engine the stop condition the plan carries, and adds no node budget', async () => {
+    const limits: unknown[] = []
+    const searcher: Searcher = {
+      analyse: (_fen, limit) => {
+        limits.push(limit)
+        return Promise.resolve(ANSWERS[(limits.length - 1) % ANSWERS.length]!)
+      },
+    }
+    await analysePlan({ ...PLAN, nodes: null, seconds: 2.5, maia: false }, searcher)
+    expect(limits.length).toBeGreaterThan(0)
+    for (const limit of limits) expect(limit).toEqual({ nodes: null, depth: null, seconds: 2.5 })
+  })
+
   it('produces exactly the rows the Python produces for the same plan', async () => {
     const { searcher, seen } = fakeEngine()
     const rows = await analysePlan(PLAN, searcher)

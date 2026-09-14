@@ -7,15 +7,15 @@ and the MCP coach both talk to. Three rules shape it:
   write path probes the process and validates the stored options against what the engine
   itself declared.
 - An engine advertises what kind of thing it is and never claims a job. The owner assigns
-  one engine to each of Quick, Deep and Human moves (`EngineRole`), stored as three
+  one engine to each of Analysis and Human moves (`EngineRole`), stored as two
   settings, and **nothing falls back**: if the engine chosen for a role cannot run, that
   role does not run and the caller is told which engine and why. The alternative — the
   old `default_tier` preference, which quietly handed a switched-off engine's work to
   whichever UCI engine happened to be first — meant the engine doing the work was
   routinely one the owner had never picked and the UI could not name.
 - A missing or disabled engine degrades. `engine_for_role` returns None and `role_status`
-  explains why in words a UI can show; only `require_engine_for_tier` raises, and it raises
-  `TierUnavailableError` rather than whatever the process layer threw.
+  explains why in words a UI can show; only `require_engine_for_role` raises, and it raises
+  `EngineUnavailableError` rather than whatever the process layer threw.
 
 An engine row with a `runner_id` bends the first rule and keeps the rest. Its binary is
 on another machine, so there is nothing here to probe and nothing to `stat`: the row is
@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from backend.db.enums import EngineKind, EngineRole, RunStatus, Tier
+from backend.db.enums import EngineKind, EngineRole, RunStatus
 from backend.db.models import AnalysisRun, Engine, Runner
 from backend.services import app_settings as app_settings_service
 
@@ -71,15 +71,13 @@ EDITABLE = frozenset({"name", "path", "kind", "options", "enabled"})
 # Maia would answer a policy where an evaluation was wanted; a human-move role asked of
 # Stockfish would answer the best move rather than the likely one.
 ROLE_KINDS: dict[EngineRole, EngineKind] = {
-    EngineRole.QUICK: EngineKind.UCI,
-    EngineRole.DEEP: EngineKind.UCI,
+    EngineRole.ANALYSIS: EngineKind.UCI,
     EngineRole.HUMAN: EngineKind.MAIA,
 }
 
 # How each role is named in a sentence the owner has to act on.
 ROLE_LABELS: dict[EngineRole, str] = {
-    EngineRole.QUICK: "the quick tier",
-    EngineRole.DEEP: "the deep tier",
+    EngineRole.ANALYSIS: "the analysis role",
     EngineRole.HUMAN: "human moves",
 }
 
@@ -121,12 +119,19 @@ class EngineRunError(EngineServiceError):
     """The engine started but could not produce the analysis that was asked for."""
 
 
-class TierUnavailableError(EngineServiceError):
-    """A tier has no usable engine. Callers degrade; nothing crashes."""
+class EngineUnavailableError(EngineServiceError):
+    """The engine a run needs cannot run it. Callers degrade; nothing crashes.
 
-    def __init__(self, tier: Tier, reason: str) -> None:
-        super().__init__(f"the {tier.value} tier is unavailable: {reason}")
-        self.tier = tier
+    Keyed by nothing but its sentence, because it has two sources that share no key: the
+    analysis role having no usable engine, and an engine a person picked in the Analyse
+    dialog having gone away or been switched off. Either way the reason names the engine
+    where there is one, which is the part the owner acts on.
+    """
+
+    code = "engine_unavailable"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
         self.reason = reason
 
 
@@ -144,26 +149,6 @@ class AcceptedEngine:
             "name": self.name,
             "engine_id": self.engine_id,
             "accepted": self.accepted,
-            "reason": self.reason,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class TierStatus:
-    """What a tier can do right now, and why it cannot do more."""
-
-    tier: Tier
-    engine_id: int | None = None
-    engine_name: str | None = None
-    available: bool = False
-    reason: str | None = None
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "tier": self.tier.value,
-            "engine_id": self.engine_id,
-            "engine_name": self.engine_name,
-            "available": self.available,
             "reason": self.reason,
         }
 
@@ -324,7 +309,8 @@ def delete_engine(session: Session, engine_id: int, *, unqueue: bool = True) -> 
     the owner gets from Settings) it is dropped rather than left behind. `delete_runner`
     passes `unqueue=False`: its engine rows are the runner's own advertisement, not
     configuration the owner deleted on purpose, and a run still queued for one is nobody's
-    job yet — `_prepare` stands its tier's own engine in where this host has one, same as
+    job yet — `_prepare` stands the analysis role's engine in for an import-priority run
+    where this host has one (a run a person asked for on that engine fails instead), same as
     it would if the runner had merely gone offline.
 
     Any role the engine was assigned to becomes unassigned. A setting pointing at a row
@@ -599,16 +585,22 @@ def validate_options(probed: EngineProbe, options: Mapping[str, Any] | None) -> 
     return validated
 
 
-# --- the three roles -------------------------------------------------------
+# --- the two roles ---------------------------------------------------------
 
 
-def engine_for_role(session: Session, role: EngineRole) -> Engine | None:
+def engine_for_role(
+    session: Session, role: EngineRole, *, local_only: bool = False
+) -> Engine | None:
     """The engine assigned to this role, if it can serve it. Never anything else.
 
     None where the owner has assigned nothing, where what they assigned has been deleted or
     switched off, or where it is the wrong kind of engine for the job. There is deliberately
     no substitute: a role served by an engine nobody chose is work the owner cannot account
     for, and `role_status` is where the reason is put into words.
+
+    `local_only` is what the local worker set asks with, and it narrows rather than
+    substitutes: an assigned engine that lives on a runner is a binary this host cannot
+    start, and answering with a different one would run the role on an engine nobody chose.
     """
     role = EngineRole(role)
     engine_id = app_settings_service.get_role_engine_id(session, role)
@@ -617,7 +609,34 @@ def engine_for_role(session: Session, role: EngineRole) -> Engine | None:
     engine = session.get(Engine, engine_id)
     if engine is None or not engine.enabled or engine.kind is not ROLE_KINDS[role]:
         return None
+    if local_only and engine.runner_id is not None:
+        return None
     return engine
+
+
+def require_engine_for_role(
+    session: Session, role: EngineRole, *, local_only: bool = False
+) -> Engine:
+    """The role's engine, or a typed reason it has none.
+
+    `local_only` is what a caller that starts the binary itself asks with. A one-shot
+    evaluation is computed in this process — tunnelling a single position to a runner is
+    deliberately not part of the runner protocol — so a remote engine's `path` is a path on
+    a machine this one cannot see, and starting it here would at best be a different
+    binary. Such a caller is told plainly that the role's own engine is somewhere else,
+    rather than being handed a different engine that happens to be here.
+    """
+    role = EngineRole(role)
+    status = role_status(session, role)
+    if not status.available or status.engine_id is None:
+        raise EngineUnavailableError(status.reason or "no engine is available")
+    engine = require_engine(session, status.engine_id)
+    if not local_only or engine.runner_id is None:
+        return engine
+    raise EngineUnavailableError(
+        f"the engine assigned to {ROLE_LABELS[role]}, {engine.name!r}, is on "
+        f"{engine_host(session, engine)}, and this is worked out here"
+    )
 
 
 def role_status(session: Session, role: EngineRole) -> RoleStatus:
@@ -682,8 +701,8 @@ def set_role_engines(
 ) -> list[RoleStatus]:
     """Assign several roles at once, all of them or none. Every role's status afterwards.
 
-    The whole set is checked before any of it is written: a form that saves three dropdowns
-    and refuses the third must not leave the first two applied, or the deployment ends up
+    The whole set is checked before any of it is written: a form that saves two dropdowns
+    and refuses the second must not leave the first applied, or the deployment ends up
     wired differently from the page that wired it.
     """
     checked = {
@@ -701,7 +720,7 @@ def assign_default_roles(session: Session, engine: Engine) -> list[EngineRole]:
 
     A fresh install and a first-time runner have to do useful work before anybody opens the
     roles form, and with nothing falling back that can only be a real write: the first UCI
-    engine takes Quick and Deep, the first Maia takes Human moves, and the choice then shows
+    engine takes Analysis, the first Maia takes Human moves, and the choice then shows
     up in the dropdown as the owner's own rather than hiding in a resolution rule.
 
     It never overwrites an assignment, so a second engine steals nothing.
@@ -726,11 +745,6 @@ def clear_role_engine(session: Session, engine_id: int) -> list[EngineRole]:
         app_settings_service.set_role_engine_id(session, role, None)
         cleared.append(role)
     return cleared
-
-
-def role_for_tier(tier: Tier) -> EngineRole:
-    """The role that serves a tier's runs. They share their spelling, and only that."""
-    return EngineRole(Tier(tier).value)
 
 
 def _checked_role_engine(
@@ -759,57 +773,6 @@ def _kind_mismatch(engine: Engine, role: EngineRole) -> str:
     return (
         f"{engine.name!r} is a human-move model, which answers with a policy rather than "
         f"a search; {ROLE_LABELS[role]} needs a UCI engine"
-    )
-
-
-def engine_for_tier(session: Session, tier: Tier, *, local_only: bool = False) -> Engine | None:
-    """The engine assigned to this tier's role, or None if it cannot serve it.
-
-    `local_only` is what the local worker set asks with, and it narrows rather than
-    substitutes: an assigned engine that lives on a runner is a binary this host cannot
-    start, and answering with a different one would run the tier on an engine nobody chose.
-    """
-    engine = engine_for_role(session, role_for_tier(tier))
-    if engine is None or (local_only and engine.runner_id is not None):
-        return None
-    return engine
-
-
-def require_engine_for_tier(session: Session, tier: Tier, *, local_only: bool = False) -> Engine:
-    """The tier's engine, or a typed reason it has none.
-
-    `local_only` is what a caller that starts the binary itself asks with. A one-shot
-    evaluation is computed in this process — tunnelling a single position to a runner is
-    deliberately not part of the runner protocol — so a remote engine's `path` is a path on
-    a machine this one cannot see, and starting it here would at best be a different
-    binary. Such a caller is told plainly that the tier's own engine is somewhere else,
-    rather than being handed a different engine that happens to be here.
-    """
-    status = tier_status(session, tier)
-    if not status.available or status.engine_id is None:
-        raise TierUnavailableError(tier, status.reason or "no engine is available")
-    engine = require_engine(session, status.engine_id)
-    if not local_only or engine.runner_id is None:
-        return engine
-    raise TierUnavailableError(
-        tier,
-        f"the engine assigned to the {tier.value} tier, {engine.name!r}, is on "
-        f"{engine_host(session, engine)}, and this is worked out here",
-    )
-
-
-def tier_status(session: Session, tier: Tier) -> TierStatus:
-    """Whether a tier can run, phrased for the warning a UI shows when it cannot.
-
-    The tier-typed half of `role_status`, for a caller that only has a `Tier` in hand.
-    """
-    status = role_status(session, role_for_tier(tier))
-    return TierStatus(
-        tier=Tier(tier),
-        engine_id=status.engine_id,
-        engine_name=status.engine_name,
-        available=status.available,
-        reason=status.reason,
     )
 
 

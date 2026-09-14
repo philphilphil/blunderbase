@@ -967,7 +967,7 @@ def test_an_engine_that_does_not_drive_a_board_is_refused(session: Session) -> N
 
 def test_the_pickers_offer_every_engine_and_say_which_cannot_search(session: Session) -> None:
     """One list for both modes: a task may run on any of them, a search on the ones with no
-    `search_trouble`. The deep role's engine is the default; a runner's is offered with the
+    `search_trouble`. The analysis role's engine is the default; a runner's is offered with the
     reason it cannot search yet rather than hidden; Maia is offered to neither."""
     from backend.services import engines as engines_service
 

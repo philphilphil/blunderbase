@@ -259,13 +259,13 @@ def test_a_runner_that_drops_takes_its_board_with_it(
 def test_a_board_takes_the_slot_of_a_queue_run_rather_than_waiting_for_it(
     api: TestClient, settings: Settings
 ) -> None:
-    """D6: somebody is at a board; a deep pass can start again a minute later."""
+    """D6: somebody is at a board; a queued run can start again a minute later."""
     runner_id, token = register(settings, slots=1)
     game_id = seed_game(api)
 
     with connect(api, token, slots=1) as runner:
         engine_id = runner.engine_ids["sf-remote"]
-        run_id = enqueue(api, game_id, engine_id, tier="deep")
+        run_id = enqueue(api, game_id, engine_id, nodes=1000)
         dispatched = runner.recv(protocol.RUN_DISPATCH)
         assert dispatched["run_id"] == run_id
 

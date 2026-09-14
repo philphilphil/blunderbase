@@ -20,11 +20,11 @@ One cap, on this server's card, and everything that runs an engine here counts a
 
 | Setting | |
 |---|---|
-| **Queue processes** | Engine processes this machine may run at once — quick and deep passes, correspondence tasks, the analysis boards, and [correspondence searches](../guide/correspondence.md). 1 to 64; empty is the machine's cores minus two |
+| **Queue processes** | Engine processes this machine may run at once — analysis passes, correspondence tasks, the analysis boards, and [correspondence searches](../guide/correspondence.md). 1 to 64; empty is the machine's cores minus two |
 
 A correspondence search holds one of these from start to pause, for as long as it runs,
 and while it does the queue has one fewer to work with: with four processes and four
-searches going, an imported game's quick pass waits until you pause or stop one. That is by
+searches going, an imported game's analysis pass waits until you pause or stop one. That is by
 design — a search is visible on the correspondence page, in its capacity strip and on this
 card, so the wait is never a mystery — and it is why the card counts searches among what is
 in use. There is no separate cap for them any more.
@@ -46,8 +46,9 @@ be holding it — and says in words when the cap at full load would exceed the m
 processes of a four-thread Stockfish are twenty-four threads; on eight cores that thrashes,
 and the line says so. Lower the cap, or give a row fewer threads on Engines. Threads are
 per engine; how many processes is per machine. While
-[correspondence mode](../guide/analysis.md#correspondence) is off only the engines holding
-Quick and Deep are priced, because nothing else runs here.
+[correspondence mode](../guide/analysis.md#correspondence) is off only the engine holding
+Analysis is priced, because nothing else runs here unless you pick another in a game's
+**Analyse**.
 
 A remote runner's slots are set when it is registered and can be changed on its card
 (**Rename or resize**); the machine's threads are in its own `runner.yaml`, so the budget
@@ -132,7 +133,7 @@ Every key, with its default.
 | `options` | `{}` | UCI options, validated at start-up against what the binary declares |
 | `streams` | `true` for `uci` | Whether this engine may drive an analysis board. A Maia never streams, however this is written |
 | `instances` | one process per slot | How many copies of this binary may run at once |
-| `tier` | — | Accepted and ignored. A file written before roles existed still starts |
+| `tier` | — | Accepted and ignored, whatever it says. A file written before roles existed, or before there was one analysis pass, still starts |
 
 A whole file:
 
@@ -180,7 +181,7 @@ It can only lower the number of processes, never raise it above `slots`.
 mistake, not a preference, and the refusal names the field and the file it came from.
 
 A runner advertises what it *has* and claims nothing about what it is *for*. Which engine
-serves Quick, Deep and Human moves is assigned on the [Engines](engines.md) page.
+serves Analysis and Human moves is assigned on the [Engines](engines.md) page.
 
 Four values can come from the environment instead of the file, and beat it, so a token need
 not live in something that gets copied around:
@@ -264,6 +265,12 @@ working perfectly. Watch the log lines instead.
 | close code `4426` | The two halves do not speak the same runner protocol; the process exits `2` |
 | close code `4429` | This token has been refused often enough that the server has shut its door on it. Dialling again only holds the door shut — fix the token and wait. Ten failures start a backoff that doubles from one second to a minute |
 | the log says "polling" | The socket failed three times. The runner is still working, over HTTP, and retries the socket every minute |
+
+A runner from before a run could stop at a depth or after a number of seconds still
+connects and still works: it is handed every run that stops at a node budget, which is the
+pass every imported game gets and anything asked for in nodes. A run you asked for with a
+depth or seconds on one of its engines waits in the queue until that runner is updated —
+the queue shows it waiting on that machine, and updating the runner is the fix.
 
 ## Revoking
 

@@ -5,14 +5,14 @@ import asyncio
 import getpass
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 from backend import __version__
 from backend.config import Settings, get_settings
-from backend.db.enums import EngineKind, EngineRole, JobStatus, Platform, Tier
+from backend.db.enums import EngineKind, EngineRole, JobStatus, Platform
 from backend.db.migrate import upgrade_to_head
 from backend.db.session import reset_engines, session_scope
 from backend.services import accounts as accounts_service
@@ -34,8 +34,23 @@ def _positive_int(value: str) -> int:
     return number
 
 
+def _positive_float(value: str) -> float:
+    number = float(value)
+    if not number > 0:
+        raise argparse.ArgumentTypeError("must be above zero")
+    return number
+
+
+def _lines(value: str) -> int:
+    """`--lines`: refused past five rather than clamped, the way the dialog's field is."""
+    number = int(value)
+    if not 1 <= number <= 5:
+        raise argparse.ArgumentTypeError("must be 1 to 5")
+    return number
+
+
 def _ply_range(value: str) -> tuple[int, int]:
-    """`--ply-range 40:80`: the moves a deep pass should look at, end exclusive."""
+    """`--ply-range 40:80`: the moves a requested run should look at, end exclusive."""
     start, separator, end = value.partition(":")
     if not separator:
         raise argparse.ArgumentTypeError("expected START:END, e.g. 40:80")
@@ -177,11 +192,22 @@ def build_parser(settings: Settings | None = None) -> argparse.ArgumentParser:
     analyze.add_argument(
         "--game-id", type=_positive_int, help="one game; omit for every pending game"
     )
-    analyze.add_argument("--tier", choices=[str(tier) for tier in Tier], default=str(Tier.QUICK))
     analyze.add_argument("--fen", help="analyse one position instead of a game")
+    analyze.add_argument(
+        "--engine",
+        metavar="NAME",
+        help="the engine to run on, by name or id; omit for the analysis role's",
+    )
     analyze.add_argument("--ply-range", type=_ply_range, metavar="START:END")
-    analyze.add_argument("--multipv", type=_positive_int, metavar="N")
-    analyze.add_argument("--nodes", type=_positive_int, metavar="N")
+    analyze.add_argument(
+        "--lines", type=_lines, metavar="N", help="lines kept per position, 1 to 5"
+    )
+    # One limit per move, as the Analyse dialog offers: a search stopped at whichever of
+    # two limits came first would be neither number that was typed.
+    stop = analyze.add_mutually_exclusive_group()
+    stop.add_argument("--nodes", type=_positive_int, metavar="N", help="nodes per move")
+    stop.add_argument("--depth", type=_positive_int, metavar="N", help="depth per move")
+    stop.add_argument("--seconds", type=_positive_float, metavar="S", help="seconds per move")
     analyze.add_argument("--limit", type=_positive_int, metavar="N", help="queue at most N games")
     analyze.add_argument(
         "--queue-only", action="store_true", help="enqueue without running the workers"
@@ -517,51 +543,89 @@ def command_engines(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _run_limit(event: Mapping[str, Any]) -> str:
+    """What a run stopped each move at, the way the web's run badge prints it.
+
+    `d24`, `10s` or `500k`, then the line count. An event without any limit — an older
+    frame, or a Maia fill that searches nothing — prints what it has and no more.
+    """
+    if event.get("maia_only"):
+        return "maia fill"
+    if event.get("depth"):
+        limit = f"d{event['depth']}"
+    elif event.get("seconds"):
+        limit = f"{event['seconds']:g}s"
+    elif event.get("nodes"):
+        nodes = int(event["nodes"])
+        if nodes >= 1_000_000:
+            limit = f"{nodes / 1_000_000:g}M"
+        elif nodes >= 1000:
+            limit = f"{nodes / 1000:g}k"
+        else:
+            limit = f"{nodes} nodes"
+    else:
+        limit = ""
+    multipv = event.get("multipv")
+    lines = f"{multipv} line{'' if multipv == 1 else 's'}" if multipv else ""
+    return " · ".join(part for part in (limit, lines) if part)
+
+
 def _print_run_event(event: dict[str, Any]) -> None:
     if event["event"] == analysis_service.EVENT_RUN_PROGRESS:
         return
     name = event["event"].removeprefix("analysis.")
     target = f"game {event['game_id']}" if event.get("game_id") else "position"
+    what = ", ".join(part for part in (target, _run_limit(event)) if part)
     detail = event.get("error") or (f"{event['evals']} moves" if "evals" in event else "")
-    print(f"run {event['run_id']} ({target}, {event['tier']}): {name} {detail}".rstrip())
+    print(f"run {event['run_id']} ({what}): {name} {detail}".rstrip())
+
+
+def _engine_id(session: Any, wanted: str | None) -> int | None:
+    """`--engine` as an id: a number is taken as one, anything else is looked up by name."""
+    if wanted is None:
+        return None
+    if wanted.strip().isdigit():
+        return int(wanted)
+    engine = _engine_by_name(session, wanted)
+    if engine is None:
+        raise analysis_service.AnalysisRequestError(f"no engine named {wanted!r}")
+    return engine.id
 
 
 def command_analyze(args: argparse.Namespace, settings: Settings) -> int:
-    """Queue the passes the flags ask for, then drain the queue in this process."""
-    tier = Tier(args.tier)
+    """Queue the runs the flags ask for, then drain the queue in this process.
+
+    `--game-id` and `--fen` are a person at a terminal asking, so they go in ahead of the
+    import backlog with whatever engine and limit the flags name. With neither, this is
+    the backfill: the import pass over every game that has none, at the budget the
+    Settings page shows, so the flags for a single run do not apply to it.
+    """
     upgrade_to_head(settings)
     try:
         with session_scope(settings) as session:
-            if args.fen is not None:
+            if args.fen is not None or args.game_id is not None:
                 queued = [
                     analysis_service.request_analysis(
                         session,
+                        game_id=args.game_id if args.fen is None else None,
                         fen=args.fen,
-                        tier=tier,
-                        multipv=args.multipv,
+                        engine_id=_engine_id(session, args.engine),
+                        ply_range=args.ply_range if args.fen is None else None,
+                        multipv=args.lines,
                         nodes=args.nodes,
-                        commit=False,
-                    )
-                ]
-            elif args.game_id is not None:
-                queued = [
-                    analysis_service.request_analysis(
-                        session,
-                        game_id=args.game_id,
-                        tier=tier,
-                        ply_range=args.ply_range,
-                        multipv=args.multipv,
-                        nodes=args.nodes,
+                        depth=args.depth,
+                        seconds=args.seconds,
+                        priority=analysis_service.REQUESTED_PRIORITY,
                         commit=False,
                     )
                 ]
             else:
-                queued = analysis_service.enqueue_missing(session, tier, limit=args.limit)
+                queued = analysis_service.enqueue_missing(session, limit=args.limit)
     except (analysis_service.AnalysisRequestError, engines_service.EngineServiceError) as exc:
         print(f"analyze: {exc}")
         return 1
 
-    print(f"queued {len(queued)} {tier} run(s)")
+    print(f"queued {len(queued)} run(s)")
     if args.queue_only:
         return 0
 
@@ -706,8 +770,7 @@ def command_demo(args: argparse.Namespace, settings: Settings) -> int:
         return 1
     print(f"demo database: {summary.path}")
     print(
-        f"{summary.games} games, {summary.analyzed} analyzed, "
-        f"{summary.deep} deep, {summary.notes} notes"
+        f"{summary.games} games, {summary.analyzed} analyzed, {summary.notes} notes"
     )
     print(f"serve it with BLUNDERBASE_DB_PATH={summary.path} blunderbase serve")
     print("add BLUNDERBASE_RUNTIME_MODE=demo to serve it to everyone, read-only")
@@ -761,8 +824,41 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings = get_settings()
     if settings.runtime_mode == "desktop":
         widen_path_for_desktop()
-    args = build_parser(settings).parse_args(argv)
+    parser = build_parser(settings)
+    args = parser.parse_args(argv)
+    if args.command == "analyze":
+        _refuse_single_run_flags_in_a_backfill(parser, args)
     return COMMANDS[args.command](args, settings)
+
+
+# The flags that shape one requested run, by the option a person typed.
+SINGLE_RUN_FLAGS = (
+    ("engine", "--engine"),
+    ("ply_range", "--ply-range"),
+    ("lines", "--lines"),
+    ("nodes", "--nodes"),
+    ("depth", "--depth"),
+    ("seconds", "--seconds"),
+)
+
+
+def _refuse_single_run_flags_in_a_backfill(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> None:
+    """Stop `analyze --depth 30` without a game before it queues something else.
+
+    The backfill is the import pass at the Settings page's budget on the analysis role's
+    engine; it has no use for a limit or an engine. Accepting them silently printed
+    "queued N run(s)" for runs that were not the ones typed, so they are an error instead.
+    """
+    if args.game_id is not None or args.fen is not None:
+        return
+    given = [flag for name, flag in SINGLE_RUN_FLAGS if getattr(args, name, None) is not None]
+    if given:
+        parser.error(
+            f"analyze: {', '.join(given)} shape one run and need --game-id or --fen; "
+            "the backfill runs at the analysis pass's own settings"
+        )
 
 
 if __name__ == "__main__":

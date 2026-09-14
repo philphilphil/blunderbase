@@ -38,6 +38,7 @@ from backend.db.models import (
     GamePosition,
 )
 from backend.db.session import get_engine
+from backend.services import analysis as analysis_service
 from backend.services import app_settings as app_settings_service
 from backend.services import correspondence as correspondence_service
 from backend.services import engines as engines_service
@@ -338,7 +339,7 @@ def test_taking_back_the_only_position_is_refused(session: Session) -> None:
         correspondence_service.undo_move(session, payload["game"]["game_id"])
 
 
-def test_finishing_queues_both_passes_and_freezes_the_tree(session: Session) -> None:
+def test_finishing_queues_the_import_pass_and_freezes_the_tree(session: Session) -> None:
     add_engine(session)
     payload = make_game(session)
     game_id = payload["game"]["game_id"]
@@ -354,8 +355,11 @@ def test_finishing_queues_both_passes_and_freezes_the_tree(session: Session) -> 
     assert '[Result "1-0"]' in game.pgn
     assert finished["game"]["state"] == "finished"
     assert finished["game"]["reply_due"] is None
-    tiers = sorted(str(run.tier) for run in session.scalars(select(AnalysisRun)))
-    assert tiers == ["deep", "quick"]
+    runs = list(session.scalars(select(AnalysisRun)))
+    assert [(run.priority, run.ply_start, run.ply_end, run.depth, run.seconds) for run in runs] == [
+        (analysis_service.IMPORT_PRIORITY, None, None, None, None)
+    ]
+    assert runs[0].nodes is not None
 
     with pytest.raises(correspondence_service.TreeLockedError):
         correspondence_service.play_move(session, game_id, "e7e5")
@@ -1201,7 +1205,7 @@ def test_the_settings_survive_a_save_of_the_form(api: TestClient) -> None:
         json={
             "correspondence_enabled": 1,
             "correspondence_multipv": 4,
-            "quick_nodes": 250_000,
+            "analysis_nodes": 250_000,
         },
     )
     assert saved.status_code == 200

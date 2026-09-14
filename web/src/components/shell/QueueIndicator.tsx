@@ -60,11 +60,13 @@ export function QueueIndicator({ className }: { className?: string }) {
             {/*
               The word and the full-width bar are the first things to go on a phone: the
               `3/7` beside them already says whether anything is running, and the titlebar
-              has four other things to fit into 375px.
+              has four other things to fit into 375px. They go below `lg` rather than `md`,
+              because a tablet's titlebar with the queue busy — Pause and Clear beside this —
+              is where the account menu at the far end was being pushed off.
             */}
             <span
               className={cn(
-                'text-[0.6875rem] max-md:hidden',
+                'text-[0.6875rem] max-lg:hidden',
                 paused ? 'text-mistake' : idle ? 'text-dim-2' : 'text-soft',
               )}
             >
@@ -74,7 +76,7 @@ export function QueueIndicator({ className }: { className?: string }) {
               queued={queued}
               running={running}
               stopped={paused || data?.workers === false}
-              className="h-[0.1875rem] w-16 max-md:w-8"
+              className="h-[0.1875rem] w-16 max-lg:w-8"
             />
             <span
               className={cn(

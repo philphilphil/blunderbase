@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import EngineKind, Tier
+from backend.db.enums import EngineKind, EngineRole
 from backend.db.session import get_sessionmaker
 from backend.db.types import utcnow
 from backend.services import engines as engines_service
@@ -289,7 +289,7 @@ class StreamBroker:
         game_id: int | None = None,
         ply: int | None = None,
     ) -> StreamSession:
-        """Start an analysis board. The engine defaults to the deep tier's."""
+        """Start an analysis board. The engine defaults to the analysis role's."""
         position = _position(fen)
         multipv = _multipv(multipv)
         surface = _surface(surface)
@@ -552,9 +552,9 @@ class StreamBroker:
         """Which engine, on which host — and whether it can actually be asked right now."""
         with self.sessions() as session:
             if engine_id is None:
-                engine = engines_service.engine_for_tier(session, Tier.DEEP)
+                engine = engines_service.engine_for_role(session, EngineRole.ANALYSIS)
                 if engine is None:
-                    status = engines_service.tier_status(session, Tier.DEEP)
+                    status = engines_service.role_status(session, EngineRole.ANALYSIS)
                     raise StreamUnavailableError(
                         status.reason or "no engine is available for an analysis board"
                     )

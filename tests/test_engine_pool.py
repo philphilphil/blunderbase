@@ -148,7 +148,7 @@ def test_capping_the_instances_is_not_a_different_engine() -> None:
 
 
 async def test_two_callers_of_one_engine_get_a_process_each() -> None:
-    """Every analysis worker resolves the quick tier to the same engine row, so a single
+    """Every analysis worker resolves the analysis role to the same engine row, so a single
     process per spec would queue the whole pool behind one search and make the
     concurrency cap mean nothing."""
     log: list[str] = []

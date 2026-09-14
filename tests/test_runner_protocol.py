@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from backend.db.enums import Classification, Color, Tier
+from backend.db.enums import Classification, Color
 from backend.db.models import MoveEval
 from backend.runners import protocol
 from backend.runners.protocol import EngineAd, ProtocolError
@@ -29,7 +29,6 @@ STOCKFISH_OPTION = {
 def _game_plan(**changes: Any) -> RunPlan:
     defaults: dict[str, Any] = {
         "run_id": 12,
-        "tier": Tier.QUICK,
         "game_id": 5,
         "fen": None,
         "variant": "standard",
@@ -145,13 +144,14 @@ def test_a_snapshot_carries_lines_in_the_shape_the_database_stores() -> None:
             owner_rating=None,
         ),
         _game_plan(
-            tier=Tier.DEEP,
             variant="chess960",
             initial_fen=CHESS960_FEN,
+            nodes=None,
             depth=22,
             multipv=4,
             owner_color=Color.BLACK,
         ),
+        _game_plan(nodes=None, seconds=2.5),
         _game_plan(maia_target_elo=1700),
         _game_plan(maia=False),
         _game_plan(maia_both_sides=False),
@@ -159,7 +159,8 @@ def test_a_snapshot_carries_lines_in_the_shape_the_database_stores() -> None:
     ids=[
         "a game",
         "a bare fen",
-        "chess960",
+        "chess960 to a depth",
+        "seconds per move",
         "a maia target elo",
         "no maia pass",
         "the owner's moves only",
@@ -233,12 +234,36 @@ def test_a_plan_that_does_not_decode_says_so() -> None:
         protocol.decode_plan(broken)
 
 
-def test_a_plan_with_a_tier_nobody_has_is_refused() -> None:
-    broken = protocol.encode_plan(_game_plan())
-    broken["tier"] = "instant"
+def test_every_plan_still_says_quick_for_the_runners_that_require_a_tier() -> None:
+    """A runner from before one analysis pass decodes `tier` as required; nothing reads it."""
+    plans = (_game_plan(), _game_plan(nodes=None, depth=24), _game_plan(nodes=None, seconds=5.0))
+    for plan in plans:
+        assert protocol.encode_plan(plan)["tier"] == protocol.LEGACY_PLAN_TIER == "quick"
 
-    with pytest.raises(ProtocolError):
-        protocol.decode_plan(broken)
+
+def test_a_plan_decodes_whatever_its_tier_says() -> None:
+    older = protocol.encode_plan(_game_plan())
+    older["tier"] = "deep"
+
+    assert protocol.decode_plan(older) == _game_plan()
+    del older["tier"]
+    assert protocol.decode_plan(older) == _game_plan()
+
+
+def test_a_plan_with_no_stop_condition_is_refused() -> None:
+    """A search with no bound would never answer; only a Maia-only fill searches nothing."""
+    unbounded = protocol.encode_plan(_game_plan(nodes=None))
+
+    with pytest.raises(ProtocolError, match="nodes, depth or seconds"):
+        protocol.decode_plan(unbounded)
+    assert protocol.decode_plan({**unbounded, "maia_only": True}).maia_only is True
+
+
+def test_a_runner_announces_that_it_can_stop_on_depth_or_seconds() -> None:
+    assert protocol.FEATURE_RUN_LIMITS in protocol.FEATURES
+    assert protocol.FEATURE_RUN_LIMITS in protocol.hello(
+        runner="gpu-box", features=protocol.FEATURES
+    )["features"]
 
 
 # --- the evaluations ------------------------------------------------------
@@ -350,6 +375,12 @@ def test_an_engine_that_is_not_a_file_advertises_the_same_way() -> None:
     assert ad.probe().option("Threads") is not None
 
 
+def test_an_advertised_tier_is_accepted_whatever_it_says() -> None:
+    """The roles are the owner's to assign on the server; an old ad's word for it is ignored."""
+    for tier in ("quick", "deep", "instant", None):
+        assert EngineAd.from_dict({"name": "sf", "path": "/x", "tier": tier}).name == "sf"
+
+
 def test_a_plain_advertisement_streams_and_a_maia_one_does_not() -> None:
     uci = EngineAd.from_dict({"name": "sf", "path": "/usr/games/stockfish"})
     maia = EngineAd.from_dict({"name": "maia", "kind": "maia", "path": "lc0 --weights=w"})
@@ -365,7 +396,6 @@ def test_a_plain_advertisement_streams_and_a_maia_one_does_not() -> None:
         ({"name": "  ", "path": "/x"}, "needs a name"),
         ({"name": "sf"}, "no path"),
         ({"name": "sf", "path": "/x", "kind": "neural"}, "not an engine kind"),
-        ({"name": "sf", "path": "/x", "tier": "instant"}, "not a tier"),
         ({"name": "sf", "path": "/x", "options": [1]}, "not an object"),
         ({"name": "sf", "path": "/x", "declared_options": "Threads"}, "not a list"),
         ({"name": "sf", "path": "/x", "declared_options": ["Threads"]}, "not an object"),

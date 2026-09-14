@@ -15,9 +15,9 @@ from backend.api.schemas import (
     BackfillCancelled,
     BackfillPreview,
     BackfillReceipt,
-    BackfillRequest,
     BatchAnalysisRequest,
     BatchAnalysisResponse,
+    CorrespondenceSearchEngine,
     MaiaFillReceipt,
     MaiaFillRequest,
     MaiaFillStatus,
@@ -35,7 +35,7 @@ from backend.api.schemas import (
     RunResponse,
 )
 from backend.config import Settings
-from backend.db.enums import RunStatus, Tier
+from backend.db.enums import RunStatus
 from backend.db.session import session_scope
 from backend.services import analysis as analysis_service
 from backend.services import runners as runners_service
@@ -51,18 +51,19 @@ MAX_RUNS = 200
     "", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED, summary="Enqueue a pass"
 )
 def enqueue(request: Request, session: SessionDep, body: AnalysisRequest) -> Any:
-    """Queue one run over a game or a FEN. Re-analysis is always a new run."""
+    """Queue one run over a game or a FEN, as somebody asked for it. Re-analysis is always a
+    new run, and it goes in at the requested priority — see `AnalysisRequest`."""
     run = analysis_service.request_analysis(
         session,
         game_id=body.game_id,
         fen=body.fen,
-        tier=body.tier,
         ply_range=body.ply_range,
         engine_id=body.engine_id,
         multipv=body.multipv,
         nodes=body.nodes,
         depth=body.depth,
-        priority=body.priority,
+        seconds=body.seconds,
+        priority=analysis_service.REQUESTED_PRIORITY,
         elos=body.elos,
         maia=body.maia,
     )
@@ -84,19 +85,10 @@ def enqueue_batch(
     What the games page's selection footer sends: sixty selected games are one call and
     one commit rather than sixty of each. A game that cannot be queued is named in
     `refused` instead of failing the rest — 202 is what the batch was accepted as, not a
-    claim that every id in it was.
+    claim that every id in it was. Each is the import pass, at import priority.
     """
     queued, refused = analysis_service.request_analysis_batch(
-        session,
-        body.game_ids,
-        tier=body.tier,
-        engine_id=body.engine_id,
-        multipv=body.multipv,
-        nodes=body.nodes,
-        depth=body.depth,
-        priority=body.priority,
-        elos=body.elos,
-        maia=body.maia,
+        session, body.game_ids, priority=analysis_service.IMPORT_PRIORITY
     )
     wake_workers(request)
     return BatchAnalysisResponse(
@@ -104,6 +96,22 @@ def enqueue_batch(
         queued=[QueuedRun(game_id=run.game_id, run_id=run.id) for run in queued],
         refused=[RefusedGame(game_id=item.game_id, reason=item.reason) for item in refused],
     )
+
+
+@router.get(
+    "/engines",
+    response_model=list[CorrespondenceSearchEngine],
+    summary="The engines the Analyse dialog can run on",
+)
+def analysis_engines(session: SessionDep) -> list[Any]:
+    """Every enabled UCI engine, this host's and the runners', the analysis role's marked
+    `default`.
+
+    The same rows the correspondence pickers read, because a person choosing an engine for
+    a run over a game is choosing from the same machines, and a dialog that offered a
+    different list from the correspondence one would be two answers to one question.
+    """
+    return analysis_service.analysis_engines(session)
 
 
 @router.get(
@@ -147,16 +155,14 @@ def maia_fill(
 @router.get(
     "/backfill", response_model=BackfillPreview, summary="How many games have no pass yet"
 )
-def backfill_preview(
-    session: SessionDep,
-    tier: Annotated[Tier, Query(description="the tier the backfill would be over")] = Tier.QUICK,
-) -> BackfillPreview:
-    """What a backfill of this tier has left to do.
+def backfill_preview(session: SessionDep) -> BackfillPreview:
+    """What a backfill has left to do.
 
     Read off the same statement the enqueue selects with, so the number the button shows
-    and the number of rows the button writes are answers to one question.
+    and the number of rows the button writes are answers to one question. A stale client
+    still sending `?tier=` is answered the same, since an unknown query parameter is ignored.
     """
-    return BackfillPreview(tier=tier, pending=analysis_service.count_missing(session, tier))
+    return BackfillPreview(pending=analysis_service.count_missing(session))
 
 
 @router.post(
@@ -165,10 +171,8 @@ def backfill_preview(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Queue a pass over every game that has none",
 )
-def backfill(
-    request: Request, session: SessionDep, body: BackfillRequest | None = None
-) -> BackfillReceipt:
-    """Queue a full-game pass over every game with no live run of this tier.
+def backfill(request: Request, session: SessionDep) -> BackfillReceipt:
+    """Queue the analysis pass over every game with no live full-game run.
 
     Uncapped, which is the whole difference between this and `/batch`. That route serves a
     selection made by hand on the games page and keeps its five-hundred ceiling for exactly
@@ -178,15 +182,12 @@ def backfill(
     A backfill announces itself once — see `analysis.backfill_event` — rather than once per
     run, so a client hears that the queue moved without being handed every row that moved
     it. The 202 is what the write was accepted as; the runs are worked afterwards, by
-    whichever machine the tier's engine lives on.
+    whichever machine the analysis role's engine lives on.
     """
-    tier = (body or BackfillRequest()).tier
-    queued = analysis_service.enqueue_missing(session, tier)
+    queued = analysis_service.enqueue_missing(session)
     wake_workers(request)
     return BackfillReceipt(
-        tier=tier,
-        queued=len(queued),
-        outstanding=analysis_service.outstanding_runs(session, tier),
+        queued=len(queued), outstanding=analysis_service.outstanding_runs(session)
     )
 
 
@@ -195,32 +196,31 @@ def backfill(
     response_model=BackfillCancelled,
     summary="Take a backfill back out of the queue",
 )
-def cancel_backfill(session: SessionDep, body: BackfillRequest | None = None) -> BackfillCancelled:
-    """Drop this tier's queued full-game runs, leaving the ones already being worked.
+def cancel_backfill(session: SessionDep) -> BackfillCancelled:
+    """Drop the queued import passes, leaving what is being worked and what somebody asked for.
 
     Not a 202: the queue is shorter by the time this answers, and `dropped` is the count of
     rows that actually went. `outstanding` is what is still in flight — a pass the workers
-    had already claimed finishes, because there is nothing to move it to.
+    had already claimed finishes, because there is nothing to move it to. A run a person
+    queued from the game's Analyse dialog is not a backfill and stays, which is why this is
+    narrower than `/queue/clear`.
     """
-    tier = (body or BackfillRequest()).tier
-    dropped = analysis_service.cancel_queued(session, tier)
+    dropped = analysis_service.cancel_queued(session)
     return BackfillCancelled(
-        tier=tier,
-        dropped=dropped,
-        outstanding=analysis_service.outstanding_runs(session, tier),
+        dropped=dropped, outstanding=analysis_service.outstanding_runs(session)
     )
 
 
 @router.post(
     "/queue/clear",
     response_model=QueueCleared,
-    summary="Take everything still queued back out, whatever tier or shape it is",
+    summary="Take everything still queued back out, whatever shape it is",
 )
 def clear_queue(session: SessionDep) -> QueueCleared:
     """Drop every queued run in one call — the undo for a queue built up by mistake.
 
-    Not scoped to a tier the way `/backfill/cancel` is: a queue that took on eight hundred
-    Maia-fill runs by accident, or the wrong tier over the whole library, is emptied in one
+    Not scoped to import passes the way `/backfill/cancel` is: a queue that took on eight
+    hundred Maia-fill runs by accident, or requested runs nobody wants now, is emptied in one
     write regardless of what filled it. A run already claimed by a worker is left to finish,
     same as a backfill's cancel — there is nowhere else for it to go.
     """
@@ -319,14 +319,13 @@ def coverage(session: SessionDep, settings: SettingsDep) -> AnalysisCoverage:
 def list_runs(
     session: SessionDep,
     game_id: Annotated[int | None, Query(description="the game whose runs to list")] = None,
-    tier: Tier | None = None,
     status: Annotated[
         RunStatus | None, Query(description="narrow to one status, e.g. failed")
     ] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_RUNS)] = 50,
 ) -> list[Any]:
     """Newest first. One of `game_id` and `status` has to be given — see the service."""
-    return analysis_service.list_runs(session, game_id, tier=tier, status=status, limit=limit)
+    return analysis_service.list_runs(session, game_id, status=status, limit=limit)
 
 
 @router.post(
@@ -338,7 +337,8 @@ def list_runs(
 def retry_failed(
     request: Request, session: SessionDep, body: RetryFailedRequest | None = None
 ) -> RetryFailedReceipt:
-    """Pick the failures back up: a new run per game, under the tier its failure had.
+    """Pick the failures back up: a new run per game, with the engine, limit, window and
+    priority its failure had.
 
     Never a resurrection of the failed row — that row is the record of what went wrong, and
     a retry is a new run for the same reason every re-analysis is. A game that has since

@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from backend.cli import build_parser, main
 from backend.config import Settings
-from backend.db.enums import EngineKind, Tier
+from backend.db.enums import EngineKind
 from backend.db.models import AnalysisRun, Engine, Runner
 from backend.db.session import session_scope
 from backend.runners.config import RunnerConfig
@@ -113,7 +113,7 @@ def test_runners_revoke_takes_the_runner_and_its_engines_with_it(
         )
         session.add(engine)
         session.flush()
-        session.add(AnalysisRun(engine_id=engine.id, tier=Tier.DEEP))
+        session.add(AnalysisRun(engine_id=engine.id))
     capsys.readouterr()
 
     assert main(["runners", "revoke", "gpu-box"]) == 0

@@ -201,7 +201,7 @@ final class LiveEngineStore {
         }
     }
 
-    /// Which engine to open on. Nil takes the one holding the deep tier's role, which is the
+    /// Which engine to open on. Nil takes the one holding the analysis role, which is the
     /// normal case and may itself be an engine on a remote runner.
     ///
     /// The engine is the one thing a session cannot be patched onto, so changing it while a

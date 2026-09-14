@@ -13,7 +13,7 @@ game on that site in a new tab; on a phone the same link is the arrow beside the
 ## What the badges mean
 
 The move column marks a move `??`, `?`, `?!` or `!` and tints the flagged rows. The
-**Flagged** tab beside **Moves** shows only those; `T` swaps. What earns each badge is in
+**Flagged** tab beside **Moves** shows only those. What earns each badge is in
 [Analysis](analysis.md).
 
 ## Read the evaluation graph
@@ -33,13 +33,38 @@ plot each player's average think, longest think and time left at the end take th
 of the accuracy tallies — a player who lost on time is left with `0:00` — and pointing at
 a column reads the move number and the think; the move and its clock are in the move
 table beside it. The first move of each side is played before the clock starts and is
-not counted. Clicking seeks, as on the evaluation.
+not counted. Clicking seeks, as on the evaluation. `T` opens this tab and `V` goes back to
+**Evaluation**.
 
 ## Engine lines and the preview
 
-The lines under the board are what the stored pass found: one for a quick pass, four for a
-deep one. Point at one and it is drawn on the board, in whatever form you chose under
+The lines under the board are what the stored pass found: as many as that pass kept, two
+by default for the pass every game gets on import, as many as you chose for one you asked
+for. Point at one and it is drawn on the board, in whatever form you chose under
 **Line preview**.
+
+## Ask for a deeper look { #ask-for-a-deeper-look }
+
+**Analyse**, at the right end of the engine pane's title on the **Run** tab, or `A`, opens
+a dialog that queues a run of your own over this game. It sits left of a thin rule; right of
+it are the live engine's icon and switch, which search without storing anything. While the
+engine is hidden the pane is gone, and the button moves to the row under the board. The run
+goes ahead of every import pass still waiting, and the button spins until it is done; until
+then neither the button nor `A` opens the dialog again.
+
+| | |
+|---|---|
+| **Engine** | Every engine that is switched on and speaks UCI, on this machine and on your runners. The one holding the **Analysis** role is picked when the dialog opens; one that cannot run — its program gone, Maia on another machine — is greyed, with the reason written under the engines |
+| **Lines** | How many candidate lines to keep per move, 1 to 5. Blank takes the import pass's line count from [Analysis](analysis.md#how-much-work-does-a-pass-do) |
+| **Stop each move at** | A number of **seconds**, a **depth** or a number of **nodes**. It opens on depth 24; switching to seconds starts at 5, switching to nodes at the import pass's budget |
+| **Moves** | **This move** — the move that led to the position on the board, the one whose badge you are looking at; **From here on** — that move to the end; **Whole game**, which is where it opens. The first two are greyed at the starting position |
+
+A whole-game run becomes what the game is read from, statistics included; a run over part
+of the game answers for those moves and leaves the rest as it was. The badge in the bar
+across the top then says what ran, `d24 · 2 lines` for the default. What the dialog cannot
+queue — the engine switched off, a runner gone away — is said inside it, and nothing is
+queued. With no engine at all, the dialog offers to set up Stockfish in this browser
+instead; see [Engines](../operate/engines.md#the-engine-in-your-browser).
 
 ## Try a move of your own
 
@@ -73,14 +98,15 @@ you are in.
 ## What a human would play
 
 The Maia panel gives five moves with the odds of each at the level you pick, not the best
-move. It shows no line; see [Analysis](analysis.md).
+move. It shows no line; see [Analysis](analysis.md). `L` sets every level side by side, and
+pressed again goes back to the one you picked.
 
 ## Read a game without the engine
 
 `⇧E`, or the computer in the title bar, takes every engine verdict off this screen: the
 evaluation bar and the score, the `??` badges and the tinted rows, the graph, the engine
-and Maia panels. The moves, the clocks and your notes stay, and so do the **Quick** and
-**Deep** buttons — write down what you think went wrong, then press one and see. The mode
+and Maia panels. The moves, the clocks and your notes stay, and so does **Analyse** —
+write down what you think went wrong, then ask and see. The mode
 holds until you press it again; the whole of it is under
 [Settings](settings.md#hide-the-engine).
 
@@ -93,6 +119,7 @@ Read the game, then press it — that game speaks from then on, and the others a
 
 `N` writes a note about the position on the board; **Enter** saves it, **Shift+Enter** is a
 new line. Notes come back in every game that reaches that position — see [Notes](notes.md).
+The **Book** tab beside **Notes** shows how your own games went on from here; `B` opens it.
 
 ## The correspondence tree
 

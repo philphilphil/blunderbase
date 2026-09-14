@@ -23,7 +23,6 @@ from backend.db.models import (
 from backend.services.games import (
     DRAW,
     LOSS,
-    TIER_RANK,
     WIN,
     game_summary,
     outcome_from,
@@ -521,7 +520,7 @@ def position_occurrences(
 
     The eval is joined in from the runs over those games rather than looked up per row, so
     the whole tree costs one query however many games are in it. A game with several done
-    runs contributes several rows; the deepest, newest one wins, and picking it is the
+    runs contributes several rows; the best-ranked one wins, and picking it is the
     database's job — a window function over (game, ply) rather than a fold in Python, so
     the same ranking is available to an ORDER BY and a LIMIT.
     """
@@ -539,17 +538,16 @@ def _ranked_occurrences(
     """The join rows of one position, each ranked against the others for its (game, ply).
 
     `rank == 1` is the row that answers for that ply: an evaluated one over an unevaluated
-    one, then the deeper tier, then the newer run. One definition, used by every read and
-    by the rebuild, because a tree that ranked runs differently from the game list behind
-    it would be two accounts of the same move.
+    one, then a run somebody asked for over an import pass, then the newer run — the same
+    `games.run_rank` the game detail merges by. One definition, used by every read and by
+    the rebuild, because a tree that ranked runs differently from the game list behind it
+    would be two accounts of the same move.
     """
     evaluated = case(
         (or_(MoveEval.win_loss.is_not(None), MoveEval.classification.is_not(None)), 1),
         else_=0,
     )
-    tier_rank = case(
-        *[(AnalysisRun.tier == tier, rank) for tier, rank in TIER_RANK.items()], else_=0
-    )
+    requested = case((AnalysisRun.priority > 0, 1), else_=0)
     statement: Select[Any] = (
         select(
             GamePosition.game_id.label("game_id"),
@@ -566,7 +564,7 @@ def _ranked_occurrences(
                 partition_by=(GamePosition.game_id, GamePosition.ply),
                 order_by=(
                     evaluated.desc(),
-                    tier_rank.desc(),
+                    requested.desc(),
                     func.coalesce(AnalysisRun.id, 0).desc(),
                 ),
             )

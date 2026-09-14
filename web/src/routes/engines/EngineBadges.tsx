@@ -1,14 +1,15 @@
 /**
  * The chips the Engines page uses for itself, and nothing outside it does.
  *
- * Deliberately not `TierBadge`. On a game row that badge means "this game got a deep pass,
- * at depth 18" — a fact about work that happened. Reused here it meant "this engine is the
- * one assigned to deep-tier runs" — a role. Same pixels, unrelated claims, and the owner
- * reading "Deep" beside an engine name had no way to tell which one was meant. Keeping the
- * two vocabularies in two components is what makes "Deep · d18" unambiguous everywhere else.
+ * Deliberately not `RunBadge`. On a game row that badge says what ran — "d24 · 2 lines", a
+ * fact about work that happened. The old tier badge was once reused here to mean "this
+ * engine is the one assigned to deep runs" — a role. Same pixels, unrelated claims, and the
+ * owner reading "Deep" beside an engine name had no way to tell which one was meant. Keeping
+ * the two vocabularies in two components is what keeps a run chip unambiguous everywhere
+ * else.
  *
- * These are quieter than a tier badge on purpose: on this page the name is the headline and
- * the chips are the annotation, where on a game row the tier *is* the headline.
+ * These are quieter than a run badge on purpose: on this page the name is the headline and
+ * the chips are the annotation, where on a game row what ran *is* the headline.
  */
 import { useLingui } from '@lingui/react/macro'
 
@@ -45,8 +46,7 @@ export function KindBadge({ kind, className }: { kind: EngineKind; className?: s
 }
 
 /**
- * What this engine is assigned to — `Quick + Deep`, `Deep`, `Quick`, `Human moves`, or an
- * em dash.
+ * What this engine is assigned to — `Analysis`, `Human moves`, or an em dash.
  *
  * The em dash is unbordered: an engine that serves nothing should read as a quiet fact
  * about the roster, not as a chip claiming something.

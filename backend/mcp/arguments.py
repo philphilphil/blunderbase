@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
-from backend.db.enums import Color, Source, Speed, Tier
+from backend.db.enums import Color, Source, Speed
 from backend.mcp.errors import BAD_ARGUMENT, BAD_FEN, CoachError
 
 # "30d" / "6w" / "12m" / "2y": how a coach says a window out loud. Anything else is read
@@ -38,8 +38,60 @@ def color(value: str | None) -> Color | None:
     return member(Color, value, "color")
 
 
-def tier(value: str | None, default: Tier = Tier.DEEP) -> Tier:
-    return member(Tier, value, "tier") or default
+MAX_LINES = 5
+
+
+def lines(value: int | None) -> int | None:
+    """How many lines a run keeps per position, 1 to 5; None takes `analysis_multipv`.
+
+    Refused rather than clamped, unlike `capped`: a coach that asked for ten lines and got
+    five would read the answer as the engine finding only five moves worth a line.
+    """
+    if value is None:
+        return None
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        raise CoachError(BAD_ARGUMENT, f"lines is a count, not {value!r}") from None
+    if not 1 <= count <= MAX_LINES:
+        raise CoachError(BAD_ARGUMENT, f"lines is 1 to {MAX_LINES}, not {count}")
+    return count
+
+
+def limit(
+    nodes: int | None, depth: int | None, seconds: float | None
+) -> tuple[int | None, int | None, float | None]:
+    """The one limit each move's search stops at, as (nodes, depth, seconds).
+
+    At most one: a search that stops at whichever of two limits comes first is neither
+    number the caller asked for. None of them is allowed too, and the service then uses
+    the `analysis_nodes` setting.
+    """
+    given = {
+        name: value
+        for name, value in (("nodes", nodes), ("depth", depth), ("seconds", seconds))
+        if value is not None
+    }
+    if len(given) > 1:
+        raise CoachError(
+            BAD_ARGUMENT,
+            f"a run stops at one limit, not {' and '.join(given)}",
+            allowed=["nodes", "depth", "seconds"],
+        )
+    try:
+        wanted_nodes = int(nodes) if nodes is not None else None
+        wanted_depth = int(depth) if depth is not None else None
+        wanted_seconds = float(seconds) if seconds is not None else None
+    except (TypeError, ValueError):
+        raise CoachError(BAD_ARGUMENT, "nodes, depth and seconds are numbers") from None
+    for name, value in (
+        ("nodes", wanted_nodes),
+        ("depth", wanted_depth),
+        ("seconds", wanted_seconds),
+    ):
+        if value is not None and value <= 0:
+            raise CoachError(BAD_ARGUMENT, f"{name} must be above zero, not {value}")
+    return wanted_nodes, wanted_depth, wanted_seconds
 
 
 def flag(value: bool | str | None, field: str) -> bool | None:

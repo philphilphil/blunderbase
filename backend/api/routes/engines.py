@@ -2,11 +2,10 @@
 
 Every write path probes the process, so a bad binary is rejected here rather than at
 analysis time. `/engines/roles` is the other half of that promise: it is where the owner
-says which engine does Quick, which does Deep and which answers for human moves, and it
-says in words why a role cannot run — which is what the UI shows instead of failing a run
-later. Nothing falls back, so an unassigned or unavailable role is a sentence here rather
-than a surprise engine at analysis time. `/engines/tiers` is the same answer narrowed to
-the two tiers, for a caller that only has a `Tier` in hand.
+says which engine runs the analysis and which answers for human moves, and it says in
+words why a role cannot run — which is what the UI shows instead of failing a run later.
+Nothing falls back, so an unassigned or unavailable role is a sentence here rather than a
+surprise engine at analysis time.
 """
 
 from __future__ import annotations
@@ -27,9 +26,8 @@ from backend.api.schemas import (
     ProbeResponse,
     SampleRequest,
     SampleResponse,
-    TierStatusResponse,
 )
-from backend.db.enums import EngineRole, Tier
+from backend.db.enums import EngineRole
 from backend.services import engines as engines_service
 
 router = APIRouter(prefix="/engines", tags=["engines"])
@@ -61,19 +59,9 @@ def probe(body: ProbeRequest) -> Any:
     return engines_service.probe_engine(body.path, body.kind).as_dict()
 
 
-@router.get("/tiers", response_model=list[TierStatusResponse], summary="What each tier can do")
-def tiers(session: SessionDep) -> list[Any]:
-    return [engines_service.tier_status(session, tier).as_dict() for tier in Tier]
-
-
 @router.get("/roles", response_model=EngineRolesResponse, summary="What runs what")
 def roles(session: SessionDep) -> Any:
-    """Every role in one read: the two tiers, and human moves beside them.
-
-    Supersedes `/tiers` for anything that draws the whole picture. `/tiers` still answers
-    the narrower, tier-typed question, and a caller that only has a `Tier` in hand wants
-    that one.
-    """
+    """Every role in one read: the analysis, and human moves beside it."""
     return {
         "roles": [engines_service.role_status(session, role).as_dict() for role in EngineRole]
     }

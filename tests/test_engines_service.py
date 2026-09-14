@@ -1,4 +1,4 @@
-"""Engine management: probe on add, honest options, and a tier that degrades."""
+"""Engine management: probe on add, honest options, and a role that degrades."""
 
 from __future__ import annotations
 
@@ -10,20 +10,20 @@ from fake_uci import MAIA_OPTIONS, STOCKFISH_OPTIONS, fake_engine_command
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.db.enums import EngineKind, EngineRole, RunStatus, Tier
+from backend.db.enums import EngineKind, EngineRole, RunStatus
 from backend.db.models import AnalysisRun, Engine, MoveEval, Runner
 from backend.services.engines import (
     DuplicateEngineError,
     EngineOptionError,
     EngineProbeError,
     EngineRunError,
+    EngineUnavailableError,
     EngineValidationError,
-    TierUnavailableError,
     UnknownEngineError,
     add_engine,
     binary_present,
     delete_engine,
-    engine_for_tier,
+    engine_for_role,
     get_engine,
     is_binary_path,
     list_engines,
@@ -34,7 +34,6 @@ from backend.services.engines import (
     sample_eval,
     set_role_engine,
     spec_for,
-    tier_status,
     update_engine,
     validate_options,
 )
@@ -281,7 +280,7 @@ def test_deleting_an_engine_leaves_its_runs_behind_without_it(
     session: Session, stockfish_path: str
 ) -> None:
     engine = register(session, stockfish_path)
-    run = AnalysisRun(tier=Tier.QUICK, engine_id=engine.id, status=RunStatus.DONE)
+    run = AnalysisRun(engine_id=engine.id, nodes=1000, status=RunStatus.DONE)
     session.add(run)
     session.commit()
 
@@ -296,8 +295,8 @@ def test_deleting_an_engine_drops_its_queued_runs_but_keeps_the_rest(
     session: Session, stockfish_path: str
 ) -> None:
     engine = register(session, stockfish_path)
-    queued = AnalysisRun(tier=Tier.QUICK, engine_id=engine.id, status=RunStatus.QUEUED)
-    done = AnalysisRun(tier=Tier.QUICK, engine_id=engine.id, status=RunStatus.DONE)
+    queued = AnalysisRun(engine_id=engine.id, nodes=1000, status=RunStatus.QUEUED)
+    done = AnalysisRun(engine_id=engine.id, nodes=1000, status=RunStatus.DONE)
     session.add_all([queued, done])
     session.commit()
     session.add(MoveEval(run_id=done.id, ply=0, move_uci="e2e4", move_san="e4"))
@@ -318,17 +317,17 @@ def test_deleting_an_engine_that_is_not_there_says_so(session: Session) -> None:
 
 # --- the roles ------------------------------------------------------------
 #
-# The owner assigns one engine to each of Quick, Deep and Human moves. Nothing falls back:
+# The owner assigns one engine to each of Analysis and Human moves. Nothing falls back:
 # a role whose engine cannot run does not run, and says which engine and why.
 
 
-def test_a_tier_uses_the_engine_it_is_assigned(session: Session, stockfish_path: str) -> None:
-    register(session, stockfish_path, name="Quick")
-    deep = register(session, stockfish_path, name="Deep")
-    set_role_engine(session, EngineRole.DEEP, deep.id)
+def test_a_role_uses_the_engine_it_is_assigned(session: Session, stockfish_path: str) -> None:
+    register(session, stockfish_path, name="First")
+    chosen = register(session, stockfish_path, name="Chosen")
+    set_role_engine(session, EngineRole.ANALYSIS, chosen.id)
 
-    assert engine_for_tier(session, Tier.DEEP) is deep
-    assert tier_status(session, Tier.DEEP).engine_name == "Deep"
+    assert engine_for_role(session, EngineRole.ANALYSIS) is chosen
+    assert role_status(session, EngineRole.ANALYSIS).engine_name == "Chosen"
 
 
 def test_the_first_engine_registered_takes_the_roles_it_fits(
@@ -340,8 +339,7 @@ def test_the_first_engine_registered_takes_the_roles_it_fits(
     model = register(session, maia_path, name="maia3", kind=EngineKind.MAIA)
     register(session, stockfish_path, name="Second")
 
-    assert engine_for_tier(session, Tier.QUICK) is first
-    assert engine_for_tier(session, Tier.DEEP) is first
+    assert engine_for_role(session, EngineRole.ANALYSIS) is first
     assert role_status(session, EngineRole.HUMAN).engine_id == model.id
 
 
@@ -352,11 +350,13 @@ def test_a_disabled_engine_is_not_used_and_nothing_stands_in_for_it(
     register(session, stockfish_path, name="Spare")
     update_engine(session, engine.id, enabled=False)
 
-    assert engine_for_tier(session, Tier.QUICK) is None
-    status = tier_status(session, Tier.QUICK)
+    assert engine_for_role(session, EngineRole.ANALYSIS) is None
+    status = role_status(session, EngineRole.ANALYSIS)
     assert status.available is False
     assert status.engine_id == engine.id
-    assert "'Stockfish' is assigned to the quick tier and is switched off" in (status.reason or "")
+    assert "'Stockfish' is assigned to the analysis role and is switched off" in (
+        status.reason or ""
+    )
 
 
 def test_a_role_refuses_an_engine_of_a_kind_it_cannot_use(
@@ -366,11 +366,11 @@ def test_a_role_refuses_an_engine_of_a_kind_it_cannot_use(
     model = register(session, maia_path, name="maia3", kind=EngineKind.MAIA)
 
     with pytest.raises(EngineValidationError, match="needs a UCI engine"):
-        set_role_engine(session, EngineRole.DEEP, model.id)
+        set_role_engine(session, EngineRole.ANALYSIS, model.id)
     with pytest.raises(EngineValidationError, match="needs a human-move model"):
         set_role_engine(session, EngineRole.HUMAN, search.id)
     with pytest.raises(EngineValidationError, match="no engine with id"):
-        set_role_engine(session, EngineRole.QUICK, 4242)
+        set_role_engine(session, EngineRole.ANALYSIS, 4242)
 
 
 def test_deleting_an_engine_unassigns_the_roles_it_held(
@@ -380,7 +380,7 @@ def test_deleting_an_engine_unassigns_the_roles_it_held(
 
     delete_engine(session, engine.id)
 
-    status = role_status(session, EngineRole.QUICK)
+    status = role_status(session, EngineRole.ANALYSIS)
     assert status.configured is False
     assert status.engine_id is None
     assert "no engine is assigned" in (status.reason or "")
@@ -389,26 +389,26 @@ def test_deleting_an_engine_unassigns_the_roles_it_held(
 def test_a_maia_engine_never_stands_in_for_an_evaluation(session: Session, maia_path: str) -> None:
     register(session, maia_path, name="Maia 1500", kind=EngineKind.MAIA)
 
-    assert engine_for_tier(session, Tier.QUICK) is None
+    assert engine_for_role(session, EngineRole.ANALYSIS) is None
 
 
 def test_no_engines_at_all_is_a_reason_not_a_crash(session: Session) -> None:
-    status = tier_status(session, Tier.QUICK)
+    status = role_status(session, EngineRole.ANALYSIS)
 
     assert status.available is False
     assert status.engine_id is None
-    assert "no engine is assigned to the quick tier" in (status.reason or "")
-    assert status.as_dict()["tier"] == "quick"
+    assert "no engine is assigned to the analysis role" in (status.reason or "")
+    assert status.as_dict()["role"] == "analysis"
 
 
-def test_an_engine_whose_binary_has_gone_missing_degrades_its_tier(
+def test_an_engine_whose_binary_has_gone_missing_degrades_its_role(
     session: Session, stockfish_path: str, tmp_path: Path
 ) -> None:
     engine = register(session, stockfish_path)
     engine.path = str(tmp_path / "moved-away")
     session.commit()
 
-    status = tier_status(session, Tier.QUICK)
+    status = role_status(session, EngineRole.ANALYSIS)
     assert status.available is False
     assert status.engine_id == engine.id
     assert "no longer at" in (status.reason or "")
@@ -417,11 +417,11 @@ def test_an_engine_whose_binary_has_gone_missing_degrades_its_tier(
 def test_a_caller_that_needs_an_engine_gets_a_typed_condition(session: Session) -> None:
     from backend.services import engines as engine_service
 
-    with pytest.raises(TierUnavailableError) as caught:
-        engine_service.require_engine_for_tier(session, Tier.DEEP)
+    with pytest.raises(EngineUnavailableError) as caught:
+        engine_service.require_engine_for_role(session, EngineRole.ANALYSIS)
 
-    assert caught.value.tier is Tier.DEEP
-    assert caught.value.reason
+    assert caught.value.code == "engine_unavailable"
+    assert "the analysis role" in caught.value.reason
 
 
 def test_a_caller_that_needs_an_engine_gets_it_when_there_is_one(
@@ -431,13 +431,13 @@ def test_a_caller_that_needs_an_engine_gets_it_when_there_is_one(
 
     engine = register(session, stockfish_path)
 
-    assert engine_service.require_engine_for_tier(session, Tier.QUICK) is engine
+    assert engine_service.require_engine_for_role(session, EngineRole.ANALYSIS) is engine
 
 
 # --- the human-move role --------------------------------------------------
 #
-# Beside the tiers, never inside them: `Tier` is a search budget stored on every run row,
-# and Maia searches nothing. A deployment with no model at all is a shape, not a fault.
+# A role of its own rather than a budget of the analysis one: Maia searches nothing. A
+# deployment with no model at all is a shape, not a fault.
 
 
 def test_the_human_move_role_names_the_model_this_host_reaches_for(

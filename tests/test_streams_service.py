@@ -102,7 +102,7 @@ def add_engine(
     name: str = "stockfish",
     *,
     kind: EngineKind = EngineKind.UCI,
-    role: EngineRole | None = EngineRole.DEEP,
+    role: EngineRole | None = EngineRole.ANALYSIS,
     enabled: bool = True,
     runner_id: int | None = None,
     streams: bool = True,
@@ -118,9 +118,8 @@ def add_engine(
         )
         session.add(engine)
         session.commit()
-        # First registered keeps the role, as the old `default_tier` resolution did: a
-        # board with no engine named asks for the deep one, and these tests are about which
-        # engine that is.
+        # First registered keeps the role: a board with no engine named asks for the
+        # analysis role's, and these tests are about which engine that is.
         if role is not None and app_settings.get_role_engine_id(session, role) is None:
             engines_service.set_role_engine(session, role, engine.id)
         return engine.id
@@ -158,10 +157,10 @@ def of_kind(events: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
 # --- choosing an engine ------------------------------------------------------
 
 
-async def test_a_board_with_no_engine_named_takes_the_deep_tier_s(
+async def test_a_board_with_no_engine_named_takes_the_analysis_role_s(
     settings: Settings, sessions: sessionmaker[Session], events: list[dict[str, Any]]
 ) -> None:
-    engine_id = add_engine(sessions, "deepfish", role=EngineRole.DEEP)
+    engine_id = add_engine(sessions, "deepfish", role=EngineRole.ANALYSIS)
     broker = broker_for(settings, sessions)
 
     session = await broker.open(fen=STARTING_FEN, surface="game")
@@ -505,7 +504,7 @@ async def test_a_runner_that_drops_takes_its_boards_with_it(
     """`runner_gone` is what tells the page it may offer another engine, local included."""
     runner_id = add_runner(sessions)
     engine_id = add_engine(sessions, "sf-remote", runner_id=runner_id)
-    local_id = add_engine(sessions, "stockfish", role=EngineRole.QUICK)
+    local_id = add_engine(sessions, "stockfish", role=EngineRole.ANALYSIS)
     broker = broker_for(
         settings,
         sessions,

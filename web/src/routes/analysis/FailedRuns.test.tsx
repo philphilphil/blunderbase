@@ -26,14 +26,15 @@ function failure(overrides: Partial<RunResponse> = {}): RunResponse {
   return {
     id: 1,
     game_id: 42,
-    tier: 'quick',
     status: 'failed',
+    nodes: 500_000,
     multipv: 1,
     priority: 0,
+    requested: false,
     attempts: 2,
     created_at: '2026-08-01T10:00:00Z',
     finished_at: '2026-08-01T10:00:04Z',
-    error: 'no engine is registered for the quick tier',
+    error: 'no engine is registered for the analysis role',
     ...overrides,
   }
 }
@@ -98,13 +99,25 @@ describe('FailedRuns', () => {
   it('groups the failures by their message', async () => {
     failures = [
       ...Array.from({ length: 5 }, (_, index) => failure({ id: index + 1, game_id: index + 1 })),
-      failure({ id: 99, game_id: 99, tier: 'deep', error: 'the engine went away mid-search' }),
+      failure({
+        id: 99,
+        game_id: 99,
+        nodes: null,
+        depth: 30,
+        multipv: 3,
+        priority: 10,
+        requested: true,
+        error: 'the engine went away mid-search',
+      }),
     ]
     draw(6)
 
     await screen.findByText('5×')
     expect(screen.getByText('1×')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    // Each group says what ran, once per shape rather than once per run.
+    expect(screen.getAllByText('500k · 1 line')).toHaveLength(1)
+    expect(screen.getByText('d30 · 3 lines')).toHaveClass('text-deep')
     // The first few games are named, the rest counted.
     expect(screen.getByRole('link', { name: '#1' })).toHaveAttribute('href', '/games/1')
     expect(screen.getByText('and 1 more')).toBeInTheDocument()
@@ -135,7 +148,7 @@ describe('FailedRuns', () => {
   })
 
   /**
-   * The refusal worth naming: the tier behind these failures still has no engine, so a
+   * The refusal worth naming: the engine behind these failures still cannot run, so a
    * retry would fail exactly the same way. Saying that, and where to fix it, is the whole
    * difference between a useful page and a red stack trace.
    */
@@ -143,7 +156,7 @@ describe('FailedRuns', () => {
     failures = [failure()]
     retryAnswer = {
       status: 409,
-      body: { error: 'tier_unavailable', detail: 'no engine is available for tier quick' },
+      body: { error: 'engine_unavailable', detail: 'no engine is assigned to the analysis role' },
     }
     draw(1)
 
@@ -151,7 +164,7 @@ describe('FailedRuns', () => {
     await userEvent.click(retryButton())
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('still has no engine that can take them')
+    expect(alert).toHaveTextContent('still cannot take them')
     expect(screen.getByRole('link', { name: /register or enable an engine/i })).toHaveAttribute(
       'href',
       '/compute/engines',

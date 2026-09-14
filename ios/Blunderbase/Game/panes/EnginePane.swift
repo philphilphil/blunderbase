@@ -196,7 +196,10 @@ struct EnginePane: View {
     /// otherwise tell it from a board on the server.
     private var engineSubtitle: String {
         guard live.isOn else {
-            guard let run = store.detail?.runs.first else { return "" }
+            // Runs arrive in the order the server merges them, so the one that answers is
+            // the last that searched: a requested run over any import pass, then the newer.
+            let searched = store.detail?.runs.filter { $0.maiaOnly != true } ?? []
+            guard let run = searched.last else { return "" }
             return runLabel(run)
         }
         switch live.phase {
@@ -440,11 +443,32 @@ struct EnginePane: View {
         return Theme.body2
     }
 
+    /// The run as the web's badge prints it — `d24`, `10s` or `500k`, then the line count —
+    /// and the engine, because on a phone the header is the only place the engine is named.
+    /// One limit is ever set on a run; a row from before the limits were stored carries
+    /// `nodes`, and prints the same way.
     private func runLabel(_ run: RunSummary) -> String {
         var parts: [String] = []
-        if let tier = run.tier { parts.append(tier) }
-        if let depth = run.depth { parts.append("d\(depth)") }
+        if let depth = run.depth {
+            parts.append("d\(depth)")
+        } else if let seconds = run.seconds {
+            parts.append("\(seconds.formatted(.number.precision(.fractionLength(0...1))))s")
+        } else if let nodes = run.nodes {
+            parts.append(Self.nodeCount(nodes))
+        }
+        if let multipv = run.multipv { parts.append(String(localized: "\(multipv) lines")) }
         if let engine = run.engine { parts.append(engine) }
         return parts.joined(separator: " · ")
+    }
+
+    /// `500k`, `2M`: the node budget in the few characters a header has room for.
+    private static func nodeCount(_ nodes: Int) -> String {
+        if nodes >= 1_000_000 {
+            return "\((Double(nodes) / 1_000_000).formatted(.number.precision(.fractionLength(0...1))))M"
+        }
+        if nodes >= 1000 {
+            return "\((Double(nodes) / 1000).formatted(.number.precision(.fractionLength(0...1))))k"
+        }
+        return "\(nodes)"
     }
 }

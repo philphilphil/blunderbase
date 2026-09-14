@@ -379,7 +379,9 @@ def test_the_roles_are_seeded_from_what_each_tier_resolved_to(settings: Settings
         _add_engine(connection, "sf-deep", default_tier="deep")
         _add_engine(connection, "maia", kind="maia")
 
-    command.upgrade(config, "head")
+    # Up to 0014 and no further: 0028 folds the two tier roles into one, which is its own
+    # test below.
+    command.upgrade(config, "0014_engine_roles")
 
     assert "default_tier" not in _columns(engine, "engines")
     with engine.connect() as connection:
@@ -408,7 +410,7 @@ def test_a_role_nothing_resolved_to_is_written_as_nothing(settings: Settings) ->
     with engine.begin() as connection:
         _add_engine(connection, "sf-only")
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "0014_engine_roles")
 
     assert set(_settings_of(engine, ROLE_KEYS)) == {"quick_engine_id", "deep_engine_id"}
 
@@ -437,6 +439,243 @@ def test_the_human_role_prefers_the_model_on_this_host(settings: Settings) -> No
     with engine.connect() as connection:
         ids = dict(connection.execute(text("SELECT name, id FROM engines")).all())
     assert _settings_of(engine, ("human_engine_id",)) == {"human_engine_id": ids["maia-here"]}
+
+
+def _put_settings(engine: Engine, values: dict[str, Any]) -> None:
+    with engine.begin() as connection:
+        for key, value in values.items():
+            connection.execute(
+                text(
+                    "INSERT OR REPLACE INTO app_settings (key, value, updated_at) "
+                    "VALUES (:key, :value, :now)"
+                ),
+                {"key": key, "value": json.dumps(value), "now": "2026-08-01 12:00:00"},
+            )
+
+
+OLD_PASS_KEYS = (
+    "quick_engine_id",
+    "deep_engine_id",
+    "quick_nodes",
+    "deep_nodes",
+    "deep_multipv",
+    "maia_on_quick",
+    "maia_on_deep",
+)
+NEW_PASS_KEYS = ("analysis_engine_id", "analysis_nodes", "analysis_multipv", "maia_on_analysis")
+
+
+def test_the_analysis_pass_keeps_the_engine_and_maia_flag_imports_ran_with(
+    settings: Settings,
+) -> None:
+    """The quick role and its Maia flag are what every imported game was analysed under, so
+    they are what the one pass inherits; the budgets start again from the new defaults."""
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "0027_games_engine_hidden")
+
+    engine = get_engine(settings)
+    _put_settings(
+        engine,
+        {
+            "quick_engine_id": 3,
+            "deep_engine_id": 4,
+            "quick_nodes": 1000,
+            "deep_nodes": 9000,
+            "deep_multipv": 6,
+            "maia_on_quick": 0,
+            "maia_on_deep": 1,
+        },
+    )
+
+    command.upgrade(config, "head")
+
+    assert _settings_of(engine, OLD_PASS_KEYS) == {}
+    assert _settings_of(engine, NEW_PASS_KEYS) == {"analysis_engine_id": 3, "maia_on_analysis": 0}
+
+    command.downgrade(config, "0027_games_engine_hidden")
+
+    # Both old roles come back on the one engine; the budgets fall back to their defaults.
+    assert _settings_of(engine, NEW_PASS_KEYS) == {}
+    assert _settings_of(engine, OLD_PASS_KEYS) == {
+        "quick_engine_id": 3,
+        "deep_engine_id": 3,
+        "maia_on_quick": 0,
+    }
+
+
+def test_the_analysis_role_falls_back_to_the_deep_engine(settings: Settings) -> None:
+    """An owner who only ever assigned the deep role still has an analysis engine."""
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "0027_games_engine_hidden")
+
+    engine = get_engine(settings)
+    _put_settings(engine, {"deep_engine_id": 4})
+
+    command.upgrade(config, "head")
+
+    assert _settings_of(engine, NEW_PASS_KEYS) == {"analysis_engine_id": 4}
+
+
+def test_a_run_without_a_tier_survives_the_downgrade_as_the_nearest_old_one(
+    settings: Settings,
+) -> None:
+    """`tier` goes nullable and `seconds` arrives; going back, a requested run reads as deep
+    and an import run as quick, and the claim index keeps its directions both ways."""
+    upgrade_to_head(settings)
+    engine = get_engine(settings)
+    assert "seconds" in _columns(engine, "analysis_runs")
+    with engine.begin() as connection:
+        for priority, seconds in ((0, None), (1, None), (10, 5.0)):
+            connection.execute(
+                text(
+                    "INSERT INTO analysis_runs "
+                    "(tier, status, multipv, priority, maia_only, maia, attempts, seconds, "
+                    "created_at) VALUES (NULL, 'queued', 1, :priority, 0, 1, 0, :seconds, :now)"
+                ),
+                {"priority": priority, "seconds": seconds, "now": "2026-08-01 12:00:00"},
+            )
+
+    config = alembic_config(settings)
+    command.downgrade(config, "0027_games_engine_hidden")
+
+    assert "seconds" not in _columns(engine, "analysis_runs")
+    with engine.connect() as connection:
+        tiers = connection.execute(
+            text("SELECT priority, tier FROM analysis_runs ORDER BY priority")
+        ).all()
+        index_sql = connection.execute(
+            text(
+                "SELECT sql FROM sqlite_master "
+                "WHERE name = 'ix_analysis_runs_status_priority_created_at'"
+            )
+        ).scalar_one()
+    assert [tuple(row) for row in tiers] == [(0, "quick"), (1, "deep"), (10, "deep")]
+    assert "priority DESC" in index_sql
+
+    command.upgrade(config, "head")
+
+    assert _columns(engine, "analysis_runs") >= {"seconds", "tier"}
+    with engine.connect() as connection:
+        indexes = {
+            row[0]
+            for row in connection.execute(
+                text("SELECT name FROM sqlite_master WHERE tbl_name = 'analysis_runs'")
+            )
+        }
+    assert {
+        "ix_analysis_runs_game_id",
+        "ix_analysis_runs_correspondence_search_id",
+        "ix_analysis_runs_status_priority_created_at",
+    } <= indexes
+
+
+def test_old_runs_lose_a_fabricated_depth_and_a_queued_deep_backfill_its_priority(
+    settings: Settings,
+) -> None:
+    """A depth beside a node budget would badge as the limit; a queued deep pass would outlive
+    the new Stop. A windowed deep run, a done one and a node-less depth run keep theirs."""
+    upgrade_to_head(settings)
+    config = alembic_config(settings)
+    command.downgrade(config, "0027_games_engine_hidden")
+
+    engine = get_engine(settings)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO games "
+                "(source, dedup_hash, white_name, black_name, result, variant, pgn, "
+                "moves_uci, moves_san, ply_count, imported_at) "
+                "VALUES ('pgn', 'deadbeef', 'owner', 'opponent', '1-0', 'standard', "
+                "'1. e4', '[]', '[]', 0, :now)"
+            ),
+            {"now": "2026-08-01 12:00:00"},
+        )
+        game_id = connection.execute(text("SELECT id FROM games")).scalar_one()
+        rows = (
+            # (label, tier, status, priority, nodes, depth, ply_start)
+            ("demo", "quick", "done", 0, 250000, 18, None),
+            ("depth-only", "deep", "done", 10, None, 30, None),
+            ("backfill", "deep", "queued", 10, 5000000, None, None),
+            ("window", "deep", "queued", 10, 5000000, None, 4),
+            ("done-deep", "deep", "done", 10, 5000000, None, None),
+        )
+        for index, (_label, tier, status, priority, nodes, depth, ply_start) in enumerate(rows):
+            connection.execute(
+                text(
+                    "INSERT INTO analysis_runs "
+                    "(game_id, tier, status, multipv, priority, maia_only, maia, attempts, "
+                    "nodes, depth, ply_start, ply_end, created_at) VALUES (:game, :tier, "
+                    ":status, 1, :priority, 0, 1, 0, :nodes, :depth, :start, :end, :now)"
+                ),
+                {
+                    "game": game_id,
+                    "tier": tier,
+                    "status": status,
+                    "priority": priority,
+                    "nodes": nodes,
+                    "depth": depth,
+                    "start": ply_start,
+                    "end": None if ply_start is None else ply_start + 2,
+                    "now": f"2026-08-01 12:00:0{index}",
+                },
+            )
+
+    command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        after = connection.execute(
+            text("SELECT priority, nodes, depth FROM analysis_runs ORDER BY id")
+        ).all()
+    assert [tuple(row) for row in after] == [
+        (0, 250000, None),
+        (10, None, 30),
+        (0, 5000000, None),
+        (10, 5000000, None),
+        (10, 5000000, None),
+    ]
+
+
+def test_the_downgrade_clears_only_the_folds_the_old_readers_cannot_read(
+    settings: Settings,
+) -> None:
+    """A card without `deep` and a summary without `tier` were folded since the upgrade; the
+    old code reads both keys bare, so those go back to NULL and nothing else does."""
+    upgrade_to_head(settings)
+    engine = get_engine(settings)
+    old_card = {"analyzed": True, "deep": False, "eval_curve": [], "worst_moments": []}
+    new_card = {"analyzed": True, "requested": False, "eval_curve": [], "worst_moments": []}
+    old_summary = {"run_id": 1, "worst": [{"ply": 3, "tier": "quick"}]}
+    new_summary = {"run_id": 2, "worst": [{"ply": 3}]}
+    empty_summary = {"run_id": 3, "worst": []}
+    with engine.begin() as connection:
+        for index, (card, summary) in enumerate(
+            ((old_card, old_summary), (new_card, new_summary), (new_card, empty_summary))
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO games "
+                    "(source, dedup_hash, white_name, black_name, result, variant, pgn, "
+                    "moves_uci, moves_san, ply_count, imported_at, card, stat_summary) "
+                    "VALUES ('pgn', :hash, 'owner', 'opponent', '1-0', 'standard', "
+                    "'1. e4', '[]', '[]', 0, :now, :card, :summary)"
+                ),
+                {
+                    "hash": f"hash{index}",
+                    "now": "2026-08-01 12:00:00",
+                    "card": json.dumps(card),
+                    "summary": json.dumps(summary),
+                },
+            )
+
+    command.downgrade(alembic_config(settings), "0027_games_engine_hidden")
+
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT card IS NULL, stat_summary IS NULL FROM games ORDER BY id")
+        ).all()
+    assert [tuple(row) for row in stored] == [(0, 0), (1, 1), (1, 0)]
 
 
 def test_games_no_source_named_are_named_once_from_the_book(settings: Settings) -> None:

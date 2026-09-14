@@ -20,9 +20,9 @@ from backend.db.enums import (
     Platform,
     RunStatus,
     Source,
-    Tier,
 )
 from backend.db.models import Account, AnalysisRun, Engine, Game, GamePosition, MoveEval
+from backend.mcp import payloads
 from backend.mcp import server as mcp_server
 from backend.mcp.server import build_server
 from backend.services import analysis as analysis_service
@@ -70,7 +70,7 @@ def analyse(
     evals: Sequence[dict[str, Any]],
     *,
     engine: Engine | None = None,
-    tier: Tier = Tier.QUICK,
+    priority: int = 0,
     status: RunStatus = RunStatus.DONE,
 ) -> AnalysisRun:
     """One finished full-game run, the way a worker eventually writes it."""
@@ -81,7 +81,7 @@ def analyse(
     run = AnalysisRun(
         game_id=game.id,
         engine_id=engine.id if engine is not None else None,
-        tier=tier,
+        priority=priority,
         status=status,
         finished_at=datetime.now(UTC),
     )
@@ -112,7 +112,7 @@ def analyse(
 
 @pytest.fixture()
 def analysed(library: dict[str, Game], session: Session, engine_row: Engine) -> dict[str, Game]:
-    """Quick passes over two of the owner's games, one of them with Maia and lines."""
+    """Import passes over two of the owner's games, one of them with Maia and lines."""
     berlin = library["qg000001"]
     analyse(
         session,
@@ -439,8 +439,23 @@ async def test_get_game_reads_a_game_move_by_move(
     assert len(payload["moves"]) == game.ply_count
     assert [move["ply"] for move in payload["moves"][:3]] == [0, 1, 2]
     assert payload["moves"][0]["san"] == game.moves_san[0]
-    assert payload["runs"][0]["tier"] == "quick"
+    assert payload["runs"][0]["requested"] is False
     assert payload["runs"][0]["status"] == "done"
+    assert payload["runs"][0]["maia_only"] is False
+    assert "engine_id" in payload["runs"][0]
+
+
+def test_a_run_row_says_when_the_pass_was_a_maia_fill() -> None:
+    """A fill carries a node budget like any pass; only the flag says it searched nothing."""
+    row = payloads.run_row(
+        {"id": 7, "status": "done", "engine_id": 2, "maia": True, "maia_only": True, "nodes": 1}
+    )
+    assert (row["engine_id"], row["maia"], row["maia_only"], row["requested"]) == (
+        2,
+        True,
+        True,
+        False,
+    )
 
 
 async def test_get_game_only_classifies_the_moves_that_went_wrong(
@@ -608,13 +623,33 @@ async def test_request_analysis_queues_a_run_and_hands_back_its_id(
     coach: MCPServer, analysed: dict[str, Game], session: Session
 ) -> None:
     game = analysed["qg000001"]
-    payload = await call(coach, "request_analysis", game_id=game.id, tier="deep")
+    payload = await call(coach, "request_analysis", game_id=game.id, depth=24, lines=3)
     assert payload["status"] == "queued"
-    assert payload["tier"] == "deep"
+    assert "tier" not in payload
+    assert (payload["depth"], payload["multipv"]) == (24, 3)
     assert payload["game_id"] == game.id
     assert payload["queue"]["queued"] == 1
     run = analysis_service.get_run(session, payload["run_id"])
     assert run is not None and run.game_id == game.id
+    assert (payload["requested"], payload["engine_id"], payload["maia_only"]) == (
+        True,
+        run.engine_id,
+        False,
+    )
+    status = await call(coach, "get_analysis_status", run_id=run.id)
+    assert (status["engine_id"], status["maia_only"]) == (run.engine_id, False)
+    # A coach asking is somebody asking: it goes ahead of the import backlog.
+    assert run.priority == analysis_service.REQUESTED_PRIORITY
+    assert run.nodes is None
+
+
+async def test_request_analysis_stops_at_one_limit_and_at_most_five_lines(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    game_id = analysed["qg000001"].id
+    both = await failure(coach, "request_analysis", game_id=game_id, depth=20, seconds=5)
+    lines = await failure(coach, "request_analysis", game_id=game_id, lines=9)
+    assert (both["error"], lines["error"]) == ("bad_argument", "bad_argument")
 
 
 async def test_request_analysis_takes_the_levels_to_ask_maia_about(
@@ -670,11 +705,11 @@ async def test_a_full_queue_is_a_structured_error(
     assert payload["queued"] == 1
 
 
-async def test_clear_queue_drops_every_tier_and_says_how_many(
+async def test_clear_queue_drops_every_run_and_says_how_many(
     coach: MCPServer, analysed: dict[str, Game]
 ) -> None:
     await call(coach, "request_analysis", game_id=analysed["qg000001"].id)
-    await call(coach, "request_analysis", game_id=analysed["qg000006"].id, tier="deep")
+    await call(coach, "request_analysis", game_id=analysed["qg000006"].id, depth=20)
 
     payload = await call(coach, "clear_queue")
 
@@ -833,7 +868,7 @@ async def test_runners_status_says_which_runner_the_backlog_is_waiting_on(
     )
     session.add(remote)
     session.flush()
-    session.add(AnalysisRun(engine_id=remote.id, tier=Tier.DEEP, game_id=library["qg000001"].id))
+    session.add(AnalysisRun(engine_id=remote.id, priority=10, game_id=library["qg000001"].id))
     session.commit()
 
     payload = await call(coach, "runners_status")
