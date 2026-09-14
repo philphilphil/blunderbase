@@ -430,6 +430,47 @@ async def test_two_engines_search_one_node_at_the_same_time(
     assert len(pids(log)) == 2
 
 
+async def test_a_search_waiting_for_a_slot_is_not_counted_as_holding_one(
+    settings: Settings, db: Any, tmp_path: Path
+) -> None:
+    """The Machines card reads `busy` as searches spending this machine's slots. A search
+    launched but still queued behind a full pool spends none, and must not be counted."""
+    engine = add_engine(db, tmp_path)
+    game = make_game(db)
+    pool = EnginePool(concurrency=1)
+    async with CorrespondenceSearches(
+        settings=settings, sessions=db, pool=pool, owns_pool=True
+    ) as worker:
+        release = asyncio.Event()
+        held = asyncio.Event()
+
+        async def hold_the_slot() -> None:
+            async with pool.reserve():
+                held.set()
+                await release.wait()
+
+        holder = asyncio.create_task(hold_the_slot())
+        await held.wait()
+
+        started = call(
+            db, correspondence_service.start_search, node_id=game["tree"]["id"], engine_id=engine.id
+        )
+        await wait_for(lambda: started["id"] in worker._runs)
+        await asyncio.sleep(0.05)
+        assert worker.busy == 0
+        assert worker.capacity()["in_use"] == 0
+
+        release.set()
+        await holder
+        await wait_for_status(db, started["id"], SearchStatus.RUNNING)
+        assert worker.busy == 1
+        assert worker.capacity()["in_use"] == 1
+
+        call(db, correspondence_service.stop_search, started["id"])
+        await wait_for_status(db, started["id"], SearchStatus.STOPPED)
+        await wait_for(lambda: worker.busy == 0)
+
+
 async def test_the_worker_tells_the_status_payload_what_it_sized_itself_to(
     settings: Settings, db: Any, tmp_path: Path
 ) -> None:

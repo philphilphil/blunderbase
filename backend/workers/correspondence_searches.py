@@ -138,6 +138,9 @@ class _Run:
     context: dict[str, Any] | None = None
     task: asyncio.Task[None] | None = None
     stop: threading.Event | None = None
+    # Inside one of this machine's engine slots. A run out on a runner never is, and a local
+    # one is not until the pool lets it in, so this and not `_runs` is what a slot count reads.
+    slotted: bool = False
     # Asked for by the owner: park the process and give the slot back.
     pausing: bool = False
     # Asked for by the owner (or by shutdown): the search is over.
@@ -242,7 +245,8 @@ class CorrespondenceSearches:
 
     @property
     def busy(self) -> int:
-        return len(self._runs)
+        """The searches holding one of this machine's engine slots right now."""
+        return sum(1 for run in self._runs.values() if run.slotted)
 
     @property
     def parked(self) -> int:
@@ -366,8 +370,8 @@ class CorrespondenceSearches:
         pool = self._pool
         return {
             "slots": self.slots,
-            "in_use": len(self._runs),
-            "busy": pool.active if pool is not None else len(self._runs),
+            "in_use": self.busy,
+            "busy": pool.active if pool is not None else self.busy,
             "parked": len(self._parked),
         }
 
@@ -513,6 +517,7 @@ class CorrespondenceSearches:
                 else self.pool.acquire(context["spec"])
             )
             async with slot as pooled_engine:
+                run.slotted = True
                 if run.closing:
                     # Stopped while it was queueing: `finally` quits whatever it took.
                     return
