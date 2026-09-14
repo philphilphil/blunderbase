@@ -374,6 +374,47 @@ async def test_lowering_the_cap_interrupts_nothing_and_admits_less_afterwards() 
     await pool.close()
 
 
+async def test_free_follows_a_shrink_and_recovers_once_the_callers_are_out() -> None:
+    """`free` is what the queue reads before claiming a run. Counting the withheld permits
+    against the already-lowered cap once read a drained pool as full forever, and the queue
+    never claimed again."""
+    log: list[str] = []
+    pool = build(log, concurrency=3)
+    inside = 0
+    all_in = asyncio.Event()
+    releases = [asyncio.Event() for _ in range(3)]
+
+    async def hold(release: asyncio.Event) -> None:
+        nonlocal inside
+        async with pool.acquire(STOCKFISH):
+            inside += 1
+            if inside == 3:
+                all_in.set()
+            await release.wait()
+
+    held = [asyncio.create_task(hold(release)) for release in releases]
+    await all_in.wait()
+    assert pool.free == 0
+
+    pool.resize(1)
+    await asyncio.sleep(0)
+    for task, release in zip(held[:2], releases[:2], strict=True):
+        release.set()
+        await task
+        await asyncio.sleep(0)
+        assert pool.free == 0, "one caller still holds the only slot the new cap allows"
+
+    releases[2].set()
+    await held[2]
+    await asyncio.sleep(0)
+    assert pool.free == 1
+
+    async with pool.acquire(STOCKFISH):
+        assert pool.free == 0
+    assert pool.free == 1
+    await pool.close()
+
+
 async def test_a_grow_calls_off_a_shrink_that_is_still_waiting() -> None:
     log: list[str] = []
     pool = build(log, concurrency=2)

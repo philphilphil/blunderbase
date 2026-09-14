@@ -387,12 +387,15 @@ class EnginePool:
     def free(self) -> int:
         """Slots nobody holds right now — what a worker looks at before claiming a run.
 
-        The cap less what a shrink has withdrawn, less the callers inside it. Advisory: two
+        The cap less the callers inside it. A shrink's withheld permits are not subtracted:
+        `resize` already lowered the cap, so they are outside it, and counting them again
+        would read a drained pool as full for good. Permits a shrink has yet to withdraw
+        are not free either, since the withdrawer is first in line for them. Advisory: two
         readers may both see one free slot and one of them will wait in `acquire`, which is
         harmless. What it prevents is the worse case — a worker claiming a run, marking it
         `running`, and then sitting on a full pool for as long as a search holds the slot.
         """
-        return max(0, self.concurrency - self._withheld - self._active)
+        return max(0, self.concurrency - self._active)
 
     def resize(self, concurrency: int) -> int:
         """Change the cap while callers are inside it. Returns the cap now in force.
