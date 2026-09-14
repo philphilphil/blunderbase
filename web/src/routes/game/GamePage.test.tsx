@@ -872,17 +872,16 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    const toggle = () =>
-      screen.getByRole('switch', { name: 'Analyse this position continuously' })
-    expect(toggle()).toHaveAttribute('aria-checked', 'false')
+    const stop = () => screen.queryByRole('button', { name: 'Stop live analysis' })
+    expect(stop()).not.toBeInTheDocument()
 
     await user.keyboard('e')
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
-    expect(toggle()).toHaveAttribute('aria-checked', 'true')
+    expect(stop()).toBeInTheDocument()
 
     // The same key is the way back out — it is one switch, not a way in.
     await user.keyboard('e')
-    expect(toggle()).toHaveAttribute('aria-checked', 'false')
+    expect(stop()).not.toBeInTheDocument()
   })
 
   it('leaves an analysis line with escape, keeping it', async () => {
@@ -1205,22 +1204,16 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
 
-    // One pane, two claims behind a switch: what the run concluded, and what an engine
-    // could find now. At rest the pane is on Run, and the switch that starts the search is
-    // on the pane's own title strip — not behind the Live tab it fills.
+    // One pane, two claims: what the run concluded, and what an engine could find now. At
+    // rest the pane is on Run, and the Live tab is what starts the search.
     const pane = within(screen.getByTestId('maia-panel'))
     expect(pane.getByText('stockfish')).toBeInTheDocument()
     expect(pane.getByRole('tab', { name: 'Run' })).toHaveAttribute('aria-selected', 'true')
     expect(pane.getByRole('tab', { name: 'Live' })).toHaveAttribute('aria-selected', 'false')
-    expect(
-      pane.getByRole('switch', { name: 'Analyse this position continuously' }),
-    ).toBeInTheDocument()
     // Nothing is opened until the reader asks.
     expect(streamCalls).toHaveLength(0)
 
-    await user.click(
-      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
-    )
+    await user.click(pane.getByRole('tab', { name: 'Live' }))
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
     expect(streamCalls[0]!.body).toMatchObject({
       surface: 'game',
@@ -1238,11 +1231,11 @@ describe('GamePage', () => {
     await screen.findByText('Scandinavian Defense')
     const pane = () => within(screen.getByTestId('maia-panel'))
     const tab = (name: string) => pane().getByRole('tab', { name })
-    const toggle = () => pane().getByRole('switch', { name: 'Analyse this position continuously' })
+    const stop = () => pane().queryByRole('button', { name: 'Stop live analysis' })
 
-    // Switching the search on is asking for its answer, so the pane lands on Live — with
-    // the pickers that steer the search, and without the run's rows.
-    await user.click(toggle())
+    // Clicking Live is asking for its answer, so the search starts and the pane lands on
+    // Live — with the pickers that steer the search, and without the run's rows.
+    await user.click(tab('Live'))
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
     expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
     expect(pane().getByRole('combobox', { name: 'Lines' })).toBeInTheDocument()
@@ -1250,19 +1243,22 @@ describe('GamePage', () => {
     expect(pane().queryByTestId('engine-played-line')).not.toBeInTheDocument()
 
     // Run is still there to look at while the search keeps going: the stored lines come
-    // back, the pickers go, the switch stays on, and nothing was closed.
+    // back, the pickers go, the stop stays offered, and nothing was closed.
     await user.click(tab('Run'))
     expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
     expect(pane().getByTestId('engine-played-line')).toBeInTheDocument()
     expect(pane().queryByRole('combobox', { name: 'Lines' })).not.toBeInTheDocument()
-    expect(toggle()).toHaveAttribute('aria-checked', 'true')
+    expect(stop()).toBeInTheDocument()
     expect(streamCalls.filter((c) => c.method === 'DELETE')).toHaveLength(0)
 
-    // Off again from the Run tab: the Live tab would be an empty box, so it is not offered.
+    // Back to Live while it runs is only a view change: no second search.
     await user.click(tab('Live'))
     expect(tab('Live')).toHaveAttribute('aria-selected', 'true')
-    await user.click(toggle())
-    expect(toggle()).toHaveAttribute('aria-checked', 'false')
+    expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1)
+
+    // Stopped: the Live tab would be an empty box, so the pane goes back to Run.
+    await user.click(stop()!)
+    expect(stop()).not.toBeInTheDocument()
     expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -1273,7 +1269,7 @@ describe('GamePage', () => {
     const pane = () => within(screen.getByTestId('maia-panel'))
     const tab = (name: string) => pane().getByRole('tab', { name })
 
-    await user.click(pane().getByRole('switch', { name: 'Analyse this position continuously' }))
+    await user.click(tab('Live'))
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
     await user.click(tab('Run'))
     expect(tab('Run')).toHaveAttribute('aria-selected', 'true')
@@ -1302,9 +1298,7 @@ describe('GamePage', () => {
     await user.keyboard('{ArrowRight}')
     expect(screen.getByText('ply 1 / 4')).toBeInTheDocument()
 
-    await user.click(
-      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
-    )
+    await user.click(screen.getByRole('tab', { name: 'Live' }))
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
     const { fen } = streamCalls[0]!.body as { fen: string }
 
@@ -1349,9 +1343,7 @@ describe('GamePage', () => {
     const bar = () => screen.getByRole('img', { name: /Evaluation/ })
     expect(bar()).toHaveAttribute('title', expect.stringContaining('+0.40'))
 
-    await user.click(
-      screen.getByRole('switch', { name: 'Analyse this position continuously' }),
-    )
+    await user.click(screen.getByRole('tab', { name: 'Live' }))
     await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
     const { fen } = streamCalls[0]!.body as { fen: string }
 

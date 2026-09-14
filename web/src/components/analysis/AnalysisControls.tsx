@@ -104,16 +104,13 @@ interface ControlProps {
 }
 
 /**
- * The switch that opens and closes the search, and the setup dialog behind it.
+ * The setup dialog behind whatever starts the search, and the effect that opens it.
  *
- * Its own component rather than a line of `AnalysisControls` because the game page puts the
- * switch in a pane's title strip and the two pickers in that pane's body, two places one
- * flex row cannot reach. The dialog rides with the switch, and only with it: the effect
- * that opens it must run exactly once per stream, and the switch is the one control every
- * surface has exactly one of.
+ * A hook rather than part of `LiveSwitch` because the game page starts its search from the
+ * engine pane's Live tab, not a switch. Whichever control a surface uses must call this
+ * exactly once per stream: the effect opens the dialog, and two would open it twice.
  */
-export function LiveSwitch({ stream, fen, className }: ControlProps) {
-  const { t } = useLingui()
+export function useLiveSetup(stream: StreamSessionApi) {
   const setup = useEngineSetup()
   const { error, resume } = stream
   const { show } = setup
@@ -141,11 +138,24 @@ export function LiveSwitch({ stream, fen, className }: ControlProps) {
       cancelled = true
     }
   }, [error, resume, show])
+  return setup.dialog
+}
+
+/**
+ * The switch that opens and closes the search, and the setup dialog behind it.
+ *
+ * Its own component rather than a line of `AnalysisControls` so a surface can place it apart
+ * from the pickers. The dialog rides with the switch (`useLiveSetup`), since the switch is
+ * the one control such a surface has exactly one of.
+ */
+export function LiveSwitch({ stream, fen, className }: ControlProps) {
+  const { t } = useLingui()
+  const dialog = useLiveSetup(stream)
   const idle = fen === null || fen === ''
 
   return (
     <>
-      {setup.dialog}
+      {dialog}
       <Toggle
         checked={stream.enabled}
         onChange={stream.setEnabled}

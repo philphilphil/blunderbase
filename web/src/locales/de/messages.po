@@ -180,6 +180,7 @@ msgid "analysis engine"
 msgstr "Analyse-Engine"
 
 #: src/components/analysis/AnalysisControls.tsx
+#: src/routes/game/components/MaiaPanel.tsx
 msgid "Analyse this position continuously"
 msgstr "Diese Stellung fortlaufend analysieren"
 
@@ -5315,6 +5316,10 @@ msgstr "{0} s pro Zug"
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "Run"
 msgstr "Analyse"
+
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "Stop live analysis"
+msgstr "Live-Analyse anhalten"
 
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "human moves"

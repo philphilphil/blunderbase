@@ -1,10 +1,9 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronDown, Columns3, User } from 'lucide-react'
+import { ChevronDown, Columns3, Square, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { AnalyseButton, type AnalyseButtonProps } from '@/components/analysis/AnalyseButton'
-import { LiveLinesChip, LiveSwitch } from '@/components/analysis/AnalysisControls'
-import { LiveAnalysisIcon } from '@/components/analysis/ScanIcons'
+import { LiveLinesChip, useLiveSetup } from '@/components/analysis/AnalysisControls'
 import {
   LiveSearchLines,
   LiveSearchMeta,
@@ -215,8 +214,9 @@ export interface EnginePaneSearch {
  * the stored pass concluded, and what a search is finding now. They used to be two boxes,
  * the run here and the search at the foot of the column, and a reader with the search on
  * had two lists of lines for one position four rows apart with only the board saying which
- * won. One pane, and the tab says which claim is on it; the on/off switch sits at the right
- * end of the title strip so it is reachable from either tab, and the search's two pickers
+ * won. One pane, and the tab says which claim is on it; the Live tab is also the search's
+ * start and stop (`EnginePaneTabs`), so everything right of the tabs belongs to the claim
+ * on show and nothing on the strip is shared between the two. The search's two pickers
  * are the strip's own readings of them — the engine's name and the line-count chip, each
  * with its select laid over it, where the run's tab shows the run's name and its MPV.
  */
@@ -435,7 +435,7 @@ export function MaiaPanel({
               is not, and it is the switch at the end that must survive (`LiveSearchMeta`). */}
           <div className="bb-pane-title @container">
             {search ? (
-              <EnginePaneTabs search={search} />
+              <EnginePaneTabs search={search} idle={!fen} />
             ) : (
               <span
                 className={cn(
@@ -515,41 +515,10 @@ export function MaiaPanel({
             */}
             {onHoverLine ? <LinePreviewRowChip /> : null}
             {/*
-              The search's on/off switch, last on the strip and on both tabs: it is the one
-              control that decides whether the Live tab has anything on it, and a switch
-              that could only be reached from the tab it fills would make the tab a step
-              rather than a view. `h-7`, because the strip is 35 design pixels and the
-              switch was sized for a 2rem footer row it no longer sits in.
-            */}
-            {/*
               The stored run's verb, on the Run tab only: on Live the readouts beside it are
               the search's, and a button there would seem to act on them.
             */}
             {analyse && !onLive ? <AnalyseButton {...analyse} variant="strip" /> : null}
-            {/*
-              A rule, then the live search's icon and switch. Left of the rule is the stored
-              run and what changes it; right of it the search that stores nothing. The two
-              icons are one family (`ScanIcons`) because both are an engine looking at this
-              position, and the rule is what keeps them from reading as two ways to do one
-              thing. The icon's line sweeps while the search runs.
-            */}
-            {search ? (
-              <>
-                <span aria-hidden className="h-4 w-px flex-none bg-edge" />
-                <LiveAnalysisIcon
-                  on={search.stream.phase === 'running'}
-                  className={cn(
-                    'size-3',
-                    search.stream.enabled ? 'text-accent-teal' : 'text-dim',
-                  )}
-                />
-                <LiveSwitch
-                  stream={search.stream}
-                  fen={fen ?? null}
-                  className="-mr-1.5 -ml-1 h-7 flex-none"
-                />
-              </>
-            ) : null}
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[0.4375rem] py-1.5">
@@ -633,13 +602,20 @@ export function MaiaPanel({
  * Each tab carries the dot its claim would have carried alone — the run's steady teal, the
  * search's pulse while it is running — so a reader on the Run tab can see the search is
  * still going without switching to it, and a reader on Live can see there is a run to go
- * back to. The switch that starts the search is not here: it is the strip's last control
- * (`LiveSwitch`), because a tab that started a search when clicked could not be looked at
- * without starting one.
+ * back to.
+ *
+ * The Live tab is also the search's switch, so the strip has one control for it rather than
+ * a tab, a switch and an icon that all meant the same thing. Clicking Live with the search
+ * off starts it (the page decides that, in `onTabChange`), since an idle Live tab has
+ * nothing to show. While it runs, a stop square sits inside the tab — a sibling of the tab
+ * button, not inside it, since a button cannot hold a button — reachable from either tab
+ * the way the switch used to be. The setup dialog for a missing engine rides here too,
+ * because this is where the search is started.
  */
-function EnginePaneTabs({ search }: { search: EnginePaneSearch }) {
+function EnginePaneTabs({ search, idle }: { search: EnginePaneSearch; idle: boolean }) {
   const { t } = useLingui()
-  const { phase } = search.stream
+  const dialog = useLiveSetup(search.stream)
+  const { phase, enabled } = search.stream
   const tabs: { tab: EnginePaneTab; label: string; dot: string }[] = [
     { tab: 'run', label: t`Run`, dot: 'bg-accent-teal' },
     {
@@ -657,25 +633,50 @@ function EnginePaneTabs({ search }: { search: EnginePaneSearch }) {
   ]
   return (
     <div role="tablist" aria-label={t`Engine`} className="-ml-1 flex flex-none items-center gap-0.5">
+      {dialog}
       {tabs.map(({ tab, label, dot }) => {
         const selected = search.tab === tab
+        const stoppable = tab === 'live' && enabled
+        const starts = tab === 'live' && !enabled
         return (
-          <button
+          <span
             key={tab}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            data-testid={`engine-pane-tab-${tab}`}
-            onClick={() => search.onTabChange(tab)}
             className={cn(
-              'inline-flex h-6 items-center gap-1.5 rounded-sm px-1.5 text-[0.6875rem] transition-colors',
-              'outline-none focus-visible:bg-raised',
-              selected ? 'bg-selected font-semibold text-ink' : 'text-dim hover:bg-raised hover:text-ink',
+              'inline-flex h-6 items-center rounded-sm transition-colors',
+              selected ? 'bg-selected' : 'hover:bg-raised',
             )}
           >
-            <span className={cn('size-1.5 flex-none rounded-full', dot)} />
-            {label}
-          </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              data-testid={`engine-pane-tab-${tab}`}
+              disabled={starts && idle}
+              title={starts ? t`Analyse this position continuously` : undefined}
+              onClick={() => search.onTabChange(tab)}
+              className={cn(
+                'inline-flex h-6 items-center gap-1.5 rounded-sm px-1.5 text-[0.6875rem]',
+                'outline-none focus-visible:bg-raised disabled:opacity-50',
+                stoppable && 'pr-1',
+                selected ? 'font-semibold text-ink' : 'text-dim hover:text-ink',
+              )}
+            >
+              <span className={cn('size-1.5 flex-none rounded-full', dot)} />
+              {label}
+            </button>
+            {stoppable ? (
+              <button
+                type="button"
+                aria-label={t`Stop live analysis`}
+                title={t`Stop live analysis`}
+                data-testid="engine-pane-live-stop"
+                onClick={() => search.stream.setEnabled(false)}
+                className="mr-0.5 inline-flex size-5 items-center justify-center rounded-sm text-dim outline-none transition-colors hover:bg-raised hover:text-blunder focus-visible:bg-raised"
+              >
+                <Square className="size-2.5" fill="currentColor" strokeWidth={0} />
+              </button>
+            ) : null}
+          </span>
         )
       })}
     </div>

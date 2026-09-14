@@ -46,8 +46,7 @@ for. Point at one and it is drawn on the board, in whatever form you chose under
 ## Ask for a deeper look { #ask-for-a-deeper-look }
 
 **Analyse**, at the right end of the engine pane's title on the **Run** tab, or `A`, opens
-a dialog that queues a run of your own over this game. It sits left of a thin rule; right of
-it are the live engine's icon and switch, which search without storing anything. While the
+a dialog that queues a run of your own over this game. While the
 engine is hidden the pane is gone, and the button moves to the row under the board. The run
 goes ahead of every import pass still waiting, and the button spins until it is done; until
 then neither the button nor `A` opens the dialog again.
@@ -83,11 +82,11 @@ caret rather than the game.
 ## Run the live engine
 
 The engine pane has two tabs, **Run** and **Live**: what the stored pass found, and what
-an engine finds now. `E`, or the switch at the right end of the pane's title, starts the
-live engine on the position in front of you and moves the pane to **Live**; the same key
-or switch stops it and moves it back. While the engine runs you can click **Run** to look
-at the stored lines again — the dot on the **Live** tab keeps pulsing until you stop the
-search.
+an engine finds now, which stores nothing. Clicking **Live**, or `E`, starts the live engine
+on the position in front of you and moves the pane there. While it runs the **Live** tab
+carries a small square: click it, or press `E` again, to stop the search and go back to
+**Run**. You can also click **Run** to look at the stored lines while the engine keeps
+going — the dot on the **Live** tab keeps pulsing until you stop it.
 
 On the **Live** tab the engine's name and the line count in the title are pickers: click
 the name to choose which engine searches, the count to choose how many lines it shows.

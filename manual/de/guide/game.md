@@ -49,9 +49,7 @@ wird auf dem Brett gezeigt, so wie du es unter **Variantenvorschau** eingestellt
 ## Genauer hinsehen lassen { #ask-for-a-deeper-look }
 
 **Analysieren** rechts in der Titelzeile des Engine-Felds auf dem Reiter **Analyse**, oder
-`A`, öffnet einen Dialog, der eine eigene Analyse dieser Partie einreiht. Die Schaltfläche
-steht links von einem feinen Strich; rechts davon sitzen Symbol und Schalter der Live-Engine,
-die rechnet, ohne etwas zu speichern. Ist die Engine ausgeblendet, fehlt das Feld, und die
+`A`, öffnet einen Dialog, der eine eigene Analyse dieser Partie einreiht. Ist die Engine ausgeblendet, fehlt das Feld, und die
 Schaltfläche rückt in die Zeile unter dem Brett. Die Analyse zieht an jeder Importanalyse
 vorbei, die noch wartet, und die Schaltfläche dreht sich, bis sie fertig ist. Bis dahin
 öffnen weder die Schaltfläche noch `A` den Dialog ein zweites Mal.
@@ -90,12 +88,12 @@ die Partie.
 ## Die Engine live rechnen lassen
 
 Das Engine-Feld hat zwei Reiter, **Analyse** und **Live**: was die gespeicherte Analyse
-gefunden hat, und was eine Engine jetzt gerade findet. `E`, oder der Schalter rechts in
-der Titelzeile des Felds, startet die Engine auf der aktuellen Stellung und wechselt auf
-**Live**; dieselbe Taste oder derselbe Schalter hält sie an und wechselt zurück. Während
-die Engine rechnet, kannst du auf **Analyse** klicken, um dir die gespeicherten Varianten
-noch einmal anzusehen – der Punkt auf dem Reiter **Live** pulsiert weiter, bis du die
-Suche anhältst.
+gefunden hat, und was eine Engine jetzt gerade findet, ohne etwas zu speichern. Ein Klick
+auf **Live**, oder `E`, startet die Engine auf der aktuellen Stellung und wechselt dorthin.
+Solange sie rechnet, trägt der Reiter **Live** ein kleines Quadrat: ein Klick darauf, oder
+noch einmal `E`, hält die Suche an und wechselt zurück auf **Analyse**. Du kannst auch
+einfach auf **Analyse** klicken, um dir die gespeicherten Varianten anzusehen, während die
+Engine weiterrechnet – der Punkt auf dem Reiter **Live** pulsiert, bis du sie anhältst.
 
 Auf dem Reiter **Live** sind der Name der Engine und die Variantenzahl in der Titelzeile
 Auswahlfelder: Klick auf den Namen, um die Engine zu wählen, auf die Zahl, um

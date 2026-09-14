@@ -1256,8 +1256,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    *
    * The search moves it and the reader moves it. Switching the search on lands on Live,
    * because that is what was just asked for; switching it off lands back on Run, because a
-   * Live tab with nothing running on it is an empty box. Between those the reader may click
-   * Run to look at the stored lines while the search keeps going. Leaving the game line
+   * Live tab with nothing running on it is an empty box. For the same reason clicking Live
+   * with the search off switches it on: there is no Live tab worth looking at without one.
+   * Between those the reader may click Run to look at the stored lines while the search
+   * keeps going. Leaving the game line
    * lands on Live as well while a search is running: the run never looked at where the
    * board has gone, and the search is the only thing here with an opinion about it.
    */
@@ -1279,15 +1281,22 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     setWasExploring(exploring)
     if (exploring && stream.enabled) setEnginePaneTab('live')
   }
+  const onEnginePaneTab = useCallback(
+    (tab: EnginePaneTab) => {
+      if (tab === 'live' && !stream.enabled) setLiveSearch(true)
+      else setEnginePaneTab(tab)
+    },
+    [setLiveSearch, stream.enabled],
+  )
   const search = useMemo(
     () => ({
       stream: { ...stream, setEnabled: setLiveSearch },
       // Off — by the switch, by ⇧E, by the session ending — the Live tab is an empty box,
-      // so it is not offered: Run, whatever was chosen last.
+      // so it is not shown: Run, whatever was chosen last.
       tab: stream.enabled ? enginePaneTab : ('run' as const),
-      onTabChange: setEnginePaneTab,
+      onTabChange: onEnginePaneTab,
     }),
-    [enginePaneTab, setLiveSearch, stream],
+    [enginePaneTab, onEnginePaneTab, setLiveSearch, stream],
   )
   /**
    * What the last search said, or nothing at all while the engine is hidden. The session is
