@@ -232,6 +232,23 @@ const MAIA_LIVE = {
   ],
 }
 
+/** Who practice can be against: the one local Stockfish, held to a rating, and no Maia. */
+const PRACTICE_OPPONENTS = {
+  engines: [
+    {
+      engine_id: 1,
+      name: 'stockfish',
+      runner_id: null,
+      available: true,
+      reason: null,
+      strength: { min: 1320, max: 3190, default: 1320 },
+    },
+  ],
+  default_engine_id: 1,
+  maia: { available: false, reason: 'no human-move model is chosen' },
+  movetime_ms: { default: 1000, min: 100, max: 10000 },
+}
+
 function stubFetch(
   overrides: Record<string, unknown> = {},
   { maiaStatus = 200 }: { maiaStatus?: number } = {},
@@ -245,6 +262,22 @@ function stubFetch(
         return json({ error: 'maia_unavailable', detail: 'No local Maia engine.' }, maiaStatus)
       }
       return json(MAIA_LIVE)
+    }
+    if (url.includes('/practice/opponents')) return json(PRACTICE_OPPONENTS)
+    if (url.includes('/practice/move')) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { fen: string }) : null
+      posted.push({ url, body })
+      // Black's answer to whatever White just played from the start: e5 is legal after any of
+      // the first moves these tests type.
+      return json({
+        uci: 'e7e5',
+        san: 'e5',
+        engine_id: 1,
+        engine: 'stockfish',
+        runner_id: null,
+        elo: 1700,
+        movetime_ms: 1000,
+      })
     }
     if (url.includes('/auth/status')) {
       return json({ setup_required: false, authenticated: true, maia_target_elo: 1700 })
@@ -1766,6 +1799,81 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
     expect(screen.queryByRole('button', { name: 'Show the engine' })).not.toBeInTheDocument()
+  })
+})
+
+describe('GamePage practice', () => {
+  it('plays a position out against the engine, hiding the answers until asked', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('{Home}')
+
+    await user.keyboard('p')
+    const dialog = await screen.findByRole('dialog', { name: 'Practise from here' })
+    // Maia cannot answer here, so the engine is the one preselected, and why Maia is greyed
+    // is said rather than left to a tooltip.
+    expect(within(dialog).getByRole('button', { name: 'stockfish' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(dialog).toHaveTextContent('no human-move model is chosen')
+    // The slider opens on the reader's target rating, inside the engine's own range.
+    expect(within(dialog).getByRole('slider')).toHaveValue('1700')
+    await user.click(within(dialog).getByRole('button', { name: 'Play' }))
+
+    const bar = await screen.findByTestId('practice-bar')
+    expect(bar).toHaveTextContent('you play White against stockfish 1700')
+    expect(bar).toHaveTextContent('Your move.')
+    // The evaluation, the engine band and its graph are what practice keeps back.
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+
+    await user.keyboard('m')
+    await user.type(screen.getByRole('textbox', { name: 'Type a move' }), 'd4')
+    await waitFor(() =>
+      expect(posted.filter((call) => call.url.includes('/practice/move'))).toHaveLength(1),
+    )
+    const asked = posted.find((call) => call.url.includes('/practice/move'))!.body as Record<
+      string,
+      unknown
+    >
+    expect(asked).toMatchObject({ engine_id: 1, elo: 1700, movetime_ms: 1000 })
+    expect(String(asked.fen)).toMatch(/^rnbqkbnr\/pppppppp\/8\/8\/3P4\/8\/PPP1PPPP\/RNBQKBNR b/)
+    expect(await screen.findByText('analysis +2')).toBeInTheDocument()
+    expect(screen.getByTestId('practice-bar')).toHaveTextContent('Your move.')
+
+    // Take back removes the reply and the move it answered.
+    await user.click(screen.getByRole('button', { name: /Take back/ }))
+    await waitFor(() => expect(screen.queryByText(/analysis \+/)).not.toBeInTheDocument())
+
+    // H shows the engine without ending the game; P ends it.
+    await user.keyboard('h')
+    expect(await screen.findByTestId('maia-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('practice-bar')).toBeInTheDocument()
+    await user.keyboard('p')
+    expect(screen.queryByTestId('practice-bar')).not.toBeInTheDocument()
+    expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
+  })
+
+  it('refuses a move on the computer’s turn and ends the game with Escape', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('{Home}')
+    await user.click(screen.getByRole('button', { name: /Practise/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Practise from here' })
+    await user.click(within(dialog).getByRole('button', { name: 'Black' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Play' }))
+
+    // White is to move and White is the computer's: it answers first.
+    await waitFor(() =>
+      expect(posted.filter((call) => call.url.includes('/practice/move'))).toHaveLength(1),
+    )
+    const bar = await screen.findByTestId('practice-bar')
+    expect(bar).toHaveTextContent('you play Black against stockfish')
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('practice-bar')).not.toBeInTheDocument()
   })
 })
 

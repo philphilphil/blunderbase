@@ -83,6 +83,34 @@ reported as ambiguous until you add the file. `↵` plays what is typed when the
 waiting for more, `Esc` closes it. While the box has the cursor, the arrow keys move the
 caret rather than the game.
 
+## Practise from a position
+
+**Practise**, in the row under the board, or `P`, plays the position on the board out against
+the computer. The dialog asks three things:
+
+| | |
+|---|---|
+| **You play** | White or Black. It opens on the side at the bottom of the board |
+| **Against** | Maia, or any search engine that is switched on, on this server, on a runner or in this browser. It opens on Maia where Maia can answer. An engine that cannot answer right now is greyed out, and the reason is written under the list |
+| **Strength** | For an engine that has a rating limit, a rating between the lowest and highest it accepts, or **Full strength**. It opens on your Maia target rating. Stockfish's limit is calibrated for about a second a move. An engine without one plays at full strength. For Maia this is the **Maia level** instead, from the levels set in [Analysis](analysis.md) |
+| **Think time** | How long an engine searches for each move: half a second to five seconds |
+
+If the computer is to move, it moves first. Play your moves on the board or type them with
+`M`. The engine searches for the think time and plays the move its rating limit picks. Maia
+plays a move humans at its level play in the position, chosen by how often they play it, so
+it makes their mistakes too.
+
+While you practise, the evaluation, the engine pane, Maia, the graph and the arrows are
+hidden. A strip in their place says whose move it is. **Show the engine**, or `H`, brings
+them back without ending the game. **Take back** removes your last move and the reply to it.
+The game ends by itself on mate, stalemate, insufficient material, the fifty-move rule or a
+threefold repetition.
+
+**Stop**, `P` or `Esc` ends practice. The moves stay on the board as a line, so you can switch
+on the live engine and see where it went wrong, or keep the line with **Pin this line**.
+Leaving the line or going back to the game also ends practice. Nothing is stored unless you
+pin it.
+
 ## Run the live engine
 
 The engine pane has two tabs, **Run** and **Live**: what the stored pass found, and what

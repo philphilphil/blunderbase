@@ -89,6 +89,7 @@ msgid "Engine"
 msgstr "Engine"
 
 #: src/components/analysis/AnalyseDialog.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 msgid "Looking for engines…"
 msgstr "Looking for engines…"
 
@@ -175,6 +176,7 @@ msgstr "From {moveName} to the end of the game."
 #: src/routes/engines/CreateRunnerForm.tsx
 #: src/routes/engines/EngineDetail.tsx
 #: src/routes/engines/RunnerCard.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 #: src/routes/games/components/DeleteGamesDialog.tsx
 #: src/routes/import/DeleteAllGamesDialog.tsx
 #: src/routes/live/SaveMoment.tsx
@@ -441,6 +443,7 @@ msgstr "Failed"
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/game/components/MoveTimeGraph.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -451,6 +454,7 @@ msgstr "White"
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/game/components/MoveTimeGraph.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -1683,6 +1687,10 @@ msgid "Analyse this game…"
 msgstr "Analyse this game…"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Practise from this position against the computer, or stop"
+msgstr "Practise from this position against the computer, or stop"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Copy the PGN"
 msgstr "Copy the PGN"
 
@@ -1772,6 +1780,7 @@ msgstr "The coverage could not be read."
 #: src/routes/engines/EnginesPage.tsx
 #: src/routes/engines/MachinesPage.tsx
 #: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/game/components/PracticeBar.tsx
 #: src/routes/games/components/GamesTable.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 #: src/routes/stats/kit/states.tsx
@@ -2684,6 +2693,7 @@ msgstr "Pause"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 #: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/game/components/PracticeBar.tsx
 #: src/routes/import/JobProgress.tsx
 msgid "Stop"
 msgstr "Stop"
@@ -5095,6 +5105,15 @@ msgid "The game payload was empty."
 msgstr "The game payload was empty."
 
 #: src/routes/game/GamePage.tsx
+msgid "Play this position out against the computer (P)"
+msgstr "Play this position out against the computer (P)"
+
+#. Button in the transport row that opens the practice dialog
+#: src/routes/game/GamePage.tsx
+msgid "Practise"
+msgstr "Practise"
+
+#: src/routes/game/GamePage.tsx
 msgid "Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it."
 msgstr "Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it."
 
@@ -5205,6 +5224,7 @@ msgstr "The engine was held back on this game when it was imported, so you could
 
 #. Button in the transport row that reveals the engine on a game imported with it hidden
 #: src/routes/game/components/EngineRevealButton.tsx
+#: src/routes/game/components/PracticeBar.tsx
 msgid "Show the engine"
 msgstr "Show the engine"
 
@@ -5369,6 +5389,7 @@ msgid "What people at this level actually play here — not the engine’s best 
 msgstr "What people at this level actually play here — not the engine’s best move"
 
 #: src/routes/game/components/MaiaPanel.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 msgid "Maia level"
 msgstr "Maia level"
 
@@ -5609,6 +5630,126 @@ msgstr "from {origin}"
 msgid "not from this game"
 msgstr "not from this game"
 
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Practice · you play White against {opponent}"
+msgstr "Practice · you play White against {opponent}"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Practice · you play Black against {opponent}"
+msgstr "Practice · you play Black against {opponent}"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "{opponent} is thinking…"
+msgstr "{opponent} is thinking…"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Looking back — step to the end of the line to play on."
+msgstr "Looking back — step to the end of the line to play on."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Your move."
+msgstr "Your move."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Take back your last move and the reply to it"
+msgstr "Take back your last move and the reply to it"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Take back"
+msgstr "Take back"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Show or hide the evaluation, the engine lines and Maia (H)"
+msgstr "Show or hide the evaluation, the engine lines and Maia (H)"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Hide the engine"
+msgstr "Hide the engine"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Stop practising; the moves stay on the board as a line (P)"
+msgstr "Stop practising; the moves stay on the board as a line (P)"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Checkmate — you won."
+msgstr "Checkmate — you won."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Checkmate — you lost."
+msgstr "Checkmate — you lost."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Stalemate — a draw."
+msgstr "Stalemate — a draw."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Neither side can mate — a draw."
+msgstr "Neither side can mate — a draw."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Fifty moves without a capture or a pawn move — a draw."
+msgstr "Fifty moves without a capture or a pawn move — a draw."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "The same position three times — a draw."
+msgstr "The same position three times — a draw."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Practise from here"
+msgstr "Practise from here"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Play this position out against the computer. The evaluation, the engine lines and Maia stay hidden until you press H; the moves land in the move list as a line you can keep."
+msgstr "Play this position out against the computer. The evaluation, the engine lines and Maia stay hidden until you press H; the moves land in the move list as a line you can keep."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "You play"
+msgstr "You play"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Against"
+msgstr "Against"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "There is no engine here that can play. Add one under Compute → Engines."
+msgstr "There is no engine here that can play. Add one under Compute → Engines."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Maia plays a move humans at this level play here, drawn by how often they play it — so it blunders the way they do."
+msgstr "Maia plays a move humans at this level play here, drawn by how often they play it — so it blunders the way they do."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Strength"
+msgstr "Strength"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Full strength"
+msgstr "Full strength"
+
+#. placeholder {0}: strength.min
+#. placeholder {1}: strength.max
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "The engine’s own rating limit, from {0} to {1}. It plays weaker moves on purpose, calibrated for about a second a move."
+msgstr "The engine’s own rating limit, from {0} to {1}. It plays weaker moves on purpose, calibrated for about a second a move."
+
+#. placeholder {0}: engine.name
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "{0} declares no rating limit, so it plays at full strength."
+msgstr "{0} declares no rating limit, so it plays at full strength."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Think time"
+msgstr "Think time"
+
+#. placeholder {0}: value / 1000
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "{0} s"
+msgstr "{0} s"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Play"
+msgstr "Play"
+
 #: src/routes/game/components/StudioActions.tsx
 msgid "← Back to explorer"
 msgstr "← Back to explorer"
@@ -5652,6 +5793,10 @@ msgstr "ply {count}"
 #: src/routes/game/useAnalysisRequest.ts
 msgid "Stockfish in this tab"
 msgstr "Stockfish in this tab"
+
+#: src/routes/game/usePractice.ts
+msgid "No move came back for this position."
+msgstr "No move came back for this position."
 
 #: src/routes/games/GamesPage.tsx
 msgid "the request never landed"

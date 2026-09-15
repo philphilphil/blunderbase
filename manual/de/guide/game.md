@@ -90,6 +90,34 @@ Linie dazuschreibst. `↵` spielt das Getippte, wenn das Feld noch auf mehr wart
 schließt es. Solange das Feld den Cursor hat, bewegen die Pfeiltasten den Cursor und nicht
 die Partie.
 
+## Von einer Stellung aus üben { #practise-from-a-position }
+
+**Üben** in der Leiste unter dem Brett, oder `P`, spielt die Stellung auf dem Brett gegen
+den Computer aus. Der Dialog fragt drei Dinge:
+
+| | |
+|---|---|
+| **Du spielst** | Weiß oder Schwarz. Er öffnet mit der Seite, die unten auf dem Brett steht |
+| **Gegen** | Maia, oder jede eingeschaltete Suchengine – auf diesem Server, auf einem Runner oder in diesem Browser. Er öffnet mit Maia, wenn Maia antworten kann. Eine Engine, die gerade nicht antworten kann, ist ausgegraut, und der Grund steht unter der Liste |
+| **Spielstärke** | Bei einer Engine mit Wertungsbegrenzung eine Wertung zwischen der niedrigsten und der höchsten, die sie annimmt, oder **Volle Stärke**. Er öffnet mit deiner Maia-Zielwertung. Die Begrenzung von Stockfish ist auf etwa eine Sekunde pro Zug abgestimmt. Eine Engine ohne Begrenzung spielt mit voller Stärke. Bei Maia steht hier stattdessen die **Maia-Stufe**, aus den Stufen, die unter [Analyse](analysis.md) eingestellt sind |
+| **Bedenkzeit** | Wie lange eine Engine je Zug rechnet: eine halbe bis fünf Sekunden |
+
+Ist der Computer am Zug, zieht er zuerst. Deine Züge spielst du auf dem Brett oder tippst
+sie mit `M`. Die Engine rechnet die Bedenkzeit lang und spielt den Zug, den ihre
+Wertungsbegrenzung auswählt. Maia spielt einen Zug, den Menschen ihrer Stufe in der Stellung
+spielen, ausgewählt danach, wie oft sie ihn spielen – und macht deshalb auch ihre Fehler.
+
+Solange du übst, sind Bewertung, Engine-Feld, Maia, Verlauf und Pfeile verborgen. Eine Leiste
+an ihrer Stelle sagt, wer am Zug ist. **Engine zeigen**, oder `H`, holt sie zurück, ohne die
+Partie zu beenden. **Zurücknehmen** nimmt deinen letzten Zug und die Antwort darauf zurück.
+Die Partie endet von selbst bei Matt, Patt, zu wenig Material, der Fünfzig-Züge-Regel oder
+dreifacher Stellungswiederholung.
+
+**Stoppen**, `P` oder `Esc` beendet das Üben. Die Züge bleiben als Variante auf dem Brett:
+Du kannst die Engine live rechnen lassen und nachsehen, wo es schiefging, oder die Variante
+mit **Diese Variante anheften** behalten. Verlässt du die Variante oder gehst zur Partie
+zurück, endet das Üben ebenfalls. Gespeichert wird nichts, solange du nichts anheftest.
+
 ## Die Engine live rechnen lassen
 
 Das Engine-Feld hat zwei Reiter, **Analyse** und **Live**: was die gespeicherte Analyse

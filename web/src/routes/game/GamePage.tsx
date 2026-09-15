@@ -1,4 +1,5 @@
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Swords } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
@@ -15,6 +16,7 @@ import {
   useMaiaElos,
   useNoteTags,
   usePositionBook,
+  usePracticeOpponents,
   useReferenceGame,
   useSaveLine,
   useSaveNote,
@@ -56,6 +58,8 @@ import {
 } from './components/MoveList'
 import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
 import { NotesTrack, type NotesTrackTab } from './components/NotesTrack'
+import { PracticeBar } from './components/PracticeBar'
+import { PracticeDialog } from './components/PracticeDialog'
 import { StudioActions } from './components/StudioActions'
 import {
   bestRun,
@@ -104,6 +108,7 @@ import { variationRows } from './variationRows'
 import { useAnalysisRequest } from './useAnalysisRequest'
 import { useBoardKeys } from './useBoardKeys'
 import { useLiveMaia } from './useLiveMaia'
+import { usePractice, type PracticeSetup } from './usePractice'
 
 // --- the right column's width ---------------------------------------------
 //
@@ -670,6 +675,57 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     keepBranch()
     setBranch(null)
   }, [keepBranch])
+
+  // --- practice ---------------------------------------------------------------
+  //
+  // A practice game is the analysis line with a side that belongs to the reader
+  // (`./practice`, `./usePractice`). The two callbacks below are the only ways the computer's
+  // side touches the line, and both go through `setBranch` exactly as a drag does, so the move
+  // list, the kept lines and Pin this line see a practice game as the line it is.
+  //
+  // The hook is handed the line only while there *is* a branch: "Back to game" leaves the
+  // board on the position the practice began from, with the same base, and that must still
+  // end the game.
+
+  /** The computer's reply, played only if the board is still at the end of the line on `fen`. */
+  const appendPracticeMove = useCallback(
+    (fen: string, uci: string) => {
+      if (!analysis || analysis.position.fen !== fen) return
+      if (analysis.cursor !== analysis.moves.length) return
+      setBranch({
+        base: analysis.base,
+        moves: [...analysis.moves, uci],
+        cursor: analysis.moves.length + 1,
+      })
+    },
+    [analysis],
+  )
+  /** A take-back: the line cut to `length`, with the board at its new end. */
+  const truncatePractice = useCallback(
+    (length: number) => {
+      if (!analysis) return
+      setHoverMove(null)
+      setPreview(null)
+      setBranch({ base: analysis.base, moves: analysis.moves.slice(0, length), cursor: length })
+    },
+    [analysis],
+  )
+  const practice = usePractice({
+    analysis: branch ? analysis : null,
+    start: analysis ? (line.boards[analysis.base] ?? null) : null,
+    append: appendPracticeMove,
+    truncate: truncatePractice,
+  })
+  const practiceGame = practice.game
+  const { begin: startPractice, stop: stopPractice, toggleReveal } = practice
+  /** Practising with the answers hidden — what the eval, the lines, Maia and the arrows obey. */
+  const concealed = practiceGame !== null && !practiceGame.reveal
+  /** What Hints means right now: practice's reveal while practising, the reader's own otherwise. */
+  const shownHints = practiceGame ? practiceGame.reveal : hints
+  /** The engine panes are left out of the layout: ⇧E, a held-back game, or a practice game. */
+  const quiet = engineHidden || concealed
+  const [practiceOpen, setPracticeOpen] = useState(false)
+  const practiceOpponents = usePracticeOpponents({ enabled: practiceOpen })
 
   const seek = useCallback(
     (next: number) => {
@@ -1452,6 +1508,20 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const playMove = useCallback(
     (orig: string, dest: string, promotion?: TypedMove['move']['promotion']) => {
       if (!analysis) return
+      // Practising, a move is the reader's own and nothing else: only on their side's turn,
+      // and never snapped onto an engine line, which would play the engine's continuation
+      // for them. Played from a position stepped back to, it cuts the line there and the
+      // game goes on from it — the cut line is kept, as any other.
+      if (practiceGame) {
+        if (analysis.board.turn !== practiceGame.side) return
+        const played = withBoardMove(analysis, orig, dest, promotion)
+        if (!played) return
+        if (analysis.cursor < analysis.moves.length) keepBranch()
+        setHoverMove(null)
+        setPreview(null)
+        setBranch({ base: analysis.base, moves: played, cursor: played.length })
+        return
+      }
       const next = withBoardMove(analysis, orig, dest, promotion)
       if (!next) return
       const offered = lineStartingWith(boardPvs, next[next.length - 1]!)
@@ -1464,8 +1534,40 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       setPreview(null)
       setBranch({ base: analysis.base, moves: next, cursor: next.length })
     },
-    [analysis, boardPvs, keepBranch, playLine],
+    [analysis, boardPvs, keepBranch, playLine, practiceGame],
   )
+
+  /**
+   * Start practising from the board as it stands. A line walked past the board is cut at
+   * it (and kept), the live search is switched off — it would be the answer — and the game
+   * stops playing itself through.
+   */
+  const beginPractice = useCallback(
+    (setup: PracticeSetup) => {
+      setPracticeOpen(false)
+      if (!analysis) return
+      const from = analysis.cursor
+      if (from < analysis.moves.length) keepBranch()
+      setHoverMove(null)
+      setPreview(null)
+      setBranch({ base: analysis.base, moves: analysis.moves.slice(0, from), cursor: from })
+      setPlaying(false)
+      setLiveSearch(false)
+      startPractice(setup, analysis.base, from)
+    },
+    [analysis, keepBranch, startPractice, setLiveSearch],
+  )
+
+  /**
+   * The board's legal moves, emptied while it is not the reader's move in a practice game:
+   * a piece that can be dragged on the computer's turn is a move the page would then have
+   * to refuse.
+   */
+  const boardAnalysis = useMemo(() => {
+    if (!analysis || !practiceGame) return analysis
+    const yours = analysis.board.turn === practiceGame.side && !practice.thinking
+    return yours ? analysis : { ...analysis, dests: new Map() }
+  }, [analysis, practiceGame, practice.thinking])
 
   /*
    * Playing the game through, a ply at a time.
@@ -1535,17 +1637,22 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       flip: () => setFlipped((value) => !value),
       // Still bound while ⇧E is on: what is left for it to switch is the arrow for the move
       // the game itself played next, which is the game rather than a verdict about it.
-      toggleHints: () => setHints((value) => !value),
+      // Practising, H is the one switch for everything practice hides.
+      toggleHints: practiceGame ? toggleReveal : () => setHints((value) => !value),
       // The same switch the engine pane's title strip carries, and the same guard it draws
       // disabled under: with nothing on the board there is nothing to search.
       toggleEngine:
-        boardPosition?.fen && !engineHidden ? () => setLiveSearch(!stream.enabled) : undefined,
+        boardPosition?.fen && !engineHidden && !concealed
+          ? () => setLiveSearch(!stream.enabled)
+          : undefined,
       // A note hangs off a game row, so a model game nobody has added has none to write.
       note: readOnly ? undefined : focusComposer,
       // Only while there is a line to leave: off one, Escape is the browser's again — and,
       // more to the point, whatever is open on top of the page keeps it.
-      exitLine: exploring ? exitLine : undefined,
-      playBest: playEngineBest,
+      // Practising, Escape ends the game and leaves its moves on the board as a line; a
+      // second Escape leaves the line.
+      exitLine: practiceGame ? stopPractice : exploring ? exitLine : undefined,
+      playBest: concealed ? undefined : playEngineBest,
       // Open the typed-move box, or put the caret back in it: the same key either way, so
       // a reader whose hand left the box for the mouse has one thing to press.
       typeMove: () => {
@@ -1557,17 +1664,17 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // The button's own call: the key opens the dialog rather than queueing anything,
       // because what to run is the dialog's question and a key cannot answer it.
       analyse: readOnly ? undefined : analysisRequest.openDialog,
+      practice: practiceGame ? stopPractice : () => setPracticeOpen(true),
       // The key presses the one PGN button on the screen rather than copying the game a
       // second time of its own — see `PGN_BUTTON_ID`.
       copyPgn: () => document.getElementById(PGN_BUTTON_ID)?.click(),
       // The compare grid is the human column's, so the key is bound only where that column
       // is drawn: with hints off there is no Maia on the screen to switch.
-      maiaCompare: hints && humanColumn ? () => setMaiaCompare(!compare) : undefined,
+      maiaCompare: shownHints && humanColumn ? () => setMaiaCompare(!compare) : undefined,
       // The graph pane is engine, and gone under ⇧E; the time tab exists only with a clock.
       // The phone reaches these panes through its own tab strip, so the keys are desktop's.
-      graphEval: mobile || engineHidden ? undefined : () => setGraphTab('eval'),
-      graphTime:
-        mobile || engineHidden || times.length === 0 ? undefined : () => setGraphTab('time'),
+      graphEval: mobile || quiet ? undefined : () => setGraphTab('eval'),
+      graphTime: mobile || quiet || times.length === 0 ? undefined : () => setGraphTab('time'),
       bookTab: mobile ? undefined : () => setNotesTab('book'),
       // At the end of the game there is nothing to play through, so Space starts nothing —
       // the same as the ⏭ beside it being spent.
@@ -1621,7 +1728,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   // their headers, their rules and their heights, and a column of labelled empty boxes is
   // not a game read unaided: it is the same screen with the answers cut out of it. Gone,
   // the move table and the notes take the room, which is what this reading is for.
-  const maiaPanel = engineHidden ? null : (
+  //
+  // A practice game with its answers hidden is the same silence for the same reason, and
+  // leaves the same panels out (`quiet`); the practice strip takes the band's row instead.
+  const maiaPanel = quiet ? null : (
     <MaiaPanel
       rating={maia?.rating ?? null}
       human={human}
@@ -1630,8 +1740,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       compare={compare}
       onCompareChange={setMaiaCompare}
       comparison={comparison}
-      showHuman={hints && humanColumn}
-      showEngine={hints}
+      showHuman={shownHints && humanColumn}
+      showEngine={shownHints}
       run={engineRun}
       // Off the game line the column is the run's own line seen from further along it
       // (`alongLine`), or nothing at all where the board has left every line it drew.
@@ -1695,10 +1805,26 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
+  const practiceBar = practiceGame ? (
+    <PracticeBar
+      game={practiceGame}
+      phase={practice.phase}
+      result={practice.result}
+      thinking={practice.thinking}
+      error={practice.error}
+      canTakeBack={practice.canTakeBack}
+      onTakeBack={practice.takeBack}
+      onToggleReveal={toggleReveal}
+      onRetry={practice.retry}
+      onStop={stopPractice}
+      className={mobile ? 'rounded-md border border-edge' : 'col-span-2 border-b border-edge-strong'}
+    />
+  ) : null
+
   const board = (
     <BoardPanel
       position={position}
-      analysis={analysis}
+      analysis={boardAnalysis}
       onPlayMove={playMove}
       // A typed move is a board move with its promotion spelled out (`e8=N`), resolved
       // against the line's own position — the game position when no line is being walked.
@@ -1725,26 +1851,26 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // at; on an analysis position there is no such claim, and only Maia's own
       // (live) arrow is left — and the live search's, which is looking at exactly the
       // position on the board (`boardEngineBest` carries that rule).
-      upcoming={exploring ? undefined : upcoming}
-      engineBest={boardEngineBest}
+      upcoming={exploring || concealed ? undefined : upcoming}
+      engineBest={concealed ? null : boardEngineBest}
       hoverMove={hoverMove}
       previewFen={previewView.fen}
       previewShapes={previewView.shapes}
       previewLastMove={previewView.lastMove}
       previewCaption={previewView.caption}
       previewDim={previewView.dim}
-      maia={maia}
+      maia={concealed ? null : maia}
       win={boardWin}
       score={boardScore}
       scoreAlongLine={scoreAlongLine}
       cursor={cursor}
       plyCount={plyCount}
-      hints={hints}
-      onHintsChange={setHints}
+      hints={shownHints}
+      onHintsChange={practiceGame ? toggleReveal : setHints}
       // Everything above is already empty while ⇧E is on — the rows were stripped. This is
       // what the panel cannot work out for itself: that the eval bar and the score chip are
       // to go rather than stand there reading 0.00, which is a claim of its own.
-      engineHidden={engineHidden}
+      engineHidden={quiet}
       readOnly={readOnly}
       onFlip={() => setFlipped((value) => !value)}
       onSeek={seek}
@@ -1771,6 +1897,22 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // titlebar is the one strip on this screen nobody's eye goes to.
       actions={
         <>
+          {/* Practise… sits with the other things done to the position rather than with the
+              transport: it starts a game, it does not move through this one. Gone while a
+              practice game is on — the strip carries Stop. */}
+          {practiceGame ? null : (
+            <button
+              type="button"
+              onClick={() => setPracticeOpen(true)}
+              title={t`Play this position out against the computer (P)`}
+              className="flex flex-none items-center gap-1 rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
+            >
+              <Swords className="size-3" aria-hidden />
+              <Trans comment="Button in the transport row that opens the practice dialog">
+                Practise
+              </Trans>
+            </button>
+          )}
           {/* The way to hear the engine on a game that was imported with it held back.
               Nothing while the game is not, and never for a reference game, which has no
               row of its own to carry the flag. */}
@@ -1787,7 +1929,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   )
 
-  const evalGraph = engineHidden ? null : (
+  const evalGraph = quiet ? null : (
     <EvalGraph
       points={curve}
       plyCount={plyCount}
@@ -1976,12 +2118,26 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     />
   ) : null
 
+  // Mounted only while open, for the same reason as Analyse…: every opening starts from the
+  // dialog's own defaults, and the opponents are asked for fresh.
+  const practiceDialog = practiceOpen ? (
+    <PracticeDialog
+      opponents={practiceOpponents.data}
+      loadError={practiceOpponents.error?.message ?? null}
+      maiaLevels={elos}
+      defaultSide={orientation}
+      onStart={beginPractice}
+      onClose={() => setPracticeOpen(false)}
+    />
+  ) : null
+
   if (mobile) {
     return (
       <>
         {chrome}
         {analysisRequest.setupDialog}
         {analyseDialog}
+        {practiceDialog}
         <MobileGameView
           game={detail.game}
           best={best}
@@ -1996,10 +2152,21 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           noteCount={noteList.length}
           // The strip loses Eval and Engine with it; `evalGraph` and `maiaPanel` above are
           // already null, and a tab onto nothing is worse than no tab.
-          engineHidden={engineHidden}
+          engineHidden={quiet}
           tab={mobileTab}
           onTabChange={setMobileTab}
-          board={board}
+          // On the phone the practice strip rides above the board, where the thumb and the
+          // eye already are; the engine tabs it replaces are gone from the strip below.
+          board={
+            practiceBar ? (
+              <div className="flex flex-col gap-2">
+                {practiceBar}
+                {board}
+              </div>
+            ) : (
+              board
+            )
+          }
           moveList={moveList}
           evalGraph={evalGraph}
           flaggedMoments={flaggedMoments}
@@ -2015,6 +2182,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       {chrome}
       {analysisRequest.setupDialog}
       {analyseDialog}
+      {practiceDialog}
 
       {/*
         The screen's own heading, across the whole workspace: what the game is, and what has
@@ -2125,7 +2293,13 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           data-testid="moves-column"
           className={cn(
             'grid min-h-0 min-w-[26.875rem] grow-0',
-            'grid-cols-[15.625rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]',
+            'grid-cols-[15.625rem_minmax(0,1fr)]',
+            // A practice strip is one more row above the band. With the answers hidden the
+            // band and the graph are gone and the strip stands in the band's place; shown,
+            // it sits over them and the move table is still the row that takes the slack.
+            practiceBar && !quiet
+              ? 'grid-rows-[auto_auto_minmax(0,1fr)_auto]'
+              : 'grid-rows-[auto_minmax(0,1fr)_auto]',
             // The middle band starts at 1440 rather than at 1280. At exactly 1280 — a very
             // common laptop — the rail (200), the board column's floor (420) and this
             // column's 508 come to 1271, which fits; the 1280 band asked for 508 more than
@@ -2143,6 +2317,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           )}
           style={movesWidth === null ? undefined : { flexBasis: `${movesWidth}rem` }}
         >
+          {practiceBar}
           {maiaPanel}
           {moveList}
           {/*

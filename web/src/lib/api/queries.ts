@@ -1442,6 +1442,24 @@ export function useDeleteLine(
   })
 }
 
+// --- practice ---------------------------------------------------------------
+
+/**
+ * Who a practice game can be against. Asked when the dialog opens rather than cached for
+ * long: whether a runner's engine can answer is a fact about this minute.
+ */
+export function usePracticeOpponents(
+  options?: Options<Awaited<ReturnType<typeof api.practiceOpponents>>>,
+) {
+  return useQuery({
+    queryKey: queryKeys.practiceOpponents(),
+    queryFn: api.practiceOpponents,
+    staleTime: 0,
+    retry: false,
+    ...options,
+  })
+}
+
 // --- maia -----------------------------------------------------------------
 
 export interface MaiaPolicyQuery {

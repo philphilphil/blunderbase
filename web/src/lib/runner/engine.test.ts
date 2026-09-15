@@ -267,6 +267,36 @@ describe('analyse', () => {
   })
 })
 
+describe('playMove', () => {
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+  it('reads the move from bestmove after a movetime search', async () => {
+    const { engine, module } = await boot()
+    const move = await engine.playMove(START, { movetimeMs: 800, options: {} })
+
+    expect(move).toBe('e2e4')
+    expect(module.commands).toContain(`position fen ${START}`)
+    expect(module.commands).toContain('go movetime 800')
+  })
+
+  it('sets options for the one search and puts them back after it', async () => {
+    const { engine, module } = await boot()
+    await engine.playMove(START, { movetimeMs: 500, options: { hash: 64 } })
+
+    const sent = module.commands.filter((command) => command.startsWith('setoption name Hash'))
+    // The declared spelling, not the caller's, and back to the default once it has played.
+    expect(sent).toEqual(['setoption name Hash value 64', 'setoption name Hash value 16'])
+  })
+
+  it('refuses an option the engine never declared, before it searches', async () => {
+    const { engine, module } = await boot()
+    await expect(
+      engine.playMove(START, { movetimeMs: 500, options: { UCI_Elo: 1500 } }),
+    ).rejects.toThrow('UCI_Elo is not an option of this engine')
+    expect(module.commands.some((command) => command.startsWith('go movetime'))).toBe(false)
+  })
+})
+
 describe('searchInfinite', () => {
   const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 

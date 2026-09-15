@@ -149,6 +149,7 @@ function fakeEngine(
     analyse,
     stopSearch: vi.fn(),
     quit: vi.fn(),
+    playMove: vi.fn(() => Promise.resolve('g1f3')),
     searchInfinite: (fen, options) =>
       new Promise<boolean>((resolve) => {
         const board: FakeBoard = {
@@ -259,8 +260,9 @@ describe('the handshake', () => {
     expect(hello.browser).toBe(true)
     expect(hello.slots).toBe(1)
     expect(hello.active_runs).toEqual([])
-    // Without it the gateway hands this tab only node-budget runs.
-    expect(hello.features).toEqual(['run_limits'])
+    // Without the first the gateway hands this tab only node-budget runs; without the
+    // second practice names this tab as too old rather than asking it for a move.
+    expect(hello.features).toEqual(['run_limits', 'play_move'])
 
     const engines = hello.engines as Record<string, unknown>[]
     expect(engines).toHaveLength(1)
@@ -608,6 +610,71 @@ describe('an analysis board', () => {
       reason: 'engine_failed',
       error: 'the engine stopped searching this position',
     })
+  })
+})
+
+describe('a practice reply', () => {
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+  async function connected() {
+    const kit = harness()
+    kit.client.start(CREDENTIAL)
+    await tick()
+    const socket = kit.sockets[0]!
+    socket.accept()
+    socket.deliver(welcome())
+    return { ...kit, socket }
+  }
+
+  function request(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      type: 'move_request',
+      request_id: 'mv_1',
+      engine: ENGINE_NAME,
+      fen: START,
+      movetime_ms: 800,
+      options: { UCI_LimitStrength: true, UCI_Elo: 1500 },
+      ...extra,
+    }
+  }
+
+  it('plays with the options it was sent and answers with the move', async () => {
+    const { socket, engine } = await connected()
+    socket.deliver(request())
+    await tick()
+
+    expect(engine.playMove).toHaveBeenCalledWith(START, {
+      movetimeMs: 800,
+      options: { UCI_LimitStrength: true, UCI_Elo: 1500 },
+    })
+    expect(socket.frame('move_result')).toEqual({
+      type: 'move_result',
+      request_id: 'mv_1',
+      uci: 'g1f3',
+      error: null,
+    })
+  })
+
+  it('answers a request for an engine it does not have with a sentence', async () => {
+    const { socket, engine } = await connected()
+    socket.deliver(request({ engine: 'sf-remote' }))
+    await tick()
+
+    expect(engine.playMove).not.toHaveBeenCalled()
+    expect(socket.frame('move_result')).toMatchObject({
+      request_id: 'mv_1',
+      uci: null,
+      error: 'sf-remote is not an engine this runner plays on',
+    })
+  })
+
+  it('turns an engine failure into an answer rather than a silence', async () => {
+    const { socket, engine } = await connected()
+    vi.mocked(engine.playMove).mockRejectedValueOnce(new Error('UCI_Elo is not an option'))
+    socket.deliver(request())
+    await tick()
+
+    expect(socket.frame('move_result')).toMatchObject({ uci: null, error: expect.any(String) })
   })
 })
 

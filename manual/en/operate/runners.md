@@ -59,7 +59,9 @@ line is this server's only.
 A **runner** is a second Blunderbase process on a machine with cores to spare. It has no
 database and serves no page. It dials *out* to your server, says which engines it has, and
 is handed whole analysis jobs and analysis boards. Nothing about a finished run says where
-it happened.
+it happened. It also answers the moves of a
+[practice game](../guide/game.md#practise-from-a-position) on its engines. A runner older
+than practice cannot, and the practice dialog says to update it.
 
 Use one when the machine running Blunderbase is not the machine you want doing the
 searching.

@@ -730,6 +730,10 @@ class RunnerClient:
             self._on_ack(frame)
         elif kind in STREAM_FRAMES:
             await self._on_stream(frame)
+        elif kind == protocol.MOVE_REQUEST:
+            # On a task of its own: the search takes a second or more, and the receive loop
+            # owes the server its pongs while it does.
+            self._spawn(self._play_move(frame))
         else:
             logger.info("ignoring a %r, which this runner does not understand", kind)
 
@@ -1039,6 +1043,72 @@ class RunnerClient:
     ) -> None:
         await self._send_quietly(
             protocol.stream_closed(session_id=session_id, reason=reason, error=error)
+        )
+
+    # --- practice replies ---------------------------------------------------------
+
+    async def _play_move(self, frame: Mapping[str, Any]) -> None:
+        """One bounded search that answers with the move played, then nothing is kept.
+
+        The options in the frame (a rating to play at) are laid over the engine's own for
+        this search only, and they are part of the pool key: a weakened process is its own
+        warm process, never the one the next run is handed. Every failure is a
+        `move_result` with a sentence, because the server has a person waiting on it.
+        """
+        request_id = str(frame.get("request_id") or "")
+        if not request_id:
+            logger.warning("a move_request arrived without a request id")
+            return
+        name = str(frame.get("engine") or "")
+        engine = self.config.engines_by_name.get(name)
+        if engine is None or engine.kind == MAIA_KIND:
+            await self._send_quietly(
+                protocol.move_result(
+                    request_id=request_id, error=f"{name!r} is not a search engine on this runner"
+                )
+            )
+            return
+        options = frame.get("options") or {}
+        if not isinstance(options, Mapping):
+            options = {}
+        try:
+            board = _board(str(frame.get("fen") or ""))
+            movetime = max(1, int(frame.get("movetime_ms") or 1000)) / 1000
+        except (TypeError, ValueError) as exc:
+            await self._send_quietly(protocol.move_result(request_id=request_id, error=str(exc)))
+            return
+        spec = EngineSpec.build(
+            engine.path,
+            kind=engine.kind,
+            options={**dict(engine.options), **dict(options)},
+            name=engine.name,
+            instances=engine.instances,
+        )
+
+        def work(adapter: Any) -> str | None:
+            import chess
+            import chess.engine
+
+            try:
+                standard = chess.Board(board.fen())
+            except ValueError:
+                standard = board
+            played = adapter.engine.play(standard, chess.engine.Limit(time=movetime))
+            return None if played.move is None else standard.uci(played.move)
+
+        try:
+            uci = await self.pool.run(spec, work)
+        except Exception as exc:
+            await self._send_quietly(
+                protocol.move_result(request_id=request_id, error=_message(exc))
+            )
+            return
+        await self._send_quietly(
+            protocol.move_result(
+                request_id=request_id,
+                uci=uci,
+                error=None if uci else f"{engine.name!r} had no move to play",
+            )
         )
 
     async def _drop_streams(self) -> None:

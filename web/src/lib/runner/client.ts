@@ -80,6 +80,7 @@ import {
   decodeFrame,
   decodePlan,
   hello,
+  moveResult,
   pong,
   ProtocolError,
   runCancelled,
@@ -545,6 +546,9 @@ export class BrowserRunnerClient {
       case 'stream_open':
         this.openStream(frame)
         return
+      case 'move_request':
+        void this.playMove(frame)
+        return
       case 'stream_restart':
         this.restartStream(frame)
         return
@@ -665,6 +669,47 @@ export class BrowserRunnerClient {
       socket.send(JSON.stringify(frame))
     } catch {
       // A socket that is closing takes the frame with it; the server requeues the run.
+    }
+  }
+
+  // --- practice replies ------------------------------------------------------------
+
+  /**
+   * One bounded search that answers with the move played. `client.py: _play_move`.
+   *
+   * It queues on the engine behind whatever is running — the gateway took the slot before
+   * sending this, preempting a run if it had to, so what is ahead of it is a position
+   * finishing, not a whole game. Every failure is a `move_result` with a sentence: a person
+   * is waiting for the reply on the other end.
+   */
+  private async playMove(frame: Record<string, unknown>): Promise<void> {
+    const requestId = String(frame.request_id ?? '')
+    if (!requestId) return
+    const engine = String(frame.engine ?? '')
+    const searcher = this.engine
+    if (!searcher || engine !== browserEngineName(this.credential?.runnerName ?? '')) {
+      this.send(moveResult({ requestId, error: `${engine} is not an engine this runner plays on` }))
+      return
+    }
+    const raw = frame.options
+    const options: Record<string, string | number | boolean> = {}
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          options[name] = value
+        }
+      }
+    }
+    try {
+      const uci = await searcher.playMove(String(frame.fen ?? ''), {
+        movetimeMs: Math.max(1, Number(frame.movetime_ms) || 1000),
+        options,
+      })
+      this.send(
+        moveResult({ requestId, uci, error: uci === null ? `${engine} had no move to play` : null }),
+      )
+    } catch (cause) {
+      this.send(moveResult({ requestId, error: message(cause) }))
     }
   }
 

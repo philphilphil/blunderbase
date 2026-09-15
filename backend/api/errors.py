@@ -26,6 +26,7 @@ from backend.services import import_service
 from backend.services import maia_live as maia_live_service
 from backend.services import mcp_keys as mcp_keys_service
 from backend.services import notes as notes_service
+from backend.services import practice as practice_service
 from backend.services import reference as reference_service
 from backend.services import repertoire as repertoire_service
 from backend.services import runners as runners_service
@@ -118,6 +119,9 @@ MAPPINGS: tuple[tuple[type[Exception], int, str], ...] = (
     (streams_service.StreamLimitError, 409, "stream_limit"),
     (streams_service.StreamUnavailableError, 409, "stream_unavailable"),
     (streams_service.StreamRequestError, 422, "invalid_request"),
+    # 409 like a busy analysis board: the engine exists, it cannot answer this second.
+    (practice_service.PracticeUnavailableError, 409, "practice_unavailable"),
+    (practice_service.PracticeRequestError, 422, "invalid_request"),
     # 409 rather than 503: the board hides its live Maia section on it, which is a shape
     # the deployment is in, not a failure to retry.
     (maia_live_service.LivePolicyRequestError, 422, "invalid_request"),

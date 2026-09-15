@@ -142,6 +142,11 @@ class Engine(Base):
     path: Mapped[str] = mapped_column(String(512), nullable=False)
     version: Mapped[str | None] = mapped_column(String(64))
     options: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    # What the binary declared at its last probe (`UciOption.as_dict()` per entry), kept so
+    # a question about the engine's abilities — can it play at a rating, and between which
+    # — is answered by the engine rather than guessed. NULL until it has been probed since
+    # the column was added; `services.engines.declared_options` fills a local one on demand.
+    declared_options: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Whether the host that advertised this engine answers `stream_open` — its own word,
     # persisted rather than inferred. A binary on this host advertises nothing and drives

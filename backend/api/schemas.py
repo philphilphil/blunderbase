@@ -1065,6 +1065,67 @@ class PositionAnalysis(Payload):
 # --- maia -----------------------------------------------------------------
 
 
+class PracticeStrength(Payload):
+    """The ratings an engine declares it can be held to (`UCI_Elo`'s own bounds)."""
+
+    min: int
+    max: int
+    default: int
+
+
+class PracticeEngine(Payload):
+    engine_id: int
+    name: str
+    runner_id: int | None = None
+    available: bool
+    reason: str | None = None
+    # None when the engine does not declare `UCI_LimitStrength` and `UCI_Elo`: it plays at
+    # full strength and the picker offers no rating.
+    strength: PracticeStrength | None = None
+
+
+class PracticeMaia(Payload):
+    available: bool
+    reason: str | None = None
+
+
+class PracticeMovetime(Payload):
+    default: int
+    min: int
+    max: int
+
+
+class PracticeOpponents(Payload):
+    """`services.practice.PracticeBroker.opponents`: who a practice game can be against."""
+
+    engines: list[PracticeEngine] = Field(default_factory=list)
+    default_engine_id: int | None = None
+    maia: PracticeMaia
+    movetime_ms: PracticeMovetime
+
+
+class PracticeMoveRequest(Input):
+    """The engine's reply in a position. `engine_id` omitted takes the analysis role's."""
+
+    fen: str = Field(min_length=1)
+    engine_id: int | None = None
+    elo: int | None = Field(
+        default=None, ge=1, description="clamped to the engine's declared UCI_Elo range"
+    )
+    movetime_ms: int = Field(default=1000, ge=100, le=10_000)
+
+
+class PracticeMoveResponse(Payload):
+    uci: str
+    san: str
+    engine_id: int
+    engine: str
+    runner_id: int | None = None
+    # The rating the engine was held to, after clamping; null at full strength.
+    elo: int | None = None
+    movetime_ms: int
+
+
 class MaiaPolicyRequest(Input):
     """Ask the human-move model about a position the analysis board made up.
 

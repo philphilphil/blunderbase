@@ -48,7 +48,7 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # Writes to nothing but the process's own memory and CPU, and the door that answers with
 # its own refusal — see the module docstring.
 EXEMPT_PREFIXES = ("/streams", "/auth")
-EXEMPT_EXACT = frozenset({"/maia/policy", "/analysis/position"})
+EXEMPT_EXACT = frozenset({"/maia/policy", "/analysis/position", "/practice/move"})
 # Reads the demo refuses anyway: every one is the whole library as a file — see the module
 # docstring. A prefix, so the estimate and the prepared-download routes go with the backup.
 DOWNLOAD_PREFIXES = ("/library/backup", "/games/export")

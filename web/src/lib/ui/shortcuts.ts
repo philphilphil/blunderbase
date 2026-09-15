@@ -86,6 +86,7 @@ export type BoardAction =
   | 'type-move'
   | 'board-settings'
   | 'analyse'
+  | 'practice'
   | 'copy-pgn'
   | 'maia-compare'
   | 'graph-eval'
@@ -338,6 +339,15 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     press: ['a', 'A'],
     keys: ['A'],
     label: msg`Analyse this game…`,
+  },
+  // One key both ways: it opens the practice dialog, and while a practice game is on it
+  // ends it, so the hand that started one has one thing to press to stop.
+  {
+    section: GAME,
+    action: 'practice',
+    press: ['p', 'P'],
+    keys: ['P'],
+    label: msg`Practise from this position against the computer, or stop`,
   },
   {
     section: GAME,

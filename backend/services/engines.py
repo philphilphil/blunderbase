@@ -235,6 +235,7 @@ def add_engine(
         path=path,
         version=_version(probed),
         options=validate_options(probed, options),
+        declared_options=_declared(probed),
         enabled=enabled,
     )
     session.add(engine)
@@ -291,6 +292,7 @@ def update_engine(
         probed = probe_engine(path, kind, probe=probe)
         engine.version = _version(probed)
         engine.options = validate_options(probed, engine.options if options is None else options)
+        engine.declared_options = _declared(probed)
 
     engine.name = name
     engine.path = path
@@ -499,6 +501,7 @@ def sync_runner_engines(
         engine.path = ad.path
         engine.version = (ad.version or "")[:64] or None
         engine.options = options
+        engine.declared_options = _declared(probed)
         # The runner's own word about `stream_open`, not what its kind implies: a host may
         # run queue work and answer no analysis board, and a board offered to one that
         # never answers is a board that hangs.
@@ -830,13 +833,17 @@ def binary_present(path: str) -> bool:
     return shutil.which(command[0]) is not None
 
 
-def spec_for(engine: Engine) -> EngineSpec:
+def spec_for(engine: Engine, overrides: Mapping[str, Any] | None = None) -> EngineSpec:
     """The pool key for an engine row. Editing its options makes it a different process.
 
     A pool key is a promise that this host can start the thing, so an engine that is not a
     binary is refused here rather than handed on as a key that would fail at `popen`. Every
     caller already asks where the engine lives first; this is the backstop for the one that
     forgets.
+
+    `overrides` are laid over the stored options for one caller — practice playing at a
+    rating. They are part of the key, so a weakened process is never handed to an analysis
+    pass that expects the engine at full strength.
     """
     from backend.adapters.pool import EngineSpec
 
@@ -848,10 +855,34 @@ def spec_for(engine: Engine) -> EngineSpec:
     return EngineSpec.build(
         engine.path,
         kind=engine.kind.value,
-        options=engine.options or {},
+        options={**(engine.options or {}), **(overrides or {})},
         name=engine.name,
         engine_id=engine.id,
     )
+
+
+def declared_options(
+    session: Session, engine: Engine, *, probe: ProbeFn | None = None
+) -> list[dict[str, Any]]:
+    """What the engine declared at its last probe, probing a local binary that has none yet.
+
+    A runner's row is rewritten from its advertisement on every connect, so an empty one
+    stays empty until it next dials in. A local row written before the column existed is
+    probed once, here, and remembered; a binary that will not start answers with nothing
+    rather than an error, because the question is "what can it do" and the answer to that
+    for a missing binary is nothing.
+    """
+    if engine.declared_options is not None:
+        return list(engine.declared_options)
+    if engine.runner_id is not None or not is_binary_path(engine.path):
+        return []
+    try:
+        probed = probe_engine(engine.path, engine.kind, probe=probe)
+    except EngineProbeError:
+        return []
+    engine.declared_options = _declared(probed)
+    session.commit()
+    return list(engine.declared_options)
 
 
 def sample_eval(
@@ -950,6 +981,10 @@ def _maia_sample(
     return {
         "policy": {level: [move.as_dict() for move in moves] for level, moves in policy.items()}
     }
+
+
+def _declared(probed: EngineProbe) -> list[dict[str, Any]]:
+    return [option.as_dict() for option in probed.options]
 
 
 def _version(probed: EngineProbe) -> str | None:
