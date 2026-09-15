@@ -4,6 +4,18 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.5.0 — 2026-09-15
+
+- Added speed and period filters to your own tree in the explorer
+- Added opening names to a game's Book tab
+- Added an Analyse dialog for deeper runs on a game (update remote runners for depth and time limits)
+- Added game keys for Maia levels, graph tabs and the book
+- Added our own icons for the rail
+- Changed import analysis to one pass, replacing quick and deep
+- Changed live search to start and stop from the engine pane's Live tab
+- Changed narrow screens to drop readouts instead of clipping controls
+- Removed the run badge from the game header
+
 ## v1.4.0 — 2026-09-14
 
 - Added typing moves on the board with M
