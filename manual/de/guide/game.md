@@ -109,7 +109,8 @@ spielen, ausgewählt danach, wie oft sie ihn spielen – und macht deshalb auch 
 
 Solange du übst, sind Bewertung, Engine-Feld, Maia, Verlauf und Pfeile verborgen. Eine Leiste
 an ihrer Stelle sagt, wer am Zug ist. **Engine zeigen**, oder `H`, holt sie zurück, ohne die
-Partie zu beenden. **Zurücknehmen** nimmt deinen letzten Zug und die Antwort darauf zurück.
+Partie zu beenden, und lässt die Engine live auf der Stellung rechnen, auf dem Reiter
+**Live**. Verbirgst du sie wieder, hält sie an. **Zurücknehmen** nimmt deinen letzten Zug und die Antwort darauf zurück.
 Die Partie endet von selbst bei Matt, Patt, zu wenig Material, der Fünfzig-Züge-Regel oder
 dreifacher Stellungswiederholung.
 

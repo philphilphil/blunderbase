@@ -1846,10 +1846,19 @@ describe('GamePage practice', () => {
     await user.click(screen.getByRole('button', { name: /Take back/ }))
     await waitFor(() => expect(screen.queryByText(/analysis \+/)).not.toBeInTheDocument())
 
-    // H shows the engine without ending the game; P ends it.
+    // H shows the engine without ending the game, as the live search on the board: the
+    // stored run never looked at a practice position, so Run would be an empty pane.
     await user.keyboard('h')
     expect(await screen.findByTestId('maia-panel')).toBeInTheDocument()
     expect(screen.getByTestId('practice-bar')).toBeInTheDocument()
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    expect(screen.getByRole('button', { name: 'Stop live analysis' })).toBeInTheDocument()
+
+    // Hiding it again stops the search, which would otherwise still be the answer.
+    await user.keyboard('h')
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+    await user.keyboard('h')
+    expect(await screen.findByTestId('maia-panel')).toBeInTheDocument()
     await user.keyboard('p')
     expect(screen.queryByTestId('practice-bar')).not.toBeInTheDocument()
     expect(screen.getByTestId('maia-panel')).toBeInTheDocument()

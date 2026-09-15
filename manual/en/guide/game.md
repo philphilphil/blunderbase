@@ -102,7 +102,8 @@ it makes their mistakes too.
 
 While you practise, the evaluation, the engine pane, Maia, the graph and the arrows are
 hidden. A strip in their place says whose move it is. **Show the engine**, or `H`, brings
-them back without ending the game. **Take back** removes your last move and the reply to it.
+them back without ending the game and starts the live engine on the position, on the
+**Live** tab. Hiding them again stops it. **Take back** removes your last move and the reply to it.
 The game ends by itself on mate, stalemate, insufficient material, the fifty-move rule or a
 threefold repetition.
 

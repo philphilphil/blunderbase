@@ -1330,6 +1330,20 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     },
     [setStreamEnabled],
   )
+  /**
+   * Show or hide the engine during a practice game — the strip's button, Hints and `H`.
+   *
+   * Showing it switches the live search on and lands on Live. A practice game is played off
+   * every stored run, so the Run tab has nothing to say about the position on the board and
+   * "show the engine" would otherwise reveal an empty pane. Hiding it switches the search
+   * off again, since a running search is the answer practice is holding back.
+   */
+  const revealPractice = useCallback(() => {
+    if (!practiceGame) return
+    const showing = !practiceGame.reveal
+    toggleReveal()
+    setLiveSearch(showing && !!boardPosition?.fen && !engineHidden)
+  }, [boardPosition, engineHidden, practiceGame, setLiveSearch, toggleReveal])
   // Leaving the game line is not a gesture of the search's, so it is caught here as the
   // render sees `exploring` change, the way React adjusts one state to another — not in
   // an effect, which would paint the Run tab once before moving off it.
@@ -1638,7 +1652,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // Still bound while ⇧E is on: what is left for it to switch is the arrow for the move
       // the game itself played next, which is the game rather than a verdict about it.
       // Practising, H is the one switch for everything practice hides.
-      toggleHints: practiceGame ? toggleReveal : () => setHints((value) => !value),
+      toggleHints: practiceGame ? revealPractice : () => setHints((value) => !value),
       // The same switch the engine pane's title strip carries, and the same guard it draws
       // disabled under: with nothing on the board there is nothing to search.
       toggleEngine:
@@ -1814,7 +1828,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       error={practice.error}
       canTakeBack={practice.canTakeBack}
       onTakeBack={practice.takeBack}
-      onToggleReveal={toggleReveal}
+      onToggleReveal={revealPractice}
       onRetry={practice.retry}
       onStop={stopPractice}
       className={mobile ? 'rounded-md border border-edge' : 'col-span-2 border-b border-edge-strong'}
@@ -1866,7 +1880,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       cursor={cursor}
       plyCount={plyCount}
       hints={shownHints}
-      onHintsChange={practiceGame ? toggleReveal : setHints}
+      onHintsChange={practiceGame ? revealPractice : setHints}
       // Everything above is already empty while ⇧E is on — the rows were stripped. This is
       // what the panel cannot work out for itself: that the eval bar and the score chip are
       // to go rather than stand there reading 0.00, which is a claim of its own.
