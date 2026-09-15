@@ -161,6 +161,11 @@ export interface BoardPanelProps {
   /** Live ply counts from `analysis.progress`, while a run is working. */
   progress: RunProgress | null
   pending: boolean
+  /** Stops the requested run holding the Analyse button (`AnalyseButton`). */
+  onStopAnalysis?: () => void
+  stoppingAnalysis?: boolean
+  /** The analysis queue is paused, which a queued run's button says. */
+  queuePaused?: boolean
   /**
    * Open the Analyse… dialog. Only passed while ⇧E has taken the engine pane away: the
    * button lives in that pane's title strip, and this row is where it stands in when the
@@ -244,6 +249,9 @@ export function BoardPanel({
   activeRun,
   progress,
   pending,
+  onStopAnalysis,
+  stoppingAnalysis,
+  queuePaused,
   onAnalyse,
   onNote,
   noting,
@@ -660,6 +668,9 @@ export function BoardPanel({
             activeRun={activeRun}
             progress={progress}
             onAnalyse={onAnalyse}
+            onStop={onStopAnalysis}
+            stopping={stoppingAnalysis}
+            queuePaused={queuePaused}
           />
         )}
 

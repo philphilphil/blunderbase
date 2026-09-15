@@ -1591,6 +1591,49 @@ def test_clearing_the_queue_drops_every_priority_windowed_and_fill_alike(
     ]
 
 
+def test_cancelling_a_run_drops_it_whether_queued_or_running(session: Session) -> None:
+    """The game view's stop button reaches a claimed run too, which `clear_queue` leaves."""
+    _engine(session)
+    games = [_game(session), _game(session)]
+    first = analysis.request_analysis(session, game_id=games[0].id, depth=30)
+    second = analysis.request_analysis(session, game_id=games[1].id, depth=40)
+    running = analysis.claim_next_run(session)
+    assert running is not None
+    running_id = running.id
+    queued_id = second.id if running_id == first.id else first.id
+    seen: list[dict[str, Any]] = []
+    cancel = analysis.subscribe(seen.append)
+
+    try:
+        assert analysis.cancel_run(session, running_id) is True
+        assert analysis.cancel_run(session, queued_id) is True
+    finally:
+        cancel()
+
+    assert analysis.queue_depth(session) == {"queued": 0, "running": 0}
+    assert session.scalars(select(AnalysisRun)).all() == []
+    assert [(event["event"], event["run_id"], event["status"]) for event in seen] == [
+        (analysis.EVENT_RUN_CANCELLED, running_id, "running"),
+        (analysis.EVENT_RUN_CANCELLED, queued_id, "queued"),
+    ]
+    # A worker still holding the running one learns at its next beat.
+    assert analysis.heartbeat_runs(session, [running_id]) == {running_id}
+
+
+def test_a_finished_run_cannot_be_cancelled(session: Session) -> None:
+    _engine(session)
+    game = _game(session)
+    analysis.request_analysis(session, game_id=game.id)
+    run = analysis.claim_next_run(session)
+    assert run is not None
+    analysis.fail_run(session, run, "engine died", retry=False)
+
+    assert analysis.cancel_run(session, run.id) is False
+    assert session.get(AnalysisRun, run.id) is not None
+    with pytest.raises(analysis.UnknownRunError):
+        analysis.cancel_run(session, run.id + 100)
+
+
 def test_clearing_an_empty_queue_says_nothing(session: Session) -> None:
     _engine(session)
     _game(session)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request, status
@@ -32,6 +33,7 @@ from backend.api.schemas import (
     RefusedGame,
     RetryFailedReceipt,
     RetryFailedRequest,
+    RunCancelled,
     RunResponse,
 )
 from backend.config import Settings
@@ -356,6 +358,32 @@ def get_run(session: SessionDep, run_id: int) -> Any:
     if run is None:
         raise not_found("unknown_run", f"no analysis run with id {run_id}")
     return run
+
+
+@router.post(
+    "/runs/{run_id}/cancel",
+    response_model=RunCancelled,
+    summary="Stop one run, queued or mid-search",
+)
+def cancel_run(request: Request, session: SessionDep, run_id: int) -> RunCancelled:
+    """Take one run back, whether it is still waiting or an engine is already searching it.
+
+    The row goes first, then whoever holds the search is told: this process's workers
+    directly, a runner through the gateway. A worker that cannot be told — the CLI's — stops
+    at its next heartbeat. See `analysis.cancel_run`.
+    """
+    cancelled = analysis_service.cancel_run(session, run_id)
+    if cancelled:
+        loop = getattr(request.app.state, "loop", None)
+        workers = getattr(request.app.state, "workers", None)
+        gateway = getattr(request.app.state, "gateway", None)
+        if loop is not None:
+            with contextlib.suppress(RuntimeError):
+                if workers is not None:
+                    loop.call_soon_threadsafe(workers.cancel, run_id)
+                if gateway is not None:
+                    loop.call_soon_threadsafe(gateway.cancel, run_id)
+    return RunCancelled(cancelled=cancelled)
 
 
 @router.get(

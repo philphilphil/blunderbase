@@ -80,6 +80,12 @@ export function useRunActivity(): RunActivity[] {
   // never closes over a stale list.
   const record = useCallback((event: AnyEvent) => {
     if (!isAnalysisEvent(event)) return
+    // A run taken back has no row left to describe, so it leaves the list rather than
+    // standing there as running for ever.
+    if (event.event === 'analysis.cancelled') {
+      setRuns((current) => current.filter((run) => run.runId !== event.run_id))
+      return
+    }
     const status = STATUS_OF[event.event]
     if (!status) return
     setRuns((current) => {
@@ -116,6 +122,7 @@ export function useRunActivity(): RunActivity[] {
   useEventListener('analysis.progress', record)
   useEventListener('analysis.done', record)
   useEventListener('analysis.failed', record)
+  useEventListener('analysis.cancelled', record)
 
   return runs
 }

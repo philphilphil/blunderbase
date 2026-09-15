@@ -1665,6 +1665,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
               activeRun: analysisRequest.activeRun,
               progress: analysisRequest.progress,
               onAnalyse: analysisRequest.openDialog,
+              onStop: analysisRequest.stop,
+              stopping: analysisRequest.stopping,
+              queuePaused: analysisRequest.queuePaused,
             }
       }
       // On the desktop the band is the workspace's top row: two panes side by side,
@@ -1754,6 +1757,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       activeRun={analysisRequest.activeRun}
       progress={analysisRequest.progress}
       pending={analysisRequest.pending}
+      onStopAnalysis={analysisRequest.stop}
+      stoppingAnalysis={analysisRequest.stopping}
+      queuePaused={analysisRequest.queuePaused}
       // The button lives in the engine pane's title strip; the board row carries it only
       // while ⇧E has taken that pane off the screen, when asking is exactly what comes next.
       onAnalyse={engineHidden ? analysisRequest.openDialog : undefined}

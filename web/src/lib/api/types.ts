@@ -946,6 +946,11 @@ export interface QueueStatus {
   destinations: QueueDestination[]
 }
 
+/** What stopping one run answers. False: it had already finished or failed. */
+export interface RunCancelled {
+  cancelled: boolean
+}
+
 /** What pausing or resuming answers: the switch, and the depth it was thrown over. */
 export interface QueuePaused {
   paused: boolean

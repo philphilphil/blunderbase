@@ -426,6 +426,33 @@ describe('BoardPanel analyse button', () => {
     expect(button).toBeDisabled()
   })
 
+  it('carries a stop square while a requested run holds it', () => {
+    const onStopAnalysis = vi.fn()
+    renderPanel({ activeRun: ACTIVE_RUN, onStopAnalysis })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop this analysis' }))
+    expect(onStopAnalysis).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no stop square while nothing it can stop is live', () => {
+    renderPanel({ activeRun: IMPORT_RUN, onStopAnalysis: vi.fn() })
+    expect(screen.queryByRole('button', { name: 'Stop this analysis' })).not.toBeInTheDocument()
+  })
+
+  it('says a queued run is paused rather than spinning while the queue is paused', () => {
+    renderPanel({ activeRun: { ...ACTIVE_RUN, status: 'queued' }, queuePaused: true })
+    expect(screen.getByRole('button', { name: 'Paused' })).toBeDisabled()
+  })
+
+  it('keeps spinning for a run already on an engine when the queue is paused', () => {
+    renderPanel({
+      activeRun: { ...ACTIVE_RUN, status: 'running' },
+      progress: { done: 27, total: 50 },
+      queuePaused: true,
+    })
+    expect(screen.getByRole('button', { name: '54%' })).toBeDisabled()
+  })
+
   it('stays disabled without a percent when no progress frame has arrived yet', () => {
     renderPanel({ activeRun: ACTIVE_RUN })
     expect(screen.getByRole('button', { name: 'Analyse' })).toBeDisabled()

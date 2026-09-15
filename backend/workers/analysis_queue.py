@@ -136,6 +136,9 @@ class AnalysisWorkers:
         # The runs this set has claimed and not yet handed back. What the heartbeat marks
         # alive, so that another process starting up leaves them alone.
         self._inflight: set[int] = set()
+        # Each claimed run's execution, on a task of its own so that one run can be stopped
+        # (`cancel`) without taking the worker executing it down too.
+        self._executions: dict[int, asyncio.Task[None]] = {}
 
     # --- lifecycle --------------------------------------------------------
 
@@ -214,6 +217,20 @@ class AnalysisWorkers:
     def notify(self) -> None:
         """Wake an idle worker: something was just enqueued."""
         self._wake.set()
+
+    def cancel(self, run_id: int) -> bool:
+        """Stop searching a run whose row `analysis.cancel_run` has deleted. Was it here?
+
+        Cancelling the execution unwinds through the engine pool, which shuts the process
+        down on the way out (`_Slot.acquire`) — the one way to end a search a blocking
+        `analyse` call is in the middle of. The slot starts a fresh engine for the next run.
+        Nothing is written: the row is already gone.
+        """
+        execution = self._executions.get(run_id)
+        if execution is None or execution.done():
+            return False
+        execution.cancel()
+        return True
 
     def resize(self, concurrency: int) -> int:
         """Change how many runs this set executes at once, without stopping it.
@@ -302,9 +319,19 @@ class AnalysisWorkers:
                 continue
             self._busy += 1
             self._inflight.add(run_id)
+            execution = asyncio.create_task(
+                self._execute(run_id), name=f"analysis-run-{run_id}"
+            )
+            self._executions[run_id] = execution
             try:
-                await self._execute(run_id)
+                await execution
             except asyncio.CancelledError:
+                current = asyncio.current_task()
+                if current is not None and current.cancelling() == 0:
+                    # Only the run was cancelled (`cancel`): its row is gone and this
+                    # worker goes on to the next one.
+                    logger.info("analysis run %s was cancelled mid-search", run_id)
+                    continue
                 # Awaiting anything here would be cancelled again straight away, so the
                 # handover back to the queue is the one blocking call this loop makes.
                 self._abandon(run_id)
@@ -316,6 +343,7 @@ class AnalysisWorkers:
                 logger.exception("analysis run %s died in its worker", run_id)
                 await self._release(run_id, _message(exc))
             finally:
+                self._executions.pop(run_id, None)
                 self._inflight.discard(run_id)
                 self._busy -= 1
                 # A slot just came free: a sibling dozing on a full pool can look again.
@@ -333,9 +361,13 @@ class AnalysisWorkers:
             if not run_ids:
                 continue
             try:
-                await self._db(self._touch, run_ids)
+                gone = await self._db(self._touch, run_ids)
             except Exception:
                 logger.exception("could not mark runs %s alive", run_ids)
+                continue
+            # Cancelled by a process that could not reach this one (`cancel`).
+            for run_id in gone:
+                self.cancel(run_id)
 
     async def _release(self, run_id: int, error: str) -> None:
         """Hand a run back after its worker fell over, so the row does not stay `running`.
@@ -507,9 +539,9 @@ class AnalysisWorkers:
             claimed.append(run.id)
             return run.id
 
-    def _touch(self, run_ids: list[int]) -> None:
+    def _touch(self, run_ids: list[int]) -> set[int]:
         with self.sessions() as session:
-            analysis.heartbeat_runs(session, run_ids)
+            return analysis.heartbeat_runs(session, run_ids)
 
     def _prepare(self, run_id: int) -> RunContext | None:
         """Turn a claimed row into a plan plus the engines that will serve it."""
@@ -564,7 +596,10 @@ class AnalysisWorkers:
 
     def _finish(self, run_id: int, evals: list[MoveEval], note: str | None) -> None:
         with self.sessions() as session:
-            run = analysis.require_run(session, run_id)
+            run = analysis.get_run(session, run_id)
+            if run is None:
+                # Cancelled in the moment between the search ending and this write.
+                return
             analysis.complete_run(session, run, evals)
             if note is not None:
                 analysis.note_run(session, run, note)

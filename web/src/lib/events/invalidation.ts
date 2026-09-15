@@ -32,6 +32,8 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     // `analysis.done` is soon enough.
     case 'analysis.queued':
     case 'analysis.running':
+    // A run taken back wrote nothing, so only the queue and the game's run list moved.
+    case 'analysis.cancelled':
       return [queryKeys.analysis()]
 
     // Nothing about a run row changes while it works, only how far along it is.

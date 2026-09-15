@@ -529,6 +529,17 @@ asked to re-analyse, coverage counts that treated one as a pass would leave the 
 out of a backfill, and `/analysis/backfill/cancel` leaves fills alone — `POST
 /analysis/queue/clear` is what takes those back.
 
+**Stopping one run.** `POST /analysis/runs/{id}/cancel` is the one cancel that reaches a
+claimed run: the game view's stop button, for a deep look nobody wants to wait an hour for.
+`analysis.cancel_run` deletes the row — a queued or running run has written no evals, so
+there is nothing to keep and no cancelled status to invent — and announces
+`analysis.cancelled`. Then whoever holds the search is told. The route cancels the local
+worker's execution task, which unwinds through the engine pool and shuts the process down
+mid-`analyse`; a worker in another process (`blunderbase analyze`) sees the row missing at
+its next heartbeat and does the same. The gateway sends the runner holding it a
+`run_cancel`, and any late answer for that attempt is refused as unknown. A correspondence
+task is refused here: `cancel_task` closes both halves of one.
+
 **Pausing.** `POST /analysis/queue/pause` and `/queue/resume` throw one stored flag
 (`app_settings.queue_paused`), and `claim_next_run` is the only thing that reads it: both
 the local worker set and the runner gateway take their work through that one claim, so a

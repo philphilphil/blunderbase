@@ -103,6 +103,7 @@ POLL = "poll"
 CANCEL_STOLEN = "stolen"
 CANCEL_REQUEUED = "requeued"
 CANCEL_PREEMPTED = "preempted"
+CANCEL_CANCELLED = "cancelled"
 
 # Why a link ended, as `runner.disconnected` reports it.
 REASON_CLOSED = "socket_closed"
@@ -420,6 +421,25 @@ class RunnerGateway:
             return
         with contextlib.suppress(RuntimeError):
             loop.call_soon_threadsafe(self._wake.set)
+
+    def cancel(self, run_id: int) -> bool:
+        """Tell the runner searching a run `analysis.cancel_run` deleted to stop. Was one?
+
+        Called on the loop. Without it the runner would only learn at its next progress
+        frame, which on a deep search of one position can be the whole search away. The
+        slot comes free here, as with every other `run_cancel` this gateway sends.
+        """
+        for state in list(self._states.values()):
+            held = state.runs.get(run_id)
+            if held is not None:
+                self._spawn(self._cancelled(state, run_id, held.attempt_token))
+                return True
+        return False
+
+    async def _cancelled(self, state: RunnerState, run_id: int, attempt_token: str) -> None:
+        await self._release(state, run_id, CANCEL_CANCELLED, attempt_token)
+        # The slot is free now, and the queue may have work for it.
+        self.notify()
 
     def _on_run_event(self, event: Mapping[str, Any]) -> None:
         """A subscriber must never be able to fail a run, so this does almost nothing."""

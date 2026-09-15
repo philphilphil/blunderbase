@@ -42,6 +42,10 @@ msgid "Analysing"
 msgstr "Analyse läuft"
 
 #: src/components/analysis/AnalyseButton.tsx
+msgid "The analysis queue is paused; this run starts once it is resumed"
+msgstr "Die Analyse-Warteschlange ist pausiert; diese Analyse startet, sobald sie weiterläuft"
+
+#: src/components/analysis/AnalyseButton.tsx
 msgid "An analysis pass is waiting over this game; a run you ask for goes ahead of it (A)"
 msgstr "Ein Analysedurchlauf wartet für diese Partie; eine Analyse, die du anforderst, zieht an ihm vorbei (A)"
 
@@ -52,6 +56,15 @@ msgstr "Analysiert – wähle eine Analyse, um genauer hinzusehen (A)"
 #: src/components/analysis/AnalyseButton.tsx
 msgid "Choose an engine, a limit and the moves to analyse (A)"
 msgstr "Wähle eine Engine, eine Grenze und die Züge, die analysiert werden (A)"
+
+#: src/components/analysis/AnalyseButton.tsx
+#: src/components/shell/QueueIndicator.tsx
+msgid "Paused"
+msgstr "Pausiert"
+
+#: src/components/analysis/AnalyseButton.tsx
+msgid "Stop this analysis"
+msgstr "Diese Analyse abbrechen"
 
 #: src/components/analysis/AnalyseDialog.tsx
 msgid "Analyse…"
@@ -1005,10 +1018,6 @@ msgstr "{queued} wartend, {running} laufend"
 #: src/components/shell/QueueIndicator.tsx
 msgid "{queued} queued, {running} running — workers are not draining the queue"
 msgstr "{queued} wartend, {running} laufend – die Warteschlange wird nicht abgearbeitet"
-
-#: src/components/shell/QueueIndicator.tsx
-msgid "Paused"
-msgstr "Pausiert"
 
 #: src/components/shell/QueueIndicator.tsx
 msgid "Idle"

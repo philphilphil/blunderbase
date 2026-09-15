@@ -27,6 +27,7 @@ export const EVENT_NAMES = [
   'analysis.progress',
   'analysis.done',
   'analysis.failed',
+  'analysis.cancelled',
   'analysis.backfill',
   'analysis.paused',
   'note.created',
@@ -115,7 +116,12 @@ interface AnalysisBase {
 }
 
 export interface AnalysisRunEvent extends AnalysisBase {
-  event: 'analysis.queued' | 'analysis.running' | 'analysis.done' | 'analysis.failed'
+  event:
+    | 'analysis.queued'
+    | 'analysis.running'
+    | 'analysis.done'
+    | 'analysis.failed'
+    | 'analysis.cancelled'
   fen?: string | null
   priority?: number
   attempts?: number

@@ -588,6 +588,36 @@ async def test_a_shutdown_hands_a_run_back_without_spending_its_retry(
     assert run.error == analysis.STALE_RUN_MESSAGE
 
 
+async def test_a_run_cancelled_mid_search_stops_the_engine_and_the_worker_goes_on(
+    db: sessionmaker[Session], settings: Settings, tmp_path: Path, fixtures_dir: Path
+) -> None:
+    """The game view's stop button: the search ends now, not when the engine would have
+    finished, and the worker is still there to take the next run."""
+    _register(db, tmp_path, go=[{**NEUTRAL_REPLY, "hold": True}], go_default=NEUTRAL_REPLY)
+    game = _import_game(db, fixtures_dir)
+    # A second engine for the next run: a fresh process of the first would hold again.
+    quick = _register(db, tmp_path, name="QuickFish", go_default=NEUTRAL_REPLY)
+    workers = AnalysisWorkers(settings=settings, sessions=db, stop_grace=0.05)
+
+    await workers.start()
+    try:
+        run_id = await _wait_for_status(db, RunStatus.RUNNING)
+        with db() as session:
+            assert analysis.cancel_run(session, run_id) is True
+        assert workers.cancel(run_id) is True
+
+        with db() as session:
+            analysis.request_analysis(session, game_id=game.id, engine_id=quick.id, nodes=100)
+        workers.notify()
+        assert await workers.wait_idle(10.0), "the worker never took the next run"
+    finally:
+        await workers.stop()
+
+    with db() as session:
+        runs = session.scalars(select(AnalysisRun)).all()
+    assert [(run.engine_id, run.status) for run in runs] == [(quick.id, RunStatus.DONE)]
+
+
 @pytest.mark.slow
 async def test_a_run_being_worked_on_keeps_saying_it_is_alive(
     db: sessionmaker[Session],

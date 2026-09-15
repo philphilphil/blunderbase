@@ -506,6 +506,21 @@ export function useRequestAnalysis(
   })
 }
 
+/** One run stopped, queued or mid-search. */
+export function useCancelRun(
+  options?: UseMutationOptions<Awaited<ReturnType<typeof api.cancelRun>>, Error, number>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (runId: number) => api.cancelRun(runId),
+    ...options,
+    onSuccess: (...args) => {
+      void client.invalidateQueries({ queryKey: queryKeys.analysis() })
+      options?.onSuccess?.(...args)
+    },
+  })
+}
+
 /** A selection's worth of games, queued in one call. Partly refused is still a success. */
 export function useRequestAnalysisBatch(
   options?: UseMutationOptions<

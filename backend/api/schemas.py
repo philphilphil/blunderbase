@@ -840,6 +840,12 @@ class BackfillCancelled(BaseModel):
     outstanding: int
 
 
+class RunCancelled(BaseModel):
+    """Whether the stop button took a run back. False: it had already finished or failed."""
+
+    cancelled: bool
+
+
 class QueueCleared(BaseModel):
     """How many queued runs the whole-queue reset took back, and what is left working.
 

@@ -107,6 +107,8 @@ EVENT_RUN_STARTED = "analysis.running"
 EVENT_RUN_PROGRESS = "analysis.progress"
 EVENT_RUN_DONE = "analysis.done"
 EVENT_RUN_FAILED = "analysis.failed"
+# A run somebody took back — queued or mid-search — whose row is gone. See `cancel_run`.
+EVENT_RUN_CANCELLED = "analysis.cancelled"
 # One frame for a whole library-sized write, in place of one per run; see `backfill_event`.
 EVENT_BACKFILL = "analysis.backfill"
 # The queue stopping or starting again. Its own event rather than a `backfill` one: nothing
@@ -968,6 +970,37 @@ def clear_queue(session: Session) -> int:
 
         correspondence_service.release_tasks(session, tasks)
     return int(dropped)
+
+
+def cancel_run(session: Session, run_id: int) -> bool:
+    """Take one queued or running run back. False if it had already ended.
+
+    The stop button on the game view's Analyse: a depth-40 look somebody asked for and no
+    longer wants. Unlike `clear_queue` this reaches a run a worker has already claimed —
+    one run is exactly the case where a search that will take an hour is worth throwing
+    away. The row is deleted rather than moved to a status: a run's evals are written only
+    when it completes, so a queued or running row has nothing to keep, and a "cancelled"
+    row would be a status every reader of the table would then have to learn.
+
+    Deleting the row is what stops the search. The local worker is told directly by the
+    route and finds out on its next heartbeat otherwise; a runner is told by the gateway,
+    and its answer for the attempt is refused as for any run that is not its any more.
+
+    A correspondence task is refused: its search row is the other half of it, and
+    `correspondence.cancel_task` is the verb that closes both.
+    """
+    run = require_run(session, run_id)
+    if run.correspondence_search_id is not None:
+        raise AnalysisRequestError(
+            "this run is a correspondence task; stop it from the correspondence tree"
+        )
+    if run.status not in (RunStatus.QUEUED, RunStatus.RUNNING):
+        return False
+    event = run_event(EVENT_RUN_CANCELLED, run)
+    session.delete(run)
+    session.commit()
+    emit_run_event(event)
+    return True
 
 
 # --- filling in the Maia levels a game was never analysed at ---------------
@@ -1876,16 +1909,25 @@ def claim_next_run(
     return run
 
 
-def heartbeat_runs(session: Session, run_ids: Sequence[int]) -> None:
-    """Say that these runs are still being worked on. Called by their worker while it runs."""
+def heartbeat_runs(session: Session, run_ids: Sequence[int]) -> set[int]:
+    """Say that these runs are still being worked on. The ones whose row has gone come back.
+
+    Called by their worker while it runs. A run missing here was cancelled (`cancel_run`)
+    by a process that could not reach this worker directly — the CLI's, or the server's
+    while `blunderbase analyze` holds the run — and the worker stops searching it.
+    """
     if not run_ids:
-        return
+        return set()
     session.execute(
         update(AnalysisRun)
         .where(AnalysisRun.id.in_(list(run_ids)), AnalysisRun.status == RunStatus.RUNNING)
         .values(heartbeat_at=utcnow())
     )
     session.commit()
+    present = set(
+        session.scalars(select(AnalysisRun.id).where(AnalysisRun.id.in_(list(run_ids))))
+    )
+    return set(run_ids) - present
 
 
 def guard_attempt(session: Session, run_id: int, attempt_token: str) -> AnalysisRun:

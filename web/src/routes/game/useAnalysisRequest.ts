@@ -5,7 +5,14 @@ import type { AnalyseChoice } from '@/components/analysis/AnalyseDialog'
 import { useEngineSetup } from '@/components/analysis/useEngineSetup'
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import { getAppSettings, getGame } from '@/lib/api/endpoints'
-import { useAnalysisEngines, useAppSettings, useRequestAnalysis, useRuns } from '@/lib/api/queries'
+import {
+  useAnalysisEngines,
+  useAppSettings,
+  useCancelRun,
+  useQueueStatus,
+  useRequestAnalysis,
+  useRuns,
+} from '@/lib/api/queries'
 import type { CorrespondenceSearchEngine, RunResponse } from '@/lib/api/types'
 import { demoAnalysis, demoPlan, DEMO_ENGINE_ID, useDemoAnalysis } from '@/lib/demo/analysis'
 import { useEventListener } from '@/lib/events/EventsProvider'
@@ -70,6 +77,10 @@ export function useAnalysisRequest(gameId: number | null) {
   // not asked for. `useRuns` still needs *an* id for its key; nothing reads the result.
   const runs = useRuns(gameId ?? 0, { enabled: gameId !== null })
   const analysis = useRequestAnalysis()
+  const cancelRun = useCancelRun()
+  // Whether the queue is paused: a queued run then waits for the resume, and the button has
+  // to say so rather than spin as though it were moving. The same cache the top bar reads.
+  const queue = useQueueStatus({ enabled: gameId !== null && !readOnly })
   // Both only while the dialog is up: a reader stepping through a game never needs them.
   const serverEngines = useAnalysisEngines({ enabled: open && gameId !== null && !readOnly })
   const settings = useAppSettings({ enabled: open && gameId !== null })
@@ -148,6 +159,11 @@ export function useAnalysisRequest(gameId: number | null) {
     if (!tracksRun(event as AnalysisRunEvent)) return
     setProgress(null)
   })
+  useEventListener('analysis.cancelled', (event) => {
+    if (!tracksRun(event as AnalysisRunEvent)) return
+    setProgress(null)
+    setRequested(null)
+  })
   // The counter belongs to one run, so a different run taking the button over starts empty
   // rather than inheriting the last frame of the one before it.
   const runProgress: RunProgress | null =
@@ -214,6 +230,28 @@ export function useAnalysisRequest(gameId: number | null) {
   const openWhenIdle = useCallback(() => {
     if (!busy) openDialog()
   }, [busy, openDialog])
+
+  // The stop square beside the button: only for a run somebody asked for, the same run the
+  // button is held by. An import pass is the queue's business and is stopped from there.
+  // `requested` is cleared on success because the list may never have caught up with a run
+  // that was taken back at once, and the stand-in would then hold the button for ever.
+  const stoppableId = readOnly ? null : activeRun?.requested ? activeRun.id : null
+  const { mutate: cancel } = cancelRun
+  const stop = useCallback(() => {
+    if (readOnly) {
+      demoAnalysis.stop()
+      return
+    }
+    if (stoppableId === null) return
+    cancel(stoppableId, {
+      onSuccess: () => {
+        setRequested(null)
+        setProgress(null)
+      },
+      onError: (error) => toast.error(error.message),
+    })
+  }, [cancel, readOnly, stoppableId])
+  const canStop = readOnly ? demoRun?.requested === true : stoppableId !== null
   return {
     /** A run over this game that is queued or running right now, a requested one first. */
     activeRun: readOnly ? demoRun : activeRun,
@@ -222,6 +260,12 @@ export function useAnalysisRequest(gameId: number | null) {
     /** Live ply counts from `analysis.progress`, while a run is working. */
     progress: readOnly ? (demoRun ? demo.progress : null) : runProgress,
     pending,
+    /** Stops the requested run the button is held by; undefined while there is none. */
+    stop: canStop ? stop : undefined,
+    /** Whether that stop is on its way to the server. */
+    stopping: cancelRun.isPending,
+    /** The queue is paused, so a queued run is waiting for the resume, not for its turn. */
+    queuePaused: !readOnly && queue.data?.paused === true,
     /** Whether the Analyse dialog is up, and what it needs to draw. */
     dialog: {
       open: open && !noEngines,

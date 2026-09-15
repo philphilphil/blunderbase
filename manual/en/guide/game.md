@@ -49,7 +49,11 @@ for. Point at one and it is drawn on the board, in whatever form you chose under
 a dialog that queues a run of your own over this game. While the
 engine is hidden the pane is gone, and the button moves to the row under the board. The run
 goes ahead of every import pass still waiting, and the button spins until it is done; until
-then neither the button nor `A` opens the dialog again.
+then neither the button nor `A` opens the dialog again. The square beside it stops the run,
+whether it is still waiting or already searching, and keeps nothing of it — the game stays
+as it was before you asked. While the analysis queue is paused, a run that has not started
+reads **Paused** instead of spinning, and starts once the queue is resumed; a run already
+searching carries on.
 
 | | |
 |---|---|

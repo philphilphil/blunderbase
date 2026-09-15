@@ -90,6 +90,7 @@ import type {
   ProfileResponse,
   QueueCleared,
   QueuePaused,
+  RunCancelled,
   QueueStatus,
   ReferenceExplorerResponse,
   ReferenceGame,
@@ -380,6 +381,14 @@ export const retryFailedRuns = (runIds?: number[]) =>
   })
 
 export const getRun = (runId: number) => http.get<RunResponse>(`/analysis/runs/${runId}`)
+
+/**
+ * Stops one run, whether it is still queued or an engine is already searching it — the
+ * game view's stop button. The row is gone afterwards; `cancelled` is false when the run
+ * had already finished.
+ */
+export const cancelRun = (runId: number) =>
+  http.post<RunCancelled>(`/analysis/runs/${runId}/cancel`)
 
 /** The window is half-open, the way a run is configured. */
 export const getRunEvals = (

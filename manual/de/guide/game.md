@@ -52,7 +52,12 @@ wird auf dem Brett gezeigt, so wie du es unter **Variantenvorschau** eingestellt
 `A`, öffnet einen Dialog, der eine eigene Analyse dieser Partie einreiht. Ist die Engine ausgeblendet, fehlt das Feld, und die
 Schaltfläche rückt in die Zeile unter dem Brett. Die Analyse zieht an jeder Importanalyse
 vorbei, die noch wartet, und die Schaltfläche dreht sich, bis sie fertig ist. Bis dahin
-öffnen weder die Schaltfläche noch `A` den Dialog ein zweites Mal.
+öffnen weder die Schaltfläche noch `A` den Dialog ein zweites Mal. Das Quadrat daneben
+bricht die Analyse ab, ob sie noch wartet oder schon rechnet, und nichts davon bleibt
+übrig — die Partie ist so, wie sie vor der Anfrage war. Ist die Analyse-Warteschlange
+angehalten, zeigt eine Analyse, die noch nicht begonnen hat, **Pausiert** statt sich zu
+drehen, und startet, sobald die Warteschlange weiterläuft; eine, die schon rechnet, läuft
+weiter.
 
 | | |
 |---|---|
