@@ -528,6 +528,9 @@ export interface GameBookMove extends Extra {
   blunders?: number
   avg_ply?: number | null
   last_played?: string | null
+  /** What the opening book calls the position this move reaches; null unless it names it. */
+  eco?: string | null
+  name?: string | null
 }
 
 /** One position's book: how often the owner reached it, and what they played from it. */
@@ -558,6 +561,19 @@ export interface GameDetail extends Extra {
    * (`memory/blunderbase-meltdown-root-cause.md`).
    */
   book?: Record<string, GameBookEntry>
+  /**
+   * Every position along the game the vendored opening book names, root first. The opening
+   * at a ply is the last entry at or before it (`openingAt`); the book stops naming a few
+   * plies in, so there are only ever a handful.
+   */
+  openings?: GameOpening[]
+}
+
+/** A position along a game that the vendored opening book names. */
+export interface GameOpening extends Extra {
+  ply: number
+  eco: string
+  name: string
 }
 
 /** The query vocabulary shared by `/games` and every `/stats` dimension. */

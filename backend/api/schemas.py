@@ -480,6 +480,12 @@ class GameBookMove(Payload):
     blunders: int = 0
     avg_ply: float | None = None
     last_played: str | None = None
+    eco: str | None = None
+    name: str | None = Field(
+        default=None,
+        description="what the opening book calls the position this move reaches; null unless "
+        "the book names that position itself",
+    )
 
 
 class GameBookEntry(Payload):
@@ -491,6 +497,14 @@ class GameBookEntry(Payload):
     losses: int = 0
     score: float | None = None
     moves: list[GameBookMove] = Field(default_factory=list)
+
+
+class GameOpening(Payload):
+    """A position along the game that the vendored opening book names."""
+
+    ply: int = Field(description="how many moves have been played to reach the position")
+    eco: str
+    name: str
 
 
 class GameDetail(Payload):
@@ -512,6 +526,11 @@ class GameDetail(Payload):
         "its opening and nothing after. Shipped with the game rather than fetched per "
         "position, because stepping through a game must not be a request per ply. The keys "
         "are strings in JSON, as every integer-keyed mapping is",
+    )
+    openings: list[GameOpening] = Field(
+        default_factory=list,
+        description="every position along the game the opening book names, root first; the "
+        "opening at a ply is the last entry at or before it",
     )
 
 

@@ -63,8 +63,8 @@ vorbei, die noch wartet, und die Schaltfläche dreht sich, bis sie fertig ist. B
 
 Eine Analyse über die ganze Partie ist danach das, woraus die Partie gelesen wird,
 Statistiken eingeschlossen; eine über einen Teil gilt für diese Züge und lässt den Rest,
-wie er war. Die Markierung in der Leiste über der Partie sagt dann, was gelaufen ist, mit
-den Voreinstellungen `d24 · 2 Varianten`. Was der Dialog nicht einreihen kann – die Engine
+wie er war. Die Titelzeile des Reiters **Analyse** sagt dann, was gelaufen ist, mit
+den Voreinstellungen `d24` und `MPV 2`. Was der Dialog nicht einreihen kann – die Engine
 ist ausgeschaltet, ein Runner ist weg –, sagt er in sich selbst, und nichts wird
 eingereiht. Gibt es gar keine Engine, bietet er stattdessen an, Stockfish in diesem Browser
 einzurichten; siehe [Engines](../operate/engines.md#the-engine-in-your-browser).
@@ -129,7 +129,9 @@ von da an spricht diese Partie, und die anderen bleiben unberührt.
 `N` öffnet eine Notiz zur Stellung auf dem Brett; **Enter** speichert sie, **Shift+Enter**
 ist eine neue Zeile. Notizen erscheinen in jeder Partie, die diese Stellung erreicht – siehe
 [Notizen](notes.md). Der Reiter **Buch** neben **Notizen** zeigt, wie es in deinen eigenen
-Partien von hier aus weiterging; `B` öffnet ihn.
+Partien von hier aus weiterging; `B` öffnet ihn. Oben steht der Name der Eröffnung, in der
+die Partie gerade ist, und ein Zug, der in eine benannte Eröffnung führt, zeigt ihren Namen
+in der Spalte **Eröffnung**.
 
 ## Der Fernschachbaum { #the-correspondence-tree }
 

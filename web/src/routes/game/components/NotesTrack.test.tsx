@@ -98,6 +98,18 @@ describe('NotesTrack', () => {
     expect(screen.getByText('9 games')).toBeInTheDocument()
   })
 
+  it('heads the book with the opening name, even where no game reached the position', async () => {
+    const user = userEvent.setup()
+    renderTrack({ book: null, opening: { eco: 'B90', name: 'Sicilian Defense: Najdorf Variation' } })
+
+    await user.click(screen.getByRole('tab', { name: 'Book' }))
+
+    expect(screen.getByTestId('book-opening')).toHaveTextContent(
+      'Sicilian Defense: Najdorf VariationB90',
+    )
+    expect(screen.getByTestId('book-panel-empty')).toBeInTheDocument()
+  })
+
   it('offers the way out to the explorer on the Book tab, and only there', async () => {
     const user = userEvent.setup()
     const onOpenInExplorer = vi.fn()

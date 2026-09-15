@@ -960,6 +960,7 @@ def get_game_detail(
     }
     if include_book:
         detail["book"] = game_book(session, game_id, ply_range=ply_range)
+        detail["openings"] = game_openings(game)
     if include_notes:
         detail["notes"] = game_notes(session, game_id)
     return detail
@@ -1028,6 +1029,34 @@ def game_book(
     # A game that repeats a position gets the same entry under both plies, which is what a
     # reader stepping through it should see: the tree belongs to the position, not the ply.
     return {ply: books[position_id] for ply, position_id in rows if position_id in books}
+
+
+def game_openings(game: Game) -> list[dict[str, Any]]:
+    """Every position along the game the vendored book names, root first, as `ply`/`eco`/`name`.
+
+    What the Book tab heads itself with: the name at a ply is the last entry at or before it,
+    the same deepest-ancestor rule `explorer._opening` names a position by. Sparse rather than
+    one name per ply because the book stops naming a few plies in, so a game carries a
+    handful of entries whatever its length, and a board that has left the game line can still
+    be named by the last of them it branched after.
+
+    Worked from `moves_uci` in memory — no query — and only as far as `BOOK_MAX_PLY`, well past
+    the deepest position the book names. A move that will not play ends the walk there.
+    """
+    from backend.adapters import openings
+
+    board = start_board(game)
+    named: list[dict[str, Any]] = []
+    for ply in range(min(len(game.moves_uci), BOOK_MAX_PLY) + 1):
+        if ply > 0:
+            try:
+                board.push(board.parse_uci(game.moves_uci[ply - 1]))
+            except ValueError:
+                break
+        found = openings.find(board.epd())
+        if found is not None:
+            named.append({"ply": ply, "eco": found.eco, "name": found.name})
+    return named
 
 
 def analysis_runs(session: Session, game_id: int, done_only: bool = True) -> list[AnalysisRun]:

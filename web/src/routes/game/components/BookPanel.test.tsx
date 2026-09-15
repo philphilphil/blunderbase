@@ -11,15 +11,24 @@ const MOVES: BookMove[] = [
 ]
 
 describe('BookPanel', () => {
-  it('cuts the explorer to four columns, in the explorer’s order and vocabulary', () => {
+  it('cuts the explorer to five columns, in the explorer’s order and vocabulary', () => {
     render(<BookPanel moves={MOVES} ply={4} onPlay={vi.fn()} />)
 
     const [header] = screen.getAllByRole('row')
-    expect(header).toHaveTextContent(/^MoveGamesScoreAvg drop$/)
-    // The three the narrow track cannot afford stay on the explorer's own screen.
+    expect(header).toHaveTextContent(/^MoveGamesScoreAvg dropOpening$/)
+    // The two the narrow track cannot afford stay on the explorer's own screen.
     expect(header).not.toHaveTextContent('Score%')
     expect(header).not.toHaveTextContent('Blund')
-    expect(header).not.toHaveTextContent('Opening')
+  })
+
+  it('names the opening a continuation enters in its row, and leaves the cell blank otherwise', () => {
+    const named = MOVES.map((move) =>
+      move.uci === 'd2d4' ? { ...move, name: 'Sicilian Defense: Open' } : move,
+    )
+    render(<BookPanel moves={named} ply={4} onPlay={vi.fn()} />)
+
+    const cells = screen.getAllByTestId('book-move-opening')
+    expect(cells.map((cell) => cell.textContent)).toEqual(['Sicilian Defense: Open', '', ''])
   })
 
   it('labels a continuation with the ply it occupies, not the one before it', () => {

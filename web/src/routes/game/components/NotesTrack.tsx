@@ -51,6 +51,8 @@ export interface NotesTrackProps {
   book?: BookEntry | null
   /** The half-move count on the board: the key `book` was taken from, and the moves' label. */
   bookPly: number
+  /** What the opening book calls the line the board is in (`gameModel.openingAt`). */
+  opening?: { eco: string; name: string } | null
   onPlayBookMove?: (move: BookMove) => void
   /**
    * Open the position on the board in `/explorer`, where the same tree has the whole screen
@@ -92,6 +94,7 @@ const COMPOSER_SLOT = 'h-[9rem]'
 export function NotesTrack({
   book,
   bookPly,
+  opening = null,
   onPlayBookMove,
   onPreviewBookMove,
   onOpenInExplorer,
@@ -190,12 +193,29 @@ export function NotesTrack({
         className="min-h-0 overflow-y-auto"
       >
         {active === 'book' ? (
-          <BookPanel
-            moves={moves}
-            ply={bookPly}
-            onPlay={onPlayBookMove}
-            onPreview={onPreviewBookMove}
-          />
+          <>
+            {/* The name heads the pane rather than sitting on the tab row: that row is 35
+                design pixels with two tabs, a count and the explorer arrow already on it,
+                and an opening name is as long as "Sicilian Defense: Najdorf Variation". */}
+            {opening ? (
+              <div
+                data-testid="book-opening"
+                title={opening.name}
+                className="flex items-baseline gap-2 px-3 pt-2 pb-1"
+              >
+                <span className="truncate text-[0.75rem] font-semibold text-ink">
+                  {opening.name}
+                </span>
+                <span className="flex-none font-mono text-[0.625rem] text-dim">{opening.eco}</span>
+              </div>
+            ) : null}
+            <BookPanel
+              moves={moves}
+              ply={bookPly}
+              onPlay={onPlayBookMove}
+              onPreview={onPreviewBookMove}
+            />
+          </>
         ) : (
           <NoteList notes={notes} activeNoteId={activeNoteId} onSelect={onSelectNote} />
         )}

@@ -750,10 +750,24 @@ def test_game_detail_ships_the_book_of_the_positions_the_library_repeats(
     # the two screens read one fold. Only what a per-position *page* adds is missing.
     page = explorer.opening_explorer(session, fen=AFTER_E4_E5)["moves"]
     assert book[2]["moves"] == [
-        {key: value for key, value in node.items() if key not in {"eco", "name", "note"}}
+        {key: value for key, value in node.items() if key != "note"}
         for node in page
     ]
     assert book[2]["moves"][0]["avg_win_loss"] is not None
+
+
+def test_game_detail_names_the_openings_along_the_game(analysed: Library) -> None:
+    """The book's names ride along too, sparse and root first, so the Book tab can head itself."""
+    detail = games_service.get_game_detail(analysed.session, analysed["qg000001"].id)
+    assert detail is not None
+    named = detail["openings"]
+
+    assert named
+    plies = [entry["ply"] for entry in named]
+    assert plies == sorted(plies) and len(set(plies)) == len(plies)
+    # The fixture's first game is a Ruy Lopez, and the deepest name says so.
+    assert named[-1]["name"].startswith("Ruy Lopez")
+    assert named[-1]["eco"].startswith("C")
 
 
 def test_the_shipped_book_stops_where_a_position_stops_repeating(library: Library) -> None:

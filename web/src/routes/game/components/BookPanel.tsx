@@ -3,14 +3,15 @@
  * game screen's notes track.
  *
  * It is the *same feature* as `/explorer`, so it uses the explorer's own columns, in the
- * explorer's order and vocabulary: Move, Games, the win/draw/loss split, Avg drop. It even
+ * explorer's order and vocabulary: Move, Games, the win/draw/loss split, Avg drop, Opening. It even
  * imports the explorer's `splitOf`/`formatAvgDrop`/`dropTone`/`ScoreBar` rather than
  * restating them, because a percentage that rounds differently on the two screens is how
  * one feature becomes two. The explorer's full table has seven columns and wants ~440px;
- * this track is nothing like that wide, so it is cut to four — the three that say how often
- * and how well, plus the move they belong to. `Score%` and `Blund` are the ones that go:
- * the split bar already draws the score, and blunders are a stronger claim than a handful
- * of games can support.
+ * this track is nothing like that wide, so it is cut to five — the three that say how often
+ * and how well, the move they belong to, and the opening that move enters. `Score%` and
+ * `Blund` are the ones that go: the split bar already draws the score, and blunders are a
+ * stronger claim than a handful of games can support. The bar is a fixed short width so
+ * the opening name gets what is left; a split reads just as well at half the length.
  *
  * DRESSED LIKE THE MOVE TABLE, NOT LIKE A CARD. No border, no radius, no panel background —
  * it sits flat on the column's own ground, with rows the height, radius and hover of a move
@@ -48,6 +49,8 @@ export interface BookMove {
   losses?: number
   /** Win percentage the owner gave away playing this move, averaged. Null until analysed. */
   avg_win_loss?: number | null
+  /** The opening this move enters, where the book names the position it reaches. */
+  name?: string | null
 }
 
 /**
@@ -79,10 +82,11 @@ export interface BookPanelProps {
 }
 
 /**
- * `58 34 1fr 52` at the mockup's scale, converted: the app runs at `html { font-size: 120% }`
+ * `58 34 48 52 1fr` at the mockup's scale, converted: the app runs at `html { font-size: 120% }`
  * and the mockup at 100%, so every length here is `rem` and none of them is a pixel.
  */
-const GRID = 'grid grid-cols-[3.625rem_2.125rem_minmax(0,1fr)_3.25rem] items-center gap-2'
+const GRID =
+  'grid grid-cols-[3.625rem_2.125rem_3rem_3.25rem_minmax(0,1fr)] items-center gap-2'
 
 /** A move row's own metrics, so the two tables either side of the divider stay in step. */
 const ROW = cn(GRID, 'h-[1.625rem] rounded-[0.3125rem] px-1.5 font-mono text-[0.6875rem] tabular')
@@ -128,6 +132,9 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
         <span className="text-right">
           <Trans>Avg drop</Trans>
         </span>
+        <span>
+          <Trans>Opening</Trans>
+        </span>
       </div>
 
       {moves.map((move) => {
@@ -144,6 +151,15 @@ export function BookPanel({ moves, ply, onPlay, onPreview, className }: BookPane
             <ScoreBar split={split} className="w-full" />
             <span className={cn('text-right', dropTone(move.avg_win_loss))}>
               {formatAvgDrop(move.avg_win_loss)}
+            </span>
+            {/* Last, as on the explorer, and the column that truncates: most rows past the
+                first few plies have no name, and those that do are long. */}
+            <span
+              title={move.name ?? undefined}
+              data-testid="book-move-opening"
+              className="truncate font-sans text-[0.6875rem] text-soft-2"
+            >
+              {move.name}
             </span>
           </>
         )

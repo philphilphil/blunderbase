@@ -59,8 +59,8 @@ then neither the button nor `A` opens the dialog again.
 | **Moves** | **This move** — the move that led to the position on the board, the one whose badge you are looking at; **From here on** — that move to the end; **Whole game**, which is where it opens. The first two are greyed at the starting position |
 
 A whole-game run becomes what the game is read from, statistics included; a run over part
-of the game answers for those moves and leaves the rest as it was. The badge in the bar
-across the top then says what ran, `d24 · 2 lines` for the default. What the dialog cannot
+of the game answers for those moves and leaves the rest as it was. The **Run** tab's title
+then says what ran, `d24` and `MPV 2` for the default. What the dialog cannot
 queue — the engine switched off, a runner gone away — is said inside it, and nothing is
 queued. With no engine at all, the dialog offers to set up Stockfish in this browser
 instead; see [Engines](../operate/engines.md#the-engine-in-your-browser).
@@ -119,6 +119,8 @@ Read the game, then press it — that game speaks from then on, and the others a
 `N` writes a note about the position on the board; **Enter** saves it, **Shift+Enter** is a
 new line. Notes come back in every game that reaches that position — see [Notes](notes.md).
 The **Book** tab beside **Notes** shows how your own games went on from here; `B` opens it.
+It is headed with the name of the opening the game is in, and a move that enters a named
+opening shows that name in its **Opening** column.
 
 ## The correspondence tree
 

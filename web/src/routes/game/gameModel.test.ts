@@ -10,6 +10,7 @@ import {
   engineLines,
   evalAtCursor,
   evalCurve,
+  openingAt,
   flaggedSide,
   formatRemaining,
   formatResult,
@@ -55,6 +56,22 @@ describe('ply arithmetic', () => {
     expect(sideOf(1)).toBe('black')
     expect(plyLabel(46)).toBe('24.')
     expect(plyLabel(47)).toBe('24…')
+  })
+})
+
+describe('openingAt', () => {
+  const OPENINGS = [
+    { ply: 1, eco: 'B00', name: "King's Pawn Game" },
+    { ply: 2, eco: 'B20', name: 'Sicilian Defense' },
+    { ply: 10, eco: 'B90', name: 'Sicilian Defense: Najdorf Variation' },
+  ]
+
+  it('names a ply by the deepest named position at or before it', () => {
+    expect(openingAt(OPENINGS, 0)).toBeNull()
+    expect(openingAt(OPENINGS, 2)?.eco).toBe('B20')
+    expect(openingAt(OPENINGS, 9)?.eco).toBe('B20')
+    expect(openingAt(OPENINGS, 40)?.eco).toBe('B90')
+    expect(openingAt(undefined, 5)).toBeNull()
   })
 })
 

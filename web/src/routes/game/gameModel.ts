@@ -24,6 +24,7 @@ import { parseUci } from 'chessops/util'
 import type {
   Classification,
   EngineLine,
+  GameOpening,
   GameRunSummary,
   GameSummary,
   MaiaLevelPolicy,
@@ -74,6 +75,22 @@ export interface GameLine {
 /** The side that plays a ply. Ply 0 is White's first move (`backend/services/games.py`). */
 export function sideOf(ply: number): Side {
   return ply % 2 === 0 ? 'white' : 'black'
+}
+
+/**
+ * The opening the game's line is in once `count` moves are on the board: the deepest position
+ * at or before it the book names (`GameDetail.openings`, root first). Null before the first.
+ */
+export function openingAt(
+  openings: readonly GameOpening[] | undefined,
+  count: number,
+): GameOpening | null {
+  let found: GameOpening | null = null
+  for (const entry of openings ?? []) {
+    if (entry.ply > count) break
+    found = entry
+  }
+  return found
 }
 
 /** `46` -> `24.`, `47` -> `24…` — the move-list number column. */

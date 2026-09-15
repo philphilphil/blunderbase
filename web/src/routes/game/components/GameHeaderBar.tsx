@@ -2,7 +2,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { SourceBadge } from '@/components/badges/SourceBadge'
-import { RunBadge, RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
+import { RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
 import type { GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { relative } from '@/lib/mcp/status'
 import { cn } from '@/lib/utils'
@@ -43,7 +43,7 @@ export function GameHeaderBar({
   className,
 }: {
   game: GameSummary
-  /** The finished run that answers for the game (`gameModel.bestRun`), as its chip reports it. */
+  /** The finished run that answers for the game (`gameModel.bestRun`): when it finished. */
   best: GameRunSummary | null
   /** A run that is queued or running right now, from `/analysis/runs`. */
   active: RunResponse | null
@@ -139,11 +139,11 @@ export function GameHeaderBar({
           about the game: it is about the app's work, not about the game. */}
       <div className="flex-1" />
 
+      {/* No chip for a finished run: what it searched is the engine pane's Run tab's to
+          say, and "analysed …" beside this already says one happened. */}
       {active ? (
         <RunStatusBadge status={active.status} className="flex-none" />
-      ) : best ? (
-        <RunBadge run={best} className="flex-none" />
-      ) : (
+      ) : best ? null : (
         <UnanalysedBadge className="flex-none" />
       )}
       {/* First to leave on a narrow bar: the badge beside it already says whether a run

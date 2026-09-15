@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { SideDot } from '@/components/badges/SideDot'
-import { RunBadge, RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
+import { RunStatusBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
 import type { Color, GameRunSummary, GameSummary, RunResponse } from '@/lib/api/types'
 import { formatScore, type Score } from '@/lib/chess/evaluation'
 import { cn } from '@/lib/utils'
@@ -306,9 +306,7 @@ function CompactHeader({
       <div className="flex flex-none items-center gap-2">
         {active ? (
           <RunStatusBadge status={active.status} />
-        ) : best ? (
-          <RunBadge run={best} />
-        ) : (
+        ) : best ? null : (
           <UnanalysedBadge />
         )}
         {/* The desktop header's source chip is the link to the game on its site; this line

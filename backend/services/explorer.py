@@ -264,9 +264,10 @@ def position_books(
     The narrow entry point behind a game's shipped book (`services.games.game_book`), which
     wants one strip of continuations per ply rather than one page per position. It is the
     same fold `opening_explorer` runs, the stored book where a position has one and a live
-    fold where it does not, minus everything that belongs to a *page*: no book walk, no
-    opening names, no notes on each child. Those are what make a tree expensive — a walk is
-    tens of queries — and a per-ply strip asks none of them.
+    fold where it does not, minus everything that belongs to a *page*: no book walk and no
+    notes on each child. Those are what make a tree expensive — a walk is tens of queries —
+    and a per-ply strip asks none of them. Each continuation's opening name does come along
+    (`_name_children`), since that is a lookup in memory and not a query.
 
     A position comes back only when at least `min_games` of the owner's games reached it,
     which is the same cut `book_walk` stops at: a move played once is not book. On a real
@@ -314,8 +315,36 @@ def position_books(
             moves, totals, _ended = _tree(occurrences, position.side_to_move, min_games=1)
         if not moves:
             continue
-        books[key] = {**totals, "moves": moves[: max(limit, 0)] if limit else moves}
+        kept = moves[: max(limit, 0)] if limit else moves
+        _name_children(position.fen, kept)
+        books[key] = {**totals, "moves": kept}
     return books
+
+
+def _name_children(fen: str, moves: Sequence[dict[str, Any]]) -> None:
+    """Give each continuation the `eco`/`name` the book calls the position it reaches.
+
+    The same rule as the explorer page's rows — only a child the book names itself gets a
+    name — without the note lookup that comes with them there. A dict hit per move on one
+    board replayed in place, so it costs a strip no query.
+    """
+    try:
+        board = read_fen(fen)
+    except ValueError:
+        board = None
+    for move in moves:
+        found = None
+        if board is not None:
+            try:
+                parsed = board.parse_uci(move["uci"])
+            except ValueError:
+                parsed = None
+            if parsed is not None:
+                board.push(parsed)
+                found = openings.find(board.epd())
+                board.pop()
+        move["eco"] = found.eco if found else None
+        move["name"] = found.name if found else None
 
 
 def position_book(

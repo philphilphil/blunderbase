@@ -1698,9 +1698,8 @@ describe('GamePage', () => {
     expect(screen.queryByTestId('evaluation-plot')).not.toBeInTheDocument()
     // The move table is still the game: the moves, and the note somebody wrote about one.
     expect(screen.getByText('d5')).toBeInTheDocument()
-    // And so is what the app has *done* — the run happened, whatever it found: the run chip
-    // in the header, and the button that asks for another.
-    expect(screen.getByText('400k · 3 lines')).toBeInTheDocument()
+    // And so is what the app has *done* — the run happened, whatever it found: the button
+    // that asks for another.
     expect(screen.getByRole('button', { name: 'Analyse' })).toBeInTheDocument()
 
     act(() => setEngineHidden(false))

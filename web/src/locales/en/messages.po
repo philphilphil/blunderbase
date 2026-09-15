@@ -4853,6 +4853,7 @@ msgstr "Blund"
 
 #: src/routes/explorer/components/MoveTreeTable.tsx
 #: src/routes/explorer/components/ReferenceMoveTable.tsx
+#: src/routes/game/components/BookPanel.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/games/filters.ts
 #: src/routes/stats/cards/BlundersByPhaseCard.tsx
