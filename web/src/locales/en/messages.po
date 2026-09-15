@@ -4875,6 +4875,63 @@ msgstr "Continuations"
 msgid "No game of yours goes any further than this position."
 msgstr "No game of yours goes any further than this position."
 
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "bullet"
+msgstr "bullet"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "blitz"
+msgstr "blitz"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "rapid"
+msgstr "rapid"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "classical"
+msgstr "classical"
+
+#. Short for "correspondence", inside a sentence
+#. Short for "correspondence", the speed of a game played over days
+#. Short for "correspondence", the speed of a game played over days
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "corr."
+msgstr "corr."
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+msgid "speed"
+msgstr "speed"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "correspondence"
+msgstr "correspondence"
+
+#. Chip marking the engine row for the move the game actually played
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "played"
+msgstr "played"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+msgid "Played within"
+msgstr "Played within"
+
 #: src/routes/explorer/components/PositionNotes.tsx
 msgid "Your notes on this position"
 msgstr "Your notes on this position"
@@ -4917,34 +4974,6 @@ msgstr "note via MCP"
 #: src/routes/explorer/components/PositionNotes.tsx
 msgid "What is worth remembering about this position? Enter saves, Shift+Enter breaks the line."
 msgstr "What is worth remembering about this position? Enter saves, Shift+Enter breaks the line."
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "bullet"
-msgstr "bullet"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "blitz"
-msgstr "blitz"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "rapid"
-msgstr "rapid"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "classical"
-msgstr "classical"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-msgid "speed"
-msgstr "speed"
 
 #: src/routes/explorer/components/ReferenceFilters.tsx
 #: src/routes/stats/cards/ProgressCard.tsx
@@ -5353,11 +5382,6 @@ msgstr "Compare the levels side by side"
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "Play {san} on the analysis board"
 msgstr "Play {san} on the analysis board"
-
-#. Chip marking the engine row for the move the game actually played
-#: src/routes/game/components/MaiaPanel.tsx
-msgid "played"
-msgstr "played"
 
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "likely continuation"
@@ -7253,17 +7277,6 @@ msgstr "Repertoire moves"
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "has a comment"
 msgstr "has a comment"
-
-#: src/routes/stats/StatsPage.tsx
-msgid "correspondence"
-msgstr "correspondence"
-
-#. Short for "correspondence", inside a sentence
-#. Short for "correspondence", the speed of a game played over days
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "corr."
-msgstr "corr."
 
 #: src/routes/stats/StatsPage.tsx
 msgid "{analysedCount} analysed of {gameCount} games · {period} · {colours}"

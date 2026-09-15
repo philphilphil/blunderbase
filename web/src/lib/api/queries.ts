@@ -736,7 +736,7 @@ export function usePositionBook(
 
 export function usePositionOccurrences(
   fen: string,
-  query: { color?: 'white' | 'black'; limit?: number } = {},
+  query: api.PositionsQuery = {},
   options?: Options<Awaited<ReturnType<typeof api.findPositions>>>,
 ) {
   return useQuery({

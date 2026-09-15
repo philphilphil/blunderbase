@@ -352,6 +352,27 @@ describe('ExplorerPage sources', () => {
     vi.unstubAllGlobals()
   })
 
+  it('narrows the owner’s own tree and its games by speed and period', async () => {
+    const seen = stubSources()
+    renderPage('/explorer?tc=blitz&period=90d')
+
+    await screen.findByText('1.e4')
+    const tree = seen.find((url) => url.includes('/explorer?'))
+    const games = seen.find((url) => url.includes('/explorer/positions'))
+    for (const asked of [tree, games]) {
+      expect(asked).toContain('speed=blitz')
+      expect(asked).toContain('days=90')
+    }
+    expect(screen.getByRole('button', { name: 'blitz' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'correspondence' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(screen.getByRole('button', { name: '90d' })).toHaveAttribute('aria-pressed', 'true')
+
+    vi.unstubAllGlobals()
+  })
+
   it('offers no speed or rating chips for the masters database', async () => {
     stubSources()
     renderPage('/explorer?source=masters')

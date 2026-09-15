@@ -7,6 +7,7 @@ import type {
   GameDetailQuery,
   GameQuery,
   NoteQuery,
+  PositionsQuery,
   ReferenceExplorerQuery,
   StatsDashboardQuery,
 } from './endpoints'
@@ -101,10 +102,12 @@ export const queryKeys = {
   // Keyed by the position, not by the game: walking back and forth over the same square
   // asks once, and two games that transpose share the answer.
   explorerBook: (fen: string): QueryKey => ['explorer', 'book', fen],
-  explorerPositions: (
-    fen: string,
-    query: { color?: 'white' | 'black'; limit?: number } = {},
-  ): QueryKey => ['explorer', 'positions', fen, query],
+  explorerPositions: (fen: string, query: PositionsQuery = {}): QueryKey => [
+    'explorer',
+    'positions',
+    fen,
+    query,
+  ],
 
   /**
    * The outside books — Lichess's masters and rated databases, read through

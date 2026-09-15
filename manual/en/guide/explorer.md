@@ -7,6 +7,11 @@ you reached that position, how you scored, and the worst move you played there. 
 `→` walk the line. **Games in this line** and **Your notes on this position** are beside
 it.
 
+The chips above the table narrow which of your games count: **speed** keeps only the time
+controls you leave on, and **played** keeps only games from the last 30 days, 90 days or
+year, counted back from today. The tree, its book line and the games below all follow them,
+and the filter stays in the page's address, so a filtered tree is a link.
+
 ## The Lichess reference databases
 
 The same board also reads two Lichess databases: **masters**, over-the-board games between

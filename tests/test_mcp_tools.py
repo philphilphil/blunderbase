@@ -574,6 +574,16 @@ async def test_opening_explorer_walks_the_owners_own_tree(
     assert payload["main_line"][0]["san"] == "e4"
 
 
+async def test_opening_explorer_narrows_by_speed(
+    coach: MCPServer, analysed: dict[str, Game]
+) -> None:
+    payload = await call(coach, "opening_explorer", speeds=["bullet"])
+    assert payload["totals"]["games"] == 1
+    assert [move["san"] for move in payload["moves"]] == ["d4"]
+    refused = await failure(coach, "opening_explorer", speeds=["hyperbullet"])
+    assert refused["error"] == "bad_argument"
+
+
 async def test_opening_explorer_enters_by_eco(coach: MCPServer, analysed: dict[str, Game]) -> None:
     payload = await call(coach, "opening_explorer", eco="C5")
     assert payload["totals"]["games"] == 2

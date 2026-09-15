@@ -5,6 +5,9 @@ import {
   DEFAULT_SPEEDS,
   formatCount,
   formatCsv,
+  ownFilterQuery,
+  parseOwnSpeeds,
+  parsePeriod,
   parseRatings,
   parseSource,
   parseSpeeds,
@@ -90,5 +93,30 @@ describe('formatCsv', () => {
   it('is what both the URL and the backend take', () => {
     expect(formatCsv(['blitz', 'rapid'])).toBe('blitz,rapid')
     expect(formatCsv([1600, 1800])).toBe('1600,1800')
+  })
+})
+
+describe('the owner’s own filters', () => {
+  it('reads every speed, correspondence included, and falls back to all of them', () => {
+    expect(parseOwnSpeeds('correspondence,blitz')).toEqual(['blitz', 'correspondence'])
+    expect(parseOwnSpeeds(null)).toEqual([
+      'bullet',
+      'blitz',
+      'rapid',
+      'classical',
+      'correspondence',
+    ])
+    expect(parseOwnSpeeds('nonsense')).toHaveLength(5)
+  })
+
+  it('reads a known period and nothing else', () => {
+    expect(parsePeriod('90d')).toBe('90d')
+    expect(parsePeriod('7d')).toBe('all')
+    expect(parsePeriod(null)).toBe('all')
+  })
+
+  it('sends nothing for every speed and every game', () => {
+    expect(ownFilterQuery(parseOwnSpeeds(null), 'all')).toEqual({})
+    expect(ownFilterQuery(['blitz'], '30d')).toEqual({ speed: ['blitz'], days: 30 })
   })
 })

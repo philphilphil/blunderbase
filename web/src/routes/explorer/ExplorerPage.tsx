@@ -31,7 +31,8 @@
  *   `PositionNotes` is the one thing that stays on every source, because a note is about
  *   the position on the board and the board is the same board.
  *
- * The line, the scope, the source and the lichess filters all ride in the URL, so any
+ * The line, the scope, the source and both sources' filters — lichess's speeds and ratings,
+ * the owner's speeds and period — all ride in the URL, so any
  * position in any book is a link and the back button walks backwards for free. The filters
  * and the scope are lenses (`replace: true`) — which book you are reading is not a place
  * you went — while playing a move is history.
@@ -44,6 +45,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { Board } from '@/components/board/Board'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useExplorer, usePositionOccurrences, useReferenceExplorer } from '@/lib/api/queries'
+import { SPEEDS } from '@/lib/api/types'
 import type { Color, ExplorerMove } from '@/lib/api/types'
 import { isTyping } from '@/lib/ui/shortcuts'
 import { cn } from '@/lib/utils'
@@ -53,6 +55,7 @@ import { LineBreadcrumb } from './components/LineBreadcrumb'
 import { LineSummary } from './components/LineSummary'
 import { ModelGames } from './components/ModelGames'
 import { MoveTreeTable } from './components/MoveTreeTable'
+import { OwnFilters } from './components/OwnFilters'
 import { PositionNotes } from './components/PositionNotes'
 import { ReferenceFilters } from './components/ReferenceFilters'
 import { ReferenceMoveTable } from './components/ReferenceMoveTable'
@@ -69,6 +72,9 @@ import {
   SOURCES,
   SOURCE_LABELS,
   formatCsv,
+  ownFilterQuery,
+  parseOwnSpeeds,
+  parsePeriod,
   parseRatings,
   parseSource,
   parseSpeeds,
@@ -127,6 +133,10 @@ export function ExplorerPage() {
   // when the lichess database is the one being asked — masters has neither.
   const speeds = useMemo(() => parseSpeeds(params.get('speeds')), [params])
   const ratings = useMemo(() => parseRatings(params.get('ratings')), [params])
+  // The owner's own two lenses, in params of their own (`parseOwnSpeeds` says why).
+  const ownSpeeds = useMemo(() => parseOwnSpeeds(params.get('tc')), [params])
+  const period = parsePeriod(params.get('period'))
+  const ownFilter = useMemo(() => ownFilterQuery(ownSpeeds, period), [ownSpeeds, period])
   // `?fen=` roots the tree at a position whose move order nobody recorded — how a note
   // written about a position links back here, and how the coach can hand over a board.
   // `?line=` still walks from it, so the two compose and the breadcrumb stays honest: it
@@ -216,6 +226,7 @@ export function ExplorerPage() {
       // positions a few plies in, so the path is what lets a deep position take its name
       // from the ancestor that has one.
       line: formatLineParam(line.steps.map((step) => step.uci)),
+      ...ownFilter,
     },
     // A reference source hides everything this tree feeds, so it is not asked for. The
     // answer stays in the cache, which is what makes switching back instant.
@@ -223,7 +234,7 @@ export function ExplorerPage() {
   )
   const occurrences = usePositionOccurrences(
     line.fen,
-    { color: scope, limit: GAME_LIMIT },
+    { color: scope, limit: GAME_LIMIT, ...ownFilter },
     { enabled: !reference },
   )
   const book = useReferenceExplorer(
@@ -315,9 +326,16 @@ export function ExplorerPage() {
     return () => {
       const query = new URLSearchParams({ eco })
       if (scope) query.set('color', scope)
+      // The library filters by one speed and a start date, so a single speed and the period
+      // carry over; a set of two speeds has no spelling there and is left behind.
+      if (ownFilter.speed?.length === 1) query.set('speed', ownFilter.speed[0])
+      if (ownFilter.days) {
+        const since = new Date(Date.now() - ownFilter.days * 86_400_000)
+        query.set('since', since.toISOString().slice(0, 10))
+      }
       navigate(`/games?${query.toString()}`)
     }
-  }, [tagged?.eco, scope, navigate])
+  }, [tagged?.eco, scope, ownFilter, navigate])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -462,6 +480,16 @@ export function ExplorerPage() {
               />
               <ScopeToggle scope={scope} onChange={setScope} disabled={reference} />
             </div>
+            {source === 'mine' ? (
+              <OwnFilters
+                speeds={ownSpeeds}
+                period={period}
+                onSpeeds={(next) =>
+                  setLens('tc', next.length === SPEEDS.length ? null : formatCsv(next))
+                }
+                onPeriod={(next) => setLens('period', next === 'all' ? null : next)}
+              />
+            ) : null}
             {source === 'lichess' ? (
               <ReferenceFilters
                 speeds={speeds}

@@ -1,6 +1,6 @@
 /**
- * Reading and writing the reference explorer's URL state, and the small formatters its
- * table needs.
+ * Reading and writing the explorer's filter state — the reference books' and the owner's
+ * own — and the small formatters the reference table needs.
  *
  * `/explorer` keeps everything it is looking at in the URL — the line, the colour scope,
  * the root FEN — so which book it is asking and how that book is filtered belong there
@@ -17,7 +17,9 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 
 import { ApiError } from '@/lib/api/client'
-import type { ReferenceSource } from '@/lib/api/types'
+import { SPEEDS as GAME_SPEEDS } from '@/lib/api/types'
+import type { ReferenceSource, Speed as GameSpeed } from '@/lib/api/types'
+import { DEFAULT_WINDOWS, WINDOW_DAYS, type WindowKey } from '@/routes/stats/kit/analytics'
 
 /** What the source control can be on. `mine` is the owner's own games — the default. */
 export type ExplorerSource = 'mine' | ReferenceSource
@@ -91,6 +93,45 @@ export function parseRatings(value: string | null): number[] {
     .filter((item) => (RATINGS as readonly number[]).includes(item))
   const unique = RATINGS.filter((rating) => kept.includes(rating))
   return unique.length > 0 ? [...unique] : [...DEFAULT_RATINGS]
+}
+
+/**
+ * `?tc=blitz,rapid` — which of the owner's own games the tree counts, by speed.
+ *
+ * Its own param rather than a second reading of `speeds`: the two books bucket games
+ * differently (the owner has correspondence games, lichess's explorer does not) and start
+ * from different defaults, so one param would carry a filter from one source into another
+ * where it means something else. Nothing readable, or every speed, is all of them.
+ */
+export function parseOwnSpeeds(value: string | null): GameSpeed[] {
+  const kept = (value ?? '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+  const unique = GAME_SPEEDS.filter((speed) => kept.includes(speed))
+  return unique.length > 0 ? unique : [...GAME_SPEEDS]
+}
+
+/** The periods the owner's tree can be narrowed to — the Stats page's own windows. */
+export const PERIODS: readonly WindowKey[] = DEFAULT_WINDOWS
+
+/** `?period=90d`; anything else is every game the owner has. */
+export function parsePeriod(value: string | null): WindowKey {
+  return PERIODS.find((period) => period === value) ?? 'all'
+}
+
+/**
+ * What the owner's tree sends for its two lenses, and what it leaves out. Every speed on
+ * is no speed filter, so a game whose speed was never parsed still counts until somebody
+ * names the speeds they want — the rule the Stats page keeps.
+ */
+export function ownFilterQuery(
+  speeds: readonly GameSpeed[],
+  period: WindowKey,
+): { speed?: GameSpeed[]; days?: number } {
+  return {
+    ...(speeds.length < GAME_SPEEDS.length ? { speed: [...speeds] } : {}),
+    ...(period === 'all' ? {} : { days: WINDOW_DAYS[period] }),
+  }
 }
 
 /** How a filter rides in the URL and how it goes to the backend: a comma-joined list. */

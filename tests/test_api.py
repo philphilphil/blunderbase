@@ -1234,6 +1234,18 @@ def test_the_explorer_answers_from_the_initial_array(api: TestClient) -> None:
     assert body["main_line"]
 
 
+def test_the_explorer_and_its_games_narrow_by_speed_and_days(api: TestClient) -> None:
+    start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
+    bullet = api.get("/explorer", params={"speed": "bullet"}).json()
+    rows = api.get("/explorer/positions", params={"fen": start, "speed": "bullet"}).json()
+
+    assert bullet["totals"]["games"] == 1
+    assert len(rows) == 1
+    # The fixtures were played long enough ago that a day's window finds none of them.
+    assert api.get("/explorer", params={"days": 1}).json()["totals"]["games"] == 0
+    assert api.get("/explorer", params={"days": 0}).status_code == 422
+
+
 def test_the_explorer_names_the_line_it_was_reached_by(api: TestClient) -> None:
     line = "d2d4,g8f6,c2c4,e7e6,g1f3,d7d5,b1c3,f8b4,c1g5,h7h6"
     body = api.get("/explorer", params={"line": line}).json()

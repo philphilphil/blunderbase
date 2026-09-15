@@ -9,7 +9,7 @@ from mcp.types import TextContent
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings, get_settings
-from backend.db.enums import NoteSource, Platform, Result
+from backend.db.enums import NoteSource, Platform, Result, Speed
 from backend.db.session import get_sessionmaker
 from backend.mcp import arguments as args
 from backend.mcp import payloads
@@ -420,14 +420,19 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         color: str | None = None,
         limit: int = DEFAULT_CONTINUATIONS,
         min_games: int = 1,
+        speeds: list[str] | None = None,
+        since: str | None = None,
     ) -> TextContent:
         """The owner's personal opening tree from a position: how often they played each
         continuation, how they scored, the average win% they gave away playing it, and
         where they leave their own book. Enter by FEN, by ECO code, or by neither for the
         starting position. There is no reference database here — this is their games only.
+        `speeds` (like ["blitz","rapid"]) and `since` (an ISO date or a relative window like
+        '90d') narrow which of their games count.
         The accuracy numbers (`blunders`, `avg_win_loss`) count the owner's own moves, so
         they are zero and null on a continuation only the opponent ever played there."""
         start = args.fen(fen, required=False)
+        chosen = [args.member(Speed, speed, "speed") for speed in args.tags(speeds)]
         with coach.session() as session:
             tree = explorer_service.opening_explorer(
                 session,
@@ -436,6 +441,8 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
                 color=args.color(color),
                 limit=args.capped(limit, DEFAULT_CONTINUATIONS, MAX_CONTINUATIONS),
                 min_games=max(1, int(min_games)),
+                speeds=[speed for speed in chosen if speed is not None],
+                since=args.when(since, "since"),
             )
         return payloads.result(tree)
 

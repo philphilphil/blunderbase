@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql import Alias, Join, Subquery
 
 from backend.adapters import openings
-from backend.db.enums import Color, RunStatus
+from backend.db.enums import Color, RunStatus, Speed
 from backend.db.models import (
     AnalysisRun,
     Game,
@@ -104,6 +104,39 @@ class Continuation(NamedTuple):
     next_position_id: int | None
 
 
+@dataclass(frozen=True, slots=True)
+class GameScope:
+    """Which of the owner's games a tree counts, beyond the colour: speeds and a start date.
+
+    Separate from `color` because the stored book is kept per owner colour and nothing
+    else. A colour-scoped tree can still be read out of `position_moves`; a tree narrowed to
+    blitz, or to the last month, is a question the book never counted, so any scope that
+    narrows sends every step — the tree, the walk, the ECO root — down the live fold. That
+    is slower on the hot positions near the root and the price of the answer being right.
+
+    An empty speed set is no filter rather than a filter matching nothing, the same rule
+    `GameFilters.speeds` keeps.
+    """
+
+    speeds: tuple[Speed, ...] | None = None
+    since: datetime | None = None
+
+    @property
+    def narrows(self) -> bool:
+        return bool(self.speeds) or self.since is not None
+
+    def conditions(self) -> list[ColumnElement[bool]]:
+        clauses: list[ColumnElement[bool]] = []
+        if self.speeds:
+            clauses.append(Game.speed.in_(self.speeds))
+        if self.since is not None:
+            clauses.append(Game.played_at >= self.since)
+        return clauses
+
+
+EVERY_GAME = GameScope()
+
+
 @dataclass(slots=True)
 class MoveCounts:
     """One continuation's folded numbers, from either the stored book or a live fold.
@@ -181,9 +214,15 @@ def opening_explorer(
     limit: int = 20,
     min_games: int = 1,
     line: Sequence[str] | None = None,
+    speeds: Sequence[Speed] | None = None,
+    since: datetime | None = None,
 ) -> dict[str, Any]:
     """The owner's personal tree from one position: per continuation frequency, score,
     average eval drop, and where the owner leaves book.
+
+    `speeds` and `since` narrow which games count — only these time controls, only games
+    played on or after that moment — and apply to everything the payload says: the tree,
+    its totals, the book walk and an ECO root (`GameScope`).
 
     Entry is by FEN, by ECO, or by neither — the initial array. An ECO code names a set of
     games rather than a position, so its root is the deepest position all of those games
@@ -204,12 +243,13 @@ def opening_explorer(
     root is narrowed to one code's games and so is not what the book counted — folds its
     join rows live. The two paths are the same fold and produce the same payload.
     """
+    scope = GameScope(speeds=tuple(speeds) if speeds else None, since=since)
     path: list[dict[str, Any]] = []
     if fen:
         position = find_position(session, fen)
         games: set[int] | None = None
     elif eco:
-        position, games, path = eco_root(session, eco, color)
+        position, games, path = eco_root(session, eco, color, scope=scope)
     else:
         position = find_position(session, START_EPD)
         games = None
@@ -217,7 +257,7 @@ def opening_explorer(
     if position is None:
         return _empty(fen=fen, eco=eco, color=color, path=path, opening=opening)
 
-    if games is None and position.book_state == BOOK_BUILT:
+    if games is None and not scope.narrows and position.book_state == BOOK_BUILT:
         moves, totals, ended, root_ply = _tree_from_book(
             session, position, color=color, min_games=min_games
         )
@@ -226,7 +266,9 @@ def opening_explorer(
                 fen=fen, eco=eco, color=color, path=path, position=position, opening=opening
             )
     else:
-        occurrences = position_occurrences(session, position.id, color=color, game_ids=games)
+        occurrences = position_occurrences(
+            session, position.id, color=color, game_ids=games, scope=scope
+        )
         if not occurrences:
             return _empty(
                 fen=fen, eco=eco, color=color, path=path, position=position, opening=opening
@@ -236,7 +278,7 @@ def opening_explorer(
 
     sliced_moves = moves[: max(limit, 0)] if limit else moves
     _annotate_continuations(session, sliced_moves, position.fen)
-    book = book_walk(session, position, color=color)
+    book = book_walk(session, position, color=color, scope=scope)
     return {
         "fen": position.fen,
         "eco": eco,
@@ -435,18 +477,26 @@ def _live_game_counts(
 
 
 def find_positions(
-    session: Session, fen: str, color: Color | None = None, limit: int = 20
+    session: Session,
+    fen: str,
+    color: Color | None = None,
+    limit: int = 20,
+    *,
+    speeds: Sequence[Speed] | None = None,
+    since: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """"Have I been here before?" — the games that reached a position, with outcomes.
 
     Newest first, and both the ordering and the cap are the database's: the initial array
     is every game the owner has, and hydrating nine and a half thousand occurrences to hand
-    back fourteen of them was most of what this cost.
+    back fourteen of them was most of what this cost. `speeds` and `since` narrow the games
+    the way they narrow `opening_explorer`, so the list under a filtered tree is its games.
     """
     position = find_position(session, fen)
     if position is None:
         return []
-    best = _ranked_occurrences(position.id, color=color)
+    scope = GameScope(speeds=tuple(speeds) if speeds else None, since=since)
+    best = _ranked_occurrences(position.id, color=color, scope=scope)
     statement = (
         select(best)
         .where(best.c.rank == 1)
@@ -544,6 +594,7 @@ def position_occurrences(
     *,
     color: Color | None = None,
     game_ids: Iterable[int] | None = None,
+    scope: GameScope = EVERY_GAME,
 ) -> list[Occurrence]:
     """Every time one of the owner's games passed through a position.
 
@@ -555,14 +606,18 @@ def position_occurrences(
     """
     occurrences: list[Occurrence] = []
     for chunk in _chunks(game_ids):
-        best = _ranked_occurrences(position_id, color=color, chunk=chunk)
+        best = _ranked_occurrences(position_id, color=color, chunk=chunk, scope=scope)
         statement = select(best).where(best.c.rank == 1)
         occurrences.extend(_occurrence(row) for row in session.execute(statement))
     return occurrences
 
 
 def _ranked_occurrences(
-    position_id: int, *, color: Color | None = None, chunk: Sequence[int] | None = None
+    position_id: int,
+    *,
+    color: Color | None = None,
+    chunk: Sequence[int] | None = None,
+    scope: GameScope = EVERY_GAME,
 ) -> Subquery:
     """The join rows of one position, each ranked against the others for its (game, ply).
 
@@ -609,7 +664,11 @@ def _ranked_occurrences(
             MoveEval,
             and_(MoveEval.run_id == AnalysisRun.id, MoveEval.ply == GamePosition.ply),
         )
-        .where(GamePosition.position_id == position_id, Game.owner_color.is_not(None))
+        .where(
+            GamePosition.position_id == position_id,
+            Game.owner_color.is_not(None),
+            *scope.conditions(),
+        )
     )
     if color is not None:
         statement = statement.where(Game.owner_color == color)
@@ -639,6 +698,7 @@ def book_walk(
     color: Color | None = None,
     max_depth: int = MAX_BOOK_DEPTH,
     min_games: int = BOOK_MIN_GAMES,
+    scope: GameScope = EVERY_GAME,
 ) -> dict[str, Any]:
     """Follow the owner's most-played continuation until it stops repeating.
 
@@ -682,7 +742,7 @@ def book_walk(
         if current is None:
             reason = "unknown position"
             break
-        counts = _book_continuations(session, current, color=color)
+        counts = _book_continuations(session, current, color=color, scope=scope)
         if not counts:
             reason = "no continuation"
             break
@@ -700,7 +760,9 @@ def book_walk(
         current = session.get(Position, move.next_position_id)
         depth += 1
 
-    supported = _supported_depth(session, visited, color=color, min_games=min_games)
+    supported = _supported_depth(
+        session, visited, color=color, min_games=min_games, scope=scope
+    )
     departs = len(line) > depth
     if supported < depth:
         # The moves are still the owner's most-played ones; what was not true is that they
@@ -711,7 +773,11 @@ def book_walk(
         departs = True
     line = line[:depth]
 
-    leaves = _departing_move(session, visited[: depth + 1], color=color) if departs else None
+    leaves = (
+        _departing_move(session, visited[: depth + 1], color=color, scope=scope)
+        if departs
+        else None
+    )
     if leaves is not None:
         line.append({"ply": depth, **leaves})
     elif departs and reason == "novelty":
@@ -733,7 +799,12 @@ def book_walk(
 
 
 def _supported_depth(
-    session: Session, visited: Sequence[int], *, color: Color | None, min_games: int
+    session: Session,
+    visited: Sequence[int],
+    *,
+    color: Color | None,
+    min_games: int,
+    scope: GameScope = EVERY_GAME,
 ) -> int:
     """How far down a walked line `min_games` of the owner's games actually got, together.
 
@@ -745,16 +816,22 @@ def _supported_depth(
     low, high = 0, len(visited) - 1
     while low < high:
         middle = (low + high + 1) // 2
-        if _line_games(session, visited[: middle + 1], color=color) >= min_games:
+        if _line_games(session, visited[: middle + 1], color=color, scope=scope) >= min_games:
             low = middle
         else:
             high = middle - 1
     return low
 
 
-def _line_games(session: Session, visited: Sequence[int], *, color: Color | None) -> int:
+def _line_games(
+    session: Session,
+    visited: Sequence[int],
+    *,
+    color: Color | None,
+    scope: GameScope = EVERY_GAME,
+) -> int:
     """How many of the owner's games stood in every one of these positions in turn."""
-    joined, clauses = _played_line(visited, color=color)
+    joined, clauses = _played_line(visited, color=color, scope=scope)
     statement = (
         select(func.count(func.distinct(LINE_ANCHOR.c.game_id)))
         .select_from(joined)
@@ -764,7 +841,11 @@ def _line_games(session: Session, visited: Sequence[int], *, color: Color | None
 
 
 def _departing_move(
-    session: Session, visited: Sequence[int], *, color: Color | None
+    session: Session,
+    visited: Sequence[int],
+    *,
+    color: Color | None,
+    scope: GameScope = EVERY_GAME,
 ) -> dict[str, Any] | None:
     """What the games that played a whole line played next, most-played first.
 
@@ -773,7 +854,7 @@ def _departing_move(
     not be a move anybody who followed the line this far ever made. `None` when every game
     that got here ended here.
     """
-    joined, clauses = _played_line(visited, color=color)
+    joined, clauses = _played_line(visited, color=color, scope=scope)
     statement = (
         select(
             LINE_ANCHOR.c.move_uci,
@@ -793,7 +874,7 @@ def _departing_move(
 
 
 def _played_line(
-    visited: Sequence[int], *, color: Color | None = None
+    visited: Sequence[int], *, color: Color | None = None, scope: GameScope = EVERY_GAME
 ) -> tuple[Join, list[ColumnElement[bool]]]:
     """Games that stood in every position of a line in turn, as a join and its conditions.
 
@@ -829,6 +910,7 @@ def _played_line(
     clauses: list[ColumnElement[bool]] = [
         LINE_ANCHOR.c.position_id == visited[-1],
         games.c.owner_color.is_not(None),
+        *scope.conditions(),
     ]
     if color is not None:
         clauses.append(games.c.owner_color == color)
@@ -1030,14 +1112,19 @@ def _next_positions(session: Session, position_id: int) -> dict[str, int]:
 
 
 def _book_continuations(
-    session: Session, position: Position, *, color: Color | None = None
+    session: Session,
+    position: Position,
+    *,
+    color: Color | None = None,
+    scope: GameScope = EVERY_GAME,
 ) -> list[Continuation]:
     """The moves out of one position for the walk: the book's rows, or a live count.
 
     Per step rather than per walk, because a line runs through hot positions near the root
-    and cold ones once it is deep enough that only a couple of games are left.
+    and cold ones once it is deep enough that only a couple of games are left. A narrowing
+    scope is always live — the book counted every game.
     """
-    if position.book_state == BOOK_BUILT:
+    if not scope.narrows and position.book_state == BOOK_BUILT:
         statement = select(PositionMove).where(PositionMove.position_id == position.id)
         if color is not None:
             statement = statement.where(PositionMove.owner_color == color)
@@ -1074,6 +1161,7 @@ def _book_continuations(
             GamePosition.position_id == position.id,
             GamePosition.move_uci.is_not(None),
             Game.owner_color.is_not(None),
+            *scope.conditions(),
         )
         .group_by(GamePosition.move_uci)
     )
@@ -1150,15 +1238,18 @@ def _tree_from_book(
 
 
 def eco_root(
-    session: Session, eco: str, color: Color | None = None
+    session: Session, eco: str, color: Color | None = None, *, scope: GameScope = EVERY_GAME
 ) -> tuple[Position | None, set[int] | None, list[dict[str, Any]]]:
     """The deepest position every game with this ECO code shares, and those games.
 
     An ECO code names an opening, not a position, and the games filed under one do not all
     reach the same square on the same ply. Walking from the start while every candidate
-    plays the same move lands on the position they genuinely have in common.
+    plays the same move lands on the position they genuinely have in common. The candidates
+    are already narrowed by `scope`, so the steps after them need not be.
     """
-    statement = select(Game.id).where(Game.owner_color.is_not(None), _eco_like(eco))
+    statement = select(Game.id).where(
+        Game.owner_color.is_not(None), _eco_like(eco), *scope.conditions()
+    )
     if color is not None:
         statement = statement.where(Game.owner_color == color)
     candidates = set(session.scalars(statement))

@@ -4875,6 +4875,63 @@ msgstr "Fortsetzungen"
 msgid "No game of yours goes any further than this position."
 msgstr "Keine deiner Partien geht über diese Stellung hinaus."
 
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "bullet"
+msgstr "Bullet"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "blitz"
+msgstr "Blitz"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "rapid"
+msgstr "Schnellschach"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "classical"
+msgstr "Klassisch"
+
+#. Short for "correspondence", inside a sentence
+#. Short for "correspondence", the speed of a game played over days
+#. Short for "correspondence", the speed of a game played over days
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+#: src/routes/stats/cards/TimeControlCard.tsx
+msgid "corr."
+msgstr "Fern."
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/explorer/components/ReferenceFilters.tsx
+msgid "speed"
+msgstr "Bedenkzeit"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/stats/StatsPage.tsx
+msgid "correspondence"
+msgstr "Fernschach"
+
+#. Chip marking the engine row for the move the game actually played
+#: src/routes/explorer/components/OwnFilters.tsx
+#: src/routes/game/components/MaiaPanel.tsx
+msgid "played"
+msgstr "gespielt"
+
+#: src/routes/explorer/components/OwnFilters.tsx
+msgid "Played within"
+msgstr "Gespielt im Zeitraum"
+
 #: src/routes/explorer/components/PositionNotes.tsx
 msgid "Your notes on this position"
 msgstr "Deine Notizen zu dieser Stellung"
@@ -4917,34 +4974,6 @@ msgstr "Notiz über MCP"
 #: src/routes/explorer/components/PositionNotes.tsx
 msgid "What is worth remembering about this position? Enter saves, Shift+Enter breaks the line."
 msgstr "Was ist an dieser Stellung merkenswert? Enter speichert, Shift+Enter bricht die Zeile um."
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "bullet"
-msgstr "Bullet"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "blitz"
-msgstr "Blitz"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "rapid"
-msgstr "Schnellschach"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "classical"
-msgstr "Klassisch"
-
-#: src/routes/explorer/components/ReferenceFilters.tsx
-msgid "speed"
-msgstr "Bedenkzeit"
 
 #: src/routes/explorer/components/ReferenceFilters.tsx
 #: src/routes/stats/cards/ProgressCard.tsx
@@ -5353,11 +5382,6 @@ msgstr "Die Stufen nebeneinander vergleichen"
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "Play {san} on the analysis board"
 msgstr "{san} auf dem Analysebrett spielen"
-
-#. Chip marking the engine row for the move the game actually played
-#: src/routes/game/components/MaiaPanel.tsx
-msgid "played"
-msgstr "gespielt"
 
 #: src/routes/game/components/MaiaPanel.tsx
 msgid "likely continuation"
@@ -7253,17 +7277,6 @@ msgstr "Repertoirezüge"
 #: src/routes/repertoire/RepertoirePage.tsx
 msgid "has a comment"
 msgstr "hat einen Kommentar"
-
-#: src/routes/stats/StatsPage.tsx
-msgid "correspondence"
-msgstr "Fernschach"
-
-#. Short for "correspondence", inside a sentence
-#. Short for "correspondence", the speed of a game played over days
-#: src/routes/stats/StatsPage.tsx
-#: src/routes/stats/cards/TimeControlCard.tsx
-msgid "corr."
-msgstr "Fern."
 
 #: src/routes/stats/StatsPage.tsx
 msgid "{analysedCount} analysed of {gameCount} games · {period} · {colours}"

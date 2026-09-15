@@ -1251,6 +1251,38 @@ def test_the_stored_book_answers_exactly_as_the_live_fold_does(
     assert [explorer.opening_explorer(session, **query) for query in queries] == live
 
 
+def test_the_tree_narrows_to_speeds_and_a_start_date(
+    library: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A narrowed tree counts only its games, even where the stored book counted them all."""
+    session = library.session
+    monkeypatch.setattr(explorer, "BOOK_MIN_OCCURRENCES", 2)
+    while explorer.rebuild_position_books(session):
+        pass
+    assert explorer.find_position(session, START_EPD).book_state == explorer.BOOK_BUILT
+
+    # 60+0 is the one bullet game, and it is the one d4.
+    bullet = explorer.opening_explorer(session, speeds=[Speed.BULLET])
+    assert bullet["totals"]["games"] == 1
+    assert [node["uci"] for node in bullet["moves"]] == ["d2d4"]
+    assert bullet["book_depth"] == 0
+
+    recent = explorer.opening_explorer(session, since=datetime(2026, 2, 12, tzinfo=UTC))
+    assert recent["totals"]["games"] == 3
+    keyed = {node["uci"]: node["games"] for node in recent["moves"]}
+    assert keyed == {"e2e4": 2, "d2d4": 1}
+
+    both = explorer.opening_explorer(
+        session, speeds=[Speed.BLITZ, Speed.RAPID], since=datetime(2026, 2, 12, tzinfo=UTC)
+    )
+    assert both["totals"]["games"] == 2
+    assert both["book_depth"] == 1
+    assert both["leaves_book_with"]["san"] == "c5"
+
+    rows = explorer.find_positions(session, START_EPD, speeds=[Speed.BULLET])
+    assert [row["game"]["id"] for row in rows] == [library["qg000004"].id]
+
+
 def test_find_positions_caps_the_newest_games_in_the_database(library: Library) -> None:
     """The ordering and the cap are SQL's: the tail is never fetched to be thrown away."""
     rows = explorer.find_positions(library.session, START_EPD, limit=2)

@@ -113,6 +113,7 @@ import type {
   SampleResponse,
   SearchResponse,
   Source,
+  Speed,
   StatsDashboardResponse,
   StatsResponse,
   StreamCreate,
@@ -416,15 +417,24 @@ export interface ExplorerQuery {
    * any deeper takes its name from an ancestor, and only the path says which one.
    */
   line?: string
+  /** Only games at these speeds; left out, every game counts. */
+  speed?: Speed[]
+  /** Only games played in the last this many days. */
+  days?: number
 }
 
 export const explore = (query: ExplorerQuery = {}) =>
   http.get<ExplorerResponse>('/explorer', { query: query as Record<string, QueryValue> })
 
-export const findPositions = (
-  fen: string,
-  query: { color?: 'white' | 'black'; limit?: number } = {},
-) => http.get<PositionOccurrence[]>('/explorer/positions', { query: { fen, ...query } })
+export interface PositionsQuery {
+  color?: 'white' | 'black'
+  limit?: number
+  speed?: Speed[]
+  days?: number
+}
+
+export const findPositions = (fen: string, query: PositionsQuery = {}) =>
+  http.get<PositionOccurrence[]>('/explorer/positions', { query: { fen, ...query } })
 
 /**
  * One position's strip of continuations, for a board that has left the game line.

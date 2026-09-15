@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 
 from backend.api.deps import SessionDep
 from backend.api.schemas import ExplorerResponse, GameBookEntry, PositionOccurrence
-from backend.db.enums import Color
+from backend.db.enums import Color, Speed
 from backend.services import explorer as explorer_service
 
 # The same cap the game's own shipped book uses, so the two paths cannot disagree about how
@@ -26,6 +27,15 @@ MAX_MOVES = 100
 # never a tree; a 422 would take the page away over a link someone edited by hand.
 UCI = re.compile(r"^[a-h][1-8][a-h][1-8][qrbn]?$")
 
+# The two lenses the tree and its game list share, spelled the way `/games` spells them.
+SpeedQuery = Annotated[
+    list[Speed] | None,
+    Query(description="repeatable: speed=blitz&speed=rapid counts only those games"),
+]
+DaysQuery = Annotated[
+    int | None, Query(ge=1, description="only games played in the last this many days")
+]
+
 
 @router.get("", response_model=ExplorerResponse, summary="The personal tree from a position")
 def explore(
@@ -39,6 +49,8 @@ def explore(
         str | None,
         Query(description="the UCI moves this position was reached by, `e2e4,e7e5`"),
     ] = None,
+    speed: SpeedQuery = None,
+    days: DaysQuery = None,
 ) -> Any:
     """Per continuation: frequency, score, average eval drop, and where book runs out."""
     return explorer_service.opening_explorer(
@@ -49,7 +61,14 @@ def explore(
         limit=limit,
         min_games=min_games,
         line=_line(line),
+        speeds=speed,
+        since=_since(days),
     )
+
+
+def _since(days: int | None) -> datetime | None:
+    """`days` as the moment it reaches back to. The window ends now, not at the newest game."""
+    return None if days is None else datetime.now(UTC) - timedelta(days=days)
 
 
 def _line(value: str | None) -> list[str]:
@@ -90,5 +109,9 @@ def find_positions(
     fen: Annotated[str, Query(description="a FEN or an EPD")],
     color: Color | None = None,
     limit: Annotated[int, Query(ge=1, le=MAX_MOVES)] = 20,
+    speed: SpeedQuery = None,
+    days: DaysQuery = None,
 ) -> list[Any]:
-    return explorer_service.find_positions(session, fen, color=color, limit=limit)
+    return explorer_service.find_positions(
+        session, fen, color=color, limit=limit, speeds=speed, since=_since(days)
+    )
