@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flag,
+  FlipVertical2,
   Keyboard,
   Lightbulb,
   Pause,
@@ -969,9 +970,19 @@ function BoardTools({
   moveEntry: BoardPanelProps['moveEntry']
 }) {
   const { t } = useLingui()
-  // One size for the whole group, so the four sit on one baseline in either row.
+  /*
+   * One shape for all four, and a square one.
+   *
+   * They are four buttons of equal weight sitting side by side, so anything that differs
+   * between them — a wider box, a smaller glyph, a text arrow beside three drawn icons —
+   * reads as a difference in kind that is not there. The compact box is `size-6` — the
+   * player row's own `h-6`, so the four fill the row they ride rather than floating inside
+   * it — with the icon centred and `p-0` overriding whatever padding the button brought
+   * with it (`BoardSettingsButton` has its own, for the row it used to stand in).
+   */
+  const icon = 'size-4'
   const shape = compact
-    ? 'flex flex-none items-center rounded border px-1 py-0.5 text-[0.6875rem]'
+    ? 'flex size-6 flex-none items-center justify-center rounded border p-0 max-md:p-0'
     : 'flex flex-none items-center rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5'
   const quiet = 'border-edge bg-elevated text-dim hover:text-ink'
   const lit = 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
@@ -979,7 +990,8 @@ function BoardTools({
   return (
     <>
       <BoardSettingsButton
-        className={compact ? 'rounded border px-1 py-0.5 text-dim' : undefined}
+        className={compact ? cn(shape, quiet) : undefined}
+        iconClassName={compact ? icon : undefined}
       />
 
       <button
@@ -990,9 +1002,10 @@ function BoardTools({
         title={t`Flip the board (F)`}
         className={cn(shape, quiet, !compact && 'text-soft')}
       >
-        {/* The arrow is the icon and stays put; only the word is language, and only the
-            control row has room for it. */}
-        {compact ? '⇅' : <span>⇅ {t`Flip`}</span>}
+        {/* A drawn icon rather than the `⇅` this button used to carry: an arrow pair is a
+            *swap*, and what this does is turn the board over — the mirror the icon draws.
+            The row's button keeps the arrow, where it sits beside its own word. */}
+        {compact ? <FlipVertical2 className={icon} aria-hidden /> : <span>⇅ {t`Flip`}</span>}
       </button>
 
       {/* While the engine is hidden the button's own title is a promise the screen has
@@ -1011,7 +1024,7 @@ function BoardTools({
         }
         className={cn(shape, hints ? lit : quiet)}
       >
-        {compact ? <Lightbulb className="size-3" aria-hidden /> : <Trans>Hints</Trans>}
+        {compact ? <Lightbulb className={icon} aria-hidden /> : <Trans>Hints</Trans>}
       </button>
 
       {/* Typing a move is another way of playing on the board, not something done to the
@@ -1026,7 +1039,7 @@ function BoardTools({
           title={t`Type a move (M) — Nf3, exd5, O-O — instead of dragging it`}
           className={cn(shape, moveEntry.open ? lit : quiet, !compact && 'px-2')}
         >
-          <Keyboard className={compact ? 'size-3' : 'size-3.5'} aria-hidden />
+          <Keyboard className={icon} aria-hidden />
         </button>
       ) : null}
     </>

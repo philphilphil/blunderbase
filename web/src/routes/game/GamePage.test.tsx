@@ -1820,8 +1820,12 @@ describe('the board’s controls', () => {
     // What the board is showing goes with the board, above it — icon-only at the row's own
     // height, each naming its key in its tooltip.
     for (const name of ['Board settings', 'Flip the board', 'Hints', 'Type a move (M)']) {
-      expect(within(top!).getByRole('button', { name })).toBeInTheDocument()
-      expect(controlRow()).not.toContainElement(within(top!).getByRole('button', { name }))
+      const button = within(top!).getByRole('button', { name })
+      expect(controlRow()).not.toContainElement(button)
+      // One square box for all four: they are buttons of equal weight side by side, and a
+      // wider one among them reads as a difference in kind that is not there.
+      expect(button).toHaveClass('size-6')
+      expect(button.querySelector('svg')).toHaveClass('size-4')
     }
     // Where you are and what it is worth, directly above the transport that changes it.
     expect(within(bottom!).getByText('ply 0 / 4')).toBeInTheDocument()
