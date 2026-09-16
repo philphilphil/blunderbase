@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -380,7 +380,7 @@ function ExplorerStub() {
   )
 }
 
-function renderPage(entry = '/games/14') {
+function renderPage(entry: string | { pathname: string; state: unknown } = '/games/14') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   })
@@ -463,8 +463,11 @@ describe('GamePage', () => {
     expect(within(screen.getByTestId('maia-engine-lines')).getByRole('button', { name: 'Analyse' })).toBe(
       analyse,
     )
-    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement
-    expect(settings?.parentElement?.contains(analyse)).toBe(false)
+    // The board's own toggles are not in that row either: they ride the top player row.
+    const toggles = screen.getByRole('button', { name: 'Flip the board' }).parentElement
+    expect(toggles?.contains(analyse)).toBe(false)
+    const [topRow] = screen.getAllByTestId('player-row')
+    expect(topRow!.contains(toggles!)).toBe(true)
   })
 
   it('moves Analyse… into the board row while the engine is hidden', async () => {
@@ -475,8 +478,10 @@ describe('GamePage', () => {
     // ⇧E takes the engine pane away, and asking is what a reader does next.
     expect(screen.queryByTestId('maia-engine-lines')).not.toBeInTheDocument()
     const analyse = screen.getByRole('button', { name: 'Analyse' })
-    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement
-    expect(settings?.parentElement?.contains(analyse)).toBe(true)
+    // The board row is the one holding the transport, which is where Analyse… stands in.
+    const row = screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!
+      .parentElement!
+    expect(row.contains(analyse)).toBe(true)
   })
 
   it('puts both players’ Lichess-style totals to the left of the evaluation chart', async () => {
@@ -759,7 +764,7 @@ describe('GamePage', () => {
 
     // Tabbed to rather than clicked, so the reader is driving from the keyboard and ↵ is
     // that button's: the board stays on the game rather than walking the engine's line.
-    const flip = screen.getByRole('button', { name: '⇅ Flip' })
+    const flip = screen.getByRole('button', { name: 'Flip the board' })
     flip.focus()
     await user.tab()
     flip.focus()
@@ -1799,6 +1804,62 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
     expect(screen.queryByRole('button', { name: 'Show the engine' })).not.toBeInTheDocument()
+  })
+})
+
+describe('the board’s controls', () => {
+  /** The row under the board: the one holding the transport. */
+  const controlRow = () =>
+    screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!.parentElement!
+
+  it('rides the toggles on the top player row and the readouts on the bottom one', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const [top, bottom] = screen.getAllByTestId('player-row')
+    // What the board is showing goes with the board, above it — icon-only at the row's own
+    // height, each naming its key in its tooltip.
+    for (const name of ['Board settings', 'Flip the board', 'Hints', 'Type a move (M)']) {
+      expect(within(top!).getByRole('button', { name })).toBeInTheDocument()
+      expect(controlRow()).not.toContainElement(within(top!).getByRole('button', { name }))
+    }
+    // Where you are and what it is worth, directly above the transport that changes it.
+    expect(within(bottom!).getByText('ply 0 / 4')).toBeInTheDocument()
+    expect(within(bottom!).getByText(/^[+−-]\d/)).toBeInTheDocument()
+    expect(controlRow()).not.toHaveTextContent('ply 0 / 4')
+  })
+
+  it('keeps the typed-move box in the row, under the button that opens it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const [top] = screen.getAllByTestId('player-row')
+    await user.click(within(top!).getByRole('button', { name: 'Type a move (M)' }))
+    const box = screen.getByRole('textbox', { name: 'Type a move' })
+    // The player row is one line with a name in it; the box is the width of a move, so it
+    // goes where there is room for it.
+    expect(controlRow()).toContainElement(box)
+  })
+
+  it('puts the rare doors behind ⋯, and nothing there on an ordinary game', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    // A library game opened from the library has neither a way back to the explorer nor a
+    // correspondence tree, so the row grows no menu at all.
+    expect(screen.queryByRole('button', { name: 'More for this game' })).not.toBeInTheDocument()
+
+    cleanup()
+    // The way back rides in router state, the way `ModelGames` puts it there.
+    renderPage({ pathname: '/games/14', state: { from: '/explorer?fen=start' } })
+    await screen.findByText('Scandinavian Defense')
+    // Arrived from the explorer: the way back is one click behind the ⋯ rather than a
+    // button competing with Analyse… for the row.
+    const more = await screen.findByRole('button', { name: 'More for this game' })
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument()
+    await user.click(more)
+    expect(screen.getByRole('menuitem', { name: '← Back to explorer' })).toBeInTheDocument()
   })
 })
 

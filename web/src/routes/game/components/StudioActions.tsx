@@ -4,18 +4,23 @@
  *
  * These lived in the titlebar, at the far end of a strip the reader's eye never goes to
  * while a game is being read: the whole screen below it is board and moves, and a reader
- * three plies into a model game had no way of knowing the door was there at all. They ride
- * in the board's control row now, as one more group in the band that says what to do to the
- * game — beside Analyse… and Note, which are the same kind of decision, and within
- * a hand's reach of the board they are about.
+ * three plies into a model game had no way of knowing the door was there at all. They are
+ * in the board's control row now, where the hand is.
  *
- * A component rather than a node built inside `GamePage` because it holds a react-query
- * mutation: the studio re-renders on every engine tick, and the pending and error states of
- * "Add to library" belong to the button rather than to the page that places it.
+ * Which of them is a button and which is a line in the ⋯ menu is decided by how often it is
+ * pressed. **Add to library** is the one affirmative act on a model game's screen and exists
+ * only while the game is one, so it is a lit chip in the row. The way back to the explorer
+ * and the tree behind a finished correspondence game are pressed once a session at most, and
+ * they are what `useStudioMenu` hands to `RowMenu` — a row that carried them as buttons was
+ * a row that wrapped.
+ *
+ * A component and a hook rather than nodes built inside `GamePage` because both hold
+ * react-query state: the studio re-renders on every engine tick, and the pending and error
+ * states of "Add to library" belong here rather than to the page that places it.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { SETTING_DEFAULTS } from '@/lib/api/appSettings'
 import {
@@ -27,6 +32,7 @@ import { CorrespondenceTreeDialog } from '@/routes/correspondence/components/Cor
 import { cn } from '@/lib/utils'
 
 import type { StudioGame } from '../GamePage'
+import type { RowMenuItem } from './RowMenu'
 
 /** The board row's button metrics — shared with everything else in that band. */
 const BUTTON = 'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5'
@@ -39,28 +45,50 @@ export function StudioActions({
   game: StudioGame
   backTo: string | null
 }) {
-  const tree = useCorrespondenceTree(game.kind === 'library' ? game.id : null)
-  if (game.kind === 'library' && !backTo && !tree.has) return null
-  return (
-    // A group of its own, so the row wraps it whole rather than splitting the door from the
-    // way back — the same rule every other group in that row is built on.
-    <div className="flex flex-none items-center gap-2 max-md:gap-1.5">
-      {game.kind === 'reference' ? (
-        <AddToLibrary source={game.source} id={game.id} backTo={backTo} />
-      ) : null}
-      {tree.has && game.kind === 'library' ? (
-        <CorrespondenceTreeButton gameId={game.id} />
-      ) : null}
-      {backTo ? (
-        <Link
-          to={backTo}
-          className={cn(BUTTON, 'border-edge bg-elevated text-soft hover:text-ink')}
-        >
-          <Trans>← Back to explorer</Trans>
-        </Link>
-      ) : null}
-    </div>
-  )
+  if (game.kind !== 'reference') return null
+  return <AddToLibrary source={game.source} id={game.id} backTo={backTo} />
+}
+
+/**
+ * The studio's rare doors, as rows of the control row's ⋯ — and the tree dialog one of them
+ * opens, which the page renders wherever it renders dialogs.
+ *
+ * A hook rather than a component because the menu is one list: the page folds these into
+ * whatever else belongs behind that ⋯, and a second ⋯ of the studio's own would be two
+ * menus in one row holding one item each.
+ */
+export function useStudioMenu(
+  game: StudioGame,
+  backTo: string | null,
+): { items: RowMenuItem[]; dialog: ReactNode } {
+  const navigate = useNavigate()
+  const [tree, setTree] = useState(false)
+  const gameId = game.kind === 'library' ? game.id : null
+  const correspondence = useCorrespondenceTree(gameId)
+
+  const items: RowMenuItem[] = []
+  if (correspondence.has && gameId !== null) {
+    items.push({
+      id: 'correspondence-tree',
+      label: <Trans>Correspondence tree</Trans>,
+      onSelect: () => setTree(true),
+    })
+  }
+  if (backTo) {
+    items.push({
+      id: 'back-to-explorer',
+      label: <Trans>← Back to explorer</Trans>,
+      onSelect: () => navigate(backTo),
+    })
+  }
+
+  return {
+    items,
+    dialog:
+      tree && gameId !== null ? (
+        <CorrespondenceTreeDialog gameId={gameId} onClose={() => setTree(false)} />
+      ) : null,
+  }
 }
 
 /**
@@ -81,29 +109,6 @@ function useCorrespondenceTree(gameId: number | null): { has: boolean } {
       gameId !== null &&
       (games.data?.games ?? []).some((candidate) => candidate.game_id === gameId),
   }
-}
-
-/**
- * The door into the months of work behind a finished correspondence game. Read-only: the
- * tree froze when the game did, and this screen is where the game is read, not where the
- * tree is edited.
- */
-function CorrespondenceTreeButton({ gameId }: { gameId: number }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={cn(BUTTON, 'border-edge bg-elevated text-soft hover:text-ink')}
-      >
-        <Trans>Correspondence tree</Trans>
-      </button>
-      {open ? (
-        <CorrespondenceTreeDialog gameId={gameId} onClose={() => setOpen(false)} />
-      ) : null}
-    </>
-  )
 }
 
 /**

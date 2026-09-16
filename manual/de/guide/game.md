@@ -7,6 +7,14 @@ markierten Zug, Pos1 und Ende an Anfang und Ende, die Leertaste spielt die Parti
 dreht das Brett, `[` und `]` öffnen die vorige und die nächste Partie deiner Liste. Die
 vollständige Tastenliste steht unter [Einstellungen](settings.md).
 
+Die Bedienelemente stehen rund um das Brett statt darunter. Die Zeile mit dem Namen deines
+Gegners, über dem Brett, trägt die vier Dinge, die ändern, was das Brett *zeigt*:
+Bretteinstellungen, drehen, Hinweise und die Tastatur zum Tippen eines Zuges. Die Zeile mit
+deinem eigenen Namen, darunter, trägt, wo du in der Partie stehst und was die Stellung wert
+ist. Die Zeile darunter ist das, was du mit der Partie machst – analysieren, notieren, üben –
+und ganz rechts die Schaltflächen, mit denen du durch sie gehst. Was eine Partie selten
+braucht, etwa der Weg zurück zum Explorer, liegt hinter dem **⋯**.
+
 Die Leiste oben nennt die Eröffnung, die Herkunft der Partie, ihre Bedenkzeit und den
 Ausgang. Bei einer Lichess- oder Chess.com-Partie ist der Quellen-Chip dort ein Link, der
 die Partie auf der Seite in einem neuen Tab öffnet; auf dem Telefon ist derselbe Link der
@@ -80,8 +88,8 @@ Spiel einen Zug auf dem Brett, und du bist in einer Variante; `Esc` bringt dich 
 zurück. **Diese Variante anheften** speichert sie mit der Partie, sodass sie beim nächsten
 Mal wieder da ist und im PGN-Export steht.
 
-Du kannst die Züge auch tippen. `M`, oder die Tastatur-Schaltfläche neben **Hinweise**,
-öffnet ein kleines Feld unter dem Brett: Tipp `Sf3`, `exd5`, `O-O` oder `e8=D` – oder
+Du kannst die Züge auch tippen. `M`, oder die Tastatur-Schaltfläche neben **Hinweise** über
+dem Brett, öffnet ein kleines Feld in der Zeile darunter: Tipp `Sf3`, `exd5`, `O-O` oder `e8=D` – oder
 schlicht `g1f3` –, und der Zug wird gespielt, sobald er nur noch eines bedeuten kann; eine
 ganze Variante geht so als eine Folge von Zügen hinein. Schlagzeichen, Schach und `=` sind
 freiwillig, die englischen Figurenbuchstaben gehen genauso (`Nf3`), und ein Zug, den zwei
@@ -169,9 +177,9 @@ in der Spalte **Eröffnung**.
 
 ## Der Fernschachbaum { #the-correspondence-tree }
 
-Eine Partie, die du im Fernschach gespielt hast, trägt in der Titelleiste die Schaltfläche
-**Fernschachbaum**. Sie öffnet den Baum, der während der Partie entstanden ist – die
+Eine Partie, die du im Fernschach gespielt hast, trägt hinter dem **⋯** unter dem Brett den
+Eintrag **Fernschachbaum**. Er öffnet den Baum, der während der Partie entstanden ist – die
 Zugkandidaten, die Kommentare und das, was die Engines zu jeder Stellung gesagt haben – zum
-Lesen, nicht zum Ändern: Der Baum ist mit der Partie eingefroren. Die Schaltfläche gibt es
+Lesen, nicht zum Ändern: Der Baum ist mit der Partie eingefroren. Den Eintrag gibt es
 nur bei diesen Partien und nur, solange der Fernschachmodus an ist; der Modus steht unter
 [Fernschach](correspondence.md).

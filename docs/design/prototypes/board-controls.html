@@ -1,0 +1,690 @@
+<!doctype html>
+<!-- PROTOTYPE — the control row under the game board, and six ways to un-crowd it.
+     Baseline first ("Today", as BoardPanel.tsx draws it), then six concepts and a proposal,
+     each drawn as a believable game view at two window sizes and as a phone. The harness
+     switches the states that crowd the row (walking a line, a run in progress, ⇧E, a
+     held-back game, a model game, practising) so every concept is judged on the same worst
+     case. Tokens are the real ones from web/src/index.css. Static HTML, no dependencies;
+     the popovers, the mode segment and the ⋯ menus work enough to judge them.
+     Delete or absorb after review. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blunderbase — board controls</title>
+  <link rel="icon" href="../brand/favicon.png" />
+  <script>
+    (() => {
+      const q = new URLSearchParams(location.search).get('theme')
+      let saved = null
+      try { saved = localStorage.getItem('blunderbase-prototype-theme') } catch {}
+      const theme = ['light', 'dark'].includes(q) ? q : ['light', 'dark'].includes(saved) ? saved
+        : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      document.documentElement.dataset.theme = theme
+    })()
+  </script>
+  <style>
+    /* --- tokens: the app's own, dark first, light overrides (web/src/index.css) --- */
+    :root{color-scheme:dark;
+      --void:#1d1e1f;--panel:#292a2a;--surface:#232424;--elevated:#303131;--raised:#343535;--selected:#29445b;
+      --hairline:#3a3c3b;--line:#3e4040;--edge:#474949;--edge-strong:#555756;--edge-hover:#777975;
+      --text:#eeeeea;--body:#d8d8d3;--muted:#b6b5b0;--dim:#a3a29c;--dim-2:#9a998f;--faint:#8b8a82;--faint-2:#7c7b73;
+      --accent:#83b7e3;--accent-ink:#10202c;--blunder:#ee766e;--mistake:#dda05a;--inaccuracy:#cbb96a;--good:#78b98c;
+      --brilliant:#b098d7;--deep:#c1adde;--info:#8fb6c9;
+      --arrow-engine:#99b9d1;--arrow-maia:#b7a5cf;
+      --board-light:#a9b2b8;--board-dark:#616d75;
+      --track:#3a3c3b;--row-active:#2f3030;--cell:#2b2c2c;--eval-track:#3a3c3b;
+      --side-white:#e6e6e1;--side-black:#232424;--side-black-edge:#555655;
+      --graph-bg:#3a3c3b;--graph-grid:#4e5150;--chip-info:#2a3540;--chip-info-edge:#46586a;
+      --shadow:rgb(0 0 0 / .5)}
+    html[data-theme="light"]{color-scheme:light;
+      --void:#e7e7e4;--panel:#f2f2f0;--surface:#fafaf8;--elevated:#f4f4f1;--raised:#ebebe8;--selected:#dbe6f2;
+      --hairline:#dcdcd8;--line:#d1d1cd;--edge:#c5c5c0;--edge-strong:#b6b6b1;--edge-hover:#91918c;
+      --text:#202020;--body:#3b3b39;--muted:#5c5c59;--dim:#71716e;--dim-2:#787874;--faint:#8a8a86;--faint-2:#9a9a95;
+      --accent:#245f9e;--accent-ink:#ffffff;--blunder:#bb3e35;--mistake:#9b6819;--inaccuracy:#7d6a12;--good:#34724a;
+      --brilliant:#7054a5;--deep:#63499a;--info:#3a6274;
+      --arrow-engine:#3d6790;--arrow-maia:#79639c;
+      --board-light:#d8dde0;--board-dark:#8f9da5;
+      --track:#dededa;--row-active:#e9e9e5;--cell:#f2f2ef;--eval-track:#d7d7d3;
+      --side-white:#ffffff;--side-black:#3a3b3b;--side-black-edge:#3a3b3b;
+      --graph-bg:#dcdcd8;--graph-grid:#c6c6c1;--chip-info:#e7eef6;--chip-info-edge:#b9cde2;
+      --shadow:rgb(30 30 28 / .16)}
+
+    *{box-sizing:border-box}html,body{height:100%;margin:0}
+    body{display:flex;flex-direction:column;min-width:320px;overflow:hidden;color:var(--text);background:var(--void);font:13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+    button{font:inherit;cursor:pointer;color:inherit}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+    /* ---- harness ------------------------------------------------------------------ */
+    .harness{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--edge-strong)}
+    .hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .hrow .title{font-weight:650;letter-spacing:-.01em}.hrow .title small{color:var(--dim);font-weight:400;margin-left:8px}
+    .tabs{display:inline-flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden;background:var(--elevated)}
+    .tabs button{height:28px;padding:0 11px;border:0;border-right:1px solid var(--edge);background:none;color:var(--muted);font-size:12px;white-space:nowrap}
+    .tabs button:last-child{border-right:0}.tabs button:hover{color:var(--text);background:var(--raised)}
+    .tabs button.on{color:var(--text);background:var(--selected)}.tabs button .n{color:var(--faint);font-size:10px;margin-right:5px}
+    .tabs button.rec{color:var(--accent)}
+    .lab{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-right:2px}
+    .tog{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;padding:3px 7px;border:1px solid var(--edge);border-radius:6px;background:var(--elevated)}
+    .tog input{margin:0}.tog.on{color:var(--text);border-color:var(--edge-strong)}
+    .tool{height:28px;min-width:30px;padding:0 9px;border:1px solid var(--edge);border-radius:6px;color:var(--body);background:var(--elevated)}.tool:hover{border-color:var(--edge-strong);background:var(--raised)}
+    .spacer{flex:1}
+    select{height:28px;padding:0 6px;border:1px solid var(--edge);border-radius:6px;color:var(--text);background:var(--elevated);font:inherit}
+
+    /* the note card for the current concept */
+    .note{flex:none;display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1.2fr;gap:14px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--edge-strong);font-size:12px;line-height:1.45;color:var(--body)}
+    .note h3{margin:0 0 3px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+    .note p{margin:0}.note b{color:var(--text);font-weight:600}.note .cost{color:var(--good)}.note .cost.bad{color:var(--mistake)}
+    .note .readout{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim)}
+
+    .stage{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;gap:16px;align-items:flex-start}
+    .frame{flex:none;position:relative;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);border:1px solid var(--edge-strong);border-radius:8px;box-shadow:0 24px 60px -30px var(--shadow)}
+    .frame .cap{position:absolute;right:8px;bottom:6px;z-index:3;font:10px ui-monospace,Menlo,monospace;color:var(--faint);background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:1px 5px}
+
+    /* ---- app chrome ------------------------------------------------------------- */
+    .tb{height:42px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid var(--edge-strong);background:var(--panel)}
+    .brand{display:flex;align-items:center;gap:7px;font-weight:650;letter-spacing:-.01em}.brand img{width:18px;height:18px}
+    .divider{width:1px;height:19px;background:var(--line)}.crumb{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crumb b{color:var(--text);font-weight:500}
+    .help{width:22px;height:22px;display:grid;place-items:center;border:1px solid var(--edge);border-radius:50%;color:var(--dim);font-size:11px}
+    .ws{flex:1;min-height:0;display:flex}
+    .nav{width:176px;flex:none;display:flex;flex-direction:column;gap:1px;padding:11px 8px;border-right:1px solid var(--edge-strong);background:var(--panel)}
+    .nav .side-label{margin:6px 8px 4px;color:var(--faint);font-size:10px;font-weight:600}
+    .nav a{display:grid;grid-template-columns:18px 1fr;align-items:center;gap:7px;min-height:27px;padding:0 8px;border-radius:4px;color:var(--body);font-size:12px}.nav a.active{color:var(--text);background:var(--selected)}
+    .nav .icon{color:var(--dim);text-align:center;font-size:12px}
+    .main{flex:1;min-width:0;display:flex;flex-direction:column}
+    .hb{height:42px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--edge-strong);background:var(--surface);white-space:nowrap;overflow:hidden;font-size:12px}
+    .hb .nm{color:var(--text);font-weight:600;font-size:13px}.hb .q{color:var(--faint)}
+    .eco{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);border:1px solid var(--edge);border-radius:4px;padding:1px 5px}
+    .src{display:inline-flex;align-items:center;gap:5px;padding:1px 7px;border-radius:4px;background:var(--chip-info);border:1px solid var(--chip-info-edge);color:var(--info);font-size:11px}
+    .runchip{display:inline-flex;gap:5px;padding:1px 7px;border-radius:4px;border:1px solid color-mix(in srgb,var(--deep) 40%,transparent);color:var(--deep);font-size:11px}
+    .cols{flex:1;min-height:0;display:flex}
+
+    /* ---- the board column ----------------------------------------------------------- */
+    .bcol{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 14px;background:var(--surface);width:calc(var(--bw) + var(--bx) + var(--rw) + 28px);min-width:0;overflow:hidden}
+    .prow{height:24px;flex:none;display:flex;align-items:center;gap:8px;padding-left:var(--bx);font-size:12px;white-space:nowrap;min-width:0}
+    .prow .nm{color:var(--body);overflow:hidden;text-overflow:ellipsis;min-width:0}.prow .nm.me{color:var(--text);font-weight:500}
+    .prow .r{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim)}
+    .prow .cap{font-size:15px;line-height:1;letter-spacing:-1px;color:var(--dim-2)}.prow .bal{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted)}.prow .bal.down{color:var(--faint)}
+    .sd{width:8px;height:8px;border-radius:2px;flex:none}.sd.w{background:var(--side-white)}.sd.b{background:var(--side-black);border:1px solid var(--side-black-edge)}
+    .brow{display:flex;gap:10px;align-items:stretch;flex:none}
+    .evb{width:14px;flex:none;border-radius:3px;overflow:hidden;background:var(--eval-track);display:flex;flex-direction:column}
+    .evb .b{background:var(--side-black);flex:1}.evb .w{background:var(--side-white);height:55%}
+    .board{position:relative;width:var(--bw);height:var(--bw);flex:none;border-radius:3px;overflow:hidden;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);font-size:calc(var(--bw) / 9.5)}
+    .board .sq{display:flex;align-items:center;justify-content:center;line-height:1;position:relative}
+    .board .sq.l{background:var(--board-light)}.board .sq.d{background:var(--board-dark)}
+    .board .sq.last{box-shadow:inset 0 0 0 100vmax color-mix(in srgb,var(--accent) 35%,transparent)}
+    .board .sq.mark{box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--blunder) 85%,transparent)}
+    .board .pw{color:#f4f4f0;text-shadow:0 0 2px #222,0 0 1px #000}.board .pb{color:#1c1c1c;text-shadow:0 0 1px #999}
+    .board svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+    .board .quiet-tag{position:absolute;right:6px;top:6px;font:10px ui-monospace,Menlo,monospace;color:var(--dim);background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:1px 5px}
+    .rail{width:28px;flex:none;display:flex;flex-direction:column;gap:4px;align-items:center}
+    .rail .rule{width:18px;height:1px;margin:2px 0}
+
+    /* the control row and its vocabulary — the app's own metrics at 100 % */
+    .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:28px;flex:none;position:relative}
+    .grp{display:inline-flex;align-items:center;gap:8px;flex:none;position:relative}
+    .b{height:28px;padding:0 10px;border:1px solid var(--edge);border-radius:6px;background:var(--elevated);color:var(--muted);font-size:12px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex:none;position:relative}
+    .b:hover{color:var(--text)}.b .i{font-size:12px;line-height:1}.b .k{margin-left:2px;font:10px ui-monospace,Menlo,monospace;color:var(--faint)}
+    .b.sq{width:28px;padding:0;justify-content:center}
+    .b.on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+    .b.purple{color:var(--brilliant);border-color:color-mix(in srgb,var(--brilliant) 30%,transparent);background:color-mix(in srgb,var(--brilliant) 10%,transparent)}
+    .b.mini{height:22px;padding:0 7px;font-size:11px;border-radius:5px}.b.mini.sq{width:22px;padding:0}
+    .b.pill{padding-right:4px}.b .stop{width:16px;height:16px;display:grid;place-items:center;border-radius:3px;color:var(--dim);font-size:8px}.b .stop:hover{background:var(--raised);color:var(--blunder)}
+    .spin{display:inline-block;width:10px;height:10px;border:1.5px solid var(--faint);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .rule{width:1px;height:20px;background:var(--edge);flex:none}
+    .sp{flex:1;min-width:0}
+    .rd{font:11px ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;color:var(--dim);white-space:nowrap}
+    .sc{font:11px ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;color:var(--text);background:var(--chip-info);border:1px solid var(--edge);border-radius:4px;padding:2px 6px;white-space:nowrap}
+    .sc.purple{color:var(--brilliant);border-color:color-mix(in srgb,var(--brilliant) 35%,transparent);background:color-mix(in srgb,var(--brilliant) 10%,transparent)}
+    .tg{display:inline-flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden;background:var(--elevated);flex:none}
+    .tg button{height:26px;padding:0 9px;border:0;border-right:1px solid var(--edge);background:none;color:var(--muted);font-size:12px;white-space:nowrap}
+    .tg button:last-child{border-right:0}.tg button:hover{background:var(--selected);color:var(--text)}.tg button:disabled{color:var(--faint-2);cursor:default}.tg button:disabled:hover{background:none}
+    .tg.big button{height:32px;padding:0 12px;font-size:14px}
+    .seg{display:inline-flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden;background:var(--elevated);flex:none}
+    .seg button{height:26px;padding:0 10px;border:0;border-right:1px solid var(--edge);background:none;color:var(--muted);font-size:12px;white-space:nowrap}
+    .seg button:last-child{border-right:0}.seg button.on{background:var(--selected);color:var(--text)}.seg button .k{margin-left:4px;font:10px ui-monospace,Menlo,monospace;color:var(--faint)}
+    .modelab{font-size:11px;color:var(--dim);white-space:nowrap}
+
+    /* popovers: the ⋯ menu, the Actions palette, the type-a-move box */
+    /* Menus open upward: the row is the last thing in a column that clips, exactly as the
+       app's column does, so downward would be under the fold. Radix would flip the same way. */
+    .pop{display:none;position:absolute;left:0;bottom:calc(100% + 5px);z-index:6;min-width:210px;padding:4px;background:var(--elevated);border:1px solid var(--edge-strong);border-radius:6px;box-shadow:0 10px 30px -10px var(--shadow)}
+    .pop.right{left:auto;right:0}
+    .grp.open .pop,.b-wrap.open .pop{display:block}
+    .pop .h{padding:6px 8px 3px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+    .pop .it{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;font-size:12px;color:var(--body);white-space:nowrap;cursor:pointer}
+    .pop .it:hover{background:var(--raised);color:var(--text)}.pop .it .i{width:14px;text-align:center;color:var(--dim)}
+    .pop .it .k{margin-left:auto;font:10px ui-monospace,Menlo,monospace;color:var(--faint);border:1px solid var(--edge);border-radius:3px;padding:0 4px;min-width:16px;text-align:center}
+    .pop .it.on{color:var(--accent)}.pop .sep{height:1px;margin:4px 6px;background:var(--line)}
+    .b-wrap{position:relative;display:inline-flex;flex:none}
+    .minput{height:28px;width:120px;padding:0 8px;border:1px solid var(--accent);border-radius:6px;background:var(--surface);color:var(--text);font:12px ui-monospace,Menlo,monospace}
+
+    /* ---- the right column ---------------------------------------------------------- */
+    .split{width:1px;flex:none;background:var(--edge-strong)}
+    .rcol{flex:1;min-width:0;display:grid;grid-template-columns:42% 58%;background:var(--surface)}
+    .pbar{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--edge-strong);background:var(--surface)}
+    .pbar .t{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim-2)}.pbar .s{font-size:12px;color:var(--text);margin-top:2px}
+    .pbar .acts{margin-left:auto;display:flex;gap:6px}
+    .tstrip{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:0 10px;height:36px;border-bottom:1px solid var(--edge-strong);background:var(--panel)}
+    .band{grid-column:1/-1;display:grid;grid-template-columns:27% 73%;height:150px;border-bottom:1px solid var(--edge-strong)}
+    .band .pane+.pane{border-left:1px solid var(--edge-strong)}
+    .pane{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+    .strip{height:30px;flex:none;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);font-size:11px;color:var(--dim);white-space:nowrap}
+    .strip .t{padding:0 4px;height:30px;display:inline-flex;align-items:center;color:var(--dim);cursor:pointer}.strip .t.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+    .strip .sp{flex:1}.strip .b.mini{height:22px}
+    .lines{padding:6px 10px;display:grid;gap:4px;font:11px ui-monospace,Menlo,monospace;color:var(--body)}
+    .lines .ln{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:3px 6px;border-radius:4px;background:var(--cell);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .lines .ln b{color:var(--text);font-weight:600}.lines .ln .pv{overflow:hidden;text-overflow:ellipsis}
+    .maia{padding:6px 10px;display:grid;gap:4px;font-size:11px}.maia div{display:flex;gap:8px;align-items:center}.maia .m{font-family:ui-monospace,Menlo,monospace;color:var(--text);width:38px}
+    .maia .bar{flex:1;height:5px;border-radius:3px;background:var(--track);overflow:hidden}.maia .bar i{display:block;height:100%;background:var(--deep)}.maia .p{width:30px;text-align:right;color:var(--dim);font-family:ui-monospace,Menlo,monospace}
+    .moves{border-right:1px solid var(--edge-strong)}
+    .mv{flex:1;min-height:0;overflow:hidden;font:12px ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+    .mv .row{display:grid;grid-template-columns:30px 1fr 1fr;height:24px;align-items:center;padding:0 8px;color:var(--body)}
+    .mv .row .n{color:var(--faint)}.mv .row.cur{background:var(--row-active)}.mv .row .c{color:var(--text);font-weight:600}
+    .mv .g{display:inline-block;margin-left:5px;font-size:9px;padding:0 3px;border-radius:3px;font-weight:700}
+    .g.bl{background:var(--blunder);color:#1a0605}.g.mi{background:var(--mistake);color:#2b1d09}.g.in{background:var(--inaccuracy);color:#2b2409}
+    .mv .line{padding:2px 8px 2px 38px;font-size:11px;color:var(--brilliant)}
+    .notes .body{flex:1;min-height:0;padding:8px 10px;font-size:12px;color:var(--body);line-height:1.45;overflow:hidden}
+    .notes .card{padding:7px 9px;border:1px solid var(--line);border-radius:5px;background:var(--elevated)}.notes .card .m{font:10px ui-monospace,Menlo,monospace;color:var(--faint);margin-bottom:3px}
+    .composer{flex:none;margin:0 10px 10px;padding:6px 9px;border:1px solid var(--edge);border-radius:6px;background:var(--surface);font-size:11px;color:var(--faint)}
+    .graph{grid-column:1/-1;height:110px;border-top:1px solid var(--edge-strong);display:flex;flex-direction:column}
+    .graph .plot{flex:1;min-height:0;background:var(--graph-bg)}.graph svg{display:block;width:100%;height:100%}
+
+    /* ---- the phone ----------------------------------------------------------------- */
+    .frame.phone{width:375px;height:740px;--bw:355px}
+    .ph-tb{height:42px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--edge-strong);background:var(--panel);font-size:12px}
+    .ph-head{flex:none;padding:6px 10px;border-bottom:1px solid var(--edge-strong);font-size:12px;display:grid;gap:3px}
+    .ph-head .l1{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}.ph-head .l1 .x{color:var(--faint);margin:0 4px}
+    .ph-head .l2{display:flex;gap:8px;color:var(--dim);font:11px ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden}.ph-head .l2 b{color:var(--text);font-weight:500}
+    .ph-body{flex:1;min-height:0;display:flex;flex-direction:column}
+    .ph-boardwrap{flex:none;padding:8px 10px 0;display:flex;justify-content:center}
+    .ph-ctl{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;position:relative}
+    .ph-ctl .b{height:32px;padding:0 12px}.ph-ctl .b.sq{width:32px;padding:0}
+    .ph-ctl .grp{gap:6px}.ph-ctl .grp.first{order:-1;width:100%}
+    .ph-ctl .rule{display:none}.ph-ctl .sp{display:none}
+    .ph-tabs{height:40px;flex:none;display:flex;align-items:stretch;border-top:1px solid var(--edge-strong);border-bottom:1px solid var(--edge-strong);background:var(--panel)}
+    .ph-tabs .t{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--dim)}.ph-tabs .t.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+    .ph-pane{flex:1;min-height:0;overflow:hidden;position:relative}
+    .ph-pane .floor{position:absolute;left:0;right:0;bottom:0;padding:3px 8px;font:10px ui-monospace,Menlo,monospace;color:var(--faint);background:var(--panel);border-top:1px dashed var(--edge)}
+    .ph-pbar{flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--edge-strong);font-size:11px}
+    .ph-pbar .acts{margin-left:auto;display:flex;gap:5px}.ph-pbar .b.mini{height:24px}
+    .lines-tag{position:absolute;right:10px;top:-9px;font:10px ui-monospace,Menlo,monospace;color:var(--mistake);background:var(--surface);padding:0 4px}
+
+    /* ---- the closing recommendation --------------------------------------------- */
+    .verdict{flex:none;padding:10px 16px 12px;border-top:1px solid var(--edge-strong);background:var(--panel);font-size:12px;line-height:1.5;color:var(--body);display:grid;grid-template-columns:1fr 1fr;gap:6px 24px}
+    .verdict h3{grid-column:1/-1;margin:0 0 2px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+    .verdict p{margin:0}.verdict b{color:var(--text);font-weight:600}
+  </style>
+</head>
+<body>
+<div class="harness">
+  <div class="hrow">
+    <span class="title">Board controls <small>the row under the board, and where else it could go</small></span>
+    <div class="spacer"></div>
+    <span class="lab">Window</span>
+    <select id="win">
+      <option value="1180x700">1180 × 700 — a 13″ laptop</option>
+      <option value="1440x860">1440 × 860 — a desk monitor</option>
+      <option value="1100x640">1100 × 640 — short, near the floor</option>
+    </select>
+    <button class="tool" onclick="toggleTheme()" title="Theme">◐</button>
+  </div>
+  <div class="hrow">
+    <div class="tabs" id="ctabs"></div>
+  </div>
+  <div class="hrow">
+    <span class="lab">State</span>
+    <label class="tog"><input type="checkbox" data-s="line" checked> walking a line</label>
+    <label class="tog"><input type="checkbox" data-s="run" checked> a run in progress</label>
+    <label class="tog"><input type="checkbox" data-s="quiet" checked> engine hidden (⇧E)</label>
+    <label class="tog"><input type="checkbox" data-s="held" checked> held-back game</label>
+    <label class="tog"><input type="checkbox" data-s="explorer" checked> opened from the explorer</label>
+    <label class="tog"><input type="checkbox" data-s="model"> model game</label>
+    <label class="tog"><input type="checkbox" data-s="practice"> practising</label>
+    <label class="tog"><input type="checkbox" data-s="typing"> type-a-move box open</label>
+  </div>
+</div>
+
+<div class="note" id="note"></div>
+<div class="stage" id="stage"></div>
+
+<div class="verdict" id="verdict">
+  <h3>Recommendation</h3>
+  <p><b>Build the proposal: concept 2 (above and below) with concept 1's ⋯ menu.</b> The four
+  toggles ride the top player row and the ply and score ride the bottom one — both rows exist
+  already, are two-thirds empty and cost the board nothing — so the row under the board is only
+  actions on the left and the transport on the right. The rare studio extras (Back to explorer,
+  the correspondence tree, Copy PGN) go behind ⋯, and the things that exist only in a state
+  (Back to game, Show the engine, Add to library, a running run) stay as tinted chips in that
+  state. Every key is unchanged and every frequent control keeps its word.</p>
+  <p>Why not the bolder ones: <b>4</b> gives the biggest board (about 2.25 rem) but takes the
+  transport out of the board column and cannot wrap the bottom player row, so it needs ⋯ as a
+  safety net and a habit change; worth revisiting if the row is still the limiting height on
+  the owner's own window. <b>5</b> (modes) is the clearest screen but the largest change and
+  makes a modeless page modal. <b>3</b> and <b>6</b> hide frequent controls behind glyphs or a
+  menu. On the phone the proposal is today's two rows with icon toggles and ⋯, which is what
+  makes the worst case fit the two lines the phone's board budget assumes.</p>
+</div>
+
+<script>
+/* ------------------------------------------------------------------------------------
+   The harness state: what is going on in the game, which is what decides what the row
+   holds. Defaults are the crowded case the row is being redesigned for. */
+const S = { line: true, run: true, quiet: true, held: true, explorer: true, model: false, practice: false, typing: false, hints: true }
+let concept = 'today'
+let modeOverride = null   // concept 5's segment, when clicked
+let win = [1180, 700]
+
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+  document.documentElement.dataset.theme = next
+  try { localStorage.setItem('blunderbase-prototype-theme', next) } catch {}
+}
+
+/* ---- pieces of the row ------------------------------------------------------------ */
+const esc = (s) => s.replace(/"/g, '&quot;')
+function b(txt, o = {}) {
+  const cls = ['b', o.cls || '', txt ? '' : 'sq', o.mini ? 'mini' : ''].join(' ')
+  const title = o.title || (txt || o.name || '') + (o.key ? ` (${o.key})` : '')
+  return `<button class="${cls}" title="${esc(title)}" ${o.attr || ''}>${o.icon ? `<span class="i">${o.icon}</span>` : ''}${txt ? `<span>${txt}</span>` : ''}${o.showKey && o.key ? `<span class="k">${o.key}</span>` : ''}</button>`
+}
+const ICON = { settings: '⚙', flip: '⇅', hints: '◐', type: '⌨', note: '✎', practise: '⚔', analyse: '◌', eye: '◉', back: '↶', more: '⋯', add: '+', explorer: '←', pgn: '⎘', tree: '⌥' }
+
+/* the four board toggles, in three weights: with words, icon-only, and small for a player row */
+function toggles(variant) {
+  const mini = variant === 'mini'
+  const words = variant === 'words'
+  const on = (k) => (S.hints && k === 'hints') || (S.typing && k === 'type') ? 'on' : ''
+  const parts = [
+    b(words ? '' : '', { icon: ICON.settings, name: 'Board settings', key: 'S', mini }),
+    b(words ? 'Flip' : '', { icon: ICON.flip, name: 'Flip the board', key: 'F', mini }),
+    b(words ? 'Hints' : '', { icon: words ? '' : ICON.hints, name: 'Hints', key: 'H', mini, cls: on('hints') }),
+  ]
+  parts.push(b('', { icon: ICON.type, name: 'Type a move', key: 'M', mini, cls: on('type') }))
+  if (S.typing && !mini) parts.push(`<input class="minput" value="Nf3" placeholder="Nf3, exd5, O-O">`)
+  return parts.join('')
+}
+function analyse(o = {}) {
+  if (S.model) return ''
+  if (S.run) {
+    if (o.iconOnly) return `<button class="b sq" title="Analysing 42% · d24 · 2 lines — click to stop"><span class="spin"></span></button>`
+    return `<button class="b pill ${o.mini ? 'mini' : ''}" title="Analysing · d24 · 2 lines" disabled style="cursor:default"><span class="spin"></span><span>42%</span><span class="stop" title="Stop this analysis">■</span></button>`
+  }
+  return b(o.iconOnly ? '' : 'Analyse', { icon: ICON.analyse, name: 'Analyse', key: 'A', mini: o.mini, title: 'Choose an engine, a limit and the moves to analyse (A)' })
+}
+/* Analyse rides the row only while ⇧E has taken the engine pane away; otherwise it is in the pane's strip */
+const analyseInRow = (o) => (S.quiet && !S.practice ? analyse(o) : '')
+const note = (o = {}) => (S.model ? '' : b(o.iconOnly ? '' : 'Note', { icon: ICON.note, name: 'Write a note about this position', key: 'N', mini: o.mini }))
+const backToGame = (o = {}) => (S.line && !S.practice ? b(o.depth ? 'Back to game · +3' : 'Back to game', { icon: ICON.back, cls: 'purple', key: 'Esc', mini: o.mini, title: 'Leave the analysis line and go back to the game (Esc)' }) : '')
+const practise = (o = {}) => (S.practice ? '' : b(o.iconOnly ? '' : 'Practise', { icon: ICON.practise, name: 'Play this position out against the computer', key: 'P', mini: o.mini }))
+const held = (o = {}) => (S.held && !S.model ? b('Show the engine', { icon: ICON.eye, cls: 'on', mini: o.mini, title: 'The engine was held back on this game when it was imported. Show it.' }) : '')
+const addToLibrary = (o = {}) => (S.model ? b('+ Add to library', { cls: 'on', mini: o.mini, title: 'Kept as somebody else’s game: analysed and annotated like your own, counted in no statistic.' }) : '')
+const backToExplorer = (o = {}) => (S.explorer ? b('← Back to explorer', { mini: o.mini }) : '')
+const score = () => (S.quiet || S.practice ? '' : `<span class="sc ${S.line ? 'purple' : ''}" title="${S.line ? 'The engine’s evaluation of this line' : ''}">+0.32</span>`)
+const readouts = () => `<span class="rd">${S.line && !S.practice ? 'analysis +3' : S.practice ? 'practice +4' : 'ply 34 / 91'}</span>${score()}`
+function transport(o = {}) {
+  const big = o.big ? 'big' : ''
+  return `<div class="tg ${big}"><button title="First (Home)">⏮</button><button title="Previous (←)">◀</button><button title="Next (→)">▶</button><button title="Last (End)">⏭</button><button title="Play the game through (Space)">▷</button></div>` +
+    `<div class="tg ${big}"><button title="Previous flagged move (↑)">‹⚑</button><button title="Next flagged move (↓)">⚑›</button></div>`
+}
+/* the ⋯ menu: what a game rarely needs, one click away */
+function more(items, o = {}) {
+  const rows = items.filter(Boolean).map((it) => `<div class="it ${it.on ? 'on' : ''}"><span class="i">${it.icon || ''}</span>${it.label}${it.key ? `<span class="k">${it.key}</span>` : ''}</div>`).join('')
+  return `<span class="b-wrap"><button class="b ${o.mini ? 'mini' : ''} sq pop-btn" title="More">${ICON.more}</button><div class="pop ${o.pos || ''}">${rows}</div></span>`
+}
+const studioItems = () => [
+  S.explorer && { icon: ICON.explorer, label: 'Back to explorer' },
+  { icon: ICON.tree, label: 'Correspondence tree' },
+  { icon: ICON.pgn, label: 'Copy the PGN', key: 'C' },
+]
+const rule = '<span class="rule"></span>'
+const group = (inner, cls = '') => (inner ? `<span class="grp ${cls}">${inner}</span>` : '')
+
+/* practice tools, for the concepts that put them in the row rather than in the strip */
+const practiceTools = (o = {}) => `<span class="modelab">you play White · Maia 1700 · <b style="color:var(--text)">your move</b></span>` +
+  b('Take back', { icon: ICON.back, mini: o.mini, title: 'Take back your last move and the reply to it' }) +
+  b('Show the engine', { icon: ICON.eye, mini: o.mini, key: 'H' }) +
+  b('Stop', { icon: '■', mini: o.mini, key: 'P', title: 'Stop practising; the moves stay on the board as a line (P)' })
+
+/* ------------------------------------------------------------------------------------
+   The concepts. Each says what the board column's two player rows carry beyond the
+   players, what the control row is (empty string = no row), whether there is a rail on
+   the board's right edge, what extra strip the right column takes, and the phone's two
+   rows. `note` is the card above the frames. */
+const CONCEPTS = [
+  {
+    id: 'today', name: 'Today',
+    desk: () => ({
+      ctl: group(toggles('words')) + rule +
+        group([analyseInRow(), note(), backToGame(), practise(), held(), addToLibrary(), backToExplorer()].join('')) +
+        '<span class="sp"></span>' + group(readouts()) + rule + group(transport()),
+    }),
+    phone: () => [transport({ big: true }), toggles('words') + analyseInRow() + note() + backToGame() + practise() + held() + addToLibrary() + backToExplorer()],
+    note: {
+      moves: 'The row as <b>BoardPanel</b> draws it: the board’s own toggles, then everything done to the game, then hard right the readouts and the transport. Every control is the same weight, so the row reads as a strip to be searched once it is long.',
+      cost: 'One line while it fits; the worst case wraps at any column under about 900 px, and the second line is height the board wanted (or is clipped below the fold).',
+      discover: 'Good — every control has its word and a tooltip with its key.',
+      keys: 'Every control has one; none is printed.',
+      risks: 'This is the problem, not a proposal. On the phone the second row goes to three lines in the worst case and the tab pane pays for it.',
+    },
+  },
+  {
+    id: 'tidy', name: 'Tidy row',
+    desk: () => ({
+      ctl: group(toggles('icons')) + rule +
+        group([analyseInRow(), note(), practise(), backToGame({ depth: true }), held(), addToLibrary(), more(studioItems())].join('')) +
+        '<span class="sp"></span>' + group(score()) + (score() ? rule : '') + group(transport()),
+    }),
+    phone: () => [transport({ big: true }), toggles('icons') + analyseInRow() + note() + practise() + backToGame({ depth: true }) + held() + addToLibrary() + more(studioItems())],
+    note: {
+      moves: 'Nothing leaves the row. The four toggles go <b>icon-only</b>, the line depth folds into the Back to game chip (“Back to game · +3”), the ply readout goes (the move list is the ply), and the studio extras — Back to explorer, the correspondence tree, Copy PGN — go behind <b>⋯</b>. Add to library and Show the engine stay: each is the one act on its kind of game.',
+      cost: '<span class="cost">None.</span> One line down to about 620 px.',
+      discover: 'Tooltips carry the word and the key; ⋯ is one click from anything rare. Flip and Settings as glyphs need learning once.',
+      keys: 'Unchanged.',
+      risks: 'A glyph for Hints is weak — it is a state, and the lit word says more than a lit dot. ⋯ hides Back to explorer, which is the way out of a game opened from there. It relieves the row rather than rethinking it.',
+    },
+  },
+  {
+    id: 'split', name: 'Above and below',
+    desk: () => ({
+      top: '<span class="sp"></span>' + group(toggles('mini')),
+      bottom: '<span class="sp"></span>' + group(readouts()),
+      ctl: group([analyseInRow(), note(), practise(), backToGame(), held(), addToLibrary(), backToExplorer()].join('')) +
+        '<span class="sp"></span>' + group(transport()),
+    }),
+    phone: () => [transport({ big: true }), toggles('words') + analyseInRow() + note() + backToGame() + practise() + held() + addToLibrary() + backToExplorer()],
+    note: {
+      moves: 'The four toggles ride the <b>top player row’s</b> empty right half, at that row’s own height (a window’s title bar: what the board is showing, above the board). Ply and score ride the <b>bottom player row’s</b> right end, directly above the transport they belong to. The row is then actions | transport, no rules needed.',
+      cost: '<span class="cost">None.</span> Both rows already exist at h-6 and are two-thirds empty.',
+      discover: 'The toggles keep their words if wanted (the row has room); the actions row is short enough to read at a glance.',
+      keys: 'Unchanged.',
+      risks: 'The player rows are hidden on the phone, so the toggles fall back into the second row there — today’s layout. A board with no game behind it (the explorer’s stand-in) needs the same fallback. A long name truncates against the toggles. Alone, the worst case still wraps under ~560 px; with concept 1’s ⋯ it does not.',
+    },
+  },
+  {
+    id: 'rail', name: 'Rail',
+    desk: () => ({
+      rail: [toggles('icons'), '<span class="rule"></span>', S.quiet && !S.practice ? analyse({ iconOnly: true }) : '', note({ iconOnly: true }), practise({ iconOnly: true }), more(studioItems(), { pos: 'right' })].join(''),
+      ctl: group([backToGame({ depth: true }), held(), addToLibrary()].join('')) +
+        '<span class="sp"></span>' + group(score()) + (score() ? rule : '') + group(transport()),
+    }),
+    phone: () => [transport({ big: true }), toggles('icons') + analyseInRow() + note({ iconOnly: true }) + practise({ iconOnly: true }) + backToGame({ depth: true }) + held() + addToLibrary() + more(studioItems())],
+    note: {
+      moves: 'Every toggle and every game action goes into a <b>28 px vertical rail</b> on the board’s right edge, top to bottom in the row’s own order and grouped by the same rules. The row keeps only what is about <i>now</i>: the contextual chips, the score and the transport.',
+      cost: '<span class="cost">No height.</span> About 2 rem of width off the right column; the board is height-bound on any ordinary window, so it does not shrink.',
+      discover: 'A stack of glyphs with tooltips — weaker than words, and a vertical list is read less readily than a row. Note and Practise lose their names.',
+      keys: 'Unchanged.',
+      risks: 'The board is flanked on both sides (eval bar left, rail right) and the rail reads as part of the right column. Icon-only everywhere. On the phone it is concept 1.',
+    },
+  },
+  {
+    id: 'empty', name: 'Nothing under the board',
+    desk: () => ({
+      top: '<span class="sp"></span>' + group(toggles('mini')),
+      bottom: '<span class="sp"></span>' + group([backToGame({ mini: true }), held({ mini: true }), addToLibrary({ mini: true }), note({ mini: true }), practise({ mini: true }), more(studioItems(), { mini: true, pos: 'right' })].join('')),
+      ctl: '',
+      tstrip: group(transport()) + group(readouts()) + '<span class="sp"></span>' + group(analyseInRow()),
+    }),
+    phone: () => [transport({ big: true }), toggles('icons') + analyseInRow() + note() + practise() + backToGame({ depth: true }) + held() + addToLibrary() + more(studioItems())],
+    note: {
+      moves: 'The control row is <b>gone</b>. Toggles up into the top player row; actions and the contextual chips into the bottom player row; the transport, its readouts and Analyse (⇧E) into a <b>strip across the right column</b> above the moves — beside the list it walks.',
+      cost: '<span class="cost">Negative: the board gains the row and a gap, about 2.25 rem</span> (see the readout).',
+      discover: 'The transport is next to the moves; the actions sit on the board’s bottom edge. Nothing is hidden that was not already conditional.',
+      keys: 'Unchanged — and the arrows and the wheel are how most stepping happens anyway.',
+      risks: 'The bottom player row cannot wrap, so overflow must go into ⋯ (a long name and a model game compete for it). The transport leaves the board column: a habit to relearn, and the phone (where it stays under the thumb) no longer mirrors the desktop. On a narrow right column the strip competes with the Moves / Flagged tabs.',
+    },
+  },
+  {
+    id: 'modes', name: 'Modes',
+    desk: () => {
+      const mode = modeOverride || (S.practice ? 'practise' : S.line ? 'analyse' : 'read')
+      const seg = `<div class="seg" data-seg><button class="${mode === 'read' ? 'on' : ''}" data-mode="read">Read</button><button class="${mode === 'analyse' ? 'on' : ''}" data-mode="analyse">Analyse</button><button class="${mode === 'practise' ? 'on' : ''}" data-mode="practise">Practise<span class="k">P</span></button></div>`
+      let tools = ''
+      if (mode === 'read') tools = [note(), b('Hints', { key: 'H', cls: S.hints ? 'on' : '' }), b('Flip', { icon: ICON.flip, key: 'F' }), b('', { icon: ICON.settings, name: 'Board settings', key: 'S' }), held(), addToLibrary(), more(studioItems())].join('')
+      if (mode === 'analyse') tools = [b('', { icon: ICON.type, name: 'Type a move', key: 'M', cls: S.typing ? 'on' : '' }), S.typing ? '<input class="minput" value="Nf3">' : '', S.line ? b('Back to game · +3', { icon: ICON.back, cls: 'purple', key: 'Esc' }) : '', analyseInRow(), note(), more(studioItems())].join('')
+      if (mode === 'practise') tools = S.practice ? practiceTools() : `<span class="modelab">not practising —</span>` + b('Start a game from here', { icon: ICON.practise, key: 'P' })
+      return {
+        noPbar: true,
+        ctl: seg + group(tools) + '<span class="sp"></span>' + group(readouts()) + rule + group(transport()),
+      }
+    },
+    phone: () => {
+      const mode = modeOverride || (S.practice ? 'practise' : S.line ? 'analyse' : 'read')
+      const seg = `<div class="seg" data-seg><button class="${mode === 'read' ? 'on' : ''}" data-mode="read">Read</button><button class="${mode === 'analyse' ? 'on' : ''}" data-mode="analyse">Analyse</button><button class="${mode === 'practise' ? 'on' : ''}" data-mode="practise">Practise</button></div>`
+      const tools = mode === 'read' ? note() + b('Hints', { cls: S.hints ? 'on' : '' }) + b('', { icon: ICON.flip }) + b('', { icon: ICON.settings }) + held() + addToLibrary() + more(studioItems())
+        : mode === 'analyse' ? b('', { icon: ICON.type }) + (S.line ? b('Back · +3', { icon: ICON.back, cls: 'purple' }) : '') + analyseInRow() + note() + more(studioItems())
+        : S.practice ? b('Take back', { icon: ICON.back }) + b('', { icon: ICON.eye }) + b('Stop', { icon: '■' }) : b('Start a game', { icon: ICON.practise })
+      return [transport({ big: true }), seg + tools]
+    },
+    note: {
+      moves: 'A segmented <b>Read · Analyse · Practise</b> leads the row and <i>reflects</i> what the board is doing — drag a piece and it is Analyse, press P and it is Practise, Esc and it is Read — and each mode shows only its own tools. Practise’s tools replace the PracticeBar, so the right column gets that row back. Click the segment to see each.',
+      cost: '<span class="cost">None</span>, and one row fewer in the right column while practising.',
+      discover: 'The strongest: the mode names what the screen is for and the tools next to it are the ones that apply. Keys ride the segment.',
+      keys: 'Unchanged; P and Esc become visible as mode changes.',
+      risks: 'Modal UI on a page that was modeless. Flip and Settings hide inside Read; a segment that follows state rather than setting it can feel jumpy (the first drag flips it). The largest build of the six.',
+    },
+  },
+  {
+    id: 'palette', name: 'Contextual + Actions',
+    desk: () => ({
+      ctl: group(`<span class="b-wrap"><button class="b pop-btn" title="Everything you can do here">⌘ Actions</button><div class="pop">${palette()}</div></span>` + b('Hints', { key: 'H', cls: S.hints ? 'on' : '' })) +
+        group([backToGame({ depth: true }), S.quiet && S.run && !S.model ? analyse() : '', held(), addToLibrary()].join('')) +
+        '<span class="sp"></span>' + group(readouts()) + rule + group(transport()),
+    }),
+    phone: () => [transport({ big: true }), `<span class="b-wrap"><button class="b pop-btn">⌘ Actions</button><div class="pop">${palette()}</div></span>` + b('Hints', { cls: S.hints ? 'on' : '' }) + backToGame({ depth: true }) + (S.quiet && S.run && !S.model ? analyse() : '') + held() + addToLibrary()],
+    note: {
+      moves: 'The row is the transport, the readouts, Hints, and <b>chips that exist only while they apply</b> — Back to game, a running run, Show the engine, Add to library. Everything else is behind one <b>Actions</b> button: a palette grouped like the shortcut sheet, with the key beside each item. Open it.',
+      cost: '<span class="cost">None</span>; the shortest row of the six.',
+      discover: 'The palette teaches the keys, which is what the shortcut sheet was for. But Flip, Settings, Note and Practise are two clicks away.',
+      keys: 'Unchanged, and printed where the hand is.',
+      risks: 'Hides frequent things; a menu is the wrong shape for a toggle (Flip). It is the shortcut overlay again under another name, and on the phone — no keys — it is only a menu.',
+    },
+  },
+  {
+    id: 'proposal', name: 'Proposal', rec: true,
+    desk: () => ({
+      top: '<span class="sp"></span>' + group(toggles('mini')),
+      bottom: '<span class="sp"></span>' + group(readouts()),
+      ctl: group([analyseInRow(), note(), practise(), backToGame({ depth: true }), held(), addToLibrary(), more(studioItems())].join('')) +
+        '<span class="sp"></span>' + group(transport()),
+    }),
+    phone: () => [transport({ big: true }), toggles('icons') + analyseInRow() + note() + practise() + backToGame({ depth: true }) + held() + addToLibrary() + more(studioItems())],
+    note: {
+      moves: '<b>Concept 2 with concept 1’s ⋯.</b> Toggles in the top player row (icon-only, tooltip with the key); ply and score in the bottom player row; the row is Analyse (⇧E only), Note, Practise, the contextual chips, ⋯ — and the transport. The type-a-move box opens under the top row’s ⌨, in the row (toggle it in the harness). On the phone: today’s two rows, icon toggles and ⋯, so the worst case fits two lines.',
+      cost: '<span class="cost">None.</span> The row stays one line down to about 480 px, under every floor the layout has.',
+      discover: 'Every frequent control keeps its word; every rare one is one click behind ⋯; every state-only one appears lit when its state does.',
+      keys: 'Unchanged.',
+      risks: 'Needs the phone / no-game fallback (toggles back into the row). Names truncate against the toggles on a narrow board. The bottom row’s readouts and the top row’s toggles are two new homes to learn, both one row from where they were.',
+    },
+  },
+]
+
+function palette() {
+  const it = (icon, label, key, on) => `<div class="it ${on ? 'on' : ''}"><span class="i">${icon}</span>${label}<span class="k">${key}</span></div>`
+  return `<div class="h">The board</div>${it(ICON.settings, 'Board settings', 'S')}${it(ICON.flip, 'Flip the board', 'F')}${it(ICON.hints, 'Hints', 'H', S.hints)}${it(ICON.type, 'Type a move', 'M')}` +
+    `<div class="sep"></div><div class="h">The game</div>${S.model ? '' : it(ICON.analyse, 'Analyse…', 'A')}${S.model ? '' : it(ICON.note, 'Write a note', 'N')}${it(ICON.practise, S.practice ? 'Stop practising' : 'Practise from here', 'P')}${it(ICON.pgn, 'Copy the PGN', 'C')}` +
+    `${S.explorer ? `<div class="sep"></div><div class="h">This game</div>${it(ICON.explorer, 'Back to explorer', '')}${it(ICON.tree, 'Correspondence tree', '')}` : ''}`
+}
+
+/* ------------------------------------------------------------------------------------
+   The game view around the row: chrome, board, right column, phone. */
+const FEN = 'r1bq1rk1/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP2BPPP/R2Q1RK1'
+const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
+function boardHtml(o = {}) {
+  const rows = FEN.split('/')
+  let cells = ''
+  for (let r = 0; r < 8; r++) {
+    let f = 0
+    for (const ch of rows[r]) {
+      if (/\d/.test(ch)) { for (let i = 0; i < +ch; i++, f++) cells += cell(r, f, null) }
+      else { cells += cell(r, f, ch); f++ }
+    }
+  }
+  function cell(r, f, ch) {
+    const light = (r + f) % 2 === 0
+    const sq = 'abcdefgh'[f] + (8 - r)
+    const cls = ['sq', light ? 'l' : 'd', ['e8', 'g8'].includes(sq) ? 'last' : '', S.hints && !S.quiet && !S.practice && ['d5', 'c4'].includes(sq) ? 'mark' : ''].join(' ')
+    const white = ch && ch === ch.toUpperCase()
+    return `<div class="${cls}">${ch ? `<span class="${white ? 'pw' : 'pb'}">${GLYPH[ch.toLowerCase()]}</span>` : ''}</div>`
+  }
+  const arrows = S.hints && !S.quiet && !S.practice ? `<svg viewBox="0 0 100 100"><defs>
+      <marker id="ae" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--arrow-engine)"/></marker>
+      <marker id="am" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--arrow-maia)"/></marker></defs>
+      <g opacity=".75" stroke-width="2.2" stroke-linecap="round" fill="none">
+      <line x1="31.25" y1="56.25" x2="43.75" y2="43.75" stroke="var(--arrow-engine)" marker-end="url(#ae)"/>
+      <line x1="68.75" y1="68.75" x2="56.25" y2="43.75" stroke="var(--arrow-maia)" marker-end="url(#am)"/></g></svg>` : ''
+  const tag = S.practice ? '<span class="quiet-tag">practice · your move</span>' : S.quiet ? '<span class="quiet-tag">engine hidden ⇧E</span>' : ''
+  return `<div class="board">${cells}${arrows}${tag}</div>`
+}
+const playerTop = () => `<span class="sd b"></span><span class="nm">kasparov_1963</span><span class="r">1795</span><span class="cap">♟</span><span class="bal down">−1</span>`
+const playerBottom = () => `<span class="sd w"></span><span class="nm me">phib</span><span class="r">1712</span><span class="cap">♞♟</span><span class="bal">+1</span>`
+
+function rightColumn(o = {}) {
+  // ⇧E and a practice game with its answers hidden are the same silence: no band, no graph.
+  const quiet = S.quiet || S.practice
+  const pbar = S.practice && !o.noPbar ? `<div class="pbar"><div><div class="t">Practice · you play White against Maia 1700</div><div class="s">Your move.</div></div><div class="acts">${b('Take back', { icon: ICON.back, mini: true })}${b('Show the engine', { icon: ICON.eye, mini: true, key: 'H' })}${b('Stop', { icon: '■', mini: true, key: 'P' })}</div></div>` : ''
+  const tstrip = o.tstrip ? `<div class="tstrip">${o.tstrip}</div>` : ''
+  const band = quiet ? '' : `<div class="band">
+      <div class="pane"><div class="strip"><b style="color:var(--text);font-weight:600">Maia</b> 1700 ▾ <span class="sp"></span>L</div>
+        <div class="maia"><div><span class="m">cxd5</span><span class="bar"><i style="width:46%"></i></span><span class="p">46%</span></div><div><span class="m">Bd3</span><span class="bar"><i style="width:22%"></i></span><span class="p">22%</span></div><div><span class="m">a3</span><span class="bar"><i style="width:11%"></i></span><span class="p">11%</span></div><div><span class="m">Qc2</span><span class="bar"><i style="width:8%"></i></span><span class="p">8%</span></div></div></div>
+      <div class="pane"><div class="strip"><span class="t on">Run</span><span class="t">Live</span><span style="color:var(--faint)">d24 · 2 lines</span><span class="sp"></span>${S.model ? '' : (S.run ? analyse({ mini: true }) : b('Analyse', { icon: ICON.analyse, key: 'A', mini: true }))}</div>
+        <div class="lines"><div class="ln"><b>+0.32</b><span class="pv">9. cxd5 exd5 10. h3 Be6 11. Bd3 Rc8 12. O-O a6 13. Rc1 …</span></div><div class="ln"><span>+0.18</span><span class="pv">9. Bd3 dxc4 10. Bxc4 a6 11. a4 Nb4 12. O-O b6 …</span></div></div></div>
+    </div>`
+  const moves = `<div class="pane moves"><div class="strip"><span class="t on">Moves</span><span class="t">Flagged <span style="color:var(--faint)">4</span></span><span class="sp"></span>PGN</div>
+    <div class="mv">${[['6', 'e3', 'O-O'], ['7', 'Nf3', 'Nc6'], ['8', 'Be2', 'dxc4'], ['9', 'Bxc4', 'Bd6'], ['10', 'O-O', 'e5'], ['11', 'h3', 'exd4'], ['12', 'exd4', 'Nb4'], ['13', 'Bg5', 'h6'], ['14', 'Bh4', 'Bf5'], ['15', 'Re1', 'Re8'], ['16', 'Qb3', 'Nbd5'], ['17', 'Nxd5', 'Nxd5']].map((m, i) => `<div class="row ${i === 11 ? 'cur' : ''}"><span class="n">${m[0]}</span><span class="${i === 11 ? 'c' : ''}">${m[1]}${i === 3 ? '<span class="g mi">?!</span>' : ''}${i === 7 ? '<span class="g bl">??</span>' : ''}</span><span>${m[2]}${i === 5 ? '<span class="g in">?!</span>' : ''}</span></div>`).join('')}${S.line ? '<div class="line">18. Bxd5 Qxd5 19. Qxb7 …</div>' : ''}</div></div>`
+  const notes = `<div class="pane notes"><div class="strip"><span class="t">Book</span><span class="t on">Notes <span style="color:var(--faint)">2</span></span></div>
+    <div class="body"><div class="card"><div class="m">ply 27 · 3 days ago</div>The knight on b4 is loose after h3 — I keep playing this line without checking c2.</div></div>
+    <div class="composer">Write a note about this position… (N)</div></div>`
+  const graph = quiet ? '' : `<div class="graph"><div class="strip" style="height:26px">Eval <span class="sp"></span><span style="color:var(--faint)">V · T</span></div><div class="plot"><svg viewBox="0 0 400 80" preserveAspectRatio="none"><line x1="0" y1="40" x2="400" y2="40" stroke="var(--graph-grid)"/><path d="M0 40 L30 36 60 38 90 30 120 34 150 22 180 26 210 44 240 58 270 52 300 62 330 48 360 30 400 34 L400 80 L0 80z" fill="var(--side-white)" opacity=".85"/><line x1="240" y1="0" x2="240" y2="80" stroke="var(--accent)" stroke-width="1.2"/><circle cx="210" cy="44" r="3" fill="var(--blunder)"/></svg></div></div>`
+  // The moves/notes row is the only one that takes the slack; the strips above it are
+  // `auto` and there are as many of them as the state puts there.
+  const above = [pbar, tstrip, band].filter(Boolean).map(() => 'auto').join(' ')
+  const rows = `${above} minmax(0,1fr)${graph ? ' auto' : ''}`.trim()
+  return `<div class="rcol" style="grid-template-rows:${rows}">${pbar}${tstrip}${band}${moves}${notes}${graph}</div>`
+}
+
+function deskFrame(c) {
+  const d = c.desk()
+  const bx = S.quiet || S.practice ? 0 : 24
+  const rw = d.rail ? 38 : 0
+  return `<div class="frame desk" style="width:${win[0]}px;height:${win[1]}px">
+    <div class="tb"><div class="brand"><img src="../brand/favicon.png" alt=""> Blunderbase</div><div class="divider"></div><span class="crumb">Games · <b>kasparov_1963 – phib</b> · 12 Sep 2026</span><span class="spacer"></span><span class="help">?</span></div>
+    <div class="ws">
+      <aside class="nav"><div class="side-label">WORKSPACE</div><a><span class="icon">▤</span>Dashboard</a><a class="active"><span class="icon">♜</span>Games</a><a><span class="icon">⌘</span>Explorer</a><a><span class="icon">∿</span>Stats</a><a><span class="icon">✎</span>Notes</a><a><span class="icon">◉</span>Live</a><a><span class="icon">✉</span>Correspondence</a></aside>
+      <div class="main">
+        <div class="hb"><span class="nm">Queen’s Gambit Declined, Semi-Tarrasch</span><span class="eco">D41</span><span class="q">·</span><span class="src">lichess</span><span class="q">·</span>10+0 rapid<span class="q">·</span>0–1<span class="spacer"></span>${S.run ? '<span class="runchip">◌ analysing · d24</span>' : '<span class="runchip">d24 · 2 lines</span>'}</div>
+        <div class="cols">
+          <div class="bcol" style="--bx:${bx}px;--rw:${rw}px;--bw:400px">
+            <div class="prow">${playerTop()}${d.top || ''}</div>
+            <div class="brow">${bx ? '<div class="evb"><div class="b"></div><div class="w"></div></div>' : ''}${boardHtml()}${d.rail ? `<div class="rail">${d.rail}</div>` : ''}</div>
+            <div class="prow">${playerBottom()}${d.bottom || ''}</div>
+            ${d.ctl ? `<div class="ctl">${d.ctl}</div>` : ''}
+          </div>
+          <div class="split"></div>
+          ${rightColumn(d)}
+        </div>
+      </div>
+    </div>
+    <span class="cap" data-cap></span>
+  </div>`
+}
+
+function phoneFrame(c) {
+  const [row1, row2] = c.phone()
+  const pbar = S.practice && c.id !== 'modes' ? `<div class="ph-pbar"><div><div style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim-2)">Practice · Maia 1700</div><div style="color:var(--text)">Your move.</div></div><div class="acts">${b('', { icon: ICON.back, mini: true, name: 'Take back' })}${b('', { icon: ICON.eye, mini: true, name: 'Show the engine' })}${b('Stop', { icon: '■', mini: true })}</div></div>` : ''
+  return `<div class="frame phone">
+    <div class="ph-tb"><div class="brand"><img src="../brand/favicon.png" alt=""></div><span class="crumb">Games · <b>kasparov_1963 – phib</b></span><span class="spacer"></span><span class="help">?</span></div>
+    <div class="ph-body">
+      <div class="ph-head"><div class="l1"><span class="sd b"></span>kasparov_1963 <span class="r" style="color:var(--dim)">1795</span><span class="x">–</span><span class="sd w"></span><b>phib</b> <span style="color:var(--dim)">1712</span></div>
+        <div class="l2">${S.quiet ? '' : '<b>+0.32</b> ·'} 0–1 · ply 34/91 · <span style="overflow:hidden;text-overflow:ellipsis">QGD Semi-Tarrasch</span></div></div>
+      ${pbar}
+      <div class="ph-boardwrap" style="--bw:355px">${boardHtml()}</div>
+      <div class="ph-ctl"><span class="grp first">${row1}</span><span class="grp" style="flex-wrap:wrap">${row2}</span><span class="lines-tag" data-lines></span></div>
+      <div class="ph-tabs"><span class="t on">Moves</span>${S.quiet || S.practice ? '' : '<span class="t">Eval</span><span class="t">Engine</span>'}<span class="t">Notes</span></div>
+      <div class="ph-pane"><div class="mv">${[['15', 'Re1', 'Re8'], ['16', 'Qb3', 'Nbd5'], ['17', 'Nxd5', 'Nxd5'], ['18', 'Bxd5', 'Qxd5'], ['19', 'Qxb7', 'Rab8']].map((m, i) => `<div class="row ${i === 2 ? 'cur' : ''}"><span class="n">${m[0]}</span><span>${m[1]}</span><span>${m[2]}</span></div>`).join('')}</div><div class="floor" data-floor></div></div>
+    </div>
+  </div>`
+}
+
+/* ------------------------------------------------------------------------------------
+   Fitting the board to the height budget, the way BoardPanel does: the board is the
+   frame's height less everything standing above and below it. The row can wrap once the
+   board (and so the column) is narrow, which costs height, so it is measured after each
+   pass until it settles. */
+function fit(frame) {
+  const col = frame.querySelector('.bcol')
+  if (!col) return null
+  const frameH = frame.clientHeight
+  const chromeAbove = 42 + 42 + 20 // titlebar, header bar, column padding
+  let bw = 400
+  for (let i = 0; i < 5; i++) {
+    col.style.setProperty('--bw', bw + 'px')
+    const kids = [...col.children].filter((el) => !el.classList.contains('brow'))
+    const used = kids.reduce((a, el) => a + el.offsetHeight, 0) + 8 * (kids.length) + chromeAbove
+    const rightFloor = 430 + 176 + 1
+    const maxByWidth = frame.clientWidth - rightFloor - 28 - parseFloat(getComputedStyle(col).getPropertyValue('--bx')) - parseFloat(getComputedStyle(col).getPropertyValue('--rw'))
+    const next = Math.min(frameH - used, maxByWidth)
+    if (Math.abs(next - bw) < 1) break
+    bw = next
+  }
+  const ctl = col.querySelector('.ctl')
+  const lines = ctl ? Math.round(ctl.offsetHeight / 34) || 1 : 0
+  return { bw: Math.round(bw), lines }
+}
+
+function render() {
+  const c = CONCEPTS.find((x) => x.id === concept)
+  document.getElementById('ctabs').innerHTML = CONCEPTS.map((x, i) => `<button class="${x.id === concept ? 'on' : ''} ${x.rec ? 'rec' : ''}" data-c="${x.id}"><span class="n">${i === 0 ? '·' : i}</span>${x.name}${x.rec ? ' ★' : ''}</button>`).join('')
+  const stage = document.getElementById('stage')
+  stage.innerHTML = deskFrame(c) + phoneFrame(c)
+  const desk = stage.querySelector('.frame.desk')
+  const m = fit(desk)
+  // the baseline at the same window and state, so the note can say what a concept costs
+  const today = CONCEPTS[0]
+  let base = m
+  if (c.id !== 'today') {
+    const tmp = document.createElement('div'); tmp.style.cssText = 'position:absolute;visibility:hidden;left:-9999px;top:0'
+    tmp.innerHTML = deskFrame(today); document.body.appendChild(tmp)
+    base = fit(tmp.querySelector('.frame.desk')); tmp.remove()
+  }
+  desk.querySelector('[data-cap]').textContent = `board ${m.bw} px · row ${m.lines === 0 ? 'none' : m.lines + (m.lines === 1 ? ' line' : ' lines')}`
+  const phone = stage.querySelector('.frame.phone')
+  const pc = phone.querySelector('.ph-ctl')
+  const plines = Math.round((pc.offsetHeight - 16) / 38)
+  phone.querySelector('[data-lines]').textContent = plines > 2 ? `${plines} lines — the pane pays` : ''
+  const pane = phone.querySelector('.ph-pane')
+  phone.querySelector('[data-floor]').textContent = `tab pane ${pane.clientHeight} px`
+  const n = c.note
+  const delta = m.bw - base.bw
+  document.getElementById('note').innerHTML = `
+    <div><h3>What moves where</h3><p>${n.moves}</p></div>
+    <div><h3>Board size</h3><p>${n.cost}</p><p class="readout">this window: ${m.bw} px${c.id === 'today' ? '' : ` (${delta >= 0 ? '+' : ''}${delta} vs today)`}${m.lines > 1 ? ` · row wraps to ${m.lines}` : ''}</p></div>
+    <div><h3>Discoverable?</h3><p>${n.discover}</p></div>
+    <div><h3>Keyboard</h3><p>${n.keys}</p></div>
+    <div><h3>Risks</h3><p>${n.risks}</p></div>`
+}
+
+/* ---- wiring ------------------------------------------------------------------------- */
+document.getElementById('ctabs').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-c]'); if (!t) return
+  concept = t.dataset.c; modeOverride = null; render()
+})
+document.querySelectorAll('[data-s]').forEach((el) => {
+  const sync = () => el.closest('.tog').classList.toggle('on', el.checked)
+  sync()
+  el.addEventListener('change', () => { S[el.dataset.s] = el.checked; modeOverride = null; sync(); render() })
+})
+document.getElementById('win').addEventListener('change', (e) => { win = e.target.value.split('x').map(Number); render() })
+document.addEventListener('click', (e) => {
+  const seg = e.target.closest('[data-mode]')
+  if (seg) { modeOverride = seg.dataset.mode; render(); return }
+  const pb = e.target.closest('.pop-btn')
+  document.querySelectorAll('.b-wrap.open').forEach((w) => { if (!pb || !w.contains(pb)) w.classList.remove('open') })
+  if (pb) pb.closest('.b-wrap').classList.toggle('open')
+})
+window.addEventListener('resize', () => render())
+render()
+</script>
+</body>
+</html>

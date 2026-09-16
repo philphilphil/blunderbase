@@ -392,5 +392,5 @@ game shows it as text instead.
 
 From there it is a library game like any other: on the evaluation graph, in **Games** under
 its source and the correspondence time control, and in the statistics. Its game page keeps a
-**Correspondence tree** button in the title bar, which opens the frozen tree beside the
+**Correspondence tree** entry behind the **⋯** under the board, which opens the frozen tree beside the
 finished game — see [Analysing a game](game.md#the-correspondence-tree).

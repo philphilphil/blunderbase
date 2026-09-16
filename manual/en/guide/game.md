@@ -6,6 +6,13 @@
 to the ends, and Space plays the game through. `F` flips the board, `[` and `]` open the
 previous and next game in your list. The full list is under [Settings](settings.md).
 
+The controls sit around the board rather than under it. The row with your opponent's name,
+above the board, carries the four things that change what the board *shows*: board settings,
+flip, hints and the keyboard for typing a move. The row with your own name, below it, carries
+where you are in the game and what the position is worth. The row under that is what you do
+to the game — analyse, note, practise — and, hard right, the buttons that step through it.
+What this game rarely needs, such as the way back to the explorer, is behind the **⋯**.
+
 The bar across the top names the opening, where the game came from, its time control and
 how it ended. On a Lichess or Chess.com game the source chip there is a link that opens the
 game on that site in a new tab; on a phone the same link is the arrow beside the PGN button.
@@ -74,8 +81,8 @@ instead; see [Engines](../operate/engines.md#the-engine-in-your-browser).
 Play a move on the board and you are in a variation; `Esc` returns to the game. **Pin this
 line** keeps one with the game, so it is there next time and in the PGN export.
 
-You can type the moves instead. `M`, or the keyboard button beside **Hints**, opens a small
-box under the board: type `Nf3`, `exd5`, `O-O` or `e8=Q` — or plain `g1f3` — and the move
+You can type the moves instead. `M`, or the keyboard button beside **Hints** above the board,
+opens a small box in the row under it: type `Nf3`, `exd5`, `O-O` or `e8=Q` — or plain `g1f3` — and the move
 is played the moment it can only mean one thing, so a whole line goes in as one run of
 moves. Captures, checks and `=` are optional, the piece letters of your language work
 (`Sf3` in German), and a move two pieces could make (`Nd2` with both knights able) is
@@ -157,8 +164,8 @@ opening shows that name in its **Opening** column.
 
 ## The correspondence tree
 
-A game you played by correspondence carries a **Correspondence tree** button in the title
-bar. It opens the tree that was built while the game was running — the candidate moves, the
+A game you played by correspondence carries a **Correspondence tree** entry behind the **⋯**
+under the board. It opens the tree that was built while the game was running — the candidate moves, the
 comments and what the engines said about each position — to read, not to change: the tree
-froze when the game did. The button is there only for those games, and only while
+froze when the game did. The entry is there only for those games, and only while
 correspondence mode is on; the mode is [Correspondence](correspondence.md).

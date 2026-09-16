@@ -428,6 +428,6 @@ Partie ausging (Aufgabe, Schiedsspruch, Zeit). Danach:
   Rechenzeit. **Stopp** in ihrem Feld beendet sie, wenn die Partie vorbei ist.
 
 Ab da ist es eine Partie wie jede andere: im Bewertungsverlauf, unter **Partien** bei ihrer
-Quelle und der Bedenkzeit Fernschach, und in den Statistiken. Ihre Partieseite behält in der
-Titelleiste die Schaltfläche **Fernschachbaum**, die den eingefrorenen Baum neben der
+Quelle und der Bedenkzeit Fernschach, und in den Statistiken. Ihre Partieseite behält hinter
+dem **⋯** unter dem Brett den Eintrag **Fernschachbaum**, der den eingefrorenen Baum neben der
 beendeten Partie öffnet – siehe [Eine Partie analysieren](game.md#the-correspondence-tree).

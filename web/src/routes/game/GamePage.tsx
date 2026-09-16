@@ -60,7 +60,7 @@ import { COMPOSER_TEXT_ID, NoteComposer } from './components/NoteComposer'
 import { NotesTrack, type NotesTrackTab } from './components/NotesTrack'
 import { PracticeBar } from './components/PracticeBar'
 import { PracticeDialog } from './components/PracticeDialog'
-import { StudioActions } from './components/StudioActions'
+import { StudioActions, useStudioMenu } from './components/StudioActions'
 import {
   bestRun,
   buildGameLine,
@@ -1127,6 +1127,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const cameFrom = (location.state as { from?: unknown } | null)?.from
   const backToExplorer =
     typeof cameFrom === 'string' && cameFrom.startsWith('/explorer') ? cameFrom : null
+  // What this game rarely needs, for the control row's ⋯ — the way back to the explorer, the
+  // tree behind a correspondence game — and the dialog one of them opens.
+  const studioMenu = useStudioMenu(from, backToExplorer)
   const [requested] = useState(() => ({
     ply: intParam(params.get('ply')),
     line: intParam(params.get('line')),
@@ -1903,6 +1906,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       // The button lives in the engine pane's title strip; the board row carries it only
       // while ⇧E has taken that pane off the screen, when asking is exactly what comes next.
       onAnalyse={engineHidden ? analysisRequest.openDialog : undefined}
+      menu={studioMenu.items}
+      // The phone has no player rows to hang the toggles and the readouts on, so there they
+      // stay in the control row, where they have always been.
+      toolsInRow={mobile}
       // A note hangs off a game row, so there is nothing to write one against until the
       // model game has been added to the library.
       onNote={readOnly ? undefined : focusComposer}
@@ -2152,6 +2159,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
         {analysisRequest.setupDialog}
         {analyseDialog}
         {practiceDialog}
+        {studioMenu.dialog}
         <MobileGameView
           game={detail.game}
           best={best}
@@ -2197,6 +2205,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       {analysisRequest.setupDialog}
       {analyseDialog}
       {practiceDialog}
+      {studioMenu.dialog}
 
       {/*
         The screen's own heading, across the whole workspace: what the game is, and what has

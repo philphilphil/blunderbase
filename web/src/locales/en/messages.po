@@ -1634,6 +1634,7 @@ msgstr "Next game in your games list"
 
 #: src/lib/ui/shortcuts.ts
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/game/components/BoardPanel.tsx
 #: src/routes/live/LivePage.tsx
 msgid "Flip the board"
 msgstr "Flip the board"
@@ -5122,35 +5123,6 @@ msgid "Moves column width"
 msgstr "Moves column width"
 
 #: src/routes/game/components/BoardPanel.tsx
-msgid "Flip the board (F)"
-msgstr "Flip the board (F)"
-
-#: src/routes/game/components/BoardPanel.tsx
-#: src/routes/repertoire/RepertoirePage.tsx
-msgid "Flip"
-msgstr "Flip"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
-msgstr "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
-msgstr "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints"
-msgstr "Hints"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Type a move (M)"
-msgstr "Type a move (M)"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
-msgstr "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
-
-#: src/routes/game/components/BoardPanel.tsx
 msgid "Write a note about this position (N)"
 msgstr "Write a note about this position (N)"
 
@@ -5161,18 +5133,6 @@ msgstr "Leave the analysis line and go back to the game (Esc)"
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Back to game"
 msgstr "Back to game"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "analysis +{lineDepth}"
-msgstr "analysis +{lineDepth}"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "ply {ply} / {plyCount}"
-msgstr "ply {ply} / {plyCount}"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
-msgstr "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
 
 #: src/routes/game/components/BoardPanel.tsx
 msgid "First"
@@ -5205,6 +5165,47 @@ msgstr "Up {advantage} in material"
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Down {deficit} in material"
 msgstr "Down {deficit} in material"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Flip the board (F)"
+msgstr "Flip the board (F)"
+
+#: src/routes/game/components/BoardPanel.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Flip"
+msgstr "Flip"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints"
+msgstr "Hints"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
+msgstr "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+msgstr "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M)"
+msgstr "Type a move (M)"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
+msgstr "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "analysis +{lineDepth}"
+msgstr "analysis +{lineDepth}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "ply {ply} / {plyCount}"
+msgstr "ply {ply} / {plyCount}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
+msgstr "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
 
 #: src/routes/game/components/BookPanel.tsx
 msgid "None of your games reached this position."
@@ -5749,6 +5750,10 @@ msgstr "{0} s"
 #: src/routes/game/components/PracticeDialog.tsx
 msgid "Play"
 msgstr "Play"
+
+#: src/routes/game/components/RowMenu.tsx
+msgid "More for this game"
+msgstr "More for this game"
 
 #: src/routes/game/components/StudioActions.tsx
 msgid "← Back to explorer"

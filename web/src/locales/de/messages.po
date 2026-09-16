@@ -1634,6 +1634,7 @@ msgstr "Nächste Partie in deiner Partienliste"
 
 #: src/lib/ui/shortcuts.ts
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/game/components/BoardPanel.tsx
 #: src/routes/live/LivePage.tsx
 msgid "Flip the board"
 msgstr "Brett drehen"
@@ -5122,35 +5123,6 @@ msgid "Moves column width"
 msgstr "Breite der Zugspalte"
 
 #: src/routes/game/components/BoardPanel.tsx
-msgid "Flip the board (F)"
-msgstr "Brett drehen (F)"
-
-#: src/routes/game/components/BoardPanel.tsx
-#: src/routes/repertoire/RepertoirePage.tsx
-msgid "Flip"
-msgstr "Drehen"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
-msgstr "Hinweise (H): die festen Pfeile auf dem Brett. Die Engine ist ohnehin ausgeblendet (⇧E)."
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
-msgstr "Hinweise (H) – alles, was die Stellung beantwortet: die Pfeile und Markierungen auf dem Brett und die Spalten von Engine und Maia. Aus, um die Stellung erst selbst zu lesen."
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints"
-msgstr "Hinweise"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Type a move (M)"
-msgstr "Einen Zug tippen (M)"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
-msgstr "Einen Zug tippen (M) – Sf3, exd5, O-O – statt ihn zu ziehen"
-
-#: src/routes/game/components/BoardPanel.tsx
 msgid "Write a note about this position (N)"
 msgstr "Eine Notiz zu dieser Stellung schreiben (N)"
 
@@ -5161,18 +5133,6 @@ msgstr "Die Analysevariante verlassen und zurück zur Partie (Esc)"
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Back to game"
 msgstr "Zurück zur Partie"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "analysis +{lineDepth}"
-msgstr "Analyse +{lineDepth}"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "ply {ply} / {plyCount}"
-msgstr "Halbzug {ply} / {plyCount}"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
-msgstr "Die Bewertung dieser Variante durch die Engine – sie gilt entlang der Variante und bleibt leer, sobald das Brett sie verlässt"
 
 #: src/routes/game/components/BoardPanel.tsx
 msgid "First"
@@ -5205,6 +5165,47 @@ msgstr "Materialvorteil von {advantage}"
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Down {deficit} in material"
 msgstr "Materialrückstand von {deficit}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Flip the board (F)"
+msgstr "Brett drehen (F)"
+
+#: src/routes/game/components/BoardPanel.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Flip"
+msgstr "Drehen"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints"
+msgstr "Hinweise"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
+msgstr "Hinweise (H): die festen Pfeile auf dem Brett. Die Engine ist ohnehin ausgeblendet (⇧E)."
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+msgstr "Hinweise (H) – alles, was die Stellung beantwortet: die Pfeile und Markierungen auf dem Brett und die Spalten von Engine und Maia. Aus, um die Stellung erst selbst zu lesen."
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M)"
+msgstr "Einen Zug tippen (M)"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
+msgstr "Einen Zug tippen (M) – Sf3, exd5, O-O – statt ihn zu ziehen"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "analysis +{lineDepth}"
+msgstr "Analyse +{lineDepth}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "ply {ply} / {plyCount}"
+msgstr "Halbzug {ply} / {plyCount}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
+msgstr "Die Bewertung dieser Variante durch die Engine – sie gilt entlang der Variante und bleibt leer, sobald das Brett sie verlässt"
 
 #: src/routes/game/components/BookPanel.tsx
 msgid "None of your games reached this position."
@@ -5749,6 +5750,10 @@ msgstr "{0} s"
 #: src/routes/game/components/PracticeDialog.tsx
 msgid "Play"
 msgstr "Spielen"
+
+#: src/routes/game/components/RowMenu.tsx
+msgid "More for this game"
+msgstr "Mehr zu dieser Partie"
 
 #: src/routes/game/components/StudioActions.tsx
 msgid "← Back to explorer"
