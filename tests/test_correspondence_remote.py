@@ -153,9 +153,10 @@ def test_a_search_on_a_runner_is_a_stream_that_checkpoints_pauses_warm_and_stops
             paused = runner.recv(protocol.STREAM_PAUSE)
             assert paused["session_id"] == session_id
             runner.send(protocol.stream_paused(session_id=session_id, warm=True))
-            settle(lambda: status_of(api, search["id"]) == "paused", "paused")
-            row = search_row(api, search["id"])
-            assert row["warm"] is True
+            # `paused` is on the row the moment the request returns; `warm` is the worker's
+            # answer arriving after it, so that — not the status — is what there is to wait for.
+            settle(lambda: search_row(api, search["id"])["warm"] is True, "the parked process")
+            assert status_of(api, search["id"]) == "paused"
             # The slot went back to the runner's queue work.
             settle(lambda: runner_row(api, runner_id)["streams"] == 0, "the slot back")
 
