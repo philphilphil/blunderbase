@@ -387,6 +387,51 @@ export interface MaiaPolicy extends Extra {
   [key: string]: unknown
 }
 
+// --- practice (`/practice`) ------------------------------------------------
+
+/** The ratings an engine declares it can be held to — `UCI_Elo`'s own bounds. */
+export interface PracticeStrength {
+  min: number
+  max: number
+  default: number
+}
+
+export interface PracticeEngine {
+  engine_id: number
+  name: string
+  runner_id: number | null
+  available: boolean
+  /** Why it cannot answer right now, in the backend's words. */
+  reason: string | null
+  /** Null: the engine declares no rating and plays at full strength. */
+  strength: PracticeStrength | null
+}
+
+export interface PracticeOpponents {
+  engines: PracticeEngine[]
+  default_engine_id: number | null
+  maia: { available: boolean; reason: string | null }
+  movetime_ms: { default: number; min: number; max: number }
+}
+
+export interface PracticeMoveRequest {
+  fen: string
+  engine_id?: number | null
+  elo?: number | null
+  movetime_ms?: number
+}
+
+export interface PracticeMoveResponse {
+  uci: string
+  san: string
+  engine_id: number
+  engine: string
+  runner_id: number | null
+  /** The rating actually played at, after clamping; null at full strength. */
+  elo: number | null
+  movetime_ms: number
+}
+
 // --- live Maia (`POST /maia/policy`) --------------------------------------
 
 /** One move the human model offers, as both the stored blob and the live endpoint write it. */

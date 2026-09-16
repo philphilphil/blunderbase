@@ -105,6 +105,7 @@ are on.
 |---|---|
 | `N` | Write a note about this position |
 | `A` | Analyse — ask for a deeper look |
+| `P` | Practise from this position against the computer, or stop |
 | `C` | Copy the PGN |
 
 ### The library table

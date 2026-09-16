@@ -49,8 +49,8 @@ describe('decodePlan', () => {
 })
 
 describe('hello', () => {
-  it('announces run limits, so the gateway sends this tab more than node budgets', () => {
+  it('announces run limits and practice moves, so the gateway sends this tab both', () => {
     const frame = hello({ runner: 'tab', version: null, slots: 1, engines: [], activeRuns: [] })
-    expect(frame.features).toEqual(['run_limits'])
+    expect(frame.features).toEqual(['run_limits', 'play_move'])
   })
 })

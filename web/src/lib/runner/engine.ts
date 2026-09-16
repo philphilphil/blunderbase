@@ -141,8 +141,21 @@ export interface BrowserEngine extends Searcher {
    * not search — which is a session that has ended rather than one that was closed.
    */
   searchInfinite(fen: string, options: InfiniteSearchOptions): Promise<boolean>
+  /**
+   * The move the engine *plays* after `movetimeMs`, in UCI, or null when it has none — a
+   * practice reply. `options` (a rating to play at) are set for this search only and put
+   * back afterwards, so the next run on this one module is not searched by a weakened
+   * engine. `client.py: _play_move`.
+   */
+  playMove(fen: string, options: PlayMoveOptions): Promise<string | null>
   /** Stop the engine. A quit engine refuses further searches rather than hanging. */
   quit(): void
+}
+
+/** What a `move_request` asks for. */
+export interface PlayMoveOptions {
+  movetimeMs: number
+  options: Record<string, string | number | boolean>
 }
 
 export interface StartEngineOptions {
@@ -521,6 +534,51 @@ class WasmEngine implements BrowserEngine {
       // search this one. The last picture is still worth showing.
       if (!asked) hand(buffer.flush())
       return !asked
+    })
+  }
+
+  /**
+   * `go movetime` and the move from its `bestmove` line, not from the `info` lines: a
+   * rating-limited Stockfish searches at full strength and weakens only the move it picks.
+   */
+  playMove(fen: string, request: PlayMoveOptions): Promise<string | null> {
+    const position = positionFrom(fen)
+    if (position === null) {
+      return Promise.reject(new BrowserEngineError(`${fen} is not a position this engine can read`))
+    }
+    return this.driver.serialise(async () => {
+      const applied: UciOption[] = []
+      for (const [name, value] of Object.entries(request.options)) {
+        const declared = this.declaredOptions.find(
+          (option) => option.name.toLowerCase() === name.toLowerCase(),
+        )
+        if (declared === undefined) {
+          throw new BrowserEngineError(`${name} is not an option of this engine`)
+        }
+        this.driver.send(`setoption name ${declared.name} value ${String(value)}`)
+        applied.push(declared)
+      }
+      if (applied.length > 0) await this.driver.ready()
+      try {
+        this.driver.send(`position fen ${fen}`)
+        const answer = await this.driver.exchange(
+          `go movetime ${Math.max(1, Math.round(request.movetimeMs))}`,
+          (line) => (isBestMoveLine(line) ? line : undefined),
+        )
+        const token = answer.trim().split(/\s+/)[1] ?? ''
+        const move = readUci(position, token)
+        return move === null ? null : writeUci(position, move, false)
+      } finally {
+        // Put back what this search changed: the engine's advertised value where it has
+        // one, its declared default otherwise.
+        for (const option of applied) {
+          const restored = this.options[option.name] ?? option.default
+          if (restored !== null) {
+            this.driver.send(`setoption name ${option.name} value ${String(restored)}`)
+          }
+        }
+        if (applied.length > 0) await this.driver.ready()
+      }
     })
   }
 

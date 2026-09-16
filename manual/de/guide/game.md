@@ -7,6 +7,14 @@ markierten Zug, Pos1 und Ende an Anfang und Ende, die Leertaste spielt die Parti
 dreht das Brett, `[` und `]` öffnen die vorige und die nächste Partie deiner Liste. Die
 vollständige Tastenliste steht unter [Einstellungen](settings.md).
 
+Die Bedienelemente stehen rund um das Brett statt darunter. Die Zeile mit dem Namen deines
+Gegners, über dem Brett, trägt die vier Dinge, die ändern, was das Brett *zeigt*:
+Bretteinstellungen, drehen, Hinweise und die Tastatur zum Tippen eines Zuges. Die Zeile mit
+deinem eigenen Namen, darunter, trägt, wo du in der Partie stehst und was die Stellung wert
+ist. Die Zeile darunter ist das, was du mit der Partie machst – analysieren, notieren, üben –
+und ganz rechts die Schaltflächen, mit denen du durch sie gehst. Was eine Partie selten
+braucht, etwa der Weg zurück zum Explorer, liegt hinter dem **⋯**.
+
 Die Leiste oben nennt die Eröffnung, die Herkunft der Partie, ihre Bedenkzeit und den
 Ausgang. Bei einer Lichess- oder Chess.com-Partie ist der Quellen-Chip dort ein Link, der
 die Partie auf der Seite in einem neuen Tab öffnet; auf dem Telefon ist derselbe Link der
@@ -80,8 +88,8 @@ Spiel einen Zug auf dem Brett, und du bist in einer Variante; `Esc` bringt dich 
 zurück. **Diese Variante anheften** speichert sie mit der Partie, sodass sie beim nächsten
 Mal wieder da ist und im PGN-Export steht.
 
-Du kannst die Züge auch tippen. `M`, oder die Tastatur-Schaltfläche neben **Hinweise**,
-öffnet ein kleines Feld unter dem Brett: Tipp `Sf3`, `exd5`, `O-O` oder `e8=D` – oder
+Du kannst die Züge auch tippen. `M`, oder die Tastatur-Schaltfläche neben **Hinweise** über
+dem Brett, öffnet ein kleines Feld in der Zeile darunter: Tipp `Sf3`, `exd5`, `O-O` oder `e8=D` – oder
 schlicht `g1f3` –, und der Zug wird gespielt, sobald er nur noch eines bedeuten kann; eine
 ganze Variante geht so als eine Folge von Zügen hinein. Schlagzeichen, Schach und `=` sind
 freiwillig, die englischen Figurenbuchstaben gehen genauso (`Nf3`), und ein Zug, den zwei
@@ -89,6 +97,35 @@ Figuren machen könnten (`Sd2` mit zwei Springern), wird als mehrdeutig gemeldet
 Linie dazuschreibst. `↵` spielt das Getippte, wenn das Feld noch auf mehr wartet, `Esc`
 schließt es. Solange das Feld den Cursor hat, bewegen die Pfeiltasten den Cursor und nicht
 die Partie.
+
+## Von einer Stellung aus üben { #practise-from-a-position }
+
+**Üben** in der Leiste unter dem Brett, oder `P`, spielt die Stellung auf dem Brett gegen
+den Computer aus. Der Dialog fragt drei Dinge:
+
+| | |
+|---|---|
+| **Du spielst** | Weiß oder Schwarz. Er öffnet mit der Seite, die unten auf dem Brett steht |
+| **Gegen** | Maia, oder jede eingeschaltete Suchengine – auf diesem Server, auf einem Runner oder in diesem Browser. Er öffnet mit Maia, wenn Maia antworten kann. Eine Engine, die gerade nicht antworten kann, ist ausgegraut, und der Grund steht unter der Liste |
+| **Spielstärke** | Bei einer Engine mit Wertungsbegrenzung eine Wertung zwischen der niedrigsten und der höchsten, die sie annimmt, oder **Volle Stärke**. Er öffnet mit deiner Maia-Zielwertung. Die Begrenzung von Stockfish ist auf etwa eine Sekunde pro Zug abgestimmt. Eine Engine ohne Begrenzung spielt mit voller Stärke. Bei Maia steht hier stattdessen die **Maia-Stufe**, aus den Stufen, die unter [Analyse](analysis.md) eingestellt sind |
+| **Bedenkzeit** | Wie lange eine Engine je Zug rechnet: eine halbe bis fünf Sekunden |
+
+Ist der Computer am Zug, zieht er zuerst. Deine Züge spielst du auf dem Brett oder tippst
+sie mit `M`. Die Engine rechnet die Bedenkzeit lang und spielt den Zug, den ihre
+Wertungsbegrenzung auswählt. Maia spielt einen Zug, den Menschen ihrer Stufe in der Stellung
+spielen, ausgewählt danach, wie oft sie ihn spielen – und macht deshalb auch ihre Fehler.
+
+Solange du übst, sind Bewertung, Engine-Feld, Maia, Verlauf und Pfeile verborgen. Eine Leiste
+an ihrer Stelle sagt, wer am Zug ist. **Engine zeigen**, oder `H`, holt sie zurück, ohne die
+Partie zu beenden, und lässt die Engine live auf der Stellung rechnen, auf dem Reiter
+**Live**. Verbirgst du sie wieder, hält sie an. **Zurücknehmen** nimmt deinen letzten Zug und die Antwort darauf zurück.
+Die Partie endet von selbst bei Matt, Patt, zu wenig Material, der Fünfzig-Züge-Regel oder
+dreifacher Stellungswiederholung.
+
+**Stoppen**, `P` oder `Esc` beendet das Üben. Die Züge bleiben als Variante auf dem Brett:
+Du kannst die Engine live rechnen lassen und nachsehen, wo es schiefging, oder die Variante
+mit **Diese Variante anheften** behalten. Verlässt du die Variante oder gehst zur Partie
+zurück, endet das Üben ebenfalls. Gespeichert wird nichts, solange du nichts anheftest.
 
 ## Die Engine live rechnen lassen
 
@@ -140,9 +177,9 @@ in der Spalte **Eröffnung**.
 
 ## Der Fernschachbaum { #the-correspondence-tree }
 
-Eine Partie, die du im Fernschach gespielt hast, trägt in der Titelleiste die Schaltfläche
-**Fernschachbaum**. Sie öffnet den Baum, der während der Partie entstanden ist – die
+Eine Partie, die du im Fernschach gespielt hast, trägt hinter dem **⋯** unter dem Brett den
+Eintrag **Fernschachbaum**. Er öffnet den Baum, der während der Partie entstanden ist – die
 Zugkandidaten, die Kommentare und das, was die Engines zu jeder Stellung gesagt haben – zum
-Lesen, nicht zum Ändern: Der Baum ist mit der Partie eingefroren. Die Schaltfläche gibt es
+Lesen, nicht zum Ändern: Der Baum ist mit der Partie eingefroren. Den Eintrag gibt es
 nur bei diesen Partien und nur, solange der Fernschachmodus an ist; der Modus steht unter
 [Fernschach](correspondence.md).

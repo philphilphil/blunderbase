@@ -72,6 +72,9 @@ import type {
   MaiaFillStatus,
   MaiaPolicyRequest,
   MaiaPolicyResponse,
+  PracticeMoveRequest,
+  PracticeMoveResponse,
+  PracticeOpponents,
   McpKeyCreate,
   McpKeyCreated,
   McpKeyResponse,
@@ -735,6 +738,18 @@ export const closeStream = (id: string) => http.delete<void>(`/streams/${id}`)
  */
 export const maiaPolicy = (body: MaiaPolicyRequest) =>
   http.post<MaiaPolicyResponse>('/maia/policy', { body })
+
+// --- practice -------------------------------------------------------------
+
+/** Every engine a practice game can be against, with its rating range, and Maia. */
+export const practiceOpponents = () => http.get<PracticeOpponents>('/practice/opponents')
+
+/**
+ * The engine's reply in a position: a bounded search that answers with the move it plays,
+ * held to `elo` where given. `409` is a sentence about why it cannot answer right now.
+ */
+export const practiceMove = (body: PracticeMoveRequest) =>
+  http.post<PracticeMoveResponse>('/practice/move', { body })
 
 // --- live -----------------------------------------------------------------
 

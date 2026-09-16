@@ -164,6 +164,8 @@ export const queryKeys = {
   engines: (): QueryKey => ['engines'],
   engineList: (enabledOnly = false): QueryKey => ['engines', 'list', enabledOnly],
   engine: (id: number): QueryKey => ['engines', 'detail', id],
+  /** Under `engines`, so anything that changes an engine refreshes who can be played. */
+  practiceOpponents: (): QueryKey => ['engines', 'practice'],
   engineRoles: (): QueryKey => ['engines', 'roles'],
   /**
    * The Analyse dialog's engine list. Under `['engines']` rather than `['analysis']`: what

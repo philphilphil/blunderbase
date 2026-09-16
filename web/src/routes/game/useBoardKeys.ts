@@ -30,6 +30,8 @@ export interface BoardKeyHandlers {
   boardSettings?: () => void
   /** Open the Analyse… dialog. */
   analyse?: () => void
+  /** Open the practice dialog, or end the practice game that is on. */
+  practice?: () => void
   copyPgn?: () => void
   /** Maia's compare grid on or off. */
   maiaCompare?: () => void
@@ -196,6 +198,8 @@ function run(action: BoardAction, keys: BoardKeyHandlers): boolean {
       return call(keys.boardSettings)
     case 'analyse':
       return call(keys.analyse)
+    case 'practice':
+      return call(keys.practice)
     case 'copy-pgn':
       return call(keys.copyPgn)
     case 'maia-compare':

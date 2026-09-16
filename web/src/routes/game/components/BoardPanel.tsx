@@ -6,7 +6,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Flag,
+  FlipVertical2,
   Keyboard,
+  Lightbulb,
   Pause,
   Play,
   StickyNote,
@@ -32,6 +34,7 @@ import type { TypedMove } from '../moveInput'
 import type { RunProgress } from '../useAnalysisRequest'
 import { EvalBar } from './EvalBar'
 import { MoveInput } from './MoveInput'
+import { RowMenu, type RowMenuItem } from './RowMenu'
 
 export interface BoardPanelProps {
   /** The game position the cursor is on. */
@@ -186,6 +189,23 @@ export interface BoardPanelProps {
    * where the reader is looking, immediately after Hints.
    */
   actions?: ReactNode
+  /**
+   * What this game rarely needs, behind the row's ⋯ (`RowMenu`): the way back to the
+   * explorer, the tree behind a correspondence game. Empty draws no button at all.
+   */
+  menu?: RowMenuItem[]
+  /**
+   * Put the four board toggles and the two readouts in the control row rather than in the
+   * player rows flanking the board.
+   *
+   * The desktop's answer is the player rows: they exist, they are two-thirds empty, and a
+   * control that rides one costs the board nothing, where the same control in the row under
+   * the board is what was crowding it. The phone has no player rows — `MobileGameView` names
+   * both players in its own header and this panel hides them — so there the row is still the
+   * only place they can go, which is what this says. A board with no game behind it (the
+   * explorer's stand-in) has no player rows either, and falls back on its own.
+   */
+  toolsInRow?: boolean
   className?: string
 }
 
@@ -256,6 +276,8 @@ export function BoardPanel({
   onNote,
   noting,
   actions,
+  menu = [],
+  toolsInRow = false,
   className,
 }: BoardPanelProps) {
   const { t } = useLingui()
@@ -376,6 +398,30 @@ export function BoardPanel({
     })
   }, [analysis])
 
+  // Where the four toggles and the two readouts go. The player rows are the desktop's
+  // answer; without them — the phone, or a board with no game behind it — they are back in
+  // the control row, exactly as they were drawn before.
+  const inRow = toolsInRow || !game
+  const tools = <BoardTools
+    compact={!inRow}
+    hints={hints}
+    onHintsChange={onHintsChange}
+    engineHidden={engineHidden}
+    onFlip={onFlip}
+    moveEntry={moveEntry}
+  />
+  const readouts = (
+    <Readouts
+      inLine={inLine && analysis !== null}
+      lineDepth={lineDepth}
+      ply={ply}
+      plyCount={plyCount}
+      score={score}
+      scoreAlongLine={scoreAlongLine}
+      engineHidden={engineHidden}
+    />
+  )
+
   return (
     <div
       ref={column}
@@ -406,7 +452,16 @@ export function BoardPanel({
         one at the bottom of the board, so it is the one on the bottom row, and the row a
         player is on always agrees with the half of the board their pieces start on.
       */}
-      <PlayerRow side={orientation === 'white' ? 'black' : 'white'} game={game} material={material} />
+      <PlayerRow
+        side={orientation === 'white' ? 'black' : 'white'}
+        game={game}
+        material={material}
+        // The four board toggles ride this row's empty right half. They are about what the
+        // board is *showing* rather than about the game, they are pressed with the eye on
+        // the board, and up here they cost the board nothing — which is the whole of why
+        // the control row under it fits on one line again.
+        tools={inRow ? null : tools}
+      />
 
       {/*
         The board column takes the page's spare width now (`GamePage`), and the board is
@@ -537,25 +592,36 @@ export function BoardPanel({
         </Board>
       </div>
 
-      <PlayerRow side={orientation} game={game} material={material} />
+      <PlayerRow
+        side={orientation}
+        game={game}
+        material={material}
+        // `ply 34 / 91` and the score, directly above the transport that changes them: the
+        // answer is beside the thing that sets it, and one row further from the board than
+        // it used to be.
+        tools={inRow ? null : readouts}
+      />
 
       {/*
-        Three groups and two rules. Left, what the board is showing: its settings, Flip,
-        Hints. Then what to do to the game: Analyse…, a note, leaving a line, and
-        whatever the studio hangs off this particular game — adding a model game to the
-        library, going back to the explorer it was opened from. And hard right, past the
-        spacer, where you are and how to move: the ply and score
-        readouts and then the transport and the flagged jumps. Loose in one row, a dozen
-        controls of the same weight read as a strip to be searched; grouped, the hand goes to
-        the end of the row it wants. The rules are that grouping made visible, nothing more.
+        Two groups on the desktop now: what to *do* to the game, and how to move through it.
+
+        The row used to hold three, and the first of them — board settings, Flip, Hints, the
+        typed-move box — has gone up to the top player row, while the ply and score readouts
+        have gone down to the bottom one. Both rows were already there and two-thirds empty,
+        so the controls cost the board nothing where they are and were the reason the row
+        under the board wrapped onto a second line on an ordinary window. What is left here
+        is Analyse… (only while ⇧E has taken the engine pane away), Note, Practise, whatever
+        exists only in a state (Back to game, Show the engine, Add to library), the ⋯ for
+        what a game rarely needs, and hard right the transport and the flagged jumps.
 
         The stepping controls anchor the right because that is where the hand lives while a
         game is being read — against the moves column, beside the list they are walking, and
-        in the one corner of this row that never moves as the middle group grows and shrinks.
-        The two readouts ride with them rather than staying at the far edge: `ply 34 / 91` is
-        the answer the transport changes, and a number belongs next to the thing that sets it.
+        in the one corner of this row that never moves as the group beside it grows and
+        shrinks.
 
-        Which leaves the phone, where none of that holds. There the row sits directly under
+        Which leaves the phone, where none of that holds. It has no player rows at all
+        (`MobileGameView` names both players in its own header), so there the toggles and the
+        readouts are in this row exactly as they always were — `toolsInRow`. There the row sits directly under
         the board with the thumb already on it, and what the thumb is there for is the next
         move — so the navigation group takes `max-md:order-first` and leads. That, and the
         rules, are the only things the two layouts disagree about; a vertical rule goes below
@@ -584,81 +650,31 @@ export function BoardPanel({
         lines is worse than a group that moved.
       */}
       <div className="flex flex-wrap items-center gap-2 max-md:gap-1.5">
-        <div className="flex flex-none items-center gap-2 max-md:gap-1.5">
-          <BoardSettingsButton />
-
-          <button
-            type="button"
-            onClick={onFlip}
-            title={t`Flip the board (F)`}
-            className="flex-none rounded-md border border-edge bg-elevated px-2.5 py-[0.3125rem] text-xs text-soft hover:text-ink max-md:py-1.5"
-          >
-            {/* The arrow is the icon and stays put; only the word is language. */}
-            ⇅ <Trans>Flip</Trans>
-          </button>
-
-          {/* While the engine is hidden the button's own title is a promise the screen has
-              already kept twice over, and the columns it names are not on the page — but
-              the standing arrow for the move the game played next is still its business, so
-              it stays and only its tooltip narrows. */}
-          <button
-            type="button"
-            onClick={() => onHintsChange(!hints)}
-            aria-pressed={hints}
-            title={
-              engineHidden
-                ? t`Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E).`
-                : t`Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first.`
-            }
-            className={cn(
-              'flex-none rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
-              hints
-                ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-                : 'border-edge bg-elevated text-dim hover:text-ink',
+        {inRow ? (
+          <>
+            <div className="flex flex-none items-center gap-2 max-md:gap-1.5">{tools}</div>
+            {/* A rule with nothing behind it divides the row from the air. The actions group
+                can be empty — the explorer's stand-in board queues no run, takes no note and
+                is not a game anybody arrived at — so its rule is drawn only when it separates
+                something. */}
+            {(readOnly || !onAnalyse) && !onNote && !(inLine && onExitAnalysis) && !actions ? null : (
+              <Rule />
             )}
-          >
-            <Trans>Hints</Trans>
-          </button>
+          </>
+        ) : null}
 
-          {/* The typed-move box, and the button that opens it. In the "what the board is
-              showing" group rather than with the actions: typing a move is another way of
-              playing on the board, not something done to the game. Lit while open, like
-              Hints, and the box itself follows the button so the row grows to the right of
-              what the reader just pressed. */}
-          {moveEntry ? (
-            <>
-              <button
-                type="button"
-                onClick={() => moveEntry.onOpenChange(!moveEntry.open)}
-                aria-pressed={moveEntry.open}
-                aria-label={t`Type a move (M)`}
-                title={t`Type a move (M) — Nf3, exd5, O-O — instead of dragging it`}
-                className={cn(
-                  'flex flex-none items-center rounded-md border px-2 py-[0.3125rem] text-xs max-md:py-1.5',
-                  moveEntry.open
-                    ? 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
-                    : 'border-edge bg-elevated text-dim hover:text-ink',
-                )}
-              >
-                <Keyboard className="size-3.5" aria-hidden />
-              </button>
-              {moveEntry.open ? (
-                <MoveInput
-                  board={moveEntry.board}
-                  onPlay={moveEntry.onPlay}
-                  onClose={() => moveEntry.onOpenChange(false)}
-                  focusNonce={moveEntry.focusNonce}
-                />
-              ) : null}
-            </>
-          ) : null}
-        </div>
-
-        {/* A rule with nothing behind it divides the row from the air. The actions group can
-            be empty — the explorer's stand-in board queues no run, takes no note and is not
-            a game anybody arrived at — so its rule is drawn only when it separates
-            something. */}
-        {(readOnly || !onAnalyse) && !onNote && !(inLine && onExitAnalysis) && !actions ? null : <Rule />}
+        {/* The box the moves are typed into, when its button — up in the player row on the
+            desktop — is lit. It is here rather than beside that button because it is a text
+            field the width of a move list entry, and the player row is `h-6` with a name in
+            it; this row is the one thing on the screen that can grow a box. */}
+        {!inRow && moveEntry?.open ? (
+          <MoveInput
+            board={moveEntry.board}
+            onPlay={moveEntry.onPlay}
+            onClose={() => moveEntry.onOpenChange(false)}
+            focusNonce={moveEntry.focusNonce}
+          />
+        ) : null}
 
         {readOnly || !onAnalyse ? null : (
           <AnalyseButton
@@ -706,45 +722,19 @@ export function BoardPanel({
 
         {actions}
 
+        {/* What this game rarely needs. Nothing is drawn when there is nothing in it, which
+            is the ordinary library game opened from the library. */}
+        <RowMenu items={menu} />
+
         <div className="flex-1 max-md:hidden" />
         {/*
-          Both readouts go below `md`, and `MobileGameView`'s header carries both instead —
+          The readouts ride the bottom player row on the desktop. Here only where there is no
+          such row — and below `md` not at all: `MobileGameView`'s header carries both,
           `+0.32 · 1-0 · ply 34/91` on a line it was drawing anyway. Kept here they wrapped
           onto a third line of their own, which spent a third of a `rem` of pinned height on
           two small pieces of text and took it straight out of the tab pane underneath.
         */}
-        {/* One group, so a row that has to wrap never leaves the score chip stranded on a
-            line of its own: the two readouts are read together and they move together. */}
-        <div className="flex flex-none items-center gap-2 max-md:hidden">
-          <span className="font-mono text-[0.6875rem] tabular whitespace-nowrap text-dim">
-            {inLine && analysis ? (
-              <Trans>analysis +{lineDepth}</Trans>
-            ) : (
-              <Trans>ply {ply} / {plyCount}</Trans>
-            )}
-          </span>
-          {/* The ply readout beside it stays: where you are in the game is the game. */}
-          {engineHidden ? null : (
-            <span
-              title={
-                scoreAlongLine
-                  ? t`The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it`
-                  : undefined
-              }
-              className={cn(
-                'rounded-sm border px-1.5 py-0.5 font-mono text-[0.6875rem] tabular',
-                // The analysis board's own purple, the colour "Back to game" is drawn in a
-                // few controls to the left: the reader is inside a line, and this number
-                // belongs to the line rather than to the game.
-                scoreAlongLine
-                  ? 'border-brilliant/35 bg-brilliant/10 text-brilliant'
-                  : 'border-edge bg-chip-info text-ink',
-              )}
-            >
-              {formatScore(score)}
-            </span>
-          )}
-        </div>
+        {inRow ? <div className="flex flex-none items-center gap-2 max-md:hidden">{readouts}</div> : null}
 
         <Rule />
 
@@ -884,10 +874,13 @@ function PlayerRow({
   side,
   game,
   material,
+  tools,
 }: {
   side: Color
   game: GameSummary | null | undefined
   material: MaterialBalance
+  /** What rides this row's empty right half: the board toggles, or the two readouts. */
+  tools?: ReactNode
 }) {
   const { t } = useLingui()
   if (!game) return null
@@ -937,7 +930,178 @@ function PlayerRow({
           {advantage > 0 ? `+${advantage}` : `−${-advantage}`}
         </span>
       ) : null}
+      {/* The name is what gives way when the row is short of width (`truncate` above), so
+          the controls at this end keep their size whatever the player is called. */}
+      {tools ? (
+        <>
+          <span className="min-w-2 flex-1" />
+          <span className="flex flex-none items-center gap-1.5">{tools}</span>
+        </>
+      ) : null}
     </div>
+  )
+}
+
+/**
+ * The four things that change what the board is showing: its settings, Flip, Hints, and the
+ * box a move is typed into.
+ *
+ * Two weights. `compact` is the player row's — icon-only at the row's own height, since a
+ * row that is 1.5rem tall with a name in it cannot carry four words, and these are the four
+ * controls on the screen whose key everybody learns first (S, F, H, M). Otherwise it is the
+ * control row's, which is what it has always been: Flip and Hints keep their words.
+ *
+ * Every button says its key in its tooltip either way, which is the only thing an icon owes
+ * a reader who has not learned it yet.
+ */
+function BoardTools({
+  compact,
+  hints,
+  onHintsChange,
+  engineHidden,
+  onFlip,
+  moveEntry,
+}: {
+  compact: boolean
+  hints: boolean
+  onHintsChange: (hints: boolean) => void
+  engineHidden: boolean
+  onFlip: () => void
+  moveEntry: BoardPanelProps['moveEntry']
+}) {
+  const { t } = useLingui()
+  /*
+   * One shape for all four, and a square one.
+   *
+   * They are four buttons of equal weight sitting side by side, so anything that differs
+   * between them — a wider box, a smaller glyph, a text arrow beside three drawn icons —
+   * reads as a difference in kind that is not there. The compact box is `size-6` — the
+   * player row's own `h-6`, so the four fill the row they ride rather than floating inside
+   * it — with the icon centred and `p-0` overriding whatever padding the button brought
+   * with it (`BoardSettingsButton` has its own, for the row it used to stand in).
+   */
+  const icon = 'size-4'
+  const shape = compact
+    ? 'flex size-6 flex-none items-center justify-center rounded border p-0 max-md:p-0'
+    : 'flex flex-none items-center rounded-md border px-2.5 py-[0.3125rem] text-xs max-md:py-1.5'
+  const quiet = 'border-edge bg-elevated text-dim hover:text-ink'
+  const lit = 'border-accent-teal/30 bg-accent-teal/10 text-accent-teal'
+
+  return (
+    <>
+      <BoardSettingsButton
+        className={compact ? cn(shape, quiet) : undefined}
+        iconClassName={compact ? icon : undefined}
+      />
+
+      <button
+        type="button"
+        onClick={onFlip}
+        // Only the icon-only one needs a label of its own; the row's button says its word.
+        aria-label={compact ? t`Flip the board` : undefined}
+        title={t`Flip the board (F)`}
+        className={cn(shape, quiet, !compact && 'text-soft')}
+      >
+        {/* A drawn icon rather than the `⇅` this button used to carry: an arrow pair is a
+            *swap*, and what this does is turn the board over — the mirror the icon draws.
+            The row's button keeps the arrow, where it sits beside its own word. */}
+        {compact ? <FlipVertical2 className={icon} aria-hidden /> : <span>⇅ {t`Flip`}</span>}
+      </button>
+
+      {/* While the engine is hidden the button's own title is a promise the screen has
+          already kept twice over, and the columns it names are not on the page — but the
+          standing arrow for the move the game played next is still its business, so it stays
+          and only its tooltip narrows. */}
+      <button
+        type="button"
+        onClick={() => onHintsChange(!hints)}
+        aria-pressed={hints}
+        aria-label={compact ? t`Hints` : undefined}
+        title={
+          engineHidden
+            ? t`Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E).`
+            : t`Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first.`
+        }
+        className={cn(shape, hints ? lit : quiet)}
+      >
+        {compact ? <Lightbulb className={icon} aria-hidden /> : <Trans>Hints</Trans>}
+      </button>
+
+      {/* Typing a move is another way of playing on the board, not something done to the
+          game, so it belongs with the board's own controls. Lit while the box is open; the
+          box itself is in the control row, which is the row that can hold a text field. */}
+      {moveEntry ? (
+        <button
+          type="button"
+          onClick={() => moveEntry.onOpenChange(!moveEntry.open)}
+          aria-pressed={moveEntry.open}
+          aria-label={t`Type a move (M)`}
+          title={t`Type a move (M) — Nf3, exd5, O-O — instead of dragging it`}
+          className={cn(shape, moveEntry.open ? lit : quiet, !compact && 'px-2')}
+        >
+          <Keyboard className={icon} aria-hidden />
+        </button>
+      ) : null}
+    </>
+  )
+}
+
+/**
+ * Where you are in the game, and what it is worth: `ply 34 / 91` — or `analysis +3` inside a
+ * line — and the score chip.
+ *
+ * One group wherever it is drawn, so a row that has to wrap never leaves the chip stranded
+ * on a line of its own: the two are read together and they move together.
+ */
+function Readouts({
+  inLine,
+  lineDepth,
+  ply,
+  plyCount,
+  score,
+  scoreAlongLine,
+  engineHidden,
+}: {
+  inLine: boolean
+  lineDepth: number
+  ply: number
+  plyCount: number
+  score: Score | null
+  scoreAlongLine?: boolean
+  engineHidden: boolean
+}) {
+  const { t } = useLingui()
+  return (
+    <>
+      <span className="font-mono text-[0.6875rem] tabular whitespace-nowrap text-dim">
+        {inLine ? (
+          <Trans>analysis +{lineDepth}</Trans>
+        ) : (
+          <Trans>ply {ply} / {plyCount}</Trans>
+        )}
+      </span>
+      {/* The ply readout beside it stays: where you are in the game is the game. */}
+      {engineHidden ? null : (
+        <span
+          title={
+            scoreAlongLine
+              ? t`The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it`
+              : undefined
+          }
+          className={cn(
+            'rounded-sm border px-1.5 py-0.5 font-mono text-[0.6875rem] tabular',
+            // The analysis board's own purple, the colour "Back to game" is drawn in: the
+            // reader is inside a line, and this number belongs to the line rather than to
+            // the game.
+            scoreAlongLine
+              ? 'border-brilliant/35 bg-brilliant/10 text-brilliant'
+              : 'border-edge bg-chip-info text-ink',
+          )}
+        >
+          {formatScore(score)}
+        </span>
+      )}
+    </>
   )
 }
 

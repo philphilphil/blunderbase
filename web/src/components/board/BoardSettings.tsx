@@ -112,7 +112,15 @@ const GRAPH_MARKS: { value: EvalGraphMarks; label: MessageDescriptor }[] = [
  */
 export const BOARD_SETTINGS_ID = 'board-settings-button'
 
-export function BoardSettingsButton({ className }: { className?: string }) {
+export function BoardSettingsButton({
+  className,
+  // The gear's own size, for a caller that draws this button beside others and needs the
+  // four icons to match (`BoardPanel`'s board toggles).
+  iconClassName,
+}: {
+  className?: string
+  iconClassName?: string
+}) {
   const { t, i18n } = useLingui()
   const [open, setOpen] = useState(false)
   const arrows = useBoardArrowPrefs()
@@ -175,7 +183,7 @@ export function BoardSettingsButton({ className }: { className?: string }) {
           className,
         )}
       >
-        <Settings2 className="size-3.5" aria-hidden />
+        <Settings2 className={cn('size-3.5', iconClassName)} aria-hidden />
       </button>
 
       {open ? (

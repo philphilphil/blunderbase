@@ -67,6 +67,13 @@ STREAM_PAUSE = "stream_pause"
 STREAM_PAUSED = "stream_paused"
 STREAM_RESUME = "stream_resume"
 
+# Practice: one bounded search that answers with the move the engine would *play*, set up
+# with options for this one question (a rating to play at). Not a stream, because a weakened
+# Stockfish only weakens its `bestmove` — the `info` lines a stream relays are its full-
+# strength search — and not a run, because nothing is stored and a person is waiting.
+MOVE_REQUEST = "move_request"
+MOVE_RESULT = "move_result"
+
 # What a runner can do beyond the protocol version's baseline, named in its `hello` so a
 # server can tell an older runner from a newer one without bumping `PROTO_VERSION` — a
 # runner that lacks a feature still connects and takes everything else.
@@ -77,7 +84,10 @@ FEATURE_STREAM_PAUSE = "stream_pause"
 # node-budget runs for it — the queue's own import passes — and leaves the rest for a
 # runner (or the server) that can honour what the person asked for.
 FEATURE_RUN_LIMITS = "run_limits"
-FEATURES = (FEATURE_ROOT_MOVES, FEATURE_STREAM_PAUSE, FEATURE_RUN_LIMITS)
+# The runner answers `move_request`. One that does not is never sent one, and practice
+# names the runner rather than waiting on an answer that will not come.
+FEATURE_PLAY_MOVE = "play_move"
+FEATURES = (FEATURE_ROOT_MOVES, FEATURE_STREAM_PAUSE, FEATURE_RUN_LIMITS, FEATURE_PLAY_MOVE)
 
 # What every plan says in its `tier` field. The server has one analysis pass now and
 # nothing reads the word, but a runner from before still requires it when it decodes a
@@ -110,6 +120,8 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     STREAM_PAUSE: ("session_id",),
     STREAM_PAUSED: ("session_id",),
     STREAM_RESUME: ("session_id",),
+    MOVE_REQUEST: ("request_id", "engine", "fen", "movetime_ms"),
+    MOVE_RESULT: ("request_id",),
 }
 
 # --- error codes -----------------------------------------------------------
@@ -466,6 +478,34 @@ def stream_closed(
     *, session_id: str, reason: str = "closed", error: str | None = None
 ) -> dict[str, Any]:
     return {"type": STREAM_CLOSED, "session_id": session_id, "reason": reason, "error": error}
+
+
+def move_request(
+    *,
+    request_id: str,
+    engine: str,
+    fen: str,
+    movetime_ms: int,
+    options: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Search `fen` for `movetime_ms` with `options` laid over the engine's own, and answer
+    with the move it plays. The options are for this search only: the runner must not leave
+    a weakened engine behind for the next run."""
+    return {
+        "type": MOVE_REQUEST,
+        "request_id": request_id,
+        "engine": engine,
+        "fen": fen,
+        "movetime_ms": int(movetime_ms),
+        "options": dict(options or {}),
+    }
+
+
+def move_result(
+    *, request_id: str, uci: str | None = None, error: str | None = None
+) -> dict[str, Any]:
+    """The move, or why there is none. Exactly one of the two is set."""
+    return {"type": MOVE_RESULT, "request_id": request_id, "uci": uci, "error": error}
 
 
 # --- payloads: the run plan ------------------------------------------------

@@ -62,7 +62,10 @@ ihrer eigenen `runner.yaml`, die Bilanzzeile gilt also nur diesem Server.
 Ein **Runner** ist ein zweiter Blunderbase-Prozess auf einer Maschine mit freien Kernen. Er
 hat keine Datenbank und liefert keine Seite aus. Er meldet sich *von sich aus* bei deinem
 Server, sagt, welche Engines er hat, und bekommt ganze Analyseaufträge und Analysebretter
-zugeteilt. Einem fertigen Durchlauf sieht man nicht an, wo er gelaufen ist.
+zugeteilt. Einem fertigen Durchlauf sieht man nicht an, wo er gelaufen ist. Er beantwortet
+auch die Züge einer [Übungspartie](../guide/game.md#practise-from-a-position) auf seinen
+Engines. Ein Runner, der älter ist als das Üben, kann das nicht, und der Übungsdialog sagt,
+dass er aktualisiert werden muss.
 
 Nimm einen, wenn die Maschine, auf der Blunderbase läuft, nicht die Maschine ist, die rechnen
 soll.

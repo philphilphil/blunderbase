@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -232,6 +232,23 @@ const MAIA_LIVE = {
   ],
 }
 
+/** Who practice can be against: the one local Stockfish, held to a rating, and no Maia. */
+const PRACTICE_OPPONENTS = {
+  engines: [
+    {
+      engine_id: 1,
+      name: 'stockfish',
+      runner_id: null,
+      available: true,
+      reason: null,
+      strength: { min: 1320, max: 3190, default: 1320 },
+    },
+  ],
+  default_engine_id: 1,
+  maia: { available: false, reason: 'no human-move model is chosen' },
+  movetime_ms: { default: 1000, min: 100, max: 10000 },
+}
+
 function stubFetch(
   overrides: Record<string, unknown> = {},
   { maiaStatus = 200 }: { maiaStatus?: number } = {},
@@ -245,6 +262,22 @@ function stubFetch(
         return json({ error: 'maia_unavailable', detail: 'No local Maia engine.' }, maiaStatus)
       }
       return json(MAIA_LIVE)
+    }
+    if (url.includes('/practice/opponents')) return json(PRACTICE_OPPONENTS)
+    if (url.includes('/practice/move')) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { fen: string }) : null
+      posted.push({ url, body })
+      // Black's answer to whatever White just played from the start: e5 is legal after any of
+      // the first moves these tests type.
+      return json({
+        uci: 'e7e5',
+        san: 'e5',
+        engine_id: 1,
+        engine: 'stockfish',
+        runner_id: null,
+        elo: 1700,
+        movetime_ms: 1000,
+      })
     }
     if (url.includes('/auth/status')) {
       return json({ setup_required: false, authenticated: true, maia_target_elo: 1700 })
@@ -347,7 +380,7 @@ function ExplorerStub() {
   )
 }
 
-function renderPage(entry = '/games/14') {
+function renderPage(entry: string | { pathname: string; state: unknown } = '/games/14') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   })
@@ -430,8 +463,11 @@ describe('GamePage', () => {
     expect(within(screen.getByTestId('maia-engine-lines')).getByRole('button', { name: 'Analyse' })).toBe(
       analyse,
     )
-    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement
-    expect(settings?.parentElement?.contains(analyse)).toBe(false)
+    // The board's own toggles are not in that row either: they ride the top player row.
+    const toggles = screen.getByRole('button', { name: 'Flip the board' }).parentElement
+    expect(toggles?.contains(analyse)).toBe(false)
+    const [topRow] = screen.getAllByTestId('player-row')
+    expect(topRow!.contains(toggles!)).toBe(true)
   })
 
   it('moves Analyse… into the board row while the engine is hidden', async () => {
@@ -442,8 +478,10 @@ describe('GamePage', () => {
     // ⇧E takes the engine pane away, and asking is what a reader does next.
     expect(screen.queryByTestId('maia-engine-lines')).not.toBeInTheDocument()
     const analyse = screen.getByRole('button', { name: 'Analyse' })
-    const settings = screen.getByRole('button', { name: '⇅ Flip' }).parentElement
-    expect(settings?.parentElement?.contains(analyse)).toBe(true)
+    // The board row is the one holding the transport, which is where Analyse… stands in.
+    const row = screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!
+      .parentElement!
+    expect(row.contains(analyse)).toBe(true)
   })
 
   it('puts both players’ Lichess-style totals to the left of the evaluation chart', async () => {
@@ -726,7 +764,7 @@ describe('GamePage', () => {
 
     // Tabbed to rather than clicked, so the reader is driving from the keyboard and ↵ is
     // that button's: the board stays on the game rather than walking the engine's line.
-    const flip = screen.getByRole('button', { name: '⇅ Flip' })
+    const flip = screen.getByRole('button', { name: 'Flip the board' })
     flip.focus()
     await user.tab()
     flip.focus()
@@ -1766,6 +1804,150 @@ describe('GamePage', () => {
     renderPage()
     await screen.findByText('Scandinavian Defense')
     expect(screen.queryByRole('button', { name: 'Show the engine' })).not.toBeInTheDocument()
+  })
+})
+
+describe('the board’s controls', () => {
+  /** The row under the board: the one holding the transport. */
+  const controlRow = () =>
+    screen.getByRole('button', { name: 'First' }).closest('div')!.parentElement!.parentElement!
+
+  it('rides the toggles on the top player row and the readouts on the bottom one', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const [top, bottom] = screen.getAllByTestId('player-row')
+    // What the board is showing goes with the board, above it — icon-only at the row's own
+    // height, each naming its key in its tooltip.
+    for (const name of ['Board settings', 'Flip the board', 'Hints', 'Type a move (M)']) {
+      const button = within(top!).getByRole('button', { name })
+      expect(controlRow()).not.toContainElement(button)
+      // One square box for all four: they are buttons of equal weight side by side, and a
+      // wider one among them reads as a difference in kind that is not there.
+      expect(button).toHaveClass('size-6')
+      expect(button.querySelector('svg')).toHaveClass('size-4')
+    }
+    // Where you are and what it is worth, directly above the transport that changes it.
+    expect(within(bottom!).getByText('ply 0 / 4')).toBeInTheDocument()
+    expect(within(bottom!).getByText(/^[+−-]\d/)).toBeInTheDocument()
+    expect(controlRow()).not.toHaveTextContent('ply 0 / 4')
+  })
+
+  it('keeps the typed-move box in the row, under the button that opens it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+
+    const [top] = screen.getAllByTestId('player-row')
+    await user.click(within(top!).getByRole('button', { name: 'Type a move (M)' }))
+    const box = screen.getByRole('textbox', { name: 'Type a move' })
+    // The player row is one line with a name in it; the box is the width of a move, so it
+    // goes where there is room for it.
+    expect(controlRow()).toContainElement(box)
+  })
+
+  it('puts the rare doors behind ⋯, and nothing there on an ordinary game', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    // A library game opened from the library has neither a way back to the explorer nor a
+    // correspondence tree, so the row grows no menu at all.
+    expect(screen.queryByRole('button', { name: 'More for this game' })).not.toBeInTheDocument()
+
+    cleanup()
+    // The way back rides in router state, the way `ModelGames` puts it there.
+    renderPage({ pathname: '/games/14', state: { from: '/explorer?fen=start' } })
+    await screen.findByText('Scandinavian Defense')
+    // Arrived from the explorer: the way back is one click behind the ⋯ rather than a
+    // button competing with Analyse… for the row.
+    const more = await screen.findByRole('button', { name: 'More for this game' })
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument()
+    await user.click(more)
+    expect(screen.getByRole('menuitem', { name: '← Back to explorer' })).toBeInTheDocument()
+  })
+})
+
+describe('GamePage practice', () => {
+  it('plays a position out against the engine, hiding the answers until asked', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('{Home}')
+
+    await user.keyboard('p')
+    const dialog = await screen.findByRole('dialog', { name: 'Practise from here' })
+    // Maia cannot answer here, so the engine is the one preselected, and why Maia is greyed
+    // is said rather than left to a tooltip.
+    expect(within(dialog).getByRole('button', { name: 'stockfish' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(dialog).toHaveTextContent('no human-move model is chosen')
+    // The slider opens on the reader's target rating, inside the engine's own range.
+    expect(within(dialog).getByRole('slider')).toHaveValue('1700')
+    await user.click(within(dialog).getByRole('button', { name: 'Play' }))
+
+    const bar = await screen.findByTestId('practice-bar')
+    expect(bar).toHaveTextContent('you play White against stockfish 1700')
+    expect(bar).toHaveTextContent('Your move.')
+    // The evaluation, the engine band and its graph are what practice keeps back.
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+
+    await user.keyboard('m')
+    await user.type(screen.getByRole('textbox', { name: 'Type a move' }), 'd4')
+    await waitFor(() =>
+      expect(posted.filter((call) => call.url.includes('/practice/move'))).toHaveLength(1),
+    )
+    const asked = posted.find((call) => call.url.includes('/practice/move'))!.body as Record<
+      string,
+      unknown
+    >
+    expect(asked).toMatchObject({ engine_id: 1, elo: 1700, movetime_ms: 1000 })
+    expect(String(asked.fen)).toMatch(/^rnbqkbnr\/pppppppp\/8\/8\/3P4\/8\/PPP1PPPP\/RNBQKBNR b/)
+    expect(await screen.findByText('analysis +2')).toBeInTheDocument()
+    expect(screen.getByTestId('practice-bar')).toHaveTextContent('Your move.')
+
+    // Take back removes the reply and the move it answered.
+    await user.click(screen.getByRole('button', { name: /Take back/ }))
+    await waitFor(() => expect(screen.queryByText(/analysis \+/)).not.toBeInTheDocument())
+
+    // H shows the engine without ending the game, as the live search on the board: the
+    // stored run never looked at a practice position, so Run would be an empty pane.
+    await user.keyboard('h')
+    expect(await screen.findByTestId('maia-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('practice-bar')).toBeInTheDocument()
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    expect(screen.getByRole('button', { name: 'Stop live analysis' })).toBeInTheDocument()
+
+    // Hiding it again stops the search, which would otherwise still be the answer.
+    await user.keyboard('h')
+    expect(screen.queryByTestId('maia-panel')).not.toBeInTheDocument()
+    await user.keyboard('h')
+    expect(await screen.findByTestId('maia-panel')).toBeInTheDocument()
+    await user.keyboard('p')
+    expect(screen.queryByTestId('practice-bar')).not.toBeInTheDocument()
+    expect(screen.getByTestId('maia-panel')).toBeInTheDocument()
+  })
+
+  it('refuses a move on the computer’s turn and ends the game with Escape', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    await user.keyboard('{Home}')
+    await user.click(screen.getByRole('button', { name: /Practise/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Practise from here' })
+    await user.click(within(dialog).getByRole('button', { name: 'Black' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Play' }))
+
+    // White is to move and White is the computer's: it answers first.
+    await waitFor(() =>
+      expect(posted.filter((call) => call.url.includes('/practice/move'))).toHaveLength(1),
+    )
+    const bar = await screen.findByTestId('practice-bar')
+    expect(bar).toHaveTextContent('you play Black against stockfish')
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('practice-bar')).not.toBeInTheDocument()
   })
 })
 

@@ -89,6 +89,7 @@ msgid "Engine"
 msgstr "Engine"
 
 #: src/components/analysis/AnalyseDialog.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 msgid "Looking for engines…"
 msgstr "Engines werden gesucht…"
 
@@ -175,6 +176,7 @@ msgstr "Von {moveName} bis zum Ende der Partie."
 #: src/routes/engines/CreateRunnerForm.tsx
 #: src/routes/engines/EngineDetail.tsx
 #: src/routes/engines/RunnerCard.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 #: src/routes/games/components/DeleteGamesDialog.tsx
 #: src/routes/import/DeleteAllGamesDialog.tsx
 #: src/routes/live/SaveMoment.tsx
@@ -441,6 +443,7 @@ msgstr "Fehlgeschlagen"
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/game/components/MoveTimeGraph.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -451,6 +454,7 @@ msgstr "Weiß"
 #: src/routes/correspondence/components/NewGameDialog.tsx
 #: src/routes/game/components/EvalGraph.tsx
 #: src/routes/game/components/MoveTimeGraph.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 #: src/routes/games/components/FilterBar.tsx
 #: src/routes/games/components/columns.ts
 #: src/routes/live/LivePage.tsx
@@ -1630,6 +1634,7 @@ msgstr "Nächste Partie in deiner Partienliste"
 
 #: src/lib/ui/shortcuts.ts
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/game/components/BoardPanel.tsx
 #: src/routes/live/LivePage.tsx
 msgid "Flip the board"
 msgstr "Brett drehen"
@@ -1681,6 +1686,10 @@ msgstr "Eine Notiz zu dieser Stellung schreiben"
 #: src/lib/ui/shortcuts.ts
 msgid "Analyse this game…"
 msgstr "Diese Partie analysieren…"
+
+#: src/lib/ui/shortcuts.ts
+msgid "Practise from this position against the computer, or stop"
+msgstr "Diese Stellung gegen den Computer ausspielen, oder aufhören"
 
 #: src/lib/ui/shortcuts.ts
 msgid "Copy the PGN"
@@ -1772,6 +1781,7 @@ msgstr "Die Abdeckung konnte nicht gelesen werden."
 #: src/routes/engines/EnginesPage.tsx
 #: src/routes/engines/MachinesPage.tsx
 #: src/routes/explorer/ExplorerPage.tsx
+#: src/routes/game/components/PracticeBar.tsx
 #: src/routes/games/components/GamesTable.tsx
 #: src/routes/repertoire/RepertoirePage.tsx
 #: src/routes/stats/kit/states.tsx
@@ -2684,6 +2694,7 @@ msgstr "Pausieren"
 
 #: src/routes/correspondence/components/EnginePane.tsx
 #: src/routes/engines/BrowserRunnerSection.tsx
+#: src/routes/game/components/PracticeBar.tsx
 #: src/routes/import/JobProgress.tsx
 msgid "Stop"
 msgstr "Stoppen"
@@ -5095,41 +5106,21 @@ msgid "The game payload was empty."
 msgstr "Die Antwort zu dieser Partie war leer."
 
 #: src/routes/game/GamePage.tsx
+msgid "Play this position out against the computer (P)"
+msgstr "Diese Stellung gegen den Computer ausspielen (P)"
+
+#. Button in the transport row that opens the practice dialog
+#: src/routes/game/GamePage.tsx
+msgid "Practise"
+msgstr "Üben"
+
+#: src/routes/game/GamePage.tsx
 msgid "Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it."
 msgstr "Notizen hängen an einer Partie in deiner Bibliothek. Füg diese hinzu, dann lässt sie sich kommentieren wie jede andere – gezählt in keiner Statistik, da du sie nicht gespielt hast."
 
 #: src/routes/game/GamePage.tsx
 msgid "Moves column width"
 msgstr "Breite der Zugspalte"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Flip the board (F)"
-msgstr "Brett drehen (F)"
-
-#: src/routes/game/components/BoardPanel.tsx
-#: src/routes/repertoire/RepertoirePage.tsx
-msgid "Flip"
-msgstr "Drehen"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
-msgstr "Hinweise (H): die festen Pfeile auf dem Brett. Die Engine ist ohnehin ausgeblendet (⇧E)."
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
-msgstr "Hinweise (H) – alles, was die Stellung beantwortet: die Pfeile und Markierungen auf dem Brett und die Spalten von Engine und Maia. Aus, um die Stellung erst selbst zu lesen."
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Hints"
-msgstr "Hinweise"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Type a move (M)"
-msgstr "Einen Zug tippen (M)"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
-msgstr "Einen Zug tippen (M) – Sf3, exd5, O-O – statt ihn zu ziehen"
 
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Write a note about this position (N)"
@@ -5142,18 +5133,6 @@ msgstr "Die Analysevariante verlassen und zurück zur Partie (Esc)"
 #: src/routes/game/components/BoardPanel.tsx
 msgid "Back to game"
 msgstr "Zurück zur Partie"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "analysis +{lineDepth}"
-msgstr "Analyse +{lineDepth}"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "ply {ply} / {plyCount}"
-msgstr "Halbzug {ply} / {plyCount}"
-
-#: src/routes/game/components/BoardPanel.tsx
-msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
-msgstr "Die Bewertung dieser Variante durch die Engine – sie gilt entlang der Variante und bleibt leer, sobald das Brett sie verlässt"
 
 #: src/routes/game/components/BoardPanel.tsx
 msgid "First"
@@ -5187,6 +5166,47 @@ msgstr "Materialvorteil von {advantage}"
 msgid "Down {deficit} in material"
 msgstr "Materialrückstand von {deficit}"
 
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Flip the board (F)"
+msgstr "Brett drehen (F)"
+
+#: src/routes/game/components/BoardPanel.tsx
+#: src/routes/repertoire/RepertoirePage.tsx
+msgid "Flip"
+msgstr "Drehen"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints"
+msgstr "Hinweise"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H): the standing arrows on the board. The engine is hidden anyway (⇧E)."
+msgstr "Hinweise (H): die festen Pfeile auf dem Brett. Die Engine ist ohnehin ausgeblendet (⇧E)."
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Hints (H) — everything that answers the position: the board's arrows and marks, and the engine and Maia columns. Off, to read it yourself first."
+msgstr "Hinweise (H) – alles, was die Stellung beantwortet: die Pfeile und Markierungen auf dem Brett und die Spalten von Engine und Maia. Aus, um die Stellung erst selbst zu lesen."
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M)"
+msgstr "Einen Zug tippen (M)"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "Type a move (M) — Nf3, exd5, O-O — instead of dragging it"
+msgstr "Einen Zug tippen (M) – Sf3, exd5, O-O – statt ihn zu ziehen"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "analysis +{lineDepth}"
+msgstr "Analyse +{lineDepth}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "ply {ply} / {plyCount}"
+msgstr "Halbzug {ply} / {plyCount}"
+
+#: src/routes/game/components/BoardPanel.tsx
+msgid "The engine’s evaluation of this line — it holds along the line, and empties where the board leaves it"
+msgstr "Die Bewertung dieser Variante durch die Engine – sie gilt entlang der Variante und bleibt leer, sobald das Brett sie verlässt"
+
 #: src/routes/game/components/BookPanel.tsx
 msgid "None of your games reached this position."
 msgstr "Keine deiner Partien hat diese Stellung erreicht."
@@ -5205,6 +5225,7 @@ msgstr "Die Engine wurde bei dieser Partie beim Import zurückgehalten, damit du
 
 #. Button in the transport row that reveals the engine on a game imported with it hidden
 #: src/routes/game/components/EngineRevealButton.tsx
+#: src/routes/game/components/PracticeBar.tsx
 msgid "Show the engine"
 msgstr "Engine zeigen"
 
@@ -5369,6 +5390,7 @@ msgid "What people at this level actually play here — not the engine’s best 
 msgstr "Was Menschen auf dieser Stufe hier wirklich spielen – nicht der beste Zug der Engine"
 
 #: src/routes/game/components/MaiaPanel.tsx
+#: src/routes/game/components/PracticeDialog.tsx
 msgid "Maia level"
 msgstr "Maia-Stufe"
 
@@ -5609,6 +5631,130 @@ msgstr "aus {origin}"
 msgid "not from this game"
 msgstr "nicht aus dieser Partie"
 
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Practice · you play White against {opponent}"
+msgstr "Übung · du spielst Weiß gegen {opponent}"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Practice · you play Black against {opponent}"
+msgstr "Übung · du spielst Schwarz gegen {opponent}"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "{opponent} is thinking…"
+msgstr "{opponent} denkt nach…"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Looking back — step to the end of the line to play on."
+msgstr "Du blätterst zurück — geh ans Ende der Variante, um weiterzuspielen."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Your move."
+msgstr "Du bist am Zug."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Take back your last move and the reply to it"
+msgstr "Deinen letzten Zug und die Antwort darauf zurücknehmen"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Take back"
+msgstr "Zurücknehmen"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Show or hide the evaluation, the engine lines and Maia (H)"
+msgstr "Bewertung, Engine-Varianten und Maia zeigen oder verbergen (H)"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Hide the engine"
+msgstr "Engine verbergen"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Stop practising; the moves stay on the board as a line (P)"
+msgstr "Üben beenden; die Züge bleiben als Variante auf dem Brett (P)"
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Checkmate — you won."
+msgstr "Schachmatt — du hast gewonnen."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Checkmate — you lost."
+msgstr "Schachmatt — du hast verloren."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Stalemate — a draw."
+msgstr "Patt — remis."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Neither side can mate — a draw."
+msgstr "Keine Seite kann mehr mattsetzen — remis."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "Fifty moves without a capture or a pawn move — a draw."
+msgstr "Fünfzig Züge ohne Schlagen oder Bauernzug — remis."
+
+#: src/routes/game/components/PracticeBar.tsx
+msgid "The same position three times — a draw."
+msgstr "Dreimal dieselbe Stellung — remis."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Practise from here"
+msgstr "Von hier aus üben"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Play this position out against the computer. The evaluation, the engine lines and Maia stay hidden until you press H; the moves land in the move list as a line you can keep."
+msgstr "Spiel diese Stellung gegen den Computer aus. Bewertung, Engine-Varianten und Maia bleiben verborgen, bis du H drückst; die Züge landen als Variante in der Zugliste, die du behalten kannst."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "You play"
+msgstr "Du spielst"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Against"
+msgstr "Gegen"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "There is no engine here that can play. Add one under Compute → Engines."
+msgstr "Hier ist keine Engine, die spielen kann. Füge unter Rechenleistung → Engines eine hinzu."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Maia plays a move humans at this level play here, drawn by how often they play it — so it blunders the way they do."
+msgstr "Maia spielt einen Zug, den Menschen dieser Stufe hier spielen, gewichtet danach, wie oft sie ihn spielen — und patzt deshalb so wie sie."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Strength"
+msgstr "Spielstärke"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Full strength"
+msgstr "Volle Stärke"
+
+#. placeholder {0}: strength.min
+#. placeholder {1}: strength.max
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "The engine’s own rating limit, from {0} to {1}. It plays weaker moves on purpose, calibrated for about a second a move."
+msgstr "Die eigene Wertungsbegrenzung der Engine, von {0} bis {1}. Sie spielt absichtlich schwächere Züge, abgestimmt auf etwa eine Sekunde pro Zug."
+
+#. placeholder {0}: engine.name
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "{0} declares no rating limit, so it plays at full strength."
+msgstr "{0} kennt keine Wertungsbegrenzung und spielt deshalb mit voller Stärke."
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Think time"
+msgstr "Bedenkzeit"
+
+#. placeholder {0}: value / 1000
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "{0} s"
+msgstr "{0} s"
+
+#: src/routes/game/components/PracticeDialog.tsx
+msgid "Play"
+msgstr "Spielen"
+
+#: src/routes/game/components/RowMenu.tsx
+msgid "More for this game"
+msgstr "Mehr zu dieser Partie"
+
 #: src/routes/game/components/StudioActions.tsx
 msgid "← Back to explorer"
 msgstr "← Zurück zum Explorer"
@@ -5652,6 +5798,10 @@ msgstr "Halbzug {count}"
 #: src/routes/game/useAnalysisRequest.ts
 msgid "Stockfish in this tab"
 msgstr "Stockfish in diesem Tab"
+
+#: src/routes/game/usePractice.ts
+msgid "No move came back for this position."
+msgstr "Für diese Stellung kam kein Zug zurück."
 
 #: src/routes/games/GamesPage.tsx
 msgid "the request never landed"

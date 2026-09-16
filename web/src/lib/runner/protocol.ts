@@ -27,6 +27,12 @@ export const PROTO_VERSION = 1
  */
 export const FEATURE_RUN_LIMITS = 'run_limits'
 
+/**
+ * `protocol.FEATURE_PLAY_MOVE`: this tab answers `move_request` — a practice reply, one
+ * bounded search that answers with the move played (`WasmEngine.playMove`).
+ */
+export const FEATURE_PLAY_MOVE = 'play_move'
+
 /** `runners/config.py: WS_SUBPROTOCOL`. Both halves have to spell it identically. */
 export const WS_SUBPROTOCOL = 'blunderbase.runner.v1'
 
@@ -157,7 +163,7 @@ export function hello(fields: {
     // `protocol.FEATURE_RUN_LIMITS`: this tab stops a search on nodes, depth or seconds
     // (`WasmEngine.search`). Without it the gateway would only hand the tab import passes,
     // and a run somebody asked for at depth 24 on this engine would wait for nobody.
-    features: [FEATURE_RUN_LIMITS],
+    features: [FEATURE_RUN_LIMITS, FEATURE_PLAY_MOVE],
   }
 }
 
@@ -271,6 +277,22 @@ export function streamClosed(fields: {
     type: 'stream_closed',
     session_id: fields.sessionId,
     reason: fields.reason ?? STREAM_CLOSED_REASON,
+    error: fields.error ?? null,
+  }
+}
+
+// --- practice replies ---------------------------------------------------------
+
+/** `protocol.move_result`: the move played, or why there is none. */
+export function moveResult(fields: {
+  requestId: string
+  uci?: string | null
+  error?: string | null
+}): Record<string, unknown> {
+  return {
+    type: 'move_result',
+    request_id: fields.requestId,
+    uci: fields.uci ?? null,
     error: fields.error ?? null,
   }
 }

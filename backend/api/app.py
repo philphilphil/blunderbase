@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from typing import Any
 
@@ -23,10 +23,12 @@ from backend.db.session import get_engine, get_sessionmaker
 from backend.runtime import capabilities_for
 from backend.services import explorer, import_service, maia_live, stats
 from backend.services import runners as runners_service
+from backend.services.practice import PracticeBroker
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers, CorrespondenceSearches
 from backend.workers.auto_sync import AutoSync
 from backend.workers.local_streams import LocalStreamBackend
+from backend.workers.practice_moves import LocalMoveBackend, RemoteMoveBackend
 from backend.workers.runner_gateway import RunnerGateway
 from backend.workers.runner_streams import RemoteStreamBackend
 
@@ -87,6 +89,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     streams = _analysis_boards(settings, workers, gateway)
     app.state.streams = streams
     await streams.start()
+    practice, stop_practice = _practice(settings, workers, gateway)
+    app.state.practice = practice
     # Correspondence searches draw on the workers' pool — one number of engine processes on
     # this host, whatever asked for them — and they start even when the mode is switched
     # off: a deployment that turns it off with searches in flight has rows that still have
@@ -139,6 +143,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # on one of them, and both have to still be there for it to give the slot back to.
         await streams.stop()
         app.state.streams = None
+        stop_practice()
+        app.state.practice = None
         if gateway is not None:
             await gateway.stop()
         app.state.gateway = None
@@ -266,6 +272,28 @@ def _analysis_boards(
     return broker
 
 
+def _practice(
+    settings: Settings, workers: AnalysisWorkers, gateway: RunnerGateway | None
+) -> tuple[PracticeBroker, Callable[[], None]]:
+    """The practice broker, on the same two hosts an analysis board is served on.
+
+    The local backend shares the workers' pool for the reason the board does: a practice
+    reply is a search on this machine's cores, and `analysis_concurrency` counts them.
+    Returns the broker and the way to stop listening to the gateway.
+    """
+    broker = PracticeBroker(settings=settings)
+    broker.register_backend(LocalMoveBackend.name, LocalMoveBackend(workers.pool))
+    if gateway is None:
+        return broker, _nothing
+    remote = RemoteMoveBackend(gateway)
+    broker.register_backend(RemoteMoveBackend.name, remote)
+    return broker, remote.install()
+
+
+def _nothing() -> None:
+    return None
+
+
 def _clear_stale_connections(settings: Settings) -> None:
     """Nobody is dialled in yet, whatever the last process left the rows saying."""
     with get_sessionmaker(settings)() as session:
@@ -302,6 +330,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.workers = None
     app.state.gateway = None
     app.state.streams = None
+    app.state.practice = None
     app.state.searches = None
     app.state.auto_sync = None
     app.state.loop = None

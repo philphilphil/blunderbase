@@ -107,6 +107,7 @@ aktuellen Bildschirm gelten.
 |---|---|
 | `N` | Eine Notiz zu dieser Stellung schreiben |
 | `A` | Analysieren – genauer hinsehen lassen |
+| `P` | Diese Stellung gegen den Computer ausspielen, oder aufhören |
 | `C` | PGN kopieren |
 
 ### Die Partientabelle
