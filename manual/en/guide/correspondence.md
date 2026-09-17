@@ -365,7 +365,8 @@ Under the board, three tabs about the node you have selected:
   arithmetic. Pinned to the game and to no move.
 - **Book** — what is already known about this position, from either of two books:
   **Masters**, the same database as the [Explorer](explorer.md)'s reference source, which
-  needs the Lichess token stored there; and **Your games**, your own tree from this position.
+  needs [Lichess connected](explorer.md#connect-lichess) and offers **Connect Lichess** when it
+  is not; and **Your games**, your own tree from this position.
   Hovering a row draws it on the board, and clicking one puts that move into the tree —
   walking into the branch if you already have it, adding it if you do not. It is how the
   opening phase is played here: read the theory and keep what you read, in one click.

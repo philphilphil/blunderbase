@@ -1209,9 +1209,28 @@ export interface ReferenceTokenStatus extends Extra {
   configured: boolean
 }
 
-/** `null` or an empty string clears the stored token. */
-export interface ReferenceTokenUpdate {
-  token: string | null
+// --- lichess connection ---------------------------------------------------
+
+/**
+ * The owner's Lichess sign-in. `username` is only there when the token came from signing
+ * in (a token pasted before the button existed has none); `synced` says the library syncs
+ * that account, which the live import needs; `stream` is the live import's own state.
+ */
+export interface LichessConnection extends Extra {
+  connected: boolean
+  username: string | null
+  synced: boolean
+  stream: 'off' | 'connecting' | 'live' | 'rejected'
+}
+
+export interface LichessConnectRequest {
+  redirect_uri: string
+  return_to?: string
+  desktop?: boolean
+}
+
+export interface LichessConnectStarted extends Extra {
+  url: string
 }
 
 // --- repertoire -----------------------------------------------------------

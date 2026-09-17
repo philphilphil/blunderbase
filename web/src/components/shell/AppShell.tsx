@@ -3,6 +3,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { toast, Toaster } from 'sonner'
 
+import { useLichessSignInResult } from '@/components/lichess/useLichessSignInResult'
 import { TourCoachmark } from '@/components/tour/TourCoachmark'
 import { onWriteRefused } from '@/lib/api/readOnly'
 import { SITE_URL } from '@/lib/links'
@@ -107,6 +108,10 @@ export function AppShell() {
   // then, so the announcement belongs to the shell rather than to the correspondence pages.
   // Silent while the mode is off.
   useCorrespondenceSearchToasts()
+
+  // "Connect Lichess" leaves the app and comes back to the screen it was pressed on, so the
+  // sentence saying how it went belongs to whichever screen that is.
+  useLichessSignInResult()
 
   const [navOpen, setNavOpen] = useState(false)
   const main = useRef<HTMLElement>(null)

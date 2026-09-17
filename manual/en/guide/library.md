@@ -28,6 +28,26 @@ The strip above the boxes is read by every source:
 minutes, one account at a time. The box shows the interval actually in force, which may be
 rounded up from what you typed.
 
+### Import Lichess games live
+
+The Lichess box has **Connect Lichess** under it. It takes you to lichess.org to approve
+Blunderbase, then back. From then on the box says **Connected as** your Lichess name, and a
+game you finish there shows up in Blunderbase a few seconds after it ends, with its
+analysis queued, as if you had pressed **Sync** yourself. The same connection is what the
+[reference databases](explorer.md#connect-lichess) need.
+
+It only works for the Lichess account you signed in with. That account needs one ordinary
+sync first, and its box needs **Include in sync** ticked; the line under **Connected as**
+tells you which of those is missing. **Sync automatically** keeps running beside it and
+picks up any game that ended while the connection was down. **Disconnect** removes the
+connection from Blunderbase and revokes it on Lichess.
+
+On the desktop app, approving happens in your usual browser, where you are probably already
+signed in to Lichess. Close that tab afterwards; the app updates by itself. Lichess shows
+"Does not use a secure connection" on the approval page when Blunderbase is reached over
+plain `http` at an address other than `localhost`. It still works.
+Chess.com and FICS cannot tell anyone when a game ends, so they are only synced.
+
 ### Stop a sync
 
 A sync in flight shows its counts in its own box with **Stop** beside them. It stops after

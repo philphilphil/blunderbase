@@ -45,6 +45,7 @@ export const EVENT_NAMES = [
   'correspondence.updated',
   'correspondence.search',
   'correspondence.snapshot',
+  'lichess.connection',
 ] as const
 
 export type EventName = (typeof EVENT_NAMES)[number]
@@ -223,6 +224,15 @@ export type LineEvent = LineCreatedEvent | LineDeletedEvent
 export type LiveUpdatedEvent = { event: 'live.updated' } & LiveState
 
 /**
+ * The Lichess connection changed. With `stream`, it is only the live import reporting its
+ * own state; without, somebody connected or disconnected.
+ */
+export interface LichessConnectionEvent {
+  event: 'lichess.connection'
+  stream?: 'off' | 'connecting' | 'live' | 'rejected'
+}
+
+/**
  * ~2 per second per open board. Delivery is lossy and may reorder (`CLIENT_BACKLOG = 256`,
  * oldest dropped): `seq` is monotonic per session and is what lets a consumer drop a stale
  * frame. `fen`/`multipv` are the session's, so a frame for a position the board has
@@ -377,6 +387,7 @@ export type BlunderbaseEvent =
   | NoteEvent
   | LineEvent
   | LiveUpdatedEvent
+  | LichessConnectionEvent
   | StreamEvent
   | RunnerEvent
   | CorrespondenceUpdatedEvent

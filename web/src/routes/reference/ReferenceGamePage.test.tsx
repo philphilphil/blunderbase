@@ -180,14 +180,14 @@ describe('ReferenceGamePage', () => {
     expect(await screen.findByTestId('game-error')).toBeInTheDocument()
   })
 
-  it('names the token when that is what failed, instead of a retry that cannot work', async () => {
+  it('offers a reconnect when that is what failed, instead of a retry that cannot work', async () => {
     // A masters game is fetched with the owner's token, so a revoked one fails here the way
     // it fails on the explorer — and pressing "try again" would only ask for the same 409.
     stubGame({ error: 'lichess_token_rejected', detail: 'upstream 401' }, 409)
     renderPage()
 
-    expect(await screen.findByText('Lichess refused that token')).toBeInTheDocument()
-    expect(screen.getByLabelText('Lichess API token')).toBeInTheDocument()
+    expect(await screen.findByText('Lichess refused the connection')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reconnect Lichess' })).toBeInTheDocument()
     expect(screen.queryByTestId('game-error')).not.toBeInTheDocument()
   })
 

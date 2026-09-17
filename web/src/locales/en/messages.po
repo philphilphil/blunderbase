@@ -632,6 +632,50 @@ msgstr "Somebody else's games — a master collection, a friend's export. Analys
 msgid "Whose games this PGN holds"
 msgstr "Whose games this PGN holds"
 
+#: src/components/lichess/ConnectLichess.tsx
+msgid "Reconnect Lichess"
+msgstr "Reconnect Lichess"
+
+#: src/components/lichess/ConnectLichess.tsx
+msgid "Connect Lichess"
+msgstr "Connect Lichess"
+
+#: src/components/lichess/ConnectLichess.tsx
+msgid "Finish signing in in your browser. This updates by itself."
+msgstr "Finish signing in in your browser. This updates by itself."
+
+#: src/components/lichess/ConnectLichess.tsx
+msgid "Lichess refused the connection"
+msgstr "Lichess refused the connection"
+
+#: src/components/lichess/ConnectLichess.tsx
+msgid "Lichess no longer accepts the stored sign-in. It may have been revoked, or it expired after a year. Connect again to read the masters and lichess databases."
+msgstr "Lichess no longer accepts the stored sign-in. It may have been revoked, or it expired after a year. Connect again to read the masters and lichess databases."
+
+#: src/components/lichess/ConnectLichess.tsx
+msgid "The masters and lichess databases only answer signed-in requests. Connect your Lichess account to read them; the same connection imports your Lichess games as soon as they end."
+msgstr "The masters and lichess databases only answer signed-in requests. Connect your Lichess account to read them; the same connection imports your Lichess games as soon as they end."
+
+#: src/components/lichess/useLichessSignInResult.ts
+msgid "Connected to Lichess as {username}"
+msgstr "Connected to Lichess as {username}"
+
+#: src/components/lichess/useLichessSignInResult.ts
+msgid "Connected to Lichess"
+msgstr "Connected to Lichess"
+
+#: src/components/lichess/useLichessSignInResult.ts
+msgid "Lichess was not connected."
+msgstr "Lichess was not connected."
+
+#: src/components/lichess/useLichessSignInResult.ts
+msgid "That Lichess sign-in expired. Press Connect Lichess again."
+msgstr "That Lichess sign-in expired. Press Connect Lichess again."
+
+#: src/components/lichess/useLichessSignInResult.ts
+msgid "Lichess could not complete the sign-in. Try again."
+msgstr "Lichess could not complete the sign-in. Try again."
+
 #: src/components/settings/SettingField.tsx
 msgid "not set"
 msgstr "not set"
@@ -642,7 +686,6 @@ msgstr "Revert"
 
 #: src/components/settings/SettingField.tsx
 #: src/routes/engines/RunnerCard.tsx
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
 #: src/routes/notes/components/NoteEditor.tsx
 msgid "Save"
 msgstr "Save"
@@ -2558,8 +2601,8 @@ msgid "No correspondence game has finished yet."
 msgstr "No correspondence game has finished yet."
 
 #: src/routes/correspondence/components/BookPane.tsx
-msgid "The masters database is Lichess's, and it needs the token stored under Settings → Explorer. Your own games are on the other tab and need nothing."
-msgstr "The masters database is Lichess's, and it needs the token stored under Settings → Explorer. Your own games are on the other tab and need nothing."
+msgid "The masters database is Lichess's, and it needs Lichess connected. Your own games are on the other tab and need nothing."
+msgstr "The masters database is Lichess's, and it needs Lichess connected. Your own games are on the other tab and need nothing."
 
 #: src/routes/correspondence/components/BookPane.tsx
 msgid "The masters database stops here."
@@ -5016,38 +5059,6 @@ msgstr "No game in this database goes any further than this position."
 msgid "{count, plural, one {{count} game} other {{count} games}}"
 msgstr "{count, plural, one {{count} game} other {{count} games}}"
 
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "Lichess refused that token"
-msgstr "Lichess refused that token"
-
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "Lichess needs a token"
-msgstr "Lichess needs a token"
-
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "The stored token was rejected — it may have been revoked. Paste a new personal API token to read the masters and lichess databases."
-msgstr "The stored token was rejected — it may have been revoked. Paste a new personal API token to read the masters and lichess databases."
-
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "The masters and lichess databases no longer answer anonymous requests. Paste a personal API token to read them; no scope is needed."
-msgstr "The masters and lichess databases no longer answer anonymous requests. Paste a personal API token to read them; no scope is needed."
-
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "Lichess API token"
-msgstr "Lichess API token"
-
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "Saving…"
-msgstr "Saving…"
-
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "Create one on lichess.org"
-msgstr "Create one on lichess.org"
-
-#: src/routes/explorer/components/ReferenceTokenCard.tsx
-msgid "Remove the stored token"
-msgstr "Remove the stored token"
-
 #: src/routes/explorer/components/ScoreBar.tsx
 msgid "{wins} wins, {draws} draws, {losses} losses"
 msgstr "{wins} wins, {draws} draws, {losses} losses"
@@ -6578,6 +6589,46 @@ msgstr "{total, plural, one {Delete # game and everything attached to it.} other
 #: src/routes/import/LibraryManagement.tsx
 msgid "Reset imported Library…"
 msgstr "Reset imported Library…"
+
+#: src/routes/import/LichessLive.tsx
+msgid "Connect again to import games as soon as they end."
+msgstr "Connect again to import games as soon as they end."
+
+#: src/routes/import/LichessLive.tsx
+msgid "Connect Lichess to import games as soon as they end."
+msgstr "Connect Lichess to import games as soon as they end."
+
+#: src/routes/import/LichessLive.tsx
+msgid "Live: new games arrive as soon as they end."
+msgstr "Live: new games arrive as soon as they end."
+
+#: src/routes/import/LichessLive.tsx
+msgid "Connecting to Lichess…"
+msgstr "Connecting to Lichess…"
+
+#: src/routes/import/LichessLive.tsx
+msgid "Lichess refused the connection."
+msgstr "Lichess refused the connection."
+
+#: src/routes/import/LichessLive.tsx
+msgid "Sync {username} once to import new games live."
+msgstr "Sync {username} once to import new games live."
+
+#: src/routes/import/LichessLive.tsx
+msgid "Live import is off while Lichess is left out of sync."
+msgstr "Live import is off while Lichess is left out of sync."
+
+#: src/routes/import/LichessLive.tsx
+msgid "Live import is off."
+msgstr "Live import is off."
+
+#: src/routes/import/LichessLive.tsx
+msgid "Connected as <0>{username}</0>"
+msgstr "Connected as <0>{username}</0>"
+
+#: src/routes/import/LichessLive.tsx
+msgid "Disconnect"
+msgstr "Disconnect"
 
 #: src/routes/import/PgnCard.tsx
 msgid "that file carried no PGN"

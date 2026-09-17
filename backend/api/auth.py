@@ -5,6 +5,9 @@ internet that is not a policy, it is an open database. So every route is guarded
 short list of things that are not is here rather than spread across the routers:
 
 - `/health`, because the container's healthcheck has no cookie jar;
+- `/lichess/callback`, where Lichess sends a browser back after "Connect Lichess". On the
+  desktop app that is the person's own browser, which has no session here; the single-use
+  state `services/lichess_connection.py` checks is what guards it instead;
 - `/auth/*`, because a locked door needs a handle;
 - `/mcp`, which has its own bearer guard in front of the protocol itself;
 - `/runner`, the transport a remote runner speaks, which carries its own per-runner bearer
@@ -60,7 +63,7 @@ COOKIE_SAMESITE = "lax"
 # name is a deployment that belongs behind TLS.
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
 
-EXEMPT_EXACT = frozenset({"/health"})
+EXEMPT_EXACT = frozenset({"/health", "/lichess/callback"})
 EXEMPT_PREFIXES = ("/auth", "/mcp", "/runner", "/manual")
 
 # 4401 rather than 1008: the 4000 range is the application's, and mirroring HTTP's 401

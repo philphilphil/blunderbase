@@ -18,12 +18,18 @@ The same board also reads two Lichess databases: **masters**, over-the-board gam
 titled players, and the rated lichess pools, narrowable by speed and rating band. Neither
 stores anything, and neither is counted in your own numbers.
 
-## Add a Lichess token
+## Connect Lichess
 
-Both reference databases need a Lichess personal API token. Create one at
-<https://lichess.org/account/oauth/token> with **no scopes ticked**, and paste it where the
-reference sources ask. Without it they refuse rather than come back empty. An empty box
-clears the stored token.
+Lichess only answers signed-in requests to both reference databases. The first time you
+open one, it offers **Connect Lichess**: approve Blunderbase on lichess.org and you come back
+to the same position with the table filled in. The approval page lists "Read incoming
+challenges", which is the permission the [live import](library.md#import-lichess-games-live)
+needs; the databases themselves need none. If Lichess later stops accepting the connection,
+because you revoked it on lichess.org or it expired after a year, the same place offers
+**Reconnect Lichess**.
+
+A token pasted in an earlier version keeps working for the databases. To import games live,
+connect once more on the Import page.
 
 ## Open a model game
 

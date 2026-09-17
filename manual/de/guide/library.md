@@ -29,6 +29,29 @@ Die Leiste über den Feldern gilt für alle Quellen:
 Konto auf **Synchronisieren**, ein Konto nach dem anderen. Das Feld zeigt das tatsächlich
 gültige Intervall; es kann aufgerundet sein.
 
+### Lichess-Partien live importieren { #import-lichess-games-live }
+
+Unter dem Lichess-Feld steht **Mit Lichess verbinden**. Die Schaltfläche führt dich zu
+lichess.org, wo du Blunderbase den Zugriff erlaubst, und wieder zurück. Danach steht im Feld
+**Verbunden als** mit deinem Lichess-Namen, und eine Partie, die du dort beendest, taucht
+wenige Sekunden später in Blunderbase auf, die Analyse schon eingereiht, als hättest du
+selbst **Synchronisieren** gedrückt. Dieselbe Verbindung brauchen auch die
+[Referenzdatenbanken](explorer.md#connect-lichess).
+
+Das klappt nur für das Lichess-Konto, mit dem du dich angemeldet hast. Dieses Konto muss
+einmal ganz normal synchronisiert worden sein, und in seinem Feld muss **Mit
+synchronisieren** angehakt sein; die Zeile unter **Verbunden als** sagt dir, was davon
+fehlt. **Automatisch synchronisieren** läuft daneben weiter und holt Partien nach, die zu
+Ende gingen, während die Verbindung unterbrochen war. **Trennen** entfernt die Verbindung aus
+Blunderbase und widerruft sie bei Lichess.
+
+In der Desktop-App erlaubst du den Zugriff in deinem gewohnten Browser, wo du bei Lichess
+meist schon angemeldet bist. Den Tab kannst du danach schließen, die App aktualisiert sich
+von selbst. Erreichst du Blunderbase über einfaches `http` unter einer anderen Adresse als
+`localhost`, zeigt Lichess auf der Freigabeseite „Does not use a secure connection“. Es
+funktioniert trotzdem. Chess.com und FICS melden nicht, wann eine Partie endet, dort bleibt
+es beim Synchronisieren.
+
 ### Eine Synchronisierung stoppen
 
 Ein laufender Import zeigt seine Zähler in seinem Feld, daneben steht **Stoppen**. Er hält

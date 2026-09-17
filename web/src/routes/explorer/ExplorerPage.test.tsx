@@ -384,84 +384,25 @@ describe('ExplorerPage sources', () => {
     vi.unstubAllGlobals()
   })
 
-  it('asks for a token instead of an error when Lichess has not been given one', async () => {
+  it('offers Connect Lichess instead of an error when Lichess is not connected', async () => {
     stubSources({ error: 'lichess_token_missing', detail: 'no token stored' }, 409)
     renderPage('/explorer?source=masters')
 
-    expect(await screen.findByText('Lichess needs a token')).toBeInTheDocument()
-    expect(screen.getByLabelText('Lichess API token')).toHaveAttribute('type', 'password')
-    expect(screen.getByText('Create one on lichess.org')).toHaveAttribute(
-      'href',
-      'https://lichess.org/account/oauth/token',
-    )
-    // Not an error card: there is nothing to retry until a token exists.
+    expect(await screen.findByRole('button', { name: 'Connect Lichess' })).toBeInTheDocument()
+    // Nothing to paste any more: signing in is the whole of it.
+    expect(screen.queryByLabelText('Lichess API token')).not.toBeInTheDocument()
+    // Not an error card: there is nothing to retry until Lichess is connected.
     expect(screen.queryByText('Try again')).not.toBeInTheDocument()
 
     vi.unstubAllGlobals()
   })
 
-  it('says the token was refused when Lichess rejects the stored one', async () => {
+  it('offers a reconnect when Lichess refuses the stored sign-in', async () => {
     stubSources({ error: 'lichess_token_rejected', detail: 'upstream 401' }, 409)
     renderPage('/explorer?source=lichess')
 
-    expect(await screen.findByText('Lichess refused that token')).toBeInTheDocument()
-    // Nothing is stored as far as the status read knows, so there is nothing to remove.
-    expect(screen.queryByText('Remove the stored token')).not.toBeInTheDocument()
-
-    vi.unstubAllGlobals()
-  })
-
-  it('offers to take out a revoked token, and only when one is stored', async () => {
-    const seen: string[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input)
-        seen.push(`${init?.method ?? 'GET'} ${url}${init?.body ? ` ${String(init.body)}` : ''}`)
-        if (url.includes('/reference/token')) return json({ configured: true })
-        if (url.includes('/reference/explorer')) {
-          return json({ error: 'lichess_token_rejected' }, 409)
-        }
-        return json({ error: 'not_found', detail: url }, 404)
-      }),
-    )
-    renderPage('/explorer?source=masters')
-
-    await userEvent.click(await screen.findByText('Remove the stored token'))
-    await waitFor(() =>
-      expect(
-        seen.some((entry) => entry.startsWith('PUT ') && entry.includes('"token":null')),
-      ).toBe(true),
-    )
-
-    vi.unstubAllGlobals()
-  })
-
-  it('stores a pasted token and asks the database again', async () => {
-    const seen = stubSources({ error: 'lichess_token_missing' }, 409)
-    renderPage('/explorer?source=masters')
-
-    await screen.findByText('Lichess needs a token')
-    // The second answer is the real one: storing a token is what makes the failed,
-    // cached-forever query run again.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input)
-        seen.push(`${init?.method ?? 'GET'} ${url}`)
-        if (url.includes('/reference/token')) return json({ configured: true })
-        if (url.includes('/reference/explorer')) return json(REFERENCE)
-        return json({ error: 'not_found', detail: url }, 404)
-      }),
-    )
-
-    await userEvent.type(screen.getByLabelText('Lichess API token'), 'lip_secret')
-    await userEvent.click(screen.getByText('Save'))
-
-    expect(await screen.findByText('1.d4')).toBeInTheDocument()
-    expect(seen.some((url) => url.startsWith('PUT ') && url.includes('/reference/token'))).toBe(
-      true,
-    )
+    expect(await screen.findByText('Lichess refused the connection')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reconnect Lichess' })).toBeInTheDocument()
 
     vi.unstubAllGlobals()
   })

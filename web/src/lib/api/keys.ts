@@ -128,8 +128,16 @@ export const queryKeys = {
     source,
     gameId,
   ],
-  /** Under the same root, so storing a token refetches the tree that failed without one. */
+  /** Under the same root, so connecting Lichess refetches the tree that failed without it. */
   referenceToken: (): QueryKey => ['reference', 'token'],
+
+  /**
+   * The owner's Lichess sign-in. Its own root, so the live import saying it reconnected
+   * refreshes the status line and not every reference lookup; a connect or a disconnect
+   * invalidates `['reference']` beside it (`lib/events/invalidation.ts`).
+   */
+  lichess: (): QueryKey => ['lichess'],
+  lichessConnection: (): QueryKey => ['lichess', 'connection'],
 
   /**
    * The two opening repertoires. Their own root and deliberately not a corner of

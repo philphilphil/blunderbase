@@ -87,12 +87,14 @@ They are identities, not numbers with a range, so they are outside `SETTINGS` an
 analysis form must not wipe the deployment's wiring. `services.engines` is where they mean
 something; here they are two rows and their accessors, the way `maia_elos` is.
 
-**The owner's Lichess token** — `lichess_token`, the personal API token the reference
-explorer sends to `explorer.lichess.ovh`, which no longer answers an anonymous request. A
-credential rather than a number: outside `SETTINGS` and outside `replace` for the same
-reason the engine roles are, and read straight where it is used so that pasting a new one
-takes effect on the next lookup. Nothing echoes it back — the surfaces answer whether one
-is stored, never what it is.
+**The owner's Lichess token** — `lichess_token` and `lichess_username`, the token "Connect
+Lichess" stored and the account it signed in as. The reference explorer sends it to
+`explorer.lichess.ovh`, which no longer answers an anonymous request, and the live import
+opens the owner's event stream with it. A credential rather than a number: outside
+`SETTINGS` and outside `replace` for the same reason the engine roles are, and read straight
+where it is used so that a new one takes effect on the next lookup. A token pasted before
+the button existed has no username, and keeps the explorer working without the stream.
+Nothing echoes the token back — the surfaces answer whether one is stored, never what it is.
 
 **Whether the queue is draining at all** — `queue_paused`, the top bar's pause button.
 Not one of the settings proper and deliberately not a member of `SETTINGS`: it is a switch over
@@ -189,6 +191,9 @@ HUMAN_ENGINE_ID = "human_engine_id"
 # `SETTINGS` for the same reason the engine roles are: it is a credential, not a number
 # with a range, and there is no value between "the right token" and "no token" to clamp to.
 LICHESS_TOKEN = "lichess_token"
+# Whose token that is, as Lichess named the account when the owner signed in with it. Only
+# "Connect Lichess" writes it; a pasted token has no name, which is how the two are told apart.
+LICHESS_USERNAME = "lichess_username"
 
 # Whether the workers are allowed to claim. Outside `SETTINGS` and outside `replace`'s
 # whole-set rewrite on purpose: it is not a number the analysis form posts, and a key that
@@ -572,18 +577,38 @@ def set_lichess_token(session: Session, value: str | None) -> str | None:
     it away", and there is no use for a row holding nothing. Cleared, the row is deleted —
     "the owner has not chosen" is the absence of a row here as it is everywhere else.
     """
-    token = (value or "").strip()
-    if not token:
-        session.execute(delete(AppSetting).where(AppSetting.key == LICHESS_TOKEN))
-        session.commit()
+    return set_lichess_connection(session, value, None)
+
+
+def get_lichess_username(session: Session) -> str | None:
+    """The Lichess account the stored token signed in as, or None for a pasted token."""
+    if get_lichess_token(session) is None:
         return None
-    row = session.get(AppSetting, LICHESS_TOKEN)
-    if row is None:
-        session.add(AppSetting(key=LICHESS_TOKEN, value=token))
-    else:
-        row.value = token
+    row = session.get(AppSetting, LICHESS_USERNAME)
+    if row is None or not isinstance(row.value, str):
+        return None
+    return row.value.strip() or None
+
+
+def set_lichess_connection(session: Session, token: str | None, username: str | None) -> str | None:
+    """Store a token with the account it belongs to, or clear both. Returns the token.
+
+    One write for the pair, so a token is never left beside the name of the account an
+    earlier token belonged to.
+    """
+    token = (token or "").strip()
+    username = (username or "").strip() if token else ""
+    for key, value in ((LICHESS_TOKEN, token), (LICHESS_USERNAME, username)):
+        row = session.get(AppSetting, key)
+        if not value:
+            if row is not None:
+                session.delete(row)
+        elif row is None:
+            session.add(AppSetting(key=key, value=value))
+        else:
+            row.value = value
     session.commit()
-    return token
+    return token or None
 
 
 def get_queue_paused(session: Session) -> bool:

@@ -400,8 +400,9 @@ Unter dem Brett drei Reiter zum ausgewählten Knoten:
 - **Diese Partie** – das Journal: was der Gegner gern tut, der Plan, die Rechnerei mit den
   Fristen. An die Partie geheftet und an keinen Zug.
 - **Buch** – was über diese Stellung schon bekannt ist, aus zwei Büchern: **Meister**,
-  dieselbe Datenbank wie die Referenzquelle im [Explorer](explorer.md), wofür der dort
-  hinterlegte Lichess-Token nötig ist, und **Deine Partien**, dein eigener Baum aus dieser
+  dieselbe Datenbank wie die Referenzquelle im [Explorer](explorer.md), die eine
+  [Verbindung zu Lichess](explorer.md#connect-lichess) braucht und **Mit Lichess verbinden**
+  anbietet, solange keine besteht, und **Deine Partien**, dein eigener Baum aus dieser
   Stellung. Zeigst du auf eine Zeile, wird sie aufs Brett gelegt; klickst du sie an, wandert
   der Zug in den Baum – in den vorhandenen Zweig hinein, wenn es ihn gibt, sonst wird er
   angelegt. So wird hier die Eröffnungsphase gespielt: Theorie lesen und das Gelesene

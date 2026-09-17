@@ -59,8 +59,8 @@ export function parseSource(value: string | null): ExplorerSource {
 }
 
 /**
- * Which failures the token card answers instead of the error card. Both are the same
- * problem from the owner's side — the books cannot be read until a token is stored — and
+ * Which failures the Connect Lichess card answers instead of the error card. Both are the
+ * same problem from the owner's side — the books cannot be read until Lichess is connected — and
  * neither is retryable, so offering "try again" would be offering the same 409.
  *
  * It lives beside the parsers rather than on the explorer because every screen that reads a

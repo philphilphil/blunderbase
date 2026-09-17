@@ -9,7 +9,8 @@
  * Nothing else is per-source. What a run is told — how far back, how many, whether to
  * queue an evaluation pass — belongs to the strip above the grid; a box owns only its name
  * and its button. The one thing it grows is the sync in flight, in the box that is doing
- * it rather than in a block appended under the grid.
+ * it rather than in a block appended under the grid — and, on Lichess alone, the sign-in
+ * line (`LichessLive`), because Lichess is the one source that can tell us a game ended.
  */
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
@@ -28,6 +29,7 @@ import { cn } from '@/lib/utils'
 
 import { SyncCheckbox } from './SyncCheckbox'
 import { JobProgress, progressChrome } from './JobProgress'
+import { LichessLive } from './LichessLive'
 import type { SyncOptions } from './SourcesPanel'
 import type { SourceProgress } from './useImportProgress'
 
@@ -201,6 +203,8 @@ export function AccountCard({
       </div>
 
       {progress ? <JobProgress progress={progress} /> : null}
+
+      {source === 'lichess' ? <LichessLive /> : null}
     </div>
   )
 }

@@ -27,6 +27,7 @@ from backend.services.practice import PracticeBroker
 from backend.services.streams import StreamBroker
 from backend.workers import AnalysisWorkers, CorrespondenceSearches
 from backend.workers.auto_sync import AutoSync
+from backend.workers.lichess_live import LichessLive
 from backend.workers.local_streams import LocalStreamBackend
 from backend.workers.practice_moves import LocalMoveBackend, RemoteMoveBackend
 from backend.workers.runner_gateway import RunnerGateway
@@ -110,6 +111,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.auto_sync = auto_sync
     if auto_sync is not None:
         await auto_sync.start()
+    # The live Lichess import is the same Sync button, pressed by a finished game. It idles
+    # until the owner has connected Lichess and synced that account.
+    lichess_live = (
+        LichessLive(settings=settings, broker=events) if not capabilities.read_only else None
+    )
+    app.state.lichess_live = lichess_live
+    if lichess_live is not None:
+        await lichess_live.start()
     summaries = asyncio.create_task(_backfill_stat_summaries(settings))
     books = asyncio.create_task(_backfill_position_books(settings))
     try:
@@ -133,6 +142,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if auto_sync is not None:
             await auto_sync.stop()
         app.state.auto_sync = None
+        if lichess_live is not None:
+            await lichess_live.stop()
+        app.state.lichess_live = None
         await wait_for_imports(app.state.imports)
         # Before the streams, the gateway and the workers: a search holds a process of its
         # own and its own database thread, and both are this set's to shut down.
@@ -333,6 +345,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.practice = None
     app.state.searches = None
     app.state.auto_sync = None
+    app.state.lichess_live = None
     app.state.loop = None
     app.state.mcp = None
 

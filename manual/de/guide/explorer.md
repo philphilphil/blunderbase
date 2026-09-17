@@ -19,13 +19,19 @@ Dasselbe Brett liest auch zwei Datenbanken von Lichess: **Meister**, Turnierpart
 zwischen Titelträgern, und die gewerteten Lichess-Partien, eingrenzbar nach Bedenkzeit und
 Wertungsbereich. Beides wird nicht gespeichert und zählt nicht in deine eigenen Zahlen.
 
-## Ein Lichess-Token hinterlegen
+## Mit Lichess verbinden { #connect-lichess }
 
-Beide Referenzdatenbanken brauchen ein persönliches API-Token von Lichess. Erzeuge eines
-unter <https://lichess.org/account/oauth/token>, **ohne einen Berechtigungsumfang
-anzuhaken**, und trag es dort ein, wo die Referenzquellen danach fragen. Ohne Token liefern
-sie eine Fehlermeldung statt einer leeren Liste. Ein leeres Feld löscht das gespeicherte
-Token.
+Beide Referenzdatenbanken beantworten nur angemeldete Anfragen. Öffnest du eine zum ersten
+Mal, bietet sie **Mit Lichess verbinden** an: Du erlaubst Blunderbase auf lichess.org den
+Zugriff und landest wieder in derselben Stellung, diesmal mit gefüllter Tabelle. Die
+Freigabeseite nennt „Read incoming challenges“; diese Berechtigung braucht der
+[Live-Import](library.md#import-lichess-games-live), die Datenbanken selbst brauchen keine.
+Nimmt Lichess die Verbindung später nicht mehr an, weil du sie auf lichess.org widerrufen
+hast oder sie nach einem Jahr abgelaufen ist, steht an derselben Stelle **Lichess neu
+verbinden**.
+
+Ein Token, das du in einer früheren Version eingefügt hast, funktioniert für die
+Datenbanken weiter. Für den Live-Import verbindest du dich auf der Importseite einmal neu.
 
 ## Eine Musterpartie öffnen { #open-a-model-game }
 

@@ -298,6 +298,19 @@ describe('invalidationsFor — quiet events', () => {
   })
 })
 
+describe('invalidationsFor — lichess connection', () => {
+  it('refreshes the reference books when somebody connects or disconnects', () => {
+    const keys = invalidationsFor({ event: 'lichess.connection' })
+    expect(has(keys, queryKeys.lichess())).toBe(true)
+    expect(has(keys, queryKeys.reference())).toBe(true)
+  })
+
+  it('refreshes only the status when the live import reports its state', () => {
+    const keys = invalidationsFor({ event: 'lichess.connection', stream: 'live' })
+    expect(names(keys)).toEqual(names([queryKeys.lichess()]))
+  })
+})
+
 describe('dedupeKeys', () => {
   it('drops a key a broader prefix already covers', () => {
     const keys = dedupeKeys([queryKeys.games(), ['games', 'detail', 4], queryKeys.notes()])

@@ -757,7 +757,7 @@ async def test_the_coach_opens_a_model_game(
 async def test_a_coach_with_no_token_is_told_to_ask_for_one(coach: MCPServer) -> None:
     payload = await failure(coach, "reference_explorer", source="masters")
     assert payload["error"] == "reference_token_missing"
-    assert "token" in payload["message"]
+    assert "connect Lichess" in payload["message"]
 
 
 async def test_a_source_the_coach_invented_is_a_structured_error(coach: MCPServer) -> None:

@@ -464,9 +464,9 @@ def _register_insight(server: MCPServer, coach: Coach) -> None:
         never add the two together. Read-only: nothing here is in their library, and the
         `top_games` entries can be opened with get_reference_game (for "lichess" they are
         the highest-rated games first, then recent ones). It is served by Lichess
-        and needs the owner's Lichess API token to be stored, so a `reference_token_missing`
-        error means asking them to paste one under Settings, not that the position is
-        unknown."""
+        and needs the owner to have connected Lichess, so a `reference_token_missing`
+        error means asking them to press Connect Lichess in the explorer or on the Import
+        page, not that the position is unknown."""
         wanted = str(source or "").strip().casefold()
         if wanted not in reference_service.SOURCES:
             raise CoachError(

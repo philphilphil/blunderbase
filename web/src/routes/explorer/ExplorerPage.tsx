@@ -43,6 +43,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Board } from '@/components/board/Board'
+import { LichessConnectCard } from '@/components/lichess/ConnectLichess'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { useExplorer, usePositionOccurrences, useReferenceExplorer } from '@/lib/api/queries'
 import { SPEEDS } from '@/lib/api/types'
@@ -59,7 +60,6 @@ import { OwnFilters } from './components/OwnFilters'
 import { PositionNotes } from './components/PositionNotes'
 import { ReferenceFilters } from './components/ReferenceFilters'
 import { ReferenceMoveTable } from './components/ReferenceMoveTable'
-import { ReferenceTokenCard } from './components/ReferenceTokenCard'
 import {
   buildLine,
   formatLineParam,
@@ -502,7 +502,7 @@ export function ExplorerPage() {
 
           {reference ? (
             tokenReason ? (
-              <ReferenceTokenCard reason={tokenReason} />
+              <LichessConnectCard reason={tokenReason} />
             ) : book.isError ? (
               <Failure
                 title={t`Could not read that database`}

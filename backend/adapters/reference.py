@@ -245,7 +245,7 @@ def _get(
 
     if response.status_code in (httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN):
         raise ReferenceAuthError(
-            "lichess refused the stored token; mint a fresh one and paste it again"
+            "lichess refused the stored token; connect Lichess again"
         )
     if response.status_code == httpx.codes.TOO_MANY_REQUESTS:
         raise ReferenceRateLimitedError(

@@ -19,12 +19,13 @@
  * keeping what you read are one gesture, which is the only reason this pane is here rather
  * than in another tab of the browser.
  *
- * Masters needs the Lichess token the reference explorer needs, and says so plainly rather
- * than failing: an owner with no token still has their own games, which is the tab that costs
+ * Masters needs the Lichess connection the reference explorer needs, and offers it plainly
+ * rather than failing: an owner who never connected still has their own games, the tab that costs
  * nothing and never leaves the machine.
  */
 import { Trans, useLingui } from '@lingui/react/macro'
 
+import { ConnectLichessButton } from '@/components/lichess/ConnectLichess'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePositionBook, useReferenceExplorer, useReferenceToken } from '@/lib/api/queries'
 import type { CorrespondenceTreeNode, ReferenceMove } from '@/lib/api/types'
@@ -84,12 +85,15 @@ function Masters({
 
   if (token.data && !enabled) {
     return (
-      <p className="px-3 py-6 text-center text-[0.71875rem] leading-[1.6] text-dim">
-        <Trans>
-          The masters database is Lichess's, and it needs the token stored under Settings →
-          Explorer. Your own games are on the other tab and need nothing.
-        </Trans>
-      </p>
+      <div className="flex flex-col items-center gap-3 px-3 py-6">
+        <p className="text-center text-[0.71875rem] leading-[1.6] text-dim">
+          <Trans>
+            The masters database is Lichess's, and it needs Lichess connected. Your own games
+            are on the other tab and need nothing.
+          </Trans>
+        </p>
+        <ConnectLichessButton className="items-center" />
+      </div>
     )
   }
 

@@ -66,6 +66,9 @@ import type {
   ImportStarted,
   SyncSchedule,
   LineCreate,
+  LichessConnection,
+  LichessConnectRequest,
+  LichessConnectStarted,
   LineResponse,
   LiveState,
   MaiaFillReceipt,
@@ -506,9 +509,17 @@ export const importReferenceGame = (source: ReferenceSource, gameId: string) =>
 /** Whether a Lichess token is stored — both explorer databases now require one. */
 export const getReferenceToken = () => http.get<ReferenceTokenStatus>('/reference/token')
 
-/** Store or clear the Lichess token. The answer says only whether one is configured. */
-export const setReferenceToken = (token: string | null) =>
-  http.put<ReferenceTokenStatus>('/reference/token', { body: { token } })
+// --- lichess connection ---------------------------------------------------
+
+/** Whether Lichess is connected, as whom, and whether the live import is following it. */
+export const getLichessConnection = () => http.get<LichessConnection>('/lichess/connection')
+
+/** Start a sign-in. The answer is the Lichess approval page to send the browser to. */
+export const connectLichess = (body: LichessConnectRequest) =>
+  http.post<LichessConnectStarted>('/lichess/connect', { body })
+
+/** Forget the token and revoke it on Lichess. */
+export const disconnectLichess = () => http.delete<void>('/lichess/connection')
 
 // --- repertoire -----------------------------------------------------------
 

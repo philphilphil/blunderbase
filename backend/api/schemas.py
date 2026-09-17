@@ -1630,6 +1630,36 @@ class ReferenceTokenUpdate(Input):
     token: str | None = None
 
 
+# --- lichess connection ----------------------------------------------------
+
+
+class LichessConnection(Payload):
+    """The owner's Lichess sign-in: `services.lichess_connection.connection`."""
+
+    connected: bool = False
+    # Only set when the token came from signing in; a pasted token has no name.
+    username: str | None = None
+    # Whether the library syncs that account, which the event stream needs.
+    synced: bool = False
+    stream: Literal["off", "connecting", "live", "rejected"] = "off"
+
+
+class LichessConnectRequest(Input):
+    """Where Lichess should send the browser back to, and where the app goes after."""
+
+    redirect_uri: str
+    return_to: str | None = None
+    # The desktop app signs in through the person's own browser, which gets a page to
+    # close rather than a redirect into an app it has no session for.
+    desktop: bool = False
+
+
+class LichessConnectStarted(Payload):
+    """The Lichess approval page to send the browser to."""
+
+    url: str
+
+
 # --- repertoire ------------------------------------------------------------
 
 

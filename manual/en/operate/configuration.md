@@ -8,7 +8,7 @@ A variable that is present but empty means *unset*: a commented-out line somebod
 uncommented and left blank falls back to the default rather than refusing to start.
 
 Not everything is a variable. The engine budgets, the classification thresholds, the Maia
-rating, the automatic-sync interval and the Lichess explorer token are stored in the
+rating, the automatic-sync interval and the Lichess connection are stored in the
 database and edited in the app, because they are the ones you change as your play changes.
 They take effect on the next thing you click, not on the next restart. See
 [Analysis](../guide/analysis.md) and [Settings](../guide/settings.md).

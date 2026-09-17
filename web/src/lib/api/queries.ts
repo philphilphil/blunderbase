@@ -812,25 +812,34 @@ export function useReferenceToken(
   })
 }
 
-/**
- * Store or clear the Lichess token. It invalidates the whole `['reference']` root rather
- * than the token key alone, because the thing the owner is actually trying to fix is the
- * explorer query that just failed for want of a token — and that query is cached forever.
- */
-export function useSetReferenceToken(
-  options?: UseMutationOptions<
-    Awaited<ReturnType<typeof api.setReferenceToken>>,
-    Error,
-    string | null
-  >,
+export function useLichessConnection(
+  options?: Options<Awaited<ReturnType<typeof api.getLichessConnection>>>,
 ) {
+  return useQuery({
+    queryKey: queryKeys.lichessConnection(),
+    queryFn: () => api.getLichessConnection(),
+    ...options,
+  })
+}
+
+/** Start a sign-in. What to do with the URL is the caller's: see `ConnectLichessButton`. */
+export function useConnectLichess() {
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.connectLichess>[0]) => api.connectLichess(body),
+  })
+}
+
+/**
+ * Disconnect Lichess. It invalidates the `['reference']` root as well as the connection,
+ * because every explorer answer cached with the token is one the page can no longer get.
+ */
+export function useDisconnectLichess() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (token: string | null) => api.setReferenceToken(token),
-    ...options,
-    onSuccess: (...args) => {
+    mutationFn: () => api.disconnectLichess(),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.lichess() })
       void client.invalidateQueries({ queryKey: queryKeys.reference() })
-      options?.onSuccess?.(...args)
     },
   })
 }

@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 
 import { AnalyseDialog } from '@/components/analysis/AnalyseDialog'
 import { BOARD_SETTINGS_ID } from '@/components/board/BoardSettings'
+import { LichessConnectCard } from '@/components/lichess/ConnectLichess'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody } from '@/components/shell/PageHeader'
 import { liveBest, liveScore, useStreamSession } from '@/lib/analysis'
@@ -33,7 +34,6 @@ import { useNotation } from '@/lib/chess/notationPrefs'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { useIsMobile } from '@/lib/ui/media'
 import { cn } from '@/lib/utils'
-import { ReferenceTokenCard } from '@/routes/explorer/components/ReferenceTokenCard'
 import { advanceTrail, useGameTrail } from '@/routes/games/gameTrail'
 import { tokenTrouble } from '@/routes/explorer/reference'
 
@@ -1706,12 +1706,12 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   // A masters game is fetched from the explorer host with the owner's token, so this screen
   // fails the way the explorer's table does when that token is gone or refused — and the
   // error card's "try again" would fetch the same 409 forever. The explorer's own card is
-  // what answers it, because the thing to do about it is the same: paste a new token.
+  // what answers it, because the thing to do about it is the same: connect Lichess again.
   const tokenReason = readOnly ? tokenTrouble(query.error) : null
   if (tokenReason) {
     return (
       <PageBody>
-        <ReferenceTokenCard reason={tokenReason} />
+        <LichessConnectCard reason={tokenReason} />
       </PageBody>
     )
   }

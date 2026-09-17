@@ -9,8 +9,8 @@ Zeile, die jemand einkommentiert und leer gelassen hat, fällt auf den Standardw
 statt den Start zu verweigern.
 
 Nicht alles ist eine Variable. Die Engine-Budgets, die Schwellen für die Zugbewertung, die
-Maia-Wertung, das Intervall der automatischen Synchronisierung und das Token für den
-Lichess-Explorer stehen in der Datenbank und werden in der App bearbeitet, denn das sind
+Maia-Wertung, das Intervall der automatischen Synchronisierung und die Verbindung zu
+Lichess stehen in der Datenbank und werden in der App bearbeitet, denn das sind
 die Werte, die du änderst, wenn sich dein Spiel ändert. Sie gelten ab dem nächsten Klick,
 nicht ab dem nächsten Neustart. Siehe [Analyse](../guide/analysis.md) und
 [Einstellungen](../guide/settings.md).

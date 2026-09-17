@@ -135,6 +135,14 @@ export function invalidationsFor(event: AnyEvent): QueryKey[] {
     case 'correspondence.search':
       return [queryKeys.correspondence()]
 
+    // A sign-in or a sign-out changes what the reference books can answer, so their root
+    // goes too. The live import reporting that it reconnected changes the status line and
+    // nothing else, and a flaky network would otherwise re-ask Lichess for every open book.
+    case 'lichess.connection':
+      return 'stream' in event && event.stream
+        ? [queryKeys.lichess()]
+        : [queryKeys.lichess(), queryKeys.reference()]
+
     // Carried whole on the socket, and a keepalive is not news. `stream.snapshot` arrives
     // twice a second per open board — refetching on it would be a refetch loop, and
     // `correspondence.snapshot` is the same thing over a search that runs for days. Both

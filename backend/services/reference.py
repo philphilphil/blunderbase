@@ -294,8 +294,8 @@ def _token(session: Session) -> str:
     token = app_settings.get_lichess_token(session)
     if not token:
         raise TokenMissingError(
-            "the reference databases need the owner's Lichess API token; "
-            "add one under Settings"
+            "the reference databases need a Lichess connection; "
+            "connect Lichess in the explorer or on the Import page"
         )
     return token
 
