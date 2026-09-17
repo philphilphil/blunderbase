@@ -4,6 +4,13 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.6.0 — 2026-09-17
+
+- Added practising a position against the computer (update remote runners to practise on them)
+- Added stopping a requested analysis from the game view
+- Added a paused state to the analysis queue
+- Changed the board's toggles and readouts to sit in the player rows
+
 ## v1.5.0 — 2026-09-15
 
 - Added speed and period filters to your own tree in the explorer
