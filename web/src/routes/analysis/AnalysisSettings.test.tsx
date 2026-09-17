@@ -90,21 +90,21 @@ describe('focused analysis configuration', () => {
     expect(sent).not.toHaveProperty('maia_on_deep')
   })
 
-  it('offers to hide the engine on new games, and saves the switch as a flag', async () => {
+  it('hides the engine on new games from a chosen speed down, and saves the rank', async () => {
     draw(<EnginePassesPage />)
 
-    const hide = await screen.findByRole('switch', { name: 'Hide the engine on new games' })
-    // Nothing stored means off, which is what every game before the switch existed did.
-    expect(hide).toHaveAttribute('aria-checked', 'false')
+    const hide = await screen.findByLabelText('Hide the engine on')
+    // Nothing stored means nothing hidden, which is what every game before it existed did.
+    expect(hide).toHaveValue('0')
     expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled()
 
-    await userEvent.click(hide)
-    expect(hide).toHaveAttribute('aria-checked', 'true')
+    await userEvent.selectOptions(hide, 'Rapid and classical')
+    expect(hide).toHaveValue('3')
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(sent).not.toBeNull())
-    // The flag rides with the whole of the settings, the budgets untouched.
-    expect(sent).toMatchObject({ hide_engine_new_games: 1, analysis_nodes: 111000, maia_elos: [1500, 1800] })
+    // The rank rides with the whole of the settings, the budgets untouched.
+    expect(sent).toMatchObject({ hide_engine_new_games: 3, analysis_nodes: 111000, maia_elos: [1500, 1800] })
   })
 
   it('keeps Maia controls together and carries engine-pass values through its save', async () => {

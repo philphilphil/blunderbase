@@ -18,6 +18,8 @@ from backend.db.enums import (
     Result,
     RunStatus,
     Source,
+    Speed,
+    speed_rank,
 )
 from backend.db.models import (
     Account,
@@ -286,14 +288,15 @@ def test_a_rematch_with_the_same_moves_is_still_two_games(session: Session) -> N
 def test_a_new_game_arrives_with_its_engine_hidden_only_while_the_setting_says_so(
     session: Session,
 ) -> None:
-    """The flag is the setting at the moment the game is stored, copied onto the row: a
-    game stored before it was switched on stays as it was, and a game that is not the
-    owner's is never held back — there is nothing of theirs to read first."""
+    """The threshold is the setting at the moment the game is stored, read against the
+    game's speed and copied onto the row: a game stored before it was set stays as it was, a
+    game faster than it speaks at once, and a game that is not the owner's is never held
+    back — there is nothing of theirs to read first."""
     job = ImportJob(source=Source.PGN, status=JobStatus.RUNNING)
     session.add(job)
     session.commit()
 
-    def game(source_id: str) -> ParsedGame:
+    def game(source_id: str, speed: Speed = Speed.RAPID) -> ParsedGame:
         return ParsedGame(
             source=Source.LICHESS,
             source_id=source_id,
@@ -301,6 +304,7 @@ def test_a_new_game_arrives_with_its_engine_hidden_only_while_the_setting_says_s
             black_name="opponent1",
             result=Result.WHITE_WIN,
             pgn="from the API",
+            speed=speed,
             moves_uci=["e2e4", "e7e5"],
             moves_san=["e4", "e5"],
             played_at=datetime(2026, 3, 1, 12, 0, tzinfo=UTC),
@@ -308,14 +312,18 @@ def test_a_new_game_arrives_with_its_engine_hidden_only_while_the_setting_says_s
 
     before = import_service.ingest_game(session, job, game("zzBefore"))
     session.commit()
-    app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, 1)
+    app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, speed_rank(Speed.RAPID))
     hidden = import_service.ingest_game(session, job, game("zzHidden"))
+    quick = import_service.ingest_game(session, job, game("zzBlitz", Speed.BLITZ))
     not_mine = import_service.ingest_game(session, job, game("zzModel"), presume_owner=False)
-    explicit = import_service.ingest_game(session, job, game("zzShown"), hide_engine=False)
+    explicit = import_service.ingest_game(
+        session, job, game("zzShown"), hide_engine_from=app_settings.HIDE_ENGINE_NEVER
+    )
     session.commit()
 
     assert before.game is not None and before.game.engine_hidden is False
     assert hidden.game is not None and hidden.game.engine_hidden is True
+    assert quick.game is not None and quick.game.engine_hidden is False
     assert not_mine.game is not None and not_mine.game.engine_hidden is False
     assert explicit.game is not None and explicit.game.engine_hidden is False
     # The summary every payload embeds carries it, so a list row knows to hold back too.

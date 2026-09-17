@@ -21,6 +21,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Toggle } from '@/components/analysis/AnalysisControls'
+import { SETTINGS_SELECT } from '@/components/analysis/LinePreviewSettings'
 import { SaveRow, SettingField, type SettingSpec } from '@/components/settings/SettingField'
 import { SetPageChrome } from '@/components/shell/PageChrome'
 import { PageBody, PageHeader } from '@/components/shell/PageHeader'
@@ -44,6 +45,7 @@ import {
   MAX_MAIA_ELOS,
   type AppSettings,
 } from '@/lib/api/types'
+import { cn } from '@/lib/utils'
 
 type EngineKey =
   | 'analysis_nodes'
@@ -94,6 +96,23 @@ const CLASSIFICATION_FIELDS: EngineSpec[] = [
   },
   { key: 'mistake_threshold', label: msg`Mistake`, min: 0, max: 100, step: 1, unset: msg`Default 10` },
   { key: 'blunder_threshold', label: msg`Blunder`, min: 0, max: 100, step: 1, unset: msg`Default 15` },
+]
+
+/**
+ * What `hide_engine_new_games` may be: 0 for never, else a rank on the backend's speed
+ * ladder (`db/enums.speed_rank`) meaning that speed and every slower one. Each option names
+ * the speeds it covers rather than saying "and slower": a longer time control is a *slower*
+ * game and a *bigger* number, and the two readings of the word point opposite ways — the
+ * first reader of "Rapid and slower" took it for "rapid and the quicker ones". Classical is
+ * the last rank offered, and covers the games that arrive without a clock at all
+ * (`speed_rank`) and correspondence games from an import.
+ */
+const HIDE_ENGINE_CHOICES: { value: number; label: MessageDescriptor }[] = [
+  { value: 0, label: msg`Nothing` },
+  { value: 1, label: msg`Every game` },
+  { value: 2, label: msg`Blitz, rapid and classical` },
+  { value: 3, label: msg`Rapid and classical` },
+  { value: 4, label: msg`Classical only` },
 ]
 
 const FLAGS: { key: MaiaFlagKey; label: MessageDescriptor; caption: MessageDescriptor }[] = [
@@ -148,13 +167,12 @@ export function EnginePassesPage() {
     },
   })
   const [draft, setDraft] = useState<Partial<Record<EngineKey, string>>>({})
-  // The one switch on this page: null while the reader has not touched it, so the stored
+  // The one select on this page: null while the reader has not touched it, so the stored
   // value shows through and "dirty" means what it says.
-  const [hideNew, setHideNew] = useState<boolean | null>(null)
+  const [hideNew, setHideNew] = useState<number | null>(null)
   const value = (key: EngineKey) => draft[key] ?? storedText(settings.data, key)
   const fields = [...PASS_FIELDS, ...CLASSIFICATION_FIELDS]
-  const storedHideNew =
-    (settings.data?.hide_engine_new_games ?? DEFAULTS.hide_engine_new_games) === 1
+  const storedHideNew = settings.data?.hide_engine_new_games ?? DEFAULTS.hide_engine_new_games
   const hideNewShown = hideNew ?? storedHideNew
   const dirty =
     fields.some((field) => value(field.key) !== storedText(settings.data, field.key)) ||
@@ -171,7 +189,7 @@ export function EnginePassesPage() {
     if (!dirty || !settings.data) return
     const body = completeUpdate(settings.data)
     for (const field of fields) body[field.key] = parse(value(field.key))
-    body.hide_engine_new_games = hideNewShown ? 1 : 0
+    body.hide_engine_new_games = hideNewShown
     save.mutate(body)
   }
 
@@ -225,42 +243,37 @@ export function EnginePassesPage() {
           </Card>
           {/*
             Not a budget, but it belongs beside them: it decides what the analysis pass every
-            new game receives is allowed to *show* before the owner has read the game. The
-            browser-wide ⇧E mode hides everything everywhere; this is the per-game version,
-            stored on the game, so it survives a second browser and comes off one game at
-            a time.
+            new game receives is allowed to *show* before the owner has read the game. A
+            speed rather than a switch, because a bullet game is nobody's homework and a
+            classical one is the whole point — so one select, and the rest of the rule
+            (games already in the library, correspondence, model games) lives in the manual
+            where a paragraph beside a control would only be read once.
           */}
           <Card>
             <CardHeader className="flex-col items-stretch gap-1">
               <CardTitle>
                 <Trans>New games</Trans>
               </CardTitle>
-              <CardDescription>
-                <Trans>
-                  Read a game yourself before the engine tells you where it went wrong.
-                </Trans>
-              </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <div className="flex items-start gap-2">
-                <Toggle
-                  checked={hideNewShown}
-                  onChange={setHideNew}
-                  label={t`Hide the engine on new games`}
-                />
-                <div className="flex flex-col gap-0.5 pt-1.5">
-                  <span className="text-[0.71875rem] text-body">
-                    <Trans>Hide the engine on new games</Trans>
-                  </span>
-                  <span className="text-[0.625rem] leading-[1.5] text-dim-2">
-                    <Trans>
-                      Every game you import from now on is analysed as usual but shows no
-                      evaluation, badge or line until you press <strong>Show the engine</strong> on
-                      that game. Games already in the library are left as they are.
-                    </Trans>
-                  </span>
-                </div>
-              </div>
+            <CardContent className="flex flex-col gap-1.5">
+              <Label htmlFor="hide-engine-new-games">
+                <Trans>Hide the engine on</Trans>
+              </Label>
+              <select
+                id="hide-engine-new-games"
+                value={String(hideNewShown)}
+                onChange={(event) => setHideNew(Number(event.target.value))}
+                className={cn(SETTINGS_SELECT, 'w-64')}
+              >
+                {HIDE_ENGINE_CHOICES.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {i18n._(choice.label)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[0.6875rem] text-dim">
+                <Trans>Still analysed — press Show the engine when you have read it.</Trans>
+              </p>
             </CardContent>
           </Card>
           {save.isError ? <p role="alert" className="text-[0.6875rem] text-blunder">{save.error.message}</p> : null}

@@ -2329,7 +2329,9 @@ def _store(session: Session, parsed: import_service.ParsedGame, color: Color) ->
     game is played *with* the engine, and the tree is its analysis from the first move.
     """
     try:
-        outcome = import_service.import_one(session, parsed, analyze=False, hide_engine=False)
+        outcome = import_service.import_one(
+            session, parsed, analyze=False, hide_engine_from=app_settings_service.HIDE_ENGINE_NEVER
+        )
     except Exception as exc:
         raise CorrespondenceError(f"that game could not be stored: {exc}") from None
     if outcome.game is None or not outcome.created:

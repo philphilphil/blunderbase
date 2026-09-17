@@ -143,8 +143,10 @@ class AppSettings(BaseModel):
     )
     hide_engine_new_games: int | None = Field(
         default=None,
-        description="1 if a game the owner imports arrives with its engine hidden "
-        "(`engine_hidden` on the game) until they show it on that game; off by default",
+        description="from which speed a game the owner imports arrives with its engine "
+        "hidden (`engine_hidden` on the game) until they show it on that game: 0 never, "
+        "else 1 bullet, 2 blitz, 3 rapid or 4 classical, meaning that speed and anything "
+        "slower; 0 by default",
     )
     correspondence_enabled: int | None = Field(
         default=None,
@@ -206,7 +208,9 @@ class AppSettingsUpdate(Input):
     mistake_threshold: float | None = None
     blunder_threshold: float | None = None
     hide_engine_new_games: int | None = Field(
-        default=None, description="1 to hide the engine on games imported from now on"
+        default=None,
+        description="0 never, or 1 bullet / 2 blitz / 3 rapid / 4 classical: hide the engine "
+        "on games imported from now on at that speed and anything slower",
     )
     correspondence_enabled: int | None = Field(
         default=None, description="1 to show correspondence mode, 0 or null to hide it"

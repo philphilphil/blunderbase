@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.app import create_app
 from backend.config import MAIA_MAX_RATING, MAIA_MIN_RATING, Settings
-from backend.db.enums import Color, EngineKind, Result, Source
+from backend.db.enums import Color, EngineKind, Result, Source, Speed, speed_rank
 from backend.db.migrate import alembic_config, upgrade_to_head
 from backend.db.models import AnalysisRun, AppSetting, Engine, Game
 from backend.db.session import get_sessionmaker
@@ -50,20 +50,36 @@ def test_nothing_is_configured_until_somebody_configures_it(session: Session) ->
     # The analysis pass pays for Maia, over both sides of the board.
     assert app_settings.get_maia_on_analysis(session) is True
     assert app_settings.get_maia_both_sides(session) is True
-    # A new game shows what the pass found, as every game before the switch existed did.
-    assert app_settings.get_hide_engine_new_games(session) is False
+    # A new game shows what the pass found, as every game before the setting existed did.
+    assert app_settings.get_hide_engine_new_games(session) == app_settings.HIDE_ENGINE_NEVER
 
 
-def test_hiding_the_engine_on_new_games_is_a_flag_like_the_maia_switches(
+def test_hiding_the_engine_on_new_games_is_a_speed_and_everything_slower(
     session: Session,
 ) -> None:
+    """The setting is a rank on the `Speed` ladder, and 1 still means every game — which is
+    what the flag this replaced meant when it was on."""
     app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, 1)
-    assert app_settings.get_hide_engine_new_games(session) is True
-    # Clamped like every other row: there is nothing between off and on to land on.
+    assert app_settings.get_hide_engine_new_games(session) == 1
+    assert app_settings.hides_engine(1, Speed.BULLET) is True
+    assert app_settings.hides_engine(1, Speed.CLASSICAL) is True
+
+    rapid_and_slower = speed_rank(Speed.RAPID)
+    app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, rapid_and_slower)
+    assert app_settings.get_hide_engine_new_games(session) == rapid_and_slower
+    assert app_settings.hides_engine(rapid_and_slower, Speed.BLITZ) is False
+    assert app_settings.hides_engine(rapid_and_slower, Speed.RAPID) is True
+    assert app_settings.hides_engine(rapid_and_slower, Speed.CORRESPONDENCE) is True
+    # A game with no time control at all counts as classical: nothing says it was fast.
+    assert app_settings.hides_engine(rapid_and_slower, None) is True
+    # Off hides nothing, whatever the game is.
+    assert app_settings.hides_engine(app_settings.HIDE_ENGINE_NEVER, Speed.CLASSICAL) is False
+
+    # Clamped like every other row: there is no rank above classical to land on.
     app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, 7)
-    assert app_settings.get_hide_engine_new_games(session) is True
+    assert app_settings.get_hide_engine_new_games(session) == app_settings.HIDE_ENGINE_MAX_SPEED
     app_settings.set_value(session, app_settings.HIDE_ENGINE_NEW_GAMES, None)
-    assert app_settings.get_hide_engine_new_games(session) is False
+    assert app_settings.get_hide_engine_new_games(session) == app_settings.HIDE_ENGINE_NEVER
 
 
 def test_the_maia_pass_is_one_switch_over_every_run(session: Session) -> None:

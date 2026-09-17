@@ -396,7 +396,7 @@ def ingest_games(
     # Read once for the stream rather than per game: a sync of a few thousand games is a
     # few thousand games stored under one answer, and the setting is the answer at the
     # moment the stream started, the way a run's budget is the budget when it was queued.
-    hide_engine = app_settings.get_hide_engine_new_games(session)
+    hide_engine_from = app_settings.get_hide_engine_new_games(session)
 
     result = ImportResult()
     # Whether the stream is still settling: it stops at the first game the database could
@@ -423,7 +423,7 @@ def ingest_games(
                     accounts,
                     analyze=analyze,
                     presume_owner=presume_owner,
-                    hide_engine=hide_engine,
+                    hide_engine_from=hide_engine_from,
                     sleep=sleep,
                 )
             except Exception as exc:
@@ -465,7 +465,7 @@ def _ingest_with_retries(
     *,
     analyze: bool,
     presume_owner: bool,
-    hide_engine: bool,
+    hide_engine_from: int,
     sleep: Callable[[float], None],
 ) -> IngestOutcome:
     """`ingest_game`, tried again while it is the database that is failing, not the game.
@@ -484,7 +484,7 @@ def _ingest_with_retries(
                 accounts,
                 analyze=analyze,
                 presume_owner=presume_owner,
-                hide_engine=hide_engine,
+                hide_engine_from=hide_engine_from,
             )
         except Exception as exc:
             session.rollback()
@@ -510,7 +510,7 @@ def ingest_game(
     *,
     analyze: bool = True,
     presume_owner: bool = True,
-    hide_engine: bool | None = None,
+    hide_engine_from: int | None = None,
 ) -> IngestOutcome:
     """Store one parsed game, or report the one that is already there.
 
@@ -524,15 +524,17 @@ def ingest_game(
     account is recognised in it — and passes False. A PGN upload is the one route that can
     be either, so the person uploading it says which.
 
-    `hide_engine` is whether the game arrives with its engine held back
-    (`Game.engine_hidden`). None asks the `hide_engine_new_games` setting, which is what
-    every import route means; a stream reads it once and passes the answer down. A game
-    that is not the owner's is never hidden — there is nothing of theirs to review first.
+    `hide_engine_from` is the speed at which a game arrives with its engine held back
+    (`Game.engine_hidden`), read by `app_settings.hides_engine`: 0 never, otherwise that rank
+    on the `Speed` ladder and everything slower. None asks the `hide_engine_new_games`
+    setting, which is what every import route means; a stream reads it once and passes the
+    answer down. A game that is not the owner's is never hidden — there is nothing of theirs
+    to review first.
     """
     if accounts is None:
         accounts = AccountIndex.load(session)
-    if hide_engine is None:
-        hide_engine = app_settings.get_hide_engine_new_games(session)
+    if hide_engine_from is None:
+        hide_engine_from = app_settings.get_hide_engine_new_games(session)
 
     digest = dedup_hash(parsed)
     # One question — "does the library know this game?" — asked once, over the games and
@@ -575,7 +577,7 @@ def ingest_game(
         black_account_id=black_account,
         owner_color=owner_color,
         is_owner_game=is_owner_game,
-        engine_hidden=hide_engine and is_owner_game,
+        engine_hidden=is_owner_game and app_settings.hides_engine(hide_engine_from, parsed.speed),
         result=parsed.result,
         termination=parsed.termination,
         variant=parsed.variant,
@@ -728,7 +730,7 @@ def import_one(
     progress: ProgressHook | None = None,
     presume_owner: bool = True,
     analyze: bool = True,
-    hide_engine: bool | None = None,
+    hide_engine_from: int | None = None,
 ) -> IngestOutcome:
     """Store one game the owner asked for by name, under a job of its own.
 
@@ -745,9 +747,10 @@ def import_one(
 
     `analyze=False` stores the game without the automatic analysis pass, which is what a
     correspondence game being created is: it has no moves yet, its analysis is the tree
-    while it is played, and a pass over it would be redone after every move. `hide_engine`
-    is `ingest_game`'s: None asks the setting, and a correspondence game passes False,
-    because a game played *with* the engine is not one to be read before it speaks.
+    while it is played, and a pass over it would be redone after every move.
+    `hide_engine_from` is `ingest_game`'s: None asks the setting, and a correspondence game
+    passes `HIDE_ENGINE_NEVER`, because a game played *with* the engine is not one to be
+    read before it speaks.
     """
     known = games_service.identify(session, parsed.source, parsed.source_id, dedup_hash(parsed))
     if known.deleted is not None:
@@ -766,7 +769,7 @@ def import_one(
             parsed,
             presume_owner=presume_owner,
             analyze=analyze,
-            hide_engine=hide_engine,
+            hide_engine_from=hide_engine_from,
         )
     except Exception as exc:
         session.rollback()

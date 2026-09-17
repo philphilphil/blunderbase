@@ -278,6 +278,7 @@ msgid "Peek board"
 msgstr "Kleines Brett"
 
 #: src/components/analysis/LinePreviewSettings.tsx
+#: src/routes/analysis/AnalysisSettings.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Nothing"
 msgstr "Nichts"
@@ -1868,6 +1869,22 @@ msgid "Default 15"
 msgstr "Standard 15"
 
 #: src/routes/analysis/AnalysisSettings.tsx
+msgid "Every game"
+msgstr "Jede Partie"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Blitz, rapid and classical"
+msgstr "Blitz, Schnellschach und Klassisch"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Rapid and classical"
+msgstr "Schnellschach und Klassisch"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Classical only"
+msgstr "Nur Klassisch"
+
+#: src/routes/analysis/AnalysisSettings.tsx
 msgid "Maia on the analysis pass"
 msgstr "Maia beim Analysedurchlauf"
 
@@ -1913,16 +1930,12 @@ msgid "New games"
 msgstr "Neue Partien"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Read a game yourself before the engine tells you where it went wrong."
-msgstr "Lies eine Partie erst selbst, bevor die Engine dir sagt, wo sie gekippt ist."
+msgid "Hide the engine on"
+msgstr "Engine ausblenden bei"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Hide the engine on new games"
-msgstr "Engine bei neuen Partien ausblenden"
-
-#: src/routes/analysis/AnalysisSettings.tsx
-msgid "Every game you import from now on is analysed as usual but shows no evaluation, badge or line until you press <0>Show the engine</0> on that game. Games already in the library are left as they are."
-msgstr "Jede Partie, die du von jetzt an importierst, wird wie gewohnt analysiert, zeigt aber keine Bewertung, Markierung oder Variante, bis du bei dieser Partie <0>Engine zeigen</0> drückst. Partien, die schon in der Bibliothek sind, bleiben, wie sie sind."
+msgid "Still analysed — press Show the engine when you have read it."
+msgstr "Wird trotzdem analysiert – drücke Engine zeigen, wenn du sie gelesen hast."
 
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Remove {elo}"

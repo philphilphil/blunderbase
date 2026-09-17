@@ -149,9 +149,10 @@ write down what you think went wrong, then ask and see. The mode
 holds until you press it again; the whole of it is under
 [Settings](settings.md#hide-the-engine).
 
-A game can also arrive quiet on its own: with **Hide the engine on new games** on under
-[Analysis](analysis.md#hide-the-engine-on-new-games), every newly imported game is analysed
-but shows nothing of it, and a **Show the engine** button sits in the row under the board.
+A game can also arrive quiet on its own: with speeds picked under **Hide the engine on** in
+[Analysis](analysis.md#hide-the-engine-on-new-games), a newly imported game at one of them is
+analysed but shows nothing of it, and a **Show the engine** button sits in the row under the
+board.
 Read the game, then press it — that game speaks from then on, and the others are untouched.
 
 ## Write a note

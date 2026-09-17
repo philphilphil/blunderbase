@@ -278,6 +278,7 @@ msgid "Peek board"
 msgstr "Peek board"
 
 #: src/components/analysis/LinePreviewSettings.tsx
+#: src/routes/analysis/AnalysisSettings.tsx
 #: src/routes/correspondence/components/SearchDialog.tsx
 msgid "Nothing"
 msgstr "Nothing"
@@ -1868,6 +1869,22 @@ msgid "Default 15"
 msgstr "Default 15"
 
 #: src/routes/analysis/AnalysisSettings.tsx
+msgid "Every game"
+msgstr "Every game"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Blitz, rapid and classical"
+msgstr "Blitz, rapid and classical"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Rapid and classical"
+msgstr "Rapid and classical"
+
+#: src/routes/analysis/AnalysisSettings.tsx
+msgid "Classical only"
+msgstr "Classical only"
+
+#: src/routes/analysis/AnalysisSettings.tsx
 msgid "Maia on the analysis pass"
 msgstr "Maia on the analysis pass"
 
@@ -1913,16 +1930,12 @@ msgid "New games"
 msgstr "New games"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Read a game yourself before the engine tells you where it went wrong."
-msgstr "Read a game yourself before the engine tells you where it went wrong."
+msgid "Hide the engine on"
+msgstr "Hide the engine on"
 
 #: src/routes/analysis/AnalysisSettings.tsx
-msgid "Hide the engine on new games"
-msgstr "Hide the engine on new games"
-
-#: src/routes/analysis/AnalysisSettings.tsx
-msgid "Every game you import from now on is analysed as usual but shows no evaluation, badge or line until you press <0>Show the engine</0> on that game. Games already in the library are left as they are."
-msgstr "Every game you import from now on is analysed as usual but shows no evaluation, badge or line until you press <0>Show the engine</0> on that game. Games already in the library are left as they are."
+msgid "Still analysed — press Show the engine when you have read it."
+msgstr "Still analysed — press Show the engine when you have read it."
 
 #: src/routes/analysis/AnalysisSettings.tsx
 msgid "Remove {elo}"

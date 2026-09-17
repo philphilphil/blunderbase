@@ -67,14 +67,21 @@ the lines it offers before you type a number.
 
 ## Hide the engine on new games
 
-The same page has **New games → Hide the engine on new games**. On, every game you import
-from then on is analysed as usual but arrives quiet: no evaluation, badge, graph or line
-until you press **Show the engine** in the row under the board of that game. The idea is
-to read your own game first — where did it turn? — and only then ask. Games already in the
-library are left as they are, and so are correspondence games and model games from the
-reference explorer; in the games list and on the dashboard such a game shows an eye
-instead of its worst move. `⇧E` still hides everything everywhere on top of this; the
-difference is that `⇧E` is a switch of the browser, and this is stored on each game.
+The same page has **New games → Hide the engine on**, and each choice names the speeds it
+covers: **Nothing**, **Every game**, **Blitz, rapid and classical**, **Rapid and classical**
+or **Classical only**. A game you import from then on at one of those speeds is analysed as
+usual but arrives quiet: no evaluation, badge, graph or line until you press **Show the
+engine** in the row under the board of that game. The idea is to read your own game first —
+where did it turn? — and only then ask, which is worth doing for a game you thought about
+and not for the bullet game you did not.
+
+A game with no time control at all — a PGN of an over-the-board game — counts as classical,
+so every choice but **Nothing** covers it, and so does an imported correspondence game.
+Games already in the library are left as they are, and so are the games of Blunderbase's own
+correspondence mode and model games from the reference explorer; in the games list and on
+the dashboard a hidden game shows an eye instead of its worst move. `⇧E` still hides
+everything everywhere on top of this; the difference is that `⇧E` is a switch of the
+browser, and this is stored on each game.
 
 ## What is Maia asked?
 

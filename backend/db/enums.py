@@ -53,6 +53,30 @@ class Speed(StrEnum):
     CORRESPONDENCE = "correspondence"
 
 
+# The speeds in order, fastest first, so a setting can say "this one and everything slower"
+# with a single number. Ranks start at 1 because 0 is what "no speed at all" means wherever
+# one of these thresholds is read.
+SPEED_LADDER: tuple[Speed, ...] = (
+    Speed.BULLET,
+    Speed.BLITZ,
+    Speed.RAPID,
+    Speed.CLASSICAL,
+    Speed.CORRESPONDENCE,
+)
+
+
+def speed_rank(speed: Speed | None) -> int:
+    """Where a speed sits on the ladder, 1 (bullet) to 5 (correspondence).
+
+    A game with no speed — a PGN with no time control, a game off a board — counts as
+    classical: nothing says it was fast, and the games that arrive without a clock are the
+    long ones somebody sat over.
+    """
+    if speed is None:
+        return SPEED_LADDER.index(Speed.CLASSICAL) + 1
+    return SPEED_LADDER.index(speed) + 1
+
+
 class NoteSource(StrEnum):
     """Which surface wrote a note down.
 

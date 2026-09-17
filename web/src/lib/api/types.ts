@@ -161,9 +161,11 @@ export interface AppSettings {
   mistake_threshold: number | null
   blunder_threshold: number | null
   /**
-   * Whether a game the owner imports from now on arrives with its engine hidden
-   * (`GameSummary.engine_hidden`) until they show it on that game. 0 or 1, off by default;
-   * optional in the type for the reason the correspondence fields are.
+   * From which speed a game the owner imports from now on arrives with its engine hidden
+   * (`GameSummary.engine_hidden`) until they show it on that game: 0 never, else a rank on
+   * the backend's speed ladder — 1 bullet, 2 blitz, 3 rapid, 4 classical — meaning that
+   * speed and everything slower. 0 by default; optional in the type for the reason the
+   * correspondence fields are.
    */
   hide_engine_new_games?: number | null
   /**

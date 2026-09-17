@@ -161,9 +161,10 @@ lass rechnen und vergleiche. Der Modus bleibt an, bis du ihn wieder
 ausschaltest; alles dazu steht unter [Einstellungen](settings.md#hide-the-engine).
 
 Eine Partie kann auch von selbst stumm ankommen: Ist unter
-[Analyse](analysis.md#hide-the-engine-on-new-games) **Engine bei neuen Partien ausblenden**
-an, wird jede neu importierte Partie analysiert, zeigt aber nichts davon, und in der Zeile
-unter dem Brett steht eine Schaltfläche **Engine zeigen**. Lies die Partie, dann drück sie –
+[Analyse](analysis.md#hide-the-engine-on-new-games) bei **Engine ausblenden bei** eine
+Auswahl getroffen, wird eine neu importierte Partie mit einer dieser Bedenkzeiten analysiert,
+zeigt aber nichts davon, und in der Zeile unter dem Brett steht eine Schaltfläche **Engine
+zeigen**. Lies die Partie, dann drück sie –
 von da an spricht diese Partie, und die anderen bleiben unberührt.
 
 ## Eine Notiz schreiben

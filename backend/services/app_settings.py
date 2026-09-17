@@ -38,15 +38,18 @@ enqueued, so they are the budget of the *next* run rather than of every run ever
 points lost by the mover. Read per plan, which means a game re-analysed after they moved
 is judged by the new ones and one analysed before it keeps what it was judged by.
 
-**Whether a new game arrives with its engine hidden** — `hide_engine_new_games`, 0 or 1.
-The analysis pass still runs over every imported game; what this decides is whether its
-verdict is *shown* before the owner has read the game themselves. On, every game of the
-owner's that an import stores gets `Game.engine_hidden` set, and the game screen keeps
-every evaluation off it until they press "Show the engine" on that game — the per-game
-twin of the browser's ⇧E mode, which hides everything everywhere and is not stored here at
-all. Read when a game is stored, so a game already in the library is left as it is either
-way. A model game from the reference books and a correspondence game are never hidden by
-it: neither is a game of theirs to be reviewed before the engine speaks.
+**From which speed a new game arrives with its engine hidden** — `hide_engine_new_games`,
+0 to 4. The analysis pass still runs over every imported game; what this decides is whether
+its verdict is *shown* before the owner has read the game themselves. 0 is off; anything
+else is a rank on `Speed`'s ladder (1 bullet, 2 blitz, 3 rapid, 4 classical), and a game of
+the owner's at that speed or slower is stored with `Game.engine_hidden` set — the game
+screen keeps every evaluation off it until they press "Show the engine" on that game, the
+per-game twin of the browser's ⇧E mode, which hides everything everywhere and is not stored
+here at all. A threshold rather than a flag because a bullet game is not one anybody reads
+twice, while a classical one is the whole point of reading a game before the engine talks.
+Read when a game is stored, so a game already in the library is left as it is either way. A
+model game from the reference books and a correspondence game are never hidden by it:
+neither is a game of theirs to be reviewed before the engine speaks.
 
 **Correspondence** — `correspondence_enabled`, `correspondence_multipv`, and the three the
 bounded half of the mode is configured with, `correspondence_task_nodes`,
@@ -138,7 +141,7 @@ from backend.config import (
     default_analysis_concurrency,
     get_settings,
 )
-from backend.db.enums import EngineRole
+from backend.db.enums import EngineRole, Speed, speed_rank
 from backend.db.models import AppSetting
 
 # --- the keys -------------------------------------------------------------
@@ -158,9 +161,10 @@ ANALYSIS_MULTIPV = "analysis_multipv"
 INACCURACY_THRESHOLD = "inaccuracy_threshold"
 MISTAKE_THRESHOLD = "mistake_threshold"
 BLUNDER_THRESHOLD = "blunder_threshold"
-# Whether a game the owner imports arrives with `Game.engine_hidden` set — the engine's
-# verdict kept off the screen until they ask for it on that game. A flag like the Maia
-# switches, and a member of `SETTINGS` for the same reason they are.
+# From which speed a game the owner imports arrives with `Game.engine_hidden` set — the
+# engine's verdict kept off the screen until they ask for it on that game. 0 is never, and
+# 1-4 is a rank on the `Speed` ladder meaning "this speed and everything slower". An
+# ordinary number with a range, and a member of `SETTINGS` like every other.
 HIDE_ENGINE_NEW_GAMES = "hide_engine_new_games"
 # Correspondence mode: whether it is on at all, and how many lines a search over one node
 # keeps. There is deliberately no reply window: the server a game is played on is the
@@ -235,8 +239,13 @@ INACCURACY_DEFAULT = 5.0
 MISTAKE_DEFAULT = 10.0
 BLUNDER_DEFAULT = 15.0
 # Off: an install that said nothing shows what the analysis pass found as soon as it has found
-# it, which is what every game imported before this switch existed already does.
+# it, which is what every game imported before this setting existed already does.
 HIDE_ENGINE_NEW_GAMES_DEFAULT = 0
+# Never, and the two ends of the ladder the owner may pick between. 1 is bullet-and-slower,
+# which is every game there is; 4 is classical, which with `speed_rank`'s reading of an
+# absent speed also covers the games that arrive without a clock.
+HIDE_ENGINE_NEVER = 0
+HIDE_ENGINE_MAX_SPEED = speed_rank(Speed.CLASSICAL)
 # The levels an install that configured nothing asks Maia at: the top of what the model can
 # answer, and only that one. The same default the single target elo had, as a list of one.
 MAIA_ELOS_DEFAULT: tuple[int, ...] = (MAIA_MAX_RATING,)
@@ -373,8 +382,8 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(
         key=HIDE_ENGINE_NEW_GAMES,
         default=HIDE_ENGINE_NEW_GAMES_DEFAULT,
-        low=FLAG_OFF,
-        high=FLAG_ON,
+        low=HIDE_ENGINE_NEVER,
+        high=HIDE_ENGINE_MAX_SPEED,
         whole=True,
     ),
     Setting(
@@ -686,14 +695,26 @@ def get_maia_both_sides(session: Session) -> bool:
     return _flag(session, MAIA_BOTH_SIDES)
 
 
-def get_hide_engine_new_games(session: Session) -> bool:
-    """Whether a game the owner imports now arrives with its engine hidden.
+def get_hide_engine_new_games(session: Session) -> int:
+    """From which speed a game the owner imports now arrives with its engine hidden.
 
-    Read when the game is stored (`import_service.ingest_game`) and copied onto the row as
-    `Game.engine_hidden`, so flipping it later moves no game already in the library —
-    the same rule a run's budget follows.
+    0 is never; 1 to 4 is a rank on the `Speed` ladder meaning that speed and everything
+    slower. Read when the game is stored (`import_service.ingest_game`) and turned into
+    `Game.engine_hidden` by `hides_engine`, so moving it later moves no game already in the
+    library — the same rule a run's budget follows.
     """
-    return _flag(session, HIDE_ENGINE_NEW_GAMES)
+    value = stored(session, HIDE_ENGINE_NEW_GAMES)
+    return HIDE_ENGINE_NEW_GAMES_DEFAULT if value is None else int(value)
+
+
+def hides_engine(threshold: int, speed: Speed | None) -> bool:
+    """Whether a game at this speed arrives quiet under this threshold.
+
+    Here rather than in the import service because the reading of the number is the
+    setting's, not the importer's: the importer knows only that it has a speed and an
+    answer to ask for.
+    """
+    return threshold != HIDE_ENGINE_NEVER and speed_rank(speed) >= threshold
 
 
 def get_analysis_nodes(session: Session) -> int:

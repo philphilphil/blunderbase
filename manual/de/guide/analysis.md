@@ -73,15 +73,22 @@ keine eintippst.
 
 ## Die Engine bei neuen Partien ausblenden { #hide-the-engine-on-new-games }
 
-Auf derselben Seite steht **Neue Partien → Engine bei neuen Partien ausblenden**. Ist es
-an, wird jede Partie, die du von da an importierst, wie gewohnt analysiert, kommt aber
+Auf derselben Seite steht **Neue Partien → Engine ausblenden bei**, und jede Auswahl nennt
+die Bedenkzeiten, für die sie gilt: **Nichts**, **Jede Partie**, **Blitz, Schnellschach und
+Klassisch**, **Schnellschach und Klassisch** oder **Nur Klassisch**. Eine Partie, die du von
+da an mit einer dieser Bedenkzeiten importierst, wird wie gewohnt analysiert, kommt aber
 stumm an: keine Bewertung, keine Markierung, kein Verlauf und keine Variante, bis du in der
 Zeile unter dem Brett dieser Partie **Engine zeigen** drückst. Der Gedanke: erst die eigene
-Partie lesen – wo ist sie gekippt? –, dann fragen. Partien, die schon in der Bibliothek
-sind, bleiben, wie sie sind; ebenso Fernschachpartien und Musterpartien aus dem
-Referenz-Explorer. In der Partienliste und auf der Startseite zeigt so eine Partie ein Auge
-statt ihres schlechtesten Zugs. `⇧E` blendet weiterhin alles überall aus, zusätzlich dazu;
-der Unterschied ist, dass `⇧E` ein Schalter des Browsers ist und dies an jeder Partie
+Partie lesen – wo ist sie gekippt? –, dann fragen; das lohnt bei einer Partie, über die du
+nachgedacht hast, und nicht bei der Bullet-Partie, bei der du es nicht hast.
+
+Eine Partie ganz ohne Bedenkzeit – ein PGN einer Partie am Brett – zählt als klassisch, wird
+also von jeder Auswahl außer **Nichts** erfasst, und eine importierte Fernschachpartie
+ebenso. Partien, die schon in der Bibliothek sind, bleiben, wie sie sind; ebenso die Partien
+von Blunderbases eigenem Fernschach-Modus und Musterpartien aus dem Referenz-Explorer. In
+der Partienliste und auf der Startseite zeigt so eine Partie ein Auge statt ihres
+schlechtesten Zugs. `⇧E` blendet weiterhin alles überall aus, zusätzlich dazu; der
+Unterschied ist, dass `⇧E` ein Schalter des Browsers ist und dies an jeder Partie
 gespeichert wird.
 
 ## Was wird Maia gefragt? { #what-is-maia-asked }
