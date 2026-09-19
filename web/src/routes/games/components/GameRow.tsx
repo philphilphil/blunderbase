@@ -12,6 +12,7 @@ import { EyeOff, X } from 'lucide-react'
 import type * as React from 'react'
 import { memo } from 'react'
 
+import { preloadRoute } from '@/app/lazyRoutes'
 import { ClassificationBadge } from '@/components/badges/ClassificationBadge'
 import { SourceBadge } from '@/components/badges/SourceBadge'
 import { RunBadge, UnanalysedBadge } from '@/components/badges/RunBadge'
@@ -96,6 +97,8 @@ export const GameRow = memo(function GameRow({
       tabIndex={0}
       data-games-row
       aria-selected={selected}
+      // The game screen is its own chunk; a pointer over a row is about to ask for it.
+      onPointerEnter={() => preloadRoute(`/games/${game.id}`)}
       onClick={() => onOpen(game.id)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -104,7 +107,9 @@ export const GameRow = memo(function GameRow({
         }
       }}
       className={cn(
-        'group flex cursor-pointer items-center gap-2.5 border-t border-raised px-5 font-mono text-[0.71875rem] tabular outline-none',
+        // `select-none`: a shift-click extends the selection of rows, and must not also
+        // paint a run of text blue from the last row clicked to this one.
+        'group flex cursor-pointer items-center gap-2.5 border-t border-raised px-5 font-mono text-[0.71875rem] tabular outline-none select-none',
         ROW_HEIGHT,
         PHONE_CARD,
         'max-md:gap-x-2 max-md:gap-y-1 max-md:px-3 max-md:py-2',

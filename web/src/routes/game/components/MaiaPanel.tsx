@@ -632,7 +632,7 @@ function EnginePaneTabs({ search, idle }: { search: EnginePaneSearch; idle: bool
     },
   ]
   return (
-    <div role="tablist" aria-label={t`Engine`} className="-ml-1 flex flex-none items-center gap-0.5">
+    <div role="tablist" aria-label={t`Engine`} className="-ml-1 flex flex-none items-center gap-0.5 select-none">
       {dialog}
       {tabs.map(({ tab, label, dot }) => {
         const selected = search.tab === tab

@@ -440,7 +440,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh]"
+      className="bb-fade-in fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
@@ -449,7 +449,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label={t`Search everything`}
-        className="bb-card flex w-full max-w-[34rem] flex-col overflow-hidden shadow-[0_1rem_3rem_var(--bb-shadow)]"
+        className="bb-card bb-rise-in flex w-full max-w-[34rem] flex-col overflow-hidden shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex items-center gap-2.5 border-b border-hairline px-3.5 py-2.5">
           <input

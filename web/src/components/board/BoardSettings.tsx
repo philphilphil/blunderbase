@@ -188,14 +188,14 @@ export function BoardSettingsButton({
 
       {open ? (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/75 px-6 py-[8vh]"
+          className="bb-fade-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/75 px-6 py-[8vh]"
           onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="board-settings-title"
-            className="bb-card flex w-full max-w-2xl flex-col shadow-[0_1rem_3rem_var(--bb-shadow)]"
+            className="bb-card bb-rise-in flex w-full max-w-2xl flex-col shadow-[0_1rem_3rem_var(--bb-shadow)]"
           >
             <header className="flex items-start gap-3 border-b border-hairline px-4 py-3.5">
               <div className="flex flex-1 flex-col gap-1">

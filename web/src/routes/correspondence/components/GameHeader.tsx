@@ -62,7 +62,7 @@ export function OpponentMoveDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[14vh] max-md:px-4 max-md:pt-8"
+      className="bb-fade-in fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[14vh] max-md:px-4 max-md:pt-8"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <form
@@ -71,7 +71,7 @@ export function OpponentMoveDialog({
         aria-labelledby="correspondence-move-title"
         noValidate
         onSubmit={submit}
-        className="bb-card flex w-full max-w-[24rem] flex-col gap-3.5 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
+        className="bb-card bb-rise-in flex w-full max-w-[24rem] flex-col gap-3.5 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
           <h2 id="correspondence-move-title" className="text-[0.875rem] font-semibold text-ink">
@@ -168,7 +168,7 @@ export function FinishDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[14vh] max-md:px-4 max-md:pt-8"
+      className="bb-fade-in fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[14vh] max-md:px-4 max-md:pt-8"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <form
@@ -177,7 +177,7 @@ export function FinishDialog({
         aria-labelledby="correspondence-finish-title"
         noValidate
         onSubmit={submit}
-        className="bb-card flex w-full max-w-[24rem] flex-col gap-3.5 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
+        className="bb-card bb-rise-in flex w-full max-w-[24rem] flex-col gap-3.5 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
           <h2 id="correspondence-finish-title" className="text-[0.875rem] font-semibold text-ink">

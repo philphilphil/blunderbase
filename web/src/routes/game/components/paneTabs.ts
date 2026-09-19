@@ -9,7 +9,7 @@
  * strip — three hand-copied class strings had already started to drift.
  */
 export const TAB_ROW =
-  'flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5'
+  'flex h-[2.1875rem] flex-none items-stretch border-b border-line bg-panel pr-2.5 select-none'
 
 export const TAB =
   'relative flex h-full items-center gap-1.5 px-3 text-xs text-dim transition-colors hover:text-body-3'

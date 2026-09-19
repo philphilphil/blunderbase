@@ -1,7 +1,7 @@
 import {
   createContext,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -89,7 +89,10 @@ export function SetPageChrome({
     (breadcrumb ?? []).map((crumb) => [typeof crumb.label === 'string' ? crumb.label : '', crumb.to]),
   )
 
-  useEffect(() => {
+  // A layout effect rather than a passive one: the titlebar is then written before the
+  // frame that shows the new page is painted, instead of one frame after it — a frame in
+  // which the reader saw the new screen under the old screen's breadcrumb and buttons.
+  useLayoutEffect(() => {
     set({ breadcrumb: breadcrumb ?? [], actions: actions ?? null, manual: manual ?? null })
     return () => set({ breadcrumb: [], actions: null, manual: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps

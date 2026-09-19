@@ -477,6 +477,48 @@
     height: 100%;
   }
 
+  /*
+   * Tailwind 4 resets every button to `cursor: default`, which is what a native control
+   * shows — but this is a page in a browser, and on a page the hand is how a control says
+   * it can be pressed. Without it every button in the app read as inert text.
+   */
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  /*
+   * The window is the app, not a page inside one: no rubber band at the edges of the
+   * document, and no swipe-back out of it when a trackpad overshoots a horizontal scroll.
+   * Panes that scroll still bounce on their own; the bounce simply never reaches the
+   * document, which is the one that navigates.
+   */
+  html {
+    overscroll-behavior: none;
+  }
+
+  /* A dragged icon turning into a ghost image is a web page's habit, not a tool's. */
+  img,
+  svg {
+    -webkit-user-drag: none;
+  }
+
+  /*
+   * One switch for everyone who asked the OS for less motion: every entrance below and
+   * every hover transition collapses to an instant, in one place rather than per class.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   body {
     background: var(--bb-void);
     color: var(--bb-text);
@@ -577,6 +619,23 @@
     font-variant-numeric: tabular-nums;
   }
   /*
+   * How things arrive. Three entrances and no more, so every dialog, popover and tooltip in
+   * the app lands the same way: a backdrop fades, a dialog rises into place, a popover pops
+   * out from the control that opened it. Short — under 200ms — because the point is that a
+   * region does not simply *appear*, not that the reader watches it come. `both` so the
+   * first frame is already the start of the entrance rather than a flash of the end.
+   */
+  .bb-fade-in {
+    animation: bb-fade-in 150ms ease-out both;
+  }
+  .bb-rise-in {
+    animation: bb-rise-in 170ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+  .bb-pop-in {
+    animation: bb-pop-in 120ms cubic-bezier(0.2, 0, 0, 1) both;
+    transform-origin: top;
+  }
+  /*
    * The live-analysis icon's scan line, while the search it stands for is running
    * (`components/analysis/ScanIcons.tsx`). A slow sweep rather than a spin: the frame is
    * fixed on the board, only the look moves. Still for anyone who asked for less motion.
@@ -589,6 +648,24 @@
     .bb-scan-line {
       animation: none;
     }
+  }
+}
+
+@keyframes bb-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes bb-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem) scale(0.985);
+  }
+}
+@keyframes bb-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.98);
   }
 }
 

@@ -159,14 +159,14 @@ function WhoseGamesDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-start justify-center bg-void/75 px-6 pt-[12vh] max-md:px-4 max-md:pt-6"
+      className="bb-fade-in fixed inset-0 z-[70] flex items-start justify-center bg-void/75 px-6 pt-[12vh] max-md:px-4 max-md:pt-6"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="pgn-drop-title"
-        className="bb-card flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
+        className="bb-card bb-rise-in flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
           <h2 id="pgn-drop-title" className="text-sm font-semibold text-ink">

@@ -17,6 +17,7 @@ import { useCorrespondenceSearchToasts } from '@/routes/correspondence/useSearch
 import { CommandPaletteProvider } from './CommandPalette'
 import { ShortcutsOverlayProvider } from './ShortcutsOverlay'
 import { NavDrawer, SideNav } from './SideNav'
+import { TitleTooltips } from './TitleTooltips'
 import { TopBar } from './TopBar'
 
 /**
@@ -184,6 +185,8 @@ export function AppShell() {
             </div>
           </div>
           <NavDrawer open={navOpen} onClose={closeNav} />
+          {/* Every `title=` in the app, drawn by the app rather than by the browser. */}
+          <TitleTooltips />
           <PgnDropOverlay />
           <NativeFeedback />
           <TourCoachmark />

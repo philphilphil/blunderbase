@@ -40,14 +40,14 @@ export function CorrespondenceTreeDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[8vh] pb-8 max-md:px-3 max-md:pt-4"
+      className="bb-fade-in fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[8vh] pb-8 max-md:px-3 max-md:pt-4"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="correspondence-tree-title"
-        className="bb-card flex max-h-full w-full max-w-[46rem] flex-col shadow-[0_1rem_3rem_var(--bb-shadow)]"
+        className="bb-card bb-rise-in flex max-h-full w-full max-w-[46rem] flex-col shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-none items-center gap-2 border-b border-line px-3.5 py-2.5">
           <h2 id="correspondence-tree-title" className="text-[0.8125rem] font-semibold text-ink">

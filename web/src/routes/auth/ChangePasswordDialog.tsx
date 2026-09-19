@@ -49,7 +49,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
       // Three password fields do not fit under a 12vh inset on a phone, least of all with
       // the keyboard up, so below `md` the sheet starts near the top and the backdrop
       // itself scrolls.
-      className="fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh] max-md:overflow-y-auto max-md:px-4 max-md:pt-6 max-md:pb-6"
+      className="bb-fade-in fixed inset-0 z-50 flex items-start justify-center bg-void/75 px-6 pt-[12vh] max-md:overflow-y-auto max-md:px-4 max-md:pt-6 max-md:pb-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
@@ -58,7 +58,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="change-password-title"
-        className="bb-card flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
+        className="bb-card bb-rise-in flex w-full max-w-[22rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-col gap-1.5">
           <h2 id="change-password-title" className="text-[0.875rem] font-semibold text-ink">

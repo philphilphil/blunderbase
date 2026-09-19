@@ -35,6 +35,7 @@ import {
 } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
+import { preloadRoute } from '@/app/lazyRoutes'
 import { StatusDot } from '@/components/badges/StatusDot'
 import {
   AnalysisIcon,
@@ -201,10 +202,14 @@ function Item({
   const collapsed = useCollapsed()
   const { i18n } = useLingui()
   const label = i18n._(item.label)
+  // The screen's code is fetched while the pointer is still on its way to the click.
+  const preload = () => preloadRoute(item.to)
   return (
     <NavLink
       to={item.to}
       end={item.end}
+      onPointerEnter={preload}
+      onFocus={preload}
       // Folded, the icon is the whole row, so the name it would have read has to be said
       // some other way or the link has no accessible name at all.
       aria-label={collapsed ? label : undefined}
@@ -789,7 +794,10 @@ export function SideNav() {
       <nav
         aria-label={t`Sections`}
         className={cn(
-          'flex flex-none flex-col gap-px border-r border-edge-strong bg-panel py-2.5 max-md:hidden',
+          // The fold is a width that moves rather than a width that jumps; the labels are
+          // clipped for the 200ms rather than wrapped, which is what `overflow-hidden` and
+          // `whitespace-nowrap` are for. Nothing in the rail is prose, so nothing selects.
+          'flex flex-none flex-col gap-px overflow-hidden border-r border-edge-strong bg-panel py-2.5 whitespace-nowrap transition-[width,padding] duration-200 ease-out select-none max-md:hidden',
           collapsed ? 'w-[3.25rem] px-1.5' : 'w-50 px-2',
         )}
       >
@@ -853,7 +861,7 @@ export function NavDrawer({ open, onClose }: { open: boolean; onClose: () => voi
         ref={panel}
         tabIndex={-1}
         aria-label={t`Sections`}
-        className="relative flex h-full w-[17rem] max-w-[85vw] flex-col gap-px overflow-y-auto border-r border-edge-strong bg-panel shadow-[0_0_2rem_var(--bb-shadow)] outline-none duration-200 animate-in slide-in-from-left pt-[max(0.875rem,env(safe-area-inset-top,0rem))] pr-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0rem))] pl-[max(0.625rem,env(safe-area-inset-left,0rem))]"
+        className="relative flex h-full w-[17rem] max-w-[85vw] flex-col gap-px overflow-y-auto border-r border-edge-strong bg-panel shadow-[0_0_2rem_var(--bb-shadow)] outline-none select-none duration-200 animate-in slide-in-from-left pt-[max(0.875rem,env(safe-area-inset-top,0rem))] pr-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0rem))] pl-[max(0.625rem,env(safe-area-inset-left,0rem))]"
       >
         <div className="flex flex-none items-center justify-between pb-1">
           <span className="pl-2 text-[0.8125rem] font-semibold tracking-[-0.01em] text-ink">

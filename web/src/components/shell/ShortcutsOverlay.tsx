@@ -91,7 +91,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-void/75 p-6 max-md:p-3"
+      className="bb-fade-in fixed inset-0 z-50 flex items-center justify-center bg-void/75 p-6 max-md:p-3"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
@@ -113,7 +113,7 @@ function Dialog({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label={t`Keyboard shortcuts`}
-        className="bb-card flex max-h-full w-full max-w-[52rem] flex-col overflow-hidden shadow-[0_1rem_3rem_var(--bb-shadow)]"
+        className="bb-card bb-rise-in flex max-h-full w-full max-w-[52rem] flex-col overflow-hidden shadow-[0_1rem_3rem_var(--bb-shadow)]"
       >
         <div className="flex flex-none items-center gap-2.5 border-b border-hairline px-4 py-2.5">
           <Keyboard className="size-3.5 flex-none text-faint" aria-hidden />

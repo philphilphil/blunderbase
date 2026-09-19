@@ -607,7 +607,7 @@ export function TreePane({
           data-testid="tree-menu"
           style={{ left: menu.x, top: menu.y }}
           onClick={(event) => event.stopPropagation()}
-          className="absolute z-30 w-56 rounded-md border border-edge-strong bg-panel p-1 shadow-[0_0.375rem_1.125rem_var(--bb-shadow)]"
+          className="bb-pop-in absolute z-30 w-56 rounded-md border border-edge-strong bg-panel p-1 shadow-[0_0.375rem_1.125rem_var(--bb-shadow)]"
         >
           <MenuItem
             disabled={!onSearch}

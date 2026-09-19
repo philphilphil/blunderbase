@@ -106,8 +106,8 @@ export function useEngineSetup() {
     show,
     dialog: <Dialog.Root open={pending !== null} onOpenChange={(open) => { if (!open) decline() }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-void/75" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-edge bg-elevated p-6 shadow-xl">
+        <Dialog.Overlay className="bb-fade-in fixed inset-0 z-50 bg-void/75" />
+        <Dialog.Content className="bb-rise-in fixed left-1/2 top-1/2 z-50 w-[min(28rem,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-edge bg-elevated p-6 shadow-xl">
           <Dialog.Title className="text-lg font-medium"><Trans>No engine is set up</Trans></Dialog.Title>
           <Dialog.Description className="mt-2 text-sm text-dim">
             {capabilities.read_only

@@ -408,7 +408,7 @@ function TabStrip({
     <div
       role="tablist"
       aria-label={t`Game panels`}
-      className="flex h-[2.5rem] flex-none items-stretch border-y border-hairline"
+      className="flex h-[2.5rem] flex-none items-stretch border-y border-hairline select-none"
     >
       {tabs.map((name) => {
         const count = name === 'eval' ? flaggedCount : name === 'notes' ? noteCount : 0

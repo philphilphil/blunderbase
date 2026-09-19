@@ -158,7 +158,7 @@ export function GamesTable({
         // took the strip to 346px, which is exactly a 375px screen's content width, and
         // `Worst` fell off the end on its own. `gap-x-2` leaves about 30px in hand while
         // the padding stays at `px-3`, so the chips still line up with the cards below.
-        className="flex h-[2.125rem] flex-none items-center gap-2.5 border-b border-hairline bg-panel px-5 text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase max-md:h-auto max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-1.5 max-md:px-3 max-md:py-2"
+        className="flex h-[2.125rem] flex-none items-center gap-2.5 border-b border-hairline bg-panel px-5 text-[0.65625rem] tracking-[.06em] text-dim-2 uppercase select-none max-md:h-auto max-md:flex-wrap max-md:gap-x-2 max-md:gap-y-1.5 max-md:px-3 max-md:py-2"
       >
         {columns.map((col) => {
           const active = col.sort === sort.key

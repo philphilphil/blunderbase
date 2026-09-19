@@ -60,3 +60,40 @@ export const NotesPage = lazy(() =>
 export const StatsPage = lazy(() =>
   import('@/routes/stats').then((route) => ({ default: route.StatsPage })),
 )
+
+/**
+ * The chunk a destination needs, by the first segment of its path — the same `import()`
+ * specifiers as above, which is what makes Vite hand back the same chunk rather than a
+ * second copy of it.
+ *
+ * A screen split into its own chunk is fetched the first time it is opened, and the reader
+ * sees the shell's "Loading…" in the meantime. Pointing at a rail entry is a second or so
+ * of warning that a screen is about to be asked for, which is longer than the fetch takes;
+ * `preloadRoute` spends it, so the screen is already here by the time it is clicked.
+ */
+const CHUNKS: Record<string, () => Promise<unknown>> = {
+  '': () => import('@/routes/dashboard'),
+  games: () => import('@/routes/games'),
+  explorer: () => import('@/routes/explorer'),
+  repertoire: () => import('@/routes/repertoire'),
+  reference: () => import('@/routes/reference'),
+  notes: () => import('@/routes/notes'),
+  stats: () => import('@/routes/stats'),
+  library: () => import('@/routes/import'),
+  import: () => import('@/routes/import'),
+  analysis: () => import('@/routes/analysis'),
+  compute: () => import('@/routes/engines'),
+  engines: () => import('@/routes/engines'),
+  assistant: () => import('@/routes/mcp'),
+  live: () => import('@/routes/live'),
+  correspondence: () => import('@/routes/correspondence'),
+}
+
+/** Fetch the chunk behind `path` now, so opening it later costs nothing. Safe to repeat. */
+export function preloadRoute(path: string): void {
+  const [first, second] = path.replace(/^\//, '').split(/[/?#]/)
+  // `/games` is the library and `/games/7` is a game — two screens, two chunks.
+  const load = first === 'games' && second ? () => import('@/routes/game') : CHUNKS[first ?? '']
+  // A chunk that fails to fetch fails again, and says so, when the route is actually opened.
+  load?.().catch(() => {})
+}

@@ -38,7 +38,7 @@ export function Frame({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/75 px-6 pt-[8vh] pb-8 max-md:px-4 max-md:pt-6"
+      className="bb-fade-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/75 px-6 pt-[8vh] pb-8 max-md:px-4 max-md:pt-6"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
@@ -46,7 +46,7 @@ export function Frame({
         aria-modal="true"
         aria-labelledby={labelledBy}
         className={cn(
-          'bb-card flex w-full max-w-[34rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]',
+          'bb-card bb-rise-in flex w-full max-w-[34rem] flex-col gap-4 px-5 py-5 shadow-[0_1rem_3rem_var(--bb-shadow)]',
           className,
         )}
       >

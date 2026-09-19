@@ -181,7 +181,7 @@ function SaveFilter({ filters }: { filters: LibraryFilters }) {
         // Anchored to the bar rather than to the chip below `md`, like every other panel
         // on this bar — this one sits at its right-hand end, where a 250px panel has the
         // least room of all.
-        <div className="absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:right-0">
+        <div className="bb-pop-in absolute top-[calc(100%+0.375rem)] left-0 z-30 flex flex-col gap-2.5 rounded-lg border border-edge bg-elevated p-2.5 shadow-[0_1.125rem_2.5rem_-1.125rem_var(--bb-shadow)] md:w-[15.625rem] max-md:right-0">
           <PopoverLabel>
             <Trans>Save this cut as</Trans>
           </PopoverLabel>
