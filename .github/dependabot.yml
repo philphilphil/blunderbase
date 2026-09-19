@@ -1,0 +1,55 @@
+# Dependabot opens the fix; the dependency-audit workflow only reports.
+#
+# App dependencies (Python, both pnpm trees, the Tauri Cargo tree) get security updates
+# only: open-pull-requests-limit 0 turns routine version bumps off while the ecosystem
+# stays registered, so "Dependabot security updates" (a repository setting) can still raise
+# a PR for an advisory. Routine bumps of React, FastAPI or Tauri need a real look, pnpm
+# i18n and the manual tests, and are done in a deliberate batch instead.
+#
+# Actions and Docker base images are not covered by the audit at all, so those get monthly
+# version updates, grouped into one PR per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: cargo
+    directory: /desktop/src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(docker)"
+    groups:
+      base-images:
+        patterns: ["*"]

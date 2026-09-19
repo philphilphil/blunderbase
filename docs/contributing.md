@@ -182,6 +182,13 @@ GTK3 `glib`, which our macOS/Windows desktop releases do not use. Remove that ex
 before adding Linux desktop support. These checks cover package advisories, not Docker
 OS packages or bundled engine binaries.
 
+The audit only reports; `.github/dependabot.yml` opens the fix. App dependencies (Python,
+both pnpm trees, the Tauri Cargo tree) get security updates only, so a routine React or
+FastAPI minor never arrives as a PR; those are bumped by hand in a batch. GitHub Actions
+and the Dockerfile base images, which the audit does not cover, get one grouped version
+update PR per ecosystem each month. Security updates also need "Dependabot security
+updates" switched on in the repository settings; the yaml alone does not enable them.
+
 Both desktop build scripts use the locked `desktop-build` group, including the exact
 PyInstaller version in `pyproject.toml`. To update it, change that pin and regenerate
 `uv.lock`; no separate platform-specific PyInstaller versions are needed.
