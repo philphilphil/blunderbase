@@ -4,6 +4,13 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.7.0 — 2026-09-19
+
+- Added a Lichess sign-in that imports games as they end
+- Changed hiding the engine on new games to go by time control
+- Added the held-back engine verdict to the iOS app
+- Added the app's own tooltips and dialog animations
+
 ## v1.6.0 — 2026-09-17
 
 - Added practising a position against the computer (update remote runners to practise on them)
