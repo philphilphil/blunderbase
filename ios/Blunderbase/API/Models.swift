@@ -272,6 +272,12 @@ struct GameSummary: Decodable, Sendable, Equatable, Identifiable {
     var color: String?
     /// Absent means true. False is a model game from the reference books.
     var isOwnerGame: Bool?
+    /// True while the engine's verdict on this game is held back until it is asked for on
+    /// the game itself — set by an import under the server's **New games** setting, cleared
+    /// by `Endpoints.setEngineHidden`. Absent means false. The per-game twin of the phone's
+    /// own engine-hidden mode (`Preferences.Key.engineHidden`): every screen that draws a
+    /// verdict holds it back for this game whatever the mode says.
+    var engineHidden: Bool?
     var result: String?
     var outcome: String?
     var white: String?
@@ -297,6 +303,7 @@ struct GameSummary: Decodable, Sendable, Equatable, Identifiable {
         case playedAt = "played_at"
         case color
         case isOwnerGame = "is_owner_game"
+        case engineHidden = "engine_hidden"
         case result
         case outcome
         case white
@@ -324,6 +331,7 @@ struct GameSummary: Decodable, Sendable, Equatable, Identifiable {
         playedAt = try container.decodeIfPresent(Date.self, forKey: .playedAt)
         color = try container.decodeIfPresent(String.self, forKey: .color)
         isOwnerGame = try container.decodeIfPresent(Bool.self, forKey: .isOwnerGame)
+        engineHidden = try container.decodeIfPresent(Bool.self, forKey: .engineHidden)
         result = try container.decodeIfPresent(String.self, forKey: .result)
         outcome = try container.decodeIfPresent(String.self, forKey: .outcome)
         white = try container.decodeIfPresent(String.self, forKey: .white)

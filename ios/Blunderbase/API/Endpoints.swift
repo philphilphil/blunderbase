@@ -126,6 +126,7 @@ struct Endpoints: Sendable {
         static let explorerPositions = "/explorer/positions"
 
         static func game(_ id: Int) -> String { "/games/\(id)" }
+        static func gameEngine(_ id: Int) -> String { "/games/\(id)/engine" }
     }
 
     // MARK: Auth
@@ -164,6 +165,20 @@ struct Endpoints: Sendable {
             Path.game(id),
             query: [URLQueryItem.flag("notes", notes)].compactMap { $0 },
             as: GameDetail.self
+        )
+    }
+
+    /// Show the engine on one game, or hold it back again, and answer with the game as it
+    /// now reads.
+    ///
+    /// This is the per-game flag an import sets under the server's **New games** setting,
+    /// and not the phone's own engine-hidden mode: that one is a `UserDefaults` key and
+    /// never leaves the device, while this is stored on the game and reaches every client.
+    func setEngineHidden(gameID: Int, hidden: Bool) async throws -> GameSummary {
+        try await client.put(
+            Path.gameEngine(gameID),
+            body: GameEngineUpdate(hidden: hidden),
+            as: GameSummary.self
         )
     }
 
@@ -292,6 +307,12 @@ struct Endpoints: Sendable {
 
 private struct LoginRequest: Encodable, Sendable {
     let password: String
+}
+
+/// What `PUT /games/{id}/engine` takes. False is the "Show the engine" button; true puts a
+/// game back the way an import held it back, which no screen here asks for yet.
+private struct GameEngineUpdate: Encodable, Sendable {
+    let hidden: Bool
 }
 
 /// What `POST /notes` takes. The optional anchors are omitted rather than sent as null,

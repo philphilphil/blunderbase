@@ -225,7 +225,7 @@ final class GameScreenSnapshotTests: XCTestCase {
         )
         // Pinned rather than read from the phone, so the unaided snapshot is the only one
         // drawn unaided even after a crashed run left the setting behind.
-        store.engineHidden = Preferences.engineHidden
+        store.modeHidden = Preferences.engineHidden
         store.adopt(try GameFixture.friedLiver())
         return store
     }

@@ -267,7 +267,11 @@ struct ExplorerView: View {
                 Text(occurrence.moveSan ?? Format.absent)
                     .font(Theme.Font.mono(12, weight: .medium))
                     .foregroundStyle(Theme.body)
-                if !engineHidden, occurrence.classification.isFlagged {
+                // The glyph is the engine's verdict on that move, so a game holding its
+                // verdict back keeps it here too — a `??` beside a game the owner has not
+                // read yet is the spoiler in miniature.
+                if !engineHidden, occurrence.game.engineHidden != true,
+                   occurrence.classification.isFlagged {
                     Text(occurrence.classification.glyph)
                         .font(Theme.Font.mono(11, weight: .bold))
                         .foregroundStyle(occurrence.classification.color)

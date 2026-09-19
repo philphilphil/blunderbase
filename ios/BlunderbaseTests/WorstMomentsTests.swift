@@ -50,6 +50,26 @@ final class WorstMomentsTests: XCTestCase {
         XCTAssertTrue(moments.isVisible(engineHidden: false))
     }
 
+    /// A moment *is* the engine's verdict, so one belonging to a game that is still holding
+    /// its verdict back would say on the dashboard exactly what that game refuses to say —
+    /// the one thing the per-game flag exists to prevent.
+    func testAMomentFromAGameHoldingItsVerdictBackIsNotOnTheStrip() throws {
+        let moments = MomentsStore()
+        moments.adopt([try blunder(), try blunder(gameID: 2, engineHidden: true)])
+
+        XCTAssertEqual(moments.moments.count, 1)
+        XCTAssertEqual(moments.moments.first?.game.id, 1)
+        XCTAssertEqual(moments.fetched.count, 2, "the answer is kept whole; the strip is what filters")
+    }
+
+    /// And a window whose every moment is held back is an empty window: the strip goes
+    /// rather than drawing a heading over nothing.
+    func testAWindowOfHeldBackGamesShowsNoStripAtAll() throws {
+        let moments = MomentsStore()
+        moments.adopt([try blunder(engineHidden: true)])
+        XCTAssertFalse(moments.isVisible())
+    }
+
     // MARK: Where a tile lands
 
     /// The contract `GameDetailView(initialPly:)` is handed by a tile: seeking to the
@@ -59,7 +79,7 @@ final class WorstMomentsTests: XCTestCase {
             gameID: 1,
             endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!)
         )
-        store.engineHidden = false
+        store.modeHidden = false
         store.adopt(try GameFixture.friedLiver())
 
         let moment = try blunder()
@@ -83,7 +103,7 @@ final class WorstMomentsTests: XCTestCase {
             gameID: 1,
             endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!)
         )
-        store.engineHidden = false
+        store.modeHidden = false
         store.adopt(try GameFixture.friedLiver())
 
         // A note written at count 10 is about the position 5… Nxd5 made.
@@ -95,10 +115,11 @@ final class WorstMomentsTests: XCTestCase {
 
     /// The fixture game's blunder as `/stats/worst-moments` would hand it over, decoded
     /// rather than built, so the test rides on the same shape the app really reads.
-    private func blunder() throws -> MomentResponse {
+    private func blunder(gameID: Int = 1, engineHidden: Bool = false) throws -> MomentResponse {
         let json = """
         {
-          "game": {"id": 1, "source": "lichess", "played_at": "2026-08-22T19:04:11Z", "opponent": "opponent"},
+          "game": {"id": \(gameID), "source": "lichess", "played_at": "2026-08-22T19:04:11Z",
+                   "opponent": "opponent", "engine_hidden": \(engineHidden)},
           "ply": 9,
           "move_number": 5,
           "san": "Nxd5",

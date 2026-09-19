@@ -59,17 +59,26 @@ final class GameStore {
     /// of the game: the toolbar button changes this game, the setting changes the next one.
     var showHints: Bool = Preferences.showHints
 
-    /// Whether the engine may speak on this screen at all — the mode behind `showHints`.
+    /// The phone's own "engine off" mode — the mode behind `showHints`.
     ///
     /// It starts from the phone's setting and the screen keeps it in step with it, so a
-    /// flip in Settings or on the games list reaches a game already open. While it is on,
-    /// `moves` answers with the engine stripped off, and every panel that reads through
-    /// the store — the eval bar, the curve, the glyph, the arrows, the lines, Maia — goes
-    /// quiet by construction rather than by each checking. A preview line is an engine
-    /// line, so it is dropped the moment the mode comes on.
-    var engineHidden: Bool = Preferences.engineHidden {
-        didSet { if engineHidden { previewLine = nil } }
+    /// flip in Settings or on the games list reaches a game already open. A preview line is
+    /// an engine line, so it is dropped the moment the mode comes on.
+    var modeHidden: Bool = Preferences.engineHidden {
+        didSet { if modeHidden { previewLine = nil } }
     }
+
+    /// Whether *this game* is holding its verdict back: `GameSummary.engineHidden`, set when
+    /// an import stored it under the server's **New games** setting. Cleared by `showEngine`,
+    /// which is the button on the screen, and by nothing else — unlike the mode, it is the
+    /// game's own state and outlives this phone.
+    private(set) var gameHidden: Bool = false
+
+    /// Whether the engine may speak on this screen at all: either switch is enough to keep
+    /// it quiet. While it is on, `moves` answers with the engine stripped off, and every
+    /// panel that reads through the store — the eval bar, the curve, the glyph, the arrows,
+    /// the lines, Maia — goes quiet by construction rather than by each checking.
+    var engineHidden: Bool { modeHidden || gameHidden }
 
     /// The Maia level being read. Starts at the server's configured target Elo, which is
     /// the level the owner is actually trying to beat.
@@ -107,6 +116,7 @@ final class GameStore {
     func adopt(_ detail: GameDetail, maiaTargetElo: Int? = nil) {
         self.detail = detail
         self.notes = detail.notes ?? []
+        self.gameHidden = detail.game.engineHidden == true
         self.unaidedMoves = Preferences.withoutEngine(detail.moves)
         self.snapshots = Replay.snapshots(from: detail.moves.map {
             ReplayMove(ply: $0.ply, san: $0.san, uci: $0.uci)
@@ -120,6 +130,22 @@ final class GameStore {
         self.maiaElo = maiaTargetElo ?? availableMaiaElos.last
         self.cursor = 0
         self.state = .loaded
+    }
+
+    /// Ask the server to show the engine on this game, and answer whether it did.
+    ///
+    /// The flag is the server's, so the button waits for the round trip rather than clearing
+    /// it hopefully: a game that is quiet on this phone and loud on the desk would be the
+    /// one thing this feature must never do. The moves are already loaded — hiding was only
+    /// ever the screen declining to read them — so there is nothing to fetch afterwards.
+    func showEngine() async -> Bool {
+        do {
+            let game = try await endpoints.setEngineHidden(gameID: gameID, hidden: false)
+            gameHidden = game.engineHidden == true
+            return true
+        } catch {
+            return false
+        }
     }
 
     // MARK: The analysis line

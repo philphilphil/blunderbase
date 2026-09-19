@@ -169,7 +169,10 @@ export function WorstMomentsRow({ className }: { className?: string }) {
   const nothingRecent = recent.isSuccess && recent.data.length === 0
   const everything = useWorstMoments({ amount: COUNT }, { enabled: nothingRecent })
   const query = nothingRecent ? everything : recent
-  const moments = query.data ?? []
+  // A moment *is* the engine's verdict, so one from a game that is still holding its own
+  // back (`engine_hidden`) would say here exactly what that game refuses to say. ⇧E is not
+  // consulted: the whole row is already gone under it (`DashboardPage`).
+  const moments = (query.data ?? []).filter((moment) => moment.game.engine_hidden !== true)
   const days = RECENT_DAYS
 
   return (

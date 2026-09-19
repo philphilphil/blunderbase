@@ -110,6 +110,21 @@ describe('WorstMomentsRow — dashboard moment cards (design 2a)', () => {
     expect(useWorstMoments).toHaveBeenLastCalledWith({ amount: 6 }, { enabled: false })
   })
 
+  it('leaves out a moment from a game that is still holding its verdict back', () => {
+    // The card is the engine's verdict on a move, so a game imported under **New games**
+    // would have the thing it is keeping quiet about spelled out on the dashboard.
+    useWorstMoments.mockReturnValue(
+      answered([
+        moment({ game: { id: 7, source: 'lichess', opponent: 'jazzoz', engine_hidden: true } }),
+        moment({ game: { id: 8, source: 'lichess', opponent: 'gambiteer' } }),
+      ]),
+    )
+    draw()
+
+    expect(screen.queryByRole('link', { name: /jazzoz/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /gambiteer/ })).toBeInTheDocument()
+  })
+
   it('says so where nothing anywhere has gone wrong', () => {
     useWorstMoments.mockReturnValue(answered([]))
     draw()

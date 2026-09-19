@@ -34,8 +34,16 @@ import SwiftUI
 /// verdict to check against afterwards.
 struct GameRowView: View {
     let card: GameCard
-    /// Whether the engine's verdict is on the row. See `Preferences.engineHidden`.
+    /// Whether the phone's engine-off mode is on. See `Preferences.engineHidden`.
     var engineHidden: Bool = false
+
+    /// Quiet either because the mode is on or because this one game was imported holding its
+    /// verdict back (`GameSummary.engineHidden`). The two read differently on the row: the
+    /// mode takes the stamp's column away from every row alike, while a single held-back game
+    /// keeps its place and puts an eye there, so the row says *why* it is quiet rather than
+    /// looking like a game nothing has analysed.
+    private var heldBack: Bool { !engineHidden && card.game.engineHidden == true }
+    private var quiet: Bool { engineHidden || heldBack }
 
     /// The stamp on the right. Small enough to be a texture in the row rather than a chart
     /// competing with the text, and wide enough that a swing has somewhere to happen.
@@ -47,7 +55,14 @@ struct GameRowView: View {
                 players
                 qualifiers
             }
-            if !engineHidden {
+            if heldBack {
+                // The stamp's own column, so the rows stay in line: an eye where the shape
+                // of the game would be, on the one game that is holding it back.
+                Image(systemName: "eye")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.dim)
+                    .frame(width: GameRowView.sparklineSize.width, height: GameRowView.sparklineSize.height)
+            } else if !engineHidden {
                 Sparkline(points: card.evalCurve ?? [], flagged: flaggedPlies)
                     .frame(width: GameRowView.sparklineSize.width, height: GameRowView.sparklineSize.height)
             }
@@ -122,7 +137,7 @@ struct GameRowView: View {
             Spacer(minLength: 4)
 
             runMarker
-            if !engineHidden {
+            if !quiet {
                 Text(Format.winLoss(worstDrop))
                     .font(Theme.Font.mono(11, weight: .medium))
                     .foregroundStyle(Format.severityColor(worstDrop))
@@ -227,7 +242,7 @@ struct GameRowView: View {
         parts.append(String(localized: "\(white) versus \(black)"))
         if let result = card.game.result { parts.append(Format.result(result)) }
         if let played = card.game.playedAt { parts.append(Format.date(played)) }
-        if !engineHidden, let drop = worstDrop {
+        if !quiet, let drop = worstDrop {
             parts.append(String(localized: "worst move cost \(Int(drop.rounded())) percent"))
         }
         if card.analyzed != true { parts.append(String(localized: "not analysed")) }

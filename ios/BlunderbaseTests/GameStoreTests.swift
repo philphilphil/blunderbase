@@ -26,7 +26,7 @@ final class GameStoreTests: XCTestCase {
         store = GameStore(gameID: 1, endpoints: Endpoints(serverURL: URL(string: "https://example.invalid")!))
         // The store starts from the phone's setting, and a simulator that crashed out of a
         // test with the engine hidden would otherwise hand every test here an unaided game.
-        store.engineHidden = false
+        store.modeHidden = false
         store.adopt(try decodeDetail())
     }
 
@@ -324,7 +324,7 @@ final class GameStoreTests: XCTestCase {
     /// here is one surface the web hides (`engineVisibility.ts`), checked at the blunder,
     /// where every one of them would otherwise have something to say.
     func testHidingTheEngineTakesEveryVerdictOffTheGame() {
-        store.engineHidden = true
+        store.modeHidden = true
         store.seek(to: 10)
 
         XCTAssertNil(store.glyph, "the ?? on d5")
@@ -347,7 +347,7 @@ final class GameStoreTests: XCTestCase {
     /// still walk it and write about it.
     func testHidingTheEngineLeavesTheGameItself() {
         let before = store.moves
-        store.engineHidden = true
+        store.modeHidden = true
 
         XCTAssertEqual(store.moves.count, before.count)
         XCTAssertEqual(store.moves.map(\.san), before.map(\.san))
@@ -361,11 +361,11 @@ final class GameStoreTests: XCTestCase {
     /// Switching back is a plain flip: nothing was thrown away, so the verdicts are the
     /// ones the server sent, not a re-fetch.
     func testShowingTheEngineAgainBringsTheVerdictsBack() {
-        store.engineHidden = true
+        store.modeHidden = true
         store.seek(to: 10)
         XCTAssertNil(store.glyph)
 
-        store.engineHidden = false
+        store.modeHidden = false
         XCTAssertEqual(store.glyph?.text, "??")
         XCTAssertEqual(store.playedMove?.classification, .blunder)
     }
@@ -375,14 +375,50 @@ final class GameStoreTests: XCTestCase {
     func testHidingTheEngineDropsAPreviewLine() {
         store.seek(to: 9)
         store.previewLine = ["c4f7"]
-        store.engineHidden = true
+        store.modeHidden = true
         XCTAssertNil(store.previewLine)
         XCTAssertEqual(store.arrows.map(\.kind), [.played])
+    }
+
+    /// The game's own flag, which is the server's and not the phone's: a game imported under
+    /// the **New games** setting arrives quiet however the mode is set, and the store reads
+    /// the two as one question so that no pane has to ask twice.
+    func testAGameImportedQuietIsQuietWithTheModeOff() throws {
+        store.adopt(try heldBackGame())
+
+        XCTAssertFalse(store.modeHidden, "the phone's mode is off")
+        XCTAssertTrue(store.gameHidden)
+        XCTAssertTrue(store.engineHidden, "and the game is quiet anyway")
+
+        store.seek(to: 10)
+        XCTAssertNil(store.glyph)
+        XCTAssertNil(store.playedMove?.classification)
+        XCTAssertEqual(store.playedMove?.san, "Nxd5", "the game itself stays")
+    }
+
+    /// Flipping the mode off cannot speak for a game that is holding its own verdict back —
+    /// that one is cleared by asking the server, and by nothing on this phone.
+    func testTheModeGoingOffDoesNotShowAHeldBackGame() throws {
+        store.adopt(try heldBackGame())
+        store.modeHidden = true
+        store.modeHidden = false
+
+        XCTAssertTrue(store.engineHidden)
+        XCTAssertTrue(store.gameHidden)
     }
 
     // MARK: Fixture
 
     private func decodeDetail() throws -> GameDetail {
         try GameFixture.friedLiver()
+    }
+
+    /// The fixture as an import under the **New games** setting stored it.
+    private func heldBackGame() throws -> GameDetail {
+        let json = GameFixture.json.replacingOccurrences(
+            of: "\"id\": 1,",
+            with: "\"id\": 1, \"engine_hidden\": true,"
+        )
+        return try APIClient.makeDecoder().decode(GameDetail.self, from: Data(json.utf8))
     }
 }

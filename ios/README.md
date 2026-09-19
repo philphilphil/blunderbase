@@ -140,6 +140,15 @@ the game and what Blunderbase has *done* — the `requested` and `unanalysed` ma
 It is a setting of this phone, it survives relaunches, and the games list's computer goes
 dim while it is on so a clean move list is not mistaken for an unanalysed game.
 
+A game can also be quiet on its own. Under **Analysis → Engine passes → New games** in the
+web app, a game imported at a chosen speed or slower is stored holding its verdict back
+(`engine_hidden`), and that travels with the game rather than with a browser: here it hides
+the same things the mode does, the games list shows an eye where the game's stamp would be,
+its blunders stay off the worst-moments strip, and a band under the transport says **Show
+the engine**. Pressing it asks the server (`PUT /games/{id}/engine`) and the game speaks from
+then on, on this phone and everywhere else. If the phone's own mode is on too, the band says
+so: clearing the game's flag leaves the screen quiet until the mode goes as well.
+
 ## Languages
 
 English and German, following the phone: iOS picks the app's language from the system
@@ -167,7 +176,7 @@ Only the existing REST API and the events socket — no backend change was neede
 | Dashboard | `GET /api/stats/profile`, `GET /api/stats/dashboard`, `GET /api/stats/compare`, `GET /api/stats/worst-moments` |
 | Games | `GET /api/games?cards=true&…` |
 | Explorer | `GET /api/explorer/book`, `GET /api/explorer/positions` |
-| Game | `GET /api/games/{id}`, `GET /api/explorer/book` |
+| Game | `GET /api/games/{id}`, `GET /api/explorer/book`, `PUT /api/games/{id}/engine` |
 | Notes | `GET /api/notes`, `POST /api/notes` |
 | Live engine | `POST/PATCH/DELETE /api/streams`, output on `ws(s)://…/events` |
 

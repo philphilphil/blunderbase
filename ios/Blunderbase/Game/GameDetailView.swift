@@ -39,6 +39,11 @@ struct GameDetailView: View {
     /// from would be a screen that will not let them read the rest of the game.
     @State private var hasOpenedAtInitialPly = false
 
+    /// The "Show the engine" band's own two states: one request at a time, and what to say
+    /// when the server did not answer. Neither outlives the screen.
+    @State private var isRevealing = false
+    @State private var revealFailed = false
+
     /// The phone's "engine off" mode, bound here so a flip in Settings reaches a game that
     /// is already open. The store gets a copy in `onChange`, because the store is what
     /// every pane reads and a `@AppStorage` lives on a view.
@@ -119,7 +124,12 @@ struct GameDetailView: View {
             // paths from being two seeks.
             .onChange(of: store.state) { _, _ in openAtInitialPly() }
             .onChange(of: engineHidden, initial: true) { _, hidden in
-                store.engineHidden = hidden
+                store.modeHidden = hidden
+            }
+            // Watched on the store rather than on the mode, because the game's own flag
+            // says the same thing and arrives later, with the game: a quiet game must land
+            // on the move list with the live board closed, exactly as flipping the mode does.
+            .onChange(of: store.engineHidden, initial: true) { _, hidden in
                 guard hidden else { return }
                 // The live board is the engine too, and the pane its switch lives on is
                 // about to go; closing it here rather than leaving it for the reaper.
@@ -206,7 +216,7 @@ struct GameDetailView: View {
             // frame behind the transport and the handle above it — which is what a resize
             // that flickers actually is. The chrome around it has fixed heights, so this
             // arithmetic is the same number a frame earlier.
-            let block = max(0, outer.size.height - Self.chromeHeight - panes)
+            let block = max(0, outer.size.height - chromeHeight - panes)
             let side = max(
                 0,
                 min(fullWidthBoardSide(outer.size.width), block - 2 * boardMargin)
@@ -218,7 +228,7 @@ struct GameDetailView: View {
                     // The bar goes with the engine, and the board takes its column: a
                     // dimmed 50/50 would still be the bar saying "nothing here", and a
                     // reader annotating unaided should not have to look away from one.
-                    if !engineHidden {
+                    if !store.engineHidden {
                         EvalBarView(
                             whiteWin: store.whiteWin,
                             scoreLabel: store.scoreLabel,
@@ -262,6 +272,8 @@ struct GameDetailView: View {
 
                 transport
 
+                if store.gameHidden { reveal }
+
                 PaneHandle(
                     isExpanded: panes >= expandedPaneHeight(in: outer.size.height) - 1,
                     onDrag: { translation in
@@ -282,7 +294,7 @@ struct GameDetailView: View {
                     live: live,
                     pane: $pane,
                     isReadOnly: session.isReadOnly,
-                    engineHidden: engineHidden
+                    engineHidden: store.engineHidden
                 )
                 .frame(height: panes)
             }
@@ -296,10 +308,18 @@ struct GameDetailView: View {
     /// derived by subtraction, and a row whose height changes has to change here too.
     private static let chromeHeight: CGFloat = 34 + 38 + 26
 
+    /// The "Show the engine" band, which is chrome only while a game is holding its verdict
+    /// back — the board gives up its height for it and takes it back when the engine speaks.
+    private static let revealHeight: CGFloat = 32
+
+    private var chromeHeight: CGFloat {
+        Self.chromeHeight + (store.gameHidden ? Self.revealHeight : 0)
+    }
+
     /// How wide a board can be, which is what a board wants to be. With the engine hidden
     /// the eval bar's column is the board's.
     private func fullWidthBoardSide(_ width: CGFloat) -> CGFloat {
-        let bar = engineHidden ? 0 : Theme.Metrics.evalBarWidth + boardMargin
+        let bar = store.engineHidden ? 0 : Theme.Metrics.evalBarWidth + boardMargin
         return width - bar - 2 * boardMargin
     }
 
@@ -312,7 +332,7 @@ struct GameDetailView: View {
     /// rest. On a short phone the rest is not much, which is honest, and the reader can drag
     /// for more the moment they want it.
     private func defaultPaneHeight(in size: CGSize) -> CGFloat {
-        clampPaneHeight(size.height - Self.chromeHeight - fullWidthBoardSide(size.width), in: size.height)
+        clampPaneHeight(size.height - chromeHeight - fullWidthBoardSide(size.width), in: size.height)
     }
 
     /// As tall as the panes go. The board keeps a floor rather than disappearing, because a
@@ -446,7 +466,7 @@ struct GameDetailView: View {
             } else {
                 Button {
                     // The counter is a shortcut to the graph; with no graph, to the moves.
-                    show(engineHidden ? .moves : .eval)
+                    show(store.engineHidden ? .moves : .eval)
                 } label: {
                     Text(store.positionLabel)
                         .font(Theme.Font.mono(12))
@@ -467,6 +487,57 @@ struct GameDetailView: View {
         .padding(.horizontal, Theme.Metrics.gutter)
         .frame(height: 38)
         .background(Theme.surface)
+    }
+
+    /// "Show the engine" — the band under the transport on a game an import held back.
+    ///
+    /// It sits under the transport for the reason the web puts it in that row: that is where
+    /// the screen says what to *do* to this game, and this is the one control on it that is
+    /// about the verdict being kept from view. Only drawn while the game is holding one
+    /// back — once the engine speaks there is nothing left for it to say, and putting a
+    /// "hide it again" button on every game would cost a row for a gesture nobody makes.
+    ///
+    /// The phone's own mode is deliberately not consulted: if both are on, pressing this
+    /// clears the game's flag and the screen stays quiet until the mode goes too, which is
+    /// what the band says while it waits.
+    private var reveal: some View {
+        Button {
+            guard !isRevealing else { return }
+            isRevealing = true
+            revealFailed = false
+            Task {
+                let shown = await store.showEngine()
+                isRevealing = false
+                revealFailed = !shown
+                if shown { Haptics.selectionChanged() }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: revealFailed ? "exclamationmark.triangle" : "eye")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(revealLabel)
+                    .font(Theme.Font.text(12, weight: .medium))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(revealFailed ? Theme.mistake : Theme.accent)
+            .padding(.horizontal, Theme.Metrics.gutter)
+            .frame(height: Self.revealHeight)
+            .frame(maxWidth: .infinity)
+            .background(Theme.surface)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isRevealing)
+    }
+
+    /// Built as a `String`, so each branch is a key in its own right — see the localisation
+    /// note in `ios/README.md`.
+    private var revealLabel: String {
+        if isRevealing { return String(localized: "Showing the engine…") }
+        if revealFailed { return String(localized: "That did not reach the server. Tap to try again") }
+        return engineHidden
+            ? String(localized: "Show the engine (the mode is hiding it too)")
+            : String(localized: "Show the engine")
     }
 
     private func transportButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -491,7 +562,7 @@ struct GameDetailView: View {
         ToolbarItemGroup(placement: .topBarTrailing) {
             // The lightbulb is the arrows' switch, and with the engine hidden there are no
             // arrows to switch; a button that does nothing is worse than none.
-            if !engineHidden {
+            if !store.engineHidden {
                 Button {
                     store.showHints.toggle()
                     Haptics.selectionChanged()
@@ -510,7 +581,7 @@ struct GameDetailView: View {
                 }
                 // The flagged moves are the engine's, so the two ways to jump between
                 // them go with it rather than sitting greyed out for the whole game.
-                if !engineHidden {
+                if !store.engineHidden {
                     Button {
                         store.toPreviousFlagged()
                     } label: {

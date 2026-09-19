@@ -1812,6 +1812,26 @@
         }
       }
     },
+    "Show the engine (the mode is hiding it too)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine anzeigen (der Modus blendet sie ebenfalls aus)"
+          }
+        }
+      }
+    },
+    "Showing the engine…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine wird angezeigt …"
+          }
+        }
+      }
+    },
     "Shrink the panels" : {
       "localizations" : {
         "de" : {
@@ -1938,6 +1958,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ziel-Elo"
+          }
+        }
+      }
+    },
+    "That did not reach the server. Tap to try again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das hat den Server nicht erreicht. Zum Wiederholen tippen"
           }
         }
       }

@@ -58,10 +58,28 @@ final class ModelsDecodingTests: XCTestCase {
         XCTAssertNil(game.opening)
         XCTAssertNil(game.termination)
         XCTAssertNil(game.plyCount)
+        XCTAssertNil(game.engineHidden)
         // Absent means the owner played it, which is what every list assumes.
         XCTAssertTrue(game.isOwners)
         XCTAssertNil(game.ownerIsWhite)
         XCTAssertNil(game.ownerName)
+    }
+
+    /// A game an import stored under the server's **New games** setting. The key has to be
+    /// listed in `CodingKeys` to arrive at all — an unlisted one is dropped in silence — and
+    /// a row that dropped it would draw the verdict the game is holding back.
+    func testAHeldBackGameCarriesItsFlag() throws {
+        let held = try decode(
+            GameSummary.self,
+            #"{"id": 7, "source": "lichess", "engine_hidden": true}"#
+        )
+        XCTAssertEqual(held.engineHidden, true)
+
+        let shown = try decode(
+            GameSummary.self,
+            #"{"id": 7, "source": "lichess", "engine_hidden": false}"#
+        )
+        XCTAssertEqual(shown.engineHidden, false)
     }
 
     func testOwnerAndOpponentComeFromTheSidePlayed() throws {

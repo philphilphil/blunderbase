@@ -179,7 +179,13 @@ final class MomentsStore {
     /// current — the web's own window, said out loud in the heading.
     static let recentDays = 30
 
-    private(set) var moments: [MomentResponse] = []
+    /// What the strip shows: the fetched moments, less the ones belonging to a game that is
+    /// holding its verdict back. A moment *is* the engine's verdict, so one on the strip
+    /// would tell the owner where a game they have not read yet went wrong — the one thing
+    /// the per-game flag exists to prevent. Filtered here rather than at each tile so that
+    /// `isVisible` counts what will actually be drawn.
+    var moments: [MomentResponse] { fetched.filter { $0.game.engineHidden != true } }
+    private(set) var fetched: [MomentResponse] = []
     private(set) var state: LoadState = .idle
 
     @ObservationIgnored private var endpoints: Endpoints?
@@ -216,7 +222,7 @@ final class MomentsStore {
     /// worth exercising, and the fetch is not. A preview and a test both want this half
     /// without a server to fake.
     func adopt(_ moments: [MomentResponse]) {
-        self.moments = moments
+        self.fetched = moments
         self.state = .loaded
     }
 
@@ -235,14 +241,14 @@ final class MomentsStore {
         guard let endpoints else { return }
         if showingSkeleton { state = .loading }
         do {
-            moments = try await endpoints.worstMoments(
+            fetched = try await endpoints.worstMoments(
                 days: MomentsStore.recentDays,
                 amount: MomentsStore.count
             )
             state = .loaded
         } catch {
             session?.handle(error)
-            moments = []
+            fetched = []
             state = .failed
         }
     }

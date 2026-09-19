@@ -248,6 +248,24 @@ actor APIClient {
         return try decode(data, as: type)
     }
 
+    /// The same as `post` with the other verb, for the routes that replace a thing rather
+    /// than create one — `PUT /games/{id}/engine`, which is the whole of it so far.
+    func put<B: Encodable & Sendable, T: Decodable & Sendable>(
+        _ path: String,
+        body: B,
+        query: [URLQueryItem] = [],
+        as type: T.Type
+    ) async throws -> T {
+        let payload: Data
+        do {
+            payload = try encoder.encode(body)
+        } catch {
+            throw APIError.decoding(error)
+        }
+        let data = try await perform(request(path, method: "PUT", query: query, body: payload))
+        return try decode(data, as: type)
+    }
+
     /// A POST whose answer is a 204 — logout. Separate from `post` because there is no body
     /// to decode and `T = Void` is not a `Decodable`.
     func postNoContent(_ path: String, query: [URLQueryItem] = []) async throws {
