@@ -105,14 +105,20 @@ function lineContext(
 /**
  * The Notes tab's rows: every note this game carries, in the order a reader walks the game.
  *
- * The game's own notes come first, in ply order, because they are the game — a variation is
- * a detour, and a detour's notes read as an aside under the moves they hang off. Inside each
- * group the position decides the order, and two notes on the same position are newest first,
+ * The position decides the order, and nothing else does — a note on a variation sits among
+ * the game's own notes, at the ply the variation branches from. This list used to keep the
+ * game's notes together and hang the variations' underneath them all, on the reasoning that
+ * a variation is a detour; but the reader is walking one game, and a thought written on an
+ * engine line off move 12 belongs beside the thought written on move 11, not past the note
+ * on move 29. Grouped by kind, the tab put the detour first in reading order exactly when
+ * the reader had most reason to expect it in place.
+ *
+ * A variation's own notes stay in the variation's order (`base`, then how far into the
+ * line), so they read as the line reads. Two notes on the same position are newest first,
  * which is the order they were written back to front.
  *
- * A note with no position at all (a free note that happens to name this game) sorts to the
- * end of the first group: it is about the game entire, and there is nowhere earlier to put
- * it.
+ * A note with no position at all (a free note that happens to name this game) sorts last:
+ * it is about the game entire, and there is nowhere along the reading to put it.
  */
 export function noteRows(
   notes: readonly GameNote[],
@@ -154,7 +160,6 @@ export function noteRows(
   })
 
   return rows.sort((left, right) => {
-    if (left.onLine !== right.onLine) return left.onLine ? 1 : -1
     const at = comparePositions(left.anchor, right.anchor)
     if (at !== 0) return at
     return Date.parse(right.note.created_at) - Date.parse(left.note.created_at)
@@ -168,10 +173,18 @@ function comparePositions(left: NoteAnchor, right: NoteAnchor): number {
   return leftBase === rightBase ? leftIn - rightIn : leftBase - rightBase
 }
 
-/** An anchor as `[game ply, moves into a line]`, which orders lexicographically. */
+/**
+ * An anchor as `[game ply, moves into a line]`, which orders lexicographically.
+ *
+ * A line's notes are counted from `base + 1` rather than from `base`, because a variation
+ * is an alternative to the game's move out of that position, not to the position itself:
+ * at `base` they would sort ahead of the game's own note on the move they replace, and the
+ * detour would be read before the thing it is a detour from. One past it puts them exactly
+ * where the move list keeps the line — after that move, before the next one.
+ */
 function anchorAt(anchor: NoteAnchor): [number, number] {
   if (anchor.kind === 'mainline') return [anchor.count, 0]
-  if (anchor.kind === 'line') return [anchor.base, anchor.index]
+  if (anchor.kind === 'line') return [anchor.base + 1, anchor.index]
   return [Number.POSITIVE_INFINITY, 0]
 }
 

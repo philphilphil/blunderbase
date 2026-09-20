@@ -104,9 +104,11 @@ describe('noteRows', () => {
     expect(row).toMatchObject({ onLine: true, context: '2.d4' })
   })
 
-  it('reads the game’s own notes in ply order, and the variations’ after them', () => {
+  it('reads every note in the order the game is walked, variations in place', () => {
     const rows = noteRows(
       [
+        // The line branches off ply 1, so its notes read after the game's own note there
+        // and before the game's note on ply 3 — where the move list keeps the line.
         note({ id: 1, ply: 3, line_id: 7 }),
         note({ id: 2, ply: 3 }),
         note({ id: 3, ply: 1 }),
@@ -115,7 +117,16 @@ describe('noteRows', () => {
       [LINE],
       MOVES,
     )
-    expect(rows.map((row) => row.note.id)).toEqual([3, 2, 4, 1])
+    expect(rows.map((row) => row.note.id)).toEqual([3, 1, 2, 4])
+  })
+
+  it('keeps a variation’s notes in the variation’s own order', () => {
+    const rows = noteRows(
+      [note({ id: 1, ply: 3, line_id: 7 }), note({ id: 2, ply: 2, line_id: 7 })],
+      [LINE],
+      MOVES,
+    )
+    expect(rows.map((row) => row.note.id)).toEqual([2, 1])
   })
 
   it('puts the newer of two notes on the same position first', () => {
