@@ -4,6 +4,10 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.7.1 — 2026-09-20
+
+- Fixed the eval bar swinging to even between live engine answers
+
 ## v1.7.0 — 2026-09-19
 
 - Added a Lichess sign-in that imports games as they end
