@@ -112,6 +112,13 @@ export interface BoardPanelProps {
    * chip says so rather than letting a walked line look like a fresh search.
    */
   scoreAlongLine?: boolean
+  /**
+   * A live search is on the way to this position and nothing else has an opinion about it
+   * — the eval bar holds its last column rather than swinging to level and back. Only the
+   * bar reads it: the score chip has a number or it has none, and a chip repeating the
+   * previous position's score would be reporting a stale claim in figures.
+   */
+  evalPending?: boolean
   /** `-1` for the starting position. */
   cursor: number
   plyCount: number
@@ -252,6 +259,7 @@ export function BoardPanel({
   win,
   score,
   scoreAlongLine,
+  evalPending = false,
   cursor,
   plyCount,
   hints,
@@ -516,7 +524,13 @@ export function BoardPanel({
             is hidden — the board takes the 1.5rem, which is the one place on this screen
             where hiding something makes the thing worth looking at bigger. */}
         {engineHidden ? null : (
-          <EvalBar win={win} score={score} orientation={orientation} className="self-stretch" />
+          <EvalBar
+            win={win}
+            score={score}
+            pending={evalPending}
+            orientation={orientation}
+            className="self-stretch"
+          />
         )}
         {/* Nothing floats over the squares: Maia's prediction is a panel of its own, under
             the engine lines, and only its target square is marked here. */}

@@ -58,4 +58,30 @@ describe('EvalBar', () => {
     expect(fills()).toHaveLength(2)
   })
 
+  it('holds the last column while a live search is on its way', () => {
+    const { rerender } = render(<EvalBar win={80} score={{ cp: 300, mate: null }} />)
+    // The board steps onto a position the search has not reached: no number, but a search
+    // is coming. The 80 % stays where it was, dimmed, rather than falling to level.
+    rerender(<EvalBar win={null} score={null} pending />)
+    expect(white()).toHaveStyle({ height: '80%', opacity: '0.6' })
+    expect(black()).toHaveStyle({ height: '20%' })
+    expect(hairline()).toHaveStyle({ top: '20%' })
+    // The held number is the previous position's, so it is not read out as this one's.
+    expect(screen.getByRole('img')).toHaveAttribute('title', 'waiting for the engine')
+
+    // The answer arrives: the bar moves to it, at full strength.
+    rerender(<EvalBar win={30} score={{ cp: -150, mate: null }} pending />)
+    expect(white()).toHaveStyle({ height: '30%', opacity: '1' })
+    expect(screen.getByRole('img')).toHaveAttribute('title', '−1.50 · White 30%')
+  })
+
+  it('goes level once there is nothing on the way either', () => {
+    const { rerender } = render(<EvalBar win={80} score={{ cp: 300, mate: null }} />)
+    // The search is off — a null `win` now means nobody has looked at this position, which
+    // is the one thing the held column must not be allowed to paper over.
+    rerender(<EvalBar win={null} score={null} />)
+    expect(white()).toHaveStyle({ height: '50%', opacity: '0.25' })
+    expect(fills()).toHaveLength(2)
+    expect(screen.getByRole('img')).toHaveAttribute('title', 'not analysed')
+  })
 })

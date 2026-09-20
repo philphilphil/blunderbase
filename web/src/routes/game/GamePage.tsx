@@ -1490,6 +1490,18 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       : win
   /** Whether that number is the line's rather than this position's own — the chip says so. */
   const scoreAlongLine = boardLiveScore === null && exploring && alongLine !== null
+  /**
+   * The bar is between answers rather than looking at a position nobody has evaluated.
+   *
+   * A search does not follow the board instantly: the position change is PATCHed after the
+   * keyboard settles and the engine then needs a moment to say anything, so every step onto
+   * a fresh position left `boardWin` null for a few frames and the bar fell to dead level
+   * and climbed back — a swing to "equal" that no engine ever claimed. While a session is
+   * opening or running, that gap is a wait and the bar holds instead (`EvalBar`); with the
+   * search off it is not, and an empty bar is the honest drawing.
+   */
+  const evalPending =
+    boardWin === null && (stream.phase === 'opening' || stream.phase === 'running')
 
   /**
    * Walk the engine's own move here onto the board — ↵.
@@ -1880,6 +1892,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       win={boardWin}
       score={boardScore}
       scoreAlongLine={scoreAlongLine}
+      evalPending={evalPending}
       cursor={cursor}
       plyCount={plyCount}
       hints={shownHints}
