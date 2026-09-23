@@ -4,6 +4,11 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.8.0 — 2026-09-23
+
+- Added notes about a whole game
+- Fixed notes on variations sorting below the game's notes
+
 ## v1.7.1 — 2026-09-20
 
 - Fixed the eval bar swinging to even between live engine answers
