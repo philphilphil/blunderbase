@@ -99,6 +99,7 @@ import {
   noteTarget,
   notedLineIndices,
   notedMoveIndices,
+  targetKey,
   type NoteRow,
 } from './notesModel'
 import { buildPgn } from './pgn'
@@ -424,6 +425,15 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * (`noteAtTarget`), so a stale id costs nothing.
    */
   const [preferredNote, setPreferredNote] = useState<number | null>(null)
+
+  /**
+   * Where the composer was switched to **Game** — the key of the position it was standing on
+   * (`targetKey`), or null while it writes about the board. Kept against a position rather
+   * than as a flag so that moving the board switches it back by itself: "about the game" is
+   * a decision made for one note, and a reader who stepped on and started typing again is
+   * writing about the square in front of them. See `NoteComposer`.
+   */
+  const [gameScopeAt, setGameScopeAt] = useState<string | null>(null)
 
   // --- the column split -----------------------------------------------------
   //
@@ -1029,9 +1039,10 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
 
   /**
    * What a new note would hang on: the position on the board, and off the game's own line
-   * the whole walk as a variation to pin. Derived rather than chosen — see `./notesModel`.
+   * the whole walk as a variation to pin. Derived rather than chosen — see `./notesModel` —
+   * with the one exception of the composer's **Game** switch, which makes it the game entire.
    */
-  const target = useMemo(
+  const positionTarget = useMemo(
     () =>
       noteTarget({
         // Only ever read where a note can actually be written, which is a library game.
@@ -1051,6 +1062,26 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
             : null,
       }),
     [analysis, boardIndex, boardPosition, gameId, moves, notate],
+  )
+  const wholeGame = gameScopeAt !== null && gameScopeAt === targetKey(positionTarget)
+  const target = useMemo(
+    () =>
+      wholeGame
+        ? noteTarget({
+            gameId: gameId ?? 0,
+            moves,
+            boardIndex,
+            fen: boardPosition.fen,
+            branch: null,
+            wholeGame: true,
+          })
+        : positionTarget,
+    [boardIndex, boardPosition, gameId, moves, positionTarget, wholeGame],
+  )
+  const setNoteScope = useCallback(
+    (scope: 'position' | 'game') =>
+      setGameScopeAt(scope === 'game' ? targetKey(positionTarget) : null),
+    [positionTarget],
   )
 
   /**
@@ -1090,8 +1121,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           text,
           tags: noteTags,
           game_id: gameId,
-          fen: target.fen,
-          ply: target.ply,
+          // Both absent on a note about the game entire — that is what makes it one.
+          fen: target.fen ?? undefined,
+          ply: target.ply ?? undefined,
           line: target.line,
           source: 'web',
         },
@@ -1167,14 +1199,22 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   /**
    * A note in the Notes tab is a bookmark: jump to its ply, or into the line it pinned —
    * and open it, which is what picking a note out of a list means. A note that came in on a
-   * position this game merely reached belongs to another game and is only a jump.
+   * position this game merely reached belongs to another game and is only a jump. A note on
+   * the game entire has nowhere to jump; it switches the composer to **Game** and opens there.
    */
   const selectNote = useCallback(
     (row: NoteRow) => {
-      if (row.anchor.kind !== 'loose' && row.note.scope !== 'position') {
-        setPreferredNote(row.note.id)
-        focusComposer()
+      if (row.note.scope === 'position') {
+        if (row.anchor.kind === 'mainline') seek(row.anchor.count - 1)
+        return
       }
+      setPreferredNote(row.note.id)
+      focusComposer()
+      if (row.anchor.kind === 'loose') {
+        setNoteScope('game')
+        return
+      }
+      setNoteScope('position')
       if (row.anchor.kind === 'line') {
         if (row.anchor.index === 0) {
           seek(row.anchor.base - 1)
@@ -1185,7 +1225,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       }
       if (row.anchor.kind === 'mainline') seek(row.anchor.count - 1)
     },
-    [enterLine, focusComposer, seek],
+    [enterLine, focusComposer, seek, setNoteScope],
   )
 
   // --- Maia -----------------------------------------------------------------
@@ -1676,6 +1716,14 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           : undefined,
       // A note hangs off a game row, so a model game nobody has added has none to write.
       note: readOnly ? undefined : focusComposer,
+      // ⇧N: the same box, switched to the game entire. The switch is set before the focus so
+      // the caret lands in a box already captioned for what it is about.
+      gameNote: readOnly
+        ? undefined
+        : () => {
+            setNoteScope('game')
+            focusComposer()
+          },
       // Only while there is a line to leave: off one, Escape is the browser's again — and,
       // more to the point, whatever is open on top of the page keeps it.
       // Practising, Escape ends the game and leaves its moves on the board as a line; a
@@ -2038,6 +2086,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       onSave={writeNote}
       onDelete={forgetNote}
       onClose={blurComposer}
+      onScope={setNoteScope}
       // No height of its own on either layout: it is handed one by the slot at the foot of
       // `NotesTrack`, which is what guarantees the box cannot move when the tab above it
       // changes — see that component's `COMPOSER_SLOT`.

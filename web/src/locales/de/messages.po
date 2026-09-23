@@ -1728,6 +1728,10 @@ msgid "Write a note about this position"
 msgstr "Eine Notiz zu dieser Stellung schreiben"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Write a note about the whole game"
+msgstr "Eine Notiz zur ganzen Partie schreiben"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Analyse this game…"
 msgstr "Diese Partie analysieren…"
 
@@ -2512,12 +2516,14 @@ msgid "move {0}, Black to play"
 msgstr "Zug {0}, Schwarz am Zug"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/game/components/NoteComposer.tsx
 #: src/routes/notes/filters.ts
 msgid "Game"
 msgstr "Partie"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 #: src/routes/engines/EngineDetail.tsx
+#: src/routes/game/components/NoteComposer.tsx
 msgid "Position"
 msgstr "Stellung"
 
@@ -5591,6 +5597,22 @@ msgid "left"
 msgstr "übrig"
 
 #: src/routes/game/components/NoteComposer.tsx
+msgid "What is worth remembering about this game?"
+msgstr "Was lohnt sich an dieser Partie zu merken?"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "What the note is about"
+msgstr "Worauf sich die Notiz bezieht"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "About the position on the board (N)"
+msgstr "Zur Stellung auf dem Brett (N)"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "About the game entire, not one move (⇧N)"
+msgstr "Zur ganzen Partie, nicht zu einem Zug (⇧N)"
+
+#: src/routes/game/components/NoteComposer.tsx
 msgid "pins the line"
 msgstr "heftet die Variante an"
 
@@ -5806,6 +5828,10 @@ msgstr "ohne Datum"
 #: src/routes/game/notesModel.ts
 msgid "branch"
 msgstr "Abzweig"
+
+#: src/routes/game/notesModel.ts
+msgid "the game"
+msgstr "die Partie"
 
 #: src/routes/game/notesModel.ts
 msgid "{move} (variation)"

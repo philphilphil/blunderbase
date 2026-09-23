@@ -104,6 +104,7 @@ are on.
 | Key | Does |
 |---|---|
 | `N` | Write a note about this position |
+| `⇧N` | Write a note about the whole game |
 | `A` | Analyse — ask for a deeper look |
 | `P` | Practise from this position against the computer, or stop |
 | `C` | Copy the PGN |

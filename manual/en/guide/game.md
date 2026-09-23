@@ -159,6 +159,16 @@ Read the game, then press it — that game speaks from then on, and the others a
 
 `N` writes a note about the position on the board; **Enter** saves it, **Shift+Enter** is a
 new line. Notes come back in every game that reaches that position — see [Notes](notes.md).
+
+Not every thought is about a square. "Played this on no sleep", "the plan was wrong from
+the opening" — that is about the game, and written on move one it would come back under
+every game that opened the same way. The **Position / Game** switch beside the tags decides
+which the note is; `⇧N` opens the box already switched to **Game**. A game note names no
+position, so it stays with this game and reads first in its notes list, under the label
+*game*. What you have typed travels with the
+switch, so a note begun under the wrong heading is moved rather than retyped. Stepping the
+board switches back to **Position**.
+
 The **Book** tab beside **Notes** shows how your own games went on from here; `B` opens it.
 It is headed with the name of the opening the game is in, and a move that enters a named
 opening shows that name in its **Opening** column.

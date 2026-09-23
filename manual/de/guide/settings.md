@@ -106,6 +106,7 @@ aktuellen Bildschirm gelten.
 | Taste | Wirkung |
 |---|---|
 | `N` | Eine Notiz zu dieser Stellung schreiben |
+| `⇧N` | Eine Notiz zur ganzen Partie schreiben |
 | `A` | Analysieren – genauer hinsehen lassen |
 | `P` | Diese Stellung gegen den Computer ausspielen, oder aufhören |
 | `C` | PGN kopieren |

@@ -7,6 +7,10 @@ every game of yours that reaches that position, whatever the move order was. A n
 carry tags, and a note written while walking a model game or a reference line is still
 yours and is kept.
 
+Or to a game entire, with no position at all: the note box's **Position / Game** switch on
+the game screen (`⇧N`), or **This game** in a correspondence game. Those come back under
+that one game only — see [Analysing a game](game.md#write-a-note).
+
 Wherever a note is written — the game screen, the explorer, the live board, a
 correspondence game, the notes page — **Enter** saves it and **Shift+Enter** starts a new
 line. A box that saves when you click away still does.

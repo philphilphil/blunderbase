@@ -117,8 +117,11 @@ function lineContext(
  * line), so they read as the line reads. Two notes on the same position are newest first,
  * which is the order they were written back to front.
  *
- * A note with no position at all (a free note that happens to name this game) sorts last:
- * it is about the game entire, and there is nowhere along the reading to put it.
+ * A note with no position at all — one written about the game entire, with the composer's
+ * **Game** switch or from the correspondence journal — sorts first. It is the paragraph
+ * about the whole game, and a reader opening the notes reads that before the move-by-move;
+ * it used to sort last, on the reasoning that there was nowhere along the reading to put
+ * it, and was found under the note on move 40 exactly when it said what the game was about.
  */
 export function noteRows(
   notes: readonly GameNote[],
@@ -166,7 +169,7 @@ export function noteRows(
   })
 }
 
-/** Where an anchor sits along the reading: a loose note has no position, so it sorts last. */
+/** Where an anchor sits along the reading: a loose note has no position, so it sorts first. */
 function comparePositions(left: NoteAnchor, right: NoteAnchor): number {
   const [leftBase, leftIn] = anchorAt(left)
   const [rightBase, rightIn] = anchorAt(right)
@@ -185,7 +188,7 @@ function comparePositions(left: NoteAnchor, right: NoteAnchor): number {
 function anchorAt(anchor: NoteAnchor): [number, number] {
   if (anchor.kind === 'mainline') return [anchor.count, 0]
   if (anchor.kind === 'line') return [anchor.base + 1, anchor.index]
-  return [Number.POSITIVE_INFINITY, 0]
+  return [Number.NEGATIVE_INFINITY, 0]
 }
 
 /**
@@ -254,11 +257,17 @@ export interface WalkedLine {
  * `base + cursor` — because that is the position the note is about.
  */
 export interface NoteTarget {
-  kind: 'mainline' | 'line'
+  /**
+   * `game` is the note about the game entire — no ply, no position, no line — which is
+   * what the composer writes with its **Game** switch on. It is the same note the
+   * correspondence screen's journal keeps, and the notes page filters as having no position.
+   */
+  kind: 'mainline' | 'line' | 'game'
   gameId: number
-  /** The half-move count to send as `ply`. */
-  ply: number
-  fen: string
+  /** The half-move count to send as `ply`; null for a note on the game entire. */
+  ply: number | null
+  /** The position to send as `fen`; null for a note on the game entire. */
+  fen: string | null
   /** The variation to keep and pin the note to, or null on the game's own line. */
   line: { game_id: number; base_ply: number; moves: string[] } | null
   /** What the composer says it is about: `2…d5`, `the starting position`, `1…c6`. */
@@ -276,8 +285,17 @@ export function noteTarget(input: {
   branch: WalkedLine | null
   /** The reader's notation for the label; English SAN when absent. */
   notate?: Notate
+  /**
+   * The note is about the game and not about the board: the composer's **Game** switch.
+   * Wherever the board stands, the note then names no position, so it comes back under
+   * this game only and never under another that reaches the same square.
+   */
+  wholeGame?: boolean
 }): NoteTarget {
-  const { gameId, moves, boardIndex, fen, branch, notate = notateEnglish } = input
+  const { gameId, moves, boardIndex, fen, branch, notate = notateEnglish, wholeGame } = input
+  if (wholeGame) {
+    return { kind: 'game', gameId, ply: null, fen: null, line: null, label: t`the game` }
+  }
   if (branch && branch.cursor > 0) {
     const index = Math.min(branch.cursor, branch.sans.length)
     const san = branch.sans[index - 1]
@@ -350,6 +368,9 @@ function anchoredAt(
   lineId: number | null,
 ): boolean {
   const anchor = noteAnchor(note, lines)
+  // A note on the game entire is the one with no position; there is at most a handful of
+  // those and the newest is the one the box rewrites (`noteAtTarget`).
+  if (target.kind === 'game') return anchor.kind === 'loose'
   if (target.kind === 'line') {
     // Off the game's own line only a note on *that* kept line counts: the same half-move
     // count in another variation is a different position entirely.

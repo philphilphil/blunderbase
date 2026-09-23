@@ -79,6 +79,7 @@ export type BoardAction =
   | 'toggle-hints'
   | 'toggle-engine'
   | 'note'
+  | 'game-note'
   | 'exit-line'
   | 'jump-back'
   | 'jump-forward'
@@ -330,6 +331,15 @@ export const BOARD_SHORTCUTS: BoardShortcut[] = [
     press: ['n', 'N'],
     keys: ['N'],
     label: msg`Write a note about this position`,
+  },
+  // The same box with its switch on Game: a note that names no position and so comes back
+  // under this game only. Shift on the same letter, so the hand that knows N knows it.
+  {
+    section: GAME,
+    action: 'game-note',
+    press: ['shift+N'],
+    keys: ['⇧N'],
+    label: msg`Write a note about the whole game`,
   },
   // One key for one dialog rather than a key per kind of run: what to stop at, how many
   // lines and which moves are choices, and a key cannot carry them.

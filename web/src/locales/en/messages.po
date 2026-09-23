@@ -1728,6 +1728,10 @@ msgid "Write a note about this position"
 msgstr "Write a note about this position"
 
 #: src/lib/ui/shortcuts.ts
+msgid "Write a note about the whole game"
+msgstr "Write a note about the whole game"
+
+#: src/lib/ui/shortcuts.ts
 msgid "Analyse this game…"
 msgstr "Analyse this game…"
 
@@ -2512,12 +2516,14 @@ msgid "move {0}, Black to play"
 msgstr "move {0}, Black to play"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
+#: src/routes/game/components/NoteComposer.tsx
 #: src/routes/notes/filters.ts
 msgid "Game"
 msgstr "Game"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 #: src/routes/engines/EngineDetail.tsx
+#: src/routes/game/components/NoteComposer.tsx
 msgid "Position"
 msgstr "Position"
 
@@ -5591,6 +5597,22 @@ msgid "left"
 msgstr "left"
 
 #: src/routes/game/components/NoteComposer.tsx
+msgid "What is worth remembering about this game?"
+msgstr "What is worth remembering about this game?"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "What the note is about"
+msgstr "What the note is about"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "About the position on the board (N)"
+msgstr "About the position on the board (N)"
+
+#: src/routes/game/components/NoteComposer.tsx
+msgid "About the game entire, not one move (⇧N)"
+msgstr "About the game entire, not one move (⇧N)"
+
+#: src/routes/game/components/NoteComposer.tsx
 msgid "pins the line"
 msgstr "pins the line"
 
@@ -5806,6 +5828,10 @@ msgstr "undated"
 #: src/routes/game/notesModel.ts
 msgid "branch"
 msgstr "branch"
+
+#: src/routes/game/notesModel.ts
+msgid "the game"
+msgstr "the game"
 
 #: src/routes/game/notesModel.ts
 msgid "{move} (variation)"

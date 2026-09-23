@@ -167,11 +167,23 @@ zeigt aber nichts davon, und in der Zeile unter dem Brett steht eine Schaltfläc
 zeigen**. Lies die Partie, dann drück sie –
 von da an spricht diese Partie, und die anderen bleiben unberührt.
 
-## Eine Notiz schreiben
+## Eine Notiz schreiben { #write-a-note }
 
 `N` öffnet eine Notiz zur Stellung auf dem Brett; **Enter** speichert sie, **Shift+Enter**
 ist eine neue Zeile. Notizen erscheinen in jeder Partie, die diese Stellung erreicht – siehe
-[Notizen](notes.md). Der Reiter **Buch** neben **Notizen** zeigt, wie es in deinen eigenen
+[Notizen](notes.md).
+
+Nicht jeder Gedanke gehört zu einem Feld. „Unausgeschlafen gespielt“, „der Plan war von der
+Eröffnung an falsch“ – das ist über die Partie, und im ersten Zug geschrieben käme es in
+jeder Partie wieder, die genauso begonnen hat. Der Schalter **Stellung / Partie** neben den
+Schlagwörtern entscheidet, was die Notiz ist; `⇧N` öffnet das Feld gleich auf **Partie**.
+Eine Partienotiz nennt keine Stellung, bleibt also bei dieser Partie und steht in deren
+Notizliste ganz oben, unter dem Etikett *Partie*. Was du schon getippt hast, wandert mit
+dem Schalter – eine Notiz, die
+unter der falschen Überschrift begonnen wurde, wird verschoben, nicht neu geschrieben. Ein
+Zug auf dem Brett schaltet zurück auf **Stellung**.
+
+Der Reiter **Buch** neben **Notizen** zeigt, wie es in deinen eigenen
 Partien von hier aus weiterging; `B` öffnet ihn. Oben steht der Name der Eröffnung, in der
 die Partie gerade ist, und ein Zug, der in eine benannte Eröffnung führt, zeigt ihren Namen
 in der Spalte **Eröffnung**.

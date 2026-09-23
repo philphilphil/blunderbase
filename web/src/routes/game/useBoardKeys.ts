@@ -21,6 +21,8 @@ export interface BoardKeyHandlers {
   /** The live search on the position the board is showing. */
   toggleEngine?: () => void
   note?: () => void
+  /** The note box switched to the game entire (⇧N). */
+  gameNote?: () => void
   /** Leave the analysis line. No-op — and so not handled — when there is none. */
   exitLine?: () => void
   /** Walk the engine's own move here onto the board. */
@@ -188,6 +190,8 @@ function run(action: BoardAction, keys: BoardKeyHandlers): boolean {
       return call(keys.toggleEngine)
     case 'note':
       return call(keys.note)
+    case 'game-note':
+      return call(keys.gameNote)
     case 'exit-line':
       return call(keys.exitLine)
     case 'play-best':

@@ -220,4 +220,45 @@ describe('NoteComposer', () => {
     await user.click(elsewhere())
     expect(onSave).toHaveBeenCalledWith('this idea belongs two moves later', [], null)
   })
+
+  it('offers the Position / Game switch only when asked, and reports which was pressed', async () => {
+    const user = userEvent.setup()
+    draw()
+    expect(screen.queryByTestId('note-scope')).not.toBeInTheDocument()
+
+    const onScope = vi.fn()
+    render(<NoteComposer target={TARGET} onSave={vi.fn()} onClose={vi.fn()} onScope={onScope} />)
+    const position = screen.getByRole('radio', { name: 'Position' })
+    const game = screen.getByRole('radio', { name: 'Game' })
+    expect(position).toHaveAttribute('aria-checked', 'true')
+    expect(game).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(game)
+    expect(onScope).toHaveBeenCalledWith('game')
+  })
+
+  it('keeps a draft when the switch moves it to the game, and writes it as a new note there', async () => {
+    const user = userEvent.setup()
+    const { onSave, view } = draw({ onScope: vi.fn() })
+
+    await user.type(screen.getByLabelText('Note text'), 'played this half asleep')
+
+    // The page answered the switch with a game target; the words typed travel with it.
+    const whole = { kind: 'game', gameId: 10, ply: null, fen: null, line: null, label: 'the game' }
+    view.rerender(
+      <NoteComposer
+        target={whole as NoteTarget}
+        onSave={onSave}
+        onClose={vi.fn()}
+        onScope={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'Game' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByLabelText('Note text')).toHaveValue('played this half asleep')
+    expect(screen.getByPlaceholderText('What is worth remembering about this game?')).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Note text'))
+    await user.click(elsewhere())
+    expect(onSave).toHaveBeenCalledWith('played this half asleep', [], null)
+  })
 })

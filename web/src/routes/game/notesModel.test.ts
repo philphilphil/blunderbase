@@ -108,7 +108,8 @@ describe('noteRows', () => {
     const rows = noteRows(
       [
         // The line branches off ply 1, so its notes read after the game's own note there
-        // and before the game's note on ply 3 — where the move list keeps the line.
+        // and before the game's note on ply 3 — where the move list keeps the line. The
+        // note with no ply at all is about the game entire and is read first.
         note({ id: 1, ply: 3, line_id: 7 }),
         note({ id: 2, ply: 3 }),
         note({ id: 3, ply: 1 }),
@@ -117,7 +118,7 @@ describe('noteRows', () => {
       [LINE],
       MOVES,
     )
-    expect(rows.map((row) => row.note.id)).toEqual([3, 1, 2, 4])
+    expect(rows.map((row) => row.note.id)).toEqual([4, 3, 1, 2])
   })
 
   it('keeps a variation’s notes in the variation’s own order', () => {
@@ -194,6 +195,24 @@ describe('noteTarget', () => {
   it('names the starting position rather than a move that does not exist', () => {
     const target = noteTarget({ ...base, boardIndex: 0, branch: null })
     expect(target).toMatchObject({ ply: 0, label: 'the starting position' })
+  })
+
+  it('names no position at all when the note is about the game entire', () => {
+    // Wherever the board stands, even in a variation: the switch outranks the square.
+    const target = noteTarget({
+      ...base,
+      boardIndex: 2,
+      branch: { base: 1, moves: ['c7c6'], sans: ['c6'], cursor: 1 },
+      wholeGame: true,
+    })
+    expect(target).toEqual({
+      kind: 'game',
+      gameId: 14,
+      ply: null,
+      fen: null,
+      line: null,
+      label: 'the game',
+    })
   })
 
   it('pins the whole walk when the board is off the game line', () => {
@@ -278,6 +297,22 @@ describe('noteAtTarget', () => {
     fen: 'fen',
     line: { game_id: 14, base_ply: 1, moves: ['c7c6', 'd2d4'] },
     label: '1…c6 (variation)',
+  })
+
+  it('finds the note on the game entire, and only that one, for a game target', () => {
+    const whole: NoteTarget = {
+      kind: 'game',
+      gameId: 14,
+      ply: null,
+      fen: null,
+      line: null,
+      label: 'the game',
+    }
+    const journal = note({ id: 5, text: 'the plan was wrong from move one' })
+    const onMove = note({ id: 6, ply: 2 })
+    expect(noteAtTarget({ target: whole, notes: [onMove, journal], lines: [] })).toBe(journal)
+    // And the other way round: standing on a move, the game's note is not the one to rewrite.
+    expect(noteAtTarget({ target: mainline(2), notes: [journal], lines: [] })).toBeNull()
   })
 
   it('finds the note on the mainline position the board is standing on', () => {
