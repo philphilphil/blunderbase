@@ -1,0 +1,45 @@
+# Blunderbase
+
+> Blunderbase is a free and open-source personal chess database (AGPL-3.0). It imports your own games from Lichess, Chess.com, FICS and PGN files, analyses every one with Stockfish and Maia, and keeps notes, stats and an opening explorer over them. It runs on your own machine: a desktop app for macOS and Windows, or a Docker image for a server, with an iOS companion app that connects to a server install.
+
+Blunderbase is a database of the games you play, not a collection of master games like ChessBase, SCID or the Lichess database. No account with Blunderbase is needed and nothing is sent to a Blunderbase service; the library is one SQLite file on your own disk.
+
+It includes no AI of its own. A server or Docker install has a built-in MCP server, so an AI assistant you already use (Claude or any other MCP client) can read your games, the engine evaluations and your notes, and show positions on a live board you both see. The desktop app has no MCP server yet.
+
+What it does:
+
+- Imports games from Lichess, Chess.com, FICS and PGN files, and keeps them in sync on a schedule
+- Analyses every game with Stockfish and marks the blunders in the move list and on the eval graph
+- Shows what Maia, a network trained on human games, expects players at several ratings to play
+- Notes on positions and variations, reference games added for study
+- An opening explorer with win rates over your own games, next to the Lichess masters and Lichess books
+- Stats by opening, colour, time control, phase of the game and clock remaining
+- Engines on the same machine, Stockfish as WebAssembly in the browser, or remote engine runners on other machines
+- A correspondence mode, backups, PGN export and a command line
+
+## Get it
+
+- [Download and install](https://blunderbase.org/#download): desktop installers for macOS (Apple silicon) and Windows (x64), and the Docker command
+- [Releases](https://github.com/philphilphil/blunderbase/releases/latest): installers and release notes
+- [Docker compose file](https://blunderbase.org/docker-compose.yml): one service, one volume, image `ghcr.io/philphilphil/blunderbase:latest`
+- [Demo](https://demo.blunderbase.org): a read-only library of anonymised games
+- [Source code](https://github.com/philphilphil/blunderbase)
+
+## Manual
+
+- [Overview](https://blunderbase.org/manual/)
+- [Getting started](https://blunderbase.org/manual/guide/getting-started/)
+- [Analysing a game](https://blunderbase.org/manual/guide/game/)
+- [Explorer](https://blunderbase.org/manual/guide/explorer/)
+- [Statistics](https://blunderbase.org/manual/guide/stats/)
+- [Notes](https://blunderbase.org/manual/guide/notes/)
+- [Your AI assistant](https://blunderbase.org/manual/guide/coach/): connecting an MCP client
+- [Install](https://blunderbase.org/manual/operate/install/)
+- [Engines](https://blunderbase.org/manual/operate/engines/)
+- [Configuration](https://blunderbase.org/manual/operate/configuration/)
+
+## Optional
+
+- [Deutsche Seite](https://blunderbase.org/de/) and [deutsches Handbuch](https://blunderbase.org/manual/de/)
+- [Changelog](https://blunderbase.org/changelog)
+- [Privacy policy](https://blunderbase.org/privacy)

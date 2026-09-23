@@ -27,6 +27,10 @@ rm -rf "$out"
 mkdir -p "$out/assets" "$out/de"
 sed "s/__BB_VERSION__/$version/g" "$root"/site/index.html > "$out"/index.html
 cp "$root"/site/404.html "$root"/site/_redirects "$out"/
+# What crawlers ask for at the root: robots.txt names the sitemaps (this one for the
+# landing and privacy pages, mkdocs' for the manual), llms.txt is the plain-text summary
+# for AI agents (llmstxt.org).
+cp "$root"/site/robots.txt "$root"/site/sitemap.xml "$root"/site/llms.txt "$out"/
 # The German page is a second copy of the page, not a template: `site/de/index.html` is
 # translated by hand and served at /de/. It reaches the shared assets by absolute path.
 sed "s/__BB_VERSION__/$version/g" "$root"/site/de/index.html > "$out"/de/index.html

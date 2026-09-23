@@ -3,15 +3,60 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blunderbase - personal chess database</title>
-<meta name="description" content="A free, open-source personal chess database. Imports your games from Lichess, Chess.com, FICS and PGN, analyses every one with Stockfish and Maia, and lets an AI coach read the same library. Desktop app, Docker image, iOS companion.">
-<meta property="og:title" content="Blunderbase">
-<meta property="og:description" content="A personal chess database that analyses every game you play. Free, open source, runs on your own machine.">
+<title>Blunderbase - free and open-source personal chess database</title>
+<meta name="description" content="Blunderbase is a free and open-source personal chess database. It imports your games from Lichess, Chess.com, FICS and PGN, analyses every one with Stockfish and Maia, and lets your own AI assistant read the library over MCP. Desktop app for macOS and Windows, Docker image, iOS companion.">
+<link rel="canonical" href="https://blunderbase.org/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Blunderbase">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:title" content="Blunderbase - free and open-source personal chess database">
+<meta property="og:description" content="A personal chess database that analyses every game you play with Stockfish and Maia. Free, open source, runs on your own machine.">
 <meta property="og:image" content="https://blunderbase.org/assets/game-dark.png">
+<meta property="og:image:width" content="3840">
+<meta property="og:image:height" content="2160">
+<meta property="og:image:alt" content="The Blunderbase game screen: a chess board with Stockfish's line drawn on it, the move list and the eval graph.">
 <meta property="og:url" content="https://blunderbase.org/">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="alternate" hreflang="en" href="https://blunderbase.org/">
 <link rel="alternate" hreflang="de" href="https://blunderbase.org/de/">
 <link rel="alternate" hreflang="x-default" href="https://blunderbase.org/">
+<!--
+  What search engines and AI crawlers read instead of the prose: one SoftwareApplication,
+  said plainly. `__BB_VERSION__` is filled in by scripts/site.sh like the download buttons.
+  The German page carries the same block in German; change them together.
+-->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Blunderbase",
+  "description": "A free and open-source personal chess database. Imports your games from Lichess, Chess.com, FICS and PGN files, analyses every one with Stockfish and Maia, and keeps notes, stats and an opening explorer over your own games. An MCP server lets your own AI assistant read the library.",
+  "url": "https://blunderbase.org/",
+  "inLanguage": ["en", "de"],
+  "applicationCategory": "GameApplication",
+  "applicationSubCategory": "Chess database",
+  "operatingSystem": "macOS, Windows, Linux (Docker), iOS",
+  "softwareVersion": "__BB_VERSION__",
+  "downloadUrl": "https://github.com/philphilphil/blunderbase/releases/latest",
+  "installUrl": "https://blunderbase.org/manual/operate/install/",
+  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "screenshot": "https://blunderbase.org/assets/game-dark.png",
+  "sameAs": ["https://github.com/philphilphil/blunderbase"],
+  "featureList": [
+    "Import games from Lichess, Chess.com, FICS and PGN files",
+    "Stockfish analysis of every game, blunders marked",
+    "Maia at several ratings, to see what humans would have played",
+    "Notes on positions and variations",
+    "Opening explorer with win stats over your own games",
+    "Stats by opening, colour, time control and phase of the game",
+    "MCP server for your own AI assistant",
+    "Self-hosted with Docker, or a desktop app for macOS and Windows"
+  ]
+}
+</script>
 <meta name="theme-color" content="#1d1e1f">
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -135,7 +180,7 @@
   .hero { padding: 5rem 0 3rem; text-align: center; }
   .hero img.mark { width: 5rem; height: 5rem; margin: 0 auto 1.5rem; filter: var(--logo-filter); }
   .hero h1 {
-    margin: 0 auto 1rem; max-width: 20ch;
+    margin: 0 auto 1rem; max-width: 28ch;
     font-size: clamp(2.125rem, 6vw, 3.5rem); line-height: 1.05; letter-spacing: -0.03em;
     color: var(--text); font-weight: 650;
   }
@@ -286,11 +331,11 @@
 <main class="wrap">
   <div class="hero">
     <img class="mark" src="assets/logo.png" alt="">
-    <h1>Personal chess database</h1>
+    <h1>Free and open-source<br> personal chess database</h1>
     <p class="lede">
       Blunderbase imports your games, runs Stockfish and Maia over every one of them, and
-      keeps notes, stats and an opening explorer on top. Free, open source, runs on your own
-      machine.
+      keeps notes, stats and an opening explorer on top. Runs on your own machine, no account,
+      no subscription.
     </p>
     <div class="cta">
       <a class="btn primary" href="#download">
@@ -323,8 +368,8 @@
       </div>
       <div class="pillar">
         <svg class="m" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H8l-5 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>
-        <h3>AI coach</h3>
-        <p>An MCP server is built in. Connect Claude or any other MCP client, ask about last week's games, and it reads the same engine numbers and notes you do, on a live board you both see.</p>
+        <h3>Your AI assistant</h3>
+        <p>An MCP server is built in. Connect your own assistant, Claude or any other MCP client, ask about last week's games, and it reads the same engine numbers and notes you do, on a live board you both see.</p>
         <p class="note">Server and Docker installs only. The desktop app has no MCP server yet.</p>
       </div>
     </div>
@@ -424,7 +469,7 @@ docker compose up -d
 docker run -d --name blunderbase -p 8765:8765 \
   -v blunderbase-data:/data \
   ghcr.io/philphilphil/blunderbase:latest</pre>
-        <p>Open it in a browser, choose a password, connect an account. Create a separate key on the Assistant page to connect your coach. TLS, reverse proxies, remote engine runners and the CLI are in the <a href="/manual/">manual</a>.</p>
+        <p>Open it in a browser, choose a password, connect an account. Create a separate key on the Assistant page to connect your AI assistant. TLS, reverse proxies, remote engine runners and the CLI are in the <a href="/manual/">manual</a>.</p>
       </div>
     </div>
   </section>

@@ -134,7 +134,8 @@ as `Blunderbase-<version>-macOS-arm64.dmg` and `Blunderbase-<version>-Windows-x6
 The version is in the name so a downloaded file still says which Blunderbase it is, and does
 not collide with the last one somebody kept. blunderbase.org's two download buttons link
 those names directly: `scripts/site.sh` writes the version from `pyproject.toml` into the
-page (the `__BB_VERSION__` placeholder in `site/index.html` and `site/de/index.html`), and
+page (the `__BB_VERSION__` placeholder in `site/index.html` and `site/de/index.html`, in the
+download buttons and in the JSON-LD block the two pages keep in step), and
 the push of the release commit is what rebuilds the site, so the buttons move with every
 release without anyone editing the page. They point at nothing for the few minutes between
 that push and the upload at the end of `make publish`. `/changelog` on the site is a

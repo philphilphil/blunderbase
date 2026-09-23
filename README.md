@@ -5,7 +5,7 @@
 <h1 align="center">Blunderbase</h1>
 
 <p align="center">
-  Personal chess database<br/>
+  Free and open-source personal chess database<br/>
 </p>
 
 <p align="center">
@@ -62,7 +62,7 @@ too.
 
 ## Documentation
 
-Everything else — importing, analysis, the explorer, the coach, engines, remote runners,
+Everything else — importing, analysis, the explorer, your AI assistant, engines, remote runners,
 reverse proxies, configuration, the CLI, backup and restore — is in the manual:
 
 **[blunderbase.org/manual](https://blunderbase.org/manual/)** ·

@@ -1,0 +1,7 @@
+# Everything on blunderbase.org is public and meant to be found, by search engines and AI
+# crawlers alike. The manual publishes its own sitemap, built by mkdocs.
+User-agent: *
+Allow: /
+
+Sitemap: https://blunderbase.org/sitemap.xml
+Sitemap: https://blunderbase.org/manual/sitemap.xml

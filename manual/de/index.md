@@ -1,6 +1,6 @@
 # Blunderbase
 
-Blunderbase ist eine persönliche Schachdatenbank. Sie importiert deine Partien von Lichess,
+Blunderbase ist eine Schachdatenbank für deine eigenen Partien. Sie importiert deine Partien von Lichess,
 Chess.com, FICS und aus PGN-Dateien, lässt Stockfish über jede neue Partie laufen und fragt
 auf Wunsch Maia, was ein Mensch deiner Spielstärke stattdessen gezogen hätte. Alles liegt
 in einer einzigen SQLite-Datei, die dir gehört: Partien, Analysen, Notizen, gespeicherte

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The landing page and the privacy policy, each in both languages. The manual's pages are
+     in /manual/sitemap.xml, which mkdocs writes; robots.txt names both. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://blunderbase.org/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://blunderbase.org/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://blunderbase.org/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://blunderbase.org/"/>
+  </url>
+  <url>
+    <loc>https://blunderbase.org/de/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://blunderbase.org/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://blunderbase.org/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://blunderbase.org/"/>
+  </url>
+  <url>
+    <loc>https://blunderbase.org/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://blunderbase.org/privacy"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://blunderbase.org/de/privacy"/>
+  </url>
+  <url>
+    <loc>https://blunderbase.org/de/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://blunderbase.org/privacy"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://blunderbase.org/de/privacy"/>
+  </url>
+</urlset>

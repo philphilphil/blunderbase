@@ -3,15 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blunderbase - persönliche Schachdatenbank</title>
-<meta name="description" content="Eine kostenlose, quelloffene Schachdatenbank für deine eigenen Partien. Importiert deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien, analysiert jede einzelne mit Stockfish und Maia und lässt einen KI-Trainer dieselbe Bibliothek lesen. Desktop-App, Docker-Image, iOS-Begleit-App.">
-<meta property="og:title" content="Blunderbase">
-<meta property="og:description" content="Eine persönliche Schachdatenbank, die jede Partie analysiert, die du spielst. Kostenlos, Open Source, läuft auf deinem eigenen Rechner.">
+<title>Blunderbase - kostenlose Open-Source-Schachdatenbank für deine Partien</title>
+<meta name="description" content="Blunderbase ist eine kostenlose Open-Source-Schachdatenbank für deine eigenen Partien. Sie importiert deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien, analysiert jede einzelne mit Stockfish und Maia und gibt deinem eigenen KI-Assistenten per MCP Zugriff auf die Bibliothek. Desktop-App für macOS und Windows, Docker-Image, iOS-Begleit-App.">
+<link rel="canonical" href="https://blunderbase.org/de/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Blunderbase">
+<meta property="og:locale" content="de_DE">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:title" content="Blunderbase - kostenlose Open-Source-Schachdatenbank für deine Partien">
+<meta property="og:description" content="Deine eigene Schachdatenbank, die jede Partie, die du spielst, mit Stockfish und Maia analysiert. Kostenlos, Open Source, läuft auf deinem eigenen Rechner.">
 <meta property="og:image" content="https://blunderbase.org/assets/game-dark.png">
+<meta property="og:image:width" content="3840">
+<meta property="og:image:height" content="2160">
+<meta property="og:image:alt" content="Der Partiebildschirm von Blunderbase: das Brett mit der eingezeichneten Variante von Stockfish, die Zugliste und der Bewertungsverlauf.">
 <meta property="og:url" content="https://blunderbase.org/de/">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="alternate" hreflang="en" href="https://blunderbase.org/">
 <link rel="alternate" hreflang="de" href="https://blunderbase.org/de/">
 <link rel="alternate" hreflang="x-default" href="https://blunderbase.org/">
+<!-- The same block as on the English page, in German; change them together. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Blunderbase",
+  "description": "Eine kostenlose Open-Source-Schachdatenbank für deine eigenen Partien. Importiert deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien, analysiert jede einzelne mit Stockfish und Maia und führt Notizen, Statistiken und einen Eröffnungsexplorer über deine eigenen Partien. Ein MCP-Server gibt deinem eigenen KI-Assistenten Zugriff auf die Bibliothek.",
+  "url": "https://blunderbase.org/de/",
+  "inLanguage": ["de", "en"],
+  "applicationCategory": "GameApplication",
+  "applicationSubCategory": "Schachdatenbank",
+  "operatingSystem": "macOS, Windows, Linux (Docker), iOS",
+  "softwareVersion": "__BB_VERSION__",
+  "downloadUrl": "https://github.com/philphilphil/blunderbase/releases/latest",
+  "installUrl": "https://blunderbase.org/manual/de/operate/install/",
+  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "screenshot": "https://blunderbase.org/assets/game-dark.png",
+  "sameAs": ["https://github.com/philphilphil/blunderbase"],
+  "featureList": [
+    "Import von Partien aus Lichess, Chess.com, FICS und PGN-Dateien",
+    "Stockfish-Analyse jeder Partie, grobe Patzer markiert",
+    "Maia in mehreren Wertungsstufen: was Menschen gespielt hätten",
+    "Notizen zu Stellungen und Varianten",
+    "Eröffnungsexplorer mit Siegquoten über deine eigenen Partien",
+    "Statistiken nach Eröffnung, Farbe, Bedenkzeit und Partiephase",
+    "MCP-Server für deinen eigenen KI-Assistenten",
+    "Selbst gehostet mit Docker oder als Desktop-App für macOS und Windows"
+  ]
+}
+</script>
 <meta name="theme-color" content="#1d1e1f">
 <link rel="icon" href="/assets/favicon.png">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
@@ -135,7 +176,7 @@
   .hero { padding: 5rem 0 3rem; text-align: center; }
   .hero img.mark { width: 5rem; height: 5rem; margin: 0 auto 1.5rem; filter: var(--logo-filter); }
   .hero h1 {
-    margin: 0 auto 1rem; max-width: 20ch;
+    margin: 0 auto 1rem; max-width: 28ch;
     font-size: clamp(2.125rem, 6vw, 3.5rem); line-height: 1.05; letter-spacing: -0.03em;
     color: var(--text); font-weight: 650;
   }
@@ -286,11 +327,11 @@
 <main class="wrap">
   <div class="hero">
     <img class="mark" src="/assets/logo.png" alt="">
-    <h1>Persönliche Schachdatenbank</h1>
+    <h1>Deine Schachdatenbank,<br> kostenlos und Open Source</h1>
     <p class="lede">
       Blunderbase importiert deine Partien, lässt Stockfish und Maia über jede einzelne
-      laufen und führt darüber Notizen, Statistiken und einen Eröffnungsexplorer. Kostenlos,
-      Open Source, läuft auf deinem eigenen Rechner.
+      laufen und führt darüber Notizen, Statistiken und einen Eröffnungsexplorer. Läuft auf
+      deinem eigenen Rechner, ohne Konto und ohne Abo.
     </p>
     <div class="cta">
       <a class="btn primary" href="#download">
@@ -318,13 +359,13 @@
       </div>
       <div class="pillar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
-        <h3>Persönliche Datenbank</h3>
+        <h3>Deine Datenbank</h3>
         <p>Deine Partien von Lichess, Chess.com, FICS und aus PGN-Dateien in einer Bibliothek, nach Zeitplan synchronisiert. Notizen zu Stellungen und Varianten, ein Explorer mit Siegquoten über deine eigenen Partien und Referenzpartien, die du zum Studieren hinzufügst.</p>
       </div>
       <div class="pillar">
         <svg class="m" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H8l-5 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>
-        <h3>KI-Trainer</h3>
-        <p>Ein MCP-Server ist eingebaut. Verbinde Claude oder einen anderen MCP-Client und frag nach den Partien der letzten Woche. Er liest dieselben Engine-Zahlen und Notizen wie du, auf einem Brett, das ihr beide live seht.</p>
+        <h3>Dein KI-Assistent</h3>
+        <p>Ein MCP-Server ist eingebaut. Verbinde deinen eigenen Assistenten, Claude oder einen anderen MCP-Client, und frag nach den Partien der letzten Woche. Er liest dieselben Engine-Zahlen und Notizen wie du, auf einem Brett, das ihr beide live seht.</p>
         <p class="note">Nur bei Server- und Docker-Installationen. Die Desktop-App hat noch keinen MCP-Server.</p>
       </div>
     </div>
@@ -424,7 +465,7 @@ docker compose up -d
 docker run -d --name blunderbase -p 8765:8765 \
   -v blunderbase-data:/data \
   ghcr.io/philphilphil/blunderbase:latest</pre>
-        <p>Im Browser öffnen, ein Passwort wählen, ein Konto verbinden. Erzeuge auf der Seite Assistent einen separaten Schlüssel für den Trainer. TLS, Reverse Proxies, externe Engine-Runner und die CLI stehen im <a href="/manual/de/">Handbuch</a>.</p>
+        <p>Im Browser öffnen, ein Passwort wählen, ein Konto verbinden. Erzeuge auf der Seite Assistent einen separaten Schlüssel für deinen KI-Assistenten. TLS, Reverse Proxies, externe Engine-Runner und die CLI stehen im <a href="/manual/de/">Handbuch</a>.</p>
       </div>
     </div>
   </section>
