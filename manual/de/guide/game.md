@@ -127,7 +127,7 @@ Du kannst die Engine live rechnen lassen und nachsehen, wo es schiefging, oder d
 mit **Diese Variante anheften** behalten. Verlässt du die Variante oder gehst zur Partie
 zurück, endet das Üben ebenfalls. Gespeichert wird nichts, solange du nichts anheftest.
 
-## Die Engine live rechnen lassen
+## Die Engine live rechnen lassen { #run-the-live-engine }
 
 Das Engine-Feld hat zwei Reiter, **Analyse** und **Live**: was die gespeicherte Analyse
 gefunden hat, und was eine Engine jetzt gerade findet, ohne etwas zu speichern. Ein Klick

@@ -24,7 +24,8 @@ need.
 It searches your games, opens one, finds positions, reads the opening explorer and the
 Lichess reference databases, reports statistics, writes and searches notes, keeps
 repertoire lines, queues analysis and reports on the queue. It can also put a game or a
-position on the [Live](live.md) board so you both look at the same thing.
+position on the [Board](board.md) so you both look at the same thing, and read back the
+position you are analysing there.
 
 ## What it cannot do
 

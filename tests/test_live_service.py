@@ -370,6 +370,148 @@ def test_batch_navigation_preserves_annotations_and_rejects_partial_batch(sessio
 
 def test_batch_game_reference_contains_replay(session: Session, game: Game) -> None:
     state = live.show_positions(session, [{"game_id": game.id, "ply": 2}])
-    assert state["game_positions"][2]["fen"] == state["fen"]
-    assert len(state["game_positions"]) == len(game.moves_uci) + 1
-    assert state["game_positions"][1]["san"]
+    assert state["line_positions"][2]["fen"] == state["fen"]
+    assert len(state["line_positions"]) == len(game.moves_uci) + 1
+    assert state["line_positions"][1]["san"]
+
+
+# --- the owner's board: loading, playing, stepping -------------------------
+
+ITALIAN_PGN = """[Event "Casual"]
+[White "A"]
+[Black "B"]
+
+1. e4 e5 2. Nf3 (2. f4 exf4) 2... Nc6 3. Bc4 {the Italian} 1-0
+"""
+
+
+def test_new_board_is_the_starting_position_on_an_empty_line() -> None:
+    state = live.new_board()
+    assert state["fen"] == START
+    assert state["active"] is True
+    assert state["ply"] is None, "a bare position has no mainline to count along"
+    assert state["line_positions"][0]["fen"] == START and len(state["line_positions"]) == 1
+
+
+def test_load_takes_a_fen() -> None:
+    assert live.load(fen=FRENCH)["fen"] == FRENCH
+
+
+def test_load_takes_one_thing_and_only_one() -> None:
+    with pytest.raises(live.LiveRequestError):
+        live.load()
+    with pytest.raises(live.LiveRequestError):
+        live.load(fen=START, pgn=ITALIAN_PGN)
+
+
+def test_a_pgn_loads_its_mainline_and_stands_at_the_end() -> None:
+    state = live.load(pgn=ITALIAN_PGN)
+    assert [p["san"] for p in state["line_positions"][1:]] == ["e4", "e5", "Nf3", "Nc6", "Bc4"]
+    assert state["ply"] == 5
+    assert state["last_move"] == "f1c4"
+    assert state["moves"] == [], "the PGN's own variation is not the board's branch"
+    assert state["game_id"] is None
+
+
+def test_a_pgn_starts_where_its_fen_header_says() -> None:
+    pgn = f'[SetUp "1"]\n[FEN "{FRENCH}"]\n\n2. d4 d5 *\n'
+    state = live.load(pgn=pgn)
+    assert state["line_positions"][0]["fen"] == FRENCH
+    assert state["ply"] == 2
+
+
+def test_a_pgn_with_an_illegal_move_is_refused_and_changes_nothing() -> None:
+    live.show_position(FRENCH)
+    with pytest.raises(live.LiveRequestError):
+        live.load(pgn="1. e4 e5 2. Ke3 *")
+    assert live.get_state()["fen"] == FRENCH
+
+
+def test_text_that_is_no_pgn_is_refused() -> None:
+    with pytest.raises(live.LiveRequestError):
+        live.load(pgn="hello there, this is not chess")
+    with pytest.raises(live.LiveRequestError):
+        live.load(pgn="   ")
+
+
+def test_play_on_an_empty_board_starts_one_for_the_owner_only() -> None:
+    with pytest.raises(live.NoLivePositionError):
+        live.play(["e2e4"])
+    state = live.play(["e2e4"], start_if_empty=True)
+    assert state["moves"] == ["e2e4"] and state["cursor"] == 1
+    assert state["position_count"] == 1
+
+
+def test_a_batch_is_played_whole_or_not_at_all() -> None:
+    live.show_position(START)
+    with pytest.raises(live.IllegalMoveError):
+        live.play(["e2e4", "e7e5", "e1e3"])
+    assert live.get_state()["fen"] == START
+    state = live.play(["e2e4", "e7e5", "g1f3"])
+    assert state["move_sans"] == ["e4", "e5", "Nf3"] and state["cursor"] == 3
+
+
+def test_stepping_back_through_the_mainline_and_forward_again() -> None:
+    live.load(pgn=ITALIAN_PGN)
+    back = live.goto(2)
+    assert back["fen"] == live.get_state()["line_positions"][2]["fen"]
+    assert back["last_move"] == "e7e5"
+    # Playing the mainline's own next move stays on it.
+    state = live.play(["g1f3"])
+    assert state["ply"] == 3 and state["moves"] == []
+
+
+def test_a_departure_from_the_mainline_is_a_branch_that_survives_stepping_away() -> None:
+    live.load(pgn=ITALIAN_PGN)
+    live.goto(2)
+    state = live.play(["f2f4", "e5f4"])
+    assert state["base"] == 2 and state["ply"] == 2
+    assert state["move_sans"] == ["f4", "exf4"] and state["cursor"] == 2
+
+    elsewhere = live.goto(5)
+    assert elsewhere["moves"] == ["f2f4", "e5f4"], "the branch is kept"
+    assert elsewhere["cursor"] == 0 and elsewhere["base"] == 2
+
+    inside = live.goto(2, 1)
+    assert inside["last_move"] == "f2f4" and inside["cursor"] == 1
+
+
+def test_the_branchs_own_next_move_steps_into_it() -> None:
+    live.show_position(START)
+    live.play(["e2e4", "e7e5", "g1f3"])
+    live.goto(0, 1)
+    state = live.play(["e7e5"])
+    assert state["cursor"] == 2 and len(state["moves"]) == 3, "the tail is kept"
+
+
+def test_another_move_inside_the_branch_cuts_it_there() -> None:
+    live.show_position(START)
+    live.play(["e2e4", "e7e5", "g1f3"])
+    live.goto(0, 1)
+    state = live.play(["c7c5"])
+    assert state["moves"] == ["e2e4", "c7c5"] and state["cursor"] == 2
+
+
+def test_a_new_departure_replaces_the_old_branch() -> None:
+    live.load(pgn=ITALIAN_PGN)
+    live.goto(2)
+    live.play(["f2f4"])
+    live.goto(4)
+    state = live.play(["f1b5"])
+    assert state["base"] == 4 and state["moves"] == ["f1b5"]
+
+
+def test_goto_refuses_what_is_not_on_the_line() -> None:
+    with pytest.raises(live.NoLivePositionError):
+        live.goto(0)
+    live.load(pgn=ITALIAN_PGN)
+    for ply, cursor in ((6, 0), (-1, 0), (2, 1), (0, -1)):
+        with pytest.raises(live.LiveRequestError):
+            live.goto(ply, cursor)
+
+
+def test_stepping_wipes_the_marks() -> None:
+    live.load(pgn=ITALIAN_PGN)
+    live.annotate(arrows=["e2e4"], text="look")
+    state = live.goto(1)
+    assert state["arrows"] == [] and state["text"] == "look"

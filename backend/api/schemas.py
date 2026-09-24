@@ -2467,7 +2467,9 @@ class LiveSquare(BaseModel):
     color: str
 
 
-class LiveGamePosition(BaseModel):
+class LiveLinePosition(BaseModel):
+    """One mainline position and the move that led to it (none for the first)."""
+
     ply: int
     fen: str
     san: str | None = None
@@ -2475,7 +2477,7 @@ class LiveGamePosition(BaseModel):
 
 
 class LiveState(Payload):
-    """`services.live.get_state`: the board the coach is driving, whole.
+    """`services.live.get_state`: the board the owner and the coach share, whole.
 
     The page fetches this once on load or reconnect and follows `live.updated` from there,
     which is why every field the socket carries is documented here too.
@@ -2483,19 +2485,47 @@ class LiveState(Payload):
 
     position_index: int = 0
     position_count: int = 0
-    game_positions: list[LiveGamePosition] = Field(default_factory=list)
+    # The mainline, from its first position; the board stands at `ply` on it.
+    line_positions: list[LiveLinePosition] = Field(default_factory=list)
     active: bool = False
     game_id: int | None = None
+    # None on a bare position; the branch's base while the board is in the branch.
     ply: int | None = None
+    # The branch: it leaves the mainline after `base` plies, `cursor` of its moves are on
+    # the board (0 is "on the mainline"). `base` is None when there is no branch.
+    base: int | None = None
+    cursor: int = 0
     fen: str | None = None
     turn: str | None = None
     moves: list[str] = Field(default_factory=list)
+    move_sans: list[str] = Field(default_factory=list)
     last_move: str | None = None
     arrows: list[LiveArrow] = Field(default_factory=list)
     squares: list[LiveSquare] = Field(default_factory=list)
     text: str | None = None
     viewer_count: int = 0
     updated_at: datetime | None = None
+
+
+class LiveLoad(Input):
+    """Put a pasted position on the board: a FEN, or a PGN whose mainline is kept."""
+
+    fen: str | None = None
+    # A whole game's worth of text; the ceiling only stops a pasted book.
+    pgn: str | None = Field(default=None, max_length=200_000)
+
+
+class LiveMoves(Input):
+    """Moves to play on the board in UCI, in order — one for a drag, several for a line."""
+
+    ucis: list[str] = Field(min_length=1, max_length=64)
+
+
+class LiveGoto(Input):
+    """Where to stand: mainline `ply`, or `cursor` moves into the branch that leaves it."""
+
+    ply: int = Field(ge=0)
+    cursor: int = Field(default=0, ge=0)
 
 
 # --- search ----------------------------------------------------------------

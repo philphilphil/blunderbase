@@ -111,7 +111,9 @@ export const router = createBrowserRouter([
           </McpRoute>
         ),
       },
-      { path: 'live', element: <LivePage /> },
+      { path: 'board', element: <LivePage /> },
+      // The Board was "Live" until it could be played on; bookmarks keep working.
+      { path: 'live', element: <Navigate to="/board" replace /> },
       {
         path: 'correspondence',
         element: (

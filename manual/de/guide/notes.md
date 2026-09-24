@@ -12,14 +12,14 @@ Notizfeld des Partie-Bildschirms (`⇧N`) oder über **Diese Partie** in einer F
 Solche Notizen erscheinen nur bei dieser einen Partie – siehe
 [Eine Partie analysieren](game.md#write-a-note).
 
-Wo immer eine Notiz geschrieben wird – Partie-Bildschirm, Explorer, Live-Brett,
+Wo immer eine Notiz geschrieben wird – Partie-Bildschirm, Explorer, Brett,
 Fernschachpartie, Notizseite –, speichert **Enter** sie, und **Shift+Enter** beginnt eine
 neue Zeile. Ein Feld, das beim Wegklicken speichert, tut das weiterhin.
 
 ## Wo tauchen sie auf?
 
 Unter dem Brett jeder Partie, die die Stellung erreicht, im Explorer unter **Deine Notizen
-zu dieser Stellung** und auf dem Live-Brett. Die Zugspalte markiert Züge, zu deren Stellung
+zu dieser Stellung** und auf dem Brett. Die Zugspalte markiert Züge, zu deren Stellung
 eine Notiz existiert. Eine Partie, über die du schon einmal nachgedacht hast, sagt es dir
 also.
 

@@ -85,7 +85,7 @@ const CHUNKS: Record<string, () => Promise<unknown>> = {
   compute: () => import('@/routes/engines'),
   engines: () => import('@/routes/engines'),
   assistant: () => import('@/routes/mcp'),
-  live: () => import('@/routes/live'),
+  board: () => import('@/routes/live'),
   correspondence: () => import('@/routes/correspondence'),
 }
 

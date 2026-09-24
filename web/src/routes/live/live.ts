@@ -65,7 +65,8 @@ export function describeSession(
   state: LiveState | undefined,
   game: GameSummary | undefined,
 ): string {
-  if (!state?.active) return t`Nothing on the board`
+  // An empty board is shown as the initial array, ready to be played on.
+  if (!state?.active) return t`Starting position`
   const played = state.moves.length
   if (state.game_id) {
     const id = state.game_id
@@ -80,10 +81,38 @@ export function describeSession(
       ? t`${players} · ply ${ply} + ${played} played`
       : t`${players} · ply ${ply}`
   }
+  if ((state.line_positions?.length ?? 0) > 1) {
+    const ply = state.ply ?? 0
+    return played > 0 ? t`Pasted game · ply ${ply} + ${played} played` : t`Pasted game · ply ${ply}`
+  }
   return played > 0 ? t`Ad-hoc position + ${played} played` : t`Ad-hoc position`
 }
 
 /** `4` -> `2…`, `3` -> `2.` — the move number a ply lands on, as the design writes it. */
 export function plyLabel(ply: number): string {
   return ply % 2 === 0 ? `${Math.floor(ply / 2) + 1}.` : `${Math.floor(ply / 2) + 1}…`
+}
+
+/**
+ * The plies played before `fen`, read off its own move counter and side to move — what the
+ * engine panel numbers its lines from, so a line on move 31 of a pasted position says 31.
+ */
+export function fenPly(fen: string): number {
+  const { number, white } = moveNumber(fen, 0)
+  return (number - 1) * 2 + (white ? 0 : 1)
+}
+
+/**
+ * The number and side of the `index`-th move played from `startFen` (0 is the first).
+ *
+ * `plyLabel` counts from the initial array; a pasted FEN or a PGN with a `FEN` header starts
+ * wherever its own move counter says and with whichever side is to move, and the move list
+ * numbers from there, the way the diagram it was copied from does.
+ */
+export function moveNumber(startFen: string | undefined, index: number): { number: number; white: boolean } {
+  const fields = (startFen ?? '').split(/\s+/)
+  const blackFirst = fields[1] === 'b' ? 1 : 0
+  const full = Number.parseInt(fields[5] ?? '1', 10)
+  const half = blackFirst + index
+  return { number: (Number.isFinite(full) && full > 0 ? full : 1) + Math.floor(half / 2), white: half % 2 === 0 }
 }

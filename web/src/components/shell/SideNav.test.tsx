@@ -204,13 +204,13 @@ describe('the correspondence entry', () => {
     expect(screen.queryByRole('link', { name: /Correspondence/ })).not.toBeInTheDocument()
   })
 
-  it('appears after Live once the mode is on', () => {
+  it('appears after Board once the mode is on', () => {
     withMode(1)
     const entry = screen.getByRole('link', { name: /Correspondence/ })
     expect(entry).toHaveAttribute('href', '/correspondence')
     const rail = screen.getByRole('navigation', { name: 'Sections' })
     const rows = within(rail).getAllByRole('link')
-    expect(rows.indexOf(entry)).toBe(rows.findIndex((row) => row.textContent === 'Live') + 1)
+    expect(rows.indexOf(entry)).toBe(rows.findIndex((row) => row.textContent === 'Board') + 1)
   })
 
   it('carries the count of games waiting on you, and nothing when none are', () => {

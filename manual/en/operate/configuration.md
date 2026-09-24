@@ -57,7 +57,7 @@ The live, continuously updating board. See [Analysis](../guide/analysis.md).
 |---|---|---|
 | `BLUNDERBASE_STREAM_SNAPSHOT_INTERVAL` | `0.5` | How often, in seconds, a running search publishes a new snapshot |
 | `BLUNDERBASE_STREAM_IDLE_SECONDS` | `30.0` | How long a session survives with nobody listening before it frees its slot |
-| `BLUNDERBASE_STREAM_MAX_SESSIONS` | `3` | Analysis boards at once. One per surface: the game board, the live board and the companion application |
+| `BLUNDERBASE_STREAM_MAX_SESSIONS` | `3` | Analysis boards at once. One per surface: the game board, the Board page and the companion application |
 
 ## Runners
 

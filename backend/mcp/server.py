@@ -1015,10 +1015,11 @@ def _register_live(server: MCPServer, coach: Coach) -> None:
     @server.tool()
     @guarded
     def show_positions(positions: list[dict[str, Any]]) -> TextContent:
-        """Push 1–100 positions at once, replacing the live queue. Each object has either
-        fen or game_id and optional ply (default 0), plus optional text, arrows, squares.
-        The first appears immediately; the user can browse with Next/Prev. A game reference
-        also shows its moves and a smaller replay board. Invalid batches change nothing."""
+        """Push 1–100 positions at once onto the owner's Board page, replacing its queue.
+        Each object has either fen or game_id and optional ply (default 0), plus optional
+        text, arrows, squares. The first appears immediately; the user can browse with
+        Next/Prev. A game reference brings the game's moves along, so the owner can step
+        through them. Invalid batches change nothing."""
         with coach.session() as session:
             return payloads.result(live_service.show_positions(session, positions))
 
@@ -1046,10 +1047,10 @@ def _register_live(server: MCPServer, coach: Coach) -> None:
     @server.tool()
     @guarded
     def make_move(uci: str) -> TextContent:
-        """Play one move on the live board, in UCI (e2e4, e7e8q for a promotion), and let
-        the browser animate it. Walk a line one call at a time. An illegal move is
-        refused with code illegal_move rather than being shown; playing the followed
-        game's own next move keeps the board on that game."""
+        """Play one move on the Board page, in UCI (e2e4, e7e8q for a promotion), from the
+        position it is standing on, and let the browser animate it. Walk a line one call
+        at a time. An illegal move is refused with code illegal_move rather than being
+        shown; playing the followed game's own next move keeps the board on that game."""
         state = live_service.make_move(str(uci))
         return payloads.result(state)
 
@@ -1060,7 +1061,7 @@ def _register_live(server: MCPServer, coach: Coach) -> None:
         squares: list[str] | None = None,
         text: str | None = None,
     ) -> TextContent:
-        """Draw on the live board. An arrow is "e2e4" or "e2e4:blue"; a highlighted square
+        """Draw on the Board page. An arrow is "e2e4" or "e2e4:blue"; a highlighted square
         is "e4" or "e4:red"; colours are green, red, blue and yellow. `text` is the comment
         shown under the board. Each argument replaces what was there and an empty list
         clears it; the marks are wiped whenever the position changes."""
@@ -1070,9 +1071,14 @@ def _register_live(server: MCPServer, coach: Coach) -> None:
     @server.tool()
     @guarded
     def get_live_state() -> TextContent:
-        """What the owner's board is showing right now, and whether anyone is looking:
-        `viewer_count` is how many browsers are subscribed. Read this before driving the
-        board in a new session, or after being told the page was reloaded."""
+        """What the owner's Board page is showing right now, and whether anyone is looking:
+        `viewer_count` is how many browsers are subscribed. The owner analyses on this
+        board too — they paste positions and games and play moves on it — so read this
+        when asked about "this position" or "the board", before driving it in a new
+        session, and after being told the page was reloaded. `fen` is the position on the
+        board. `line_positions` is the mainline and `ply` how far into it the board stands;
+        `moves` / `move_sans` is a branch leaving it after `base` plies, with `cursor` of
+        them on the board."""
         return payloads.result(live_service.get_state())
 
 

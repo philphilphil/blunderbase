@@ -6,10 +6,14 @@ import {
   boardArrows,
   boardSquares,
   describeSession,
+  fenPly,
   isVariation,
+  moveNumber,
   orientationFor,
   plyLabel,
 } from './live'
+
+const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 const idle: LiveState = {
   active: false,
@@ -118,8 +122,32 @@ describe('describeSession', () => {
     expect(describeSession(session({ game_id: null, ply: null }), undefined)).toBe(
       'Ad-hoc position',
     )
-    expect(describeSession(idle, undefined)).toBe('Nothing on the board')
-    expect(describeSession(undefined, undefined)).toBe('Nothing on the board')
+    expect(describeSession(idle, undefined)).toBe('Starting position')
+    expect(describeSession(undefined, undefined)).toBe('Starting position')
+  })
+
+  it('describes a pasted game by how far into it the board stands', () => {
+    const line = [0, 1, 2].map((ply) => ({ ply, fen: 'x', san: null, uci: null }))
+    const pasted = session({ game_id: null, ply: 2, line_positions: line })
+    expect(describeSession(pasted, undefined)).toBe('Pasted game · ply 2')
+    expect(describeSession({ ...pasted, moves: ['a2a3'] }, undefined)).toBe(
+      'Pasted game · ply 2 + 1 played',
+    )
+  })
+})
+
+describe('moveNumber and fenPly', () => {
+  it('count from the initial array by default', () => {
+    expect(moveNumber(START, 0)).toEqual({ number: 1, white: true })
+    expect(moveNumber(START, 3)).toEqual({ number: 2, white: false })
+    expect(fenPly(START)).toBe(0)
+  })
+
+  it('count from a pasted position’s own move counter and side to move', () => {
+    const black31 = '8/8/8/8/8/8/8/K1k5 b - - 4 31'
+    expect(moveNumber(black31, 0)).toEqual({ number: 31, white: false })
+    expect(moveNumber(black31, 1)).toEqual({ number: 32, white: true })
+    expect(fenPly(black31)).toBe(61)
   })
 })
 

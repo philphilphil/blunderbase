@@ -1661,16 +1661,32 @@ export interface LiveSquare {
   color: string
 }
 
+export interface LiveLinePosition {
+  ply: number
+  fen: string
+  san: string | null
+  uci: string | null
+}
+
+/**
+ * The Board page's one shared board. `line_positions` is the mainline and `ply` how far
+ * into it the board stands (null on a bare position); `moves` is a branch leaving it after
+ * `base` plies, with `cursor` of its moves on the board — 0 means the board is on the
+ * mainline. `services/live.py` is the model; this is only its wire shape.
+ */
 export interface LiveState extends Extra {
   position_index?: number
   position_count?: number
-  game_positions?: { ply: number; fen: string; san: string | null; uci: string | null }[]
+  line_positions?: LiveLinePosition[]
   active: boolean
   game_id?: number | null
   ply?: number | null
+  base?: number | null
+  cursor?: number
   fen?: string | null
   turn?: string | null
   moves: string[]
+  move_sans?: string[]
   last_move?: string | null
   arrows: LiveArrow[]
   squares: LiveSquare[]

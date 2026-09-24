@@ -59,7 +59,7 @@ Das laufende Brett, das sich ständig aktualisiert. Siehe [Analyse](../guide/ana
 |---|---|---|
 | `BLUNDERBASE_STREAM_SNAPSHOT_INTERVAL` | `0.5` | Wie oft eine laufende Suche einen neuen Schnappschuss veröffentlicht, in Sekunden |
 | `BLUNDERBASE_STREAM_IDLE_SECONDS` | `30.0` | Wie lange eine Sitzung überlebt, der niemand zuhört, bevor sie ihren Slot freigibt |
-| `BLUNDERBASE_STREAM_MAX_SESSIONS` | `3` | Analysebretter gleichzeitig. Eines je Oberfläche: das Partiebrett, das Live-Brett und die Begleitanwendung |
+| `BLUNDERBASE_STREAM_MAX_SESSIONS` | `3` | Analysebretter gleichzeitig. Eines je Oberfläche: das Partiebrett, die Brett-Seite und die Begleitanwendung |
 
 ## Runner { #runners }
 

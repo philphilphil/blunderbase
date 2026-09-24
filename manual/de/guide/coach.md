@@ -25,8 +25,8 @@ brauchst.
 Er durchsucht deine Partien, öffnet eine, findet Stellungen, liest den Eröffnungs-Explorer
 und die Lichess-Referenzdatenbanken, liefert Statistiken, schreibt und durchsucht Notizen,
 pflegt Repertoire-Varianten, reiht Analysen ein und berichtet über die Warteschlange. Er
-kann außerdem eine Partie oder eine Stellung auf das [Live](live.md)-Brett legen, damit
-ihr beide dasselbe seht.
+kann außerdem eine Partie oder eine Stellung auf das [Brett](board.md) legen, damit ihr
+beide dasselbe seht, und die Stellung auslesen, die du dort gerade analysierst.
 
 ## Was er nicht kann
 

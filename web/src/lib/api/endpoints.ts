@@ -768,6 +768,15 @@ export const getLiveState = () => http.get<LiveState>('/live')
 
 export const resetLive = () => http.post<LiveState>('/live/reset')
 export const selectLivePosition = (index: number) => http.post<LiveState>(`/live/positions/${index}`)
+export const newBoard = () => http.post<LiveState>('/live/new')
+/** A FEN or a PGN, never both; a PGN brings its mainline, and `422` says what was wrong. */
+export const loadBoard = (body: { fen: string } | { pgn: string }) =>
+  http.post<LiveState>('/live/load', { body })
+/** Played from the position the board stands on; the first move on an empty board starts one. */
+export const playBoardMoves = (ucis: string[]) =>
+  http.post<LiveState>('/live/moves', { body: { ucis } })
+export const gotoBoard = (ply: number, cursor = 0) =>
+  http.post<LiveState>('/live/goto', { body: { ply, cursor } })
 
 // --- correspondence -------------------------------------------------------
 

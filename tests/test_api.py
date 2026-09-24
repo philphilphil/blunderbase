@@ -1925,3 +1925,30 @@ def test_live_navigation_and_reset_are_shared(api: TestClient) -> None:
     assert api.post("/live/positions/1").status_code == 422
     assert api.post("/live/reset").json()["active"] is False
     assert live_service.get_state()["position_count"] == 0
+
+
+def test_the_owner_loads_plays_and_steps_on_the_board(api: TestClient) -> None:
+    assert api.post("/live/load", json={"fen": FRENCH}).json()["fen"] == FRENCH
+    loaded = api.post("/live/load", json={"pgn": "1. e4 e5 2. Nf3 *"}).json()
+    assert loaded["ply"] == 3 and len(loaded["line_positions"]) == 4
+
+    stepped = api.post("/live/goto", json={"ply": 1}).json()
+    assert stepped["last_move"] == "e2e4"
+    played = api.post("/live/moves", json={"ucis": ["c7c5", "g1f3"]}).json()
+    assert played["move_sans"] == ["c5", "Nf3"] and played["base"] == 1
+
+    assert api.post("/live/new").json()["line_positions"][0]["fen"].startswith("rnbqkbnr/")
+
+
+def test_the_boards_refusals_are_422s(api: TestClient) -> None:
+    assert api.post("/live/load", json={"fen": "not a position"}).status_code == 422
+    assert api.post("/live/load", json={}).status_code == 422
+    assert api.post("/live/goto", json={"ply": 0}).status_code == 422  # nothing on it yet
+    api.post("/live/new")
+    assert api.post("/live/moves", json={"ucis": ["e2e5"]}).status_code == 422
+    assert api.post("/live/moves", json={"ucis": []}).status_code == 422
+
+
+def test_the_owners_first_move_starts_a_board(api: TestClient) -> None:
+    state = api.post("/live/moves", json={"ucis": ["d2d4"]}).json()
+    assert state["active"] is True and state["moves"] == ["d2d4"]

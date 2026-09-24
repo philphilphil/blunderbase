@@ -56,7 +56,6 @@ import {
   useCorrespondenceStatus,
   useEngines,
   useGames,
-  useLiveState,
 } from '@/lib/api/queries'
 import type { Color } from '@/lib/api/types'
 import { useEvents } from '@/lib/events/EventsProvider'
@@ -93,7 +92,7 @@ const WORKSPACE: NavItem[] = [
   // than a cut of the explorer's tree.
   { to: '/stats', label: msg`Stats`, icon: StatsIcon },
   { to: '/notes', label: msg`Notes`, icon: NotesIcon },
-  { to: '/live', label: msg`Live`, icon: LiveIcon },
+  { to: '/board', label: msg`Board`, icon: LiveIcon },
 ]
 
 /**
@@ -694,13 +693,10 @@ function Folded({ to, pathname, search }: { to: string; pathname: string; search
  */
 function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { pathname, search } = useLocation()
-  const { t } = useLingui()
   const games = useGames({ limit: 1 })
-  const live = useLiveState()
   const settings = useAppSettings()
 
   const total = games.data?.total
-  const liveActive = live.data?.active === true
 
   // Correspondence mode. The count beside the entry is the one number that decides whether
   // the owner has to do anything today — games waiting on *their* move — which is why it is
@@ -728,11 +724,7 @@ function NavSections({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
       {WORKSPACE.map((item) =>
         entry(
           item,
-          item.to === '/games' && total !== undefined
-            ? total.toLocaleString()
-            : item.to === '/live' && liveActive
-              ? t`on air`
-              : undefined,
+          item.to === '/games' && total !== undefined ? total.toLocaleString() : undefined,
         ),
       )}
       {correspondence ? (

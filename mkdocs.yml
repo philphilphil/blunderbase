@@ -118,7 +118,7 @@ plugins:
             Explorer: Explorer
             Statistics: Statistiken
             Notes: Notizen
-            Live: Live
+            Board: Brett
             Correspondence: Fernschach
             Library: Bibliothek
             Analysis: Analyse
@@ -147,7 +147,7 @@ nav:
       - Explorer: guide/explorer.md
       - Statistics: guide/stats.md
       - Notes: guide/notes.md
-      - Live: guide/live.md
+      - Board: guide/board.md
       - Correspondence: guide/correspondence.md
       - Library: guide/library.md
       - Analysis: guide/analysis.md

@@ -31,7 +31,8 @@ Reihenfolge.
 - [Statistiken](guide/stats.md) – welche Berichte es gibt, welche Partien zählen, Zeitraum
   und Filter.
 - [Notizen](guide/notes.md) – woran eine Notiz hängt, wo sie auftaucht, die Notizseite.
-- [Live](guide/live.md) – das Brett, das ein MCP-Client steuert.
+- [Brett](guide/board.md) – ein Analysebrett für jede FEN oder PGN, geteilt mit deinem
+  Assistenten.
 - [Fernschach](guide/correspondence.md) – die Partien, die du gerade spielst: Fristen, der
   Baum der Kandidatenzüge, das Abschließen. Aus, bis du es einschaltest.
 - [Bibliothek](guide/library.md) – Import von Lichess, Chess.com, FICS und PGN, automatische

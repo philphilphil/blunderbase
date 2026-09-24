@@ -129,6 +129,8 @@ msgstr "Der Analysedurchlauf endet nach {budget} Knoten."
 #: src/components/analysis/AnalyseDialog.tsx
 #: src/routes/game/components/MobileGameView.tsx
 #: src/routes/game/components/MoveList.tsx
+#: src/routes/live/BoardMoves.tsx
+#: src/routes/live/LivePage.tsx
 msgid "Moves"
 msgstr "Züge"
 
@@ -179,6 +181,7 @@ msgstr "Von {moveName} bis zum Ende der Partie."
 #: src/routes/game/components/PracticeDialog.tsx
 #: src/routes/games/components/DeleteGamesDialog.tsx
 #: src/routes/import/DeleteAllGamesDialog.tsx
+#: src/routes/live/LoadPosition.tsx
 #: src/routes/live/SaveMoment.tsx
 #: src/routes/mcp/McpKeys.tsx
 #: src/routes/notes/components/NoteEditor.tsx
@@ -523,7 +526,10 @@ msgid "Board settings — notation, arrows, sound, the eval graph and line previ
 msgstr "Bretteinstellungen – Notation, Pfeile, Ton, Bewertungsverlauf und Variantenvorschau (S)"
 
 #: src/components/board/BoardSettings.tsx
+#: src/components/shell/CommandPalette.tsx
+#: src/components/shell/SideNav.tsx
 #: src/routes/correspondence/CorrespondenceGamePage.tsx
+#: src/routes/live/LivePage.tsx
 #: src/routes/live/SessionMeta.tsx
 msgid "Board"
 msgstr "Brett"
@@ -855,15 +861,8 @@ msgid "everything written down"
 msgstr "alles Aufgeschriebene"
 
 #: src/components/shell/CommandPalette.tsx
-#: src/components/shell/SideNav.tsx
-#: src/routes/game/components/MaiaPanel.tsx
-#: src/routes/live/LivePage.tsx
-msgid "Live"
-msgstr "Live"
-
-#: src/components/shell/CommandPalette.tsx
-msgid "the game being played now"
-msgstr "die Partie, die gerade läuft"
+msgid "analyse any position — paste a FEN or a PGN"
+msgstr "jede Stellung analysieren – FEN oder PGN einfügen"
 
 #: src/components/shell/CommandPalette.tsx
 #: src/components/shell/SideNav.tsx
@@ -1259,11 +1258,6 @@ msgstr "Blunderbase {VERSION_LABEL} – was sich geändert hat"
 #: src/components/shell/SideNav.tsx
 msgid "Workspace"
 msgstr "Arbeitsbereich"
-
-#: src/components/shell/SideNav.tsx
-#: src/routes/live/LivePage.tsx
-msgid "on air"
-msgstr "läuft"
 
 #: src/components/shell/SideNav.tsx
 msgid "Data & compute"
@@ -3090,6 +3084,8 @@ msgid "10 moves / 50 days"
 msgstr "10 Züge / 50 Tage"
 
 #: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/live/LoadPosition.tsx
+#: src/routes/live/live.ts
 msgid "Starting position"
 msgstr "Ausgangsstellung"
 
@@ -3110,6 +3106,7 @@ msgid "Paste the PGN the server exports. Its moves become the game's played line
 msgstr "Füge das PGN ein, das der Server ausgibt. Seine Züge werden zur gespielten Linie der Partie, seine Header füllen alles, was du unten frei lässt."
 
 #: src/routes/correspondence/components/NewGameDialog.tsx
+#: src/routes/live/LoadPosition.tsx
 msgid "PGN"
 msgstr "PGN"
 
@@ -3923,7 +3920,6 @@ msgid "Revoke and uninstall"
 msgstr "Widerrufen und deinstallieren"
 
 #: src/routes/engines/BrowserRunnerSection.tsx
-#: src/routes/live/LivePage.tsx
 msgid "Start"
 msgstr "Starten"
 
@@ -5408,6 +5404,10 @@ msgid "Run"
 msgstr "Analyse"
 
 #: src/routes/game/components/MaiaPanel.tsx
+msgid "Live"
+msgstr "Live"
+
+#: src/routes/game/components/MaiaPanel.tsx
 msgid "Stop live analysis"
 msgstr "Live-Analyse anhalten"
 
@@ -6796,6 +6796,19 @@ msgstr "{mins} min {secs} s"
 msgid "{secs}s"
 msgstr "{secs} s"
 
+#: src/routes/live/BoardMoves.tsx
+msgid "Play a move on the board, or load a FEN or a PGN."
+msgstr "Spiel einen Zug auf dem Brett oder lade eine FEN oder PGN."
+
+#: src/routes/live/BoardMoves.tsx
+msgid "Your variation"
+msgstr "Deine Variante"
+
+#: src/routes/live/BoardMoves.tsx
+msgctxt "move list"
+msgid "Start"
+msgstr "Start"
+
 #: src/routes/live/CoachComment.tsx
 msgid "Coach"
 msgstr "Trainer"
@@ -6814,44 +6827,44 @@ msgid "Prev"
 msgstr "Zurück"
 
 #: src/routes/live/LivePage.tsx
-msgid "The live session could not be read."
-msgstr "Die Live-Sitzung konnte nicht gelesen werden."
+msgid "Load…"
+msgstr "Laden…"
 
 #: src/routes/live/LivePage.tsx
-msgid "Nothing is on the board."
-msgstr "Es ist nichts auf dem Brett."
+msgid "The board could not be read."
+msgstr "Das Brett ließ sich nicht lesen."
 
 #: src/routes/live/LivePage.tsx
-msgid "Ask your assistant to put a game on it — <0>show_game</0> for a stored game, <1>show_position</1> for a FEN. It appears here the moment it does, no refresh."
-msgstr "Bitte deinen Assistenten, eine Partie darauf zu legen – <0>show_game</0> für eine gespeicherte Partie, <1>show_position</1> für eine FEN-Stellung. Die Partie erscheint hier in dem Moment, in dem er es tut, ohne Neuladen."
-
-#: src/routes/live/LivePage.tsx
-msgid "Game replay"
-msgstr "Partie nachspielen"
-
-#: src/routes/live/LivePage.tsx
-msgid "Referenced game position"
-msgstr "Stellung aus der verwiesenen Partie"
-
-#: src/routes/live/LivePage.tsx
-msgid "Previous game move"
-msgstr "Vorheriger Zug der Partie"
-
-#: src/routes/live/LivePage.tsx
-msgid "Ply {replayPly}"
-msgstr "Halbzug {replayPly}"
-
-#: src/routes/live/LivePage.tsx
-msgid "Next game move"
-msgstr "Nächster Zug der Partie"
-
-#: src/routes/live/LivePage.tsx
-msgid "Game moves"
-msgstr "Züge der Partie"
+msgid "Your assistant can put games and positions here too, with <0>show_game</0> and <1>show_position</1>, and read back what you are looking at."
+msgstr "Auch dein Assistent kann hier Partien und Stellungen hinlegen, mit <0>show_game</0> und <1>show_position</1>, und auslesen, was du gerade ansiehst."
 
 #: src/routes/live/LivePage.tsx
 msgid "The followed game could not be read — {followedError}"
 msgstr "Die verfolgte Partie konnte nicht gelesen werden – {followedError}"
+
+#: src/routes/live/LoadPosition.tsx
+msgid "Load a position"
+msgstr "Eine Stellung laden"
+
+#: src/routes/live/LoadPosition.tsx
+msgid "Paste a FEN or a PGN. A PGN brings its mainline, which you can step through; its variations and comments are left out. Pasting anywhere on the page does the same."
+msgstr "Füg eine FEN oder eine PGN ein. Von einer PGN kommt die Hauptvariante, durch die du gehen kannst; ihre Varianten und Kommentare bleiben draußen. Einfügen irgendwo auf der Seite tut dasselbe."
+
+#: src/routes/live/LoadPosition.tsx
+msgid "FEN"
+msgstr "FEN"
+
+#: src/routes/live/LoadPosition.tsx
+msgid "FEN or PGN"
+msgstr "FEN oder PGN"
+
+#: src/routes/live/LoadPosition.tsx
+msgid "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1 — or a whole game"
+msgstr "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1 – oder eine ganze Partie"
+
+#: src/routes/live/LoadPosition.tsx
+msgid "Load"
+msgstr "Laden"
 
 #: src/routes/live/SaveMoment.tsx
 msgid "Saved"
@@ -6927,10 +6940,6 @@ msgid "Played"
 msgstr "Gespielt"
 
 #: src/routes/live/live.ts
-msgid "Nothing on the board"
-msgstr "Nichts auf dem Brett"
-
-#: src/routes/live/live.ts
 msgid "game {id}"
 msgstr "Partie {id}"
 
@@ -6947,12 +6956,61 @@ msgid "{players} · ply {ply}"
 msgstr "{players} · Halbzug {ply}"
 
 #: src/routes/live/live.ts
+msgid "Pasted game · ply {ply} + {played} played"
+msgstr "Eingefügte Partie · Halbzug {ply} + {played} gespielt"
+
+#: src/routes/live/live.ts
+msgid "Pasted game · ply {ply}"
+msgstr "Eingefügte Partie · Halbzug {ply}"
+
+#: src/routes/live/live.ts
 msgid "Ad-hoc position + {played} played"
 msgstr "Freie Stellung + {played} gespielt"
 
 #: src/routes/live/live.ts
 msgid "Ad-hoc position"
 msgstr "Freie Stellung"
+
+#: src/routes/live/localBoard.ts
+msgid "That position is not in the queue."
+msgstr "Diese Stellung ist nicht in der Reihe."
+
+#: src/routes/live/localBoard.ts
+msgid "A move is required."
+msgstr "Es fehlt ein Zug."
+
+#: src/routes/live/localBoard.ts
+msgid "{text} is not legal here."
+msgstr "{text} ist hier nicht erlaubt."
+
+#: src/routes/live/localBoard.ts
+msgid "Nothing is on the board yet."
+msgstr "Auf dem Brett liegt noch nichts."
+
+#: src/routes/live/localBoard.ts
+msgid "That move is not on the line."
+msgstr "Dieser Zug gehört nicht zur Zugfolge."
+
+#: src/routes/live/localBoard.ts
+msgid "That is not a PGN."
+msgstr "Das ist keine PGN."
+
+#: src/routes/live/localBoard.ts
+msgid "That PGN's FEN header is not a position."
+msgstr "Der FEN-Header dieser PGN ist keine Stellung."
+
+#. placeholder {0}: node.san
+#: src/routes/live/localBoard.ts
+msgid "That PGN could not be read: {0} is not legal there."
+msgstr "Diese PGN ließ sich nicht lesen: {0} ist dort nicht erlaubt."
+
+#: src/routes/live/localBoard.ts
+msgid "That PGN has no moves."
+msgstr "Diese PGN hat keine Züge."
+
+#: src/routes/live/localBoard.ts
+msgid "That is not a position."
+msgstr "Das ist keine Stellung."
 
 #: src/routes/mcp/CopyButton.tsx
 msgid "Copy"

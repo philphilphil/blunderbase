@@ -11,14 +11,14 @@ Or to a game entire, with no position at all: the note box's **Position / Game**
 the game screen (`⇧N`), or **This game** in a correspondence game. Those come back under
 that one game only — see [Analysing a game](game.md#write-a-note).
 
-Wherever a note is written — the game screen, the explorer, the live board, a
+Wherever a note is written — the game screen, the explorer, the Board, a
 correspondence game, the notes page — **Enter** saves it and **Shift+Enter** starts a new
 line. A box that saves when you click away still does.
 
 ## Where do they show up?
 
 Under the board of any game that reaches the position, in **Your notes on this position**
-in the explorer, and on the live board. The move column marks a move whose position has
+in the explorer, and on the Board. The move column marks a move whose position has
 been written about, so a game you have thought about before says so.
 
 ## The notes page

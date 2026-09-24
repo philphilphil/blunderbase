@@ -121,7 +121,12 @@ const PAGES: PageRoute[] = [
     to: '/stats',
   },
   { label: msg`Notes`, hint: msg`everything written down`, icon: NotesIcon, to: '/notes' },
-  { label: msg`Live`, hint: msg`the game being played now`, icon: LiveIcon, to: '/live' },
+  {
+    label: msg`Board`,
+    hint: msg`analyse any position — paste a FEN or a PGN`,
+    icon: LiveIcon,
+    to: '/board',
+  },
   {
     label: msg`Library`,
     hint: msg`import, export and reset`,

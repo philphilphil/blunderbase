@@ -1,10 +1,19 @@
-"""The live session: the one board the coach is driving.
+"""The live session: the one board the owner and the coach share — the Board page.
 
 The owner works split-screen — Blunderbase in the browser, the coach in a chat beside it —
 and this module is what keeps the two looking at the same position. There is exactly one
-live board because there is exactly one owner: the game and ply they are being shown, or
-an ad-hoc FEN with the moves played on top of it, plus the arrows, highlights and comment
-drawn over it.
+board because there is exactly one owner. Either side can put something on it: a stored
+game at a ply, a pasted FEN or PGN, or the starting position, plus the arrows, highlights
+and comment drawn over it. Either side can play moves on it, and the owner can step back
+and forth through what was played.
+
+The board is a *line* with at most one *branch* off it, the same shape as the game page's
+analysis line. `line` is the mainline — a stored game's moves, a PGN's mainline, or nothing
+for a bare position — and `ply` is how far into it the board stands. `moves` is a branch
+that leaves the mainline after `base` plies, and `cursor` is how many of its moves are on
+the board: `cursor == 0` means the board is on the mainline at `ply`, anything more means
+it is in the branch. Stepping back along the mainline keeps the branch, so a variation
+survives a look at what was actually played; starting another branch replaces it.
 
 Every mutation publishes `live.updated` carrying the whole new state through
 `services.events`, which is what the `/events` sockets hand to the browser. The state
@@ -13,12 +22,13 @@ fetches `/live` once and follows the events from there.
 
 **Live moves are ephemeral.** Nothing here writes a `Game`, a `Position` or a `MoveEval`.
 The one query in the module reads a stored game in order to *start* from it; from that
-point the board is an analysis board and the coach can play anything legal on it without
+point the board is an analysis board and anything legal can be played on it without
 touching what was actually played.
 """
 
 from __future__ import annotations
 
+import io
 import threading
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
@@ -79,28 +89,35 @@ class UnknownLiveGameError(LiveError, LookupError):
 
 @dataclass
 class LiveState:
-    """The live board and what is drawn on it.
+    """The board and what is drawn on it.
 
-    `game_id` and `ply` say which stored game the board is following and how far into it;
-    `moves` holds what the coach has played beyond that line, so an empty `moves` means the
-    board still *is* the game at `ply` and a non-empty one means it has left it. An ad-hoc
-    position carries no `game_id` and counts its own moves from the FEN it was given.
+    `start` is the position the mainline `line` starts from and `ply` how far into it the
+    board stands; `moves` is the branch that leaves it after `base` plies and `cursor` how
+    much of that branch is on the board (see the module docstring). `game_id` says which
+    stored game the mainline is, when it is one. A bare position has an empty `line` and
+    counts its own moves from the FEN it was given, as a branch off ply 0.
     """
 
     game_id: int | None = None
-    ply: int | None = None
+    ply: int = 0
+    base: int = 0
     moves: list[str] = field(default_factory=list)
+    cursor: int = 0
     last_move: str | None = None
     arrows: list[dict[str, str]] = field(default_factory=list)
     squares: list[dict[str, str]] = field(default_factory=list)
     text: str | None = None
     updated_at: datetime | None = None
-    # The board itself, and the move list of the game it is following. Neither is part of
-    # the payload: the first goes out as a FEN, the second is only here so `make_move` can
-    # tell "the game's next move" from a departure without opening a Session.
+    # The line's first position and the board at the cursor, which `_rebuild` replays from
+    # it. Neither is part of the payload: the board goes out as a FEN.
+    start: chess.Board | None = None
     board: chess.Board | None = None
     line: tuple[str, ...] = ()
-    game_positions: list[dict[str, Any]] = field(default_factory=list)
+    # Every mainline position with the move that led to it, and the branch in SAN — worked
+    # out once when the line or the branch changes, so the move list is never replayed by
+    # the browser.
+    line_positions: list[dict[str, Any]] = field(default_factory=list)
+    move_sans: list[str] = field(default_factory=list)
 
 
 _STATE = LiveState()
@@ -130,10 +147,68 @@ def show_position(fen: str) -> dict[str, Any]:
     return _show_states([_position_state({"fen": fen}, None)])
 
 
+def new_board() -> dict[str, Any]:
+    """The starting position, ready to be played from — the owner's "new board"."""
+    import chess
+
+    return _show_states([_line_state(chess.Board(), ())])
+
+
+def load(fen: str | None = None, pgn: str | None = None) -> dict[str, Any]:
+    """Put a pasted FEN, or a pasted PGN's mainline, on the board.
+
+    A PGN is read the way any PGN is: its `FEN`/`SetUp` headers say where it starts and a
+    Chess960 `Variant` header is honoured. Only the mainline is kept — variations and
+    comments are the author's, and the board's own branch is where the owner's go. The
+    board stands at the end of the mainline, which is what somebody pasting a game to look
+    at "this position" means; the move list walks back from there.
+    """
+    if (fen is None) == (pgn is None):
+        raise LiveRequestError("load takes a FEN or a PGN")
+    if fen is not None:
+        return show_position(fen)
+    return _show_states([_pgn_state(str(pgn))])
+
+
+def _pgn_state(text: str) -> LiveState:
+    import chess.pgn
+
+    body = text.strip()
+    if not body:
+        raise LiveRequestError("a PGN is required")
+    game = chess.pgn.read_game(io.StringIO(body))
+    if game is None:
+        raise LiveRequestError("that is not a PGN")
+    if game.errors:
+        raise LiveRequestError(f"that PGN could not be read: {game.errors[0]}")
+    try:
+        start = game.board()
+    except ValueError as exc:  # a `FEN` header that is not one
+        raise LiveFenError(f"that PGN's FEN header is not a position: {exc}") from None
+    moves = tuple(move.uci() for move in game.mainline_moves())
+    if not moves and "FEN" not in game.headers:
+        raise LiveRequestError("that PGN has no moves")
+    state = _line_state(start, moves)
+    state.ply = len(moves)
+    return _rebuild(state)
+
+
+def _line_state(start: chess.Board, line: tuple[str, ...]) -> LiveState:
+    """A fresh state on `start` with `line` as its mainline, at the first position."""
+    state = LiveState(start=start.copy(stack=False), line=line)
+    board = start.copy(stack=False)
+    state.line_positions = [{"ply": 0, "fen": board.fen(), "san": None, "uci": None}]
+    for ply, uci in enumerate(line, 1):
+        move = board.parse_uci(uci)
+        san = board.san(move)
+        board.push(move)
+        state.line_positions.append({"ply": ply, "fen": board.fen(), "san": san, "uci": uci})
+    return _rebuild(state)
+
+
 def _position_state(entry: Mapping[str, Any], session: Session | None) -> LiveState:
     from backend.services.explorer import read_fen
 
-    state = LiveState()
     if entry.get("game_id") is not None:
         if entry.get("fen") is not None:
             raise LiveRequestError("use either game_id or fen for each position")
@@ -144,22 +219,15 @@ def _position_state(entry: Mapping[str, Any], session: Session | None) -> LiveSt
         moves = tuple(game.moves_uci or ())
         if target < 0 or target > len(moves):
             raise LiveRequestError(f"ply {target} is outside game {game.id}")
-        board = _board_at(session, game, 0)
-        state.game_positions = [{"ply": 0, "fen": board.fen(), "san": None, "uci": None}]
-        for ply, uci in enumerate(moves, 1):
-            move = board.parse_uci(uci)
-            san = board.san(move)
-            board.push(move)
-            state.game_positions.append({"ply": ply, "fen": board.fen(), "san": san, "uci": uci})
-        state.board = _board_at(session, game, target)
-        state.game_id, state.ply, state.line = game.id, target, moves
-        state.last_move = moves[target - 1] if target else None
+        state = _line_state(_board_at(session, game, 0), moves)
+        state.game_id, state.ply = game.id, target
+        _rebuild(state)
     else:
         fen = str(entry.get("fen") or "").strip()
         if not fen:
             raise LiveFenError("a FEN is required")
         try:
-            state.board = read_fen(fen)
+            state = _line_state(read_fen(fen), ())
         except ValueError as exc:
             raise LiveFenError(str(exc)) from None
     state.text = _comment(entry.get("text") or "") or None
@@ -202,43 +270,96 @@ def select_position(index: int) -> dict[str, Any]:
 
 
 def make_move(uci: str) -> dict[str, Any]:
-    """Advance the live board by one move, given in UCI (`e2e4`, `e7e8q`).
+    """Advance the board by one move, given in UCI (`e2e4`, `e7e8q`) — the coach's move.
 
-    Legality is decided by the board as it stands, so a coach walking a line can never put
-    the browser in a position that does not exist. Playing the followed game's own next
-    move keeps the board on that game — anything else is a departure from it, and the state
-    says which happened.
+    Unlike the owner's `play`, this never starts a board of its own: a coach that moves on
+    an empty board has lost track of what it is showing, and is told so.
     """
-    text = (uci or "").strip()
-    if not text:
+    return play([uci])
+
+
+def play(ucis: Sequence[str], start_if_empty: bool = False) -> dict[str, Any]:
+    """Play `ucis` from the position on the board, in order, all of them or none.
+
+    Legality is decided by the board as it stands, so neither side can put the other in a
+    position that does not exist. Each move is placed the way the move list reads it:
+
+    - the branch's own next move steps into the branch, keeping what follows;
+    - on the mainline, the mainline's own next move keeps the board on it;
+    - anything else is a departure: inside the branch it cuts the branch at the cursor and
+      continues from there, on the mainline it starts a new branch here, replacing the old.
+
+    `start_if_empty` is the owner's first drag on an empty board, which starts one from
+    the initial position rather than being refused.
+    """
+    import chess
+
+    global _STATE, _POSITIONS, _POSITION_INDEX
+    texts = [str(uci or "").strip() for uci in ucis]
+    if not texts or not all(texts):
         raise IllegalMoveError("a move is required")
 
     with _LOCK:
-        board = _STATE.board
-        if board is None:
-            raise NoLivePositionError(
-                "nothing is on the live board yet; call show_game or show_position first"
-            )
-        try:
-            move = board.parse_uci(text)
-        except ValueError as exc:
-            raise IllegalMoveError(f"{text!r} is not legal here: {exc}") from None
-
-        played = move.uci()
-        following = (
-            _STATE.game_id is not None
-            and not _STATE.moves
-            and _STATE.ply is not None
-            and _STATE.ply < len(_STATE.line)
-            and _STATE.line[_STATE.ply] == played
-        )
-        board.push(move)
-        if following:
-            _STATE.ply = (_STATE.ply or 0) + 1
+        if _STATE.board is None:
+            if not start_if_empty:
+                raise NoLivePositionError(
+                    "nothing is on the board yet; call show_game or show_position first"
+                )
+            state = _line_state(chess.Board(), ())
         else:
-            _STATE.moves.append(played)
-        _STATE.last_move = played
-        # The marks named squares of the position that has just been left.
+            state = deepcopy(_STATE)
+        # Played on a copy, so a batch with an illegal move in it changes nothing at all.
+        for text in texts:
+            _advance(state, text)
+        state.arrows.clear()  # the marks named squares of the position that was left
+        state.squares.clear()
+        if _STATE.board is None:
+            _POSITIONS, _POSITION_INDEX = [state], 0
+        _STATE = state
+        _touch()
+        payload = _payload()
+    return _published(payload)
+
+
+def _advance(state: LiveState, text: str) -> None:
+    board = state.board
+    assert board is not None
+    try:
+        played = board.parse_uci(text).uci()
+    except ValueError as exc:
+        raise IllegalMoveError(f"{text!r} is not legal here: {exc}") from None
+
+    in_branch = state.cursor > 0
+    at_branch = bool(state.moves) and (in_branch or state.ply == state.base)
+    if at_branch and state.cursor < len(state.moves) and state.moves[state.cursor] == played:
+        state.cursor += 1
+    elif not in_branch and state.ply < len(state.line) and state.line[state.ply] == played:
+        state.ply += 1
+    elif in_branch:
+        state.moves = [*state.moves[: state.cursor], played]
+        state.cursor += 1
+    else:
+        state.base, state.moves, state.cursor = state.ply, [played], 1
+    _rebuild(state)
+
+
+def goto(ply: int, cursor: int = 0) -> dict[str, Any]:
+    """Step the board to mainline ply `ply`, or `cursor` moves into the branch.
+
+    A `cursor` above 0 names a move of the branch, which hangs off one ply only, so `ply`
+    must be that ply. Stepping along the mainline keeps the branch where it is.
+    """
+    with _LOCK:
+        if _STATE.board is None:
+            raise NoLivePositionError("nothing is on the board yet")
+        if cursor < 0:
+            raise LiveRequestError("cursor is never negative")
+        if cursor > 0 and (ply != _STATE.base or cursor > len(_STATE.moves)):
+            raise LiveRequestError(f"there is no branch move {cursor} after ply {ply}")
+        if ply < 0 or ply > len(_STATE.line):
+            raise LiveRequestError(f"ply {ply} is outside the line")
+        _STATE.ply, _STATE.cursor = ply, cursor
+        _rebuild(_STATE)
         _STATE.arrows.clear()
         _STATE.squares.clear()
         _touch()
@@ -324,17 +445,49 @@ def _reset() -> None:
     global _POSITION_INDEX
     _POSITIONS.clear()
     _POSITION_INDEX = 0
-    _STATE.game_positions = []
+    _STATE.line_positions = []
+    _STATE.move_sans = []
     _STATE.game_id = None
-    _STATE.ply = None
+    _STATE.ply = 0
+    _STATE.base = 0
     _STATE.moves = []
+    _STATE.cursor = 0
     _STATE.last_move = None
     _STATE.arrows = []
     _STATE.squares = []
     _STATE.text = None
+    _STATE.start = None
     _STATE.board = None
     _STATE.line = ()
     _touch()
+
+
+def _rebuild(state: LiveState) -> LiveState:
+    """Replay the board at the cursor from `start`, and the branch's SAN with it."""
+    if state.start is None:
+        return state
+    in_branch = state.cursor > 0
+    board = state.start.copy(stack=False)
+    for uci in state.line[: state.base if in_branch else state.ply]:
+        board.push(board.parse_uci(uci))
+    # The branch leaves the mainline at `base`, wherever the board is standing on it.
+    branch = board.copy(stack=False) if in_branch else state.start.copy(stack=False)
+    if not in_branch:
+        for uci in state.line[: state.base]:
+            branch.push(branch.parse_uci(uci))
+    state.move_sans = []
+    for index, uci in enumerate(state.moves):
+        move = branch.parse_uci(uci)
+        state.move_sans.append(branch.san(move))
+        branch.push(move)
+        if in_branch and index + 1 == state.cursor:
+            board = branch.copy(stack=False)
+    state.board = board
+    if in_branch:
+        state.last_move = state.moves[state.cursor - 1]
+    else:
+        state.last_move = state.line[state.ply - 1] if state.ply else None
+    return state
 
 
 def _touch() -> None:
@@ -342,18 +495,27 @@ def _touch() -> None:
 
 
 def _payload() -> dict[str, Any]:
-    """The whole state, as both the `/live` response and the `live.updated` event."""
+    """The whole state, as both the `/live` response and the `live.updated` event.
+
+    `ply` is None on a bare position — there is no mainline to count along — and is the
+    branch's base while the board is in the branch, so a reader that only knows `ply` and
+    `moves` reads it exactly as before the branch learned a cursor.
+    """
     board = _STATE.board
+    has_line = _STATE.game_id is not None or bool(_STATE.line)
     return {
         "active": board is not None,
         "position_index": _POSITION_INDEX,
         "position_count": len(_POSITIONS),
-        "game_positions": deepcopy(_STATE.game_positions),
+        "line_positions": deepcopy(_STATE.line_positions),
         "game_id": _STATE.game_id,
-        "ply": _STATE.ply,
+        "ply": _STATE.ply if board is not None and has_line else None,
+        "base": _STATE.base if _STATE.moves else None,
+        "cursor": _STATE.cursor,
         "fen": board.fen() if board is not None else None,
         "turn": _turn(board),
         "moves": list(_STATE.moves),
+        "move_sans": list(_STATE.move_sans),
         "last_move": _STATE.last_move,
         "arrows": [dict(arrow) for arrow in _STATE.arrows],
         "squares": [dict(square) for square in _STATE.squares],

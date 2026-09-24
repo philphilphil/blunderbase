@@ -1,13 +1,19 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Providers } from '@/app/Providers'
-import type { LiveState, RunnersStatus } from '@/lib/api/types'
+import {
+  SERVER_CAPABILITIES,
+  type LiveState,
+  type RunnersStatus,
+  type RuntimeCapabilities,
+} from '@/lib/api/types'
 import { EventsProvider } from '@/lib/events/EventsProvider'
+import { RuntimeCapabilitiesContext } from '@/lib/runtime/capabilities'
 
 import { LivePage } from './LivePage'
 
@@ -28,6 +34,8 @@ class FakeSocket {
 
 /** Every `/streams` request, method included — an open and a close are not the same call. */
 let streamCalls: { method: string; path: string; body: unknown }[] = []
+/** Every write to the board, in order. */
+let boardCalls: { path: string; body: unknown }[] = []
 
 /**
  * Method-aware, because the page now opens and closes analysis sessions on the same path.
@@ -65,6 +73,9 @@ function stubFetch(routes: Record<string, unknown>) {
         return json([])
       }
       if (path === '/api/runners/status') return json(RUNNERS_STATUS)
+      if (path.startsWith('/api/live/') && method === 'POST') {
+        boardCalls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
+      }
 
       const body = routes[path]
       if (body === undefined) return json({ error: 'not_found', detail: path }, 404)
@@ -85,13 +96,15 @@ function json(payload: unknown, status = 200): Response {
  * signed-out browser never dials it. A test that mounts a page on its own is standing in
  * for the authenticated side of that gate, so it supplies the provider the gate would.
  */
-function renderPage(ui: ReactNode) {
+function renderPage(ui: ReactNode, capabilities: RuntimeCapabilities = SERVER_CAPABILITIES) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <Providers client={client}>
-      <EventsProvider>
-        <MemoryRouter>{ui}</MemoryRouter>
-      </EventsProvider>
+      <RuntimeCapabilitiesContext.Provider value={capabilities}>
+        <EventsProvider>
+          <MemoryRouter>{ui}</MemoryRouter>
+        </EventsProvider>
+      </RuntimeCapabilitiesContext.Provider>
     </Providers>,
   )
 }
@@ -184,6 +197,7 @@ const GAME = {
 
 beforeEach(() => {
   streamCalls = []
+  boardCalls = []
   vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket)
 })
 
@@ -193,14 +207,16 @@ afterEach(() => {
 })
 
 describe('LivePage', () => {
-  it('says how to start a session when the board is empty', async () => {
+  it('shows an empty board as the starting position, ready to be played on', async () => {
     stubFetch({ '/api/live': IDLE })
     renderPage(<LivePage />)
 
-    expect(await screen.findByText('Nothing is on the board.')).toBeInTheDocument()
-    expect(screen.getByText('Nothing on the board')).toBeInTheDocument()
-    // The board is still there, dimmed, rather than a hole in the page.
-    expect(screen.getByTestId('board').querySelectorAll('piece')).toHaveLength(32)
+    expect(
+      await screen.findByText('Play a move on the board, or load a FEN or a PGN.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Starting position')).toBeInTheDocument()
+    // A board that can be dragged on also carries chessground's drag ghost.
+    expect((await screen.findByTestId('board')).querySelectorAll('piece:not(.ghost)')).toHaveLength(32)
   })
 
   it('renders the coach’s board, marks and comment', async () => {
@@ -211,7 +227,6 @@ describe('LivePage', () => {
       await screen.findByText('Nine moves of careful improving, one move of generosity.'),
     ).toBeInTheDocument()
     expect(await screen.findByText('kn1ghtmare — phib · ply 1')).toBeInTheDocument()
-    expect(screen.getByText('on air')).toBeInTheDocument()
     expect(screen.getByText('1 viewer')).toBeInTheDocument()
     expect(screen.getByText('1 arrow · 1 square')).toBeInTheDocument()
 
@@ -224,14 +239,14 @@ describe('LivePage', () => {
   it('follows live.updated without refetching', async () => {
     stubFetch({ '/api/live': IDLE, '/api/games/7': GAME })
     renderPage(<LivePage />)
-    await screen.findByText('Nothing is on the board.')
+    await screen.findByText('Starting position')
 
     deliver({ event: 'live.updated', ...SHOWING })
 
     expect(
       await screen.findByText('Nine moves of careful improving, one move of generosity.'),
     ).toBeInTheDocument()
-    expect(screen.queryByText('Nothing is on the board.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Starting position')).not.toBeInTheDocument()
 
     deliver({
       event: 'live.updated',
@@ -258,17 +273,22 @@ describe('LivePage', () => {
     expect(screen.getByTestId('board')).toHaveClass('orientation-white')
   })
 
-  it('keeps the analysis panel inert while nothing is on the board', async () => {
+  it('offers the engine on the starting position of an empty board', async () => {
     stubFetch({ '/api/live': IDLE })
     renderPage(<LivePage />)
-    await screen.findByText('Nothing is on the board.')
+    await screen.findByText('Starting position')
 
     const toggle = screen.getByRole('switch', {
       name: 'Analyse this position continuously',
     })
-    expect(toggle).toBeDisabled()
-    expect(toggle).toHaveAttribute('title', 'nothing is on the board')
+    expect(toggle).toBeEnabled()
     expect(streamCalls).toHaveLength(0)
+    await userEvent.click(toggle)
+    await waitFor(() => expect(streamCalls.filter((c) => c.method === 'POST')).toHaveLength(1))
+    expect(streamCalls[0]!.body).toMatchObject({
+      surface: 'live',
+      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    })
   })
 
   it('analyses the coach’s position when asked', async () => {
@@ -310,7 +330,7 @@ describe('LivePage', () => {
     )
     renderPage(<LivePage />)
 
-    expect(await screen.findByText('The live session could not be read.')).toBeInTheDocument()
+    expect(await screen.findByText('The board could not be read.')).toBeInTheDocument()
     expect(screen.getByText('the session is gone')).toBeInTheDocument()
   })
 })
@@ -329,20 +349,121 @@ it('navigates queued positions and resets the shared session', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Prev' }))
   expect(await screen.findByText('1 / 2')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Reset' }))
-  expect(await screen.findByText('Nothing is on the board.')).toBeInTheDocument()
+  expect(await screen.findByText('Starting position')).toBeInTheDocument()
 })
 
-it('replays game moves on a second board without changing the live position', async () => {
-  stubFetch({ '/api/live': { ...SHOWING, game_positions: [
-    { ply: 0, fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', san: null, uci: null },
-    { ply: 1, fen: SHOWING.fen, san: 'e4', uci: 'e2e4' },
-  ] }, '/api/games/7': GAME })
-  renderPage(<LivePage />)
-  expect(await screen.findByText('Game replay')).toBeInTheDocument()
-  expect(screen.getAllByTestId('board')).toHaveLength(2)
-  await userEvent.click(screen.getByRole('button', { name: 'Previous game move' }))
-  expect(screen.getByText('Ply 0')).toBeInTheDocument()
-  expect(screen.getByText('kn1ghtmare — phib · ply 1')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: '1. e4' }))
-  expect(screen.getByText('Ply 1')).toBeInTheDocument()
+const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const WITH_LINE: LiveState = {
+  ...SHOWING,
+  line_positions: [
+    { ply: 0, fen: START, san: null, uci: null },
+    { ply: 1, fen: AFTER_E4, san: 'e4', uci: 'e2e4' },
+  ],
+}
+
+describe('the owner’s board', () => {
+  it('walks the game in the move list — a click is a step on the shared board', async () => {
+    stubFetch({
+      '/api/live': WITH_LINE,
+      '/api/games/7': GAME,
+      '/api/live/goto': { ...WITH_LINE, ply: 0, fen: START, last_move: null },
+    })
+    renderPage(<LivePage />)
+    await screen.findByText('kn1ghtmare — phib · ply 1')
+    expect(screen.getByRole('button', { name: 'e4' })).toHaveAttribute('aria-current', 'step')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Start' }))
+    await waitFor(() => expect(boardCalls).toEqual([{ path: '/api/live/goto', body: { ply: 0, cursor: 0 } }]))
+    expect(await screen.findByText('kn1ghtmare — phib · ply 0')).toBeInTheDocument()
+  })
+
+  it('steps with the arrow keys', async () => {
+    stubFetch({ '/api/live': WITH_LINE, '/api/games/7': GAME, '/api/live/goto': WITH_LINE })
+    renderPage(<LivePage />)
+    await screen.findByText('kn1ghtmare — phib · ply 1')
+
+    await userEvent.keyboard('{ArrowRight}')
+    expect(boardCalls).toHaveLength(0) // already at the end
+    await userEvent.keyboard('{ArrowLeft}')
+    await waitFor(() => expect(boardCalls).toEqual([{ path: '/api/live/goto', body: { ply: 0, cursor: 0 } }]))
+  })
+
+  it('loads a pasted FEN through the dialog', async () => {
+    stubFetch({ '/api/live': IDLE, '/api/live/load': { ...SHOWING, game_id: null, ply: null } })
+    renderPage(<LivePage />)
+    await screen.findByText('Starting position')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Load…' }))
+    const box = screen.getByLabelText('FEN or PGN')
+    await userEvent.type(box, AFTER_E4)
+    expect(screen.getByLabelText('FEN')).toBe(box)
+    await userEvent.click(screen.getByRole('button', { name: 'Load' }))
+
+    await waitFor(() => expect(boardCalls).toEqual([{ path: '/api/live/load', body: { fen: AFTER_E4 } }]))
+    expect(await screen.findByText('Ad-hoc position')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the dialog open and says why when the server refuses the paste', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = String(input).split('?')[0]!
+        if (path === '/api/live/load' && init?.method === 'POST') {
+          return json({ error: 'unprocessable', detail: 'that PGN has no moves' }, 422)
+        }
+        if (path === '/api/live') return json(IDLE)
+        if (path === '/api/runners/status') return json(RUNNERS_STATUS)
+        return json([])
+      }),
+    )
+    renderPage(<LivePage />)
+    await screen.findByText('Starting position')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Load…' }))
+    await userEvent.click(screen.getByLabelText('FEN or PGN'))
+    // Pasted into the box, where the page's own paste handler stands down.
+    await userEvent.paste('[Event "x"]')
+    await userEvent.click(screen.getByRole('button', { name: 'Load' }))
+
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(
+      'that PGN has no moves',
+    )
+  })
+
+  it('loads a PGN pasted anywhere on the page', async () => {
+    stubFetch({ '/api/live': IDLE, '/api/live/load': WITH_LINE, '/api/games/7': GAME })
+    renderPage(<LivePage />)
+    await screen.findByText('Starting position')
+
+    const paste = new Event('paste', { bubbles: true }) as ClipboardEvent
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { getData: () => '1. e4 e5 2. Nf3 *' },
+    })
+    act(() => {
+      document.body.dispatchEvent(paste)
+    })
+    await waitFor(() =>
+      expect(boardCalls).toEqual([{ path: '/api/live/load', body: { pgn: '1. e4 e5 2. Nf3 *' } }]),
+    )
+  })
+
+  it('keeps the board in the tab on a read-only deployment', async () => {
+    stubFetch({})
+    renderPage(<LivePage />, { ...SERVER_CAPABILITIES, read_only: true })
+    expect(await screen.findByText('Starting position')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Load…' }))
+    await userEvent.type(screen.getByLabelText('FEN or PGN'), '1. e4 e5 2. Nf3 Nc6 *')
+    await userEvent.click(screen.getByRole('button', { name: 'Load' }))
+
+    expect(await screen.findByText('Pasted game · ply 4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Nc6' })).toHaveAttribute('aria-current', 'step')
+    await userEvent.click(screen.getByRole('button', { name: 'e5' }))
+    expect(await screen.findByText('Pasted game · ply 2')).toBeInTheDocument()
+    // Nothing went to the server: not the reads, and not the writes it would refuse.
+    expect(boardCalls).toHaveLength(0)
+    const fetched = vi.mocked(fetch).mock.calls.map(([input]) => String(input))
+    expect(fetched.some((path) => path.startsWith('/api/live'))).toBe(false)
+  })
 })
