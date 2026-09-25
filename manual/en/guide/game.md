@@ -162,12 +162,24 @@ new line. Notes come back in every game that reaches that position — see [Note
 
 Not every thought is about a square. "Played this on no sleep", "the plan was wrong from
 the opening" — that is about the game, and written on move one it would come back under
-every game that opened the same way. The **Position / Game** switch beside the tags decides
-which the note is; `⇧N` opens the box already switched to **Game**. A game note names no
-position, so it stays with this game and reads first in its notes list, under the label
-*game*. What you have typed travels with the
-switch, so a note begun under the wrong heading is moved rather than retyped. Stepping the
-board switches back to **Position**.
+every game that opened the same way. So the first row of the **Notes** tab is always this
+game's own: its note about the whole game, under the label *game*, or — while it has none —
+an empty row asking what the game was about. Click it (or press `⇧N`) and the note box is
+about the game; it says **about the game** above the tags. A game note names no position,
+so it stays with this game. Whatever you had already typed moves with it rather than being
+lost. Stepping the board, clicking a move's note or pressing `N` points the box back at the
+position.
+
+A note that came in from another game, because that game reached the same position, says
+so under its text: **from** that game (**from the model game** for one that isn't yours),
+and the move it was written on when that game got there by another move order. That line
+is a link: it opens the other game at that move. A note written on the position alone says
+where instead — **from the explorer**, **from the live board** or **via MCP** — and links
+to that position in the explorer.
+
+Either way you can come straight back. The explorer offers **← Back to game**; another game
+offers a button in the row under its board named after the game you left — **← phib —
+Hubert2001** — and both return to exactly the position you were on.
 
 The **Book** tab beside **Notes** shows how your own games went on from here; `B` opens it.
 It is headed with the name of the opening the game is in, and a move that enters a named

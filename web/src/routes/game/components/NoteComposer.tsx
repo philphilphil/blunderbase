@@ -21,12 +21,6 @@ export interface NoteComposerProps {
   onSave: (text: string, tags: string[], id: number | null) => void
   onDelete?: (id: number) => void
   onClose: () => void
-  /**
-   * Switch what a new note is about: the position on the board, or the game entire.
-   * Absent, the box has no switch and writes where `target` says — the correspondence
-   * screen keeps the two kinds on tabs of its own and never needs it.
-   */
-  onScope?: (scope: 'position' | 'game') => void
   className?: string
 }
 
@@ -62,14 +56,13 @@ function sameTags(left: readonly string[], right: readonly string[]): boolean {
  * chosen — "2…d5", "1…c6 (variation)" — and off the game's own line that sentence carries the
  * consequence too, because a note on a variation pins the variation.
  *
- * The one choice it does offer is **Position / Game** (owner's ask, 2026-09-22): a thought
- * about the game as a whole — "played this on two hours' sleep", "the plan was wrong from the
- * opening" — used to be written on whatever square the board happened to show, usually move
- * one, and then came back under every other game that opened the same way. A note about the
- * game entire names no position, so it stays with this game. It is a switch on the box and
- * not a second box because the two are written in the same moment and the same breath, and
- * because a draft typed under the wrong heading should move heading, not be retyped: text
- * follows the switch the way it follows the board.
+ * A note about the game entire — "played this on two hours' sleep" — is the same box pointed
+ * at a `game` target, which names no position and so stays with this game. The box does not
+ * choose that itself: the Notes tab's *game* row and `⇧N` do. A Position / Game switch on
+ * the box was tried first (2026-09-22) and cut the next day (owner's call): it asked "what is this
+ * about?" of somebody already writing about the move in front of them, and flipping it
+ * mid-note was a surprise rather than a decision. So the box only says so when it is on the
+ * game, in its caption, since that is the one thing the board under it cannot show.
  *
  * The board moves under it while it is open, and the note under the board moves with it: a
  * position this game has already been noted on fills the box in and the save rewrites that
@@ -106,7 +99,6 @@ export function NoteComposer({
   onSave,
   onDelete,
   onClose,
-  onScope,
   className,
 }: NoteComposerProps) {
   const { t } = useLingui()
@@ -299,47 +291,14 @@ export function NoteComposer({
           </div>
         ) : null}
 
-        {onScope ? (
-          <div
-            role="radiogroup"
-            aria-label={t`What the note is about`}
-            data-testid="note-scope"
-            // Two words in one bordered pill, the pressed one filled: the same shape as the
-            // tab strips above, at the size of the tag chips beside it. `onMouseDown` is
-            // stopped from taking focus so the click does not blur-save a half-typed note
-            // *before* the switch moves it — the text should travel, not be written where
-            // it was.
-            className="flex shrink-0 overflow-hidden rounded-sm border border-edge font-mono text-[0.6875rem]"
-          >
-            {(
-              [
-                ['position', t`Position`, t`About the position on the board (N)`],
-                ['game', t`Game`, t`About the game entire, not one move (⇧N)`],
-              ] as const
-            ).map(([scope, word, hint]) => {
-              const on = (target.kind === 'game') === (scope === 'game')
-              return (
-                <button
-                  key={scope}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  title={hint}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => onScope(scope)}
-                  className={cn(
-                    'px-1.5 py-0.5',
-                    on ? 'bg-selected text-ink' : 'text-faint hover:text-soft',
-                  )}
-                >
-                  {word}
-                </button>
-              )
-            })}
-          </div>
-        ) : null}
-
         <h2 className="shrink-0 font-mono text-[0.6875rem] text-dim">
+          {/* The one place the box names what it is about: on the game entire the board
+              above it says nothing about that, and a filled-in box hides the placeholder. */}
+          {target.kind === 'game' ? (
+            <span className="text-soft">
+              <Trans>about the game</Trans>
+            </span>
+          ) : null}
           {/* No "Note on 8.Bc4": the box sits under the board, so the position it is about
               is the one on screen. Only what is not obvious is said. */}
           {/* Only a new note pins anything: a rewrite of one already on this line is a

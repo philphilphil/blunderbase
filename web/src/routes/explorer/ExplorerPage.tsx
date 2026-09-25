@@ -49,6 +49,7 @@ import { useExplorer, usePositionOccurrences, useReferenceExplorer } from '@/lib
 import { SPEEDS } from '@/lib/api/types'
 import type { Color, ExplorerMove } from '@/lib/api/types'
 import { isTyping } from '@/lib/ui/shortcuts'
+import { WAY_BACK } from '@/lib/ui/wayBack'
 import { cn } from '@/lib/utils'
 
 import { GamesInLine } from './components/GamesInLine'
@@ -428,7 +429,7 @@ export function ExplorerPage() {
             {backToGame ? (
               <Link
                 to={backToGame}
-                className="rounded-md border border-brilliant/30 bg-brilliant/10 px-2.5 py-1 text-xs text-brilliant transition-colors hover:border-brilliant/50"
+                className={cn(WAY_BACK, 'px-2.5 py-1 text-xs')}
               >
                 <Trans>← Back to game</Trans>
               </Link>

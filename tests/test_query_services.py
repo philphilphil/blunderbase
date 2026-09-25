@@ -2817,6 +2817,8 @@ def test_a_note_from_another_game_says_which_game_and_which_move(session: Sessio
     )
     assert loose["scope"] == "position"
     assert "game_id" not in loose and "game" not in loose
+    # …and carries the position, which is where the panel links it back to.
+    assert loose["fen"].split()[:4] == AFTER_E4_E5.split()[:4]
 
 
 def test_the_game_notes_a_line_note_shows_up_in(library: Library) -> None:

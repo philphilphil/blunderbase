@@ -7,8 +7,9 @@ und sie erscheint in jeder deiner Partien, die diese Stellung erreicht, egal in 
 Zugfolge. Eine Notiz kann Schlagwörter tragen. Auch eine Notiz, die du in einer Musterpartie
 oder einer Referenzvariante schreibst, gehört dir und bleibt erhalten.
 
-Oder an einer ganzen Partie, ohne Stellung: über den Schalter **Stellung / Partie** im
-Notizfeld des Partie-Bildschirms (`⇧N`) oder über **Diese Partie** in einer Fernschachpartie.
+Oder an einer ganzen Partie, ohne Stellung: über die Zeile *Partie* ganz oben im Reiter
+**Notizen** des Partie-Bildschirms (`⇧N`) oder über **Diese Partie** in einer
+Fernschachpartie.
 Solche Notizen erscheinen nur bei dieser einen Partie – siehe
 [Eine Partie analysieren](game.md#write-a-note).
 

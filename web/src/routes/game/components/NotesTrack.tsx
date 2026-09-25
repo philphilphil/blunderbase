@@ -33,6 +33,7 @@
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { ArrowUpRight } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 import { cn } from '@/lib/utils'
 
@@ -70,6 +71,19 @@ export interface NotesTrackProps {
   activeNoteId?: number | null
   /** Clicking a row seeks the board to where that note hangs. */
   onSelectNote: (row: NoteRow) => void
+  /**
+   * Point the composer at the game entire — what the *game* row does while this game has
+   * no note of its own yet. Absent (a game nobody can write on), there is no such row.
+   */
+  onWriteGameNote?: () => void
+  /** Whether the composer is on the game entire, which is when the *game* row lights up. */
+  gameNoteActive?: boolean
+  /**
+   * Router state for the links to where a note was written — the position the board is on,
+   * so the game or explorer they open offers the way back to exactly here, and who played
+   * this game, which another game names that way back with.
+   */
+  originState?: { from: string; label?: string }
 
   /** The `<NoteComposer/>` for the position on the board. Rendered, never wrapped in a tab. */
   composer: ReactNode
@@ -101,6 +115,9 @@ export function NotesTrack({
   notes,
   activeNoteId = null,
   onSelectNote,
+  onWriteGameNote,
+  gameNoteActive = false,
+  originState,
   composer,
   tab,
   onTabChange,
@@ -217,7 +234,14 @@ export function NotesTrack({
             />
           </>
         ) : (
-          <NoteList notes={notes} activeNoteId={activeNoteId} onSelect={onSelectNote} />
+          <NoteList
+            notes={notes}
+            activeNoteId={activeNoteId}
+            onSelect={onSelectNote}
+            onWriteGameNote={onWriteGameNote}
+            gameNoteActive={gameNoteActive}
+            originState={originState}
+          />
         )}
       </div>
 
@@ -256,27 +280,50 @@ export function NotesTrack({
  * game the reader is working through reads as being about the moves in front of them, and
  * for a note written on somebody else's game that is false. So those rows say where they
  * came from, on a line of their own under the words: the game and the move it was written
- * on, or just "not from this game" where there is no game to name — a note written against
- * a bare position, in the explorer or by the coach.
+ * on, or, where there is no game to name, what wrote it on the bare position — the explorer,
+ * the live board or MCP (`Origin`).
  * They are also the rows the composer will not rewrite (`notesModel.ownNote`), so the mark
  * doubles as the reason the pencil does nothing for them.
  *
- * An empty game gets one quiet line and not a dashed box: there is a composer directly
- * below saying how to fix it, and a box around "no notes yet" is furniture for a state that
- * every game starts in.
+ * That line is a link to where the note was written (owner's ask, 2026-09-24): the game at
+ * the move, or the explorer at the position — "from phib vs maia" is exactly the moment
+ * somebody wants to go and look. It sits beside the row's button, never inside it, because
+ * clicking the row still means "take this board there" and the two must not be one click.
+ *
+ * **The first row is always the game's own**, when the game can be written on: its note on
+ * the game entire, or a quiet stub offering one. That stub is how a note about the whole
+ * game gets written — clicking it points the composer at the game — and it replaced a
+ * Position / Game switch on the composer that asked the question in the wrong place (see
+ * `NoteComposer`). A game that has a note about itself shows that note instead, and a game
+ * with several (from MCP, or the correspondence journal) shows them all and no stub.
+ *
+ * With nothing to show and no stub, the tab gets one quiet line and not a dashed box: a box
+ * around "no notes yet" is furniture for a state that every game starts in.
  */
 function NoteList({
   notes,
   activeNoteId,
   onSelect,
+  onWriteGameNote,
+  gameNoteActive,
+  originState,
 }: {
   notes: readonly NoteRow[]
   activeNoteId: number | null
   onSelect: (row: NoteRow) => void
+  onWriteGameNote?: () => void
+  gameNoteActive: boolean
+  originState?: { from: string; label?: string }
 }) {
   const { t } = useLingui()
+  const gameLabel = t({
+    message: 'game',
+    comment: 'Label on a note that hangs on the whole game rather than one move',
+  })
+  const stub =
+    onWriteGameNote && !notes.some((row) => row.anchor.kind === 'loose' && !row.elsewhere)
 
-  if (notes.length === 0) {
+  if (notes.length === 0 && !stub) {
     return (
       <p className="px-3 py-4 text-[0.71875rem] text-faint">
         <Trans>No notes in this game yet.</Trans>
@@ -286,78 +333,135 @@ function NoteList({
 
   return (
     <div data-testid="game-notes" className="flex flex-col px-1.5 pt-1 pb-2">
+      {stub ? (
+        <button
+          type="button"
+          data-testid="game-note-stub"
+          onClick={onWriteGameNote}
+          className={cn(ROW, 'py-1.5', gameNoteActive ? 'bg-row-active' : 'hover:bg-elevated')}
+        >
+          <span className={cn(LABEL, 'text-dim')} title={t`On the game`}>
+            {gameLabel}
+          </span>
+          <span className="min-w-0 flex-1 text-xs leading-[1.45] text-faint">
+            <Trans>What was this game about? Click to write.</Trans>
+          </span>
+        </button>
+      ) : null}
       {notes.map((row) => {
-        // Named, because it is the placeholder a translator sees in "from …".
-        const origin = row.from
+        // Named, because they are the placeholders a translator sees in "Open … at …".
+        const from = row.from
+        const move = row.originMove
         return (
-          <button
+          <div
             key={row.note.id}
-            type="button"
-            onClick={() => onSelect(row)}
             className={cn(
-              'flex items-baseline gap-2.5 rounded-[0.3125rem] px-1.5 py-1.5 text-left transition-colors',
+              'flex flex-col rounded-[0.3125rem] transition-colors',
               row.note.id === activeNoteId ? 'bg-row-active' : 'hover:bg-elevated',
             )}
           >
-            <span
-              // A note on a pinned variation and a note on the game both label themselves
-              // with a move, and `1…c6` on a detour is not the `1…c6` of the game. The old
-              // panel said which by printing the word "variation" beside it; this row is a
-              // quarter of that width, so it says it in the colour instead — the same
-              // brilliant the variation's own moves are drawn in — and spells it out in the
-              // title for anyone the colour does not reach. A note from somewhere else gets
-              // the quietest of the three: the label is still where *this* game reaches the
-              // position, which is where clicking the row goes.
-              className={cn(
-                'w-14 flex-none font-mono text-[0.6875rem] tabular',
-                row.elsewhere ? 'text-faint' : row.onLine ? 'text-brilliant' : 'text-dim',
-              )}
-              title={
-                row.elsewhere
-                  ? t`Written elsewhere, about a position this game reached`
-                  : row.onLine
-                    ? t`On a pinned variation`
-                    : t`On the game`
-              }
+            <button
+              type="button"
+              onClick={() => onSelect(row)}
+              className={cn(ROW, row.elsewhere ? 'pt-1.5 pb-0.5' : 'py-1.5')}
             >
-              {/* A note that names no position is about the game entire; it still needs a
-                  label, and "game" is what it is. */}
-              {row.context ??
-                t({
-                  message: 'game',
-                  comment: 'Label on a note that hangs on the whole game rather than one move',
-                })}
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span
+                // A note on a pinned variation and a note on the game both label themselves
+                // with a move, and `1…c6` on a detour is not the `1…c6` of the game. The old
+                // panel said which by printing the word "variation" beside it; this row is a
+                // quarter of that width, so it says it in the colour instead — the same
+                // brilliant the variation's own moves are drawn in — and spells it out in the
+                // title for anyone the colour does not reach. A note from somewhere else gets
+                // the quietest of the three: the label is still where *this* game reaches the
+                // position, which is where clicking the row goes.
+                className={cn(
+                  LABEL,
+                  row.elsewhere ? 'text-faint' : row.onLine ? 'text-brilliant' : 'text-dim',
+                )}
+                title={
+                  row.elsewhere
+                    ? t`Written elsewhere, about a position this game reached`
+                    : row.onLine
+                      ? t`On a pinned variation`
+                      : t`On the game`
+                }
+              >
+                {/* A note that names no position is about the game entire; it still needs a
+                    label, and "game" is what it is. */}
+                {row.context ?? gameLabel}
+              </span>
               <span
                 className={cn(
-                  'line-clamp-2 text-xs leading-[1.45]',
+                  'line-clamp-2 min-w-0 flex-1 text-xs leading-[1.45]',
                   row.elsewhere ? 'text-dim' : 'text-soft-2',
                 )}
               >
                 {row.note.text}
               </span>
-              {row.elsewhere ? (
-                <span className="truncate text-[0.625rem] text-faint">
-                  {origin ? (
-                    <>
-                      <Trans>from {origin}</Trans>
-                      {row.originMove ? (
-                        <span className="font-mono"> · {row.originMove}</span>
-                      ) : null}
-                    </>
-                  ) : (
-                    // No game to name: a note written against a bare position, in the
-                    // explorer or by the coach over MCP. Which of those it was is not
-                    // something this row can know, so it says only what is certain.
-                    <Trans>not from this game</Trans>
-                  )}
-                </span>
-              ) : null}
-            </span>
-          </button>
+            </button>
+            {row.elsewhere ? (
+              // Indented to the text column: the row's padding, the label's width, the gap.
+              <span className="flex min-w-0 pr-1.5 pb-1.5 pl-[4.5rem] text-[0.625rem] text-faint">
+                {row.originHref ? (
+                  <Link
+                    to={row.originHref}
+                    state={originState}
+                    title={
+                      from
+                        ? move
+                          ? t`Open ${from} at ${move}`
+                          : t`Open ${from}`
+                        : t`Open this position in the explorer`
+                    }
+                    className="flex min-w-0 items-center gap-1 transition-colors hover:text-accent-teal"
+                  >
+                    <span className="truncate">
+                      <Origin row={row} />
+                    </span>
+                    <ArrowUpRight className="size-2.5 flex-none" aria-hidden />
+                  </Link>
+                ) : (
+                  <span className="truncate">
+                    <Origin row={row} />
+                  </span>
+                )}
+              </span>
+            ) : null}
+          </div>
         )
       })}
     </div>
   )
 }
+
+/**
+ * Where a note from elsewhere was written, in a few words: the game and its move, or — for
+ * a note that names no game — the surface that wrote it on the bare position. The note's
+ * `source` tells those apart: a web note with no game can only have come from the explorer,
+ * since every other screen that writes one writes it on a game.
+ */
+function Origin({ row }: { row: NoteRow }) {
+  // Named, because it is the placeholder a translator sees in "from …".
+  const origin = row.from
+  if (origin) {
+    return (
+      <>
+        {/* A model game is somebody else's game, as the explorer's notes say too. */}
+        {row.note.game?.is_owner_game === false ? (
+          <Trans>from the model game {origin}</Trans>
+        ) : (
+          <Trans>from {origin}</Trans>
+        )}
+        {row.originMove ? <span className="font-mono"> · {row.originMove}</span> : null}
+      </>
+    )
+  }
+  if (row.source === 'mcp') return <Trans>via MCP</Trans>
+  if (row.source === 'live') return <Trans>from the live board</Trans>
+  return <Trans>from the explorer</Trans>
+}
+
+/** A Notes-tab row's button: the label column, then the words. */
+const ROW = 'flex w-full items-baseline gap-2.5 rounded-[0.3125rem] px-1.5 text-left'
+/** The label column — `6.Bc4`, `game` — whose width the origin line indents past. */
+const LABEL = 'w-14 flex-none font-mono text-[0.6875rem] tabular'

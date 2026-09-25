@@ -21,7 +21,7 @@ export interface BoardKeyHandlers {
   /** The live search on the position the board is showing. */
   toggleEngine?: () => void
   note?: () => void
-  /** The note box switched to the game entire (⇧N). */
+  /** The note box pointed at the game entire (⇧N). */
   gameNote?: () => void
   /** Leave the analysis line. No-op — and so not handled — when there is none. */
   exitLine?: () => void

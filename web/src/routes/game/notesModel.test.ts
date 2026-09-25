@@ -130,6 +130,34 @@ describe('noteRows', () => {
     expect(rows.map((row) => row.note.id)).toEqual([2, 1])
   })
 
+  it('names the other game’s move only where it is not the one this game played', () => {
+    const there = (id: number, ply: number, san: string, label: string) =>
+      note({
+        id,
+        ply: 2,
+        game_id: 99,
+        scope: 'position',
+        move: { ply, move_number: Math.ceil(ply / 2), color: 'black', san, label },
+      })
+    const rows = noteRows(
+      [there(1, 2, 'd5', '1... d5'), there(2, 4, 'd5', '2... d5'), there(3, 2, 'e5', '1... e5')],
+      [],
+      MOVES,
+    )
+    const byId = new Map(rows.map((row) => [row.note.id, row.originMove]))
+    // Same half-move, same move: the row's `1…d5` label already says it.
+    expect(byId.get(1)).toBeNull()
+    // Reached a move later there — a transposition, and worth saying.
+    expect(byId.get(2)).toBe('2... d5')
+    // Same half-move, another move to the same board.
+    expect(byId.get(3)).toBe('1... e5')
+    // The link lands on the move it was written on *there*, not on where this game reached
+    // the board: `ply` on these rows is this game's, and on a transposition the two differ.
+    const links = new Map(rows.map((row) => [row.note.id, row.originHref]))
+    expect(links.get(1)).toBe('/games/99?ply=2')
+    expect(links.get(2)).toBe('/games/99?ply=4')
+  })
+
   it('puts the newer of two notes on the same position first', () => {
     const rows = noteRows(
       [

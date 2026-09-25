@@ -2516,14 +2516,12 @@ msgid "move {0}, Black to play"
 msgstr "Zug {0}, Schwarz am Zug"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
-#: src/routes/game/components/NoteComposer.tsx
 #: src/routes/notes/filters.ts
 msgid "Game"
 msgstr "Partie"
 
 #: src/routes/correspondence/CorrespondencePage.tsx
 #: src/routes/engines/EngineDetail.tsx
-#: src/routes/game/components/NoteComposer.tsx
 msgid "Position"
 msgstr "Stellung"
 
@@ -5028,11 +5026,13 @@ msgid "Nothing written about this position yet. What is worth remembering here?"
 msgstr "Zu dieser Stellung ist noch nichts geschrieben. Was lohnt sich hier zu merken?"
 
 #: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/game/components/NotesTrack.tsx
 #: src/routes/notes/components/NoteItem.tsx
 msgid "Open {from} at {move}"
 msgstr "{from} bei {move} öffnen"
 
 #: src/routes/explorer/components/PositionNotes.tsx
+#: src/routes/game/components/NotesTrack.tsx
 #: src/routes/notes/components/NoteItem.tsx
 msgid "Open {from}"
 msgstr "{from} öffnen"
@@ -5143,6 +5143,19 @@ msgstr "Diese Stellung gegen den Computer ausspielen (P)"
 #: src/routes/game/GamePage.tsx
 msgid "Practise"
 msgstr "Üben"
+
+#: src/routes/game/GamePage.tsx
+msgid "Back to {backToGameLabel}, where you left it"
+msgstr "Zurück zu {backToGameLabel}, an die Stelle, wo du warst"
+
+#: src/routes/game/GamePage.tsx
+msgid "Back to the game you came from, where you left it"
+msgstr "Zurück zur Partie, aus der du kamst, an die Stelle, wo du warst"
+
+#: src/routes/game/GamePage.tsx
+#: src/routes/game/components/GameHeaderBar.tsx
+msgid "Previous game"
+msgstr "Vorherige Partie"
 
 #: src/routes/game/GamePage.tsx
 msgid "Notes hang off a game in your library. Add this one and it can be annotated like any other — counted in no statistic, since you did not play it."
@@ -5327,10 +5340,6 @@ msgstr "ACPL"
 #: src/routes/game/components/MoveList.tsx
 msgid "Nothing flagged in this game."
 msgstr "In dieser Partie ist nichts markiert."
-
-#: src/routes/game/components/GameHeaderBar.tsx
-msgid "Previous game"
-msgstr "Vorherige Partie"
 
 #: src/routes/game/components/GameHeaderBar.tsx
 msgid "Next game"
@@ -5601,16 +5610,8 @@ msgid "What is worth remembering about this game?"
 msgstr "Was lohnt sich an dieser Partie zu merken?"
 
 #: src/routes/game/components/NoteComposer.tsx
-msgid "What the note is about"
-msgstr "Worauf sich die Notiz bezieht"
-
-#: src/routes/game/components/NoteComposer.tsx
-msgid "About the position on the board (N)"
-msgstr "Zur Stellung auf dem Brett (N)"
-
-#: src/routes/game/components/NoteComposer.tsx
-msgid "About the game entire, not one move (⇧N)"
-msgstr "Zur ganzen Partie, nicht zu einem Zug (⇧N)"
+msgid "about the game"
+msgstr "zur Partie"
 
 #: src/routes/game/components/NoteComposer.tsx
 msgid "pins the line"
@@ -5647,9 +5648,23 @@ msgstr "{noteCount, plural, one {# Notiz} other {# Notizen}}"
 msgid "Open this position in the explorer"
 msgstr "Diese Stellung im Explorer öffnen"
 
+#. Label on a note that hangs on the whole game rather than one move
+#: src/routes/game/components/NotesTrack.tsx
+#: src/routes/notes/presentation.ts
+msgid "game"
+msgstr "Partie"
+
 #: src/routes/game/components/NotesTrack.tsx
 msgid "No notes in this game yet."
 msgstr "Noch keine Notizen in dieser Partie."
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "On the game"
+msgstr "An der Partie"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "What was this game about? Click to write."
+msgstr "Worum ging es in dieser Partie? Klicken zum Schreiben."
 
 #: src/routes/game/components/NotesTrack.tsx
 msgid "Written elsewhere, about a position this game reached"
@@ -5660,22 +5675,26 @@ msgid "On a pinned variation"
 msgstr "An einer angehefteten Variante"
 
 #: src/routes/game/components/NotesTrack.tsx
-msgid "On the game"
-msgstr "An der Partie"
-
-#. Label on a note that hangs on the whole game rather than one move
-#: src/routes/game/components/NotesTrack.tsx
-#: src/routes/notes/presentation.ts
-msgid "game"
-msgstr "Partie"
+msgid "from the model game {origin}"
+msgstr "aus der Musterpartie {origin}"
 
 #: src/routes/game/components/NotesTrack.tsx
 msgid "from {origin}"
 msgstr "aus {origin}"
 
 #: src/routes/game/components/NotesTrack.tsx
-msgid "not from this game"
-msgstr "nicht aus dieser Partie"
+#: src/routes/live/CoachComment.tsx
+#: src/routes/notes/components/NoteItem.tsx
+msgid "via MCP"
+msgstr "über MCP"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "from the live board"
+msgstr "vom Live-Brett"
+
+#: src/routes/game/components/NotesTrack.tsx
+msgid "from the explorer"
+msgstr "aus dem Explorer"
 
 #: src/routes/game/components/PracticeBar.tsx
 msgid "Practice · you play White against {opponent}"
@@ -6799,11 +6818,6 @@ msgstr "{secs} s"
 #: src/routes/live/CoachComment.tsx
 msgid "Coach"
 msgstr "Trainer"
-
-#: src/routes/live/CoachComment.tsx
-#: src/routes/notes/components/NoteItem.tsx
-msgid "via MCP"
-msgstr "über MCP"
 
 #: src/routes/live/CoachComment.tsx
 msgid "Nothing said yet. Whatever your assistant writes with <0>annotate</0> appears here as it types it."

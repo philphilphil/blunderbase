@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Swords } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { AnalyseDialog } from '@/components/analysis/AnalyseDialog'
 import { BOARD_SETTINGS_ID } from '@/components/board/BoardSettings'
@@ -33,6 +33,7 @@ import { whiteWinPercent } from '@/lib/chess/evaluation'
 import { useNotation } from '@/lib/chess/notationPrefs'
 import { useEngineHidden } from '@/lib/ui/engineVisibility'
 import { useIsMobile } from '@/lib/ui/media'
+import { WAY_BACK } from '@/lib/ui/wayBack'
 import { cn } from '@/lib/utils'
 import { advanceTrail, useGameTrail } from '@/routes/games/gameTrail'
 import { tokenTrouble } from '@/routes/explorer/reference'
@@ -427,11 +428,12 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const [preferredNote, setPreferredNote] = useState<number | null>(null)
 
   /**
-   * Where the composer was switched to **Game** — the key of the position it was standing on
-   * (`targetKey`), or null while it writes about the board. Kept against a position rather
-   * than as a flag so that moving the board switches it back by itself: "about the game" is
-   * a decision made for one note, and a reader who stepped on and started typing again is
-   * writing about the square in front of them. See `NoteComposer`.
+   * Where the composer was pointed at the game entire — by the Notes tab's *game* row or
+   * `⇧N` — as the key of the position it was standing on (`targetKey`), or null while it
+   * writes about the board. Kept against a position rather than as a flag so that moving the
+   * board switches it back by itself: "about the game" is a decision made for one note, and a
+   * reader who stepped on and started typing again is writing about the square in front of
+   * them. See `NoteComposer`.
    */
   const [gameScopeAt, setGameScopeAt] = useState<string | null>(null)
 
@@ -937,7 +939,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const walkedRow = useMemo(() => rows.find((row) => row.cursor !== null) ?? null, [rows])
 
   /**
-   * The Book tab's arrow: this exact position, opened in `/explorer`.
+   * The way back to this exact position, for whichever screen the reader leaves for — and
+   * below it the Book tab's arrow, which opens that position in `/explorer`.
    *
    * `?fen=` roots the explorer's tree at a position whose move order it was never told,
    * which is precisely this case — the board may be three plies into a line nobody played.
@@ -956,9 +959,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * A line nobody has pinned cannot be named in a URL at all, so it returns to the game
    * position the line hangs off — the position it would step back onto anyway.
    */
-  const openInExplorer = useCallback(() => {
-    const fen = boardPosition?.fen
-    if (!fen) return
+  const here = useMemo(() => {
     const back = new URLSearchParams()
     if (walkedRow?.lineId != null) {
       back.set('line', String(walkedRow.lineId))
@@ -966,19 +967,26 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
     } else {
       back.set('ply', String(exploring && analysis ? analysis.base : boardIndex))
     }
-    navigate(`/explorer?fen=${encodeURIComponent(fen)}`, {
-      state: { from: `${location.pathname}?${back.toString()}` },
-    })
-  }, [
-    analysis,
-    analysisPly,
-    boardIndex,
-    boardPosition,
-    exploring,
-    location.pathname,
-    navigate,
-    walkedRow,
-  ])
+    return `${location.pathname}?${back.toString()}`
+  }, [analysis, analysisPly, boardIndex, exploring, location.pathname, walkedRow])
+  /**
+   * What every way out of this game carries in router state — the explorer arrow here, and
+   * the Notes tab's links to where a note was written — so the screen it lands on can offer
+   * "← Back to game" to exactly this position. `label` is who played it, which another game
+   * uses as its button: "Back to game" there already means leaving a variation.
+   */
+  const leaving = useMemo(
+    () => ({
+      from: here,
+      label: detail ? `${detail.game.white ?? '?'} — ${detail.game.black ?? '?'}` : undefined,
+    }),
+    [detail, here],
+  )
+  const openInExplorer = useCallback(() => {
+    const fen = boardPosition?.fen
+    if (!fen) return
+    navigate(`/explorer?fen=${encodeURIComponent(fen)}`, { state: leaving })
+  }, [boardPosition, leaving, navigate])
 
   // --- pinned lines and notes -----------------------------------------------
 
@@ -1040,7 +1048,8 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   /**
    * What a new note would hang on: the position on the board, and off the game's own line
    * the whole walk as a variation to pin. Derived rather than chosen — see `./notesModel` —
-   * with the one exception of the composer's **Game** switch, which makes it the game entire.
+   * with the one exception of the Notes tab's *game* row (and `⇧N`), which makes it the
+   * game entire.
    */
   const positionTarget = useMemo(
     () =>
@@ -1083,6 +1092,20 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       setGameScopeAt(scope === 'game' ? targetKey(positionTarget) : null),
     [positionTarget],
   )
+  /**
+   * Open the composer on the board (`N`) or on the game entire (`⇧N`, the *game* row). The
+   * scope is set before the focus so the caret lands in a box already captioned for what it
+   * is about — and `N` sets it too, because with no switch on the box, `N` is how somebody
+   * who pointed it at the game gets back to the position without stepping the board.
+   */
+  const writePositionNote = useCallback(() => {
+    setNoteScope('position')
+    focusComposer()
+  }, [focusComposer, setNoteScope])
+  const writeGameNote = useCallback(() => {
+    setNoteScope('game')
+    focusComposer()
+  }, [focusComposer, setNoteScope])
 
   /**
    * The note already hanging where the composer is pointed, which it rewrites rather than
@@ -1159,6 +1182,13 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
   const cameFrom = (location.state as { from?: unknown } | null)?.from
   const backToExplorer =
     typeof cameFrom === 'string' && cameFrom.startsWith('/explorer') ? cameFrom : null
+  // The same for a game reached from another game — the Notes tab's link to where a note
+  // was written. The address is the position the reader left (`here` over there), so the
+  // way back lands on it rather than on that game's first move.
+  const backToGame =
+    typeof cameFrom === 'string' && cameFrom.startsWith('/games/') ? cameFrom : null
+  const cameFromLabel = (location.state as { label?: unknown } | null)?.label
+  const backToGameLabel = typeof cameFromLabel === 'string' ? cameFromLabel : null
   // What this game rarely needs, for the control row's ⋯ — the way back to the explorer, the
   // tree behind a correspondence game — and the dialog one of them opens.
   const studioMenu = useStudioMenu(from, backToExplorer)
@@ -1200,7 +1230,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
    * A note in the Notes tab is a bookmark: jump to its ply, or into the line it pinned —
    * and open it, which is what picking a note out of a list means. A note that came in on a
    * position this game merely reached belongs to another game and is only a jump. A note on
-   * the game entire has nowhere to jump; it switches the composer to **Game** and opens there.
+   * the game entire has nowhere to jump; it points the composer at the game and opens there.
    */
   const selectNote = useCallback(
     (row: NoteRow) => {
@@ -1715,15 +1745,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           ? () => setLiveSearch(!stream.enabled)
           : undefined,
       // A note hangs off a game row, so a model game nobody has added has none to write.
-      note: readOnly ? undefined : focusComposer,
-      // ⇧N: the same box, switched to the game entire. The switch is set before the focus so
-      // the caret lands in a box already captioned for what it is about.
-      gameNote: readOnly
-        ? undefined
-        : () => {
-            setNoteScope('game')
-            focusComposer()
-          },
+      note: readOnly ? undefined : writePositionNote,
+      // ⇧N: the same box, pointed at the game entire — what the Notes tab's *game* row does.
+      gameNote: readOnly ? undefined : writeGameNote,
       // Only while there is a line to leave: off one, Escape is the browser's again — and,
       // more to the point, whatever is open on top of the page keeps it.
       // Practising, Escape ends the game and leaves its moves on the board as a line; a
@@ -2006,6 +2030,28 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
             />
           ) : null}
           <StudioActions game={from} backTo={backToExplorer} />
+          {/* A button rather than a line in ⋯ like the way back to the explorer: a detour
+              to where a note was written is taken to look and come straight back, and
+              the explorer's "← Back to game" is a button in its row for the same reason.
+              It names the game rather than saying "Back to game", which in this row is
+              already the way out of a variation into this game's own line. */}
+          {backToGame ? (
+            <Link
+              to={backToGame}
+              title={
+                backToGameLabel
+                  ? t`Back to ${backToGameLabel}, where you left it`
+                  : t`Back to the game you came from, where you left it`
+              }
+              // The explorer's way back wears the same colour (`WAY_BACK`).
+              className={cn(
+                WAY_BACK,
+                'min-w-0 max-w-[16rem] truncate px-2.5 py-[0.3125rem] text-xs max-md:py-1.5',
+              )}
+            >
+              ← {backToGameLabel ?? t`Previous game`}
+            </Link>
+          ) : null}
         </>
       }
     />
@@ -2086,7 +2132,6 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       onSave={writeNote}
       onDelete={forgetNote}
       onClose={blurComposer}
-      onScope={setNoteScope}
       // No height of its own on either layout: it is handed one by the slot at the foot of
       // `NotesTrack`, which is what guarantees the box cannot move when the tab above it
       // changes — see that component's `COMPOSER_SLOT`.
@@ -2117,6 +2162,9 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
       notes={noteList}
       activeNoteId={editedNote?.id ?? null}
       onSelectNote={selectNote}
+      onWriteGameNote={readOnly ? undefined : writeGameNote}
+      originState={leaving}
+      gameNoteActive={target.kind === 'game'}
       composer={readOnly ? referenceComposer : composer}
       tab={notesTab}
       onTabChange={setNotesTab}

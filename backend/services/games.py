@@ -1169,7 +1169,7 @@ def game_notes(session: Session, game_id: int) -> list[dict[str, Any]]:
         )
         # The game each of these was written on is read for every row, so it is joined in
         # rather than lazy-loaded one note at a time.
-        .options(joinedload(Note.game), joinedload(Note.line))
+        .options(joinedload(Note.game), joinedload(Note.line), joinedload(Note.position))
         .group_by(Note.id)
     )
     for note, reached in session.execute(attached):
@@ -1178,6 +1178,9 @@ def game_notes(session: Session, game_id: int) -> list[dict[str, Any]]:
         # this one arrived. Same-game notes carry their own ply, from the loop above.
         row = _note_row(note, scope="position", ply=reached)
         row["game_id"] = note.game_id
+        # A note with no game was written on the position itself (the explorer, the live
+        # board, an assistant over MCP), and the position is where the panel links it back to.
+        row["fen"] = note.position.fen if note.position is not None else None
         if note.game is not None:
             row["game"] = notes_service.game_brief(note.game)
             row["move"] = notes_service.note_move(note)

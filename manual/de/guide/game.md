@@ -175,13 +175,27 @@ ist eine neue Zeile. Notizen erscheinen in jeder Partie, die diese Stellung erre
 
 Nicht jeder Gedanke gehört zu einem Feld. „Unausgeschlafen gespielt“, „der Plan war von der
 Eröffnung an falsch“ – das ist über die Partie, und im ersten Zug geschrieben käme es in
-jeder Partie wieder, die genauso begonnen hat. Der Schalter **Stellung / Partie** neben den
-Schlagwörtern entscheidet, was die Notiz ist; `⇧N` öffnet das Feld gleich auf **Partie**.
-Eine Partienotiz nennt keine Stellung, bleibt also bei dieser Partie und steht in deren
-Notizliste ganz oben, unter dem Etikett *Partie*. Was du schon getippt hast, wandert mit
-dem Schalter – eine Notiz, die
-unter der falschen Überschrift begonnen wurde, wird verschoben, nicht neu geschrieben. Ein
-Zug auf dem Brett schaltet zurück auf **Stellung**.
+jeder Partie wieder, die genauso begonnen hat. Deshalb gehört die erste Zeile im Reiter
+**Notizen** immer dieser Partie selbst: ihre Notiz zur ganzen Partie, unter dem Etikett
+*Partie*, oder – solange es keine gibt – eine leere Zeile, die fragt, worum es in der Partie
+ging. Ein Klick darauf (oder `⇧N`) richtet das Notizfeld auf die Partie; über den
+Schlagwörtern steht dann **zur Partie**. Eine Partienotiz nennt keine Stellung und bleibt
+darum bei dieser Partie. Was du schon getippt hast, geht dabei nicht verloren, sondern
+wandert mit. Ein Zug auf dem Brett, ein Klick auf die Notiz eines Zuges oder `N` richten das
+Feld wieder auf die Stellung.
+
+Eine Notiz, die aus einer anderen Partie stammt, weil jene dieselbe Stellung erreicht hat,
+sagt das unter ihrem Text: **aus** jener Partie (**aus der Musterpartie**, wenn es nicht
+deine ist) und, falls jene Partie über eine andere Zugfolge dorthin kam, mit dem Zug, an
+dem sie geschrieben wurde. Diese Zeile ist ein Link und öffnet die andere Partie an genau
+diesem Zug. Eine Notiz, die nur an der Stellung hängt, nennt stattdessen, wo sie entstanden
+ist – **aus dem Explorer**, **vom Live-Brett** oder **über MCP** – und führt zu dieser
+Stellung im Explorer.
+
+In beiden Fällen kommst du direkt zurück. Der Explorer bietet **← Zurück zur Partie**; eine
+andere Partie zeigt in der Zeile unter dem Brett einen Knopf mit dem Namen der Partie, aus
+der du kamst – **← phib — Hubert2001** –, und beide führen genau in die Stellung zurück, in
+der du warst.
 
 Der Reiter **Buch** neben **Notizen** zeigt, wie es in deinen eigenen
 Partien von hier aus weiterging; `B` öffnet ihn. Oben steht der Name der Eröffnung, in der

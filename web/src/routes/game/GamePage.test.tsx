@@ -1865,6 +1865,25 @@ describe('the board’s controls', () => {
     await user.click(more)
     expect(screen.getByRole('menuitem', { name: '← Back to explorer' })).toBeInTheDocument()
   })
+
+  it('offers the way back to a game it was reached from, to the position left there', async () => {
+    renderPage()
+    await screen.findByText('Scandinavian Defense')
+    expect(screen.queryByRole('link', { name: /^←/ })).not.toBeInTheDocument()
+
+    cleanup()
+    // What the Notes tab's link to where a note was written carries (`leaving`).
+    renderPage({
+      pathname: '/games/14',
+      state: { from: '/games/9?ply=12', label: 'phib — Hubert2001' },
+    })
+    await screen.findByText('Scandinavian Defense')
+    // A button in the row, named for the game: "Back to game" here already means leaving
+    // a variation for this game's own line.
+    const back = screen.getByRole('link', { name: '← phib — Hubert2001' })
+    expect(back).toHaveAttribute('href', '/games/9?ply=12')
+    expect(controlRow()).toContainElement(back)
+  })
 })
 
 describe('GamePage practice', () => {

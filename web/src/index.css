@@ -107,6 +107,10 @@
   --bb-brilliant: #b098d7;
   --bb-deep: #c1adde;
   --bb-otb: #c9b89a;
+  /* The way back to the screen the reader came from (`lib/ui/wayBack`). A peach of its own,
+     lighter and pinker than `--bb-mistake`: grey sank into the row, purple is leaving a
+     variation, and the mistake orange is a verdict on a move — navigation is none of them. */
+  --bb-way-back: #efb48c;
   /* board arrows — their own family, quieter than the UI colours they are drawn from.
 
      An arrow lies on a slate board, over a piece, under a 0.6 layer opacity, and there are
@@ -277,6 +281,7 @@
   --bb-brilliant: #7054a5;
   --bb-deep: #63499a;
   --bb-otb: #7a6440;
+  --bb-way-back: #a2552a;
   --bb-arrow-engine: #3d6790;
   --bb-arrow-maia: #79639c;
   --bb-arrow-played: #2f2f2f;
@@ -392,6 +397,7 @@
   --color-brilliant: var(--bb-brilliant);
   --color-deep: var(--bb-deep);
   --color-otb: var(--bb-otb);
+  --color-way-back: var(--bb-way-back);
   --color-arrow-engine: var(--bb-arrow-engine);
   --color-arrow-maia: var(--bb-arrow-maia);
   --color-arrow-played: var(--bb-arrow-played);

@@ -17,7 +17,7 @@ import { t } from '@lingui/core/macro'
 
 import type { LineResponse, MoveRow, NoteSource } from '@/lib/api/types'
 import { notateEnglish, type Notate } from '@/lib/chess/notation'
-import { gameLabel } from '@/routes/notes/presentation'
+import { explorerHref, gameHref, gameLabel } from '@/routes/notes/presentation'
 
 import { plyLabel, type GameNote } from './gameModel'
 
@@ -49,6 +49,11 @@ export interface NoteRow {
   from: string | null
   /** The move it was written on *there*, which is not this game's move at that ply. */
   originMove: string | null
+  /**
+   * The way over to where the note was written: that game at that move, or — for a note
+   * that names no game — the explorer at its position, where such a note is written.
+   */
+  originHref: string | null
   source: NoteSource | null
 }
 
@@ -117,8 +122,8 @@ function lineContext(
  * line), so they read as the line reads. Two notes on the same position are newest first,
  * which is the order they were written back to front.
  *
- * A note with no position at all — one written about the game entire, with the composer's
- * **Game** switch or from the correspondence journal — sorts first. It is the paragraph
+ * A note with no position at all — one written about the game entire, from the Notes tab's
+ * *game* row or the correspondence journal — sorts first. It is the paragraph
  * about the whole game, and a reader opening the notes reads that before the move-by-move;
  * it used to sort last, on the reasoning that there was nowhere along the reading to put
  * it, and was found under the note on move 40 exactly when it said what the game was about.
@@ -157,7 +162,13 @@ export function noteRows(
         elsewhere && typeof note.game_id === 'number'
           ? gameLabel(note.game, note.game_id)
           : null,
-      originMove: elsewhere ? (note.move?.label ?? null) : null,
+      originMove: elsewhere && !sameMove(note, anchor, moves) ? (note.move?.label ?? null) : null,
+      // The note's `ply` here is where *this* game reached the position (`game_notes`
+      // swaps it), so the link takes the ply from the move it was written on *there* —
+      // on a transposition the two differ, and the link must land on the other game's move.
+      originHref: elsewhere
+        ? (gameHref({ ...note, ply: note.move?.ply ?? null }) ?? explorerHref(note.fen))
+        : null,
       source: note.source ?? null,
     }
   })
@@ -167,6 +178,18 @@ export function noteRows(
     if (at !== 0) return at
     return Date.parse(right.note.created_at) - Date.parse(left.note.created_at)
   })
+}
+
+/**
+ * Whether the note from elsewhere was written on the very move this game played to reach
+ * the position — same half-move, same SAN, on the game's own line. Then the row's label
+ * already says it, and repeating it on the origin line is noise (owner's call, 2026-09-25).
+ * A transposition keeps it: "· 5. Bc4" under a row labelled `3.Bc4` is news.
+ */
+function sameMove(note: GameNote, anchor: NoteAnchor, moves: readonly MoveRow[]): boolean {
+  const origin = note.move
+  if (!origin || origin.on_line || anchor.kind !== 'mainline') return false
+  return origin.ply === anchor.count && moves[anchor.count - 1]?.san === origin.san
 }
 
 /** Where an anchor sits along the reading: a loose note has no position, so it sorts first. */
@@ -259,7 +282,7 @@ export interface WalkedLine {
 export interface NoteTarget {
   /**
    * `game` is the note about the game entire — no ply, no position, no line — which is
-   * what the composer writes with its **Game** switch on. It is the same note the
+   * what the composer writes when opened from the Notes tab's *game* row. It is the same note the
    * correspondence screen's journal keeps, and the notes page filters as having no position.
    */
   kind: 'mainline' | 'line' | 'game'
@@ -286,7 +309,7 @@ export function noteTarget(input: {
   /** The reader's notation for the label; English SAN when absent. */
   notate?: Notate
   /**
-   * The note is about the game and not about the board: the composer's **Game** switch.
+   * The note is about the game and not about the board: the Notes tab's *game* row, or `⇧N`.
    * Wherever the board stands, the note then names no position, so it comes back under
    * this game only and never under another that reaches the same square.
    */
