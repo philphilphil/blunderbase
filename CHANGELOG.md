@@ -4,6 +4,12 @@ One line per change, newest first. Written by hand when a release is cut — see
 
 ## Unreleased
 
+## v1.8.1 — 2026-09-25
+
+- Changed game notes to a row in the Notes tab
+- Added links to the game or position a note came from
+- Added a way back to the game you left
+
 ## v1.8.0 — 2026-09-23
 
 - Added notes about a whole game
