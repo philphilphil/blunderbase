@@ -2337,7 +2337,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           board's (`flex-1`), which is the one element on the page worth more the larger it
           is. Growing sideways is not free: the board is square, so width is height, and past
           a point it would push the transport row out of the viewport — which is why
-          `BoardPanel` caps itself against `100vh`.
+          `BoardPanel` caps itself against `100dvh`.
 
           Between the two floors the boundary is the reader's: the hairline is a
           `ColumnSplitter` and what it drags is `movesWidth`, held here in `rem` and
@@ -2361,7 +2361,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
           // end up. Clipped, an overrun is visible.
           //
           // Untouched, this column is exactly as wide as the board it holds — the panel's
-          // own `calc(100vh - 12.625rem)` plus the `px-5` on either side — and the right
+          // own `calc(100dvh - 12.625rem)` plus the `px-5` on either side — and the right
           // column takes everything else. That is what puts the splitter against the board's
           // edge instead of at the end of a column padded out with slack the board declined
           // to use, and it means every pixel the board does not want goes to the moves and
@@ -2382,7 +2382,7 @@ export function GameStudio({ game: from }: { game: StudioGame }) {
               // than its own transport row clips the transport row, which is the one thing in
               // this column that is not allowed to be smaller than it is. Under the floor the
               // window scrolls sideways instead — the trade the design already makes at 1280.
-              ? 'w-[calc(100vh-9.5625rem)] max-w-full min-w-[24.5rem] shrink grow-0 xl:min-w-[26.25rem]'
+              ? 'w-[calc(100dvh-9.5625rem)] max-w-full min-w-[24.5rem] shrink grow-0 xl:min-w-[26.25rem]'
               : 'flex-1 min-w-[24.5rem] xl:min-w-[26.25rem]',
           )}
         >

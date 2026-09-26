@@ -434,7 +434,7 @@ export function BoardPanel({
     <div
       ref={column}
       // The panel is the width of the board it is about, not the width of the column it
-      // stands in — `min(100%, 100vh - 11.3125rem)` is the board's own cap below with the
+      // stands in — `min(100%, 100dvh - 11.3125rem)` is the board's own cap below with the
       // 1.5rem the eval bar and its gap take added back to every term. So the
       // player rows end where the board ends and the transport row's `flex-1` spacer parks
       // the ply readout and the score chip against the board's right edge, instead of
@@ -450,8 +450,8 @@ export function BoardPanel({
       className={cn(
         'flex flex-col gap-2',
         engineHidden
-          ? 'md:w-[min(100%,calc(100vh-12.8125rem))]'
-          : 'md:w-[min(100%,calc(100vh-11.3125rem))]',
+          ? 'md:w-[min(100%,calc(100dvh-12.8125rem))]'
+          : 'md:w-[min(100%,calc(100dvh-11.3125rem))]',
         className,
       )}
     >
@@ -491,7 +491,12 @@ export function BoardPanel({
            1.5     this panel's three `gap-2`s: player → board row → player → transport
            1.75    the transport row: `text-xs` buttons at `py-[0.3125rem]`, plus their border
           -------
-          12.8125  which is `calc(100vh-12.8125rem)`
+          12.8125  which is `calc(100dvh-12.8125rem)`
+
+        `dvh`, the same as the phone's cap below and for the same reason: the shell is
+        `height: 100%`, the *visible* viewport, while iPad Safari's `vh` is the height with
+        its toolbar hidden. A `vh` cap handed the board that toolbar's height again and
+        pushed the transport row off the bottom of an iPad in landscape.
 
         The cap is on the `Board` element, which is the grid the rank column and the file
         row live in: its height is its width less 0.125rem (a 0.875rem rail and a 0.375rem
@@ -592,7 +597,7 @@ export function BoardPanel({
           // binds on a short phone (at 812 the board is already full width and the `100%`
           // wins), and short phones are the un-notched ones whose insets are zero.
           className={cn(
-            'min-w-0 max-w-[min(100%,calc(100vh-12.8125rem))] flex-1 max-md:max-w-[min(100%,calc(100dvh-22.75rem))]',
+            'min-w-0 max-w-[min(100%,calc(100dvh-12.8125rem))] flex-1 max-md:max-w-[min(100%,calc(100dvh-22.75rem))]',
             previewDim && 'bb-preview-dim',
           )}
         >
