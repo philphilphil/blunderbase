@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
  * spare width now), the right column is the sized one at the same per-band basis `GamePage`
  * gives it, and inside it the same four rows sit on the same two tracks — engine band, move
  * table beside the notes track, eval graph, footer — with the moves/notes rule in the same
- * place. The one thing not repeated here is the board's `100vh` cap: a square that is a
+ * place. The one thing not repeated here is the board's `100dvh` cap: a square that is a
  * little too tall for a moment is not worth a second copy of that arithmetic.
  *
  * The right column's floor has to come *off* on a phone — 26.875rem is 516 physical pixels,

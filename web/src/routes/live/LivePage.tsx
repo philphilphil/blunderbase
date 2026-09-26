@@ -176,7 +176,7 @@ export function LivePage() {
         <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center max-md:flex-none">
           {live.isPending ? (
             <Skeleton
-              className="aspect-square w-full max-w-[min(100%,calc(100vh-11.875rem))] max-md:max-w-full"
+              className="aspect-square w-full max-w-[min(100%,calc(100dvh-11.875rem))] max-md:max-w-full"
               data-testid="live-loading"
             />
           ) : live.isError ? (
@@ -191,7 +191,7 @@ export function LivePage() {
               className={cn(
                 // The height cap keeps the board inside a desktop viewport that never
                 // scrolls; below `md` the page scrolls, so the board takes the full width.
-                'relative w-full max-w-[min(100%,calc(100vh-11.875rem))] rounded-md transition-shadow duration-300 max-md:max-w-full',
+                'relative w-full max-w-[min(100%,calc(100dvh-11.875rem))] rounded-md transition-shadow duration-300 max-md:max-w-full',
                 flash && 'shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--bb-accent)_55%,transparent)]',
               )}
             >

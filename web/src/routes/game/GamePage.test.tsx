@@ -2082,7 +2082,7 @@ describe('the board/moves splitter', () => {
     // is what puts the splitter against the board's edge rather than at the end of a column
     // padded out with slack. jsdom applies no CSS, so what is asserted is the class and that
     // nothing has written an inline width.
-    expect(boardColumn()).toHaveClass('w-[calc(100vh-9.5625rem)]', 'shrink', 'grow-0')
+    expect(boardColumn()).toHaveClass('w-[calc(100dvh-9.5625rem)]', 'shrink', 'grow-0')
     expect(movesColumn()).toHaveClass('flex-1')
     expect(movesColumn().style.flexBasis).toBe('')
   })
